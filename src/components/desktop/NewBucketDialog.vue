@@ -259,7 +259,7 @@ async function submit() {
                   <td class="px-3 py-2" :title="placeTitle(entry)">
                     <span class="flex items-center gap-2 text-foreground">
                       <component :is="entry.kind === 'user' ? Laptop : Server" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      {{ entry.kind === 'user' ? 'This computer' : entry.label }}
+                      {{ entry.kind === 'user' ? 'This computer' : (entry.name ?? entry.label) }}
                       <Badge v-if="entry.nodeId === suggested" variant="outline" size="sm">default</Badge>
                     </span>
                   </td>

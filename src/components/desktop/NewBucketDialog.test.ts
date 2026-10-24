@@ -16,6 +16,7 @@ import {
   input,
   moduleDefault,
   mountApp,
+  nodes,
   typeValue,
 } from '@/test/clientRender'
 
@@ -58,6 +59,7 @@ const realmNode = (nodeId: string, label: string, extra: Record<string, unknown>
   nodeId,
   kind: 'server',
   label,
+  name: nodeId,
   isLocal: false,
   location: 'Giessen',
   reachable: true,
@@ -215,6 +217,22 @@ describe('a new bucket in the desktop', () => {
     expect(radio.props.disabled).toBe(true)
     expect(input(mounted.root, 'aria-label', 'node-1 · Giessen').props.checked).toBe(true)
     expect(() => input(mounted.root, 'aria-label', 'Then link a folder on this computer')).toThrow()
+    mounted.app.unmount()
+  })
+})
+
+describe('the place table of New bucket', () => {
+  it('shows each place by name and its location once', async () => {
+    const mounted = await mountApp(NewBucketDialog, { props: { open: true } })
+    const row = (label: string) =>
+      element(mounted.root, (node) => node.tag === 'tr' && nodes(node).some((child) => child.props['aria-label'] === label))
+    const cells = (label: string) =>
+      row(label)
+        .children.filter((child) => child.tag === 'td')
+        .map((cell) => content(cell).trim())
+
+    expect(cells('node-1 · Giessen').slice(1, 3)).toEqual(['node-1 default', 'Giessen'])
+    expect(cells('This computer').slice(1, 3)).toEqual(['This computer', 'Not set'])
     mounted.app.unmount()
   })
 })
