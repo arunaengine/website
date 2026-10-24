@@ -37,6 +37,7 @@ const routerPush = vi.fn()
 let configuredObjectMode: Ref<string> | undefined
 const search = {
   documents: ref<Array<Record<string, unknown>>>([]),
+  buckets: ref<Array<Record<string, unknown>>>([]),
   groups: ref<Array<Record<string, unknown>>>([]),
   users: ref<Array<Record<string, unknown>>>([]),
   objects: ref<Array<Record<string, unknown>>>([]),
@@ -374,6 +375,7 @@ async function mount(): Promise<Mounted> {
 
 function resetSearch() {
   search.documents.value = []
+  search.buckets.value = []
   search.groups.value = []
   search.users.value = []
   search.objects.value = []
@@ -702,6 +704,40 @@ describe('narrow TopBar search panel', () => {
       name: 'dataset',
       params: { id: 'doc-1' },
       query: undefined,
+    })
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('lists bucket hits per node and opens the bucket', async () => {
+    search.buckets.value = [
+      { arn: 'arn-a', bucket: 'test', node_id: 'node-a', group_id: 'group-t', group_name: 'test', created_at: '' },
+      { arn: 'arn-b', bucket: 'test', node_id: 'node-b', group_id: 'group-t', group_name: 'test', created_at: '' },
+    ]
+    search.searched.value = true
+    const mounted = await mount()
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
+    await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'test')
+
+    const options = allNodes(mounted.root).filter((node) => node.props.role === 'option')
+    expect(options.map((node) => node.props.id)).toEqual(['qs-b:node-a:test', 'qs-b:node-b:test'])
+    expect(content(options[1])).toContain('Bucket')
+    expect(content(options[1])).toContain('Node: Storage node B · Group: test')
+    expect(content(element(mounted.root, (node) => node.props.role === 'dialog'))).toContain('2 buckets')
+
+    await click(options[1])
+    expect(routerPush).toHaveBeenCalledWith({
+      name: 'bucket',
+      params: { bucketId: 'test' },
+      query: { group: 'group-t', node: 'node-b' },
+    })
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
+    await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'test')
+    await click(allNodes(mounted.root).filter((node) => node.props.role === 'option')[0])
+    expect(routerPush).toHaveBeenLastCalledWith({
+      name: 'bucket',
+      params: { bucketId: 'test' },
+      query: { group: 'group-t' },
     })
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()

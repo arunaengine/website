@@ -26,7 +26,7 @@ import { useMediaQuery } from '@vueuse/core'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-type QuickSection = 'datasets' | 'files' | 'objects' | 'groups' | 'people'
+type QuickSection = 'datasets' | 'files' | 'buckets' | 'objects' | 'groups' | 'people'
 
 interface QuickItem {
   key: string
@@ -42,6 +42,7 @@ interface QuickItem {
 const QUICK_KIND_LABELS: Record<QuickSection, string> = {
   datasets: 'Dataset',
   files: 'File',
+  buckets: 'Bucket',
   objects: 'Object',
   groups: 'Group',
   people: 'User',
@@ -71,6 +72,7 @@ const objectModeOptions = Object.entries(OBJECT_SEARCH_MODE_LABELS).map(([value,
 // filter over it would silently answer from the first pages.
 const {
   documents: quickDocuments,
+  buckets: quickBuckets,
   groups: quickGroups,
   users: quickUsers,
   objects: quickObjects,
@@ -98,6 +100,15 @@ const items = computed<QuickItem[]>(() => [
     subtitle: hit.snippet ?? undefined,
     routeName: 'dataset',
     routeParams: { id: hit.document_id },
+  })),
+  ...quickBuckets.value.map((hit): QuickItem => ({
+    key: `b:${hit.node_id}:${hit.bucket}`,
+    section: 'buckets',
+    title: hit.bucket,
+    subtitle: `Node: ${nodeDisplayName(hit.node_id)} · Group: ${hit.group_name || truncateMiddle(hit.group_id)}`,
+    routeName: 'bucket',
+    routeParams: { bucketId: hit.bucket },
+    routeQuery: { group: hit.group_id, ...(!isLocalNode(hit.node_id) ? { node: hit.node_id } : {}) },
   })),
   ...quickObjects.value.map((hit): QuickItem => ({
     key: `o:${hit.issuer_node_id}:${hit.bucket}:${hit.key}`,

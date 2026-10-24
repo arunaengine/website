@@ -6,6 +6,7 @@
 // called during component setup (uses onBeforeUnmount).
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import {
+  type BucketSearchHit,
   type MetadataSearchHit,
   type ObjectSearchCoverage,
   type ObjectSearchHit,
@@ -17,6 +18,7 @@ import {
 } from '@/lib/api'
 import { useAruna } from '@/composables/useAruna'
 import { errorMessage } from '@/lib/utils'
+import { isWorkspaceBucket } from '@/lib/workspaces'
 
 export const UNIFIED_DEBOUNCE_MS = 250
 // Backend rejects a query shorter than two characters with 400.
@@ -28,7 +30,7 @@ export const OBJECT_SEARCH_MODE_LABELS: Record<ObjectSearchMode, string> = {
   distributed_strict: 'Distributed strict',
 }
 
-const ALL_TYPES: SearchSectionType[] = ['documents', 'groups', 'users']
+const ALL_TYPES: SearchSectionType[] = ['documents', 'buckets', 'groups', 'users']
 export type UnifiedSearchSection = SearchSectionType | 'objects'
 
 // The single completeness rule for object coverage: every partition answered
@@ -54,6 +56,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
   const objectMode = config.objectMode ?? ref<ObjectSearchMode>(DEFAULT_OBJECT_SEARCH_MODE)
 
   const documents = ref<MetadataSearchHit[]>([])
+  const buckets = ref<BucketSearchHit[]>([])
   const groups = ref<SearchGroupHit[]>([])
   const users = ref<SearchUserHit[]>([])
   const objects = ref<ObjectSearchHit[]>([])
@@ -67,6 +70,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
   const nodesQueried = ref(0)
   const nodesFailed = ref(0)
   const truncated = ref(false)
+  const bucketNodesFailed = ref(0)
   // No section of the search response carries a server timing, so the round
   // trip is measured here around the request itself.
   const requestMs = ref<number | null>(null)
@@ -79,12 +83,13 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
   const active = computed(() => query.value.trim().length >= UNIFIED_MIN_CHARS)
   const partial = computed(() =>
     nodesFailed.value > 0 ||
+    bucketNodesFailed.value > 0 ||
     truncated.value ||
     Boolean(objectCoverage.value && !coverageComplete(objectCoverage.value)),
   )
   const complete = computed(() => !error.value && !objectError.value && !partial.value)
   const empty = computed(() =>
-    !documents.value.length && !groups.value.length && !users.value.length && !objects.value.length,
+    !documents.value.length && !buckets.value.length && !groups.value.length && !users.value.length && !objects.value.length,
   )
 
   let timer: number | undefined
@@ -103,6 +108,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
 
   function reset() {
     documents.value = []
+    buckets.value = []
     groups.value = []
     users.value = []
     objects.value = []
@@ -116,6 +122,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     nodesQueried.value = 0
     nodesFailed.value = 0
     truncated.value = false
+    bucketNodesFailed.value = 0
     requestMs.value = null
     error.value = null
     searched.value = false
@@ -130,6 +137,10 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
       nodesQueried.value = response.documents.nodes_queried
       nodesFailed.value = response.documents.nodes_failed
       truncated.value = response.documents.truncated
+    }
+    if (response.buckets) {
+      buckets.value = response.buckets.hits.filter((hit) => !isWorkspaceBucket(hit.bucket))
+      bucketNodesFailed.value = response.buckets.nodes_failed
     }
     if (response.groups) {
       groups.value = response.groups.hits
@@ -305,6 +316,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
 
   return {
     documents,
+    buckets,
     groups,
     users,
     objects,
