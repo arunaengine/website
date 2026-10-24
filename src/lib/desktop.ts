@@ -115,6 +115,21 @@ export function isDesktop(): boolean {
   return desktopContext() !== null
 }
 
+/** The realm website the shell remembers, for links another device signs in through. */
+export function realmWebsite(): string | null {
+  const context = desktopContext()
+  for (const value of [context?.authCallbackOrigin, context?.realmUrl]) {
+    if (!value) continue
+    try {
+      const url = new URL(value)
+      if (url.protocol === 'https:' || url.protocol === 'http:') return url.origin
+    } catch {
+      // Not an address; the realm URL may still be one.
+    }
+  }
+  return null
+}
+
 /** The shell's command channel, or null when it injected none. */
 export function desktopBridge(): DesktopBridge | null {
   return desktopContext()?.bridge ?? null

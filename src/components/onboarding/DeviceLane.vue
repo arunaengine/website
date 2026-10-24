@@ -21,7 +21,7 @@ import SecretPanel from '@/components/onboarding/SecretPanel.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceEnrollment } from '@/composables/useDeviceEnrollment'
 import { applyEnrollment, ENROLLMENT_TTL_SECS, watchStages } from '@/composables/useDeviceSetup'
-import { isDesktop } from '@/lib/desktop'
+import { isDesktop, realmWebsite } from '@/lib/desktop'
 import { withSite } from '@/lib/enrollLink'
 import { buildDeviceEnv, managementPortals } from '@/lib/onboarding-config'
 import { errorMessage } from '@/lib/utils'
@@ -101,10 +101,12 @@ const platformLabel = computed(
 )
 
 // Opaque: the backend already form-urlencoded secret/seed/realm into it, so those
-// stay as received; the website only adds itself as `site`, the sign-in callback.
+// stay as received. Only `site`, the sign-in callback, is added: this website, or
+// in the app the realm website it remembers, never the app's own origin.
 const enrollUrl = computed(() => {
   const link = minted.value?.enroll_url ?? null
-  return link && !inDesktop ? withSite(link, window.location.origin) : link
+  const site = inDesktop ? realmWebsite() : window.location.origin
+  return link && site ? withSite(link, site) : link
 })
 
 const capLabel = computed(() =>

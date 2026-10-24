@@ -64,6 +64,23 @@ describe('web mode', () => {
   })
 })
 
+describe('realm website', () => {
+  it.each([
+    ['the callback origin', { authCallbackOrigin: 'https://v3.test', realmUrl: 'https://api.node.test' }, 'https://v3.test'],
+    ['the realm address without one', { realmUrl: 'https://v3.test/app' }, 'https://v3.test'],
+    ['the realm address past a custom scheme', { authCallbackOrigin: 'aruna://auth', realmUrl: 'https://v3.test' }, 'https://v3.test'],
+    ['nothing without a web address', { authCallbackOrigin: 'tauri://localhost', realmUrl: 'v3.test' }, null],
+  ])('names %s', async (_, over, expected) => {
+    const desktop = await boot(shell(over))
+    expect(desktop.realmWebsite()).toBe(expected)
+  })
+
+  it('names nothing on the web', async () => {
+    const desktop = await boot()
+    expect(desktop.realmWebsite()).toBeNull()
+  })
+})
+
 describe('desktop mode', () => {
   it('skips the served config and takes the injected base', async () => {
     // /portal-config.json does not exist on the shell's app origin.

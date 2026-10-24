@@ -198,6 +198,25 @@ describe('hand-off inside the desktop app', () => {
   })
 })
 
+describe('hand-off inside the desktop app with a realm website', () => {
+  let inShell: Component
+
+  beforeAll(async () => {
+    vi.resetModules()
+    const context = { apiBaseUrl: '/api/v1', authCallbackOrigin: 'https://v3.test', realmUrl: 'https://api.node.test' }
+    Object.assign(globalThis, { __ARUNA_DESKTOP__: context })
+    inShell = (await import('./DeviceLane.vue')).default
+  })
+
+  it('names the website the app remembers for another computer', async () => {
+    minted.value = enrollment()
+    const markup = decode(await renderToString(createSSRApp({ render: () => h(inShell, { step: 2 }) })))
+
+    expect(markup).toContain(`${ENROLL_URL}&site=https%3A%2F%2Fv3.test`)
+    expect(markup).not.toContain('portal.test')
+  })
+})
+
 describe('device watch step', () => {
   it('waits on the claim before the join', async () => {
     watchState.value = { phase: 'pending', enrollmentId: 'enr-1', nodeId: null, lastError: null }
