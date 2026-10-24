@@ -2,6 +2,7 @@
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Input from '@/components/ui/Input.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { ref, watch } from 'vue'
 import { Check, X } from '@lucide/vue'
 import { useJoinRequests } from '@/composables/useJoinRequests'
@@ -14,6 +15,8 @@ const props = defineProps<{ groupId: string; roles: ApiRole[] }>()
 const emit = defineEmits<{ (e: 'changed'): void; (e: 'count', n: number | null): void; (e: 'load-error', message: string | null): void }>()
 
 const { listGroupJoinRequests, decideJoinRequest, busy } = useJoinRequests()
+// The request whose decision is on its way, until the list is read again.
+const deciding = ref<string | null>(null)
 
 const { sessionEpoch, realm } = useAruna()
 
@@ -95,8 +98,9 @@ function toggleRole(roleId: string) {
 async function confirm(req: JoinRequest) {
   const groupId = props.groupId
   const epoch = sessionEpoch.value
-  if (req.group_id !== groupId) return
+  if (req.group_id !== groupId || deciding.value) return
   decideError.value = null
+  deciding.value = req.request_id
   const input =
     mode.value === 'approve'
       ? { approve: true, role_ids: selectedRoleIds.value }
@@ -109,6 +113,8 @@ async function confirm(req: JoinRequest) {
     if (groupId === props.groupId && epoch === sessionEpoch.value) emit('changed')
   } catch (err) {
     if (groupId === props.groupId && epoch === sessionEpoch.value) decideError.value = errorMessage(err)
+  } finally {
+    deciding.value = null
   }
 }
 </script>
@@ -130,10 +136,10 @@ async function confirm(req: JoinRequest) {
           </div>
           <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime(req.created_at) }}</span>
           <div class="flex shrink-0 items-center gap-1.5">
-            <Button size="sm" :disabled="busy" @click="startApprove(req)">
+            <Button size="sm" :disabled="busy || deciding !== null" @click="startApprove(req)">
               <Check class="h-3.5 w-3.5" /> Approve
             </Button>
-            <Button variant="outline" size="sm" :disabled="busy" @click="startDeny(req)">
+            <Button variant="outline" size="sm" :disabled="busy || deciding !== null" @click="startDeny(req)">
               <X class="h-3.5 w-3.5" /> Deny
             </Button>
           </div>
@@ -158,7 +164,13 @@ async function confirm(req: JoinRequest) {
               Select at least one role to assign on approval.
             </p>
             <div class="mt-3 flex items-center gap-2">
-              <Button size="sm" :disabled="busy || !selectedRoleIds.length" @click="confirm(req)">
+              <Button
+                size="sm"
+                :disabled="busy || deciding !== null || !selectedRoleIds.length"
+                :aria-busy="deciding === req.request_id"
+                @click="confirm(req)"
+              >
+                <Spinner v-if="deciding === req.request_id" label="Approving the request" class="text-current" />
                 Approve &amp; assign roles
               </Button>
               <Button variant="ghost" size="sm" :disabled="busy" @click="cancel">Cancel</Button>
@@ -168,7 +180,15 @@ async function confirm(req: JoinRequest) {
             <label class="text-xs font-medium text-foreground">Reason (optional, shown to the requester)</label>
             <Input v-model="denyReason" class="mt-1" placeholder="Why is this request declined?" />
             <div class="mt-3 flex items-center gap-2">
-              <Button variant="outline" size="sm" class="text-destructive" :disabled="busy" @click="confirm(req)">
+              <Button
+                variant="outline"
+                size="sm"
+                class="text-destructive"
+                :disabled="busy || deciding !== null"
+                :aria-busy="deciding === req.request_id"
+                @click="confirm(req)"
+              >
+                <Spinner v-if="deciding === req.request_id" label="Denying the request" class="text-current" />
                 Deny request
               </Button>
               <Button variant="ghost" size="sm" :disabled="busy" @click="cancel">Cancel</Button>

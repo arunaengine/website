@@ -23,6 +23,7 @@ const Inbox = compileClientComponent(new URL('./JoinRequestsInbox.vue', import.m
   '@/components/ui/Button.vue': moduleDefault(Button),
   '@/components/ui/Badge.vue': moduleDefault(Passthrough),
   '@/components/ui/Input.vue': moduleDefault(Empty),
+  '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('i', p.label) })),
 })
 const Wrapper = defineComponent(() => () => h(Inbox, { groupId: groupId.value, roles: roles.value }))
 
@@ -44,6 +45,29 @@ describe('membership approval inbox', () => {
     expect(decideJoinRequest).toHaveBeenCalledWith('group-1', 'request-1', { approve: true, role_ids: ['user-role'] })
     expect(content(mounted.root)).toContain('No pending join requests.')
     expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('shows the wait on the confirmed decision, sends it once and frees it when it fails', async () => {
+    let refuse: (err: unknown) => void = () => {}
+    decideJoinRequest.mockReturnValueOnce(new Promise<undefined>((_, reject) => (refuse = reject)))
+    const mounted = await mountApp(Wrapper)
+    await listGroupJoinRequests.mock.results[0]!.value
+    await flush()
+    await click(button(mounted.root, 'Deny'))
+    void (button(mounted.root, 'Deny request').props.onClick as () => Promise<void>)()
+    await flush()
+    const waiting = button(mounted.root, 'Denying the request')
+    expect(waiting.props['aria-busy']).toBe(true)
+    expect(waiting.props.disabled).toBe(true)
+    expect(button(mounted.root, 'Approve').props.disabled).toBe(true)
+    await (waiting.props.onClick as () => Promise<void>)()
+    expect(decideJoinRequest).toHaveBeenCalledTimes(1)
+    refuse(new Error('already decided'))
+    await flush()
+    expect(button(mounted.root, 'Deny request').props['aria-busy']).toBe(false)
+    expect(button(mounted.root, 'Deny request').props.disabled).toBe(false)
+    expect(content(mounted.root)).toContain('already decided')
     mounted.app.unmount()
   })
 
