@@ -6,6 +6,7 @@ import Dialog from '@/components/ui/Dialog.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
+import StorageFeatureLink from '@/components/distributed/StorageFeatureLink.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
@@ -112,7 +113,10 @@ async function submit() {
     <DialogContent class="max-w-xl">
       <DialogHeader>
         <DialogTitle>Link an S3 bucket</DialogTitle>
-        <DialogDescription>Files already in it show up in Aruna. Nothing is copied.</DialogDescription>
+        <DialogDescription>
+          Files already in it show up in Aruna. Nothing is copied.
+          <StorageFeatureLink question="elsewhere" class="ml-1" />
+        </DialogDescription>
       </DialogHeader>
       <form class="grid gap-4" @submit.prevent="submit">
         <div class="grid gap-3 sm:grid-cols-2">
