@@ -8,6 +8,7 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { UserPlus, X } from '@lucide/vue'
@@ -35,6 +36,7 @@ const pending = computed(() => pendingByGroup.value.get(props.groupId) ?? null)
 const open = ref(false)
 const message = ref('')
 const submitError = ref<string | null>(null)
+const withdrawing = ref(false)
 
 onMounted(() => {
   if (joinRequestsEnabled.value && currentUser.value) void ensureOwnRequestsLoaded()
@@ -63,11 +65,14 @@ async function submit() {
 
 async function withdraw() {
   const req = pending.value
-  if (!req) return
+  if (!req || withdrawing.value) return
+  withdrawing.value = true
   try {
     await withdrawRequest(req)
   } catch (err) {
     reportGlobalError(errorMessage(err))
+  } finally {
+    withdrawing.value = false
   }
 }
 </script>
@@ -76,8 +81,8 @@ async function withdraw() {
   <template v-if="visible">
     <div v-if="pending" class="flex items-center gap-1.5">
       <Badge size="sm" variant="warn" class="uppercase">requested</Badge>
-      <Button variant="ghost" size="sm" :disabled="busy" @click="withdraw">
-        <X class="h-3.5 w-3.5" /> Withdraw
+      <Button variant="ghost" size="sm" :disabled="busy || withdrawing" :aria-busy="withdrawing" @click="withdraw">
+        <Spinner v-if="withdrawing" label="Withdrawing the request" class="text-current" /><X v-else class="h-3.5 w-3.5" /> Withdraw
       </Button>
     </div>
     <template v-else>
