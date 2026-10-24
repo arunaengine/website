@@ -18,17 +18,21 @@ import BucketBackendTab from '@/components/storage/BucketBackendTab.vue'
 import BucketComplianceSection from '@/components/storage/BucketComplianceSection.vue'
 import BucketDeleteSection from '@/components/storage/BucketDeleteSection.vue'
 import AccessTab from '@/components/distributed/AccessTab.vue'
+import GrantGuide from '@/components/distributed/GrantGuide.vue'
 import BucketNodesTab from '@/components/storage/BucketNodesTab.vue'
 import BucketEncryptionTab from '@/components/storage/BucketEncryptionTab.vue'
 import BucketPolicySection from '@/components/storage/BucketPolicySection.vue'
 import DistributionOverview from '@/components/storage/DistributionOverview.vue'
+import BucketSources from '@/components/storage/BucketSources.vue'
 import LinkedBy from '@/components/storage/LinkedBy.vue'
 import DatabaseMark from '@/components/storage/DatabaseMark.vue'
 import CopiesOfBucket from '@/components/storage/CopiesOfBucket.vue'
 import FileSources from '@/components/storage/FileSources.vue'
 import StorageOverviewTab from '@/components/storage/StorageOverviewTab.vue'
 import TransfersTab from '@/components/storage/TransfersTab.vue'
+import Notice from '@/components/ui/Notice.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useBucketDistribution } from '@/composables/useBucketDistribution'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useRouteTab } from '@/composables/useRouteTab'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
@@ -70,7 +74,11 @@ watch(
 
 // An example bucket of the node mock. It has no session behind it, so only its own tabs show.
 const example = computed(() => (mockEnabled() ? mockBucket(bucket.value) : undefined))
-const nodesTab = computed(() => Boolean(example.value && isMulti(example.value)))
+// A bucket of this node that is stored on more nodes, as the node reports it.
+const distribution = useBucketDistribution(bucket, nodeId)
+const live = computed(() => (example.value ? null : distribution.view.value))
+const nodes = computed(() => example.value ?? live.value ?? undefined)
+const nodesTab = computed(() => Boolean(nodes.value && isMulti(nodes.value)))
 const canAdminGroup = computed(() => isGroupAdmin(group.value, currentUser.value?.id ?? ''))
 const local = computed(() => !nodeId.value)
 const backendVisible = computed(() => local.value && canAdminGroup.value)
@@ -144,14 +152,19 @@ const browserLink = computed(() => ({
       <TabsContent value="overview" class="mt-0 space-y-5">
         <DistributionOverview v-if="example" :bucket="example" />
         <StorageOverviewTab v-else :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
+        <DistributionOverview v-if="live" :bucket="live" />
         <FileSources v-if="example" :bucket="bucket" />
+        <BucketSources v-else :bucket="bucket" :node-id="nodeId" />
         <LinkedBy v-if="example" :bucket="bucket" />
         <DatabaseMark v-if="example" :bucket="bucket" />
-        <BucketDeleteSection :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
+        <Notice v-if="live" tone="info">
+          This bucket is stored on {{ live.members.length }} nodes. Deleting it is not available yet.
+        </Notice>
+        <BucketDeleteSection v-else :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
       </TabsContent>
 
-      <TabsContent v-if="example && nodesTab" value="nodes" class="mt-0">
-        <BucketNodesTab :bucket="example" />
+      <TabsContent v-if="nodes && nodesTab" value="nodes" class="mt-0">
+        <BucketNodesTab :bucket="nodes" :admin="canAdminGroup" :busy="distribution.state.value === 'loading'" @reload="distribution.reload" />
       </TabsContent>
 
       <TabsContent v-if="backendVisible" value="backend" class="mt-0">
@@ -175,6 +188,7 @@ const browserLink = computed(() => ({
 
       <TabsContent v-if="groupId || example" value="access" class="mt-0 space-y-5">
         <AccessTab v-if="example" :bucket="example" />
+        <GrantGuide v-if="live?.live" :live="live.live" />
         <BucketAccessTab v-if="groupId && !example" :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
       </TabsContent>
 

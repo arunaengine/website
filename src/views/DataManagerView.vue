@@ -28,6 +28,7 @@ import UploadPanel from '@/components/data/manager/UploadPanel.vue'
 import NewNotebookDialog from '@/components/notebook/NewNotebookDialog.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDataManager } from '@/composables/useDataManager'
+import { useBucketDistribution } from '@/composables/useBucketDistribution'
 import { providePageContext } from '@/composables/usePageContext'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { folderNameProblem } from '@/lib/bucketName'
@@ -174,6 +175,9 @@ function onSyncChanged() {
 const addDataOpen = ref(false)
 // An example bucket of the node mock replaces the object browser.
 const exampleBucket = computed(() => (mockEnabled() ? mockBucket(bucket.value) : undefined))
+// A bucket of this node that is stored on more nodes shows its state above the files.
+const distribution = useBucketDistribution(bucket, remoteNodeId)
+const storedBucket = computed(() => exampleBucket.value ?? distribution.view.value ?? undefined)
 // Without a session the example buckets still show, from static data.
 const mockOnly = computed(
   () =>
@@ -397,7 +401,7 @@ async function createFolder() {
         />
 
         <div class="min-w-0 space-y-4">
-          <DistributionBanner v-if="exampleBucket" :bucket="exampleBucket" />
+          <DistributionBanner v-if="storedBucket" :bucket="storedBucket" />
           <ObjectBrowser
             :manager="manager"
             :notebooks="notebooksView"
