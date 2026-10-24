@@ -1,13 +1,16 @@
 import {
   createDistributedBucket as requestCreate,
+  getBucketLinks as requestLinks,
   getBucketDistribution as requestDistribution,
   getBucketUsage as requestBucketUsage,
   retryAdmission as requestRetry,
   type AdmissionResponse,
   type BlobLocationsResponse,
   type BucketRoutingResponse,
+  type BucketLinksQuery,
   type BucketUsageResponse,
   type CreateDistributedRequest,
+  type DataLinksResponse,
   type DistributedResponse,
   type GroupRoutingResponse,
   type ReplicateBlobRequest,
@@ -52,6 +55,11 @@ export async function getBucketRouting(bucket: string): Promise<BucketRoutingRes
 /** What the serving node counts in one bucket; 404 means the node lacks the route. */
 export function getBucketUsage(bucket: string): Promise<BucketUsageResponse> {
   return requestBucketUsage(bucket, refreshContext().client)
+}
+
+/** Datasets that link a file, a folder or the root of a bucket on this node. */
+export function getBucketLinks(bucket: string, query: BucketLinksQuery, signal?: AbortSignal): Promise<DataLinksResponse> {
+  return requestLinks(bucket, query, refreshContext().client, signal)
 }
 
 /** The set a bucket on this node belongs to; 404 means an ordinary bucket. */
