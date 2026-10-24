@@ -6,15 +6,18 @@ import { RouterLink } from 'vue-router'
 import OriginLine from '@/components/data/OriginLine.vue'
 import GlobalId from '@/components/distributed/GlobalId.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import { useAruna } from '@/composables/useAruna'
 import { useDatabases } from '@/composables/useDatabases'
 import { useFileOrigin, type OriginTarget } from '@/composables/useFileOrigin'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import { apiUrl } from '@/lib/api'
 import { hopFrom, originFrom, projectionRows } from '@/lib/fileOrigin'
 import { shortUserId, truncateMiddle } from '@/lib/utils'
 
 const props = defineProps<{ target: OriginTarget }>()
 
 const { displayName } = useRealmNodes()
+const { apiBaseUrl } = useAruna()
 const databases = useDatabases()
 const found = useFileOrigin(computed(() => props.target))
 
@@ -33,6 +36,12 @@ const origin = computed(() =>
 )
 const hop = computed(() => (found.origin.value ? hopFrom(found.origin.value) : null))
 const rows = computed(() => projectionRows(found.origin.value?.projection ?? []))
+// The node route behind the w3id URL: it serves the bytes or redirects to a holder it chooses.
+const downloadUrl = computed(() => {
+  const id = found.origin.value?.global_id
+  const rest = id?.replace(/^https:\/\/w3id\.org\/aruna\/data\//, '')
+  return id && rest !== id ? apiUrl(`/resolve/${rest}`, {}, { baseUrl: apiBaseUrl.value }).toString() : null
+})
 // A version minted without a record is said so, never guessed.
 const recorded = computed(() => Boolean(origin.value || hop.value))
 </script>
@@ -54,6 +63,9 @@ const recorded = computed(() => Boolean(origin.value || hop.value))
           Send your token with the request unless the file is public.
         </p>
         <GlobalId :global-url="found.origin.value.global_id" />
+        <a v-if="downloadUrl" :href="downloadUrl" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">
+          Open the download link on this node
+        </a>
       </div>
       <details v-if="recorded" class="border-t border-border pt-3 text-xs">
         <summary class="cursor-pointer text-sm font-medium text-foreground">Details</summary>
