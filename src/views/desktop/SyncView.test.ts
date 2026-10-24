@@ -399,7 +399,7 @@ describe('the unified sync list', () => {
     const text = content(mounted.root)
 
     expect(text).toContain('Nothing syncs with this computer yet')
-    expect(text).toContain('Sync a folder…')
+    expect(text).toContain('Link a local folder…')
     expect(text).toContain('Keep a dataset offline…')
     expect(rows(mounted.root)).toHaveLength(0)
     mounted.app.unmount()

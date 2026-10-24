@@ -166,7 +166,7 @@ async function findOfflineDataset(): Promise<void> {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem @click="showBind = true">
-              <FolderSync class="h-4 w-4" /> Sync a folder…
+              <FolderSync class="h-4 w-4" /> Link a local folder…
             </DropdownMenuItem>
             <DropdownMenuItem @click="findOfflineDataset">
               <Search class="h-4 w-4" /> Keep a dataset offline…
@@ -203,12 +203,12 @@ async function findOfflineDataset(): Promise<void> {
         :state="shellState"
         :rows="2"
         empty-title="Nothing syncs with this computer yet"
-        empty-description="Sync a folder or keep a realm dataset offline."
+        empty-description="Link a local folder or keep a realm dataset offline."
       >
         <template #icon><FileText class="h-6 w-6" /></template>
         <template #empty-actions>
           <div class="flex flex-wrap justify-center gap-2">
-            <Button size="sm" @click="showBind = true"><FolderSync class="h-4 w-4" /> Sync a folder…</Button>
+            <Button size="sm" @click="showBind = true"><FolderSync class="h-4 w-4" /> Link a local folder…</Button>
             <Button variant="outline" size="sm" @click="findOfflineDataset">
               <Search class="h-4 w-4" /> Keep a dataset offline…
             </Button>

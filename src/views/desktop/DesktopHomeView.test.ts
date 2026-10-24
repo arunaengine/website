@@ -227,7 +227,7 @@ describe('desktop home', () => {
     const html = await render()
 
     expect(html).toContain('Connect your tools')
-    expect(html).toContain('Sync a folder')
+    expect(html).toContain('Link a local folder')
     expect(html).toContain('#tools')
   })
 

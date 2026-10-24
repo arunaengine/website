@@ -73,7 +73,7 @@ const steps = computed(() => {
   const list = [
     {
       key: 'folder',
-      title: 'Sync a folder',
+      title: 'Link a local folder',
       done: folders.value.length > 0,
       text: first ? `${folderName(first.root)} is set up with Aruna.` : 'Keep a folder on this computer in step with a bucket.',
       action: null,
@@ -211,7 +211,7 @@ onMounted(() => void reload())
         <Button variant="outline" size="sm" as-child>
           <RouterLink :to="{ name: 'tools' }"><SquareTerminal class="h-3.5 w-3.5" /> Connect your tools</RouterLink>
         </Button>
-        <Button size="sm" @click="showBind = true"><Plus class="h-4 w-4" /> Sync a folder</Button>
+        <Button size="sm" @click="showBind = true"><Plus class="h-4 w-4" /> Link a local folder</Button>
       </template>
     </PageHeader>
 
@@ -295,7 +295,7 @@ onMounted(() => void reload())
               <SyncItemRow v-for="item in folderItems" :key="item.kind === 'folder' ? item.folder.folder_id : ''" :item="item" compact />
             </ul>
             <EmptyState v-else compact class="my-3" title="Nothing syncs with this computer yet.">
-              <Button variant="outline" size="sm" @click="showBind = true">Sync a folder</Button>
+              <Button variant="outline" size="sm" @click="showBind = true">Link a local folder</Button>
             </EmptyState>
           </div>
         </section>
