@@ -10,7 +10,7 @@ import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { tesAddress } from '@/lib/toolSnippets'
 import { ArrowRight, Laptop } from '@lucide/vue'
 
-const { compute, state, ensureLoaded } = useDeviceCompute()
+const { compute, state, load } = useDeviceCompute()
 const { status } = useDeviceStatus()
 
 // The address only counts while the node itself answers.
@@ -29,7 +29,8 @@ const summary = computed(() => {
     .join(' · ')
 })
 
-onMounted(() => void ensureLoaded())
+// Running counts change all the time, so they are read again on every visit.
+onMounted(() => void load())
 </script>
 
 <template>

@@ -30,7 +30,7 @@ const { shown } = usePortalFeatures()
 const { status, state: nodeState, refresh } = useDeviceStatus()
 const { folders, listState: foldersState, ensureLoaded: ensureFolders, load: loadFolders } = useSyncedFolders()
 const { all: transfers, load: loadTransfers, state: transfersState } = useDeviceTransfers()
-const { compute, state: computeState, ensureLoaded: ensureCompute } = useDeviceCompute()
+const { compute, state: computeState, load: loadCompute } = useDeviceCompute()
 const control = useNodeControl()
 
 const showBind = ref(false)
@@ -104,7 +104,8 @@ const runsText = computed(() => {
 
 onMounted(async () => {
   await refresh()
-  await Promise.all([ensureFolders(), loadTransfers(), ensureCompute()])
+  // Running counts change all the time, so they are read again on every visit.
+  await Promise.all([ensureFolders(), loadTransfers(), loadCompute()])
 })
 </script>
 
