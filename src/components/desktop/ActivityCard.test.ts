@@ -21,7 +21,7 @@ const ChipsStub = defineComponent({
     h('div', (props.options as Array<{ label: string; count: number }>).map((option) => h('span', `${option.label} ${option.count}`))),
 })
 
-let ActivityView: Component
+let ActivityCard: Component
 
 beforeAll(async () => {
   vi.doMock('vue-router', () => ({ RouterLink: passthrough }))
@@ -29,9 +29,6 @@ beforeAll(async () => {
   vi.doMock('@/components/ui/Badge.vue', () => ({ default: passthrough }))
   vi.doMock('@/components/ui/FilterChips.vue', () => ({ default: ChipsStub }))
   vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: passthrough }))
-  vi.doMock('@/components/dashboard/PageHeader.vue', () => ({
-    default: defineComponent((_, { slots }) => () => h('div', [slots.actions?.()])),
-  }))
   vi.doMock('@/composables/useRealm', () => ({ useRealm: () => ({ realm: ref({ name: 'Test realm' }) }) }))
   vi.doMock('@/composables/useSyncedFolders', () => ({
     useSyncedFolders: () => ({
@@ -52,7 +49,7 @@ beforeAll(async () => {
   vi.doMock('@/composables/useFolderDecisions', () => ({
     useFolderDecisions: () => ({ items: decisionItems, partial: decisionsPartial, state: decisionsState, error: decisionsError, load: vi.fn(async () => undefined) }),
   }))
-  ActivityView = (await import('./ActivityView.vue')).default
+  ActivityCard = (await import('./ActivityCard.vue')).default
 })
 
 const transfer = (id: string, state: string, extra: Record<string, unknown> = {}) =>
@@ -70,7 +67,7 @@ beforeEach(() => {
   syncStatus.value = { realmReachable: true, lastSyncMs: null }
 })
 
-const render = () => renderToString(createSSRApp(ActivityView))
+const render = () => renderToString(createSSRApp(ActivityCard))
 
 describe('activity', () => {
   it('counts what moves, what failed and what is done from the node list', async () => {
@@ -84,7 +81,6 @@ describe('activity', () => {
 
     expect(html).toContain('moving now')
     expect(html).toContain('Sequencing runs')
-    expect(html).toContain('2 moving · 1 failed · 1 done')
     expect(html).toContain('The connection to Giessen was lost.')
     expect(html).toContain('Retry')
     expect(html).toContain('All 4')
@@ -99,7 +95,7 @@ describe('activity', () => {
     expect(await render()).not.toContain('Total progress')
   })
 
-  it('lists the decisions under their folder', async () => {
+  it('lists the decisions with their folder', async () => {
     decisionItems.value = [{ folderId: 'f1', folder: 'Sequencing runs', text: 'Kept your version of samplesheet.csv', atMs: null, outcome: 'applied' }]
     const html = await render()
 
@@ -128,10 +124,19 @@ describe('activity', () => {
     expect(html).not.toContain('moving now')
   })
 
-  it('shows an idle folder under All', async () => {
+  it('says nothing moves while a folder is linked', async () => {
+    expect(await render()).toContain('Nothing is moving right now.')
+
+    folders.value = []
+    expect(await render()).toContain('Nothing syncs with this computer yet.')
+  })
+
+  it('folds a long list behind Show all', async () => {
+    transfers.value = Array.from({ length: 8 }, (_, index) => transfer(`t${index}`, 'transferring'))
     const html = await render()
 
-    expect(html).toContain('Nothing is moving in this folder.')
+    expect(html).toContain('Show all 8')
+    expect(html.match(/run\/t\d\.gz<\/span>/g)).toHaveLength(6)
   })
 
   it('tells loading, unavailable and failed decisions apart from none decided', async () => {

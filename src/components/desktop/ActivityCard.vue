@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Activity: what is moving between this computer and Aruna, and what the owner
 // decided. It reads the node's own transfer list and the log of every folder;
-// nothing here is counted by the page itself.
+// nothing here is counted by the card itself.
 import { computed, onMounted, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -9,19 +9,18 @@ import FilterChips from '@/components/ui/FilterChips.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Progress from '@/components/ui/Progress.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import PageHeader from '@/components/dashboard/PageHeader.vue'
 import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
 import { useDeviceSync } from '@/composables/useDeviceSync'
 import { useDeviceTransfers } from '@/composables/useDeviceTransfers'
 import { useFolderDecisions } from '@/composables/useFolderDecisions'
 import { useRealm } from '@/composables/useRealm'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
-import { activityCounts, groupActivity, OTHER_KEY, totalProgress, type ActivityFilter } from '@/lib/activityGroups'
+import { activityCounts, groupActivity, totalProgress, type ActivityFilter } from '@/lib/activityGroups'
 import { isMoving, type DeviceTransfer } from '@/lib/deviceApi'
 import { stateVariant } from '@/lib/stateBadge'
 import { transferLabel, transferPercent } from '@/lib/syncStates'
 import { errorMessage, formatBytes, relativeTime } from '@/lib/utils'
-import { ArrowDownToLine, ArrowUpFromLine, FolderSync, History, Pause, Play, RefreshCw, RotateCw } from '@lucide/vue'
+import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, History, Pause, Play, RefreshCw, RotateCw } from '@lucide/vue'
 
 const { realm } = useRealm()
 const { folders, listState: foldersState, listError: foldersError, ensureLoaded, setPaused, sync } = useSyncedFolders()
@@ -43,6 +42,18 @@ const counts = computed(() => activityCounts(transfers.value, decisions.items.va
 const moving = computed(() => transfers.value.filter(isMoving).length)
 const progress = computed(() => totalProgress(transfers.value))
 const groups = computed(() => groupActivity(folders.value, transfers.value, decisions.items.value, filter.value))
+// One list across folders, each row naming its folder; long lists fold.
+const FOLDED = 6
+const expanded = ref(false)
+const rows = computed(() => groups.value.flatMap((group) => group.rows.map((row) => ({ row, folder: group.name }))))
+const decided = computed(() =>
+  groups.value.flatMap((group) => group.decisions.map((entry) => ({ entry, folder: group.name }))),
+)
+const shownRows = computed(() => (expanded.value ? rows.value : rows.value.slice(0, FOLDED)))
+const shownDecisions = computed(() =>
+  expanded.value ? decided.value : decided.value.slice(0, Math.max(0, FOLDED - shownRows.value.length)),
+)
+const hidden = computed(() => rows.value.length + decided.value.length - shownRows.value.length - shownDecisions.value.length)
 
 // A count that depends on decisions waits until they were read.
 const decisionsKnown = computed(() => decisions.state.value === 'ready')
@@ -132,150 +143,137 @@ function moved(transfer: DeviceTransfer): string {
   return `${formatBytes(transfer.bytes_done)} of ${formatBytes(transfer.bytes_total)}`
 }
 
-function summary(rows: DeviceTransfer[]): string {
-  const parts = [
-    [rows.filter((row) => isMoving(row)).length, 'moving'],
-    [rows.filter((row) => row.state === 'failed').length, 'failed'],
-    [rows.filter((row) => row.state === 'done').length, 'done'],
-  ] as const
-  return parts.filter(([count]) => count > 0).map(([count, word]) => `${count} ${word}`).join(' · ')
-}
-
 const when = (ms: number | null): string => (ms ? relativeTime(new Date(ms).toISOString()) : '')
 </script>
 
 <template>
-  <div>
-    <PageHeader
-      eyebrow="This computer"
-      title="Activity"
-      description="What is moving between this computer and Aruna, and what you decided."
-      :docs="{ topic: 'where-data-lives', section: 'Syncs' }"
-    >
-      <template #actions>
+  <section class="surface overflow-hidden">
+    <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
+      <div class="flex items-center gap-2">
+        <ArrowLeftRight class="h-4 w-4 text-primary" />
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">Activity</h2>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" :disabled="acting || !canAct" @click="pauseAll">
           <Play v-if="allPaused" class="h-3.5 w-3.5" />
           <Pause v-else class="h-3.5 w-3.5" />
           {{ allPaused ? 'Resume all' : 'Pause all' }}
         </Button>
-        <Button size="sm" :disabled="acting || !canAct || allPaused" @click="syncNow">
+        <Button variant="outline" size="sm" :disabled="acting || !canAct || allPaused" @click="syncNow">
           <RefreshCw class="h-3.5 w-3.5" /> Sync now
         </Button>
-      </template>
-    </PageHeader>
+      </div>
+    </header>
 
-    <div class="container space-y-4 py-5">
-      <Notice v-if="actionError" tone="error">{{ actionError }}</Notice>
+    <Notice v-if="actionError" tone="error" class="mx-5 mt-3">{{ actionError }}</Notice>
 
-      <Skeleton v-if="foldersState === 'idle' || foldersState === 'loading' || transfersState === 'idle' || transfersState === 'loading'" class="h-24" />
-      <DeviceSurfaceState v-else-if="surface" :state="surface.state" :subject="surface.subject" :error="surface.error" />
+    <Skeleton
+      v-if="foldersState === 'idle' || foldersState === 'loading' || transfersState === 'idle' || transfersState === 'loading'"
+      class="mx-5 my-3 h-16"
+    />
+    <DeviceSurfaceState v-else-if="surface" class="m-5" :state="surface.state" :subject="surface.subject" :error="surface.error" />
 
-      <template v-else>
-        <section class="surface flex flex-wrap items-center gap-x-8 gap-y-3 px-5 py-4">
-          <div>
-            <p class="font-display text-xl font-bold text-foreground">{{ moving }}</p>
-            <p class="text-[11px] text-muted-foreground">moving now</p>
+    <template v-else>
+      <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-border/70 px-5 py-3">
+        <p>
+          <span class="font-display text-lg font-semibold text-foreground">{{ moving }}</span>
+          <span class="ml-1 text-xs text-muted-foreground">moving now</span>
+        </p>
+        <p>
+          <span class="font-display text-lg font-semibold" :class="counts.failed ? 'text-destructive' : 'text-foreground'">{{ counts.failed }}</span>
+          <span class="ml-1 text-xs text-muted-foreground">failed</span>
+        </p>
+        <p>
+          <span class="font-display text-lg font-semibold text-foreground">{{ counts.done }}</span>
+          <span class="ml-1 text-xs text-muted-foreground">done</span>
+        </p>
+        <div v-if="progress" class="min-w-48 flex-1">
+          <div class="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+            <span>Total progress</span>
+            <span>{{ formatBytes(progress.done) }} of {{ formatBytes(progress.total) }}</span>
           </div>
-          <div>
-            <p class="font-display text-xl font-bold" :class="counts.failed ? 'text-destructive' : 'text-foreground'">{{ counts.failed }}</p>
-            <p class="text-[11px] text-muted-foreground">failed</p>
-          </div>
-          <div>
-            <p class="font-display text-xl font-bold text-foreground">{{ counts.done }}</p>
-            <p class="text-[11px] text-muted-foreground">done</p>
-          </div>
-          <div v-if="progress" class="min-w-[14rem]">
-            <div class="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
-              <span>Total progress</span>
-              <span>{{ formatBytes(progress.done) }} of {{ formatBytes(progress.total) }}</span>
-            </div>
-            <Progress
-              :value="progress.total ? (progress.done / progress.total) * 100 : 0"
-              label="Total progress"
-              class="mt-1 h-1.5"
-            />
-          </div>
-          <p class="ml-auto text-[11px] text-muted-foreground">{{ lastCheck }}</p>
-        </section>
-
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <FilterChips v-model="filter" :options="chips" aria-label="Filter activity" />
-          <span class="text-[11px] text-muted-foreground">Grouped by folder</span>
+          <Progress
+            :value="progress.total ? (progress.done / progress.total) * 100 : 0"
+            label="Total progress"
+            class="mt-1 h-1.5"
+          />
         </div>
+        <p class="w-full text-[11px] text-muted-foreground">{{ lastCheck }}</p>
+      </div>
 
-        <div v-if="decisionsNote" class="flex flex-wrap items-center gap-2 text-[11px]" :class="decisionsNote.tone === 'error' ? 'text-destructive' : 'text-muted-foreground'">
+      <div class="px-5 pt-3">
+        <FilterChips v-model="filter" :options="chips" aria-label="Filter activity" />
+        <p
+          v-if="decisionsNote"
+          class="mt-2 flex flex-wrap items-center gap-2 text-[11px]"
+          :class="decisionsNote.tone === 'error' ? 'text-destructive' : 'text-muted-foreground'"
+        >
           <span>{{ decisionsNote.text }}</span>
           <button v-if="decisionsNote.tone === 'error'" type="button" class="text-primary hover:underline" @click="decisions.load()">
             Try again
           </button>
-        </div>
-
-        <p v-if="!groups.length" class="surface px-5 py-8 text-center text-sm text-muted-foreground">
-          {{
-            filter === 'all'
-              ? 'Nothing syncs with this computer yet.'
-              : filter === 'decisions' && !decisionsKnown
-                ? 'Your decisions are not available right now.'
-                : filter === 'decisions'
-                  ? 'You have not decided anything yet.'
-                  : 'Nothing matches this filter.'
-          }}
         </p>
+      </div>
 
-        <section v-for="group in groups" :key="group.key" class="surface overflow-hidden">
-          <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
-            <div class="flex min-w-0 flex-wrap items-center gap-2">
-              <FolderSync v-if="group.key !== OTHER_KEY" class="h-4 w-4 shrink-0 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ group.name }}</h2>
-              <span v-if="group.root" class="hash truncate text-[11px] text-muted-foreground" :title="group.root">{{ group.root }}</span>
+      <p v-if="!rows.length && !decided.length" class="px-5 py-6 text-center text-sm text-muted-foreground">
+        {{
+          filter === 'all'
+            ? folders.length
+              ? 'Nothing is moving right now.'
+              : 'Nothing syncs with this computer yet.'
+            : filter === 'decisions' && !decisionsKnown
+              ? 'Your decisions are not available right now.'
+              : filter === 'decisions'
+                ? 'You have not decided anything yet.'
+                : 'Nothing matches this filter.'
+        }}
+      </p>
+
+      <ul v-else class="mt-2 divide-y divide-border/70 border-t border-border/70">
+        <li v-for="{ row, folder } in shownRows" :key="row.id" class="flex flex-wrap items-center gap-3 px-5 py-2.5">
+          <ArrowUpFromLine v-if="row.direction === 'upload'" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <ArrowDownToLine v-else class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="hash min-w-0 truncate text-[12px] text-foreground" :title="row.path">{{ row.path }}</span>
+              <Badge :variant="stateVariant(row.state)" size="sm">{{ transferLabel(row) }}</Badge>
             </div>
-            <span class="text-[11px] text-muted-foreground">{{ summary(group.rows) }}</span>
-          </header>
-
-          <ul v-if="group.rows.length" class="divide-y divide-border/70">
-            <li v-for="row in group.rows" :key="row.id" class="flex flex-wrap items-center gap-3 px-5 py-2.5">
-              <ArrowUpFromLine v-if="row.direction === 'upload'" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <ArrowDownToLine v-else class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <div class="min-w-0 flex-1">
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="hash min-w-0 truncate text-[12px] text-foreground" :title="row.path">{{ row.path }}</span>
-                  <Badge :variant="stateVariant(row.state)" size="sm">{{ transferLabel(row) }}</Badge>
-                </div>
-                <p v-if="row.state === 'failed' && row.message" class="mt-0.5 text-[11px] text-destructive">{{ row.message }}</p>
-              </div>
-              <span class="text-[11px] text-muted-foreground">{{ moved(row) }}</span>
-              <Progress
-                v-if="isMoving(row) || row.state === 'queued'"
-                :value="transferPercent(row) ?? 0"
-                :indeterminate="transferPercent(row) === null"
-                :label="row.path"
-                class="h-1.5 w-32 shrink-0"
-              />
-              <Button v-if="row.state === 'failed' && row.folder_id" variant="ghost" size="sm" :disabled="acting" @click="retry(row)">
-                <RotateCw class="h-3.5 w-3.5" /> Retry
-              </Button>
-            </li>
-          </ul>
-          <p v-else-if="filter === 'all' && !group.decisions.length" class="px-5 py-3 text-[11px] text-muted-foreground">
-            Nothing is moving in this folder.
-          </p>
-
-          <div v-if="group.decisions.length" class="border-t border-border/70 bg-muted/20 px-5 py-3">
-            <p class="flex items-center gap-1.5 text-[11px] font-medium text-foreground">
-              <History class="h-3.5 w-3.5 text-muted-foreground" /> Decisions
-            </p>
-            <ul class="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
-              <li
-                v-for="(entry, index) in group.decisions"
-                :key="index"
-                :class="entry.outcome === 'failed' ? 'text-destructive' : entry.outcome === 'stale' ? 'text-amber-700 dark:text-amber-300' : ''"
-              >
-                {{ entry.text }}<template v-if="entry.atMs"> · {{ when(entry.atMs) }}</template>
-              </li>
-            </ul>
+            <p v-if="row.state === 'failed' && row.message" class="mt-0.5 text-[11px] text-destructive">{{ row.message }}</p>
+            <p v-else class="mt-0.5 text-[11px] text-muted-foreground">{{ folder }}</p>
           </div>
-        </section>
-      </template>
-    </div>
-  </div>
+          <span class="text-[11px] text-muted-foreground">{{ moved(row) }}</span>
+          <Progress
+            v-if="isMoving(row) || row.state === 'queued'"
+            :value="transferPercent(row) ?? 0"
+            :indeterminate="transferPercent(row) === null"
+            :label="row.path"
+            class="h-1.5 w-28 shrink-0"
+          />
+          <Button v-if="row.state === 'failed' && row.folder_id" variant="ghost" size="sm" :disabled="acting" @click="retry(row)">
+            <RotateCw class="h-3.5 w-3.5" /> Retry
+          </Button>
+        </li>
+        <li
+          v-for="({ entry, folder }, index) in shownDecisions"
+          :key="`decision-${index}`"
+          class="flex items-start gap-3 px-5 py-2.5 text-xs"
+          :class="entry.outcome === 'failed' ? 'text-destructive' : entry.outcome === 'stale' ? 'text-amber-700 dark:text-amber-300' : 'text-foreground'"
+        >
+          <History class="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span class="min-w-0 flex-1">
+            {{ entry.text }}
+            <span class="text-muted-foreground"> · {{ folder }}<template v-if="entry.atMs"> · {{ when(entry.atMs) }}</template></span>
+          </span>
+        </li>
+      </ul>
+      <button
+        v-if="hidden > 0 || expanded"
+        type="button"
+        class="block w-full border-t border-border/70 px-5 py-2.5 text-left text-xs font-medium text-primary hover:underline"
+        @click="expanded = !expanded"
+      >
+        {{ expanded ? 'Show less' : `Show all ${rows.length + decided.length}` }}
+      </button>
+    </template>
+  </section>
 </template>
