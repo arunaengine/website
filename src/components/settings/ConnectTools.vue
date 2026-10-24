@@ -179,6 +179,11 @@ const snippet = (id: string): string =>
 const ready = (id: string) =>
   Boolean(id === 'nextflow' ? tes.value : id === 'assistant' ? address.value && assistant.value : address.value)
 
+// A key made after its dialog was closed still shows its name at once.
+function onNamed(key: { accessKeyId: string; name: string }): void {
+  names.value = { ...names.value, [key.accessKeyId]: key.name }
+}
+
 function onCreated(key: ToolKey & { name: string }): void {
   const request = pendingKey
   names.value = keyNames()
@@ -375,7 +380,7 @@ function made(iso: string): string {
       </div>
     </section>
 
-    <CreateKeyDialog v-model:open="createOpen" :create="createKey" @created="onCreated" />
+    <CreateKeyDialog v-model:open="createOpen" :create="createKey" @created="onCreated" @named="onNamed" />
     <CreateCredentialDialog v-model:open="tokenOpen" />
   </div>
 </template>
