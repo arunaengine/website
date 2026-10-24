@@ -2,9 +2,9 @@
 import AppLogo from '@/components/layout/AppLogo.vue'
 import Button from '@/components/ui/Button.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import { useAuth } from '@/composables/useAuth'
+import { DESKTOP_CALLBACK_URI, DESKTOP_STATE_PREFIX, useAuth } from '@/composables/useAuth'
 import { isDesktop } from '@/lib/desktop'
-import { onMounted, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink, type LocationQuery } from 'vue-router'
 
 const route = useRoute()
@@ -32,7 +32,23 @@ function searchOf(query: LocationQuery): URLSearchParams {
   return search
 }
 
+// The realm website is the desktop's callback too: a marked state goes on to
+// the app with the provider's answer untouched, as that sign-in lives there.
+function handoffUrl(): string | null {
+  if (inDesktop) return null
+  const { search, hash } = window.location
+  const state = new URLSearchParams(search).get('state')
+  return state?.startsWith(DESKTOP_STATE_PREFIX) ? `${DESKTOP_CALLBACK_URI}${search}${hash}` : null
+}
+
+const handoff = ref(handoffUrl())
+
 async function exchange(): Promise<void> {
+  handoff.value = handoffUrl()
+  if (handoff.value) {
+    window.location.replace(handoff.value)
+    return
+  }
   stage.value = 'idle'
   stageError.value = null
   try {
@@ -62,7 +78,17 @@ watch(
         <AppLogo :size="26" />
       </div>
       <div class="surface p-8">
-        <template v-if="stage !== 'error'">
+        <template v-if="handoff">
+          <h1 class="font-display text-base font-semibold text-foreground">Continue in Aruna Desktop</h1>
+          <p class="mt-2 text-sm text-muted-foreground">Your sign-in is done. Aruna Desktop completes it.</p>
+          <div class="mt-6 flex justify-center">
+            <Button as-child>
+              <a :href="handoff">Open Aruna Desktop</a>
+            </Button>
+          </div>
+          <p class="mt-4 text-xs text-muted-foreground">You can close this window afterwards.</p>
+        </template>
+        <template v-else-if="stage !== 'error'">
           <Spinner
             show-label
             class="flex-col gap-4 text-sm [&>svg]:size-6 [&>svg]:text-primary"
