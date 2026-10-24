@@ -25,8 +25,8 @@ const location = ref('')
 const labels = ref<RealmNodeLabel[]>([])
 const saveError = ref<string | null>(null)
 const saveMessage = ref<string | null>(null)
-// This save is on its way; the placement busy flag is shared with other controls.
-const saving = ref(false)
+// The node whose save is on its way; the placement busy flag is shared with other controls.
+const saving = ref<string | null>(null)
 
 const nodes = computed(() => realmInfo.value?.nodes ?? [])
 const options = computed(() =>
@@ -54,27 +54,30 @@ watch(nodes, (list) => {
   if (!selected.value && list.length) selected.value = list[0].node_id
 }, { immediate: true })
 watch(selected, reset, { immediate: true })
+// Another node starts without the wait and the result of the one before.
+watch(selected, () => (saving.value = null))
 
 async function save() {
   if (!node.value || !dirty.value || busy.value || saving.value) return
+  const nodeId = node.value.node_id
   saveError.value = null
   saveMessage.value = null
-  saving.value = true
+  saving.value = nodeId
   try {
     await mutateRealmPlacement({
       mutation: 'set_node_attributes',
-      node_id: node.value.node_id,
+      node_id: nodeId,
       location: location.value.trim(),
       labels: labels.value
         .map((label) => ({ key: label.key.trim(), value: label.value.trim() }))
         .filter((label) => label.key),
     })
     await loadInfo().catch(() => undefined)
-    saveMessage.value = 'Saved. That node now re-checks the copies it holds.'
+    if (selected.value === nodeId) saveMessage.value = 'Saved. That node now re-checks the copies it holds.'
   } catch (error) {
-    saveError.value = apiErrorMessage(error)
+    if (selected.value === nodeId) saveError.value = apiErrorMessage(error)
   } finally {
-    saving.value = false
+    if (saving.value === nodeId) saving.value = null
   }
 }
 </script>
@@ -146,8 +149,8 @@ async function save() {
       <p v-else-if="saveMessage" class="text-xs text-emerald-700 dark:text-emerald-300">{{ saveMessage }}</p>
 
       <div class="flex flex-wrap items-center gap-2">
-        <Button size="sm" :disabled="!dirty || busy || saving" :aria-busy="saving" @click="save">
-          <Spinner v-if="saving" label="Saving the attributes" class="text-current" /><Save v-else class="size-3.5" /> Save attributes
+        <Button size="sm" :disabled="!dirty || busy || saving !== null" :aria-busy="saving === selected" @click="save">
+          <Spinner v-if="saving === selected" label="Saving the attributes" class="text-current" /><Save v-else class="size-3.5" /> Save attributes
         </Button>
         <Button variant="ghost" size="sm" :disabled="!dirty || busy" @click="reset">Reset</Button>
         <span v-if="!dirty" class="text-[11px] text-muted-foreground">Nothing changed yet.</span>

@@ -7,7 +7,12 @@ import { button, compileClientComponent, content, element, flush, mountApp, modu
 const mutateRealmPlacement = vi.fn()
 const loadInfo = vi.fn()
 const busy = ref(false)
-const realmInfo = ref({ nodes: [{ node_id: 'n1', placement: { location: 'giessen' }, info: { labels: {} } }] })
+const realmInfo = ref({
+  nodes: [
+    { node_id: 'n1', placement: { location: 'giessen' }, info: { labels: {} } },
+    { node_id: 'n2', placement: { location: 'marburg' }, info: { labels: {} } },
+  ],
+})
 
 const Empty = defineComponent(() => () => null)
 const Slotted = (tag: string) =>
@@ -48,6 +53,25 @@ beforeEach(() => {
 })
 
 describe('NodeAttributesSection', () => {
+  it('starts another node without the wait or the result of a save still on its way', async () => {
+    mutateRealmPlacement.mockResolvedValueOnce(undefined)
+    let read: () => void = () => {}
+    loadInfo.mockReturnValueOnce(new Promise<void>((resolve) => (read = resolve)))
+    const { root } = await mountApp(section)
+    await flush()
+    await typeValue(element(root, (node) => node.tag === 'input' && node.props.id === 'node-location'), 'kassel')
+    void (button(root, 'Save attributes').props.onClick as () => Promise<void>)()
+    await flush()
+    expect(button(root, 'Saving the attributes').props['aria-busy']).toBe(true)
+    const pick = element(root, (node) => node.tag === 'select')
+    ;(pick.props['onUpdate:modelValue'] as (value: string) => void)('n2')
+    await flush()
+    expect(button(root, 'Save attributes').props['aria-busy']).toBe(false)
+    read()
+    await flush()
+    expect(content(root)).not.toContain('Saved.')
+  })
+
   it('shows the wait on Save attributes for its own save only, sends it once and frees it when it fails', async () => {
     let refuse: (err: unknown) => void = () => {}
     mutateRealmPlacement.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
