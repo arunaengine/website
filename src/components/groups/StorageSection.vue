@@ -202,6 +202,14 @@ watch(
   },
   { immediate: true },
 )
+// Another dataset bucket drops the reads still on their way and takes its rules as the new baseline.
+watch(
+  () => props.datasetBucket,
+  () => {
+    bucketRules = null
+    void reread()
+  },
+)
 onBeforeUnmount(() => {
   disposed = true
   clearPoll()

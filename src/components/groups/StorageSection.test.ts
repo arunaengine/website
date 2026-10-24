@@ -356,6 +356,50 @@ describe('StorageSection', () => {
     }
   })
 
+  it('compares the rules of a new dataset bucket only with its own, not with a late answer for the old one', async () => {
+    vi.useFakeTimers()
+    try {
+      listBackendImports.mockResolvedValue([LINKS[0]])
+      const job = { kind: 'rename', state: 'running', done: 4, failed: 0 }
+      listStorageBuckets.mockResolvedValue({ buckets: [listed('genes', { import_id: 'i1', job })], next: null })
+      const override = { key_prefix: '', exact: false, target: { class: 'cold' } }
+      const rulesOf: Record<string, unknown[]> = { a: [], b: [override] }
+      let holdA = false
+      let late: (value: unknown) => void = () => {}
+      getBucketRouting.mockImplementation((bucket: string) => {
+        if (bucket === 'a' && holdA) {
+          holdA = false
+          return new Promise((resolve) => (late = resolve))
+        }
+        return Promise.resolve({ bucket, rules: rulesOf[bucket], warnings: [] })
+      })
+      const bucket = ref('a')
+      const onBackends = vi.fn()
+      await mountApp(
+        defineComponent(() => () =>
+          h(StorageSection, { groupId: 'g1', groupName: 'spire', canAdmin: true, datasetBucket: bucket.value, onBackends }),
+        ),
+      )
+      await flush()
+      expect(onBackends).toHaveBeenCalledTimes(1)
+      // The next poll for bucket a is still on its way when the dataset location moves to b.
+      holdA = true
+      await vi.advanceTimersByTimeAsync(3000)
+      bucket.value = 'b'
+      await flush()
+      late({ bucket: 'a', rules: [], warnings: [] })
+      await flush()
+      // B's rule is removed in another tab before B's next poll.
+      rulesOf.b = []
+      await vi.advanceTimersByTimeAsync(3000)
+      await flush()
+      expect(onBackends).toHaveBeenLastCalledWith([STORAGE])
+      expect(onBackends).toHaveBeenCalledTimes(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('reports no change when the node sends the connection settings in another order', async () => {
     vi.useFakeTimers()
     try {
