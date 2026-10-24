@@ -5,6 +5,7 @@ import { apiRequest } from '@/lib/api'
 import type { RealmInfoResponse } from '@/lib/api'
 import { featureEnabled, portalConfig } from '@/lib/config'
 import { desktopBridge } from '@/lib/desktop'
+import { DESKTOP_CALLBACK_URI, DESKTOP_STATE_PREFIX } from '@/lib/desktopHandoff'
 import {
   buildAuthorizationUrl,
   buildEndSessionUrl,
@@ -45,13 +46,6 @@ let authOpener: AuthOpener | null = null
 export function setAuthOpener(opener: AuthOpener | null): void {
   authOpener = opener
 }
-
-// The shell's own origin is tauri://localhost, which no IdP accepts, so the
-// desktop default is the custom scheme it registers and routes (RFC 8252).
-export const DESKTOP_CALLBACK_URI = 'aruna://auth/callback'
-
-/** Marks a desktop state, so the realm website hands its callback on to the app. */
-export const DESKTOP_STATE_PREFIX = 'desktop.'
 
 /** The registered OIDC redirect_uri; a configured origin wins over the page. */
 export function callbackUri(): string {
