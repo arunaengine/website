@@ -88,6 +88,36 @@ describe('unified document coverage', () => {
     expect(search.partial.value).toBe(true)
   })
 
+  it('asks for buckets by default and marks failed bucket nodes partial', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const hit = (bucket: string, node_id: string) => ({
+      arn: `arn:${node_id}:${bucket}`,
+      bucket,
+      node_id,
+      group_id: 'group-t',
+      group_name: 'test',
+      created_at: '2026-10-24T13:58:44Z',
+    })
+    mocks.searchUnified.mockResolvedValueOnce({
+      buckets: {
+        hits: [hit('test', 'node-a'), hit('test', 'node-b'), hit('ws-test', 'node-a')],
+        nodes_queried: 4,
+        nodes_failed: 1,
+        failed_nodes: ['node-c'],
+      },
+    })
+
+    const search = useUnifiedSearch(ref('test'))
+    await vi.waitFor(() => expect(search.searched.value).toBe(true))
+
+    expect(mocks.searchUnified).toHaveBeenCalledWith('test', expect.objectContaining({
+      types: expect.arrayContaining(['buckets']),
+    }))
+    expect(search.buckets.value.map((bucket) => bucket.node_id)).toEqual(['node-a', 'node-b'])
+    expect(search.empty.value).toBe(false)
+    expect(search.partial.value).toBe(true)
+  })
+
   it('does not downgrade a failed strict object search', async () => {
     mocks.searchObjects.mockRejectedValueOnce(new Error('Strict coverage unavailable'))
     const mode = ref<'distributed_strict'>('distributed_strict')

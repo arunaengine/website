@@ -62,10 +62,8 @@ export async function fetchWithTimeout(
   if (callerSignal?.aborted) forwardAbort()
   else callerSignal?.addEventListener('abort', forwardAbort, { once: true })
 
-  const timeout = globalThis.setTimeout(
-    () => controller.abort(new DOMException('Request timed out.', 'TimeoutError')),
-    timeoutMs,
-  )
+  const timedOut = new DOMException('Request timed out.', 'TimeoutError')
+  const timeout = globalThis.setTimeout(() => controller.abort(timedOut), timeoutMs)
   try {
     const response = await fetch(input, { ...init, signal: controller.signal })
     // Buffer the body inside the timeout window. Some servers expose a body
@@ -79,6 +77,9 @@ export async function fetchWithTimeout(
       statusText: response.statusText,
       headers: response.headers,
     })
+  } catch (err) {
+    // WebKit rejects an aborted fetch with its own "Fetch is aborted" and drops the reason.
+    throw controller.signal.reason === timedOut ? timedOut : err
   } finally {
     globalThis.clearTimeout(timeout)
     callerSignal?.removeEventListener('abort', forwardAbort)
