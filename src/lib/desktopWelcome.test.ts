@@ -510,6 +510,38 @@ describe('session carried to a new base', () => {
     await vi.waitFor(() => expect(landed).not.toHaveLength(0))
     expect(landed).toEqual(['settings'])
   })
+
+  it('signs out a stored session the realm refused at start', async () => {
+    const welcome = await load({ state: 'running', enrolled: true, apiBaseUrl: LOCAL }, REALM, 'https://aruna.example', {
+      token: '',
+      bootstrapped: false,
+    })
+    restoring.value = true
+    let release = () => {}
+    refresh.mockImplementationOnce(
+      () =>
+        new Promise<undefined>((done) => {
+          // Like the session: a 401 cleared the restored token and left `restoring` set.
+          release = () => {
+            authToken.value = ''
+            bootstrapped.value = true
+            done(undefined)
+          }
+        }),
+    )
+    const router = blankRouter()
+    welcome.installDesktopGuard(router)
+    const landed: string[] = []
+    router.afterEach((to) => void landed.push(String(to.name)))
+    const reads = useAruna.mock.calls.length
+
+    const trip = router.push('/app/settings')
+    await vi.waitFor(() => expect(useAruna.mock.calls.length).toBeGreaterThan(reads))
+    release()
+    await trip
+
+    expect(landed).toEqual(['welcome-sign-in'])
+  })
 })
 
 describe('device setup gate', () => {

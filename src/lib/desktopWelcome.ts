@@ -160,8 +160,8 @@ async function signedOut(): Promise<boolean> {
   if (!authToken.value && !bootstrapped.value) void refresh()
   if (!authToken.value && !restoring.value) return true
   if (!bootstrapped.value) await settled(bootstrapped, BOOTSTRAP_TIMEOUT_MS)
-  // A restore still running after the wait proves nothing either.
-  if (!authToken.value) return !restoring.value
+  // A finished bootstrap without a token is signed out; only a restore still running proves nothing.
+  if (!authToken.value) return bootstrapped.value || !restoring.value
   if (!bootstrapped.value || currentUser.value) return false
   return authRejected.value
 }
