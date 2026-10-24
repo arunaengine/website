@@ -10,6 +10,7 @@ import * as DropEntries from '@/lib/upload/dropEntries'
 import * as NotebookDocument from '@/lib/notebook/document'
 import * as ObjectListing from '@/lib/objectListing'
 import * as Utils from '@/lib/utils'
+import * as Workspaces from '@/lib/workspaces'
 import { compileClientComponent, moduleDefault } from '@/test/clientRender'
 
 export const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
@@ -160,6 +161,7 @@ export function objectBrowser(): Component {
       '@/lib/notebook/document': NotebookDocument,
       '@/lib/objectListing': ObjectListing,
       '@/lib/utils': Utils,
+      '@/lib/workspaces': Workspaces,
       '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
       '@/components/ui/Button.vue': moduleDefault(ButtonStub),
       '@/components/ui/EmptyState.vue': moduleDefault(
@@ -235,7 +237,7 @@ export function fakeManager(overrides: Record<string, unknown> = {}) {
     prefix: ref('raw'),
     s3Prefix: ref('raw/'),
     remoteNodeId: ref(null),
-    realmNodes: { displayName: (id: string) => `node ${id}` },
+    realmNodes: { displayName: (id: string) => `node ${id}`, nodeById: () => null, localNodeId: ref(null) },
     references: { prefixHasReferences: () => false, keyIsReferenced: () => false },
     referenceStats: computed(() => ({ count: 0, bytes: 0, groups: [] })),
     showReferenceStats: computed(() => false),

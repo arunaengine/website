@@ -37,8 +37,8 @@ describe('Data view group selection', () => {
 
   it('names the open bucket node in the heading and keeps Refresh on the right', () => {
     const title = template.slice(template.indexOf('<template #title>'), template.indexOf('<template #description>'))
-    expect(title).toContain('on {{ requiredNodeName }}')
-    expect(title).toContain(":title=\"`${requiredNodeName} (${requiredNodeId})`\"")
+    expect(title).toContain('on {{ headerPlace.name }}')
+    expect(title).toContain(':title="headerPlace.title"')
     const actions = template.slice(template.indexOf('<template #actions>'), template.indexOf('</PageHeader>'))
     expect(actions).toContain('<RefreshButton')
     expect(actions).not.toContain('<NodePicker')
