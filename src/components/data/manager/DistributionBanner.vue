@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Above the file list of an example bucket: where it is stored and what is wrong with it.
+// Above the file list of a bucket stored on more nodes: where it is stored and what is wrong with it.
 import { computed } from 'vue'
 import DatabaseInfo from '@/components/data/DatabaseInfo.vue'
 import DegradedNotice from '@/components/distributed/DegradedNotice.vue'
@@ -16,13 +16,14 @@ const degraded = computed(() => degradedRanges(props.bucket))
 <template>
   <div class="space-y-3">
     <div class="flex flex-wrap items-center gap-2">
-      <MockNotice />
+      <MockNotice v-if="!bucket.live" />
       <Badge variant="outline" size="sm">
         {{ isMulti(bucket) ? storedLabel(bucket.preset, bucket.members.length) : 'This node' }}
       </Badge>
+      <Badge v-if="bucket.live?.pending" variant="warn" size="sm">Pending</Badge>
       <Badge v-if="degraded.length" variant="warn" size="sm">Degraded</Badge>
     </div>
-    <DatabaseInfo :bucket="bucket.name" />
+    <DatabaseInfo v-if="!bucket.live" :bucket="bucket.name" />
     <DegradedNotice v-for="range in degraded" :key="range.id" :range="range" />
   </div>
 </template>

@@ -22,7 +22,7 @@ import FileDetailsDialog from '@/components/data/FileDetailsDialog.vue'
 import PublicAccessDialog from '@/components/data/PublicAccessDialog.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import MockSidebar from '@/components/data/manager/MockSidebar.vue'
-import MockBucketBanner from '@/components/data/manager/MockBucketBanner.vue'
+import DistributionBanner from '@/components/data/manager/DistributionBanner.vue'
 import ObjectBrowser from '@/components/data/manager/ObjectBrowser.vue'
 import UploadPanel from '@/components/data/manager/UploadPanel.vue'
 import NewNotebookDialog from '@/components/notebook/NewNotebookDialog.vue'
@@ -312,7 +312,7 @@ async function createFolder() {
       <section v-else-if="mockOnly" class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
         <MockSidebar :active="bucket" @open="(name: string) => manager.openBucket(name)" />
         <div v-if="exampleBucket" class="min-w-0 space-y-4">
-          <MockBucketBanner :bucket="exampleBucket" />
+          <DistributionBanner :bucket="exampleBucket" />
           <ObjectBrowser
             :manager="manager"
             :notebooks="notebooksView"
@@ -397,7 +397,7 @@ async function createFolder() {
         />
 
         <div class="min-w-0 space-y-4">
-          <MockBucketBanner v-if="exampleBucket" :bucket="exampleBucket" />
+          <DistributionBanner v-if="exampleBucket" :bucket="exampleBucket" />
           <ObjectBrowser
             :manager="manager"
             :notebooks="notebooksView"

@@ -55,6 +55,7 @@ const TUTORIAL_NODES: RealmNodeDisplay[] = [
   {
     nodeId: TUTORIAL_NODE_ID,
     kind: 'server',
+    location: null,
     info: {
       labels: { region: 'practice' },
       executors: [{ kind: 'docker', file_staging: true, direct_s3: false }],

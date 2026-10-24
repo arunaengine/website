@@ -21,7 +21,7 @@ import AccessTab from '@/components/distributed/AccessTab.vue'
 import BucketNodesTab from '@/components/storage/BucketNodesTab.vue'
 import BucketEncryptionTab from '@/components/storage/BucketEncryptionTab.vue'
 import BucketPolicySection from '@/components/storage/BucketPolicySection.vue'
-import MockOverview from '@/components/storage/MockOverview.vue'
+import DistributionOverview from '@/components/storage/DistributionOverview.vue'
 import LinkedBy from '@/components/storage/LinkedBy.vue'
 import DatabaseMark from '@/components/storage/DatabaseMark.vue'
 import CopiesOfBucket from '@/components/storage/CopiesOfBucket.vue'
@@ -142,7 +142,7 @@ const browserLink = computed(() => ({
       </div>
 
       <TabsContent value="overview" class="mt-0 space-y-5">
-        <MockOverview v-if="example" :bucket="example" />
+        <DistributionOverview v-if="example" :bucket="example" />
         <StorageOverviewTab v-else :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
         <FileSources v-if="example" :bucket="bucket" />
         <LinkedBy v-if="example" :bucket="bucket" />

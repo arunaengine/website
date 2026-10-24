@@ -3,8 +3,9 @@
 import { computed, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
 import { stamp } from '@/lib/distributedMock'
-import type { DistributedRange } from '@/lib/distribution'
+import { isDegraded, type DistributedRange } from '@/lib/distribution'
 import { formatBytes, formatNumber } from '@/lib/utils'
 
 const props = defineProps<{ ranges: DistributedRange[] }>()
@@ -12,12 +13,15 @@ const props = defineProps<{ ranges: DistributedRange[] }>()
 const SHOWN = 8
 const all = ref(false)
 const rows = computed(() => (all.value ? props.ranges : props.ranges.slice(0, SHOWN)))
+// A node that reports no counts or refresh times gets no columns for them.
+const counted = computed(() => props.ranges.some((range) => range.objects !== undefined))
+const refreshed = computed(() => props.ranges.some((range) => range.refreshed !== undefined))
 </script>
 
 <template>
   <div class="space-y-2">
     <div class="overflow-x-auto rounded-md border border-border">
-      <table class="w-full min-w-[60rem] text-left text-xs">
+      <table class="w-full min-w-[40rem] text-left text-xs">
         <thead class="border-b border-border bg-muted/40 text-muted-foreground">
           <tr>
             <th class="px-3 py-2 font-medium">Range</th>
@@ -25,24 +29,33 @@ const rows = computed(() => (all.value ? props.ranges : props.ranges.slice(0, SH
             <th class="px-3 py-2 font-medium">Coordinator</th>
             <th class="px-3 py-2 font-medium">Epoch</th>
             <th class="px-3 py-2 font-medium">Replicas</th>
-            <th class="px-3 py-2 text-right font-medium">Objects</th>
-            <th class="px-3 py-2 text-right font-medium">Size</th>
-            <th class="px-3 py-2 font-medium">Last refresh</th>
+            <template v-if="counted">
+              <th class="px-3 py-2 text-right font-medium">Objects</th>
+              <th class="px-3 py-2 text-right font-medium">Size</th>
+            </template>
+            <th v-if="refreshed" class="px-3 py-2 font-medium">Last refresh</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-border">
-          <tr v-for="range in rows" :key="range.id" :class="range.degradedSince ? 'bg-amber-500/5' : ''">
-            <td class="px-3 py-2 font-mono">{{ range.id }}</td>
+          <tr v-for="range in rows" :key="range.id" :class="isDegraded(range) ? 'bg-amber-500/5' : ''">
+            <td class="max-w-[10rem] truncate px-3 py-2 font-mono" :title="range.id">{{ range.id }}</td>
             <td class="px-3 py-2 font-mono">{{ range.lower || '(start)' }} to {{ range.upper || '(end)' }}</td>
             <td class="px-3 py-2">
-              {{ range.coordinator }}
-              <Badge v-if="range.degradedSince" variant="warn" size="sm" class="ml-1">unreachable</Badge>
+              <NodeLabel :node-id="range.coordinator" />
+              <Badge v-if="isDegraded(range)" variant="warn" size="sm" class="ml-1">unreachable</Badge>
             </td>
             <td class="px-3 py-2">{{ range.epoch }}</td>
-            <td class="px-3 py-2">{{ range.replicas.join(', ') || 'none' }}</td>
-            <td class="px-3 py-2 text-right tabular-nums">{{ formatNumber(range.objects) }}</td>
-            <td class="px-3 py-2 text-right tabular-nums">{{ formatBytes(range.bytes) }}</td>
-            <td class="px-3 py-2">{{ stamp(range.refreshed) }}</td>
+            <td class="px-3 py-2">
+              <template v-if="range.replicas.length">
+                <NodeLabel v-for="(replica, index) in range.replicas" :key="replica" :node-id="replica" :class="index ? 'ml-2' : ''" />
+              </template>
+              <template v-else>none</template>
+            </td>
+            <template v-if="counted">
+              <td class="px-3 py-2 text-right tabular-nums">{{ range.objects === undefined ? 'Unknown' : formatNumber(range.objects) }}</td>
+              <td class="px-3 py-2 text-right tabular-nums">{{ range.bytes === undefined ? 'Unknown' : formatBytes(range.bytes) }}</td>
+            </template>
+            <td v-if="refreshed" class="px-3 py-2">{{ range.refreshed ? stamp(range.refreshed) : 'Unknown' }}</td>
           </tr>
         </tbody>
       </table>
