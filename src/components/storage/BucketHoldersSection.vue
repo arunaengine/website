@@ -37,6 +37,8 @@ const list = computed(() => holders.value?.holders ?? [])
 const recovery = computed(() => recoverySummary(holders.value ? listedRecovery(holders.value) : null))
 const partial = computed(() => Boolean(holders.value && holders.value.complete !== true))
 const busy = ref<string | null>(null)
+// The removal on its way was confirmed in the dialog, even once the dialog is closed.
+const confirmedRemoval = ref(false)
 const failure = ref<string | null>(null)
 /** A confirmation belongs to the holder set it was shown for; a newer set needs a new one. */
 interface PendingRemoval {
@@ -101,6 +103,7 @@ async function addHolder() {
 async function removeHolder(entry: BucketHolderEntry, confirm: boolean, revision: string) {
   if (busy.value !== null) return
   busy.value = entry.user_id
+  confirmedRemoval.value = confirm
   failure.value = null
   try {
     const result = await remove(entry.user_id, confirm, revision)
@@ -163,10 +166,10 @@ function confirmRemoval() {
               size="sm"
               variant="outline"
               :disabled="busy !== null || frozen"
-              :aria-busy="busy === entry.user_id && !pending"
+              :aria-busy="busy === entry.user_id && !confirmedRemoval"
               @click="startRemove(entry)"
             >
-              <Spinner v-if="busy === entry.user_id && !pending" label="Removing the key holder" class="text-current" /> Remove
+              <Spinner v-if="busy === entry.user_id && !confirmedRemoval" label="Removing the key holder" class="text-current" /> Remove
             </Button>
           </li>
         </ul>

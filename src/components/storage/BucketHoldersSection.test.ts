@@ -154,6 +154,25 @@ describe('bucket key holder list', () => {
     expect(content(direct)).toContain('Removing the key holder')
   })
 
+  it('keeps the wait of a confirmed removal off the row when the warning is closed meanwhile', async () => {
+    let answer: (value: unknown) => void = () => {}
+    remove.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const root = await render([holder('Ada'), holder('Bo')])
+    await click(rowButton(root, 'Bo'))
+    await click(element(root, (node) => node.tag === 'input' && node.props.type === 'checkbox'))
+    void (button(root, 'Remove anyway').props.onClick as () => void)()
+    await flush()
+    await click(button(root, 'Cancel'))
+    expect(content(root)).not.toContain('Remove anyway')
+    const row = rowButton(root, 'Bo')
+    expect(row.props['aria-busy']).toBe(false)
+    expect(row.props.disabled).toBe(true)
+    expect(content(row)).not.toContain('Removing the key holder')
+    answer('removed')
+    await flush()
+    expect(remove).toHaveBeenCalledWith('Bo', true, 'rev-1')
+  })
+
   it('shows the wait on Grant, sends it once and frees it when it fails', async () => {
     let refuse: (err: Error) => void = () => {}
     grant.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
