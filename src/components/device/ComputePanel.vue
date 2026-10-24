@@ -3,6 +3,7 @@
 // probe is what the shell found; the settings are what the owner decided, and
 // saving them restarts the node.
 import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -138,7 +139,7 @@ const chosenMissing = computed(() => {
           <Switch :checked="on" aria-label="Run jobs on this computer" @update:checked="setOn" />
         </div>
 
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="grid grid-cols-2 gap-3">
           <label class="block">
             <span class="text-xs font-medium text-foreground">Jobs at a time</span>
             <Input
@@ -209,12 +210,13 @@ const chosenMissing = computed(() => {
 
         <Notice v-if="saveError" tone="error">{{ saveError }}</Notice>
 
-        <div class="flex flex-wrap items-center justify-end gap-3">
-          <span class="mr-auto text-[11px] text-muted-foreground">
-            Saving restarts Aruna on this computer for a few seconds.
-          </span>
-          <span v-if="saved" class="text-[11px] text-muted-foreground">Saved.</span>
+        <p class="text-[11px] text-muted-foreground">Saving restarts Aruna on this computer for a few seconds.</p>
+        <div class="flex flex-wrap items-center gap-3">
           <Button :disabled="saving" @click="save">{{ saving ? 'Saving…' : 'Save' }}</Button>
+          <span v-if="saved" class="text-[11px] text-muted-foreground">Saved.</span>
+          <RouterLink :to="{ name: 'compute' }" class="ml-auto text-xs font-medium text-primary hover:underline">
+            See runs in Compute
+          </RouterLink>
         </div>
       </template>
     </div>

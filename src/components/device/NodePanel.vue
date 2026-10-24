@@ -95,12 +95,10 @@ async function start(): Promise<void> {
       <Notice v-if="status && !status.enrolled && !status.enrolling" tone="info">
         This computer has not joined a realm yet.
       </Notice>
-      <dl class="grid gap-3 sm:grid-cols-3">
-        <div v-for="tile in tiles" :key="tile.label" class="surface-inline px-3 py-2">
-          <dt class="text-[10px] uppercase tracking-wide text-muted-foreground">{{ tile.label }}</dt>
-          <dd :class="tile.mono ? 'font-mono text-xs' : 'text-sm font-medium'" class="mt-0.5 text-foreground">
-            {{ tile.value }}
-          </dd>
+      <dl class="space-y-2 text-xs">
+        <div v-for="tile in tiles" :key="tile.label" class="flex justify-between gap-3">
+          <dt class="text-muted-foreground">{{ tile.label }}</dt>
+          <dd :class="tile.mono ? 'font-mono' : ''" class="text-right text-foreground">{{ tile.value }}</dd>
         </div>
       </dl>
     </div>

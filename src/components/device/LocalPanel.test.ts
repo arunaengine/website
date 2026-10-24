@@ -89,9 +89,9 @@ describe('the local S3 endpoint', () => {
     const mounted = await mountApp(LocalPanel)
     const html = content(mounted.root)
 
-    expect(html).toContain('Address for your tools')
+    expect(html).toContain('Connect your tools')
     expect(html).toContain('http://127.0.0.1:34118')
-    expect(html).toContain('Set up your tools')
+    expect(html).toContain('Open Access & connection')
     expect(toggle(mounted.root).props.checked).toBe(true)
     mounted.app.unmount()
   })

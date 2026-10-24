@@ -1,10 +1,13 @@
 <script setup lang="ts">
-// This computer, mounted only in desktop mode: the state of Aruna here, where it
-// keeps its files, and the settings only you control. It is also where an
+// This computer, mounted only in desktop mode: linked folders, what is moving,
+// the state of Aruna here and the settings only you control. It is also where an
 // `aruna://enroll` link lands, so the outcome is shown here.
 import { computed, nextTick, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
+import ActivityCard from '@/components/desktop/ActivityCard.vue'
+import LinkedFolders from '@/components/desktop/LinkedFolders.vue'
+import LocalBuckets from '@/components/desktop/LocalBuckets.vue'
 import ComputePanel from '@/components/device/ComputePanel.vue'
 import EnrollPanel from '@/components/device/EnrollPanel.vue'
 import LocalPanel from '@/components/device/LocalPanel.vue'
@@ -25,10 +28,11 @@ const showEnroll = computed(() => !enrolled.value || Boolean(invite.value))
 onMounted(async () => {
   void start()
   void refresh()
-  // The node-down page links here with ?section=wipe.
-  if (route.query.section !== 'wipe') return
+  // The node-down page links here with ?section=wipe, Home with ?section=local-runs.
+  const section = route.query.section
+  if (section !== 'wipe' && section !== 'local-runs') return
   await nextTick()
-  document.getElementById('wipe')?.scrollIntoView?.({ block: 'center' })
+  document.getElementById(section)?.scrollIntoView?.({ block: 'center' })
 })
 
 function onEnrolled() {
@@ -42,16 +46,25 @@ function onEnrolled() {
     <PageHeader
       eyebrow="This computer"
       title="This computer"
-      description="Aruna runs on this computer. Start or pause it here, and choose where it keeps its files."
+      description="Aruna runs on this computer. Your folders, what is moving, and how it runs."
       :docs="{ topic: 'realm-nodes-groups', section: 'Nodes and the realm' }"
     />
 
-    <div class="container space-y-4 py-5">
+    <div class="container space-y-5 py-5">
       <EnrollPanel v-if="showEnroll" :invite="invite" @enrolled="onEnrolled" />
-      <NodePanel />
-      <LocalPanel />
-      <ComputePanel />
-      <WipePanel id="wipe" @wiped="refresh" />
+      <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div class="min-w-0 space-y-5">
+          <LinkedFolders />
+          <ActivityCard />
+        </div>
+        <div class="min-w-0 space-y-5">
+          <NodePanel />
+          <LocalBuckets />
+          <ComputePanel id="local-runs" />
+          <LocalPanel />
+          <WipePanel id="wipe" @wiped="refresh" />
+        </div>
+      </div>
     </div>
   </div>
 </template>

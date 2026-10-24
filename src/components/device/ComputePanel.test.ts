@@ -25,6 +25,7 @@ const Notice = compileClientComponent(new URL('../ui/Notice.vue', import.meta.ur
 
 const ComputePanel = compileClientComponent(new URL('./ComputePanel.vue', import.meta.url), {
   vue: VueRuntime,
+  'vue-router': { RouterLink: plain },
   '@lucide/vue': icons,
   '@/components/ui/Badge.vue': moduleDefault(plain),
   '@/components/ui/Button.vue': moduleDefault(plain),
