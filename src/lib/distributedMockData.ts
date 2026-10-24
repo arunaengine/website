@@ -1,4 +1,5 @@
 // Example data for the node mock. All values are made up.
+import type { Origin } from '@/lib/fileOrigin'
 import { grantTargets, isMulti, type DistributedBucket, type DistributedMember, type DistributedRange } from '@/lib/distribution'
 import { grantGap, REALM_ID, type StorageQuestion, type Coverage, type DataStrategy, type MemberState, type PresetId, type RangeMode } from '@/lib/distributedMock'
 
@@ -837,14 +838,6 @@ export function partLabel(part: LinkedPart): string {
   const what = part.kind === 'folder' ? 'linked folder' : part.kind === 'database' ? 'linked database' : 'linked bucket'
   return `${name}, ${what}`
 }
-
-export type Origin =
-  | { kind: 'upload'; user: string; node: string; time: string; device?: string }
-  | { kind: 'source'; source: string; path: string; etag?: string; digest?: string; database?: string }
-  | { kind: 'copy'; from: string }
-  | { kind: 'sync'; sync: string; from: string }
-  | { kind: 'storage'; folder: string; key: string }
-  | { kind: 'job'; run: string }
 
 const idOf = (version: string) => `/${REALM_ID}/${version}`
 

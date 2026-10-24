@@ -5,7 +5,8 @@ import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import type { PartOf } from '@/composables/useMockDatabases'
-import { basedOn, type BasedOn, type Origin } from '@/lib/distributedMockData'
+import { basedOn, type BasedOn } from '@/lib/distributedMockData'
+import type { Origin } from '@/lib/fileOrigin'
 
 const props = defineProps<{ origin: Origin; partOf: PartOf[] }>()
 

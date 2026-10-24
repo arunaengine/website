@@ -1,6 +1,7 @@
 import {
   createDistributedBucket as requestCreate,
   getBucketLinks as requestLinks,
+  getFileOrigin as requestOrigin,
   getBucketDistribution as requestDistribution,
   getBucketUsage as requestBucketUsage,
   retryAdmission as requestRetry,
@@ -12,6 +13,7 @@ import {
   type CreateDistributedRequest,
   type DataLinksResponse,
   type DistributedResponse,
+  type OriginResponse,
   type GroupRoutingResponse,
   type ReplicateBlobRequest,
   type ReplicateBlobResponse,
@@ -60,6 +62,11 @@ export function getBucketUsage(bucket: string): Promise<BucketUsageResponse> {
 /** Datasets that link a file, a folder or the root of a bucket on this node. */
 export function getBucketLinks(bucket: string, query: BucketLinksQuery, signal?: AbortSignal): Promise<DataLinksResponse> {
   return requestLinks(bucket, query, refreshContext().client, signal)
+}
+
+/** Where one file version of a bucket on this node came from. */
+export function getFileOrigin(bucket: string, query: { key: string; version_id?: string }, signal?: AbortSignal): Promise<OriginResponse> {
+  return requestOrigin(bucket, query, refreshContext().client, signal)
 }
 
 /** The set a bucket on this node belongs to; 404 means an ordinary bucket. */
