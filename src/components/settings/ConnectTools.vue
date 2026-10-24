@@ -121,12 +121,27 @@ watch(deviceClient, () => {
 })
 
 const canCreate = computed(() => (node.value ? Boolean(authToken.value) : deviceKeys.available.value))
-const createOnNode = computed(() => {
+
+// The key request in flight and the place it started at. Closing the dialog
+// drops it, so a late answer never lands on another place.
+let pendingKey: { nodeId: string | null; accessKeyId?: string } | null = null
+watch(createOpen, (open) => {
+  if (!open) pendingKey = null
+})
+
+// Without this computer's node the dialog keeps its own "not running" answer.
+const createKey = computed(() => {
   const target = node.value
-  if (!target) return undefined
+  if (!target && !deviceKeys.available.value) return undefined
+  const client = target ? nodeClient(target) : null
   return async (groupId: string, expiresInSeconds: number) => {
-    const made = await createDeviceCredential({ group_id: groupId, expires_in_seconds: expiresInSeconds }, nodeClient(target))
-    await loadNodeKeys()
+    const request: { nodeId: string | null; accessKeyId?: string } = { nodeId: target?.nodeId ?? null }
+    pendingKey = request
+    const made = client
+      ? await createDeviceCredential({ group_id: groupId, expires_in_seconds: expiresInSeconds }, client)
+      : await deviceKeys.create(groupId, expiresInSeconds)
+    request.accessKeyId = made.access_key_id
+    if (client) await loadNodeKeys()
     return made
   }
 })
@@ -142,8 +157,11 @@ const snippet = (id: string): string =>
 const ready = (id: string) => Boolean(id === 'nextflow' ? tes.value : address.value)
 
 function onCreated(key: ToolKey & { name: string }): void {
-  fresh.value = { ...key, nodeId: node.value?.nodeId ?? null }
+  const request = pendingKey
   names.value = keyNames()
+  if (!request || request.accessKeyId !== key.accessKeyId) return
+  pendingKey = null
+  fresh.value = { ...key, nodeId: request.nodeId }
 }
 
 async function remove(accessKeyId: string, owner: RealmNodeDisplay | null): Promise<void> {
@@ -334,7 +352,7 @@ function made(iso: string): string {
       </div>
     </section>
 
-    <CreateKeyDialog v-model:open="createOpen" :create="createOnNode" @created="onCreated" />
+    <CreateKeyDialog v-model:open="createOpen" :create="createKey" @created="onCreated" />
     <CreateCredentialDialog v-model:open="tokenOpen" />
   </div>
 </template>
