@@ -14,6 +14,7 @@ import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DocsLink from '@/components/ui/DocsLink.vue'
 import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import StorageLocationFields from '@/components/metadata/StorageLocationFields.vue'
 import { useAruna } from '@/composables/useAruna'
 import { apiErrorMessage, type GroupDetailResponse } from '@/lib/api'
@@ -26,7 +27,8 @@ const { setGroupLocation, getBucketRouting, getGroupRouting, listGroupBackends }
 
 const open = ref(false)
 const choice = ref({ bucket: '', prefix: '' })
-const busy = ref(false)
+// The save on its way: the generated group bucket or the chosen place.
+const busy = ref<'generated' | 'choice' | null>(null)
 const error = ref<string | null>(null)
 
 const location = computed(() => props.group.dataset_location ?? null)
@@ -78,8 +80,9 @@ function edit() {
 
 // null restores the generated group bucket.
 async function save(target: { bucket: string; prefix: string } | null) {
+  if (busy.value) return
   const groupId = props.group.group_id
-  busy.value = true
+  busy.value = target ? 'choice' : 'generated'
   error.value = null
   try {
     const updated = await setGroupLocation(groupId, target)
@@ -89,7 +92,7 @@ async function save(target: { bucket: string; prefix: string } | null) {
   } catch (failure) {
     if (groupId === props.group.group_id) error.value = apiErrorMessage(failure)
   } finally {
-    busy.value = false
+    busy.value = null
   }
 }
 
@@ -144,10 +147,14 @@ function saveChoice() {
         </Notice>
         <Notice v-if="error" tone="error">{{ error }}</Notice>
         <DialogFooter class="sm:justify-between">
-          <Button variant="ghost" size="sm" :disabled="busy" @click="save(null)">Use the generated group bucket</Button>
+          <Button variant="ghost" size="sm" :disabled="busy !== null" :aria-busy="busy === 'generated'" @click="save(null)">
+            <Spinner v-if="busy === 'generated'" label="Saving the location" class="text-current" /> Use the generated group bucket
+          </Button>
           <div class="flex gap-2">
-            <Button variant="outline" size="sm" :disabled="busy" @click="open = false">Cancel</Button>
-            <Button size="sm" :disabled="busy" @click="saveChoice">{{ busy ? 'Saving' : 'Save' }}</Button>
+            <Button variant="outline" size="sm" :disabled="busy !== null" @click="open = false">Cancel</Button>
+            <Button size="sm" :disabled="busy !== null" :aria-busy="busy === 'choice'" @click="saveChoice">
+              {{ busy === 'choice' ? 'Saving' : 'Save' }}
+            </Button>
           </div>
         </DialogFooter>
       </DialogContent>

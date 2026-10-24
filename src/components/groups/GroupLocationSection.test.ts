@@ -46,6 +46,7 @@ const GroupLocationSection = compileClientComponent(new URL('./GroupLocationSect
   '@/components/ui/DialogTitle.vue': moduleDefault(Slot),
   '@/components/ui/DocsLink.vue': moduleDefault(Empty),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
+  '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('i', p.label) })),
   '@/components/metadata/StorageLocationFields.vue': moduleDefault(FieldsStub),
   '@/composables/useAruna': { useAruna: () => ({ setGroupLocation, getBucketRouting, getGroupRouting, listGroupBackends }) },
   '@/lib/api': Api,
@@ -126,6 +127,29 @@ describe('GroupLocationSection', () => {
     await click(button(mounted.root, 'Save'))
 
     expect(content(mounted.root)).toContain('Choice')
+    expect(content(mounted.root)).toContain('bucket reef-raw belongs to another group')
+    mounted.app.unmount()
+  })
+
+  it('shows the wait on the save that was clicked and sends one at a time', async () => {
+    let refuse: (err: unknown) => void = () => {}
+    setGroupLocation.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+    const mounted = await render({ bucket: 'lab', prefix: 'projects/' })
+    await click(button(mounted.root, 'Edit'))
+    void (button(mounted.root, 'Use the generated group bucket').props.onClick as () => Promise<void>)()
+    await flush()
+    const generated = button(mounted.root, 'Saving the location Use the generated group bucket')
+    expect(generated.props['aria-busy']).toBe(true)
+    expect(generated.props.disabled).toBe(true)
+    const save = button(mounted.root, 'Save')
+    expect(content(save).trim()).toBe('Save')
+    expect(save.props['aria-busy']).toBe(false)
+    await click(save)
+    expect(setGroupLocation).toHaveBeenCalledTimes(1)
+    refuse(new Api.ApiError(400, 'bucket reef-raw belongs to another group'))
+    await flush()
+    expect(button(mounted.root, 'Use the generated group bucket').props['aria-busy']).toBe(false)
+    expect(button(mounted.root, 'Use the generated group bucket').props.disabled).toBe(false)
     expect(content(mounted.root)).toContain('bucket reef-raw belongs to another group')
     mounted.app.unmount()
   })
