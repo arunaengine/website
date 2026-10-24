@@ -109,6 +109,14 @@ import {
   userInfo,
 } from './aruna/state'
 import {
+  approveDatabaseRequest,
+  dropDatabaseRequest,
+  listDatabaseRequests,
+  listDatabases,
+  markDatabase,
+  removeDatabase,
+} from './aruna/databases'
+import {
   createDistributedBucket,
   getBlobLocations,
   getBucketDistribution,
@@ -258,6 +266,12 @@ export function useAruna() {
     getBucketUsage,
     getBucketDistribution,
     getBucketLinks,
+    listDatabases,
+    markDatabase,
+    removeDatabase,
+    listDatabaseRequests,
+    approveDatabaseRequest,
+    dropDatabaseRequest,
     createDistributedBucket,
     retryDistributedAdmission,
     putBucketRouting,
