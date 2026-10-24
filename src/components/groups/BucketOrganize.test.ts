@@ -282,6 +282,19 @@ describe('BucketOrganize rename start', () => {
     expect(content(root)).toContain('refused')
   })
 
+  it('shows the wait only on the step that is starting', async () => {
+    startDuplicates.mockReturnValue(new Promise(() => {}))
+    const { root } = await mount()
+    await click(buttonIn(step(root, 'step-duplicates')[0], 'Review…'))
+    void (buttonIn(root, 'Remove copies of 6 files').props.onClick as () => Promise<void>)()
+    await flush()
+    expect(buttonIn(root, 'Starting the removal Remove copies of 6 files').props['aria-busy']).toBe(true)
+    await click(buttonIn(stepOf(root), 'Review…'))
+    const rename = buttonIn(root, 'Rename 3,877 files')
+    expect(rename.props['aria-busy']).toBe(false)
+    expect(rename.props.disabled).toBe(true)
+  })
+
   it('locks the review and hides the list at once, before any read shows the step', async () => {
     const { useLinkState } = await import('@/composables/useLinkState')
     getOrganizeJob.mockReturnValue(new Promise(() => {}))

@@ -47,7 +47,8 @@ const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
 const { writesDisabled } = useConnectivity()
 
 const open = ref<'dup' | 'ren' | null>(null)
-const busy = ref(false)
+// The step being started, so only its button shows the wait.
+const busy = ref<'dup' | 'ren' | null>(null)
 const error = ref<string | null>(null)
 const copiesMissing = ref(false)
 const renamesMissing = ref(false)
@@ -153,9 +154,9 @@ function review(step: 'dup' | 'ren') {
   open.value = open.value === step ? null : step
 }
 
-async function act(run: () => Promise<unknown>, started: () => void = () => emit('started')) {
+async function act(step: 'dup' | 'ren', run: () => Promise<unknown>, started: () => void = () => emit('started')) {
   if (busy.value || props.job || writesDisabled.value) return
-  busy.value = true
+  busy.value = step
   error.value = null
   const epoch = sessionEpoch.value
   const link = props.link.import_id
@@ -167,18 +168,19 @@ async function act(run: () => Promise<unknown>, started: () => void = () => emit
     if (!same()) return
     error.value = isUnsupportedEndpoint(err) ? 'This node cannot do this yet.' : (moveRefusal(err) ?? organizeError(err))
   } finally {
-    busy.value = false
+    busy.value = null
   }
 }
 
-const removeCopies = () => act(() => startDuplicates(props.groupId, props.link.import_id, client()))
+const removeCopies = () => act('dup', () => startDuplicates(props.groupId, props.link.import_id, client()))
 const rename = () =>
   act(
+    'ren',
     () => startImportRenames(props.groupId, props.link.import_id, client()),
     () => emit('renaming'),
   )
 const offline = computed(() => (writesDisabled.value ? OFFLINE_WRITE_HINT : undefined))
-const blocked = computed(() => busy.value || Boolean(props.job) || writesDisabled.value)
+const blocked = computed(() => busy.value !== null || Boolean(props.job) || writesDisabled.value)
 </script>
 
 <template>
@@ -231,8 +233,8 @@ const blocked = computed(() => busy.value || Boolean(props.job) || writesDisable
         </PagedList>
         <div class="mt-2 flex justify-end gap-2">
           <Button variant="ghost" size="sm" @click="open = null">Cancel</Button>
-          <Button variant="destructive" size="sm" :disabled="blocked" :aria-busy="busy" :title="offline" @click="removeCopies">
-            <Spinner v-if="busy" label="Starting the removal" class="text-current" /> {{ copyButton }}
+          <Button variant="destructive" size="sm" :disabled="blocked" :aria-busy="busy === 'dup'" :title="offline" @click="removeCopies">
+            <Spinner v-if="busy === 'dup'" label="Starting the removal" class="text-current" /> {{ copyButton }}
           </Button>
         </div>
       </div>
@@ -307,8 +309,8 @@ const blocked = computed(() => busy.value || Boolean(props.job) || writesDisable
         </PagedList>
         <div class="mt-2 flex justify-end gap-2">
           <Button variant="ghost" size="sm" @click="open = null">Cancel</Button>
-          <Button size="sm" :disabled="blocked" :aria-busy="busy" :title="offline" @click="rename">
-            <Spinner v-if="busy" label="Starting the rename" class="text-current" /> Rename {{ renameCount }}
+          <Button size="sm" :disabled="blocked" :aria-busy="busy === 'ren'" :title="offline" @click="rename">
+            <Spinner v-if="busy === 'ren'" label="Starting the rename" class="text-current" /> Rename {{ renameCount }}
           </Button>
         </div>
       </div>
