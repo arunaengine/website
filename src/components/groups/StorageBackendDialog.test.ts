@@ -192,6 +192,47 @@ describe('Storage dialog connection', () => {
     expect(content(root)).toContain('refused')
   })
 
+  it('keeps a removal of one storage off the dialog of another opened meanwhile', async () => {
+    let finish: () => void = () => {}
+    disableGroupBackend.mockImplementationOnce(() => {
+      saving.value = true
+      return new Promise<void>((resolve) => {
+        finish = () => {
+          saving.value = false
+          resolve()
+        }
+      })
+    })
+    const open = ref(true)
+    const backend = ref<GroupBackendResponse>(stored)
+    const closes: boolean[] = []
+    const { root } = await mountApp(
+      defineComponent(() => () =>
+        h(StorageBackendDialog, {
+          open: open.value,
+          groupId: 'g1',
+          backend: backend.value,
+          'onUpdate:open': (value: boolean) => closes.push(value),
+        }),
+      ),
+    )
+    await flush()
+    await click(buttonWith(root, 'Remove storage…'))
+    void (buttonWith(root, 'Remove').props.onClick as () => Promise<void>)()
+    await flush()
+    open.value = false
+    await flush()
+    backend.value = { ...saved, backend_id: 'b2', name: 'other', disabled: true }
+    open.value = true
+    await flush()
+    const enable = buttonWith(root, 'Enable storage')
+    expect(enable.props['aria-busy']).toBe(false)
+    finish()
+    await flush()
+    expect(closes).toEqual([])
+    expect(buttonWith(root, 'Enable storage').props['aria-busy']).toBe(false)
+  })
+
   it('removes the storage after a confirm', async () => {
     const { root } = await mount(stored)
     await click(buttonWith(root, 'Remove storage…'))

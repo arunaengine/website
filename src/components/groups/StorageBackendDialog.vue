@@ -10,7 +10,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
-import { computed, ref, useId, watch } from 'vue'
+import { computed, ref, shallowRef, useId, watch } from 'vue'
 import { Database, Lock } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
@@ -43,8 +43,8 @@ const secretValues = ref<Record<string, string>>({})
 const toggleOn = ref(false)
 const keysOpen = ref(false)
 const removing = ref(false)
-// Remove or Enable storage is on its way; the shared saving flag is set for it too.
-const toggling = ref(false)
+// The Remove or Enable storage on its way, for the backend it was sent for; saving is set for it too.
+const toggling = shallowRef<{ backendId: string; remove: boolean } | null>(null)
 const submitError = ref<string | null>(null)
 
 const submitSummary = computed(() => (submitError.value ? shortError(submitError.value) : ''))
@@ -168,16 +168,19 @@ async function setRemoved(remove: boolean) {
   const existing = props.backend
   if (!existing || writesDisabled.value || saving.value) return
   submitError.value = null
-  toggling.value = true
+  const asked = { backendId: existing.backend_id, remove }
+  toggling.value = asked
+  // A dialog opened meanwhile for another backend stays as it is.
+  const shown = () => props.open && props.backend?.backend_id === asked.backendId
   try {
     if (remove) await disableGroupBackend(props.groupId, existing.backend_id)
     else await enableGroupBackend(props.groupId, existing.backend_id)
     emit('saved')
-    emit('update:open', false)
+    if (shown()) emit('update:open', false)
   } catch (err) {
-    submitError.value = errorMessage(err)
+    if (shown()) submitError.value = errorMessage(err)
   } finally {
-    toggling.value = false
+    if (toggling.value === asked) toggling.value = null
   }
 }
 </script>
@@ -323,10 +326,15 @@ async function setRemoved(remove: boolean) {
                 variant="destructive"
                 size="sm"
                 :disabled="saving || writesDisabled"
-                :aria-busy="toggling"
+                :aria-busy="toggling?.backendId === backend.backend_id && toggling.remove"
                 @click="setRemoved(true)"
               >
-                <Spinner v-if="toggling" label="Removing the storage" class="text-current" /> Remove
+                <Spinner
+                  v-if="toggling?.backendId === backend.backend_id && toggling.remove"
+                  label="Removing the storage"
+                  class="text-current"
+                />
+                Remove
               </Button>
               <Button type="button" variant="ghost" size="sm" @click="removing = false">Keep</Button>
             </template>
@@ -337,10 +345,15 @@ async function setRemoved(remove: boolean) {
               size="sm"
               class="mr-auto"
               :disabled="saving || writesDisabled"
-              :aria-busy="toggling"
+              :aria-busy="toggling?.backendId === backend.backend_id && !toggling.remove"
               @click="setRemoved(false)"
             >
-              <Spinner v-if="toggling" label="Enabling the storage" class="text-current" /> Enable storage
+              <Spinner
+                v-if="toggling?.backendId === backend.backend_id && !toggling.remove"
+                label="Enabling the storage"
+                class="text-current"
+              />
+              Enable storage
             </Button>
             <Button
               v-else
@@ -356,7 +369,7 @@ async function setRemoved(remove: boolean) {
           </template>
           <DialogClose as-child><Button type="button" variant="outline">Cancel</Button></DialogClose>
           <Button type="submit" :disabled="submitDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined">
-            {{ saving && !toggling ? 'Saving…' : isEdit ? 'Save' : 'Add storage' }}
+            {{ saving && toggling === null ? 'Saving…' : isEdit ? 'Save' : 'Add storage' }}
           </Button>
         </DialogFooter>
       </form>
