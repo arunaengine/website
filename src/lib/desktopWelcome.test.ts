@@ -455,6 +455,61 @@ describe('session carried to a new base', () => {
     await vi.waitFor(() => expect(landed).not.toHaveLength(0))
     expect(landed).toEqual(['settings'])
   })
+
+  it('keeps a stored session that is still restoring at start', async () => {
+    // At start the token stays empty until the realm named itself, as on a base switch.
+    const welcome = await load({ state: 'running', enrolled: true, apiBaseUrl: LOCAL }, REALM, 'https://aruna.example', {
+      token: '',
+      bootstrapped: false,
+    })
+    restoring.value = true
+    let release = () => {}
+    refresh.mockImplementationOnce(
+      () =>
+        new Promise<undefined>((done) => {
+          release = () => {
+            authToken.value = 'token'
+            restoring.value = false
+            bootstrapped.value = true
+            done(undefined)
+          }
+        }),
+    )
+    const router = blankRouter()
+    welcome.installDesktopGuard(router)
+    const landed: string[] = []
+    router.afterEach((to) => void landed.push(String(to.name)))
+    const reads = useAruna.mock.calls.length
+
+    const trip = router.push('/app/settings')
+    await vi.waitFor(() => expect(useAruna.mock.calls.length).toBeGreaterThan(reads))
+    release()
+    await trip
+
+    expect(landed).toEqual(['settings'])
+  })
+
+  it('never signs out a restore that outlasts the wait', async () => {
+    vi.useFakeTimers()
+    const welcome = await load({ state: 'running', enrolled: true, apiBaseUrl: LOCAL }, REALM, 'https://aruna.example', {
+      token: '',
+      bootstrapped: false,
+    })
+    restoring.value = true
+    refresh.mockImplementationOnce(() => new Promise<undefined>(() => {}))
+    const router = blankRouter()
+    welcome.installDesktopGuard(router)
+    const landed: string[] = []
+    router.afterEach((to) => void landed.push(String(to.name)))
+    const reads = useAruna.mock.calls.length
+
+    void router.push('/app/settings')
+    await vi.waitFor(() => expect(useAruna.mock.calls.length).toBeGreaterThan(reads))
+    await vi.advanceTimersByTimeAsync(10_000)
+
+    await vi.waitFor(() => expect(landed).not.toHaveLength(0))
+    expect(landed).toEqual(['settings'])
+  })
 })
 
 describe('device setup gate', () => {
