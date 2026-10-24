@@ -63,6 +63,7 @@ describe('folder mapping', () => {
 
   it('refuses to invent a state it does not know', () => {
     expect(readFolder({ state: 'deleting' }).state).toBe('deleting')
+    expect(readFolder({ state: 'binding' }).state).toBe('binding')
     expect(readFolder({ state: 'melting' }).state).toBe('active')
     expect(readEntry({ path: 'a.txt', state: 'sideways' }).state).toBe('error')
   })

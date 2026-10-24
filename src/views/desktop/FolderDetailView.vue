@@ -304,6 +304,7 @@ const filesText = computed(() => {
         <Badge v-if="folder" variant="outline" size="sm" class="uppercase">{{ modeLabel(folder.mode) }}</Badge>
         <Badge v-if="folder?.state === 'paused'" variant="secondary" size="sm" class="uppercase">paused</Badge>
         <Badge v-if="folder?.state === 'deleting'" variant="sky" size="sm" class="uppercase">deleting</Badge>
+        <Badge v-if="folder?.state === 'binding'" variant="sky" size="sm" class="uppercase">linking</Badge>
       </template>
       <template #actions>
         <Button variant="ghost" size="sm" as-child>
@@ -314,7 +315,7 @@ const filesText = computed(() => {
         </Button>
         <RefreshButton :busy="refreshBusy" :disabled="busy" @click="onRefresh" />
         <Button
-          v-if="folder && folder.state !== 'deleting'"
+          v-if="folder && folder.state !== 'deleting' && folder.state !== 'binding'"
           variant="outline"
           size="sm"
           :disabled="busy"
@@ -325,7 +326,7 @@ const filesText = computed(() => {
           {{ folder.state === 'paused' ? 'Resume' : 'Pause' }}
         </Button>
         <Button
-          v-if="folder && folder.state !== 'paused' && folder.state !== 'deleting'"
+          v-if="folder && folder.state !== 'paused' && folder.state !== 'deleting' && folder.state !== 'binding'"
           size="sm"
           :disabled="busy"
           @click="retry"

@@ -83,6 +83,15 @@ describe('folder item chips', () => {
     expect(itemChip({ kind: 'folder', folder: value })).toEqual({ label: 'Deleting', variant: 'sky' })
   })
 
+  it('shows a folder still being linked, with a realm problem as a warning', () => {
+    expect(itemChip({ kind: 'folder', folder: folder({ state: 'binding' }) })).toEqual({ label: 'Linking', variant: 'sky' })
+    expect(itemChip({ kind: 'folder', folder: folder({ state: 'binding', last_error: 'realm node unreachable' }) })).toEqual({
+      label: 'Linking',
+      variant: 'warn',
+      detail: 'realm node unreachable',
+    })
+  })
+
   it('uses errors before decisions and activity', () => {
     const value = folder({ counters: { ...folder().counters, conflicts: 2, uploading: 3 } })
 

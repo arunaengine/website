@@ -95,7 +95,7 @@ const surface = computed(() =>
 )
 
 const allPaused = computed(() => folders.value.length > 0 && folders.value.every((folder) => folder.state === 'paused'))
-const canAct = computed(() => folders.value.some((folder) => folder.state !== 'deleting'))
+const canAct = computed(() => folders.value.some((folder) => folder.state !== 'deleting' && folder.state !== 'binding'))
 // Sync now also carries offline datasets, so it needs the node and the realm, not a folder.
 const canSync = computed(() => syncState.value === 'ready' && syncStatus.value.realmReachable && !syncRunning.value)
 
@@ -122,7 +122,7 @@ const pauseAll = () =>
   run(() =>
     Promise.all(
       folders.value
-        .filter((folder) => folder.state !== 'deleting' && (folder.state === 'paused') === allPaused.value)
+        .filter((folder) => folder.state !== 'deleting' && folder.state !== 'binding' && (folder.state === 'paused') === allPaused.value)
         .map((folder) => setPaused(folder.folder_id, !allPaused.value)),
     ),
   )

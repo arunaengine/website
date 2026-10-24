@@ -113,10 +113,10 @@ function member<T extends string>(known: readonly T[], value: unknown, fallback:
 
 // download_only is served by newer nodes; an older one answers 400 when it is asked for.
 export type FolderMode = 'two_way' | 'upload_only' | 'download_only'
-export type FolderState = 'active' | 'paused' | 'deleting' | 'error'
+export type FolderState = 'active' | 'paused' | 'deleting' | 'error' | 'binding'
 
 export const FOLDER_MODES: readonly FolderMode[] = ['two_way', 'upload_only', 'download_only']
-const FOLDER_STATES: readonly FolderState[] = ['active', 'paused', 'deleting', 'error']
+const FOLDER_STATES: readonly FolderState[] = ['active', 'paused', 'deleting', 'error', 'binding']
 
 /** Where a folder's contents live in the realm. */
 export interface RemoteBinding {
