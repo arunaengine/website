@@ -72,7 +72,7 @@ describe('update required', () => {
 
     expect(html).toContain('Aruna Desktop needs an update')
     expect(html).toContain('Aruna v3 Demo has a newer version than this app.')
-    expect(html).toContain('Your files and your synced folders are safe.')
+    expect(html).toContain('Your files and your linked folders are safe.')
     expect(html).toContain('3.0.0-alpha.131')
     expect(html).toContain('3.0.0-alpha.133')
     expect(html).toContain('Get the latest Aruna Desktop from your Aruna administrator.')
