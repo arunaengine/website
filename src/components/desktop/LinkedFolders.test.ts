@@ -3,7 +3,6 @@ import { computed, defineComponent, h, reactive, ref } from 'vue'
 import * as RouterRuntime from 'vue-router'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useRefresh } from '@/composables/useRefresh'
 import * as DeviceApi from '@/lib/deviceApi'
 import * as StateBadge from '@/lib/stateBadge'
 import * as SyncStates from '@/lib/syncStates'
@@ -17,7 +16,6 @@ import {
   moduleDefault,
   mountApp,
   nodes,
-  refreshButton,
   type HostNode,
 } from '@/test/clientRender'
 import type {
@@ -96,16 +94,12 @@ const status = ref<DeviceSyncStatus>({
   datasets: [],
 })
 const state = ref<DeviceState>('ready')
-const running = ref(false)
-const runError = ref<string | null>(null)
 const folders = ref<SyncedFolder[]>([])
 const listState = ref<DeviceState>('ready')
 const actionErrors = reactive(new Map<string, string>())
 const transfers = ref<DeviceTransfer[]>([])
 const transfersState = ref<DeviceState>('ready')
-const uploadItems = ref<Array<Record<string, unknown>>>([])
 
-const runSync = vi.fn(async () => undefined)
 const loadSync = vi.fn(async () => undefined)
 const loadFolders = vi.fn(async () => undefined)
 const ensureLoaded = vi.fn(async () => undefined)
@@ -123,10 +117,6 @@ const ButtonStub = defineComponent({
   inheritAttrs: false,
   setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
 })
-const MenuItemStub = defineComponent({
-  inheritAttrs: false,
-  setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
-})
 const BadgeStub = defineComponent({
   props: { variant: String },
   setup: (props, { slots }) => () => h('span', { 'data-variant': props.variant }, slots.default?.()),
@@ -135,24 +125,9 @@ const EmptyStateStub = defineComponent({
   props: { title: String, description: String },
   setup: (props, { slots }) => () => h('div', [props.title, ' ', props.description, slots.default?.()]),
 })
-const PageHeaderStub = defineComponent({
-  props: { title: String },
-  setup: (props, { slots }) => () => h('div', [props.title, slots.breadcrumbs?.(), slots.actions?.()]),
-})
-const FilterChipsStub = defineComponent({
-  props: { options: { type: Array, default: () => [] }, modelValue: String },
-  emits: ['update:modelValue'],
-  setup: (props, { emit }) => () =>
-    h(
-      'div',
-      (props.options as Array<{ value: string; label: string; count?: number }>).map((option) =>
-        h('button', { onClick: () => emit('update:modelValue', option.value) }, `${option.label} ${option.count}`),
-      ),
-    ),
-})
-const RefusalStub = defineComponent({
-  props: { message: { type: String, required: true } },
-  setup: (props) => () => h('div', props.message),
+const BindStub = defineComponent({
+  props: { open: Boolean },
+  setup: (props) => () => h('div', props.open ? 'bind-dialog-open' : ''),
 })
 const ProgressStub = defineComponent({
   props: { label: String },
@@ -160,19 +135,12 @@ const ProgressStub = defineComponent({
 })
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
-const Notice = compileClientComponent(new URL('../../components/ui/Notice.vue', import.meta.url), {
+const Notice = compileClientComponent(new URL('../ui/Notice.vue', import.meta.url), {
   vue: VueRuntime,
   '@/lib/utils': Utils,
 })
 
-const ListShell = compileClientComponent(new URL('../../components/ui/ListShell.vue', import.meta.url), {
-  vue: VueRuntime,
-  '@/components/ui/ListSkeleton.vue': moduleDefault(Blank),
-  '@/components/ui/ErrorPanel.vue': moduleDefault(RefusalStub),
-  '@/components/ui/EmptyState.vue': moduleDefault(EmptyStateStub),
-})
-
-const SyncItemRow = compileClientComponent(new URL('../../components/desktop/SyncItemRow.vue', import.meta.url), {
+const SyncItemRow = compileClientComponent(new URL('./SyncItemRow.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': RouterRuntime,
   '@lucide/vue': icons,
@@ -188,39 +156,20 @@ const SyncItemRow = compileClientComponent(new URL('../../components/desktop/Syn
   '@/lib/utils': Utils,
 })
 
-const SyncView = compileClientComponent(new URL('./SyncView.vue', import.meta.url), {
+const LinkedFolders = compileClientComponent(new URL('./LinkedFolders.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': RouterRuntime,
   '@lucide/vue': icons,
   '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
-  '@/components/ui/DropdownMenu.vue': moduleDefault(Pass),
-  '@/components/ui/DropdownMenuContent.vue': moduleDefault(Pass),
-  '@/components/ui/DropdownMenuItem.vue': moduleDefault(MenuItemStub),
-  '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Pass),
   '@/components/ui/EmptyState.vue': moduleDefault(EmptyStateStub),
-  '@/components/ui/FilterChips.vue': moduleDefault(FilterChipsStub),
-  '@/components/ui/ListShell.vue': moduleDefault(ListShell),
   '@/components/ui/Notice.vue': moduleDefault(Notice),
-  '@/components/ui/Progress.vue': moduleDefault(ProgressStub),
-  '@/components/ui/Spinner.vue': moduleDefault(ProgressStub),
-  '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
-  '@/components/ui/RefusalNote.vue': moduleDefault(RefusalStub),
-  '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
-  '@/components/desktop/BindFolderDialog.vue': moduleDefault(Blank),
+  '@/components/ui/Skeleton.vue': moduleDefault(Blank),
+  '@/components/desktop/BindFolderDialog.vue': moduleDefault(BindStub),
   '@/components/desktop/DeviceSurfaceState.vue': moduleDefault(Blank),
   '@/components/desktop/SyncItemRow.vue': moduleDefault(SyncItemRow),
   '@/composables/useDeviceSync': {
-    useDeviceSync: () => ({
-      status,
-      state,
-      loading: computed(() => state.value === 'idle' || state.value === 'loading'),
-      error: ref(null),
-      runError,
-      running,
-      runSync,
-      load: loadSync,
-    }),
+    useDeviceSync: () => ({ status, state, error: ref(null), load: loadSync }),
   },
   '@/composables/useDeviceTransfers': {
     useDeviceTransfers: () => ({
@@ -230,7 +179,6 @@ const SyncView = compileClientComponent(new URL('./SyncView.vue', import.meta.ur
       load: loadTransfers,
     }),
   },
-  '@/composables/useRefresh': { useRefresh },
   '@/composables/useSyncedFolders': {
     useSyncedFolders: () => ({
       folders,
@@ -244,7 +192,6 @@ const SyncView = compileClientComponent(new URL('./SyncView.vue', import.meta.ur
       sync: syncFolder,
     }),
   },
-  '@/composables/useUploadQueue': { useUploadQueue: () => ({ items: uploadItems }) },
   '@/lib/deviceApi': DeviceApi,
   '@/lib/stateBadge': StateBadge,
   '@/lib/syncStates': SyncStates,
@@ -256,15 +203,14 @@ async function mount() {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/app/sync', name: 'sync', component: Stub },
-      { path: '/app/datasets', name: 'datasets', component: Stub },
+      { path: '/app/device', name: 'device', component: Stub },
       { path: '/app/datasets/:id', name: 'dataset', component: Stub },
       { path: '/app/folders/:folderId', name: 'folder', component: Stub },
     ],
   })
-  await router.push('/app/sync')
+  await router.push('/app/device')
   await router.isReady()
-  return { ...(await mountApp(SyncView, { router })), router }
+  return { ...(await mountApp(LinkedFolders, { router })), router }
 }
 
 function rows(root: HostNode): HostNode[] {
@@ -292,15 +238,11 @@ beforeEach(() => {
     datasets: [],
   }
   state.value = 'ready'
-  running.value = false
-  runError.value = null
   folders.value = [folder()]
   listState.value = 'ready'
   actionErrors.clear()
   transfers.value = []
   transfersState.value = 'ready'
-  uploadItems.value = []
-  runSync.mockClear()
   loadSync.mockClear()
   loadFolders.mockClear()
   ensureLoaded.mockClear()
@@ -311,13 +253,21 @@ beforeEach(() => {
   setPaused.mockImplementation(async () => undefined)
 })
 
-describe('the unified sync list', () => {
-  it('shows one realm status line', async () => {
+describe('the linked folders card', () => {
+  it('lists folders and offline datasets in one list with their count', async () => {
     const mounted = await mount()
 
-    expect(badge(mounted.root, 'Realm reachable').props['data-variant']).toBe('success')
-    expect(content(mounted.root)).toContain('last sync')
-    expect(content(mounted.root)).toContain('3 changes pending')
+    expect(rows(mounted.root)).toHaveLength(2)
+    expect(badge(mounted.root, '2').props['data-variant']).toBe('outline')
+    expect(content(mounted.root)).not.toContain('Realm unreachable')
+    mounted.app.unmount()
+  })
+
+  it('says when the realm cannot be reached', async () => {
+    status.value = { ...status.value, realmReachable: false }
+    const mounted = await mount()
+
+    expect(content(mounted.root)).toContain('Realm unreachable')
     mounted.app.unmount()
   })
 
@@ -373,45 +323,16 @@ describe('the unified sync list', () => {
     mounted.app.unmount()
   })
 
-  it('counts merged folder and document rows in the filters', async () => {
-    folders.value = [
-      folder({ counters: { ...folder().counters, conflicts: 1 } }),
-      folder({ folder_id: 'f2', root: '/home/me/moving', counters: { ...folder().counters, uploading: 2 } }),
-    ]
-    status.value = {
-      ...status.value,
-      documents: [doc(), doc({ documentId: 'd2', path: 'lab/bad.json', state: 'failed', lastError: 'failed' })],
-    }
-    const mounted = await mount()
-    const text = content(mounted.root)
-
-    expect(text).toContain('All 4')
-    expect(text).toContain('Needs attention 2')
-    expect(text).toContain('Syncing 1')
-    expect(text).toContain('In sync 1')
-    mounted.app.unmount()
-  })
-
-  it('offers both Add actions when nothing syncs yet', async () => {
+  it('opens the link dialog from the empty card', async () => {
     folders.value = []
     status.value = { ...status.value, pendingTotal: 0, documents: [] }
     const mounted = await mount()
-    const text = content(mounted.root)
 
-    expect(text).toContain('Nothing syncs with this computer yet')
-    expect(text).toContain('Sync a folder…')
-    expect(text).toContain('Keep a dataset offline…')
+    expect(content(mounted.root)).toContain('No folder is linked yet.')
     expect(rows(mounted.root)).toHaveLength(0)
-    mounted.app.unmount()
-  })
-
-  it('takes the dataset Add item to the realm search', async () => {
-    const mounted = await mount()
-
-    await click(button(mounted.root, 'Keep a dataset offline…'))
-
-    expect(mounted.router.currentRoute.value.name).toBe('datasets')
-    expect(mounted.router.currentRoute.value.query.focus).toBe('search')
+    expect(content(mounted.root)).not.toContain('bind-dialog-open')
+    await click(button(mounted.root, 'Link a local folder'))
+    expect(content(mounted.root)).toContain('bind-dialog-open')
     mounted.app.unmount()
   })
 })
