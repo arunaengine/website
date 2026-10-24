@@ -12,6 +12,7 @@ import * as Utils from '@/lib/utils'
 
 const listGroupBackends = vi.fn()
 const getGroupRouting = vi.fn()
+const getBucketRouting = vi.fn()
 const listBackendImports = vi.fn()
 const runBackendImport = vi.fn()
 const getLinkStatus = vi.fn()
@@ -80,6 +81,7 @@ const StorageSection = compileClientComponent(new URL('./StorageSection.vue', im
       sessionEpoch: ref(0),
       listGroupBackends,
       getGroupRouting,
+      getBucketRouting,
     }),
   },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled }) },
@@ -120,7 +122,7 @@ const buttonIn = (root: Root, text: string) => element(root, (node) => node.tag 
 
 async function mount(focusLink: string | null = null, onBackends?: (backends: unknown) => void) {
   const mounted = await mountApp(
-    defineComponent(() => () => h(StorageSection, { groupId: 'g1', groupName: 'spire', canAdmin: true, focusLink, onBackends })),
+    defineComponent(() => () => h(StorageSection, { groupId: 'g1', groupName: 'spire', canAdmin: true, focusLink, datasetBucket: 'datasets-g1', onBackends })),
   )
   await flush()
   if (mounted.errors.length) throw mounted.errors[0]
@@ -133,6 +135,7 @@ beforeEach(() => {
   writesDisabled.value = false
   listGroupBackends.mockResolvedValue({ backends: [STORAGE] })
   getGroupRouting.mockResolvedValue({ group_id: 'g1', default_target: { backend_id: 's1' }, warnings: [] })
+  getBucketRouting.mockResolvedValue({ bucket: 'datasets-g1', rules: [], warnings: [] })
   listBackendImports.mockResolvedValue(LINKS)
   runBackendImport.mockResolvedValue({ job_id: 'j2' })
   listStorageBuckets.mockResolvedValue({ buckets: [], next: null })
@@ -338,9 +341,16 @@ describe('StorageSection', () => {
       await vi.advanceTimersByTimeAsync(3000)
       await flush()
       expect(onBackends).toHaveBeenCalledTimes(3)
+      // A rule of the dataset bucket names the storage of the location line first.
+      const rule = { key_prefix: '', exact: false, target: { backend_id: 's1' } }
+      getBucketRouting.mockResolvedValue({ bucket: 'datasets-g1', rules: [rule], warnings: [] })
       await vi.advanceTimersByTimeAsync(3000)
       await flush()
-      expect(onBackends).toHaveBeenCalledTimes(3)
+      expect(getBucketRouting).toHaveBeenLastCalledWith('datasets-g1')
+      expect(onBackends).toHaveBeenCalledTimes(4)
+      await vi.advanceTimersByTimeAsync(3000)
+      await flush()
+      expect(onBackends).toHaveBeenCalledTimes(4)
     } finally {
       vi.useRealTimers()
     }

@@ -120,7 +120,9 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   '@/components/ui/TabsContent.vue': moduleDefault(PanelStub),
   '@/components/groups/ConnectorsSection.vue': moduleDefault(Empty),
   '@/components/groups/RepositoriesSection.vue': moduleDefault(Empty),
-  '@/components/groups/StorageSection.vue': moduleDefault(Empty),
+  '@/components/groups/StorageSection.vue': moduleDefault(
+    defineComponent({ props: { datasetBucket: String }, setup: (p) => () => h('div', { 'data-dataset-bucket': p.datasetBucket }) }),
+  ),
   '@/components/groups/GroupLocationSection.vue': moduleDefault(Empty),
   '@/components/groups/GroupMembers.vue': moduleDefault(Empty),
   '@/components/groups/GroupDetailSkeleton.vue': moduleDefault(Empty),
@@ -221,6 +223,13 @@ describe('Group tab counts', () => {
     expect(listGroupBackends).toHaveBeenCalledWith('g1')
     expect(tabText(root, 'sources')).toContain('2')
     expect(tabText(root, 'storage')).toContain('3')
+  })
+
+  it('tells the storage tab which bucket the dataset location uses', async () => {
+    const located = { ...group.value, roles: [ADMIN_ROLE], dataset_location: { bucket: 'datasets-g1', prefix: '' } }
+    group.value = located
+    const { root } = await mount('/app/groups/g1?tab=storage')
+    expect(nodes(root).some((node) => node.props['data-dataset-bucket'] === 'datasets-g1')).toBe(true)
   })
 
   it('skips the storage count for a member who is not an admin', async () => {

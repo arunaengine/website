@@ -649,6 +649,7 @@ async function leave() {
             class="border-b border-border"
             :group-id="group.group_id"
             :group-name="group.display_name"
+            :dataset-bucket="group.dataset_location?.bucket ?? null"
             :can-admin="canAdminStorage"
             :focus-link="typeof route.query.link === 'string' ? route.query.link : null"
             @count="backendCount = $event"

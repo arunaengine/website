@@ -33,13 +33,20 @@ import { backendSchema } from '@/lib/storage'
 import { defaultBucket, runActive, splitPath, splitsBuckets } from '@/lib/storageRules'
 import { errorMessage } from '@/lib/utils'
 
-const props = defineProps<{ groupId: string; groupName: string; canAdmin: boolean; focusLink?: string | null }>()
+const props = defineProps<{
+  groupId: string
+  groupName: string
+  canAdmin: boolean
+  focusLink?: string | null
+  /** The bucket of the dataset location below; its rules decide the storage that line names. */
+  datasetBucket?: string | null
+}>()
 const emit = defineEmits<{
   (e: 'count', count: number): void
   (e: 'backends', backends: GroupBackendResponse[]): void
 }>()
 
-const { apiBaseUrl, authToken, sessionEpoch, listGroupBackends, getGroupRouting } = useAruna()
+const { apiBaseUrl, authToken, sessionEpoch, listGroupBackends, getGroupRouting, getBucketRouting } = useAruna()
 const { writesDisabled } = useConnectivity()
 
 const backends = ref<GroupBackendResponse[] | null>(null)
@@ -96,6 +103,8 @@ function follow(imports: BackendImport[]) {
   }
 }
 
+// The rules of the dataset bucket as last read, only to notice a change.
+let bucketRules: unknown = null
 // Only the latest load for the current group and session writes state.
 let loadSeq = 0
 const load = () => readAll(false)
@@ -109,7 +118,7 @@ async function readAll(poll: boolean) {
   loadError.value = null
   clearPoll()
   try {
-    const [list, rules, imports, page] = await Promise.all([
+    const [list, rules, imports, page, bucketRouting] = await Promise.all([
       listGroupBackends(props.groupId),
       getGroupRouting(props.groupId),
       // A node without linked buckets still shows its storages.
@@ -122,6 +131,7 @@ async function readAll(poll: boolean) {
         if (isUnsupportedEndpoint(err)) return null
         throw err
       }),
+      props.datasetBucket ? getBucketRouting(props.datasetBucket).catch(() => null) : null,
     ])
     if (!current()) return
     // A poll reads the pages shown again, one after the other from the first, and keeps them.
@@ -136,7 +146,9 @@ async function readAll(poll: boolean) {
       read++
     }
     // A poll that only moves a step leaves the storages and rules as they were.
-    const changed = JSON.stringify([list.backends, rules]) !== JSON.stringify([backends.value, routing.value])
+    const seen = [list.backends, rules, bucketRouting?.rules ?? null]
+    const changed = JSON.stringify(seen) !== JSON.stringify([backends.value, routing.value, bucketRules])
+    bucketRules = seen[2]
     backends.value = list.backends
     routing.value = rules
     links.value = imports
