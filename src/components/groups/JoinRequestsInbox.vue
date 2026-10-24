@@ -15,8 +15,9 @@ const props = defineProps<{ groupId: string; roles: ApiRole[] }>()
 const emit = defineEmits<{ (e: 'changed'): void; (e: 'count', n: number | null): void; (e: 'load-error', message: string | null): void }>()
 
 const { listGroupJoinRequests, decideJoinRequest, busy } = useJoinRequests()
-// The request whose decision is on its way, until the list is read again.
+// The request being decided, until the list is read again, and the click that owns that wait.
 const deciding = ref<string | null>(null)
+let decideRun = 0
 
 const { sessionEpoch, realm } = useAruna()
 
@@ -67,6 +68,7 @@ watch([() => props.groupId, () => props.roles, sessionEpoch], () => {
   expandedId.value = ''
   decideError.value = null
   deciding.value = null
+  decideRun++
   void reload()
 }, { immediate: true })
 
@@ -100,6 +102,8 @@ async function confirm(req: JoinRequest) {
   const groupId = props.groupId
   const epoch = sessionEpoch.value
   if (req.group_id !== groupId || deciding.value) return
+  const run = ++decideRun
+  const current = () => run === decideRun && groupId === props.groupId && epoch === sessionEpoch.value
   decideError.value = null
   deciding.value = req.request_id
   const input =
@@ -108,14 +112,14 @@ async function confirm(req: JoinRequest) {
       : { approve: false, ...(denyReason.value.trim() ? { reason: denyReason.value.trim() } : {}) }
   try {
     await decideJoinRequest(groupId, req.request_id, input)
-    if (groupId !== props.groupId || epoch !== sessionEpoch.value) return
+    if (!current()) return
     if (expandedId.value === req.request_id) expandedId.value = ''
     await reload()
-    if (groupId === props.groupId && epoch === sessionEpoch.value) emit('changed')
+    if (current()) emit('changed')
   } catch (err) {
-    if (groupId === props.groupId && epoch === sessionEpoch.value) decideError.value = errorMessage(err)
+    if (current()) decideError.value = errorMessage(err)
   } finally {
-    if (deciding.value === req.request_id) deciding.value = null
+    if (run === decideRun) deciding.value = null
   }
 }
 </script>

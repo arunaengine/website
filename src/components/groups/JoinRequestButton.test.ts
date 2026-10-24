@@ -65,6 +65,24 @@ describe('JoinRequestButton', () => {
     pendingByGroup.value = new Map([['g1', request]])
   })
 
+  it('keeps the wait of a withdrawal in a new session when one from the old session settles', async () => {
+    let refuse: (err: unknown) => void = () => {}
+    withdrawRequest.mockReturnValueOnce(new Promise<undefined>((_, reject) => (refuse = reject)))
+    withdrawRequest.mockReturnValueOnce(new Promise<undefined>(() => {}))
+    const { root } = await mountApp(defineComponent(() => () => h(JoinRequestButton, { groupId: 'g1' })))
+    void (button(root, 'Withdraw').props.onClick as () => Promise<void>)()
+    await flush()
+    sessionEpoch.value++
+    await flush()
+    void (button(root, 'Withdraw').props.onClick as () => Promise<void>)()
+    await flush()
+    refuse(new Error('the old session was refused'))
+    await flush()
+    expect(button(root, 'Withdrawing the request').props['aria-busy']).toBe(true)
+    expect(withdrawRequest).toHaveBeenCalledTimes(2)
+    expect(reportGlobalError).not.toHaveBeenCalled()
+  })
+
   it('shows the wait on Withdraw, sends it once and frees it when it fails', async () => {
     let refuse: (err: unknown) => void = () => {}
     withdrawRequest.mockReturnValueOnce(new Promise<undefined>((_, reject) => (refuse = reject)))

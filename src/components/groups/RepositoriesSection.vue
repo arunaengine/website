@@ -31,8 +31,9 @@ const unsupported = ref(false)
 const dialogOpen = ref(false)
 const editing = ref<RepositoryConnector | null>(null)
 const confirmingId = ref<string | null>(null)
-// The repository whose deletion is on its way.
+// The repository whose deletion is on its way, and the request that owns that wait.
 const deleting = ref<string | null>(null)
+let deleteRun = 0
 const deleteError = ref<string | null>(null)
 
 // Only the latest load for the current group and session writes state.
@@ -66,6 +67,7 @@ watch(
     confirmingId.value = null
     deleteError.value = null
     deleting.value = null
+    deleteRun++
     void load()
   },
   { immediate: true },
@@ -84,8 +86,8 @@ function openEdit(connector: RepositoryConnector) {
 async function confirmDelete(connector: RepositoryConnector) {
   if (deleting.value) return
   const id = connector.connector_id
-  const epoch = sessionEpoch.value
-  const current = () => deleting.value === id && epoch === sessionEpoch.value
+  const run = ++deleteRun
+  const current = () => run === deleteRun
   deleteError.value = null
   deleting.value = id
   try {
@@ -96,7 +98,7 @@ async function confirmDelete(connector: RepositoryConnector) {
   } catch (err) {
     if (current()) deleteError.value = errorMessage(err)
   } finally {
-    if (deleting.value === id) deleting.value = null
+    if (current()) deleting.value = null
   }
 }
 </script>

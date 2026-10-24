@@ -92,6 +92,30 @@ describe('membership approval inbox', () => {
     mounted.app.unmount()
   })
 
+  it('keeps the wait of a decision in a new session when one from the old session settles', async () => {
+    let refuse: (err: unknown) => void = () => {}
+    decideJoinRequest.mockReturnValueOnce(new Promise<undefined>((_, reject) => (refuse = reject)))
+    decideJoinRequest.mockReturnValueOnce(new Promise<undefined>(() => {}))
+    const mounted = await mountApp(Wrapper)
+    await listGroupJoinRequests.mock.results[0]!.value
+    await flush()
+    await click(button(mounted.root, 'Deny'))
+    void (button(mounted.root, 'Deny request').props.onClick as () => Promise<void>)()
+    await flush()
+    sessionEpoch.value++
+    await flush()
+    await flush()
+    await click(button(mounted.root, 'Deny'))
+    void (button(mounted.root, 'Deny request').props.onClick as () => Promise<void>)()
+    await flush()
+    refuse(new Error('the old session was refused'))
+    await flush()
+    expect(button(mounted.root, 'Denying the request').props['aria-busy']).toBe(true)
+    expect(decideJoinRequest).toHaveBeenCalledTimes(2)
+    expect(content(mounted.root)).not.toContain('the old session was refused')
+    mounted.app.unmount()
+  })
+
   it('reloads pending requests when the group detail refreshes', async () => {
     listGroupJoinRequests.mockResolvedValueOnce([])
     const mounted = await mountApp(Wrapper)

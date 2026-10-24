@@ -36,8 +36,9 @@ const pending = computed(() => pendingByGroup.value.get(props.groupId) ?? null)
 const open = ref(false)
 const message = ref('')
 const submitError = ref<string | null>(null)
-// The request whose withdrawal is on its way.
+// The request whose withdrawal is on its way, and the click that owns that wait.
 const withdrawing = ref<string | null>(null)
+let withdrawRun = 0
 
 onMounted(() => {
   if (joinRequestsEnabled.value && currentUser.value) void ensureOwnRequestsLoaded()
@@ -50,7 +51,12 @@ watch(open, (isOpen) => {
   }
 })
 
-watch([() => props.groupId, sessionEpoch], () => { open.value = false; submitError.value = null; withdrawing.value = null })
+watch([() => props.groupId, sessionEpoch], () => {
+  open.value = false
+  submitError.value = null
+  withdrawing.value = null
+  withdrawRun++
+})
 
 async function submit() {
   const groupId = props.groupId
@@ -67,13 +73,14 @@ async function submit() {
 async function withdraw() {
   const req = pending.value
   if (!req || withdrawing.value) return
+  const run = ++withdrawRun
   withdrawing.value = req.request_id
   try {
     await withdrawRequest(req)
   } catch (err) {
-    reportGlobalError(errorMessage(err))
+    if (run === withdrawRun) reportGlobalError(errorMessage(err))
   } finally {
-    if (withdrawing.value === req.request_id) withdrawing.value = null
+    if (run === withdrawRun) withdrawing.value = null
   }
 }
 </script>

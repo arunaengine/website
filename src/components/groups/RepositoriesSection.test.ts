@@ -70,6 +70,31 @@ describe('RepositoriesSection', () => {
     expect(content(root)).not.toContain('the old session was refused')
   })
 
+  it('keeps the wait of a delete in a new session when one from the old session settles', async () => {
+    let refuse: (err: unknown) => void = () => {}
+    deleteRepositoryConnector.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+    deleteRepositoryConnector.mockReturnValueOnce(new Promise(() => {}))
+    const { root } = await mountApp(defineComponent(() => () => h(Section, { groupId: 'g1', canWrite: true })))
+    await flush()
+    const trash = () => element(root, (node) => node.props['aria-label'] === 'Delete repository zenodo')
+    await click(trash())
+    void (button(root, 'Delete').props.onClick as () => Promise<void>)()
+    await flush()
+    sessionEpoch.value++
+    await flush()
+    await click(trash())
+    void (button(root, 'Delete').props.onClick as () => Promise<void>)()
+    await flush()
+    refuse(new Error('the old session was refused'))
+    await flush()
+    const waiting = button(root, 'Deleting the repository')
+    expect(waiting.props['aria-busy']).toBe(true)
+    expect(waiting.props.disabled).toBe(true)
+    await (waiting.props.onClick as () => Promise<void>)()
+    expect(deleteRepositoryConnector).toHaveBeenCalledTimes(2)
+    expect(content(root)).not.toContain('the old session was refused')
+  })
+
   it('shows the wait on the confirmed Delete, sends it once and frees it when it fails', async () => {
     let refuse: (err: unknown) => void = () => {}
     deleteRepositoryConnector.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
