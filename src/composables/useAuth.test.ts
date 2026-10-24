@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { beginAuthRedirect, callbackUri, cancelSignIn, setAuthOpener, useAuth } from './useAuth'
 import { loadPortalConfig } from '@/lib/config'
+import { shellContext } from '@/lib/desktop'
 
 const PAGE_ORIGIN = 'https://portal.test'
 const AUTH_URL = 'https://idp.test/authorize?client_id=portal'
@@ -22,6 +23,7 @@ beforeEach(() => {
 
 afterEach(() => {
   setAuthOpener(null)
+  shellContext.value = null
   vi.unstubAllGlobals()
 })
 
@@ -147,5 +149,82 @@ describe('signIn', () => {
   ])('leaves the state unmarked %s', async (_, served) => {
     const url = await redirectFor({}, served)
     expect(url.searchParams.get('state')).toMatch(/^[\w-]{22}$/)
+  })
+})
+
+describe('completeSignIn in the desktop', () => {
+  const TOKEN_ENDPOINT = 'https://idp.test/token'
+  const DISCOVERY = { issuer: 'https://idp.test', authorization_endpoint: 'https://idp.test/authorize', token_endpoint: TOKEN_ENDPOINT }
+  const FORM = {
+    grant_type: 'authorization_code',
+    client_id: 'portal',
+    redirect_uri: 'https://realm.test/auth/callback',
+    code: 'c1',
+    code_verifier: 'v1',
+  }
+
+  function json(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+  }
+
+  // Aruna refuses the registration, so the flow ends right after the provider
+  // requests, which are what these cases are about.
+  async function complete(version: number, answer: (command: string) => Promise<unknown>) {
+    await configure({ features: { desktop: true }, authCallbackOrigin: 'https://realm.test' })
+    const storage = new Map([['aruna.oidc.state', 'desktop.s1'], ['aruna.oidc.verifier', 'v1']])
+    vi.stubGlobal('window', {
+      location: { origin: 'tauri://localhost', assign },
+      sessionStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => storage.set(key, value),
+        removeItem: (key: string) => storage.delete(key),
+      },
+    })
+    const discoveryUrl = `https://idp.test/${Math.random()}/.well-known/openid-configuration`
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/system/realm')) return json({ oidc_providers: [{ audience: 'portal', discovery_url: discoveryUrl }] })
+      if (url === discoveryUrl) return json(DISCOVERY)
+      if (url === TOKEN_ENDPOINT) return json({ error: 'invalid_grant', error_description: 'Code not valid' }, 400)
+      return json({ error: 'refused' }, 403)
+    })
+    vi.stubGlobal('fetch', fetch)
+    const invoke = vi.fn(async (command: string, _args?: Record<string, unknown>) => answer(command))
+    shellContext.value = { apiBaseUrl: '/api', bridge: { invoke, version } }
+    const auth = useAuth()
+    await expect(auth.completeSignIn(new URLSearchParams({ code: 'c1', state: 'desktop.s1' }))).rejects.toThrow()
+    const requested = fetch.mock.calls.map(([input]) => String(input))
+    return { discoveryUrl, invoke, requested, stageError: auth.stageError.value }
+  }
+
+  it('asks the shell for discovery and the token when its bridge offers them', async () => {
+    const run = await complete(8, async (command) =>
+      command === 'oidc_discovery' ? DISCOVERY : { access_token: 'a1', id_token: 'i1', token_type: 'Bearer' },
+    )
+    expect(run.invoke.mock.calls).toEqual([
+      ['oidc_discovery', { url: run.discoveryUrl }],
+      ['oidc_token', { endpoint: TOKEN_ENDPOINT, form: FORM }],
+    ])
+    expect(run.requested).not.toContain(run.discoveryUrl)
+    expect(run.requested).not.toContain(TOKEN_ENDPOINT)
+    expect(run.requested.some((url) => url.endsWith('/access/users/register'))).toBe(true)
+  })
+
+  it('fetches from the provider on an older bridge', async () => {
+    const run = await complete(7, async () => null)
+    expect(run.invoke).not.toHaveBeenCalled()
+    expect(run.requested).toContain(run.discoveryUrl)
+    expect(run.requested).toContain(TOKEN_ENDPOINT)
+    expect(run.stageError).toBe('Token exchange failed: Code not valid')
+  })
+
+  it('shows the reason the provider gave the shell', async () => {
+    // Tauri rejects with the command's error string.
+    const run = await complete(8, async (command) => {
+      if (command === 'oidc_discovery') return DISCOVERY
+      throw 'Code not valid'
+    })
+    expect(run.stageError).toBe('Token exchange failed: Code not valid')
+    expect(run.requested).not.toContain(TOKEN_ENDPOINT)
   })
 })

@@ -4,6 +4,7 @@ import { restoring } from '@/composables/aruna/state'
 import { apiRequest } from '@/lib/api'
 import type { RealmInfoResponse } from '@/lib/api'
 import { featureEnabled, portalConfig } from '@/lib/config'
+import { desktopBridge } from '@/lib/desktop'
 import {
   buildAuthorizationUrl,
   buildEndSessionUrl,
@@ -11,6 +12,7 @@ import {
   fetchDiscovery,
   pkceChallengeS256,
   randomUrlSafeString,
+  type OidcDiscoveryDocument,
 } from '@/lib/oidc'
 import { errorMessage } from '@/lib/utils'
 
@@ -88,6 +90,20 @@ export function cancelSignIn(): void {
   stageError.value = null
 }
 
+// From tauri://localhost a strict provider allows no CORS, so a shell with
+// the commands runs discovery and the token request natively.
+const NATIVE_OIDC_BRIDGE = 8
+
+async function nativeOidc() {
+  const bridge = desktopBridge()
+  return bridge && bridge.version >= NATIVE_OIDC_BRIDGE ? import('@/lib/desktopBridge') : null
+}
+
+async function discover(url: string): Promise<OidcDiscoveryDocument> {
+  const native = await nativeOidc()
+  return native ? native.oidcDiscovery(url) : fetchDiscovery(url)
+}
+
 async function resolveProvider() {
   const { realmInfo, apiBaseUrl } = useAruna()
   let info = realmInfo.value
@@ -109,7 +125,7 @@ async function signIn(options: { onboardingSecret?: string; redirectTo?: string;
   stageError.value = null
   try {
     const { clientId, discoveryUrl } = await resolveProvider()
-    const discovery = await fetchDiscovery(discoveryUrl)
+    const discovery = await discover(discoveryUrl)
     const verifier = randomUrlSafeString(48)
     const state = signInState()
     window.sessionStorage.removeItem(ID_TOKEN_KEY)
@@ -167,13 +183,14 @@ async function completeSignIn(params: URLSearchParams): Promise<string> {
 
     stage.value = 'exchanging'
     const { clientId, discoveryUrl } = await resolveProvider()
-    const discovery = await fetchDiscovery(discoveryUrl)
+    const discovery = await discover(discoveryUrl)
     const tokens = await exchangeAuthorizationCode({
       tokenEndpoint: discovery.token_endpoint,
       clientId,
       redirectUri: callbackUri(),
       code,
       codeVerifier: verifier,
+      send: (await nativeOidc())?.oidcToken,
     })
     // Aruna validates the audience against the client id, which Keycloak only
     // sets on the ID token; the access token is for the account API.
@@ -232,7 +249,7 @@ async function signOut() {
   if (idToken) {
     try {
       const { clientId, discoveryUrl } = await resolveProvider()
-      const discovery = await fetchDiscovery(discoveryUrl)
+      const discovery = await discover(discoveryUrl)
       if (discovery.end_session_endpoint) {
         // The shell ends the SSO session in the system browser, so its own
         // window stays on the app instead of navigating to the provider. Its

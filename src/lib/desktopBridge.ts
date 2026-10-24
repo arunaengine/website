@@ -6,6 +6,7 @@ import { desktopBridge } from './desktop'
 import { featureEnabled } from './config'
 import { cancelSignIn, setAuthOpener } from '@/composables/useAuth'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
+import type { OidcDiscoveryDocument, OidcTokenResponse } from './oidc'
 
 /** The shell exposes no such command, or injected no bridge at all. */
 export class BridgeUnavailable extends Error {
@@ -347,6 +348,18 @@ export async function revealPath(path: string): Promise<void> {
 /** Hands a URL to the system browser (never the shell's own webview). */
 export async function openExternal(url: string): Promise<void> {
   await call('open_external', { url })
+}
+
+/** Reads the provider's discovery document natively, as the provider may allow no CORS. */
+export async function oidcDiscovery(url: string): Promise<OidcDiscoveryDocument> {
+  const command = 'oidc_discovery'
+  return asRecord(command, await call(command, { url })) as unknown as OidcDiscoveryDocument
+}
+
+/** Posts a token request natively; a refusal carries the provider's own reason. */
+export async function oidcToken(endpoint: string, form: Record<string, string>): Promise<OidcTokenResponse> {
+  const command = 'oidc_token'
+  return asRecord(command, await call(command, { endpoint, form })) as unknown as OidcTokenResponse
 }
 
 /** Opens the sign-in page in a window of the app's own, which catches the redirect back. */

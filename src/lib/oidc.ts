@@ -72,12 +72,16 @@ export function buildAuthorizationUrl(input: {
   return url.toString()
 }
 
+/** Posts the token form another way, such as through a native shell without CORS. */
+export type TokenSender = (endpoint: string, form: Record<string, string>) => Promise<OidcTokenResponse>
+
 export async function exchangeAuthorizationCode(input: {
   tokenEndpoint: string
   clientId: string
   redirectUri: string
   code: string
   codeVerifier: string
+  send?: TokenSender
 }): Promise<OidcTokenResponse> {
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
@@ -86,6 +90,13 @@ export async function exchangeAuthorizationCode(input: {
     code: input.code,
     code_verifier: input.codeVerifier,
   })
+  if (input.send) {
+    try {
+      return await input.send(input.tokenEndpoint, Object.fromEntries(body))
+    } catch (err) {
+      throw new Error(`Token exchange failed: ${err instanceof Error ? err.message : String(err)}`, { cause: err })
+    }
+  }
   const response = await fetchWithTimeout(
     input.tokenEndpoint,
     {
