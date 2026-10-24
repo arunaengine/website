@@ -227,7 +227,7 @@ function remove(row: SyncRow) {
       :state="listState"
       :error="listError ?? undefined"
       empty-title="No sync you created touches this bucket."
-      empty-description="A sync writes a second, independently owned bucket on another node."
+      empty-description="A sync makes a second bucket follow this one. The second bucket has its own owner."
       @retry="load()"
     >
       <ul class="divide-y divide-border">

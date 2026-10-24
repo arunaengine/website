@@ -116,7 +116,7 @@ const stagingOpen = ref(false)
     <EmptyState
       v-if="kind === 'all' && allEmpty"
       title="Nothing is copied into or out of this bucket."
-      description="Use Add to sync it with another node or stage data."
+      description="Use Add to create a second bucket that follows this one, or to stage data."
     />
 
     <SyncsTab

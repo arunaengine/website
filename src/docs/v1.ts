@@ -374,9 +374,9 @@ export const docsTopics: DocsTopic[] = [
         title: 'Syncs',
         icon: 'Share2',
         paragraphs: [
-          'A bucket sync is a standing, one way mapping from a source bucket on this node into a bucket on a target node. The target checks its own write permission, writes its own copy, and owns and serves it from then on under its own name.',
+          'A sync makes a second bucket follow a first one. It is a standing, one way mapping from a source bucket into a bucket on a target node. The target checks its own write permission, writes its own copy, and owns and serves it from then on under its own name.',
           'Only the syncs you created are listed to you, and only you can run, pause or delete them. A bucket can be synced by somebody else without ever appearing in your list.',
-          'A sync is not a placement policy. A sync creates a second, independently owned bucket; a policy is a rule about where copies of this bucket may live. The copies a sync writes do show up in Storage locations, under the bucket and key the target uses.',
+          'A sync is not a placement policy, and it is not a bucket stored on more nodes. A sync gives you two buckets; a bucket stored on more nodes is one bucket with copies. A policy is a rule about where copies of this bucket may live. The copies a sync writes do show up in Storage locations, under the bucket and key the target uses.',
         ],
         bullets: [
           'Once: copies everything under the source now, and can be run again later.',

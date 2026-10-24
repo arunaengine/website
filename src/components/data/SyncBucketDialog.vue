@@ -257,9 +257,9 @@ function describeError(err: unknown): string {
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
     <DialogContent class="max-w-2xl">
       <DialogHeader>
-        <DialogTitle>{{ pullMode ? 'Sync to this node' : 'Sync bucket' }}</DialogTitle>
+        <DialogTitle>{{ pullMode ? 'Follow a bucket from this node' : 'Create a second bucket' }}</DialogTitle>
         <DialogDescription>
-          A sync writes a second, independently owned copy into another bucket.
+          A second bucket follows this one. It has its own name, owner, rights and storage.
         </DialogDescription>
       </DialogHeader>
 
