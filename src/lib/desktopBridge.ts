@@ -122,10 +122,10 @@ function detail(err: unknown): string {
   return typeof err === 'string' ? err : JSON.stringify(err)
 }
 
-// Tauri answers an unregistered command with a "not found" style error; that is
-// a missing shell half, not a failed call, so it maps to BridgeUnavailable.
+// The shell refuses a command it does not list, Tauri one with no handler. Only
+// these are a missing shell half; any other answer, "not found" too, is a failure.
 function unknownCommand(err: unknown): boolean {
-  return /unknown command|not (?:implemented|found)|unimplemented/i.test(detail(err))
+  return /^(?:unknown command: \S+|Command \S+ not found)$/.test(detail(err))
 }
 
 async function call(command: string, args?: Record<string, unknown>): Promise<unknown> {

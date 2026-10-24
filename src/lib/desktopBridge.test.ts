@@ -51,6 +51,20 @@ describe('bridge availability', () => {
     await expect(bridge.nodeLogsTail()).rejects.toBeInstanceOf(bridge.BridgeUnavailable)
   })
 
+  it('reads a command Tauri has no handler for as unavailable', async () => {
+    const bridge = await withShell(() => Promise.reject('Command node_logs_tail not found'))
+    await expect(bridge.nodeLogsTail()).rejects.toBeInstanceOf(bridge.BridgeUnavailable)
+  })
+
+  it('reports a provider answer that says not found as a failure', async () => {
+    // Tauri rejects with the command's error string.
+    const bridge = await withShell(() => Promise.reject('Client not found'))
+    const failure = await bridge.oidcToken('https://idp.test/token', { code: 'c1' }).catch((err: unknown) => err)
+
+    expect(failure).toBeInstanceOf(bridge.BridgeFailure)
+    expect(failure).toMatchObject({ command: 'oidc_token', message: 'Client not found' })
+  })
+
   it('reports a refused command as a failure', async () => {
     const cause = new Error('the supervisor is not running')
     const bridge = await withShell(() => Promise.reject(cause))
