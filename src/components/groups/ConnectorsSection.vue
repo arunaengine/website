@@ -34,6 +34,8 @@ const dialogOpen = ref(false)
 const editing = ref<SourceConnectorSummary | null>(null)
 const confirmingId = ref<string | null>(null)
 const deleteError = ref<string | null>(null)
+// The connector whose deletion is on its way.
+const deletingId = ref<string | null>(null)
 
 // Only the latest load writes state when the group switches mid-flight.
 let loadSeq = 0
@@ -79,13 +81,17 @@ function openEdit(connector: SourceConnectorSummary) {
 }
 
 async function confirmDelete(connector: SourceConnectorSummary) {
+  if (deletingId.value) return
   deleteError.value = null
+  deletingId.value = connector.connector_id
   try {
     await deleteGroupConnector(props.groupId, connector.connector_id)
     confirmingId.value = null
     await load()
   } catch (err) {
     deleteError.value = errorMessage(err)
+  } finally {
+    deletingId.value = null
   }
 }
 
@@ -242,7 +248,15 @@ onBeforeUnmount(() => {
           <template v-if="canWrite">
             <template v-if="confirmingId === connector.connector_id">
               <span class="text-xs text-foreground">Delete this connector?</span>
-              <Button variant="destructive" size="sm" :disabled="saving" @click="confirmDelete(connector)">Delete</Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                :disabled="saving || deletingId !== null"
+                :aria-busy="deletingId === connector.connector_id"
+                @click="confirmDelete(connector)"
+              >
+                <Spinner v-if="deletingId === connector.connector_id" label="Deleting the connector" class="text-current" /> Delete
+              </Button>
               <Button variant="ghost" size="sm" :disabled="saving" @click="confirmingId = null">Cancel</Button>
             </template>
             <template v-else>

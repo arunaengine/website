@@ -5,6 +5,7 @@ import Badge from '@/components/ui/Badge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import RepositoryDialog from '@/components/groups/RepositoryDialog.vue'
 import { ref, watch } from 'vue'
 import { KeyRound, Library, Pencil, Plus, Trash2 } from '@lucide/vue'
@@ -30,7 +31,8 @@ const unsupported = ref(false)
 const dialogOpen = ref(false)
 const editing = ref<RepositoryConnector | null>(null)
 const confirmingId = ref<string | null>(null)
-const deleting = ref(false)
+// The repository whose deletion is on its way.
+const deleting = ref<string | null>(null)
 const deleteError = ref<string | null>(null)
 
 // Only the latest load for the current group and session writes state.
@@ -79,8 +81,9 @@ function openEdit(connector: RepositoryConnector) {
 }
 
 async function confirmDelete(connector: RepositoryConnector) {
+  if (deleting.value) return
   deleteError.value = null
-  deleting.value = true
+  deleting.value = connector.connector_id
   try {
     await deleteRepositoryConnector(props.groupId, connector.connector_id, client())
     confirmingId.value = null
@@ -88,7 +91,7 @@ async function confirmDelete(connector: RepositoryConnector) {
   } catch (err) {
     deleteError.value = errorMessage(err)
   } finally {
-    deleting.value = false
+    deleting.value = null
   }
 }
 </script>
@@ -143,8 +146,16 @@ async function confirmDelete(connector: RepositoryConnector) {
           <template v-if="canWrite">
             <template v-if="confirmingId === connector.connector_id">
               <span class="text-xs text-foreground">Delete this repository? It cannot be deleted while dataset links still use it.</span>
-              <Button variant="destructive" size="sm" :disabled="deleting" @click="confirmDelete(connector)">Delete</Button>
-              <Button variant="ghost" size="sm" :disabled="deleting" @click="confirmingId = null">Cancel</Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                :disabled="deleting !== null"
+                :aria-busy="deleting === connector.connector_id"
+                @click="confirmDelete(connector)"
+              >
+                <Spinner v-if="deleting === connector.connector_id" label="Deleting the repository" class="text-current" /> Delete
+              </Button>
+              <Button variant="ghost" size="sm" :disabled="deleting !== null" @click="confirmingId = null">Cancel</Button>
             </template>
             <template v-else>
               <Button
