@@ -1,13 +1,18 @@
 <script setup lang="ts">
 // Warns while a role names single nodes of a bucket that is stored on several nodes.
-import { computed } from 'vue'
+import { computed, toRef } from 'vue'
 import PermissionNotice from '@/components/distributed/PermissionNotice.vue'
+import { useGrantGaps } from '@/composables/useGrantGaps'
 import { mockEnabled } from '@/lib/distributedMock'
 import { grantWarnings } from '@/lib/distributedMockData'
 
 const props = defineProps<{ paths: string[]; role: string }>()
 
-const warnings = computed(() => (mockEnabled() ? grantWarnings(props.paths) : []))
+const { gaps } = useGrantGaps(toRef(props, 'paths'))
+const warnings = computed<{ bucket: string; missing: string[]; glob?: string }[]>(() => [
+  ...gaps.value,
+  ...(mockEnabled() ? grantWarnings(props.paths).filter((mock) => !gaps.value.some((gap) => gap.bucket === mock.bucket)) : []),
+])
 </script>
 
 <template>
@@ -18,6 +23,7 @@ const warnings = computed(() => (mockEnabled() ? grantWarnings(props.paths) : []
       :holder="role || 'This role'"
       :bucket="warning.bucket"
       :missing="warning.missing"
+      :glob="warning.glob"
     />
   </div>
 </template>
