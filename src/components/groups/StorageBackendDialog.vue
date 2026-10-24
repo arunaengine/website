@@ -18,6 +18,7 @@ import { BACKEND_KINDS, BACKEND_KIND_SCHEMAS, backendSchema, shortError } from '
 import type { GroupBackendKind, GroupBackendResponse } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
 import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 
 const props = defineProps<{
   open: boolean
@@ -42,6 +43,8 @@ const secretValues = ref<Record<string, string>>({})
 const toggleOn = ref(false)
 const keysOpen = ref(false)
 const removing = ref(false)
+// Remove or Enable storage is on its way; the shared saving flag is set for it too.
+const toggling = ref(false)
 const submitError = ref<string | null>(null)
 
 const submitSummary = computed(() => (submitError.value ? shortError(submitError.value) : ''))
@@ -163,8 +166,9 @@ async function submit() {
 
 async function setRemoved(remove: boolean) {
   const existing = props.backend
-  if (!existing || writesDisabled.value) return
+  if (!existing || writesDisabled.value || saving.value) return
   submitError.value = null
+  toggling.value = true
   try {
     if (remove) await disableGroupBackend(props.groupId, existing.backend_id)
     else await enableGroupBackend(props.groupId, existing.backend_id)
@@ -172,6 +176,8 @@ async function setRemoved(remove: boolean) {
     emit('update:open', false)
   } catch (err) {
     submitError.value = errorMessage(err)
+  } finally {
+    toggling.value = false
   }
 }
 </script>
@@ -312,8 +318,15 @@ async function setRemoved(remove: boolean) {
               <span class="mr-auto self-center text-xs text-foreground">
                 Remove? New uploads stop going here. Files stay readable.
               </span>
-              <Button type="button" variant="destructive" size="sm" :disabled="saving || writesDisabled" @click="setRemoved(true)">
-                Remove
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                :disabled="saving || writesDisabled"
+                :aria-busy="toggling"
+                @click="setRemoved(true)"
+              >
+                <Spinner v-if="toggling" label="Removing the storage" class="text-current" /> Remove
               </Button>
               <Button type="button" variant="ghost" size="sm" @click="removing = false">Keep</Button>
             </template>
@@ -324,9 +337,10 @@ async function setRemoved(remove: boolean) {
               size="sm"
               class="mr-auto"
               :disabled="saving || writesDisabled"
+              :aria-busy="toggling"
               @click="setRemoved(false)"
             >
-              Enable storage
+              <Spinner v-if="toggling" label="Enabling the storage" class="text-current" /> Enable storage
             </Button>
             <Button
               v-else
@@ -342,7 +356,7 @@ async function setRemoved(remove: boolean) {
           </template>
           <DialogClose as-child><Button type="button" variant="outline">Cancel</Button></DialogClose>
           <Button type="submit" :disabled="submitDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined">
-            {{ saving ? 'Saving…' : isEdit ? 'Save' : 'Add storage' }}
+            {{ saving && !toggling ? 'Saving…' : isEdit ? 'Save' : 'Add storage' }}
           </Button>
         </DialogFooter>
       </form>

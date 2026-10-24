@@ -27,6 +27,7 @@ const createGroupBackend = vi.fn(async (_group: string, _body: GroupBackendReque
 const replaceGroupBackend = vi.fn(async (_group: string, _id: string, _body: GroupBackendRequest) => saved)
 const disableGroupBackend = vi.fn(async (_group: string, _id: string) => {})
 const enableGroupBackend = vi.fn(async (_group: string, _id: string) => saved)
+const saving = ref(false)
 
 const Passthrough = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 const Empty = defineComponent(() => () => null)
@@ -69,7 +70,7 @@ const StorageBackendDialog = compileClientComponent(new URL('./StorageBackendDia
   '@/lib/utils': Utils,
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
   '@/composables/useAruna': {
-    useAruna: () => ({ createGroupBackend, replaceGroupBackend, disableGroupBackend, enableGroupBackend, saving: ref(false) }),
+    useAruna: () => ({ createGroupBackend, replaceGroupBackend, disableGroupBackend, enableGroupBackend, saving }),
   },
   '@/components/ui/Dialog.vue': moduleDefault(Passthrough),
   '@/components/ui/DialogContent.vue': moduleDefault(Passthrough),
@@ -83,6 +84,7 @@ const StorageBackendDialog = compileClientComponent(new URL('./StorageBackendDia
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Switch.vue': moduleDefault(SwitchStub),
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
+  '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('i', p.label) })),
 })
 
 type Root = Parameters<typeof content>[0]
@@ -121,6 +123,7 @@ describe('Storage dialog connection', () => {
     createGroupBackend.mockClear()
     replaceGroupBackend.mockClear()
     disableGroupBackend.mockClear()
+    saving.value = false
   })
 
   it('saves a setting without keys, so the stored keys stay', async () => {
@@ -158,6 +161,35 @@ describe('Storage dialog connection', () => {
     expect(content(root)).not.toContain('Most self-hosted S3 fails without path-style.')
     await click(byLabel(root, 'Path-style addressing'))
     expect(content(root)).toContain('Most self-hosted S3 fails without path-style.')
+  })
+
+  it('shows the wait on Remove, not on Save, sends it once and frees it when it fails', async () => {
+    let refuse: (err: Error) => void = () => {}
+    disableGroupBackend.mockImplementationOnce(() => {
+      saving.value = true
+      return new Promise<void>((_, reject) => {
+        refuse = (err) => {
+          saving.value = false
+          reject(err)
+        }
+      })
+    })
+    const { root } = await mount(stored)
+    await click(buttonWith(root, 'Remove storage…'))
+    const pending = (buttonWith(root, 'Remove').props.onClick as () => Promise<void>)()
+    await flush()
+    const remove = buttonWith(root, 'Removing the storage Remove')
+    expect(remove.props['aria-busy']).toBe(true)
+    expect(remove.props.disabled).toBe(true)
+    expect(content(save(root)).trim()).toBe('Save')
+    await (remove.props.onClick as () => Promise<void>)()
+    expect(disableGroupBackend).toHaveBeenCalledTimes(1)
+    refuse(new Error('refused'))
+    await pending
+    await flush()
+    expect(buttonWith(root, 'Remove').props['aria-busy']).toBe(false)
+    expect(buttonWith(root, 'Remove').props.disabled).toBe(false)
+    expect(content(root)).toContain('refused')
   })
 
   it('removes the storage after a confirm', async () => {
