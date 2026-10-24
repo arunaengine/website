@@ -81,7 +81,7 @@ function nameOf(entry: BucketHolderEntry): string {
 }
 
 async function addHolder() {
-  if (!chosen.value) return
+  if (!chosen.value || busy.value !== null) return
   busy.value = chosen.value.user_id
   failure.value = null
   try {
@@ -97,6 +97,7 @@ async function addHolder() {
 }
 
 async function removeHolder(entry: BucketHolderEntry, confirm: boolean, revision: string) {
+  if (busy.value !== null) return
   busy.value = entry.user_id
   failure.value = null
   try {
@@ -160,9 +161,10 @@ function confirmRemoval() {
               size="sm"
               variant="outline"
               :disabled="busy !== null || frozen"
+              :aria-busy="busy === entry.user_id && !pending"
               @click="startRemove(entry)"
             >
-              Remove
+              <Spinner v-if="busy === entry.user_id && !pending" label="Removing the key holder" class="text-current" /> Remove
             </Button>
           </li>
         </ul>
@@ -176,7 +178,14 @@ function confirmRemoval() {
         <label class="text-xs font-medium text-foreground" for="holder-search">Grant a key holder</label>
         <div class="relative flex gap-2">
           <Input id="holder-search" v-model="query" placeholder="Search users (min 2 characters)" />
-          <Button size="sm" :disabled="!chosen || busy !== null || frozen" @click="addHolder">Grant</Button>
+          <Button
+            size="sm"
+            :disabled="!chosen || busy !== null || frozen"
+            :aria-busy="busy !== null && busy === chosen?.user_id"
+            @click="addHolder"
+          >
+            <Spinner v-if="busy !== null && busy === chosen?.user_id" label="Granting" class="text-current" /> Grant
+          </Button>
           <div
             v-if="searchState !== 'idle' && !chosen"
             class="absolute top-10 z-10 w-full rounded-md border border-border bg-popover shadow-md"
@@ -235,8 +244,10 @@ function confirmRemoval() {
             variant="destructive"
             size="sm"
             :disabled="!accepted || busy !== null || frozen || pendingStale"
+            :aria-busy="pending !== null && busy === pending.entry.user_id"
             @click="confirmRemoval"
           >
+            <Spinner v-if="pending && busy === pending.entry.user_id" label="Removing the key holder" class="text-current" />
             Remove anyway
           </Button>
         </DialogFooter>

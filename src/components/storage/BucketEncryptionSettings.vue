@@ -11,6 +11,7 @@ import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import type { BlockCipher, BlockKeys, BucketEncryptionResponse, EncryptionMode } from '@/lib/api'
 import {
   BLOCK_KEYS_LABEL,
@@ -92,6 +93,8 @@ interface Pending {
   context: string
 }
 const pending = ref<Pending | null>(null)
+// The confirmed change is on its way.
+const sending = ref(false)
 
 function contextOf(status: BucketEncryptionResponse): string {
   return JSON.stringify([status.bucket_id, status.key_generation, status.storage_generation, settingsOf(status)])
@@ -112,14 +115,17 @@ function ask(action: Pending['action']) {
 
 async function confirm() {
   const asked = pending.value
-  if (!asked || stale.value) return
+  if (!asked || stale.value || sending.value) return
   failure.value = null
+  sending.value = true
   try {
     if (asked.action === 'save') await props.save({ ...asked.draft, expected_generation: asked.generation })
     else await props.rotate(asked.generation)
     if (pending.value === asked) pending.value = null
   } catch (cause) {
     failure.value = actionError(cause)
+  } finally {
+    sending.value = false
   }
 }
 </script>
@@ -185,7 +191,10 @@ async function confirm() {
         <Notice v-if="failure" tone="error">{{ failure }}</Notice>
         <DialogFooter>
           <Button variant="outline" size="sm" @click="pending = null">Cancel</Button>
-          <Button size="sm" :disabled="busy || stale" @click="confirm">{{ pending?.action === 'rotate' ? 'Rotate' : 'Save' }}</Button>
+          <Button size="sm" :disabled="busy || stale || sending" :aria-busy="sending" @click="confirm">
+            <Spinner v-if="sending" :label="pending?.action === 'rotate' ? 'Rotating the key' : 'Saving the change'" class="text-current" />
+            {{ pending?.action === 'rotate' ? 'Rotate' : 'Save' }}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

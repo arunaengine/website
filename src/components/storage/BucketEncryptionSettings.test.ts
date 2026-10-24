@@ -32,6 +32,7 @@ const settings = compileClientComponent(new URL('./BucketEncryptionSettings.vue'
   '@/components/ui/DialogTitle.vue': moduleDefault(Slotted('h2')),
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/components/ui/Select.vue': moduleDefault(Slotted('select')),
+  '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('i', p.label) })),
   '@/lib/bucketEncryption': Wording,
 })
 
@@ -143,6 +144,25 @@ describe('bucket encryption settings', () => {
     await click(button(dialog(root), 'Rotate'))
 
     expect(rotate).toHaveBeenCalledWith(1)
+    expect(content(root)).toContain('Uploads to this bucket are still open')
+  })
+
+  it('shows the wait on the confirmed Rotate, sends it once and frees it when it fails', async () => {
+    let refuse: (err: unknown) => void = () => {}
+    rotate.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+    const root = await render(status({ unlock: UNLOCKED }))
+    await click(button(root, 'Rotate key'))
+    void (button(dialog(root), 'Rotate').props.onClick as () => Promise<void>)()
+    await flush()
+    const waiting = button(dialog(root), 'Rotating the key')
+    expect(waiting.props['aria-busy']).toBe(true)
+    expect(waiting.props.disabled).toBe(true)
+    await (waiting.props.onClick as () => Promise<void>)()
+    expect(rotate).toHaveBeenCalledTimes(1)
+    refuse(new Api.ApiError(409, 'busy', 'open_uploads'))
+    await flush()
+    expect(button(dialog(root), 'Rotate').props['aria-busy']).toBe(false)
+    expect(button(dialog(root), 'Rotate').props.disabled).toBe(false)
     expect(content(root)).toContain('Uploads to this bucket are still open')
   })
 

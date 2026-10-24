@@ -11,6 +11,7 @@ import { button, click, compileClientComponent, content, element, flush, mountAp
 const holders = ref<BucketHoldersResponse | null>(null)
 const state = ref<HoldersState>('ready')
 const remove = vi.fn()
+const grant = vi.fn()
 const searchUsers = vi.fn()
 
 const Slotted = (tag: string) =>
@@ -33,12 +34,12 @@ const section = compileClientComponent(new URL('./BucketHoldersSection.vue', imp
   '@/components/ui/DialogTitle.vue': moduleDefault(Slotted('h2')),
   '@/components/ui/Input.vue': moduleDefault(Slotted('input')),
   '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
-  '@/components/ui/Spinner.vue': moduleDefault(defineComponent(() => () => h('span', 'loading'))),
+  '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('span', p.label) })),
   '@/composables/useAruna': { useAruna: () => ({ searchUsers }) },
   '@/composables/useBucketHolders': {
     listedRecovery,
     recoveryAfter,
-    useBucketHolders: () => ({ holders, state, error: ref('The directory did not answer.'), load: vi.fn(), grant: vi.fn(), remove }),
+    useBucketHolders: () => ({ holders, state, error: ref('The directory did not answer.'), load: vi.fn(), grant, remove }),
   },
   '@/lib/bucketEncryption': Wording,
   '@/lib/stateBadge': StateBadge,
@@ -65,6 +66,7 @@ function rowButton(root: Awaited<ReturnType<typeof render>>, name: string) {
 beforeEach(() => {
   state.value = 'ready'
   remove.mockReset().mockResolvedValue('removed')
+  grant.mockReset().mockResolvedValue(true)
   searchUsers.mockReset().mockResolvedValue({ users: [] })
 })
 
@@ -121,6 +123,58 @@ describe('bucket key holder list', () => {
 
     expect(remove).toHaveBeenCalledWith('Cy', false, 'rev-1')
     expect(content(root)).toContain('Remove Cy?')
+  })
+
+  it('shows the wait on Remove anyway and on a direct Remove, sends each once and frees them on a failure', async () => {
+    let refuse: (err: Error) => void = () => {}
+    remove.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+    const root = await render([holder('Ada'), holder('Bo')])
+    await click(rowButton(root, 'Bo'))
+    await click(element(root, (node) => node.tag === 'input' && node.props.type === 'checkbox'))
+    void (button(root, 'Remove anyway').props.onClick as () => void)()
+    await flush()
+    const confirm = button(root, 'Removing the key holder')
+    expect(confirm.props['aria-busy']).toBe(true)
+    expect(rowButton(root, 'Bo').props['aria-busy']).toBe(false)
+    ;(confirm.props.onClick as () => void)()
+    expect(remove).toHaveBeenCalledTimes(1)
+    refuse(new Error('The node did not answer.'))
+    await flush()
+    expect(button(root, 'Remove anyway').props['aria-busy']).toBe(false)
+    expect(button(root, 'Remove anyway').props.disabled).toBe(false)
+    expect(content(root)).toContain('The node did not answer.')
+
+    remove.mockReturnValueOnce(new Promise(() => {}))
+    const kept = await render([holder('Ada'), holder('Bo'), holder('Cy')])
+    void (rowButton(kept, 'Cy').props.onClick as () => void)()
+    await flush()
+    const row = element(kept, (node) => node.tag === 'li' && content(node).startsWith('Cy'))
+    const direct = element(row, (node) => node.tag === 'button')
+    expect(direct.props['aria-busy']).toBe(true)
+    expect(content(direct)).toContain('Removing the key holder')
+  })
+
+  it('shows the wait on Grant, sends it once and frees it when it fails', async () => {
+    let refuse: (err: Error) => void = () => {}
+    grant.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+    searchUsers.mockResolvedValue({ users: [{ user_id: 'u-bo', name: 'Bo' }] })
+    const root = await render([holder('Ada')])
+    const search = element(root, (node) => node.tag === 'input' && node.props.id === 'holder-search')
+    ;(search.props['onUpdate:modelValue'] as (value: string) => void)('Bo')
+    await flush()
+    await click(element(root, (node) => node.tag === 'button' && node.props.type === 'button' && content(node).includes('Bo')))
+    void (button(root, 'Grant').props.onClick as () => Promise<void>)()
+    await flush()
+    const waiting = button(root, 'Granting')
+    expect(waiting.props['aria-busy']).toBe(true)
+    expect(waiting.props.disabled).toBe(true)
+    await (waiting.props.onClick as () => Promise<void>)()
+    expect(grant).toHaveBeenCalledTimes(1)
+    refuse(new Error('The node did not answer.'))
+    await flush()
+    expect(button(root, 'Grant').props['aria-busy']).toBe(false)
+    expect(button(root, 'Grant').props.disabled).toBe(false)
+    expect(content(root)).toContain('The node did not answer.')
   })
 
   it('offers no changes to a key holder who is not a group admin', async () => {
