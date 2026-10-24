@@ -1,8 +1,14 @@
 import {
+  createDistributedBucket as requestCreate,
+  getBucketDistribution as requestDistribution,
   getBucketUsage as requestBucketUsage,
+  retryAdmission as requestRetry,
+  type AdmissionResponse,
   type BlobLocationsResponse,
   type BucketRoutingResponse,
   type BucketUsageResponse,
+  type CreateDistributedRequest,
+  type DistributedResponse,
   type GroupRoutingResponse,
   type ReplicateBlobRequest,
   type ReplicateBlobResponse,
@@ -46,6 +52,34 @@ export async function getBucketRouting(bucket: string): Promise<BucketRoutingRes
 /** What the serving node counts in one bucket; 404 means the node lacks the route. */
 export function getBucketUsage(bucket: string): Promise<BucketUsageResponse> {
   return requestBucketUsage(bucket, refreshContext().client)
+}
+
+/** The set a bucket on this node belongs to; 404 means an ordinary bucket. */
+export function getBucketDistribution(bucket: string, signal?: AbortSignal): Promise<DistributedResponse> {
+  return requestDistribution(bucket, refreshContext().client, signal)
+}
+
+/** Group ADMIN: creates one bucket on several nodes with this node as publisher. */
+export async function createDistributedBucket(
+  groupId: string,
+  body: CreateDistributedRequest,
+): Promise<AdmissionResponse> {
+  saving.value = true
+  try {
+    return await requestCreate(groupId, body, refreshContext().client)
+  } finally {
+    saving.value = false
+  }
+}
+
+/** Asks the members that are not admitted yet to admit again. */
+export async function retryDistributedAdmission(groupId: string, setId: string): Promise<AdmissionResponse> {
+  saving.value = true
+  try {
+    return await requestRetry(groupId, setId, refreshContext().client)
+  } finally {
+    saving.value = false
+  }
 }
 
 export async function putBucketRouting(

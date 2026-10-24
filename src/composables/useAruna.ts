@@ -109,13 +109,16 @@ import {
   userInfo,
 } from './aruna/state'
 import {
+  createDistributedBucket,
   getBlobLocations,
+  getBucketDistribution,
   getBucketRouting,
   getBucketUsage,
   getGroupRouting,
   putBucketRouting,
   putGroupRouting,
   replicateBlob,
+  retryDistributedAdmission,
 } from './aruna/storage'
 import {
   createSyncRelationship,
@@ -252,6 +255,9 @@ export function useAruna() {
     putGroupRouting,
     getBucketRouting,
     getBucketUsage,
+    getBucketDistribution,
+    createDistributedBucket,
+    retryDistributedAdmission,
     putBucketRouting,
     getBlobLocations,
     replicateBlob,
