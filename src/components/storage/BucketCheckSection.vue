@@ -10,6 +10,7 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Progress from '@/components/ui/Progress.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { isUnsupportedEndpoint } from '@/composables/useAruna'
 import { apiBaseUrl, authToken } from '@/composables/aruna/state'
 import { localNodeId, nodeApiBase } from '@/composables/s3/endpoints'
@@ -28,7 +29,8 @@ const props = defineProps<{ bucket: string; nodeId: string | null }>()
 const { writesDisabled } = useConnectivity()
 const progress = ref<CheckProgress | null>(null)
 const supported = ref(true)
-const busy = ref(false)
+// The action on its way, so only its button shows the wait.
+const busy = ref<'check' | 'clean' | null>(null)
 const confirming = ref(false)
 const note = ref<string | null>(null)
 const error = ref<string | null>(null)
@@ -78,7 +80,7 @@ watch(
     progress.value = null
     broken.value = 0
     brokenMore.value = false
-    busy.value = false
+    busy.value = null
     supported.value = true
     note.value = null
     error.value = null
@@ -91,11 +93,11 @@ onBeforeUnmount(() => {
   stopPoll()
 })
 
-async function act(work: (alive: () => boolean) => Promise<void>) {
+async function act(action: 'check' | 'clean', work: (alive: () => boolean) => Promise<void>) {
   if (busy.value) return
   const origin = generation
   const alive = () => origin === generation
-  busy.value = true
+  busy.value = action
   note.value = null
   error.value = null
   let failure: string | null = null
@@ -110,17 +112,17 @@ async function act(work: (alive: () => boolean) => Promise<void>) {
       // A successful refresh must not hide why the action failed.
       if (alive()) {
         if (failure) error.value = failure
-        busy.value = false
+        busy.value = null
       }
     }
   }
 }
 
-const check = () => act(async () => void (await startBucketCheck(props.bucket, client())))
+const check = () => act('check', async () => void (await startBucketCheck(props.bucket, client())))
 
 function cleanUp() {
   confirming.value = false
-  return act(async (alive) => {
+  return act('clean', async (alive) => {
     const total = { deleted: 0, kept: 0, denied: 0 }
     let after: string | undefined
     do {
@@ -149,20 +151,22 @@ function cleanUp() {
         v-if="broken > 0 && !running"
         variant="destructive"
         size="sm"
-        :disabled="busy || writesDisabled"
+        :disabled="busy !== null || writesDisabled"
+        :aria-busy="busy === 'clean'"
         :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
         @click="confirming = true"
       >
-        Clean up
+        <Spinner v-if="busy === 'clean'" label="Removing the broken files" class="text-current" /> Clean up
       </Button>
       <Button
         variant="outline"
         size="sm"
-        :disabled="busy || running || writesDisabled"
+        :disabled="busy !== null || running || writesDisabled"
+        :aria-busy="busy === 'check'"
         :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
         @click="check"
       >
-        Check files
+        <Spinner v-if="busy === 'check'" label="Starting the check" class="text-current" /> Check files
       </Button>
     </header>
     <div class="space-y-2 px-5 py-4 text-xs text-muted-foreground">
@@ -197,7 +201,7 @@ function cleanUp() {
         </DialogHeader>
         <DialogFooter>
           <DialogClose as-child><Button type="button" variant="outline">Cancel</Button></DialogClose>
-          <Button variant="destructive" :disabled="busy || writesDisabled" @click="cleanUp">Clean up</Button>
+          <Button variant="destructive" :disabled="busy !== null || writesDisabled" @click="cleanUp">Clean up</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

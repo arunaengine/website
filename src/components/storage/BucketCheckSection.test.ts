@@ -31,6 +31,7 @@ const Section = compileClientComponent(new URL('./BucketCheckSection.vue', impor
   '@/components/ui/DialogHeader.vue': moduleDefault(Slot),
   '@/components/ui/DialogTitle.vue': moduleDefault(Slot),
   '@/components/ui/Progress.vue': moduleDefault(Empty),
+  '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('i', p.label) })),
   '@/composables/useAruna': { isUnsupportedEndpoint: (err: unknown) => err instanceof Api.ApiError && err.status === 404 },
   '@/composables/aruna/state': { apiBaseUrl: ref('https://a.test/api/v1'), authToken: ref('token') },
   '@/composables/s3/endpoints': { localNodeId: () => 'n1', nodeApiBase: () => 'https://a.test/api/v1' },
@@ -72,6 +73,22 @@ describe('BucketCheckSection', () => {
     mounted.app.unmount()
   })
 
+  it('shows the wait on Check files only while the start is on its way', async () => {
+    getBucketCheck.mockResolvedValue(done(3))
+    let answer: (value: unknown) => void = () => {}
+    startBucketCheck.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const mounted = await mount()
+    void (button(mounted.root, 'Check files').props.onClick as () => Promise<void>)()
+    await flush()
+    expect(button(mounted.root, 'Starting the check').props['aria-busy']).toBe(true)
+    expect(button(mounted.root, 'Clean up').props['aria-busy']).toBe(false)
+    answer({})
+    await flush()
+    await flush()
+    expect(button(mounted.root, 'Check files').props['aria-busy']).toBe(false)
+    mounted.app.unmount()
+  })
+
   it('shows the broken count and cleans up after a confirmation', async () => {
     getBucketCheck.mockResolvedValue(done(3))
     const mounted = await mount()
@@ -105,6 +122,36 @@ describe('BucketCheckSection', () => {
     await click(button(element(mounted.root, (node) => node.props.role === 'dialog'), 'Clean up'))
     await flush()
     expect(getBucketCheck).toHaveBeenCalledTimes(2)
+    expect(content(mounted.root)).toContain('scan limit reached')
+    mounted.app.unmount()
+  })
+
+  it('shows the wait on Clean up through every page, runs it once and frees it when a page fails', async () => {
+    getBucketCheck.mockResolvedValue(done(3))
+    let refuse: (err: Error) => void = () => {}
+    cleanBucketCheck
+      .mockResolvedValueOnce({ bucket: 'reef', deleted: 2, kept: 0, denied: 0, next: 'ab' })
+      .mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+    const mounted = await mount()
+    const dialogButton = () => button(element(mounted.root, (node) => node.props.role === 'dialog'), 'Clean up')
+    await click(button(mounted.root, 'Clean up'))
+    void (dialogButton().props.onClick as () => Promise<void>)()
+    await flush()
+    await flush()
+    expect(cleanBucketCheck).toHaveBeenCalledTimes(2)
+    const header = button(mounted.root, 'Removing the broken files')
+    expect(header.props['aria-busy']).toBe(true)
+    expect(header.props.disabled).toBe(true)
+    expect(button(mounted.root, 'Check files').props['aria-busy']).toBe(false)
+    expect(button(mounted.root, 'Check files').props.disabled).toBe(true)
+    await click(header)
+    await click(dialogButton())
+    expect(cleanBucketCheck).toHaveBeenCalledTimes(2)
+    refuse(new Api.ApiError(503, 'scan limit reached'))
+    await flush()
+    await flush()
+    expect(button(mounted.root, 'Clean up').props['aria-busy']).toBe(false)
+    expect(button(mounted.root, 'Clean up').props.disabled).toBe(false)
     expect(content(mounted.root)).toContain('scan limit reached')
     mounted.app.unmount()
   })
