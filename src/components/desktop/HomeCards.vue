@@ -1,103 +1,77 @@
 <script setup lang="ts">
-// Home of Aruna Desktop: your folders and what is moving, then the realm behind
-// them. Every card degrades on its own, so a node that is down or a route that
-// is not served yet costs one card, never the page.
+// The desktop's own part of Home: first steps, each with its button, and one
+// card for this computer. Every number is what the node reported; a read that
+// is not ready shows nothing rather than a zero.
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useLocalStorage } from '@vueuse/core'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Progress from '@/components/ui/Progress.vue'
-import Skeleton from '@/components/ui/Skeleton.vue'
-import Tooltip from '@/components/ui/Tooltip.vue'
-import PageHeader from '@/components/dashboard/PageHeader.vue'
 import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
-import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
-import SyncItemRow from '@/components/desktop/SyncItemRow.vue'
-import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
-import { useAruna } from '@/composables/useAruna'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { useDeviceCompute } from '@/composables/useDeviceCompute'
 import { useDeviceKeys } from '@/composables/useDeviceKeys'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useDeviceTransfers } from '@/composables/useDeviceTransfers'
-import { useFolderDecisions } from '@/composables/useFolderDecisions'
-import { useJobsList } from '@/composables/useJobs'
 import { useNodeControl } from '@/composables/useNodeControl'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
-import { useRealm } from '@/composables/useRealm'
-import { featureEnabled } from '@/lib/config'
-import { classify, folderName, isMoving, listDrafts, type DeviceDraft, type DeviceState } from '@/lib/deviceApi'
-import { isTerminalJobState, jobKindLabel, listJobs, type JobStatusResponse } from '@/lib/jobs'
-import { nodePill, plainDuration } from '@/lib/nodePill'
-import { transferPercent, type SyncItem } from '@/lib/syncStates'
-import { relativeTime } from '@/lib/utils'
-import { Check, Play, Plus, SquareTerminal } from '@lucide/vue'
+import { totalProgress } from '@/lib/activityGroups'
+import { folderName, isMoving } from '@/lib/deviceApi'
+import { keyNames } from '@/lib/keyNames'
+import { nodePill } from '@/lib/nodePill'
+import { needsYouCount } from '@/lib/syncStates'
+import { formatBytes } from '@/lib/utils'
+import { ArrowRight, Check, FolderPlus, Laptop, ListChecks, Play } from '@lucide/vue'
 
-const { realm } = useRealm()
-const { currentUser } = useAruna()
 const deviceKeys = useDeviceKeys()
 const { shown } = usePortalFeatures()
-const { status, state: nodeState, deviceClient, refresh } = useDeviceStatus()
-const {
-  folders,
-  listState: foldersState,
-  listError: foldersError,
-  ensureLoaded: ensureFolders,
-  sync: syncFolder,
-} = useSyncedFolders()
-const { all: syncTransfers, load: loadTransfers, state: transfersState } = useDeviceTransfers()
-const { compute, ensureLoaded: ensureCompute } = useDeviceCompute()
-const decisions = useFolderDecisions()
+const { status, state: nodeState, refresh } = useDeviceStatus()
+const { folders, listState: foldersState, ensureLoaded: ensureFolders, load: loadFolders } = useSyncedFolders()
+const { all: transfers, load: loadTransfers, state: transfersState } = useDeviceTransfers()
+const { compute, state: computeState, ensureLoaded: ensureCompute } = useDeviceCompute()
 const control = useNodeControl()
 
-const jobsEnabled = featureEnabled('jobs')
-const realmRuns = useJobsList({ pageSize: 10 })
-
-const localRuns = ref<JobStatusResponse[]>([])
-const localRunsState = ref<DeviceState>('idle')
-const drafts = ref<DeviceDraft[]>([])
 const showBind = ref(false)
-const retrying = ref(false)
 const startHidden = useLocalStorage('aruna:desktop:get-started-hidden', false)
 
 const pill = computed(() => nodePill(status.value))
 const notRunning = computed(() => nodeState.value === 'stopped' || nodeState.value === 'error')
-const runsOn = computed(() => shown('compute') && compute.value?.enabled === true)
+const runsShown = computed(() => shown('compute'))
 
-// Each step is done only when the node or the realm said so.
+const firstKeyName = computed(() => {
+  const key = deviceKeys.active.value[0]
+  return key ? keyNames()[key.access_key_id] : undefined
+})
+
+// Each step is done only when the node said so.
 const steps = computed(() => {
   const first = folders.value[0]
-  const list = [
+  return [
     {
       key: 'folder',
-      title: 'Sync a folder',
+      title: 'Link a local folder',
       done: folders.value.length > 0,
-      text: first ? `${folderName(first.root)} is set up with Aruna.` : 'Keep a folder on this computer in step with a bucket.',
-      action: null,
+      text: first ? `${folderName(first.root)} is linked.` : 'Keep a folder on this computer in step with a bucket.',
     },
     {
       key: 'tools',
       title: 'Connect your tools',
       done: deviceKeys.active.value.length > 0,
-      text: 'Use aws, rclone, Python or an AI assistant with your data.',
-      action: { label: 'Connect', to: { name: 'tools' } },
+      text: firstKeyName.value ? `Key "${firstKeyName.value}" is ready.` : 'Use aws, rclone, Python or Nextflow with your data.',
     },
-    ...(shown('compute')
+    ...(runsShown.value
       ? [
           {
             key: 'runs',
-            title: 'Turn on local runs',
+            title: 'Run jobs on this computer',
             done: compute.value?.enabled === true,
-            text: 'Run analysis jobs on this computer, next to your data.',
-            action: { label: 'Turn on', to: { name: 'device' } },
+            text: 'Analysis runs next to your data.',
           },
         ]
       : []),
   ]
-  return list
 })
 const stepsDone = computed(() => steps.value.filter((step) => step.done).length)
 // Only loaded lists can say a step is open, so nothing shows before that.
@@ -110,313 +84,149 @@ const showSteps = computed(
     stepsDone.value < steps.value.length,
 )
 
-const folderItems = computed<SyncItem[]>(() =>
-  folders.value.slice(0, 5).map((folder) => ({
-    kind: 'folder',
-    folder,
-    transfers: syncTransfers.value.filter((transfer) => transfer.folder_id === folder.folder_id),
-  })),
-)
+// A read on its way is not the same as one that failed.
+const waiting = (state: string) => (state === 'idle' || state === 'loading' ? 'Reading…' : 'Not available right now')
 
-const movingNow = computed(() => syncTransfers.value.filter(isMoving).slice(0, 3))
-const failedTransfers = computed(() => syncTransfers.value.filter((transfer) => transfer.state === 'failed'))
+const needsYou = computed(() => folders.value.reduce((sum, folder) => sum + needsYouCount(folder.counters), 0))
+const moving = computed(() => transfers.value.filter(isMoving).length)
+const progress = computed(() => totalProgress(transfers.value))
 
-async function retryFailed(): Promise<void> {
-  retrying.value = true
-  try {
-    const ids = new Set(failedTransfers.value.map((transfer) => transfer.folder_id).filter((id): id is string => !!id))
-    await Promise.allSettled([...ids].map((id) => syncFolder(id)))
-    await loadTransfers()
-  } finally {
-    retrying.value = false
-  }
-}
+const runsTitle = computed(() => {
+  if (computeState.value !== 'ready' || !compute.value) return null
+  return compute.value.enabled ? `${compute.value.running} running` : 'Off'
+})
+const runsText = computed(() => {
+  const current = compute.value
+  if (!current?.enabled) return 'Turn on under This computer.'
+  const limit = current.limits.max_concurrent
+  return [current.backend, limit ? `${limit} ${limit === 1 ? 'job' : 'jobs'} at a time` : null].filter(Boolean).join(', ')
+})
 
-const activeLocalRuns = computed(() => localRuns.value.filter((job) => !isTerminalJobState(job.state)))
-const activeRealmRuns = computed(() => realmRuns.jobs.value.filter((job) => !isTerminalJobState(job.state)))
-const activeDrafts = computed(() => drafts.value.filter((draft) => draft.status === 'pending' || draft.status === 'publishing'))
-const failedDrafts = computed(() => drafts.value.filter((draft) => draft.status === 'failed'))
-
-async function loadLocalRuns(): Promise<void> {
-  const client = deviceClient.value
-  if (!client) {
-    localRuns.value = []
-    localRunsState.value = 'offline'
-    return
-  }
-  try {
-    localRuns.value = (await listJobs({ limit: 5 }, client)).jobs
-    localRunsState.value = 'ready'
-  } catch (err) {
-    localRuns.value = []
-    localRunsState.value = classify(err)
-  }
-}
-
-async function loadDrafts(): Promise<void> {
-  const client = deviceClient.value
-  if (!client) {
-    drafts.value = []
-    return
-  }
-  try {
-    drafts.value = await listDrafts(client)
-  } catch {
-    drafts.value = []
-  }
-}
-
-async function reload(): Promise<void> {
+onMounted(async () => {
   await refresh()
-  await Promise.all([ensureFolders(), loadTransfers(), ensureCompute(), loadDrafts()])
-  await Promise.all([
-    decisions.load(),
-    compute.value?.enabled ? loadLocalRuns() : Promise.resolve(),
-    jobsEnabled && currentUser.value ? realmRuns.load() : Promise.resolve(),
-  ])
-}
-
-onMounted(() => void reload())
+  await Promise.all([ensureFolders(), loadTransfers(), ensureCompute()])
+})
 </script>
 
 <template>
-  <div>
-    <PageHeader
-      eyebrow="This computer"
-      title="Your data on this computer"
-      :description="`Signed in to ${realm.name}.`"
-      :docs="{ topic: 'where-data-lives', section: 'Syncs' }"
-    >
-      <template #breadcrumbs>
-        <span>·</span>
-        <Tooltip side="bottom">
-          <RouterLink :to="{ name: 'device' }" data-testid="node-pill">
-            <Badge :variant="pill.variant">{{ pill.label }}</Badge>
-          </RouterLink>
-          <template #content>
-            <span class="block font-medium text-foreground">
-              {{ pill.label === 'Running' ? 'This computer is running' : `This computer: ${pill.label.toLowerCase()}` }}
-            </span>
-            <span v-if="status?.version" class="block text-muted-foreground">
-              Version <span class="font-mono">{{ status.version }}</span>
-            </span>
-            <span v-if="status?.uptimeSeconds != null" class="block text-muted-foreground">
-              Running for {{ plainDuration(status.uptimeSeconds) }}
-            </span>
-            <span class="block text-muted-foreground">Signed in to {{ realm.name }}</span>
-          </template>
-        </Tooltip>
-      </template>
-      <template #actions>
-        <Button variant="outline" size="sm" as-child>
-          <RouterLink :to="{ name: 'tools' }"><SquareTerminal class="h-3.5 w-3.5" /> Connect your tools</RouterLink>
+  <div class="space-y-5">
+    <Notice v-if="notRunning" tone="warning">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="min-w-0">
+          <p class="font-medium">This computer is not running.</p>
+          <p class="mt-0.5">{{ status?.message || 'Your folders, tools and local runs wait until it runs again.' }}</p>
+          <p v-if="control.error.value" class="mt-1 text-destructive">{{ control.error.value }}</p>
+        </div>
+        <Button variant="outline" size="sm" :disabled="control.busy.value" @click="control.start">
+          <Play class="h-3.5 w-3.5" /> Start
         </Button>
-        <Button size="sm" @click="showBind = true"><Plus class="h-4 w-4" /> Sync a folder</Button>
-      </template>
-    </PageHeader>
+      </div>
+    </Notice>
 
-    <div class="container space-y-5 py-5">
-      <Notice v-if="notRunning" tone="warning">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="min-w-0">
-            <p class="font-medium">This computer is not running.</p>
-            <p class="mt-0.5">
-              {{ status?.message || 'Your folders, tools and local runs wait until it runs again.' }}
-            </p>
-            <p v-if="control.error.value" class="mt-1 text-destructive">{{ control.error.value }}</p>
+    <!-- First steps: leave once every one is done. -->
+    <section v-if="showSteps" class="surface overflow-hidden">
+      <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
+        <div class="flex items-center gap-2">
+          <ListChecks class="h-4 w-4 text-primary" />
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Get started</h2>
+          <Badge variant="secondary" size="sm">{{ stepsDone }} of {{ steps.length }} done</Badge>
+        </div>
+        <button
+          type="button"
+          class="text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
+          @click="startHidden = true"
+        >
+          Hide
+        </button>
+      </header>
+      <ul class="divide-y divide-border/70">
+        <li v-for="step in steps" :key="step.key" class="flex flex-wrap items-center gap-3 px-5 py-3">
+          <span
+            v-if="step.done"
+            class="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white"
+          >
+            <Check class="h-3 w-3" />
+          </span>
+          <span v-else class="inline-block size-5 shrink-0 rounded-full border-2 border-border" />
+          <div class="min-w-0 flex-1">
+            <span class="text-sm font-medium" :class="step.done ? 'text-muted-foreground line-through' : 'text-foreground'">
+              {{ step.title }}
+            </span>
+            <p class="mt-0.5 text-[11px] text-muted-foreground">{{ step.text }}</p>
           </div>
-          <Button variant="outline" size="sm" :disabled="control.busy.value" @click="control.start">
-            <Play class="h-3.5 w-3.5" /> Start
+          <template v-if="!step.done">
+            <Button v-if="step.key === 'folder'" size="sm" @click="showBind = true">
+              <FolderPlus class="h-3.5 w-3.5" /> Link a local folder
+            </Button>
+            <Button v-else-if="step.key === 'tools'" variant="outline" size="sm" as-child>
+              <RouterLink :to="{ name: 'settings', query: { tab: 'access', create: 'key' } }">Create a key</RouterLink>
+            </Button>
+            <Button v-else variant="outline" size="sm" as-child>
+              <RouterLink :to="{ name: 'device', query: { section: 'local-runs' } }">Turn on</RouterLink>
+            </Button>
+          </template>
+        </li>
+      </ul>
+    </section>
+
+    <!-- This computer: what it does right now, each tile opens its place. -->
+    <section class="surface overflow-hidden" aria-label="This computer">
+      <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
+        <div class="flex items-center gap-2">
+          <Laptop class="h-4 w-4 text-primary" />
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">This computer</h2>
+          <Badge :variant="pill.variant" size="sm">{{ pill.label }}</Badge>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" @click="showBind = true">
+            <FolderPlus class="h-3.5 w-3.5" /> Link a local folder
+          </Button>
+          <Button variant="ghost" size="sm" as-child>
+            <RouterLink :to="{ name: 'device' }">Open <ArrowRight class="h-3.5 w-3.5" /></RouterLink>
           </Button>
         </div>
-      </Notice>
-      <Notice v-else-if="status?.message && pill.label !== 'Running'" tone="warning">{{ status.message }}</Notice>
-
-      <!-- First steps: leave once every one is done. -->
-      <section v-if="showSteps" class="surface overflow-hidden">
-        <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
-          <div class="flex items-center gap-2">
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">Get started</h2>
-            <Badge variant="secondary" size="sm">{{ stepsDone }} of {{ steps.length }} done</Badge>
-          </div>
-          <button
-            type="button"
-            class="text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
-            @click="startHidden = true"
-          >
-            Hide
-          </button>
-        </header>
-        <ul class="divide-y divide-border/70">
-          <li v-for="step in steps" :key="step.key" class="flex items-start gap-3 px-5 py-3">
-            <span
-              v-if="step.done"
-              class="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white"
-            >
-              <Check class="h-3 w-3" />
-            </span>
-            <span v-else class="mt-0.5 inline-block size-5 shrink-0 rounded-full border-2 border-border" />
-            <div class="min-w-0 flex-1">
-              <span
-                class="text-sm font-medium"
-                :class="step.done ? 'text-muted-foreground line-through' : 'text-foreground'"
-                >{{ step.title }}</span
-              >
-              <p class="mt-0.5 text-[11px] text-muted-foreground">{{ step.text }}</p>
+      </header>
+      <div class="grid divide-y divide-border/70 sm:auto-cols-fr sm:grid-flow-col sm:divide-x sm:divide-y-0">
+        <RouterLink :to="{ name: 'device' }" class="block px-5 py-4 hover:bg-muted/40">
+          <div class="text-xs font-medium uppercase tracking-wider text-muted-foreground">Linked folders</div>
+          <template v-if="foldersState === 'ready'">
+            <div class="mt-1 font-display text-2xl font-semibold text-aruna-navy">{{ folders.length }}</div>
+            <div v-if="needsYou" class="mt-0.5 text-xs text-amber-700 dark:text-amber-300">
+              {{ needsYou }} {{ needsYou === 1 ? 'file needs' : 'files need' }} you
             </div>
-            <Button v-if="step.action && !step.done" variant="outline" size="sm" as-child>
-              <RouterLink :to="step.action.to">{{ step.action.label }}</RouterLink>
-            </Button>
-          </li>
-        </ul>
-        <p class="border-t border-border/70 px-5 py-2 text-[11px] text-muted-foreground">
-          This list goes away when all {{ steps.length === 3 ? 'three' : steps.length }} are done.
-        </p>
-      </section>
-
-      <div class="grid gap-4 lg:grid-cols-2">
-        <!-- Folders -->
-        <section class="surface flex flex-col overflow-hidden lg:col-span-2">
-          <header class="flex items-center justify-between border-b border-border px-5 py-3">
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">Folders</h2>
-            <RouterLink :to="{ name: 'sync' }" class="text-xs font-medium text-primary hover:underline">Open</RouterLink>
-          </header>
-          <div class="flex-1 px-5 py-2">
-            <Skeleton v-if="foldersState === 'idle' || foldersState === 'loading'" class="my-3 h-12" />
-            <DeviceSurfaceState
-              v-else-if="foldersState !== 'ready'"
-              class="my-3"
-              :state="foldersState"
-              subject="its folders"
-              :error="foldersError"
-              compact
-            />
-            <ul v-else-if="folderItems.length" class="divide-y divide-border/70">
-              <SyncItemRow v-for="item in folderItems" :key="item.kind === 'folder' ? item.folder.folder_id : ''" :item="item" compact />
-            </ul>
-            <EmptyState v-else compact class="my-3" title="Nothing syncs with this computer yet.">
-              <Button variant="outline" size="sm" @click="showBind = true">Sync a folder</Button>
-            </EmptyState>
-          </div>
-        </section>
-
-        <!-- Activity -->
-        <section class="surface flex flex-col overflow-hidden">
-          <header class="flex items-center justify-between border-b border-border px-5 py-3">
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">Activity</h2>
-            <RouterLink :to="{ name: 'activity' }" class="text-xs font-medium text-primary hover:underline">Open</RouterLink>
-          </header>
-          <div class="flex-1 space-y-3 px-5 py-4">
-            <Skeleton v-if="transfersState === 'idle' || transfersState === 'loading'" class="h-12" />
-            <DeviceSurfaceState
-              v-else-if="transfersState !== 'ready'"
-              :state="transfersState"
-              subject="its transfers"
-              compact
-            />
-            <template v-else>
-              <div v-if="movingNow.length" class="space-y-2 text-[11px]">
-                <div v-for="transfer in movingNow" :key="transfer.id" class="flex items-center gap-2">
-                  <span class="hash min-w-0 flex-1 truncate text-foreground" :title="transfer.path">{{ transfer.path }}</span>
-                  <span v-if="transferPercent(transfer) !== null" class="text-muted-foreground">
-                    {{ transferPercent(transfer) }}%
-                  </span>
-                  <Progress
-                    :value="transferPercent(transfer) ?? 0"
-                    :indeterminate="transferPercent(transfer) === null"
-                    :label="transfer.path"
-                    class="h-1.5 w-20 shrink-0"
-                  />
-                </div>
-              </div>
-              <p v-else class="text-sm text-muted-foreground">Nothing is moving right now.</p>
-              <ul
-                v-if="failedTransfers.length || decisions.latest.value"
-                class="space-y-1 border-t border-border/70 pt-3 text-[11px] text-muted-foreground"
-              >
-                <li v-if="failedTransfers.length" class="flex items-center gap-1.5">
-                  {{ failedTransfers.length }} {{ failedTransfers.length === 1 ? 'file' : 'files' }} failed ·
-                  <button
-                    type="button"
-                    class="text-primary hover:underline disabled:opacity-60"
-                    :disabled="retrying"
-                    @click="retryFailed"
-                  >
-                    Retry
-                  </button>
-                </li>
-                <li v-if="decisions.latest.value">
-                  {{ decisions.latest.value.text }}
-                  <template v-if="decisions.latest.value.atMs">
-                    · {{ relativeTime(new Date(decisions.latest.value.atMs).toISOString()) }}
-                  </template>
-                </li>
-              </ul>
-            </template>
-          </div>
-        </section>
-
-        <!-- Runs: only while this computer runs jobs itself. -->
-        <section v-if="runsOn" class="surface flex flex-col overflow-hidden">
-          <header class="flex items-center justify-between border-b border-border px-5 py-3">
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">Runs</h2>
-            <RouterLink :to="{ name: 'runs' }" class="text-xs font-medium text-primary hover:underline">Open</RouterLink>
-          </header>
-          <div class="flex-1 space-y-3 px-5 py-4">
-            <div class="flex flex-wrap gap-x-8 gap-y-2">
-              <div>
-                <p class="font-display text-xl font-bold text-foreground">{{ activeLocalRuns.length }}</p>
-                <p class="text-[11px] text-muted-foreground">on this computer</p>
-              </div>
-              <div>
-                <p class="font-display text-xl font-bold text-foreground">{{ activeRealmRuns.length }}</p>
-                <p class="text-[11px] text-muted-foreground">in {{ realm.shortName }}</p>
-              </div>
+          </template>
+          <div v-else class="mt-1 text-xs text-muted-foreground">{{ waiting(foldersState) }}</div>
+        </RouterLink>
+        <RouterLink :to="{ name: 'device' }" class="block px-5 py-4 hover:bg-muted/40">
+          <div class="text-xs font-medium uppercase tracking-wider text-muted-foreground">Moving now</div>
+          <template v-if="transfersState === 'ready'">
+            <div class="mt-1 font-display text-2xl font-semibold text-aruna-navy">
+              {{ moving }} {{ moving === 1 ? 'file' : 'files' }}
             </div>
-            <DeviceSurfaceState v-if="localRunsState !== 'ready'" :state="localRunsState" subject="its runs" compact />
-            <ul v-else class="space-y-1">
-              <li
-                v-for="job in localRuns.slice(0, 3)"
-                :key="job.job_id"
-                class="flex items-center gap-2 truncate text-[11px] text-muted-foreground"
-              >
-                <span class="text-foreground">{{ jobKindLabel(job.kind) }}</span>
-                <JobStateBadge :state="job.state" />
-                <span>{{ relativeTime(job.created_at) }}</span>
-              </li>
-            </ul>
-          </div>
-        </section>
-
-        <!-- Drafts: only while one waits or failed. -->
-        <section v-if="activeDrafts.length || failedDrafts.length" class="surface flex flex-col overflow-hidden">
-          <header class="flex items-center justify-between border-b border-border px-5 py-3">
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">Drafts on this computer</h2>
-          </header>
-          <div class="flex-1 px-5 py-4">
-            <template v-if="activeDrafts.length">
-              <p class="text-sm text-foreground">
-                <span class="font-display text-xl font-bold">{{ activeDrafts.length }}</span>
-                waiting to be published
-              </p>
-              <ul class="mt-2 space-y-1">
-                <li v-for="draft in activeDrafts.slice(0, 3)" :key="draft.draft_id" class="truncate text-[11px] text-muted-foreground">
-                  {{ draft.path || draft.draft_id }}
-                </li>
-              </ul>
+            <template v-if="progress">
+              <Progress
+                :value="progress.total ? (progress.done / progress.total) * 100 : 0"
+                label="Total progress"
+                class="mt-1.5 h-1.5"
+              />
+              <div class="mt-1 text-xs text-muted-foreground">
+                {{ formatBytes(progress.done) }} of {{ formatBytes(progress.total) }}
+              </div>
             </template>
-            <Notice
-              v-if="failedDrafts.length"
-              tone="error"
-              class="mt-3"
-              :title="`${failedDrafts.length} ${failedDrafts.length === 1 ? 'draft' : 'drafts'} failed to publish`"
-              :lines="failedDrafts.slice(0, 3).map((draft) => draft.path || draft.draft_id)"
-            />
-          </div>
-        </section>
+          </template>
+          <div v-else class="mt-1 text-xs text-muted-foreground">{{ waiting(transfersState) }}</div>
+        </RouterLink>
+        <RouterLink v-if="runsShown" :to="{ name: 'compute' }" class="block px-5 py-4 hover:bg-muted/40">
+          <div class="text-xs font-medium uppercase tracking-wider text-muted-foreground">Local runs</div>
+          <template v-if="runsTitle">
+            <div class="mt-1 font-display text-2xl font-semibold text-aruna-navy">{{ runsTitle }}</div>
+            <div class="mt-0.5 text-xs text-muted-foreground">{{ runsText }}</div>
+          </template>
+          <div v-else class="mt-1 text-xs text-muted-foreground">{{ waiting(computeState) }}</div>
+        </RouterLink>
       </div>
-    </div>
+    </section>
 
-    <BindFolderDialog v-model:open="showBind" @bound="ensureFolders" />
+    <BindFolderDialog v-model:open="showBind" @bound="loadFolders" />
   </div>
 </template>
