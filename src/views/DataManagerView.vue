@@ -171,9 +171,11 @@ function onBucketCreated(created: BindSource) {
   refreshShownBuckets()
 }
 
-// The list shown: every node through the search, or the one node.
+// The list shown: every node through the search, or the one node, which also
+// stands in when an older node cannot list without a name.
 function refreshShownBuckets() {
-  void (bucketNodeChoice.value === null ? manager.allBuckets.reload() : bucketList.refresh())
+  const search = bucketNodeChoice.value === null && !manager.allBuckets.needsName.value
+  void (search ? manager.allBuckets.reload() : bucketList.refresh())
 }
 
 // The desktop names the place; kind and id go to the tooltip.

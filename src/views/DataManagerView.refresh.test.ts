@@ -58,7 +58,7 @@ const DataManagerView = compileClientComponent(new URL('./DataManagerView.vue', 
 })
 
 // What the view reads at mount; any other field is an empty ref.
-function fakeManager(nodeChoice: string | null) {
+function fakeManager(nodeChoice: string | null, needsName = false) {
   const known: Record<string, unknown> = {
     route: { name: 'buckets', query: {} },
     router: { replace: vi.fn(), push: vi.fn() },
@@ -68,7 +68,7 @@ function fakeManager(nodeChoice: string | null) {
     references: { entries: ref([]), reload: vi.fn() },
     bucketNodeChoice: ref(nodeChoice),
     bucketList: { refresh: vi.fn() },
-    allBuckets: { reload: vi.fn() },
+    allBuckets: { reload: vi.fn(), needsName: ref(needsName) },
     loadSyncOverview: vi.fn(),
   }
   const empty = new Map<PropertyKey, unknown>()
@@ -81,8 +81,8 @@ function fakeManager(nodeChoice: string | null) {
   })
 }
 
-async function finishLink(nodeChoice: string | null) {
-  manager = fakeManager(nodeChoice)
+async function finishLink(nodeChoice: string | null, needsName = false) {
+  manager = fakeManager(nodeChoice, needsName)
   const { root, app } = await mountApp(DataManagerView)
   const bind = element(root, (node: HostNode) => node.props['data-stub'] === 'BindFolderDialog')
   await (bind.props.onBound as (folder: unknown) => void)({ folder_id: 'f1' })
@@ -96,6 +96,13 @@ describe('Data view after a folder link', () => {
 
     expect(shown.allBuckets.reload).toHaveBeenCalled()
     expect(shown.bucketList.refresh).not.toHaveBeenCalled()
+  })
+
+  it('reloads the one node list that stands in when the search needs a name', async () => {
+    const shown = await finishLink(null, true)
+
+    expect(shown.bucketList.refresh).toHaveBeenCalled()
+    expect(shown.allBuckets.reload).not.toHaveBeenCalled()
   })
 
   it('reloads the one node list when one node is shown', async () => {
