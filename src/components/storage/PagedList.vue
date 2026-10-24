@@ -3,6 +3,7 @@
 import { ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { rangeLabel } from '@/lib/organize'
 
 const props = withDefaults(
@@ -27,6 +28,9 @@ const emit = defineEmits<{ (e: 'prev'): void; (e: 'next'): void; (e: 'filter', v
 
 const draft = ref(props.filter)
 watch(() => props.filter, (value) => (draft.value = value))
+// The page button last used shows the wait until its page is read.
+const going = ref<'prev' | 'next' | null>(null)
+watch(() => props.busy, (busy) => busy || (going.value = null))
 </script>
 
 <template>
@@ -48,8 +52,24 @@ watch(() => props.filter, (value) => (draft.value = value))
       <span v-else />
       <span class="text-[11px] tabular-nums text-muted-foreground">{{ summary ?? (shown || !hasNext ? rangeLabel(offset, shown, total, complete) : '') }}</span>
       <span class="flex gap-2">
-        <Button variant="outline" size="sm" :disabled="busy || !hasPrev" @click="emit('prev')">Previous</Button>
-        <Button variant="outline" size="sm" :disabled="busy || !hasNext" @click="emit('next')">Next</Button>
+        <Button
+          variant="outline"
+          size="sm"
+          :disabled="busy || !hasPrev"
+          :aria-busy="busy && going === 'prev'"
+          @click="(going = 'prev'), emit('prev')"
+        >
+          <Spinner v-if="busy && going === 'prev'" label="Loading the page" class="text-current" /> Previous
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          :disabled="busy || !hasNext"
+          :aria-busy="busy && going === 'next'"
+          @click="(going = 'next'), emit('next')"
+        >
+          <Spinner v-if="busy && going === 'next'" label="Loading the page" class="text-current" /> Next
+        </Button>
       </span>
     </div>
   </div>

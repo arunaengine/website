@@ -5,6 +5,7 @@ import Badge from '@/components/ui/Badge.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import IconButton from '@/components/ui/IconButton.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import BucketJobLabel from '@/components/storage/BucketJobLabel.vue'
 import BucketEditDialog from '@/components/groups/BucketEditDialog.vue'
 import LinkBucketDialog from '@/components/groups/LinkBucketDialog.vue'
@@ -445,9 +446,11 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
                 <IconButton
                   label="Sync now"
                   :disabled="writesDisabled || syncing !== null || runActive(row.link.last_run)"
+                  :aria-busy="syncing === row.link.import_id"
                   @click="sync(row.link)"
                 >
-                  <Play class="size-3.5" />
+                  <Spinner v-if="syncing === row.link.import_id" label="Starting the sync" class="text-current" />
+                  <Play v-else class="size-3.5" />
                 </IconButton>
                 <Button variant="ghost" size="sm" :class="EDIT" title="Settings and organize" @click="openEdit(row.link)">Edit</Button>
               </span>

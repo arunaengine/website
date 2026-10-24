@@ -1,5 +1,5 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it } from 'vitest'
 import { button, compileClientComponent, click, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
 import * as Organize from '@/lib/organize'
@@ -22,6 +22,7 @@ const PagedList = compileClientComponent(new URL('./PagedList.vue', import.meta.
   vue: VueRuntime,
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
+  '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('i', p.label) })),
   '@/lib/organize': Organize,
 })
 
@@ -54,6 +55,26 @@ async function mount(offset: number, shown: number, total: number, hasNext = fal
 }
 
 describe('PagedList', () => {
+  it('shows the wait on the page button that was used until its page is read', async () => {
+    const busy = ref(false)
+    const props = { total: 250, offset: 100, shown: 0, hasNext: true, hasPrev: true, filter: '' }
+    const { root } = await mountApp(
+      defineComponent(() => () => h(PagedList, { ...props, busy: busy.value, onNext: () => (busy.value = true) })),
+    )
+    await click(button(root, 'Next'))
+    const next = button(root, 'Loading the page Next')
+    expect(next.props['aria-busy']).toBe(true)
+    expect(next.props.disabled).toBe(true)
+    expect(button(root, 'Previous').props['aria-busy']).toBe(false)
+    busy.value = false
+    await flush()
+    expect(content(root)).not.toContain('Loading the page')
+    // A read the list did not ask for marks no button.
+    busy.value = true
+    await flush()
+    expect(content(root)).not.toContain('Loading the page')
+  })
+
   it('shows the range and asks for the next and previous page', async () => {
     const { root, events } = await mount(100, 100, 250, true)
     expect(content(root)).toContain('101-200 of 250')

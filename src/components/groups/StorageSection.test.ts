@@ -66,6 +66,7 @@ const StorageSection = compileClientComponent(new URL('./StorageSection.vue', im
   '@/components/ui/IconButton.vue': moduleDefault(IconButtonStub),
   '@/components/ui/ErrorPanel.vue': moduleDefault(Empty),
   '@/components/ui/Skeleton.vue': moduleDefault(Empty),
+  '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('i', p.label) })),
   '@/components/groups/StorageBackendDialog.vue': moduleDefault(OpenStub('storage-dialog')),
   '@/components/groups/NewBucketsDialog.vue': moduleDefault(OpenStub('new-buckets-dialog')),
   '@/components/groups/LinkBucketDialog.vue': moduleDefault(OpenStub('link-dialog')),
@@ -516,6 +517,26 @@ describe('StorageSection', () => {
     expect(second.props.disabled).toBe(true)
     await click(first)
     expect(runBackendImport).toHaveBeenCalledWith('g1', 'i1', expect.anything())
+  })
+
+  it('shows the wait on Sync now, starts one sync and frees the buttons when it fails', async () => {
+    let refuse: (err: Error) => void = () => {}
+    runBackendImport.mockReturnValue(new Promise((_, reject) => (refuse = reject)))
+    const { root } = await mount()
+    const first = () => nodes(root).filter((node) => node.props['aria-label'] === 'Sync now')[0]
+    void (first().props.onClick as () => Promise<void>)()
+    await flush()
+    expect(first().props['aria-busy']).toBe(true)
+    expect(first().props.disabled).toBe(true)
+    expect(content(first())).toBe('Starting the sync')
+    await (first().props.onClick as () => Promise<void>)()
+    expect(runBackendImport).toHaveBeenCalledTimes(1)
+    refuse(new Error('refused'))
+    await flush()
+    await flush()
+    expect(first().props['aria-busy']).toBe(false)
+    expect(first().props.disabled).toBe(false)
+    expect(content(root)).toContain('refused')
   })
 
   it('opens the bucket edit from a row and from the address', async () => {
