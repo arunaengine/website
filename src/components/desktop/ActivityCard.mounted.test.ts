@@ -44,7 +44,13 @@ const ActivityCard = compileClientComponent(new URL('./ActivityCard.vue', import
   '@/components/ui/Skeleton.vue': moduleDefault(Empty),
   '@/components/desktop/DeviceSurfaceState.vue': moduleDefault(Empty),
   '@/composables/useDeviceSync': {
-    useDeviceSync: () => ({ status: ref({ realmReachable: true, lastSyncMs: null }), runSync: vi.fn(), load: vi.fn(async () => undefined) }),
+    useDeviceSync: () => ({
+      status: ref({ realmReachable: true, lastSyncMs: null }),
+      state: ref('ready'),
+      running: ref(false),
+      runSync: vi.fn(),
+      load: vi.fn(async () => undefined),
+    }),
   },
   '@/composables/useDeviceTransfers': {
     useDeviceTransfers: () => ({ all: ref([]), state: ref('ready'), error: ref(null), load: vi.fn(async () => undefined) }),

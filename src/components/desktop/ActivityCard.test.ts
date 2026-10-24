@@ -12,6 +12,7 @@ const decisionsState = ref('ready')
 const decisionsError = ref<string | null>(null)
 const decisionsPartial = ref(false)
 const syncStatus = ref({ realmReachable: true, lastSyncMs: null as number | null })
+const syncState = ref('ready')
 
 const passthrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
@@ -44,7 +45,7 @@ beforeAll(async () => {
     useDeviceTransfers: () => ({ all: transfers, state: transfersState, error: ref(null), load: vi.fn(async () => undefined) }),
   }))
   vi.doMock('@/composables/useDeviceSync', () => ({
-    useDeviceSync: () => ({ status: syncStatus, runSync: vi.fn(), load: vi.fn(async () => undefined) }),
+    useDeviceSync: () => ({ status: syncStatus, state: syncState, running: ref(false), runSync: vi.fn(), load: vi.fn(async () => undefined) }),
   }))
   vi.doMock('@/composables/useFolderDecisions', () => ({
     useFolderDecisions: () => ({ items: decisionItems, partial: decisionsPartial, state: decisionsState, error: decisionsError, load: vi.fn(async () => undefined) }),
@@ -65,6 +66,7 @@ beforeEach(() => {
   decisionsState.value = 'ready'
   decisionsError.value = null
   syncStatus.value = { realmReachable: true, lastSyncMs: null }
+  syncState.value = 'ready'
 })
 
 const render = () => renderToString(createSSRApp(ActivityCard))
@@ -94,6 +96,18 @@ describe('activity', () => {
     expect(html).toContain('bg-aruna-gradient')
     expect(html).not.toContain('bg-rose-500')
     expect(html).not.toContain('bg-amber-500')
+  })
+
+  it('offers Sync now without linked folders while the node and the realm answer', async () => {
+    folders.value = []
+    const syncButton = (html: string) => html.match(/<button[^>]*>(?:(?!<\/button>)[\s\S])*Sync now/)?.[0] ?? ''
+
+    expect(syncButton(await render())).not.toContain('disabled')
+    syncStatus.value = { realmReachable: false, lastSyncMs: null }
+    expect(syncButton(await render())).toContain('disabled')
+    syncStatus.value = { realmReachable: true, lastSyncMs: null }
+    syncState.value = 'offline'
+    expect(syncButton(await render())).toContain('disabled')
   })
 
   it('shows total progress only from counted bytes', async () => {
