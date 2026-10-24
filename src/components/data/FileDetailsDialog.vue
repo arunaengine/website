@@ -17,6 +17,7 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import MockFileGeneral from '@/components/data/MockFileGeneral.vue'
 import MockFileStorage from '@/components/data/MockFileStorage.vue'
 import FileOrigin from '@/components/data/FileOrigin.vue'
+import FilePartOf from '@/components/data/FilePartOf.vue'
 import LinkedDatasets from '@/components/data/LinkedDatasets.vue'
 import ObjectLocationsPanel from '@/components/data/ObjectLocationsPanel.vue'
 import ReferencedBy from '@/components/data/ReferencedBy.vue'
@@ -425,12 +426,17 @@ const details = computed(() => props.folder ? [
           class="mt-4"
           :target="{ bucket: props.bucket, key: props.objectKey, versionId: pinnedVersion }"
         />
+        <FilePartOf
+          v-if="props.open && !mock && !remote && !props.folder"
+          class="mt-4"
+          :target="{ bucket: props.bucket, key: props.objectKey }"
+        />
         <LinkedDatasets
-          v-if="props.open && !mock && !remote"
+          v-if="props.open && !mock && !remote && props.folder"
           class="mt-4"
           quiet-empty
-          :heading="props.folder ? 'Linked by datasets' : 'Part of'"
-          :target="{ bucket: props.bucket, key: props.objectKey, folder: Boolean(props.folder), remote: false }"
+          heading="Linked by datasets"
+          :target="{ bucket: props.bucket, key: props.objectKey, folder: true, remote: false }"
         />
         <p v-if="props.referencedFrom" class="mt-3 text-xs text-muted-foreground">
           Referenced from {{ props.referencedFrom.label }}.

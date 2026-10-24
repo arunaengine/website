@@ -75,6 +75,7 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   '@/components/data/MockFileGeneral.vue': moduleDefault(Marker('mock file ids')),
   '@/components/data/MockFileStorage.vue': moduleDefault(Marker('mock file storage')),
   '@/components/data/LinkedDatasets.vue': moduleDefault(Marker('datasets that link this')),
+  '@/components/data/FilePartOf.vue': moduleDefault(Marker('datasets this file is part of')),
   '@/components/data/FileOrigin.vue': moduleDefault(Marker('origin of this version')),
   '@/lib/distributedMock': { mockEnabled: () => false },
   '@/lib/distributedMockData': { mockFile: () => undefined },
