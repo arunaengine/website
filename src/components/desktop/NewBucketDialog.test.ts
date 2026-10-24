@@ -83,8 +83,8 @@ const NewBucketDialog = compileClientComponent(new URL('./NewBucketDialog.vue', 
     useRealmNodes: () => ({
       nodes: ref([
         { ...realmNode('device', 'device 12D3…', { kind: 'user', isLocal: true, location: null }) },
-        realmNode('node-0', 'node-0', { reachable: false }),
-        realmNode('node-1', 'node-1'),
+        realmNode('node-0', 'node-0 · Giessen', { reachable: false }),
+        realmNode('node-1', 'node-1 · Giessen'),
       ]),
     }),
   },

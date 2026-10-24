@@ -1,5 +1,5 @@
 // Readable names for the place a bucket is stored: this computer, another
-// device, or a realm node with its location. Kind and id go to a tooltip.
+// device, or a realm node. Kind and id go to a tooltip.
 import { kindLabel } from '@/components/nodes/node-display'
 import type { RealmNodeDisplay } from '@/composables/useRealmNodes'
 import type { InfoResponse } from '@/lib/api'
@@ -7,9 +7,9 @@ import { truncateMiddle } from '@/lib/utils'
 
 type PlaceNode = Pick<RealmNodeDisplay, 'nodeId' | 'kind' | 'label' | 'isLocal' | 'location'>
 
+// The desktop label already names a realm node with its location.
 export function placeName(node: PlaceNode): string {
-  if (node.kind === 'user') return node.isLocal ? 'This computer' : node.label
-  return node.location ? `${node.label} · ${node.location}` : node.label
+  return node.kind === 'user' && node.isLocal ? 'This computer' : node.label
 }
 
 export function placeTitle(node: Pick<PlaceNode, 'nodeId' | 'kind'>): string {

@@ -18,7 +18,7 @@ const hits = ref(listed)
 const more = ref(false)
 const loadMore = vi.fn()
 const nodes = new Map<string, Record<string, unknown>>([
-  ['node-1', { nodeId: 'node-1', kind: 'server', label: 'node-1', isLocal: false, location: 'Giessen' }],
+  ['node-1', { nodeId: 'node-1', kind: 'server', label: 'node-1 · Giessen', isLocal: false, location: 'Giessen' }],
   ['device', { nodeId: 'device', kind: 'user', label: 'device 12D3…', isLocal: true, location: null }],
   ['laptop', { nodeId: 'laptop', kind: 'user', label: "Lena's laptop", isLocal: false, location: null }],
 ])
