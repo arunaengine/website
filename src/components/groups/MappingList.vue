@@ -99,6 +99,8 @@ function add() {
 }
 
 function remove(index: number) {
+  // A removal would move the row that Apply… is counting for.
+  if (counting.value !== null) return
   revision++
   example.value = null
   asking.value = null
@@ -211,7 +213,7 @@ const COLUMNS = 'grid grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)_11rem] items
             >
               <Spinner v-if="counting === index" label="Counting files" class="text-current" /> Apply…
             </Button>
-            <IconButton label="Remove" @click="remove(index)"><X class="size-3.5" /></IconButton>
+            <IconButton label="Remove" :disabled="counting !== null" @click="remove(index)"><X class="size-3.5" /></IconButton>
           </span>
         </div>
         <p v-if="mapping.aruna && mapping.storage && mappingProblem(mapping)" class="mt-1 text-destructive">

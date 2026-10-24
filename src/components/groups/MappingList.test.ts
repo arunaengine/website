@@ -135,6 +135,33 @@ describe('MappingList', () => {
     expect(content(root)).toContain('refused')
   })
 
+  it('keeps the rows while an Apply… counts, so its wait stays on its own mapping', async () => {
+    previewMove.mockReturnValueOnce(new Promise(() => {}))
+    const first = { aruna: 'a/{name}', storage: '*.a' }
+    const third = { aruna: 'c/{name}', storage: '*.c' }
+    const model = ref([first, SAVED, third])
+    const { root } = await mountApp(
+      defineComponent(() => () =>
+        h(MappingList, {
+          groupId: 'g1',
+          link: LINK,
+          modelValue: model.value,
+          saved: [first, SAVED, third],
+          job: null,
+          'onUpdate:modelValue': (value: (typeof SAVED)[]) => (model.value = value),
+        }),
+      ),
+    )
+    void (buttonIn(rows(root)[1], 'Apply…').props.onClick as () => Promise<void>)()
+    await flush()
+    const removeFirst = element(rows(root)[0], (node) => node.tag === 'button' && node.props['aria-label'] === 'Remove')
+    expect(removeFirst.props.disabled).toBe(true)
+    await click(removeFirst)
+    expect(model.value).toHaveLength(3)
+    expect(buttonIn(rows(root)[1], 'Counting files Apply…').props['aria-busy']).toBe(true)
+    expect(buttonIn(rows(root)[2], 'Apply…').props['aria-busy']).toBe(false)
+  })
+
   it('drops a pending confirm when the rule is edited before the count arrives', async () => {
     let answer: (value: unknown) => void = () => {}
     previewMove.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
