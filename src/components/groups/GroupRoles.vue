@@ -6,6 +6,7 @@ import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import RoleBuilder from './RoleBuilder.vue'
 import { describeTarget, pathProblem } from './permission-paths'
 import { computed, ref } from 'vue'
@@ -24,6 +25,8 @@ const emit = defineEmits<{ (e: 'changed'): void }>()
 const { deleteGroupRole, saving } = useAruna()
 
 const roleError = ref<string | null>(null)
+// The role whose deletion is on its way.
+const deletingId = ref<string | null>(null)
 // null = builder closed; { role: null } = create; { role } = edit.
 const editor = ref<{ role: ApiRole | null; isPublic?: boolean } | null>(null)
 
@@ -129,12 +132,16 @@ function closeEditor(changed: boolean) {
 }
 
 async function removeRole(role: ApiRole) {
+  if (deletingId.value) return
   roleError.value = null
+  deletingId.value = role.role_id
   try {
     await deleteGroupRole(props.group.group_id, role.role_id)
     emit('changed')
   } catch (err) {
     roleError.value = errorMessage(err)
+  } finally {
+    deletingId.value = null
   }
 }
 </script>
@@ -210,10 +217,12 @@ async function removeRole(role: ApiRole) {
                   size="icon-sm"
                   class="text-muted-foreground"
                   :aria-label="`Delete role ${role.name}`"
-                  :disabled="saving"
+                  :disabled="saving || deletingId !== null"
+                  :aria-busy="deletingId === role.role_id"
                   @click="removeRole(role)"
                 >
-                  <Trash2 class="h-3.5 w-3.5" />
+                  <Spinner v-if="deletingId === role.role_id" label="Deleting the role" class="text-current" />
+                  <Trash2 v-else class="h-3.5 w-3.5" />
                 </Button>
               </template>
             </td>

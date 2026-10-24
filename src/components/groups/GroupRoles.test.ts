@@ -1,9 +1,11 @@
 import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import * as PermissionPaths from './permission-paths'
 import * as Utils from '@/lib/utils'
-import { button, click, compileClientComponent, content, element, mountApp, moduleDefault, nodes } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, mountApp, moduleDefault, nodes } from '@/test/clientRender'
+
+const deleteGroupRole = vi.fn(() => Promise.resolve())
 
 const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
 const Slotted = (tag: string) =>
@@ -28,9 +30,10 @@ const roles = compileClientComponent(new URL('./GroupRoles.vue', import.meta.url
   '@/components/ui/DialogDescription.vue': moduleDefault(Slotted('p')),
   '@/components/ui/DialogHeader.vue': moduleDefault(Slotted('div')),
   '@/components/ui/DialogTitle.vue': moduleDefault(Slotted('h2')),
+  '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('b', p.label) })),
   './RoleBuilder.vue': moduleDefault(BuilderStub),
   './permission-paths': PermissionPaths,
-  '@/composables/useAruna': { useAruna: () => ({ deleteGroupRole: () => Promise.resolve(), saving: ref(false) }) },
+  '@/composables/useAruna': { useAruna: () => ({ deleteGroupRole, saving: ref(false) }) },
   '@/lib/utils': Utils,
 })
 
@@ -75,6 +78,27 @@ describe('group roles table', () => {
     expect(content(open)).toContain('everyone')
     expect(content(open)).toContain('read')
     expect(content(open)).toContain('1 rule')
+  })
+
+  it('shows the wait on the Delete of the role being deleted, sends it once and frees it when it fails', async () => {
+    let refuse: (err: unknown) => void = () => {}
+    deleteGroupRole.mockReturnValueOnce(new Promise<void>((_, reject) => (refuse = reject)))
+    const root = await render()
+    const remove = (name: string) =>
+      element(root, (node) => node.tag === 'button' && node.props['aria-label'] === `Delete role ${name}`)
+    void (remove('study').props.onClick as () => Promise<void>)()
+    await flush()
+    expect(remove('study').props['aria-busy']).toBe(true)
+    expect(remove('study').props.disabled).toBe(true)
+    expect(content(remove('study'))).toContain('Deleting the role')
+    expect(remove('public').props['aria-busy']).toBe(false)
+    await (remove('study').props.onClick as () => Promise<void>)()
+    expect(deleteGroupRole).toHaveBeenCalledTimes(1)
+    refuse(new Error('role still assigned'))
+    await flush()
+    expect(remove('study').props['aria-busy']).toBe(false)
+    expect(remove('study').props.disabled).toBe(false)
+    expect(content(root)).toContain('role still assigned')
   })
 
   it('names every custom rule in a modal', async () => {
