@@ -26,6 +26,16 @@ const authToken = ref('token')
 const bootstrapped = ref(true)
 const currentUser = ref<{ id: string } | null>({ id: 'u1' })
 const authRejected = ref(false)
+const restoring = ref(false)
+const useAruna = vi.fn(() => ({
+  authToken,
+  authRejected,
+  bootstrapped,
+  currentUser,
+  setApiBaseUrl,
+  setAuthToken,
+  refresh,
+}))
 
 function store(): Storage {
   const entries = new Map<string, string>()
@@ -59,6 +69,7 @@ async function load(status: Status | null | 'stall', apiBaseUrl = LOCAL, realmUr
   bootstrapped.value = session.bootstrapped ?? true
   currentUser.value = session.user === false ? null : { id: 'u1' }
   authRejected.value = session.rejected === true
+  restoring.value = false
   listeners.clear()
   vi.doMock('@tauri-apps/api/event', () => ({
     listen: async (event: string, handler: (message: { payload: unknown }) => void) => {
@@ -67,8 +78,9 @@ async function load(status: Status | null | 'stall', apiBaseUrl = LOCAL, realmUr
     },
   }))
   vi.doMock('@/composables/useAruna', () => ({
-    useAruna: () => ({ authToken, authRejected, bootstrapped, currentUser, setApiBaseUrl, setAuthToken, refresh }),
+    useAruna,
   }))
+  vi.doMock('@/composables/aruna/state', () => ({ restoring }))
   const config = await import('./config')
   config.applyPortalConfig({ apiBaseUrl })
   return await import('./desktopWelcome')
@@ -405,6 +417,98 @@ describe('sign in gate', () => {
     bootstrapped.value = true
     await trip
     expect(router.currentRoute.value.name).toBe('settings')
+  })
+})
+
+describe('session carried to a new base', () => {
+  it('keeps the owner signed in while the device node restores the session', async () => {
+    const welcome = await load({ state: 'running', enrolled: true, apiBaseUrl: LOCAL }, REALM, 'https://aruna.example')
+    const router = await routerWith(welcome, '/app/settings')
+    // Like the session: the switch empties the token until the device named the realm.
+    setApiBaseUrl.mockImplementationOnce(() => {
+      authToken.value = ''
+      bootstrapped.value = false
+    })
+    let release = () => {}
+    refresh.mockImplementationOnce(() => {
+      restoring.value = true
+      return new Promise<undefined>((done) => {
+        release = () => {
+          authToken.value = 'token'
+          restoring.value = false
+          bootstrapped.value = true
+          done(undefined)
+        }
+      })
+    })
+
+    const landed: string[] = []
+    router.afterEach((to) => void landed.push(String(to.name)))
+    const reads = useAruna.mock.calls.length
+
+    const desktop = await import('./desktop')
+    await desktop.applyShellContext({ apiBaseUrl: LOCAL, realmUrl: 'https://aruna.example' })
+    // The switch reads the session once and the guard once more, before the restore ends.
+    await vi.waitFor(() => expect(useAruna.mock.calls.length).toBeGreaterThanOrEqual(reads + 2))
+    release()
+
+    await vi.waitFor(() => expect(landed).not.toHaveLength(0))
+    expect(landed).toEqual(['settings'])
+  })
+
+  it('keeps a stored session that is still restoring at start', async () => {
+    // At start the token stays empty until the realm named itself, as on a base switch.
+    const welcome = await load({ state: 'running', enrolled: true, apiBaseUrl: LOCAL }, REALM, 'https://aruna.example', {
+      token: '',
+      bootstrapped: false,
+    })
+    restoring.value = true
+    let release = () => {}
+    refresh.mockImplementationOnce(
+      () =>
+        new Promise<undefined>((done) => {
+          release = () => {
+            authToken.value = 'token'
+            restoring.value = false
+            bootstrapped.value = true
+            done(undefined)
+          }
+        }),
+    )
+    const router = blankRouter()
+    welcome.installDesktopGuard(router)
+    const landed: string[] = []
+    router.afterEach((to) => void landed.push(String(to.name)))
+    const reads = useAruna.mock.calls.length
+
+    const trip = router.push('/app/settings')
+    await vi.waitFor(() => expect(useAruna.mock.calls.length).toBeGreaterThan(reads))
+    release()
+    await trip
+
+    expect(landed).toEqual(['settings'])
+  })
+
+  it('never signs out a restore that outlasts the wait', async () => {
+    vi.useFakeTimers()
+    const welcome = await load({ state: 'running', enrolled: true, apiBaseUrl: LOCAL }, REALM, 'https://aruna.example', {
+      token: '',
+      bootstrapped: false,
+    })
+    restoring.value = true
+    refresh.mockImplementationOnce(() => new Promise<undefined>(() => {}))
+    const router = blankRouter()
+    welcome.installDesktopGuard(router)
+    const landed: string[] = []
+    router.afterEach((to) => void landed.push(String(to.name)))
+    const reads = useAruna.mock.calls.length
+
+    void router.push('/app/settings')
+    await vi.waitFor(() => expect(useAruna.mock.calls.length).toBeGreaterThan(reads))
+    await vi.advanceTimersByTimeAsync(10_000)
+
+    await vi.waitFor(() => expect(landed).not.toHaveLength(0))
+    expect(landed).toEqual(['settings'])
   })
 })
 

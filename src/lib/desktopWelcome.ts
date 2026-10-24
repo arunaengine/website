@@ -151,10 +151,17 @@ function settled(flag: Ref<boolean>, ms: number): Promise<void> {
 // that failed on transport proves nothing, so the window stays where it is and
 // the realm probe surfaces a base that is not answering.
 async function signedOut(): Promise<boolean> {
-  const { useAruna } = await import('@/composables/useAruna')
-  const { authToken, authRejected, bootstrapped, currentUser } = useAruna()
-  if (!authToken.value) return true
+  const [{ useAruna }, { restoring }] = await Promise.all([
+    import('@/composables/useAruna'),
+    import('@/composables/aruna/state'),
+  ])
+  const { authToken, authRejected, bootstrapped, currentUser, refresh } = useAruna()
+  // A stored token, or one carried to a new API base, is held only once the refresh restored it.
+  if (!authToken.value && !bootstrapped.value) void refresh()
+  if (!authToken.value && !restoring.value) return true
   if (!bootstrapped.value) await settled(bootstrapped, BOOTSTRAP_TIMEOUT_MS)
+  // A restore still running after the wait proves nothing either.
+  if (!authToken.value) return !restoring.value
   if (!bootstrapped.value || currentUser.value) return false
   return authRejected.value
 }
