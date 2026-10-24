@@ -5,7 +5,7 @@ import * as Api from '@/lib/api'
 import type { BucketEncryptionResponse, BucketKeyGeneration, BucketUnlockStatus } from '@/lib/api'
 import * as Wording from '@/lib/bucketEncryption'
 import * as StateBadge from '@/lib/stateBadge'
-import { button, click, compileClientComponent, content, element, mountApp, moduleDefault, nodes } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 
 const unlock = vi.fn()
 const extend = vi.fn()
@@ -30,6 +30,7 @@ const access = compileClientComponent(new URL('./BucketKeyAccess.vue', import.me
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/components/ui/Select.vue': moduleDefault(Slotted('select')),
+  '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('i', p.label) })),
   '@/lib/bucketEncryption': Wording,
   '@/lib/stateBadge': StateBadge,
 })
@@ -129,6 +130,32 @@ describe('bucket key access', () => {
     expect(extend).toHaveBeenCalledWith(2, undefined)
     expect(lock).toHaveBeenCalledOnce()
     expect(content(root)).toContain('locked or unlocked again meanwhile')
+  })
+
+  it('shows the wait on the Extend that was clicked, sends one action and frees it when it fails', async () => {
+    let refuse: (err: unknown) => void = () => {}
+    extend.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+    const root = await render(status({ generations: [key(3, 'active', OPEN), key(2, 'source', OPEN)] }))
+    void (button(row(root, 2), 'Extend').props.onClick as () => Promise<void>)()
+    await flush()
+    expect(button(row(root, 2), 'Extending the unlock').props['aria-busy']).toBe(true)
+    expect(button(row(root, 3), 'Extend').props['aria-busy']).toBe(false)
+    expect(button(root, 'Lock all keys').props['aria-busy']).toBe(false)
+    await click(button(root, 'Lock all keys'))
+    expect(lock).not.toHaveBeenCalled()
+    refuse(new Api.ApiError(503, 'unavailable'))
+    await flush()
+    expect(button(row(root, 2), 'Extend').props['aria-busy']).toBe(false)
+    expect(content(root)).toContain('did not confirm this change')
+  })
+
+  it('shows the wait on Lock all keys while the lock is on its way', async () => {
+    lock.mockReturnValueOnce(new Promise(() => {}))
+    const root = await render(status({ generations: [key(2, 'active', OPEN)] }))
+    void (button(root, 'Lock all keys').props.onClick as () => Promise<void>)()
+    await flush()
+    expect(button(root, 'Locking the keys').props['aria-busy']).toBe(true)
+    expect(button(root, 'Extend').props['aria-busy']).toBe(false)
   })
 
   it('offers no unlock length on an Aruna-managed bucket', async () => {

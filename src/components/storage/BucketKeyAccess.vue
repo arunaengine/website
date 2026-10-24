@@ -7,6 +7,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import type { BucketEncryptionResponse, BucketKeyGeneration } from '@/lib/api'
 import { ROLE_LABEL, actionError as actionMessage, durationOptions, keyGenerations, unlockView } from '@/lib/bucketEncryption'
 import { stateVariant } from '@/lib/stateBadge'
@@ -29,6 +30,8 @@ const extendOptions = computed(() => durationOptions(props.status.max_unlock_ms)
 const extendBy = reactive<Record<number, string>>({})
 const unlockTarget = ref<BucketKeyGeneration | null>(null)
 const actionError = ref<string | null>(null)
+// What is on its way: the generation being extended, or the lock of all keys.
+const sent = ref<number | 'lock' | null>(null)
 
 function canUnlock(key: BucketKeyGeneration): boolean {
   return key.unlock.state === 'locked' && caller.value.holder && (key.role === 'source' || caller.value.ready_copy)
@@ -45,18 +48,22 @@ const canLock = computed(
 )
 const anyAction = computed(() => canLock.value || keys.value.list.some((key) => canUnlock(key) || canExtend(key)))
 
-async function act(work: () => Promise<unknown>) {
+async function act(what: number | 'lock', work: () => Promise<unknown>) {
+  if (sent.value !== null) return
   actionError.value = null
+  sent.value = what
   try {
     await work()
   } catch (cause) {
     actionError.value = actionMessage(cause)
+  } finally {
+    sent.value = null
   }
 }
 
 function extendKey(key: BucketKeyGeneration) {
   const chosen = extendBy[key.generation]
-  return act(() => props.extend(key.generation, chosen ? Number(chosen) : undefined))
+  return act(key.generation, () => props.extend(key.generation, chosen ? Number(chosen) : undefined))
 }
 </script>
 
@@ -97,14 +104,18 @@ function extendKey(key: BucketKeyGeneration) {
                 aria-label="Extend the unlock by"
                 @update:model-value="(value: string) => (extendBy[key.generation] = value)"
               />
-              <Button size="sm" variant="outline" :disabled="busy" @click="extendKey(key)">Extend</Button>
+              <Button size="sm" variant="outline" :disabled="busy" :aria-busy="sent === key.generation" @click="extendKey(key)">
+                <Spinner v-if="sent === key.generation" label="Extending the unlock" class="text-current" /> Extend
+              </Button>
             </template>
           </div>
         </li>
       </ul>
       <div class="flex flex-wrap items-center gap-2">
         <template v-if="canLock">
-          <Button size="sm" variant="outline" :disabled="busy" @click="act(lock)">Lock all keys</Button>
+          <Button size="sm" variant="outline" :disabled="busy" :aria-busy="sent === 'lock'" @click="act('lock', lock)">
+            <Spinner v-if="sent === 'lock'" label="Locking the keys" class="text-current" /> Lock all keys
+          </Button>
           <span class="text-xs text-muted-foreground">Locks every key of this bucket at once, previous keys included.</span>
         </template>
         <span v-if="!anyAction" class="text-xs text-muted-foreground">No key action is open to you right now.</span>

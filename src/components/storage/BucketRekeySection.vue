@@ -5,6 +5,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import type { HolderSource } from '@/composables/useBucketHolders'
 import { ApiError, apiErrorMessage, raiseBucketEpoch, rekeyBucketPrefix } from '@/lib/api'
 import { actionError } from '@/lib/bucketEncryption'
@@ -46,6 +47,7 @@ function keyError(cause: unknown): string {
 }
 
 async function protectUploads() {
+  if (raising.value) return
   const bound = props.source.binder()
   raising.value = true
   raiseError.value = null
@@ -62,6 +64,7 @@ async function protectUploads() {
 }
 
 async function replaceKeys() {
+  if (running.value) return
   const trimmed = folder.value.trim()
   const prefix = trimmed && !trimmed.endsWith('/') ? `${trimmed}/` : trimmed
   const bound = props.source.binder()
@@ -109,7 +112,9 @@ async function replaceKeys() {
           Removed people are blocked now. New uploads get new keys after you confirm, or when a key holder next opens
           their vault.
         </p>
-        <Button size="sm" :disabled="raising || frozen" @click="protectUploads">Protect new uploads now</Button>
+        <Button size="sm" :disabled="raising || frozen" :aria-busy="raising" @click="protectUploads">
+          <Spinner v-if="raising" label="Protecting new uploads" class="text-current" /> Protect new uploads now
+        </Button>
       </template>
       <p v-else>New uploads use new keys. Older files keep their keys; replace them below if needed.</p>
       <Notice v-if="raiseError" tone="error">{{ raiseError }}</Notice>
@@ -125,8 +130,8 @@ async function replaceKeys() {
       <p>Gives every file in a folder a new key. Copies people already downloaded stay with them.</p>
       <div class="flex gap-2">
         <Input v-model="folder" placeholder="Folder (empty means the whole bucket)" :disabled="running" />
-        <Button size="sm" variant="outline" :disabled="locked || running || frozen" @click="replaceKeys">
-          Replace keys
+        <Button size="sm" variant="outline" :disabled="locked || running || frozen" :aria-busy="running" @click="replaceKeys">
+          <Spinner v-if="running" label="Replacing the keys" class="text-current" /> Replace keys
         </Button>
       </div>
       <Notice v-if="locked" tone="info">Unlock the bucket first.</Notice>

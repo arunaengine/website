@@ -9,6 +9,7 @@ import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import Select from '@/components/ui/Select.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { useAruna } from '@/composables/useAruna'
 import { usePlacement } from '@/composables/usePlacement'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -24,6 +25,8 @@ const location = ref('')
 const labels = ref<RealmNodeLabel[]>([])
 const saveError = ref<string | null>(null)
 const saveMessage = ref<string | null>(null)
+// This save is on its way; the placement busy flag is shared with other controls.
+const saving = ref(false)
 
 const nodes = computed(() => realmInfo.value?.nodes ?? [])
 const options = computed(() =>
@@ -53,9 +56,10 @@ watch(nodes, (list) => {
 watch(selected, reset, { immediate: true })
 
 async function save() {
-  if (!node.value || !dirty.value || busy.value) return
+  if (!node.value || !dirty.value || busy.value || saving.value) return
   saveError.value = null
   saveMessage.value = null
+  saving.value = true
   try {
     await mutateRealmPlacement({
       mutation: 'set_node_attributes',
@@ -69,6 +73,8 @@ async function save() {
     saveMessage.value = 'Saved. That node now re-checks the copies it holds.'
   } catch (error) {
     saveError.value = apiErrorMessage(error)
+  } finally {
+    saving.value = false
   }
 }
 </script>
@@ -140,8 +146,8 @@ async function save() {
       <p v-else-if="saveMessage" class="text-xs text-emerald-700 dark:text-emerald-300">{{ saveMessage }}</p>
 
       <div class="flex flex-wrap items-center gap-2">
-        <Button size="sm" :disabled="!dirty || busy" @click="save">
-          <Save class="size-3.5" /> Save attributes
+        <Button size="sm" :disabled="!dirty || busy || saving" :aria-busy="saving" @click="save">
+          <Spinner v-if="saving" label="Saving the attributes" class="text-current" /><Save v-else class="size-3.5" /> Save attributes
         </Button>
         <Button variant="ghost" size="sm" :disabled="!dirty || busy" @click="reset">Reset</Button>
         <span v-if="!dirty" class="text-[11px] text-muted-foreground">Nothing changed yet.</span>

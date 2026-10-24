@@ -5,7 +5,7 @@ import * as Api from '@/lib/api'
 import { ApiError, type BucketAbeStatus, type BucketEncryptionResponse, type RekeyPage } from '@/lib/api'
 import * as Wording from '@/lib/bucketEncryption'
 import * as StateBadge from '@/lib/stateBadge'
-import { button, click, compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 
 const raiseBucketEpoch = vi.fn()
 const rekeyBucketPrefix = vi.fn()
@@ -19,6 +19,7 @@ const section = compileClientComponent(new URL('./BucketRekeySection.vue', impor
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
   '@/components/ui/Input.vue': moduleDefault(Slotted('input')),
   '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
+  '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('i', { 'data-spinner': p.label }) })),
   '@/lib/api': {
     ...Api,
     raiseBucketEpoch: (...args: unknown[]) => raiseBucketEpoch(...args),
@@ -84,6 +85,25 @@ describe('removed access card', () => {
     expect(() => button(root, 'Protect new uploads now')).toThrow()
   })
 
+  it('shows the wait on Protect new uploads now, sends it once and frees it when it fails', async () => {
+    let refuse: (err: unknown) => void = () => {}
+    raiseBucketEpoch.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+    const root = await render(bucket({ raise_due: true }))
+    void (button(root, 'Protect new uploads now').props.onClick as () => Promise<void>)()
+    await flush()
+    const waiting = button(root, 'Protect new uploads now')
+    expect(waiting.props['aria-busy']).toBe(true)
+    expect(waiting.props.disabled).toBe(true)
+    expect(nodes(waiting).some((node) => node.props['data-spinner'] === 'Protecting new uploads')).toBe(true)
+    await (waiting.props.onClick as () => Promise<void>)()
+    expect(raiseBucketEpoch).toHaveBeenCalledTimes(1)
+    refuse(new ApiError(403, 'forbidden'))
+    await flush()
+    expect(button(root, 'Protect new uploads now').props['aria-busy']).toBe(false)
+    expect(button(root, 'Protect new uploads now').props.disabled).toBeFalsy()
+    expect(content(root)).toContain('Only key holders can do this.')
+  })
+
   it('says in plain words when a non holder tries it', async () => {
     raiseBucketEpoch.mockRejectedValueOnce(new ApiError(403, 'forbidden'))
     const root = await render(bucket({ raise_due: true }))
@@ -134,6 +154,25 @@ describe('replace keys card', () => {
     finish(page(70, true, ''))
     await run
     expect(content(root)).toContain('70 files done.')
+  })
+
+  it('shows the wait on Replace keys through every page, starts it once and frees it when a page fails', async () => {
+    let refuse: (err: unknown) => void = () => {}
+    rekeyBucketPrefix.mockResolvedValueOnce(page(64, false, '')).mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+    const root = await render(bucket({}))
+    void (button(root, 'Replace keys').props.onClick as () => Promise<void>)()
+    await flush()
+    expect(rekeyBucketPrefix).toHaveBeenCalledTimes(2)
+    const waiting = button(root, 'Replace keys')
+    expect(waiting.props['aria-busy']).toBe(true)
+    expect(nodes(waiting).some((node) => node.props['data-spinner'] === 'Replacing the keys')).toBe(true)
+    await (waiting.props.onClick as () => Promise<void>)()
+    expect(rekeyBucketPrefix).toHaveBeenCalledTimes(2)
+    refuse(new ApiError(403, 'forbidden'))
+    await flush()
+    expect(button(root, 'Replace keys').props['aria-busy']).toBe(false)
+    expect(button(root, 'Replace keys').props.disabled).toBeFalsy()
+    expect(content(root)).toContain('Only key holders can do this.')
   })
 
   it('resumes the running folder the node reports', async () => {
