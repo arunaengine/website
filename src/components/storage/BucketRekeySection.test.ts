@@ -104,6 +104,21 @@ describe('removed access card', () => {
     expect(content(root)).toContain('Only key holders can do this.')
   })
 
+  it('keeps the card, the wait and then the error of Protect when a read says no raise is due meanwhile', async () => {
+    let refuse: (err: unknown) => void = () => {}
+    raiseBucketEpoch.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+    const root = await render(bucket({ raise_due: true }))
+    void (button(root, 'Protect new uploads now').props.onClick as () => Promise<void>)()
+    await flush()
+    // Another key holder raised it; a refresh shows no raise due.
+    status.value = bucket({ raise_due: false })
+    await flush()
+    expect(button(root, 'Protect new uploads now').props['aria-busy']).toBe(true)
+    refuse(new ApiError(403, 'forbidden'))
+    await flush()
+    expect(content(root)).toContain('Only key holders can do this.')
+  })
+
   it('says in plain words when a non holder tries it', async () => {
     raiseBucketEpoch.mockRejectedValueOnce(new ApiError(403, 'forbidden'))
     const root = await render(bucket({ raise_due: true }))

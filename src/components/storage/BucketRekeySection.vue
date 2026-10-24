@@ -100,14 +100,15 @@ async function replaceKeys() {
 </script>
 
 <template>
-  <section v-if="waiting || raised" class="surface" data-removed-access>
+  <!-- A Protect on its way, or its error, keeps the card even when a read says no raise is due. -->
+  <section v-if="waiting || raised || raising || raiseError" class="surface" data-removed-access>
     <header class="flex flex-wrap items-center gap-2 border-b border-border px-5 py-4">
       <h2 class="font-display text-sm font-semibold text-aruna-navy">Removed access</h2>
-      <Badge v-if="waiting" :variant="toneVariant('attention')">Waiting</Badge>
+      <Badge v-if="waiting || raising" :variant="toneVariant('attention')">Waiting</Badge>
       <Badge v-else :variant="toneVariant('done')">Protected</Badge>
     </header>
     <div class="space-y-3 px-5 py-4 text-xs text-muted-foreground">
-      <template v-if="waiting">
+      <template v-if="waiting || raising">
         <p>
           Removed people are blocked now. New uploads get new keys after you confirm, or when a key holder next opens
           their vault.
