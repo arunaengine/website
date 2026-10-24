@@ -2,24 +2,22 @@ import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
+import * as BucketPlace from '@/lib/bucketPlace'
 import * as Utils from '@/lib/utils'
-import * as Workspaces from '@/lib/workspaces'
 import {
   button,
   click,
   compileClientComponent,
   content,
-  input,
   element,
+  input,
   moduleDefault,
   mountApp,
   typeValue,
 } from '@/test/clientRender'
 
 const bind = vi.fn()
-const useS3 = vi.fn()
 const busy = ref(false)
-const myGroups = ref([{ id: 'g1', name: 'Lab group' }])
 
 const existingHit = {
   arn: 'aruna:bucket:lab',
@@ -50,31 +48,41 @@ const InputStub = defineComponent({
       onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
     }),
 })
-const SelectStub = defineComponent({
-  inheritAttrs: false,
-  props: { modelValue: { type: String, default: '' } },
-  emits: ['update:modelValue'],
-  setup: (props, { attrs, emit }) => () =>
-    h('select', {
-      ...attrs,
-      value: props.modelValue,
-      onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
-    }),
-})
 const SwitchStub = defineComponent(() => () => h('button'))
 const SpinnerStub = defineComponent({ props: { label: String }, setup: () => () => h('i') })
-const BucketSearchStub = defineComponent({
-  props: { modelValue: { type: String, default: '' }, placeholder: String },
-  emits: ['update:modelValue', 'select'],
+const PickerStub = defineComponent({
+  props: { modelValue: { type: String, default: '' } },
+  emits: ['update:modelValue', 'select', 'new'],
   setup: (props, { emit }) => () =>
     h('div', [
       h('input', {
-        'aria-label': props.placeholder,
+        'aria-label': 'Bucket',
         value: props.modelValue,
         onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
       }),
       h('button', { onClick: () => emit('select', existingHit) }, 'Use existing bucket'),
+      h('button', { onClick: () => emit('new', props.modelValue) }, 'Ask for a new bucket'),
     ]),
+})
+const NewBucketStub = defineComponent({
+  props: { open: Boolean, name: String, groupId: String, forLink: Boolean },
+  emits: ['update:open', 'link'],
+  setup: (props, { emit }) => () =>
+    props.open
+      ? h('section', [
+          h('span', `New bucket ${props.name} for link ${props.forLink}`),
+          h(
+            'button',
+            {
+              onClick: () => {
+                emit('link', { bucket: props.name, nodeId: 'node-1', groupId: 'g1' })
+                emit('update:open', false)
+              },
+            },
+            'Confirm new bucket',
+          ),
+        ])
+      : null,
 })
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
@@ -83,37 +91,40 @@ const dialogStubs = Object.fromEntries(
     (name) => [`@/components/ui/${name}.vue`, moduleDefault(Passthrough)],
   ),
 )
+const realmNode = { nodeId: 'node-1', kind: 'server', label: 'node-1', isLocal: false, location: 'Giessen' }
 
 const BindFolderDialog = compileClientComponent(new URL('./BindFolderDialog.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': icons,
   ...dialogStubs,
+  '@/components/ui/Badge.vue': moduleDefault(Passthrough),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
-  '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Switch.vue': moduleDefault(SwitchStub),
   '@/components/ui/RefusalNote.vue': moduleDefault(RefusalStub),
   '@/components/ui/Spinner.vue': moduleDefault(SpinnerStub),
-  '@/components/groups/GroupSelect.vue': moduleDefault(SelectStub),
-  '@/components/data/BucketSearchBox.vue': moduleDefault(BucketSearchStub),
-  '@/composables/useAruna': { useAruna: () => ({ myGroups }) },
+  '@/components/desktop/LinkBucketPicker.vue': moduleDefault(PickerStub),
+  '@/components/desktop/NewBucketDialog.vue': moduleDefault(NewBucketStub),
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
-      nodes: ref([
-        { nodeId: 'node-offline', kind: 'server', label: 'Offline node', reachable: false },
-        { nodeId: 'node-1', kind: 'server', label: 'Realm node', reachable: true },
-      ]),
+      nodeById: (id: string) => (id === 'node-1' ? realmNode : null),
+      displayName: (id: string) => id,
     }),
-  },
-  '@/composables/useS3': {
-    useS3,
   },
   '@/composables/useSyncedFolders': { useSyncedFolders: () => ({ bind, busy }) },
   '@/lib/api': { ApiError },
+  '@/lib/bucketPlace': BucketPlace,
   '@/lib/utils': Utils,
-  '@/lib/workspaces': Workspaces,
   '@/lib/desktopBridge': { pickDirectory: vi.fn(async () => '/home/me/data') },
 })
+
+const linkButton = (root: Parameters<typeof button>[0]) => button(root, 'Link folder')
+// The folder and the bucket, split where the arrow sits.
+const summary = (root: Parameters<typeof content>[0]) => {
+  const line = element(root, (node) => node.props['data-testid'] === 'link-summary')
+  const parts = line.children.map(content).map((text) => text.replace(/\s+/g, ' ').trim()).filter(Boolean)
+  return parts.join('|')
+}
 
 async function mountReady(props: Record<string, unknown> = {}) {
   const mounted = await mountApp(BindFolderDialog, { props: { open: true, ...props } })
@@ -124,41 +135,55 @@ async function mountReady(props: Record<string, unknown> = {}) {
 beforeEach(() => {
   bind.mockReset()
   bind.mockResolvedValue({ folder_id: 'f1' })
-  useS3.mockClear()
   busy.value = false
 })
 
-describe('syncing a folder to a bucket', () => {
-  it('asks the node plane to create an unmatched bucket while binding', async () => {
-    const mounted = await mountReady()
-    await typeValue(input(mounted.root, 'aria-label', 'Bucket name'), 'new-bucket')
-
-    await click(button(mounted.root, 'Start syncing'))
-
-    expect(useS3).not.toHaveBeenCalled()
-    expect(bind).toHaveBeenCalledWith(
-      expect.objectContaining({
-        group_id: 'g1',
-        remote: { node_id: 'node-1', bucket: 'new-bucket', prefix: '' },
-        create_bucket: true,
-      }),
-    )
-    expect(content(mounted.root)).toContain('A bucket that does not exist yet is made for you.')
-    expect(mounted.errors).toEqual([])
-    mounted.app.unmount()
-  })
-
-  it('binds an existing search hit without asking the node to create it', async () => {
+describe('linking a local folder', () => {
+  it('links an existing bucket without asking the node to create it', async () => {
     const mounted = await mountReady()
 
     await click(button(mounted.root, 'Use existing bucket'))
-    await click(button(mounted.root, 'Start syncing'))
+    expect(summary(mounted.root)).toBe('/home/me/data|lab on node-1 · Giessen')
+    await click(linkButton(mounted.root))
 
-    expect(useS3).not.toHaveBeenCalled()
     expect(bind).toHaveBeenCalledWith(
       expect.objectContaining({
-        remote: expect.objectContaining({ bucket: 'lab' }),
+        group_id: 'g1',
+        remote: { node_id: 'node-1', bucket: 'lab', prefix: '' },
         create_bucket: false,
+      }),
+    )
+    mounted.app.unmount()
+  })
+
+  it('never creates a bucket from a typed name', async () => {
+    const mounted = await mountReady()
+    await typeValue(input(mounted.root, 'aria-label', 'Bucket'), 'new-bucket')
+
+    expect(linkButton(mounted.root).props.disabled).toBe(true)
+    await click(linkButton(mounted.root))
+
+    expect(bind).not.toHaveBeenCalled()
+    expect(content(mounted.root)).toContain('Nothing is created unless you choose New bucket.')
+    mounted.app.unmount()
+  })
+
+  it('creates a bucket only when New bucket asked for it', async () => {
+    const mounted = await mountReady()
+    await typeValue(input(mounted.root, 'aria-label', 'Bucket'), 'fresh')
+
+    await click(button(mounted.root, 'Ask for a new bucket'))
+    expect(content(mounted.root)).toContain('New bucket fresh for link true')
+    await click(button(mounted.root, 'Confirm new bucket'))
+
+    expect(summary(mounted.root)).toBe('/home/me/data|fresh on node-1 · Giessen (new)')
+    await click(linkButton(mounted.root))
+    expect(bind).toHaveBeenCalledWith(
+      expect.objectContaining({
+        group_id: 'g1',
+        remote: { node_id: 'node-1', bucket: 'fresh', prefix: '' },
+        create_bucket: true,
+        mode: 'two_way',
       }),
     )
     mounted.app.unmount()
@@ -168,29 +193,30 @@ describe('syncing a folder to a bucket', () => {
     const conflict = 'The bucket "lab" already belongs to group g2.'
     bind.mockRejectedValue(new Error(conflict))
     const mounted = await mountReady()
-    await typeValue(input(mounted.root, 'aria-label', 'Bucket name'), 'lab')
+    await click(button(mounted.root, 'Use existing bucket'))
 
-    await click(button(mounted.root, 'Start syncing'))
+    await click(linkButton(mounted.root))
 
     expect(content(mounted.root)).toContain(conflict)
     mounted.app.unmount()
   })
 })
 
-describe('choosing what the sync does', () => {
+describe('choosing what the link does', () => {
   const preset = { bucket: 'lab', nodeId: 'node-1', groupId: 'g1' }
 
   it('keeps a copy by default on a bucket page and never creates the bucket', async () => {
     const mounted = await mountReady(preset)
     const html = content(mounted.root)
 
-    expect(html).toContain('Sync to this computer')
-    expect(html).toContain('What do you want to do?')
-    expect(html).toContain('Keep a copy on this computer')
-    expect(html).toContain('Realm node')
+    expect(html).toContain('Link a local folder')
+    expect(html).toContain('What should happen?')
+    expect(html).toContain('Keep a copy here')
+    expect(html).toContain('on node-1 · Giessen')
+    expect(html).not.toContain('Which node')
     expect(element(mounted.root, (node) => node.props['data-testid'] === 'chosen-bucket')).toBeTruthy()
 
-    await click(button(mounted.root, 'Start syncing'))
+    await click(linkButton(mounted.root))
 
     expect(bind).toHaveBeenCalledWith({
       root: '/home/me/data',
@@ -205,14 +231,14 @@ describe('choosing what the sync does', () => {
 
   it('sends the three directions to the node as their modes', async () => {
     for (const [title, mode] of [
-      ['Send a folder to Aruna', 'upload_only'],
+      ['Send to Aruna', 'upload_only'],
       ['Both ways', 'two_way'],
-      ['Keep a copy on this computer', 'download_only'],
+      ['Keep a copy here', 'download_only'],
     ] as const) {
       bind.mockClear()
       const mounted = await mountReady(preset)
       await click(button(mounted.root, title))
-      await click(button(mounted.root, 'Start syncing'))
+      await click(linkButton(mounted.root))
 
       expect(bind).toHaveBeenCalledWith(expect.objectContaining({ mode }))
       mounted.app.unmount()
@@ -225,17 +251,16 @@ describe('choosing what the sync does', () => {
     await click(button(mounted.root, 'Pick another'))
 
     expect(() => element(mounted.root, (node) => node.props['data-testid'] === 'chosen-bucket')).toThrow()
-    expect(input(mounted.root, 'aria-label', 'Bucket name')).toBeTruthy()
+    expect(input(mounted.root, 'aria-label', 'Bucket')).toBeTruthy()
     mounted.app.unmount()
   })
 
   it('needs an existing bucket to keep a copy of', async () => {
-    const mounted = await mountReady()
-    await click(button(mounted.root, 'Keep a copy on this computer'))
-    await typeValue(input(mounted.root, 'aria-label', 'Bucket name'), 'brand-new')
+    const mounted = await mountReady({ ...preset, newBucket: true })
+    await click(button(mounted.root, 'Keep a copy here'))
 
-    expect(content(mounted.root)).toContain('Pick a bucket that exists')
-    await click(button(mounted.root, 'Start syncing'))
+    expect(content(mounted.root)).toContain('A new bucket is empty')
+    await click(linkButton(mounted.root))
     expect(bind).not.toHaveBeenCalled()
     mounted.app.unmount()
   })
@@ -246,7 +271,7 @@ describe('choosing what the sync does', () => {
     )
     const mounted = await mountReady(preset)
 
-    await click(button(mounted.root, 'Start syncing'))
+    await click(linkButton(mounted.root))
 
     expect(content(mounted.root)).toContain('cannot keep a copy on this computer yet')
     mounted.app.unmount()
@@ -256,7 +281,7 @@ describe('choosing what the sync does', () => {
     bind.mockRejectedValue(new ApiError(400, 'The folder /home/me/data is not empty.'))
     const mounted = await mountReady(preset)
 
-    await click(button(mounted.root, 'Start syncing'))
+    await click(linkButton(mounted.root))
 
     expect(content(mounted.root)).toContain('The folder /home/me/data is not empty.')
     expect(content(mounted.root)).not.toContain('cannot keep a copy')
@@ -267,7 +292,7 @@ describe('choosing what the sync does', () => {
     bind.mockRejectedValue(new ApiError(409, 'The folder is not empty.'))
     const mounted = await mountReady(preset)
 
-    await click(button(mounted.root, 'Start syncing'))
+    await click(linkButton(mounted.root))
 
     expect(content(mounted.root)).toContain('The folder is not empty.')
     mounted.app.unmount()
