@@ -18,6 +18,7 @@ const revokeKey = vi.fn()
 const createKey = vi.fn()
 const removeDeviceKey = vi.fn()
 const createDeviceKey = vi.fn()
+const infoRequest = vi.fn()
 const dialogs = {
   create: undefined as undefined | ((group: string, seconds: number) => Promise<unknown>),
   emit: undefined as undefined | ((event: 'created' | 'update:open', value: unknown) => void),
@@ -82,6 +83,7 @@ const ConnectTools = compileClientComponent(new URL('./ConnectTools.vue', import
   '@/components/ui/TabsTrigger.vue': moduleDefault(TriggerStub),
   '@/components/data/CreateCredentialDialog.vue': moduleDefault(Plain),
   '@/components/desktop/CreateKeyDialog.vue': moduleDefault(KeyDialogStub),
+  '@/lib/api': { apiRequest: infoRequest },
   '@/composables/useAruna': {
     useAruna: () => ({ authToken: ref('token'), realmInfo: ref({ interfaces: { mcp: { url: 'https://realm.example/mcp' } } }) }),
   },
@@ -142,6 +144,7 @@ beforeEach(() => {
   createKey.mockReset().mockResolvedValue({ access_key_id: 'ARKNEW', access_secret: 's' })
   removeDeviceKey.mockReset().mockResolvedValue(undefined)
   createDeviceKey.mockReset().mockResolvedValue({ access_key_id: 'ARKHERE', access_secret: 'here-secret' })
+  infoRequest.mockReset().mockResolvedValue({ services: { interfaces: {} } })
 })
 
 describe('connect your tools in the desktop settings', () => {
@@ -234,6 +237,25 @@ describe('connect your tools in the desktop settings', () => {
 
     await click(tab(mounted.root, 'node-2-id'))
     expect(content(mounted.root)).not.toContain('aws_secret_access_key s3cr3t')
+    mounted.app.unmount()
+  })
+
+  it('shows the AI address a realm node reports itself, unavailable until then', async () => {
+    let answer!: (info: unknown) => void
+    infoRequest.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const mounted = await mountApp(ConnectTools)
+    await flush()
+
+    await click(tab(mounted.root, 'node-1-id'))
+    await click(tab(mounted.root, 'assistant'))
+    expect(infoRequest).toHaveBeenCalledWith('/system/info', {}, { baseUrl: 'https://node-1.example/api/v1', token: 'token' })
+    expect(content(mounted.root)).not.toContain('https://realm.example/mcp')
+    expect(content(mounted.root)).toContain('The AI address is unavailable until this place reports it')
+
+    answer({ services: { interfaces: { mcp: { url: 'https://node-1.example/mcp' } } } })
+    await flush()
+    expect(content(mounted.root)).toContain('https://node-1.example/mcp')
+    expect(content(mounted.root)).not.toContain('The AI address is unavailable')
     mounted.app.unmount()
   })
 

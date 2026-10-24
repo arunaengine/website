@@ -21,7 +21,7 @@ import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useNodeControl } from '@/composables/useNodeControl'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { useRealmNodes, type RealmNodeDisplay } from '@/composables/useRealmNodes'
-import type { S3CredentialSummary } from '@/lib/api'
+import { apiRequest, type InfoResponse, type S3CredentialSummary } from '@/lib/api'
 import { createDeviceCredential, listDeviceCredentials, revokeDeviceCredential } from '@/lib/deviceApi'
 import { keyNames } from '@/lib/keyNames'
 import { nextflowSnippet, tesAddress, TOOLS, toolSnippet, type ToolId, type ToolKey } from '@/lib/toolSnippets'
@@ -32,7 +32,7 @@ const DEVICE = 'device'
 
 const route = useRoute()
 const { shown } = usePortalFeatures()
-const { authToken, realmInfo } = useAruna()
+const { authToken } = useAruna()
 const { nodes } = useRealmNodes()
 const { status, s3Url, mcpUrl, deviceClient } = useDeviceStatus()
 const deviceKeys = useDeviceKeys()
@@ -49,9 +49,31 @@ const address = computed(() => (node.value ? node.value.s3Url : running.value ? 
 const tes = computed(() =>
   node.value ? tesAddress(node.value.apiBase) : running.value ? tesAddress(status.value?.apiBaseUrl) : null,
 )
-const assistant = computed(() =>
-  node.value ? (realmInfo.value?.interfaces.mcp?.url ?? null) : running.value ? mcpUrl.value : null,
+// A realm node's AI address is the one that node reports itself; unknown until it answers.
+const nodeMcp = ref<{ nodeId: string; url: string | null } | null>(null)
+let mcpRead = 0
+watch(
+  () => node.value?.nodeId,
+  async () => {
+    const target = node.value
+    const mine = ++mcpRead
+    nodeMcp.value = null
+    if (!target) return
+    let url: string | null = null
+    try {
+      const info = await apiRequest<InfoResponse>('/system/info', {}, nodeClient(target))
+      url = info.services?.interfaces?.mcp?.url ?? null
+    } catch {
+      url = null
+    }
+    if (mine === mcpRead) nodeMcp.value = { nodeId: target.nodeId, url }
+  },
+  { immediate: true },
 )
+const assistant = computed(() => {
+  if (!node.value) return running.value ? mcpUrl.value : null
+  return nodeMcp.value?.nodeId === node.value.nodeId ? nodeMcp.value.url : null
+})
 
 const programs = computed(() => [
   ...TOOLS.filter((tool) => tool.id !== 'assistant'),
@@ -154,7 +176,8 @@ onMounted(() => {
 const freshHere = computed(() => (fresh.value && fresh.value.nodeId === (node.value?.nodeId ?? null) ? fresh.value : null))
 const snippet = (id: string): string =>
   id === 'nextflow' ? nextflowSnippet(tes.value) : toolSnippet(id as ToolId, address.value, freshHere.value, assistant.value)
-const ready = (id: string) => Boolean(id === 'nextflow' ? tes.value : address.value)
+const ready = (id: string) =>
+  Boolean(id === 'nextflow' ? tes.value : id === 'assistant' ? address.value && assistant.value : address.value)
 
 function onCreated(key: ToolKey & { name: string }): void {
   const request = pendingKey
@@ -345,7 +368,7 @@ function made(iso: string): string {
               </div>
             </Notice>
             <Notice v-if="entry.id === 'assistant' && address && !assistant" tone="warning">
-              Aruna reports no address for AI assistants, so the line above shows a placeholder.
+              The AI address is unavailable until this place reports it, so the line above shows a placeholder.
             </Notice>
           </TabsContent>
         </Tabs>
