@@ -135,9 +135,12 @@ describe('signIn', () => {
     expect(url.searchParams.has('max_age')).toBe(false)
   })
 
-  it('marks a desktop state that returns through the realm website', async () => {
-    const url = await redirectFor({}, { features: { desktop: true }, authCallbackOrigin: 'https://realm.test' })
-    expect(url.searchParams.get('redirect_uri')).toBe('https://realm.test/auth/callback')
+  it.each([
+    ['through the realm website', 'https://realm.test'],
+    ['through a website on its own origin', PAGE_ORIGIN],
+  ])('marks a desktop state that returns %s', async (_, origin) => {
+    const url = await redirectFor({}, { features: { desktop: true }, authCallbackOrigin: origin })
+    expect(url.searchParams.get('redirect_uri')).toBe(`${origin}/auth/callback`)
     expect(url.searchParams.get('state')).toMatch(/^desktop\.[\w-]{22}$/)
   })
 
@@ -145,7 +148,6 @@ describe('signIn', () => {
     ['on the web', {}],
     ['on the web with a callback origin', { authCallbackOrigin: 'https://realm.test' }],
     ['for the desktop scheme', { features: { desktop: true } }],
-    ['for a desktop callback on its own origin', { features: { desktop: true }, authCallbackOrigin: PAGE_ORIGIN }],
   ])('leaves the state unmarked %s', async (_, served) => {
     const url = await redirectFor({}, served)
     expect(url.searchParams.get('state')).toMatch(/^[\w-]{22}$/)

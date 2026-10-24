@@ -59,9 +59,8 @@ export function callbackUri(): string {
 function signInState(): string {
   const state = randomUrlSafeString(16)
   if (!featureEnabled('desktop')) return state
-  const target = new URL(callbackUri())
-  const web = target.protocol === 'https:' || target.protocol === 'http:'
-  return web && target.origin !== window.location.origin ? `${DESKTOP_STATE_PREFIX}${state}` : state
+  const { protocol } = new URL(callbackUri())
+  return protocol === 'https:' || protocol === 'http:' ? `${DESKTOP_STATE_PREFIX}${state}` : state
 }
 
 /**
