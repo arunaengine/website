@@ -13,9 +13,11 @@ import {
   mountApp,
   typeValue,
 } from '@/test/clientRender'
+import { ApiError } from '@/lib/api'
 import * as Editor from '@/lib/crate/editor'
 import * as References from '@/lib/crate/references'
 import * as ContentIdentity from '@/lib/contentIdentity'
+import * as LinkedPart from '@/lib/linkedPart'
 import * as Uri from '@/lib/profiles/uri'
 import * as Utils from '@/lib/utils'
 
@@ -26,6 +28,9 @@ let resolvable = true
 let bucketNames = ['reads']
 const getGroup = vi.fn()
 const getStorageLocation = vi.fn()
+const getFileOrigin = vi.fn()
+const getFilePartOf = vi.fn()
+const getBucketDistribution = vi.fn()
 
 interface QueuedUpload {
   id: number
@@ -110,6 +115,9 @@ const AddFilesDialog = compileClientComponent(new URL('./AddFilesDialog.vue', im
       authToken: ref('token'),
       nodeInfo: ref({ node: { realm_id: 'realm-1', peer_id: 'node-1' } }),
       getGroup,
+      getFileOrigin,
+      getFilePartOf,
+      getBucketDistribution,
     }),
   },
   '@/composables/useS3': {
@@ -129,7 +137,8 @@ const AddFilesDialog = compileClientComponent(new URL('./AddFilesDialog.vue', im
       contentUrl: `s3://${bucket}/${key}`,
     }),
   },
-  '@/lib/api': { getStorageLocation },
+  '@/lib/api': { ApiError, getStorageLocation },
+  '@/lib/linkedPart': LinkedPart,
   '@/lib/crate/references': References,
   '@/lib/crate/editor': Editor,
   '@/lib/dataEntities': DataEntities,
@@ -160,7 +169,12 @@ beforeEach(() => {
   enqueue.mockClear()
   getGroup.mockReset().mockResolvedValue({ dataset_location: { bucket: 'reads', prefix: '' } })
   getStorageLocation.mockReset()
+  getFileOrigin.mockReset().mockRejectedValue(new ApiError(404, 'not found'))
+  getFilePartOf.mockReset().mockRejectedValue(new ApiError(404, 'not found'))
+  getBucketDistribution.mockReset().mockRejectedValue(new ApiError(404, 'not found'))
 })
+
+const NESTED = 'arn:aruna:realm-1:node-1:s3/reads/raw/nested/'
 
 describe('AddFilesDialog', () => {
   it('names a picked object by its content and its place by contentUrl', async () => {
@@ -181,11 +195,60 @@ describe('AddFilesDialog', () => {
       },
     })
     // A picked prefix has no content of its own, so it keeps its location.
-    expect(Editor.findEntity(updates[0], 's3://reads/raw/nested/')?.types).toEqual(['Dataset'])
+    expect(Editor.findEntity(updates[0], NESTED)?.types).toEqual(['Dataset'])
     expect([...Editor.partIds(updates[0])]).toEqual([
       `https://w3id.org/aruna/data/${BLAKE3}`,
-      's3://reads/raw/nested/',
+      NESTED,
     ])
+    mounted.app.unmount()
+  })
+
+  it('adds the origin and the datasets of a picked file, and names a folder by its bucket and prefix', async () => {
+    getFileOrigin.mockResolvedValue({ projection: [{ property: 'isBasedOn', id: 'https://example.org/src/one.csv' }, { property: 'CreateAction', run_id: 'run1' }] })
+    getFilePartOf.mockResolvedValue({
+      datasets: [
+        { document_id: 'd9', graph_iri: 'https://w3id.org/aruna/d9', part_ids: [] },
+        { document_id: 'd1', graph_iri: 'https://w3id.org/aruna/d1', part_ids: [] },
+      ],
+      more: false,
+    })
+    const updates: Editor.CrateDraft[] = []
+    const mounted = await mount(updates, { draft: { ...Editor.newDraft(), documentId: 'd1' } })
+
+    await click(button(mounted.root, 'Pick objects'))
+    await flush()
+
+    expect(getFileOrigin).toHaveBeenCalledWith('reads', { key: 'raw/one.csv' })
+    const file = Editor.findEntity(updates[0], `https://w3id.org/aruna/data/${BLAKE3}`)
+    expect(file?.properties.isBasedOn).toEqual([{ kind: 'reference', value: 'https://example.org/src/one.csv' }])
+    // The dataset being edited is not named as one the file is part of.
+    expect(file?.properties.isPartOf).toEqual([{ kind: 'reference', value: 'https://w3id.org/aruna/d9' }])
+    mounted.app.unmount()
+  })
+
+  it('names a folder of a bucket stored on more nodes by its set', async () => {
+    getBucketDistribution.mockResolvedValue({ set_id: '01SET' })
+    const updates: Editor.CrateDraft[] = []
+    const mounted = await mount(updates)
+
+    await click(button(mounted.root, 'Pick objects'))
+    await flush()
+
+    const id = LinkedPart.partId({ realmId: 'realm-1', nodeId: 'node-1', bucket: 'reads', prefix: 'raw/nested/', setId: '01SET' })
+    expect(Editor.findEntity(updates[0], id)?.types).toEqual(['Dataset'])
+    expect(Editor.findEntity(updates[0], id)?.properties.contentUrl).toMatchObject([{ value: 's3://reads/raw/nested/' }])
+    mounted.app.unmount()
+  })
+
+  it('keeps the location as the name of a folder when the node cannot say what the bucket is', async () => {
+    getBucketDistribution.mockRejectedValue(new ApiError(503, 'busy'))
+    const updates: Editor.CrateDraft[] = []
+    const mounted = await mount(updates)
+
+    await click(button(mounted.root, 'Pick objects'))
+    await flush()
+
+    expect(Editor.findEntity(updates[0], 's3://reads/raw/nested/')?.types).toEqual(['Dataset'])
     mounted.app.unmount()
   })
 
@@ -218,7 +281,7 @@ describe('AddFilesDialog', () => {
 
     expect(Editor.findEntity(updates[0], 's3://reads/raw/')?.properties.hasPart).toEqual([
       { kind: 'reference', value: `https://w3id.org/aruna/data/${BLAKE3}` },
-      { kind: 'reference', value: 's3://reads/raw/nested/' },
+      { kind: 'reference', value: NESTED },
     ])
     expect(Editor.findEntity(updates[0], './')?.properties.hasPart).toEqual([
       { kind: 'reference', value: 's3://reads/raw/' },

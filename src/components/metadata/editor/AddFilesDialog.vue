@@ -42,7 +42,8 @@ import {
 } from '@/lib/crate/editor'
 import { isAbsoluteUri } from '@/lib/profiles/uri'
 import { isDataEntity } from '@/lib/dataEntities'
-import { getStorageLocation, type MetadataDocumentListItem, type StorageLocation } from '@/lib/api'
+import { ApiError, getStorageLocation, type MetadataDocumentListItem, type StorageLocation } from '@/lib/api'
+import { partId } from '@/lib/linkedPart'
 import { formatBytes } from '@/lib/utils'
 import { FileJson2 } from '@lucide/vue'
 
@@ -59,7 +60,7 @@ const emit = defineEmits<{
   (e: 'update', draft: CrateDraft): void
 }>()
 
-const { apiBaseUrl, authToken, nodeInfo, getGroup } = useAruna()
+const { apiBaseUrl, authToken, nodeInfo, getGroup, getFileOrigin, getFilePartOf, getBucketDistribution } = useAruna()
 const s3 = useS3()
 const queue = useUploadQueue()
 
@@ -113,6 +114,9 @@ const listed = computed(() => {
   })
   return candidates
 })
+// Files added in one step get their origin and datasets looked up, up to this many.
+const LOOKUP_LIMIT = 100
+const originNote = ref('')
 const urlInvalid = computed(() => Boolean(url.value.trim()) && !isAbsoluteUri(url.value.trim()))
 
 watch(() => props.open, (open) => {
@@ -124,6 +128,7 @@ watch(() => props.open, (open) => {
   urlName.value = ''
   uploading.value = []
   linked.value = new Set()
+  originNote.value = ''
   void loadBuckets()
 }, { immediate: true })
 
@@ -172,12 +177,29 @@ function identityOptions(): ContentIdentityOptions {
   }
 }
 
-async function filePart(bucketName: string, key: string, name: string, size?: number): Promise<FilePart> {
+// What the node lets a dataset say about a file: where it came from and the datasets it is part of.
+// A node that cannot say adds nothing, and the file is added as before.
+async function origins(bucketName: string, key: string): Promise<Pick<FilePart, 'basedOn' | 'partOf'>> {
+  const [origin, parts] = await Promise.allSettled([getFileOrigin(bucketName, { key }), getFilePartOf(bucketName, key)])
+  const basedOn = origin.status === 'fulfilled'
+    ? origin.value.projection.flatMap((item) => (item.property === 'isBasedOn' ? [item.id] : []))
+    : []
+  const partOf = parts.status === 'fulfilled'
+    ? parts.value.datasets.filter((dataset) => dataset.document_id !== props.draft.documentId).map((dataset) => dataset.graph_iri)
+    : []
+  if (parts.status === 'fulfilled' && parts.value.more) {
+    originNote.value = 'Some files are part of more datasets than the ten added. Open the file in Data to see them all.'
+  }
+  return { ...(basedOn.length ? { basedOn } : {}), ...(partOf.length ? { partOf } : {}) }
+}
+
+async function filePart(bucketName: string, key: string, name: string, size?: number, lookup = true): Promise<FilePart> {
   const identity = await dataEntityIdentity(bucketName, key, identityOptions())
   return {
     id: identity.id,
     name,
     contentUrl: identity.contentUrl,
+    ...(lookup ? await origins(bucketName, key) : {}),
     ...(formatOf(name) ? { encodingFormat: formatOf(name) } : {}),
     ...(size === undefined ? {} : { contentSize: String(size) }),
   }
@@ -189,15 +211,36 @@ function apply(parts: FilePart[]) {
   emit('update', next)
 }
 
+// A folder is a linked part: it is named by its bucket and prefix, and every file under it is part
+// of the dataset. Without the ids of this node it keeps its location as the name.
+async function folderPart(bucketName: string, folder: FolderEntry): Promise<FilePart> {
+  const location = objectLocation(bucketName, folder.prefix)
+  const realmId = nodeInfo.value?.node.realm_id
+  const nodeId = nodeInfo.value?.node.peer_id
+  let id = location
+  if (realmId && nodeId) {
+    try {
+      const setId = (await getBucketDistribution(bucketName)).set_id
+      id = partId({ realmId, nodeId, bucket: bucketName, prefix: folder.prefix, setId })
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        id = partId({ realmId, nodeId, bucket: bucketName, prefix: folder.prefix, setId: null })
+      }
+    }
+  }
+  return { id, name: folder.name, type: 'Dataset', contentUrl: location }
+}
+
 async function addObjects(selection: { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[] }) {
   const parts: FilePart[] = []
-  for (const object of selection.objects) {
-    parts.push(await filePart(selection.bucket, object.key, object.name, object.size))
+  originNote.value = ''
+  for (const [index, object] of selection.objects.entries()) {
+    parts.push(await filePart(selection.bucket, object.key, object.name, object.size, index < LOOKUP_LIMIT))
   }
-  for (const folder of selection.folders) {
-    const location = objectLocation(selection.bucket, folder.prefix)
-    parts.push({ id: location, name: folder.name, type: 'Dataset', contentUrl: location })
+  if (selection.objects.length > LOOKUP_LIMIT) {
+    originNote.value = `The origin and the datasets were added for the first ${LOOKUP_LIMIT} files only.`
   }
+  for (const folder of selection.folders) parts.push(await folderPart(selection.bucket, folder))
   apply(parts)
 }
 
@@ -273,6 +316,7 @@ function addUrl() {
         </DialogDescription>
       </DialogHeader>
 
+      <Notice v-if="originNote" tone="info">{{ originNote }}</Notice>
       <Tabs v-model="tab">
         <TabsList>
           <TabsTrigger value="bucket">From a bucket</TabsTrigger>
