@@ -9,13 +9,14 @@ import AddDataShell from '@/components/data/add/AddDataShell.vue'
 import UploadTab from '@/components/data/add/UploadTab.vue'
 import ConnectorTab from '@/components/data/add/ConnectorTab.vue'
 import DatabasesTab from '@/components/data/add/DatabasesTab.vue'
+import MockDatabasesTab from '@/components/data/add/MockDatabasesTab.vue'
 import CollectionTab from '@/components/data/add/CollectionTab.vue'
 import OtherBucketsTab from '@/components/data/add/OtherBucketsTab.vue'
 import { useConnectorSource, type ConnectorStagingRow } from '@/components/data/add/useConnectorSource'
 import { useOtherBuckets } from '@/components/data/add/useOtherBuckets'
 import { useBuilderBasket } from '@/composables/useBuilderBasket'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
-import type { StagingReferenceEntry } from '@/lib/api'
+import type { BucketSearchHit, StagingReferenceEntry } from '@/lib/api'
 import { mockEnabled } from '@/lib/distributedMock'
 import { mockBucket } from '@/lib/distributedMockData'
 import { computed, ref, toRef } from 'vue'
@@ -72,6 +73,12 @@ const { shown } = usePortalFeatures()
 const collection = computed(() => mockEnabled() && Boolean(mockBucket(props.bucket)))
 const tab = ref(props.tab === 'connector' && !shown('connectors') ? 'local' : props.tab ?? 'local')
 
+// A chosen database is the source of the Other buckets tab.
+function chooseDatabase(name: string, nodeId: string) {
+  otherBuckets.pickSearchHit({ bucket: name, node_id: nodeId, arn: '', group_id: '', created_at: '' } satisfies BucketSearchHit)
+  tab.value = 'other'
+}
+
 function addConnectorRows(rows: ConnectorStagingRow[]) {
   basket.addStaging('connector', rows)
 }
@@ -98,7 +105,7 @@ function onImportsCreated() {
         <TabsTrigger value="local"><Upload class="mr-1 h-3.5 w-3.5" /> Local files</TabsTrigger>
         <TabsTrigger v-if="shown('connectors')" value="connector"><CloudDownload class="mr-1 h-3.5 w-3.5" /> From connector</TabsTrigger>
         <TabsTrigger value="other"><Boxes class="mr-1 h-3.5 w-3.5" /> Other buckets</TabsTrigger>
-        <TabsTrigger v-if="mockEnabled()" value="databases"><Library class="mr-1 h-3.5 w-3.5" /> Databases</TabsTrigger>
+        <TabsTrigger value="databases"><Library class="mr-1 h-3.5 w-3.5" /> Databases</TabsTrigger>
         <TabsTrigger v-if="collection" value="collection"><Database class="mr-1 h-3.5 w-3.5" /> Whole collection</TabsTrigger>
       </TabsList>
 
@@ -122,8 +129,9 @@ function onImportsCreated() {
           @created="onImportsCreated"
         />
       </TabsContent>
-      <TabsContent v-if="mockEnabled()" value="databases" class="space-y-3">
-        <DatabasesTab :bucket="bucket" :prefix="prefix" />
+      <TabsContent value="databases" class="space-y-3">
+        <DatabasesTab :bucket="bucket" @choose="chooseDatabase" />
+        <MockDatabasesTab v-if="mockEnabled()" :bucket="bucket" :prefix="prefix" />
       </TabsContent>
 
       <TabsContent v-if="collection" value="collection" class="space-y-3">

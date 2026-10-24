@@ -16,11 +16,13 @@ import Spinner from '@/components/ui/Spinner.vue'
 import CoverageIcon from '@/components/search/CoverageIcon.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealm } from '@/composables/useRealm'
+import { useDatabases } from '@/composables/useDatabases'
 import { useMockDatabases } from '@/composables/useMockDatabases'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSearchSettings } from '@/composables/useSearchSettings'
 import { OBJECT_SEARCH_MODE_LABELS, useUnifiedSearch } from '@/composables/useUnifiedSearch'
 import { isLeafFile } from '@/lib/dataEntities'
+import { openNode } from '@/lib/databases'
 import { mockEnabled } from '@/lib/distributedMock'
 import { searchFiles } from '@/lib/distributedMockData'
 import { truncateMiddle } from '@/lib/utils'
@@ -67,10 +69,11 @@ const wrapperEl = ref<HTMLElement | null>(null)
 const isNarrowSearch = useMediaQuery(`(max-width: ${TOP_BAR_SEARCH_COLLAPSE_PX - 0.02}px)`)
 const { realm } = useRealm()
 const { authToken } = useAruna()
-const { displayName: nodeDisplayName, isLocalNode } = useRealmNodes()
+const { displayName: nodeDisplayName, isLocalNode, localNodeId } = useRealmNodes()
 const router = useRouter()
 const { objectSearchMode } = useSearchSettings()
 const { search: searchDatabases } = useMockDatabases()
+const databases = useDatabases()
 const objectModeOptions = Object.entries(OBJECT_SEARCH_MODE_LABELS).map(([value, label]) => ({ value, label }))
 
 // Quick search is server-backed only: the catalog is paged, so a client-side
@@ -128,6 +131,19 @@ const items = computed<QuickItem[]>(() => [
       ...(objectParentPrefix(hit.key) ? { prefix: objectParentPrefix(hit.key) as string } : {}),
     },
   })),
+  // The databases the user may use, by the dataset's title and the bucket name.
+  ...databases.search(q.value).map((row): QuickItem => {
+    const node = openNode(row, localNodeId.value ?? '')
+    return {
+      key: `db:${row.entryId}`,
+      section: 'databases',
+      title: row.title || row.bucket,
+      subtitle: `Bucket: ${row.bucket}`,
+      routeName: 'bucket',
+      routeParams: { bucketId: row.bucket },
+      routeQuery: { group: row.ownerGroup, ...(!isLocalNode(node) ? { node } : {}) },
+    }
+  }),
   // Databases and files of the example buckets (node mock).
   ...(mockEnabled() ? searchDatabases(q.value) : []).map((entry): QuickItem => ({
     key: `db:${entry.id}`,
@@ -190,7 +206,11 @@ const quickSummary = computed(() => {
 const activeKey = computed(() => items.value[activeIndex.value]?.key ?? null)
 
 watch(items, () => (activeIndex.value = -1))
-watch(q, () => (activeIndex.value = -1))
+watch(q, (value) => {
+  activeIndex.value = -1
+  // The list of databases is read once, when the first search needs it.
+  if (value.trim().length >= 2) databases.ensure()
+})
 watch(isNarrowSearch, (narrow) => {
   if (!narrow && panelOpen.value) requestPanelClose(false)
 })
