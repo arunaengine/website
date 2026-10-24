@@ -383,8 +383,8 @@ describe('Bucket sidebar in the desktop', () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
     const places = nodes(root).filter((node) => node.props['data-testid'] === 'row-place')
 
-    expect(places.map((node) => content(node))).toEqual(['results: node-2 · Giessen', 'notes: This computer'])
-    expect(places[0].props.title).toBe('server node-2')
+    expect(places.map((node) => content(node))).toEqual(['results: node-2', 'notes: This computer'])
+    expect(places[0].props.title).toBe('node-2 · Giessen (server node-2)')
   })
 })
 

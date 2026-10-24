@@ -86,11 +86,14 @@ const otherHits = computed(() =>
 function rowNode(nodeId: string | null): string {
   return `On ${realmNodes.displayName(nodeId ?? realmNodes.localNodeId.value)}`
 }
-// The desktop names every row's place; a row without a node is on this node.
+// The desktop names every row's place, short; the tooltip adds location, kind and id.
 function rowPlace(nodeId: string | null): { place: string | null; placeTitle: string | null } {
   if (!desktop) return { place: null, placeTitle: null }
   const node = realmNodes.nodeById(nodeId ?? realmNodes.localNodeId.value)
-  if (node) return { place: placeName(node), placeTitle: placeTitle(node) }
+  if (node) {
+    const short = node.kind === 'user' && node.isLocal ? 'This computer' : node.label
+    return { place: short, placeTitle: `${placeName(node)} (${placeTitle(node)})` }
+  }
   return { place: realmNodes.isLocalNode(nodeId) ? 'This computer' : realmNodes.displayName(nodeId), placeTitle: null }
 }
 // Arrow keys move through the shown rows of this group, then of other groups.

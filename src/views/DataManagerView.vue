@@ -168,7 +168,8 @@ function onBucketCreated(created: BindSource) {
     group_name: myGroups.value.find((group) => group.id === created.groupId)?.name ?? null,
     created_at: '',
   })
-  void bucketList.refresh()
+  // The list shown: every node through the search, or the one node.
+  void (bucketNodeChoice.value === null ? manager.allBuckets.reload() : bucketList.refresh())
 }
 
 // The desktop names the place; kind and id go to the tooltip.
