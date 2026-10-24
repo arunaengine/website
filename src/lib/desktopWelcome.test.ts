@@ -489,11 +489,13 @@ describe('session carried to a new base', () => {
     expect(landed).toEqual(['settings'])
   })
 
-  it('never signs out a restore that outlasts the wait', async () => {
+  // A restore that outlasts the guard's wait, after the window entered settings.
+  async function outlastWait() {
     vi.useFakeTimers()
     const welcome = await load({ state: 'running', enrolled: true, apiBaseUrl: LOCAL }, REALM, 'https://aruna.example', {
       token: '',
       bootstrapped: false,
+      user: false,
     })
     restoring.value = true
     refresh.mockImplementationOnce(() => new Promise<undefined>(() => {}))
@@ -508,6 +510,32 @@ describe('session carried to a new base', () => {
     await vi.advanceTimersByTimeAsync(10_000)
 
     await vi.waitFor(() => expect(landed).not.toHaveLength(0))
+    return { router, landed }
+  }
+
+  it('never signs out a restore that outlasts the wait', async () => {
+    const { landed } = await outlastWait()
+    expect(landed).toEqual(['settings'])
+  })
+
+  it('signs out a slow restore the realm refused later', async () => {
+    const { router, landed } = await outlastWait()
+    // Like the session: a 401 cleared the restored token and left `restoring` set.
+    bootstrapped.value = true
+
+    await lands(router, 'welcome-sign-in')
+    expect(landed).toEqual(['settings', 'welcome-sign-in'])
+  })
+
+  it('keeps a slow restore that succeeds later', async () => {
+    const { router, landed } = await outlastWait()
+    const replace = vi.spyOn(router, 'replace')
+    authToken.value = 'token'
+    restoring.value = false
+    bootstrapped.value = true
+    await turns()
+
+    expect(replace).not.toHaveBeenCalled()
     expect(landed).toEqual(['settings'])
   })
 
