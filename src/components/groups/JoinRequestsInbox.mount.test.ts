@@ -71,6 +71,27 @@ describe('membership approval inbox', () => {
     mounted.app.unmount()
   })
 
+  it('starts a new session without the wait of a decision from the one before', async () => {
+    let refuse: (err: unknown) => void = () => {}
+    decideJoinRequest.mockReturnValueOnce(new Promise<undefined>((_, reject) => (refuse = reject)))
+    const mounted = await mountApp(Wrapper)
+    await listGroupJoinRequests.mock.results[0]!.value
+    await flush()
+    await click(button(mounted.root, 'Deny'))
+    void (button(mounted.root, 'Deny request').props.onClick as () => Promise<void>)()
+    await flush()
+    sessionEpoch.value++
+    await flush()
+    await flush()
+    await click(button(mounted.root, 'Deny'))
+    expect(button(mounted.root, 'Deny request').props['aria-busy']).toBe(false)
+    expect(button(mounted.root, 'Deny request').props.disabled).toBe(false)
+    refuse(new Error('the old session was refused'))
+    await flush()
+    expect(content(mounted.root)).not.toContain('the old session was refused')
+    mounted.app.unmount()
+  })
+
   it('reloads pending requests when the group detail refreshes', async () => {
     listGroupJoinRequests.mockResolvedValueOnce([])
     const mounted = await mountApp(Wrapper)

@@ -66,6 +66,7 @@ watch([() => props.groupId, () => props.roles, sessionEpoch], () => {
   requests.value = []
   expandedId.value = ''
   decideError.value = null
+  deciding.value = null
   void reload()
 }, { immediate: true })
 
@@ -114,7 +115,7 @@ async function confirm(req: JoinRequest) {
   } catch (err) {
     if (groupId === props.groupId && epoch === sessionEpoch.value) decideError.value = errorMessage(err)
   } finally {
-    deciding.value = null
+    if (deciding.value === req.request_id) deciding.value = null
   }
 }
 </script>
