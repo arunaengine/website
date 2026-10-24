@@ -27,7 +27,6 @@ import { useAuth } from '@/composables/useAuth'
 import { useRefresh } from '@/composables/useRefresh'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { featureEnabled } from '@/lib/config'
-import { mockEnabled } from '@/lib/distributedMock'
 import { errorMessage, formatBytes, formatNumber, shortUserId } from '@/lib/utils'
 import { apiErrorMessage, type RealmQuotaConfig, type UserSearchHit } from '@/lib/api'
 import { useDebounceFn } from '@vueuse/core'
@@ -47,7 +46,7 @@ const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
 const placementAdminEnabled = featureEnabled('placementAdmin')
 const policiesEnabled = featureEnabled('policies')
 
-const tabs = adminTabs({ placement: placementAdminEnabled, policies: policiesEnabled, databases: mockEnabled() })
+const tabs = adminTabs({ placement: placementAdminEnabled, policies: policiesEnabled, databases: true })
 const tab = useRouteTab(
   tabs.map((entry) => entry.id),
   'realm',
@@ -354,7 +353,7 @@ async function save() {
       </section>
     </div>
 
-    <div v-else-if="!isRealmAdmin && !(mockEnabled() && tab === 'databases')" class="container py-8">
+    <div v-else-if="!isRealmAdmin && tab !== 'databases'" class="container py-8">
       <section class="surface mx-auto max-w-xl p-8 text-center">
         <ShieldCheck class="mx-auto h-8 w-8 text-muted-foreground/70" />
         <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">Realm admin access required</h2>
@@ -388,7 +387,7 @@ async function save() {
         <EffectivePolicies />
       </TabsContent>
 
-      <TabsContent v-if="mockEnabled()" value="databases" class="container mt-0 py-8"><DatabasesAdmin /></TabsContent>
+      <TabsContent value="databases" class="container mt-0 py-8"><DatabasesAdmin /></TabsContent>
 
       <TabsContent value="federation" class="container mt-0 py-8"><FederationSettings /></TabsContent>
 
