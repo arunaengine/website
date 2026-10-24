@@ -3,10 +3,10 @@
 import Badge from '@/components/ui/Badge.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import { MEMBER_TONE, mockNode, stamp } from '@/lib/distributedMock'
-import type { MockBucket } from '@/lib/distributedMockData'
+import type { DistributedBucket } from '@/lib/distribution'
 import { toneVariant } from '@/lib/stateBadge'
 
-const props = defineProps<{ bucket: MockBucket }>()
+const props = defineProps<{ bucket: DistributedBucket }>()
 
 function roles(nodeId: string) {
   const ranges = props.bucket.ranges

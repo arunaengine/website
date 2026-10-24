@@ -2,9 +2,9 @@
 // A range whose coordinator cannot be reached. The details are in the hover text.
 import Notice from '@/components/ui/Notice.vue'
 import { stamp } from '@/lib/distributedMock'
-import type { MockRange } from '@/lib/distributedMockData'
+import type { DistributedRange } from '@/lib/distribution'
 
-defineProps<{ range: MockRange }>()
+defineProps<{ range: DistributedRange }>()
 </script>
 
 <template>

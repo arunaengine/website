@@ -4,9 +4,10 @@ import { computed } from 'vue'
 import PermissionNotice from '@/components/distributed/PermissionNotice.vue'
 import Badge from '@/components/ui/Badge.vue'
 import { GROUP_ID, grantGap, REALM_ID } from '@/lib/distributedMock'
-import { MOCK_GRANTS, type MockBucket } from '@/lib/distributedMockData'
+import { MOCK_GRANTS } from '@/lib/distributedMockData'
+import { type DistributedBucket } from '@/lib/distribution'
 
-const props = defineProps<{ bucket: MockBucket }>()
+const props = defineProps<{ bucket: DistributedBucket }>()
 
 const rows = computed(() => {
   const ids = props.bucket.members.map((member) => member.nodeId)

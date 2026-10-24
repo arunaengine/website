@@ -1,38 +1,6 @@
 // Example data for the node mock. All values are made up.
+import { grantTargets, isMulti, type DistributedBucket, type DistributedMember, type DistributedRange } from '@/lib/distribution'
 import { grantGap, REALM_ID, type StorageQuestion, type Coverage, type DataStrategy, type MemberState, type PresetId, type RangeMode } from '@/lib/distributedMock'
-
-export interface MockMember {
-  nodeId: string
-  state: MemberState
-  strategy: DataStrategy
-  coverage: Coverage
-  lag: string
-  unreachableSince?: string
-}
-
-export interface MockRange {
-  id: string
-  lower: string
-  upper: string
-  coordinator: string
-  epoch: number
-  replicas: string[]
-  objects: number
-  bytes: number
-  refreshed: string
-  degradedSince?: string
-}
-
-export interface MockBucket {
-  name: string
-  preset: PresetId
-  members: MockMember[]
-  ranges: MockRange[]
-  refresh: string
-  mode: RangeMode
-  searchIndex: boolean
-  created: string
-}
 
 export const ORDINARY_BUCKET = 'lab-raw-data'
 
@@ -56,7 +24,7 @@ export function sourceObjects(index: number): number {
   return 1_020_408 + ((index * 7919) % 200_000) - 100_000
 }
 
-function bakrepRanges(): MockRange[] {
+function bakrepRanges(): DistributedRange[] {
   return Array.from({ length: BAKREP_COUNT }, (_, index) => {
     const coordinator = BAKREP_NODES[index % BAKREP_NODES.length]
     const objects = sourceObjects(index)
@@ -75,7 +43,7 @@ function bakrepRanges(): MockRange[] {
   })
 }
 
-function bakrepMembers(): MockMember[] {
+function bakrepMembers(): DistributedMember[] {
   return [
     { nodeId: 'node-1', state: 'ready', strategy: 'copy', coverage: 'assigned', lag: '2 s' },
     { nodeId: 'node-2', state: 'ready', strategy: 'copy', coverage: 'assigned', lag: '5 s' },
@@ -91,7 +59,7 @@ function bakrepMembers(): MockMember[] {
   ]
 }
 
-const SPIRE_RANGE: MockRange = {
+const SPIRE_RANGE: DistributedRange = {
   id: 'r-000',
   lower: '',
   upper: '',
@@ -103,7 +71,7 @@ const SPIRE_RANGE: MockRange = {
   refreshed: '2026-10-23T06:00:00Z',
 }
 
-export const MOCK_BUCKETS: readonly MockBucket[] = [
+export const MOCK_BUCKETS: readonly DistributedBucket[] = [
   {
     name: 'bakrep',
     preset: 'sharding-replicas',
@@ -176,22 +144,13 @@ export const MOCK_BUCKETS: readonly MockBucket[] = [
   },
 ]
 
-// An ordinary bucket lives on one node. Only a bucket on more nodes has the Nodes tab.
-export function isMulti(bucket: MockBucket): boolean {
-  return bucket.members.length > 1
-}
-
-export function exampleBuckets(filter = ''): MockBucket[] {
+export function exampleBuckets(filter = ''): DistributedBucket[] {
   const term = filter.trim().toLowerCase()
   return MOCK_BUCKETS.filter((bucket) => bucket.name.includes(term))
 }
 
-export function mockBucket(name: string): MockBucket | undefined {
+export function mockBucket(name: string): DistributedBucket | undefined {
   return MOCK_BUCKETS.find((bucket) => bucket.name === name)
-}
-
-export function degradedRanges(bucket: MockBucket): MockRange[] {
-  return bucket.ranges.filter((range) => range.degradedSince)
 }
 
 export interface PreviewDataset {
@@ -734,13 +693,7 @@ export interface GrantWarning {
 
 // Role paths like data/node-1/bakrep/** that name some nodes of an example bucket, not all.
 export function grantWarnings(suffixes: readonly string[]): GrantWarning[] {
-  const named = new Map<string, string[]>()
-  for (const suffix of suffixes) {
-    const [area, node, bucket] = suffix.split('/')
-    if (area !== 'data' || !node || !bucket) continue
-    named.set(bucket, [...(named.get(bucket) ?? []), node])
-  }
-  return [...named].flatMap(([bucket, nodes]) => {
+  return [...grantTargets(suffixes)].flatMap(([bucket, nodes]) => {
     const found = mockBucket(bucket)
     const missing = found && isMulti(found) ? grantGap(nodes, found.members.map((member) => member.nodeId)) : []
     return missing.length ? [{ bucket, missing }] : []

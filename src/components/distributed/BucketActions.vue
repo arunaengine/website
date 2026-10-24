@@ -6,10 +6,10 @@ import Notice from '@/components/ui/Notice.vue'
 import JoinDialog from '@/components/distributed/JoinDialog.vue'
 import LeaveDialog from '@/components/distributed/LeaveDialog.vue'
 import TransferDialog from '@/components/distributed/TransferDialog.vue'
-import type { MockBucket } from '@/lib/distributedMockData'
+import type { DistributedBucket } from '@/lib/distribution'
 import { ArrowRightLeft, Plus, UserMinus } from '@lucide/vue'
 
-defineProps<{ bucket: MockBucket; admin: boolean }>()
+defineProps<{ bucket: DistributedBucket; admin: boolean }>()
 
 const dialog = ref<'join' | 'leave' | 'transfer' | null>(null)
 const result = ref('')

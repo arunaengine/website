@@ -4,10 +4,10 @@ import { computed, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import { stamp } from '@/lib/distributedMock'
-import type { MockRange } from '@/lib/distributedMockData'
+import type { DistributedRange } from '@/lib/distribution'
 import { formatBytes, formatNumber } from '@/lib/utils'
 
-const props = defineProps<{ ranges: MockRange[] }>()
+const props = defineProps<{ ranges: DistributedRange[] }>()
 
 const SHOWN = 8
 const all = ref(false)

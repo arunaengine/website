@@ -4,7 +4,8 @@ import { computed } from 'vue'
 import { useMockDatabases } from '@/composables/useMockDatabases'
 import BucketRow from '@/components/data/BucketRow.vue'
 import { mockEnabled, storedLabel } from '@/lib/distributedMock'
-import { degradedRanges, exampleBuckets, isMulti, type MockBucket } from '@/lib/distributedMockData'
+import { exampleBuckets } from '@/lib/distributedMockData'
+import { degradedRanges, isMulti, type DistributedBucket } from '@/lib/distribution'
 
 const props = defineProps<{ filter: string; active: string; databaseOnly?: boolean }>()
 
@@ -15,7 +16,7 @@ const emit = defineEmits<{ (e: 'open', bucket: string): void }>()
 const rows = computed(() =>
   mockEnabled() ? exampleBuckets(props.filter).filter((bucket) => !props.databaseOnly || described(bucket.name)) : [],
 )
-const second = (bucket: MockBucket) =>
+const second = (bucket: DistributedBucket) =>
   props.databaseOnly
     ? (described(bucket.name)?.dataset.description ?? null)
     : isMulti(bucket)

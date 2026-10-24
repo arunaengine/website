@@ -12,9 +12,9 @@ import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
 import { COVERAGES, MOCK_NODES, SHARD_HOST_LABEL, STRATEGIES, type Coverage, type DataStrategy } from '@/lib/distributedMock'
-import type { MockBucket } from '@/lib/distributedMockData'
+import type { DistributedBucket } from '@/lib/distribution'
 
-const props = defineProps<{ open: boolean; bucket: MockBucket }>()
+const props = defineProps<{ open: boolean; bucket: DistributedBucket }>()
 const emit = defineEmits<{ (e: 'update:open', value: boolean): void; (e: 'done', message: string): void }>()
 
 const strategy = ref<DataStrategy>('copy')

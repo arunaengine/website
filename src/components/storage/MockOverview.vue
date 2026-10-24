@@ -4,12 +4,12 @@ import { computed } from 'vue'
 import MockNotice from '@/components/distributed/MockNotice.vue'
 import RowList from '@/components/distributed/RowList.vue'
 import { presetById, stamp, storedLabel } from '@/lib/distributedMock'
-import { degradedRanges, isMulti, type MockBucket } from '@/lib/distributedMockData'
+import { degradedRanges, isMulti, type DistributedBucket } from '@/lib/distribution'
 import { formatCount } from '@/lib/formatCount'
 import { formatBytes } from '@/lib/utils'
 import { HardDrive } from '@lucide/vue'
 
-const props = defineProps<{ bucket: MockBucket }>()
+const props = defineProps<{ bucket: DistributedBucket }>()
 
 const rows = computed(() => {
   const ranges = props.bucket.ranges

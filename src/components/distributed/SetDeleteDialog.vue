@@ -11,9 +11,10 @@ import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
-import { DELETE_PREVIEWS, degradedRanges, type MockBucket } from '@/lib/distributedMockData'
+import { DELETE_PREVIEWS } from '@/lib/distributedMockData'
+import { degradedRanges, type DistributedBucket } from '@/lib/distribution'
 
-const props = defineProps<{ open: boolean; bucket: MockBucket }>()
+const props = defineProps<{ open: boolean; bucket: DistributedBucket }>()
 const emit = defineEmits<{ (e: 'update:open', value: boolean): void; (e: 'done', message: string): void }>()
 
 const typed = ref('')

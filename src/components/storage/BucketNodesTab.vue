@@ -11,9 +11,9 @@ import StorageFeatureLink from '@/components/distributed/StorageFeatureLink.vue'
 import OptionToggle from '@/components/ui/OptionToggle.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import { presetById, stamp } from '@/lib/distributedMock'
-import { degradedRanges, type MockBucket } from '@/lib/distributedMockData'
+import { degradedRanges, type DistributedBucket } from '@/lib/distribution'
 
-const props = defineProps<{ bucket: MockBucket }>()
+const props = defineProps<{ bucket: DistributedBucket }>()
 
 // The example data can be viewed as a group admin or as a member.
 const viewer = ref('admin')

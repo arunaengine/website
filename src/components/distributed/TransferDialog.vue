@@ -12,9 +12,9 @@ import Notice from '@/components/ui/Notice.vue'
 import OptionToggle from '@/components/ui/OptionToggle.vue'
 import Select from '@/components/ui/Select.vue'
 import { stamp } from '@/lib/distributedMock'
-import type { MockBucket } from '@/lib/distributedMockData'
+import type { DistributedBucket } from '@/lib/distribution'
 
-const props = defineProps<{ open: boolean; bucket: MockBucket }>()
+const props = defineProps<{ open: boolean; bucket: DistributedBucket }>()
 const emit = defineEmits<{ (e: 'update:open', value: boolean): void; (e: 'done', message: string): void }>()
 
 const rangeId = ref(props.bucket.ranges[0].id)

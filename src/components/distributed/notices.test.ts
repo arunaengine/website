@@ -1,7 +1,8 @@
 import { createSSRApp, h } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { describe, expect, it } from 'vitest'
-import { degradedRanges, mockBucket } from '@/lib/distributedMockData'
+import { mockBucket } from '@/lib/distributedMockData'
+import { degradedRanges } from '@/lib/distribution'
 import DegradedNotice from './DegradedNotice.vue'
 import PermissionNotice from './PermissionNotice.vue'
 

@@ -9,9 +9,9 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
-import type { MockBucket } from '@/lib/distributedMockData'
+import type { DistributedBucket } from '@/lib/distribution'
 
-const props = defineProps<{ open: boolean; bucket: MockBucket }>()
+const props = defineProps<{ open: boolean; bucket: DistributedBucket }>()
 const emit = defineEmits<{ (e: 'update:open', value: boolean): void; (e: 'done', message: string): void }>()
 
 const nodeId = ref('')

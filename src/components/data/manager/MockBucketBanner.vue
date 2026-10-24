@@ -6,9 +6,9 @@ import DegradedNotice from '@/components/distributed/DegradedNotice.vue'
 import MockNotice from '@/components/distributed/MockNotice.vue'
 import Badge from '@/components/ui/Badge.vue'
 import { storedLabel } from '@/lib/distributedMock'
-import { degradedRanges, isMulti, type MockBucket } from '@/lib/distributedMockData'
+import { degradedRanges, isMulti, type DistributedBucket } from '@/lib/distribution'
 
-const props = defineProps<{ bucket: MockBucket }>()
+const props = defineProps<{ bucket: DistributedBucket }>()
 
 const degraded = computed(() => degradedRanges(props.bucket))
 </script>
