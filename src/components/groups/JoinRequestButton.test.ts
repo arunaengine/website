@@ -1,12 +1,14 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Utils from '@/lib/utils'
 import { button, compileClientComponent, content, flush, moduleDefault, mountApp } from '@/test/clientRender'
 
 const request = { request_id: 'q1', group_id: 'g1', user_id: 'u1', status: 'pending', created_at: '' }
 const withdrawRequest = vi.fn(async (_request: unknown) => undefined)
 const reportGlobalError = vi.fn()
+const sessionEpoch = ref(1)
+const pendingByGroup = ref(new Map([['g1', request]]))
 
 const Empty = defineComponent(() => () => null)
 const Slot = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
@@ -32,7 +34,7 @@ const JoinRequestButton = compileClientComponent(new URL('./JoinRequestButton.vu
   '@/composables/useJoinRequests': {
     useJoinRequests: () => ({
       joinRequestsEnabled: ref(true),
-      pendingByGroup: ref(new Map([['g1', request]])),
+      pendingByGroup,
       ensureOwnRequestsLoaded: vi.fn(),
       requestJoin: vi.fn(),
       withdrawRequest,
@@ -40,13 +42,29 @@ const JoinRequestButton = compileClientComponent(new URL('./JoinRequestButton.vu
     }),
   },
   '@/composables/useAruna': {
-    useAruna: () => ({ currentUser: ref({ id: 'u1' }), myGroups: ref([]), sessionEpoch: ref(1) }),
+    useAruna: () => ({ currentUser: ref({ id: 'u1' }), myGroups: ref([]), sessionEpoch }),
   },
   '@/composables/useGlobalErrors': { reportGlobalError },
   '@/lib/utils': Utils,
 })
 
+beforeEach(() => vi.clearAllMocks())
+
 describe('JoinRequestButton', () => {
+  it('starts a new session without the wait of a withdrawal from the one before', async () => {
+    withdrawRequest.mockReturnValueOnce(new Promise<undefined>(() => {}))
+    const { root } = await mountApp(defineComponent(() => () => h(JoinRequestButton, { groupId: 'g1' })))
+    void (button(root, 'Withdraw').props.onClick as () => Promise<void>)()
+    await flush()
+    expect(button(root, 'Withdrawing the request').props['aria-busy']).toBe(true)
+    sessionEpoch.value++
+    pendingByGroup.value = new Map([['g1', { ...request, request_id: 'q2' }]])
+    await flush()
+    expect(button(root, 'Withdraw').props['aria-busy']).toBe(false)
+    expect(button(root, 'Withdraw').props.disabled).toBe(false)
+    pendingByGroup.value = new Map([['g1', request]])
+  })
+
   it('shows the wait on Withdraw, sends it once and frees it when it fails', async () => {
     let refuse: (err: unknown) => void = () => {}
     withdrawRequest.mockReturnValueOnce(new Promise<undefined>((_, reject) => (refuse = reject)))

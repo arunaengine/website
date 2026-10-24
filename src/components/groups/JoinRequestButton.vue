@@ -36,7 +36,8 @@ const pending = computed(() => pendingByGroup.value.get(props.groupId) ?? null)
 const open = ref(false)
 const message = ref('')
 const submitError = ref<string | null>(null)
-const withdrawing = ref(false)
+// The request whose withdrawal is on its way.
+const withdrawing = ref<string | null>(null)
 
 onMounted(() => {
   if (joinRequestsEnabled.value && currentUser.value) void ensureOwnRequestsLoaded()
@@ -49,7 +50,7 @@ watch(open, (isOpen) => {
   }
 })
 
-watch([() => props.groupId, sessionEpoch], () => { open.value = false; submitError.value = null })
+watch([() => props.groupId, sessionEpoch], () => { open.value = false; submitError.value = null; withdrawing.value = null })
 
 async function submit() {
   const groupId = props.groupId
@@ -66,13 +67,13 @@ async function submit() {
 async function withdraw() {
   const req = pending.value
   if (!req || withdrawing.value) return
-  withdrawing.value = true
+  withdrawing.value = req.request_id
   try {
     await withdrawRequest(req)
   } catch (err) {
     reportGlobalError(errorMessage(err))
   } finally {
-    withdrawing.value = false
+    if (withdrawing.value === req.request_id) withdrawing.value = null
   }
 }
 </script>
@@ -81,8 +82,15 @@ async function withdraw() {
   <template v-if="visible">
     <div v-if="pending" class="flex items-center gap-1.5">
       <Badge size="sm" variant="warn" class="uppercase">requested</Badge>
-      <Button variant="ghost" size="sm" :disabled="busy || withdrawing" :aria-busy="withdrawing" @click="withdraw">
-        <Spinner v-if="withdrawing" label="Withdrawing the request" class="text-current" /><X v-else class="h-3.5 w-3.5" /> Withdraw
+      <Button
+        variant="ghost"
+        size="sm"
+        :disabled="busy || withdrawing !== null"
+        :aria-busy="withdrawing === pending.request_id"
+        @click="withdraw"
+      >
+        <Spinner v-if="withdrawing === pending.request_id" label="Withdrawing the request" class="text-current" />
+        <X v-else class="h-3.5 w-3.5" /> Withdraw
       </Button>
     </div>
     <template v-else>
