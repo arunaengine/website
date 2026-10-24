@@ -37,8 +37,8 @@ const list = computed(() => holders.value?.holders ?? [])
 const recovery = computed(() => recoverySummary(holders.value ? listedRecovery(holders.value) : null))
 const partial = computed(() => Boolean(holders.value && holders.value.complete !== true))
 const busy = ref<string | null>(null)
-// The removal on its way was confirmed in the dialog, even once the dialog is closed.
-const confirmedRemoval = ref(false)
+// What `busy` is doing for that user; a confirmed removal stays one when the dialog closes.
+const busyAction = ref<'grant' | 'remove' | 'confirm' | null>(null)
 const failure = ref<string | null>(null)
 /** A confirmation belongs to the holder set it was shown for; a newer set needs a new one. */
 interface PendingRemoval {
@@ -54,7 +54,7 @@ const query = ref('')
 const results = ref<UserSearchHit[]>([])
 const chosen = ref<UserSearchHit | null>(null)
 // Grant is on its way for the chosen user; the search stays put until it answers.
-const granting = computed(() => busy.value !== null && busy.value === chosen.value?.user_id)
+const granting = computed(() => busyAction.value === 'grant')
 const searchState = ref<'idle' | 'searching' | 'done' | 'failed'>('idle')
 const searchError = ref<string | null>(null)
 let searches = 0
@@ -87,6 +87,7 @@ function nameOf(entry: BucketHolderEntry): string {
 async function addHolder() {
   if (!chosen.value || busy.value !== null) return
   busy.value = chosen.value.user_id
+  busyAction.value = 'grant'
   failure.value = null
   try {
     if (await grant(chosen.value.user_id)) {
@@ -97,13 +98,14 @@ async function addHolder() {
     failure.value = encryptionError(cause)
   } finally {
     busy.value = null
+    busyAction.value = null
   }
 }
 
 async function removeHolder(entry: BucketHolderEntry, confirm: boolean, revision: string) {
   if (busy.value !== null) return
   busy.value = entry.user_id
-  confirmedRemoval.value = confirm
+  busyAction.value = confirm ? 'confirm' : 'remove'
   failure.value = null
   try {
     const result = await remove(entry.user_id, confirm, revision)
@@ -114,6 +116,7 @@ async function removeHolder(entry: BucketHolderEntry, confirm: boolean, revision
     failure.value = encryptionError(cause)
   } finally {
     busy.value = null
+    busyAction.value = null
   }
 }
 
@@ -166,10 +169,10 @@ function confirmRemoval() {
               size="sm"
               variant="outline"
               :disabled="busy !== null || frozen"
-              :aria-busy="busy === entry.user_id && !confirmedRemoval"
+              :aria-busy="busy === entry.user_id && busyAction === 'remove'"
               @click="startRemove(entry)"
             >
-              <Spinner v-if="busy === entry.user_id && !confirmedRemoval" label="Removing the key holder" class="text-current" /> Remove
+              <Spinner v-if="busy === entry.user_id && busyAction === 'remove'" label="Removing the key holder" class="text-current" /> Remove
             </Button>
           </li>
         </ul>
@@ -249,10 +252,14 @@ function confirmRemoval() {
             variant="destructive"
             size="sm"
             :disabled="!accepted || busy !== null || frozen || pendingStale"
-            :aria-busy="pending !== null && busy === pending.entry.user_id"
+            :aria-busy="pending !== null && busy === pending.entry.user_id && busyAction === 'confirm'"
             @click="confirmRemoval"
           >
-            <Spinner v-if="pending && busy === pending.entry.user_id" label="Removing the key holder" class="text-current" />
+            <Spinner
+              v-if="pending && busy === pending.entry.user_id && busyAction === 'confirm'"
+              label="Removing the key holder"
+              class="text-current"
+            />
             Remove anyway
           </Button>
         </DialogFooter>

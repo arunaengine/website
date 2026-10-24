@@ -173,6 +173,25 @@ describe('bucket key holder list', () => {
     expect(remove).toHaveBeenCalledWith('Bo', true, 'rev-1')
   })
 
+  it('keeps the wait of a direct Remove off Grant when the chosen user became a holder meanwhile', async () => {
+    remove.mockReturnValueOnce(new Promise(() => {}))
+    searchUsers.mockResolvedValue({ users: [{ user_id: 'Cy', name: 'Cy' }] })
+    const root = await render([holder('Ada'), holder('Bo')])
+    const search = element(root, (node) => node.tag === 'input' && node.props.id === 'holder-search')
+    ;(search.props['onUpdate:modelValue'] as (value: string) => void)('Cy')
+    await flush()
+    await click(element(root, (node) => node.tag === 'button' && node.props.type === 'button' && content(node).includes('Cy')))
+    // Another admin granted Cy; a refresh lists Cy while Cy is still the chosen user.
+    holders.value = { ...holders.value!, holders: [holder('Ada'), holder('Bo'), holder('Cy')] }
+    await flush()
+    void (rowButton(root, 'Cy').props.onClick as () => void)()
+    await flush()
+    const grantButton = element(root, (node) => node.tag === 'button' && content(node).trim().endsWith('Grant'))
+    expect(grantButton.props['aria-busy']).toBe(false)
+    expect(content(grantButton)).not.toContain('Granting')
+    expect(search.props.disabled).toBe(false)
+  })
+
   it('shows the wait on Grant, sends it once and frees it when it fails', async () => {
     let refuse: (err: Error) => void = () => {}
     grant.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
