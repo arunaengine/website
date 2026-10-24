@@ -97,8 +97,8 @@ describe('cancelSignIn', () => {
 
 describe('signIn', () => {
   // The realm names its provider; the provider's discovery names the login page.
-  async function redirectFor(options: { freshLogin?: boolean }): Promise<URL> {
-    await configure({})
+  async function redirectFor(options: { freshLogin?: boolean }, served: Record<string, unknown> = {}): Promise<URL> {
+    await configure(served)
     const storage = new Map<string, string>()
     vi.stubGlobal('window', {
       location: { origin: PAGE_ORIGIN, assign },
@@ -131,5 +131,21 @@ describe('signIn', () => {
     const url = await redirectFor({})
     expect(url.searchParams.has('prompt')).toBe(false)
     expect(url.searchParams.has('max_age')).toBe(false)
+  })
+
+  it('marks a desktop state that returns through the realm website', async () => {
+    const url = await redirectFor({}, { features: { desktop: true }, authCallbackOrigin: 'https://realm.test' })
+    expect(url.searchParams.get('redirect_uri')).toBe('https://realm.test/auth/callback')
+    expect(url.searchParams.get('state')).toMatch(/^desktop\.[\w-]{22}$/)
+  })
+
+  it.each([
+    ['on the web', {}],
+    ['on the web with a callback origin', { authCallbackOrigin: 'https://realm.test' }],
+    ['for the desktop scheme', { features: { desktop: true } }],
+    ['for a desktop callback on its own origin', { features: { desktop: true }, authCallbackOrigin: PAGE_ORIGIN }],
+  ])('leaves the state unmarked %s', async (_, served) => {
+    const url = await redirectFor({}, served)
+    expect(url.searchParams.get('state')).toMatch(/^[\w-]{22}$/)
   })
 })

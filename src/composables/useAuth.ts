@@ -46,13 +46,26 @@ export function setAuthOpener(opener: AuthOpener | null): void {
 
 // The shell's own origin is tauri://localhost, which no IdP accepts, so the
 // desktop default is the custom scheme it registers and routes (RFC 8252).
-const DESKTOP_CALLBACK_URI = 'aruna://auth/callback'
+export const DESKTOP_CALLBACK_URI = 'aruna://auth/callback'
+
+/** Marks a desktop state, so the realm website hands its callback on to the app. */
+export const DESKTOP_STATE_PREFIX = 'desktop.'
 
 /** The registered OIDC redirect_uri; a configured origin wins over the page. */
 export function callbackUri(): string {
   const origin = portalConfig().authCallbackOrigin
   if (origin) return `${origin}/auth/callback`
   return featureEnabled('desktop') ? DESKTOP_CALLBACK_URI : `${window.location.origin}/auth/callback`
+}
+
+// A desktop sign-in that returns through a website carries the mark; nothing
+// secret goes into the state, the verifier stays in this window.
+function signInState(): string {
+  const state = randomUrlSafeString(16)
+  if (!featureEnabled('desktop')) return state
+  const target = new URL(callbackUri())
+  const web = target.protocol === 'https:' || target.protocol === 'http:'
+  return web && target.origin !== window.location.origin ? `${DESKTOP_STATE_PREFIX}${state}` : state
 }
 
 /**
@@ -98,7 +111,7 @@ async function signIn(options: { onboardingSecret?: string; redirectTo?: string;
     const { clientId, discoveryUrl } = await resolveProvider()
     const discovery = await fetchDiscovery(discoveryUrl)
     const verifier = randomUrlSafeString(48)
-    const state = randomUrlSafeString(16)
+    const state = signInState()
     window.sessionStorage.removeItem(ID_TOKEN_KEY)
     window.sessionStorage.setItem(VERIFIER_KEY, verifier)
     window.sessionStorage.setItem(STATE_KEY, state)
