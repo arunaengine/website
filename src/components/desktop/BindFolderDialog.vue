@@ -53,13 +53,13 @@ const CHOICES: Array<{ value: FolderMode; title: string; text: string; icon: unk
   {
     value: 'download_only',
     title: 'Keep a copy here',
-    text: 'Download the bucket and keep it up to date. Your own edits are never overwritten.',
+    text: 'Download the bucket and keep it up to date.',
     icon: ArrowDown,
   },
   {
     value: 'two_way',
     title: 'Both ways',
-    text: 'Changes go both ways. If both sides change a file, you decide.',
+    text: 'Changes go both ways. You decide on conflicts.',
     icon: ArrowLeftRight,
   },
 ]
