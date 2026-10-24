@@ -15,7 +15,7 @@ import { useBucketSearch } from '@/composables/useBucketSearch'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import type { DataManager } from '@/composables/useDataManager'
-import type { BucketSearchHit } from '@/lib/api'
+import type { AdmissionResponse, BucketSearchHit } from '@/lib/api'
 import { isDesktop } from '@/lib/desktop'
 import type { BindSource } from '@/lib/bindSource'
 import { defaultPlacement, mockEnabled, placementLabel } from '@/lib/distributedMock'
@@ -67,6 +67,7 @@ const {
   creatingBucket,
   createBucket,
   createBucketError,
+  bucketList,
   requestDelete,
   bindSourceFor,
   linkedFolderFor,
@@ -78,7 +79,7 @@ const listings = ref(0)
 watch(() => all.loading.value, (busy) => busy || listings.value++)
 const jobs = useBucketJobs(selectedGroupId, computed(() => [buckets.value, listings.value]))
 
-// Where the next bucket is stored (node mock); this node unless changed.
+// Where the next bucket is stored: this node unless changed.
 const storageOpen = ref(false)
 const resultsOpen = ref(false)
 // A database is a bucket with a linked dataset, so this is only a filter.
@@ -94,9 +95,17 @@ const placement = ref(defaultPlacement())
 
 // Several nodes show the result of each node; one node creates as before.
 function create() {
-  const several = mockEnabled() && placement.value.several
-  if (!several) return void createBucket()
-  if (newBucketName.value.trim() && !createBucketBlocker.value) resultsOpen.value = true
+  if (!placement.value.several) return void createBucket()
+  if (newBucketName.value.trim() && !createBucketBlocker.value && selectedGroupId.value) resultsOpen.value = true
+}
+
+// The bucket opens here only when this node is one of its nodes.
+async function created(outcome: AdmissionResponse) {
+  const name = newBucketName.value.trim()
+  newBucketName.value = ''
+  placement.value = defaultPlacement()
+  await bucketList.refresh()
+  if (outcome.members.some((member) => realmNodes.isLocalNode(member.node_id)) && name) openBucket(name)
 }
 
 const allNodes = computed(() => bucketNodeChoice.value === null)
@@ -403,11 +412,11 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
             aria-label="New bucket name"
             @keyup.enter="create"
           />
-          <Button variant="outline" size="sm" aria-label="Create bucket" :title="`Creates the bucket on ${mockEnabled() && placement.several ? `${placement.members.length} nodes` : createNode}`" :disabled="creatingBucket || !newBucketName.trim() || Boolean(createBucketBlocker)" @click="create">
+          <Button variant="outline" size="sm" aria-label="Create bucket" :title="`Creates the bucket on ${placement.several ? `${placement.members.length} nodes` : createNode}`" :disabled="creatingBucket || !newBucketName.trim() || Boolean(createBucketBlocker)" @click="create">
             <FolderPlus class="h-4 w-4" />
           </Button>
         </div>
-        <button v-if="mockEnabled()" type="button" class="block text-left text-xs text-muted-foreground hover:text-foreground" @click="storageOpen = true">
+        <button type="button" class="block text-left text-xs text-muted-foreground hover:text-foreground" @click="storageOpen = true">
           Stored on: {{ placementLabel(placement) }} <span class="underline">Change</span>
         </button>
         <p v-if="createBucketError" class="text-xs text-destructive">{{ createBucketError }}</p>
@@ -415,9 +424,14 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         <p v-else-if="newBucketRefusal" class="text-xs text-muted-foreground">{{ newBucketRefusal }}</p>
       </footer>
     </div>
-    <template v-if="mockEnabled()">
-      <BucketStorageDialog v-model:open="storageOpen" v-model="placement" />
-      <BucketCreateResults v-model:open="resultsOpen" :name="newBucketName.trim()" :placement="placement" />
-    </template>
+    <BucketStorageDialog v-model:open="storageOpen" v-model="placement" />
+    <BucketCreateResults
+      v-if="selectedGroupId"
+      v-model:open="resultsOpen"
+      :name="newBucketName.trim()"
+      :group-id="selectedGroupId"
+      :placement="placement"
+      @created="created"
+    />
   </aside>
 </template>
