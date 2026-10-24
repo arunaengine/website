@@ -150,7 +150,8 @@ async function readAll(poll: boolean) {
     }
     if (editing.value) editing.value = imports.find((link) => link.import_id === editing.value?.import_id) ?? editing.value
     emit('count', list.backends.length)
-    emit('backends', list.backends)
+    // A poll changes no storage, so the dataset location below is not read again.
+    if (!poll) emit('backends', list.backends)
     follow(imports)
   } catch (err) {
     if (!current()) return

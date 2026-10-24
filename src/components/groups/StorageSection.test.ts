@@ -117,9 +117,9 @@ type Root = Parameters<typeof content>[0]
 const byTestId = (root: Root, id: string) => nodes(root).filter((node) => node.props['data-testid'] === id)
 const buttonIn = (root: Root, text: string) => element(root, (node) => node.tag === 'button' && content(node).trim() === text)
 
-async function mount(focusLink: string | null = null) {
+async function mount(focusLink: string | null = null, onBackends?: (backends: unknown) => void) {
   const mounted = await mountApp(
-    defineComponent(() => () => h(StorageSection, { groupId: 'g1', groupName: 'spire', canAdmin: true, focusLink })),
+    defineComponent(() => () => h(StorageSection, { groupId: 'g1', groupName: 'spire', canAdmin: true, focusLink, onBackends })),
   )
   await flush()
   if (mounted.errors.length) throw mounted.errors[0]
@@ -293,6 +293,28 @@ describe('StorageSection', () => {
       expect(byTestId(root, 'bucket-job')).toHaveLength(0)
       await vi.advanceTimersByTimeAsync(30_000)
       expect(listStorageBuckets).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('updates the rows in place and reports no storage change while it follows a step', async () => {
+    vi.useFakeTimers()
+    try {
+      listBackendImports.mockResolvedValue([LINKS[0]])
+      const job = { kind: 'rename', state: 'running', done: 4, failed: 0 }
+      listStorageBuckets.mockResolvedValue({ buckets: [listed('genes', { import_id: 'i1', job })], next: null })
+      const onBackends = vi.fn()
+      const { root } = await mount(null, onBackends)
+      const row = byTestId(root, 'bucket-row')[0]
+      expect(onBackends).toHaveBeenCalledTimes(1)
+      listStorageBuckets.mockResolvedValue({ buckets: [listed('genes', { import_id: 'i1', job: { ...job, done: 9 } })], next: null })
+      await vi.advanceTimersByTimeAsync(3000)
+      await flush()
+      // The poll updates the row in place; the dataset location below is not read again.
+      expect(listStorageBuckets).toHaveBeenCalledTimes(2)
+      expect(byTestId(root, 'bucket-row')[0]).toBe(row)
+      expect(onBackends).toHaveBeenCalledTimes(1)
     } finally {
       vi.useRealTimers()
     }
