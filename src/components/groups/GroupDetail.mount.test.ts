@@ -11,6 +11,7 @@ import * as Quota from '@/lib/quota'
 import * as Utils from '@/lib/utils'
 
 const TAB_NAMES = ['stats', 'members', 'roles', 'sources', 'storage', 'policies']
+const leaveGroup = vi.fn(async (_group: string) => undefined)
 const REALM = 'realm-1'
 interface Role {
   role_id: string
@@ -101,7 +102,7 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
       listGroupMetadata: vi.fn(async () => ({ documents: [] })),
       listGroupConnectors,
       listGroupBackends,
-      leaveGroup: vi.fn(async () => undefined),
+      leaveGroup,
       saving: ref(false),
       currentUser: ref({ id: 'user-1' }),
     }),
@@ -112,6 +113,7 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   '@/components/ui/Skeleton.vue': moduleDefault(Empty),
   '@/components/ui/ErrorPanel.vue': moduleDefault(Empty),
   '@/components/ui/EmptyState.vue': moduleDefault(Empty),
+  '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('i', p.label) })),
   '@/components/ui/Tabs.vue': moduleDefault(TabsStub),
   '@/components/ui/TabsList.vue': moduleDefault(Passthrough),
   '@/components/ui/TabsTrigger.vue': moduleDefault(TriggerStub),
@@ -341,6 +343,26 @@ describe('Group notifications', () => {
     await flush()
     expect(notices()).toHaveLength(0)
     expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('shows the wait on Leave group, sends it once and frees it when it fails', async () => {
+    let refuse: (err: unknown) => void = () => {}
+    leaveGroup.mockReturnValueOnce(new Promise<undefined>((_, reject) => (refuse = reject)))
+    const mounted = await mount('/app/groups/g1')
+    const leave = () => element(mounted.root, (node) => content(node).trim().endsWith('Leave group') && node.props.variant === 'outline')
+    void (leave().props.onClick as () => Promise<void>)()
+    await flush()
+    expect(leave().props['aria-busy']).toBe(true)
+    expect(leave().props.disabled).toBe(true)
+    expect(content(leave())).toContain('Leaving the group')
+    await (leave().props.onClick as () => Promise<void>)()
+    expect(leaveGroup).toHaveBeenCalledTimes(1)
+    refuse(new Error('last admin'))
+    await flush()
+    expect(leave().props['aria-busy']).toBe(false)
+    expect(leave().props.disabled).toBe(false)
+    expect(content(mounted.root)).toContain('last admin')
     mounted.app.unmount()
   })
 

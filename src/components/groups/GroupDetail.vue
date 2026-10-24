@@ -5,6 +5,7 @@ import QuotaBar from '@/components/ui/QuotaBar.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import ConnectorsSection from '@/components/groups/ConnectorsSection.vue'
 import RepositoriesSection from '@/components/groups/RepositoriesSection.vue'
 import StorageSection from '@/components/groups/StorageSection.vue'
@@ -80,6 +81,7 @@ const members = ref<GroupMember[]>([])
 const membersHidden = ref(false)
 const loadError = ref<string | null>(null)
 const leaveError = ref<string | null>(null)
+const leaving = ref(false)
 const deleteOpen = ref(false)
 const loadingDetail = ref(false)
 const usage = ref<UsageResponse | null>(null)
@@ -334,12 +336,16 @@ const askPrompt = computed(() => {
 })
 
 async function leave() {
+  if (leaving.value) return
   leaveError.value = null
+  leaving.value = true
   try {
     await leaveGroup(props.groupId)
     emit('left')
   } catch (err) {
     leaveError.value = errorMessage(err)
+  } finally {
+    leaving.value = false
   }
 }
 </script>
@@ -381,8 +387,8 @@ async function leave() {
             <Inbox class="h-3.5 w-3.5 shrink-0" />
             You have unanswered join requests
           </Button>
-          <Button v-if="isMember" variant="outline" size="sm" :disabled="saving" @click="leave">
-            <LogOut class="h-3.5 w-3.5" /> Leave group
+          <Button v-if="isMember" variant="outline" size="sm" :disabled="saving || leaving" :aria-busy="leaving" @click="leave">
+            <Spinner v-if="leaving" label="Leaving the group" class="text-current" /><LogOut v-else class="h-3.5 w-3.5" /> Leave group
           </Button>
           <Button
             v-if="canAdminGroup"
