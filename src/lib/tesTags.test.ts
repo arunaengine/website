@@ -6,6 +6,7 @@ import {
   TES_LABEL_TAG_PREFIX,
   TES_LOGICAL_STATE_TAG,
   TES_TRANSFER_BYTES_TAG,
+  isLocalRun,
   placementTags,
   pruneTesTask,
   tesPlacementLike,
@@ -120,5 +121,17 @@ describe('run list window', () => {
     expect(runListed({ state: 'RUNNING', creation_time: '2026-09-01T00:00:00Z' }, now)).toBe(true)
     expect(runListed({ state: 'CANCELING', creation_time: '2026-09-01T00:00:00Z' }, now)).toBe(true)
     expect(runListed({ state: 'COMPLETE' }, now)).toBe(true)
+  })
+})
+
+describe('where a run runs', () => {
+  it('takes a run without a realm family for one of this computer', () => {
+    expect(isLocalRun({ [TES_JOB_ID_TAG]: '01JOB' })).toBe(true)
+    expect(isLocalRun({ [TES_JOB_ID_TAG]: '01JOB', [TES_LOGICAL_STATE_TAG]: 'queued' })).toBe(false)
+  })
+
+  it('never calls a run local when the node serves no placement tags', () => {
+    expect(isLocalRun(undefined)).toBe(false)
+    expect(isLocalRun({ [TES_GROUP_TAG]: 'g1' })).toBe(false)
   })
 })
