@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // A running step with its bar. Pause, Resume and Abort show only for steps that allow them.
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { abortSentence, abortTitle, jobTitle, percent, type ProgressJob } from '@/lib/organize'
@@ -13,6 +13,10 @@ const asking = ref(false)
 // The control last sent; its button shows the wait while the node answers.
 const sent = ref<'pause' | 'resume' | 'abort' | null>(null)
 watch(() => props.busy, (busy) => busy || (sent.value = null))
+// A Pause or Resume on its way keeps its button, even when a poll already shows the new state.
+const resumeShown = computed(() =>
+  props.busy && (sent.value === 'pause' || sent.value === 'resume') ? sent.value === 'resume' : props.job.state === 'paused',
+)
 
 function send(action: 'pause' | 'resume' | 'abort') {
   sent.value = action
@@ -34,7 +38,7 @@ function abort() {
       </span>
       <span v-if="job.controls" class="flex gap-2">
         <Button
-          v-if="job.state === 'paused'"
+          v-if="resumeShown"
           variant="outline"
           size="sm"
           :disabled="busy"

@@ -56,6 +56,29 @@ describe('JobProgress', () => {
     expect(button(mounted.root, 'Pause').props.disabled).toBe(false)
   })
 
+  it('keeps the sent Pause or Resume with its wait when a poll shows the new state first', async () => {
+    const busy = ref(false)
+    const job = ref<ProgressJob>(JOB)
+    const mounted = await mountApp(
+      defineComponent(() => () => h(JobProgress, { job: job.value, busy: busy.value, onControl: () => (busy.value = true) })),
+    )
+    await click(button(mounted.root, 'Pause'))
+    job.value = { ...JOB, state: 'paused' }
+    await flush()
+    expect(button(mounted.root, 'Pausing').props['aria-busy']).toBe(true)
+    expect(() => button(mounted.root, 'Resume')).toThrow()
+    busy.value = false
+    await flush()
+    await click(button(mounted.root, 'Resume'))
+    job.value = { ...JOB, state: 'running' }
+    await flush()
+    expect(button(mounted.root, 'Resuming').props['aria-busy']).toBe(true)
+    expect(() => button(mounted.root, 'Pause')).toThrow()
+    busy.value = false
+    await flush()
+    expect(button(mounted.root, 'Pause').props['aria-busy']).toBe(false)
+  })
+
   it('marks no control for a busy state no control caused', async () => {
     const busy = ref(false)
     const mounted = await mountApp(defineComponent(() => () => h(JobProgress, { job: JOB, busy: busy.value })))
