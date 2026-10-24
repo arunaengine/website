@@ -18,6 +18,7 @@ const runBackendImport = vi.fn()
 const getLinkStatus = vi.fn()
 const listStorageBuckets = vi.fn()
 const writesDisabled = ref(false)
+const sessionEpoch = ref(0)
 
 const Empty = defineComponent(() => () => null)
 const Slot = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
@@ -78,7 +79,7 @@ const StorageSection = compileClientComponent(new URL('./StorageSection.vue', im
     useAruna: () => ({
       apiBaseUrl: ref('https://api.test'),
       authToken: ref('bearer'),
-      sessionEpoch: ref(0),
+      sessionEpoch,
       listGroupBackends,
       getGroupRouting,
       getBucketRouting,
@@ -635,6 +636,24 @@ describe('StorageSection', () => {
     expect(first().props['aria-busy']).toBe(false)
     expect(first().props.disabled).toBe(false)
     expect(content(root)).toContain('refused')
+  })
+
+  it('starts a new session without the wait or the error of a sync from the one before', async () => {
+    let refuse: (err: Error) => void = () => {}
+    runBackendImport.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+    const { root } = await mount()
+    const first = () => nodes(root).filter((node) => node.props['aria-label'] === 'Sync now')[0]
+    void (first().props.onClick as () => Promise<void>)()
+    await flush()
+    expect(first().props['aria-busy']).toBe(true)
+    sessionEpoch.value++
+    await flush()
+    await flush()
+    expect(first().props['aria-busy']).toBe(false)
+    expect(first().props.disabled).toBe(false)
+    refuse(new Error('the old session was refused'))
+    await flush()
+    expect(content(root)).not.toContain('the old session was refused')
   })
 
   it('opens the bucket edit from a row and from the address', async () => {

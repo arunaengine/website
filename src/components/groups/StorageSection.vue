@@ -186,6 +186,7 @@ watch(
     routing.value = null
     hidden.value = false
     actionError.value = null
+    syncing.value = null
     editDialog.value = false
     editing.value = null
     focused = null
@@ -324,16 +325,22 @@ function openEdit(link: BackendImport) {
 
 async function sync(link: BackendImport) {
   if (syncing.value) return
+  const id = link.import_id
+  const epoch = sessionEpoch.value
+  // A group or session left meanwhile gets neither the result nor the end of this wait.
+  const current = () => syncing.value === id && epoch === sessionEpoch.value
   actionError.value = null
-  syncing.value = link.import_id
+  syncing.value = id
   try {
-    await runBackendImport(props.groupId, link.import_id, client())
+    await runBackendImport(props.groupId, id, client())
   } catch (err) {
     // 409: a sync is already running, which is what was asked for.
-    if (!(err instanceof ApiError && err.status === 409)) actionError.value = errorMessage(err)
+    if (current() && !(err instanceof ApiError && err.status === 409)) actionError.value = errorMessage(err)
   } finally {
-    syncing.value = null
-    await load()
+    if (current()) {
+      syncing.value = null
+      await load()
+    }
   }
 }
 
