@@ -230,6 +230,15 @@ describe('object browser sync to this computer', () => {
     expect(onSyncToComputer).toHaveBeenCalledWith(source)
   })
 
+  it('keeps every toolbar label in the desktop and hides them below xl on the web', async () => {
+    desktopMode.on = true
+    const label = (root: HostNode) => element(action(root, 'Add data'), (node) => node.tag === 'span' && content(node) === 'Add data')
+    expect(label(await render()).props.class).toBeFalsy()
+
+    desktopMode.on = false
+    expect(label(await render()).props.class).toBe('hidden xl:inline')
+  })
+
   it('keeps the button out of the web portal', async () => {
     const root = await render({ showSyncButton: computed(() => true) })
 

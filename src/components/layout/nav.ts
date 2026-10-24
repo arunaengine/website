@@ -2,7 +2,6 @@
 // mobile bar all render this list, in this order.
 import {
   Activity,
-  ArrowLeftRight,
   BookOpen,
   Boxes,
   FileJson2,
@@ -11,11 +10,8 @@ import {
   ListChecks,
   MessageSquare,
   NotebookPen,
-  Play,
-  RefreshCw,
   Settings,
   ShieldCheck,
-  SquareTerminal,
   Users,
   Workflow,
 } from '@lucide/vue'
@@ -42,14 +38,12 @@ export type NavEntry = NavItem | NavSeparator
 export const navSeparator: NavSeparator = { separator: true }
 
 export interface NavOptions {
-  /** The desktop shell adds the chapter for the node it embeds. */
+  /** The desktop shell adds one entry for the node it embeds. */
   desktop: boolean
   isRealmAdmin: boolean
   canInspectUsers: boolean
   /** At least one AI provider is ready, the same gate as the top-bar launcher. */
   assistant?: boolean
-  /** This computer runs jobs itself; the desktop Runs entry needs it. */
-  localRuns?: boolean
   /** The user's feature switches; without it every feature is shown. */
   shown?: (feature: PortalFeature) => boolean
 }
@@ -86,20 +80,9 @@ export function navEntries(options: NavOptions): NavEntry[] {
     ...(featureEnabled('tes') && shown('notebooks') ? [{ to: '/app/notebooks', icon: NotebookPen, label: 'Notebooks' }] : []),
     ...(options.assistant ? [{ to: '/app/assistant', icon: MessageSquare, label: 'Assistant' }] : []),
     navSeparator,
+    // A folder page belongs to This computer, where its folder is listed.
     ...(options.desktop
-      ? [
-          {
-            to: '/app/sync',
-            icon: RefreshCw,
-            label: 'Sync',
-            match: ['/app/sync', '/app/folders'],
-          },
-          { to: '/app/activity', icon: ArrowLeftRight, label: 'Activity' },
-          { to: '/app/tools', icon: SquareTerminal, label: 'Tools' },
-          ...(shown('compute') && options.localRuns ? [{ to: '/app/runs', icon: Play, label: 'Runs' }] : []),
-          { to: '/app/device', icon: Laptop, label: 'This computer' },
-          navSeparator,
-        ]
+      ? [{ to: '/app/device', icon: Laptop, label: 'This computer', match: ['/app/device', '/app/folders'] }]
       : []),
     { to: '/app/groups', icon: Users, label: 'Groups', primary: true },
     { to: '/app/status', icon: Activity, label: 'Status' },

@@ -18,7 +18,7 @@ const sizeClass = computed(() => (props.size === 'sm' ? 'text-[11px]' : 'text-xs
 
 <template>
   <span v-if="nodeId" class="inline-flex min-w-0 items-center gap-1">
-    <span v-if="known" class="truncate" :class="sizeClass" :title="nodeId">
+    <span v-if="known" class="truncate" :class="sizeClass" :title="nodeById(nodeId)?.title ?? nodeId">
       {{ displayName(nodeId) }}
     </span>
     <span v-else class="hash truncate" :class="sizeClass" :title="nodeId">

@@ -14,7 +14,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import type { MetadataDoc } from '@/data/types'
 import { ArrowRight, BookOpen, Boxes, Database, FileJson2, Files, FolderOpen, Plus, Activity, Users } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useDashboardScope } from '@/composables/useDashboardScope'
@@ -24,10 +24,19 @@ import { useNotifications } from '@/composables/useNotifications'
 import { useRefresh } from '@/composables/useRefresh'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 import { docsTopicBySlug } from '@/docs/v1'
+import { asyncChunkError } from '@/lib/chunk-recovery'
 import { featureEnabled } from '@/lib/config'
+import { isDesktop } from '@/lib/desktop'
 import { POLL_SLOW_MS, follow, onWake } from '@/lib/poll'
 import { formatCount } from '@/lib/formatCount'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
+
+// The desktop adds its own cards; the web build never loads them.
+const HomeCards = defineAsyncComponent({
+  loader: () => import('@/components/desktop/HomeCards.vue'),
+  onError: asyncChunkError,
+})
+const desktop = isDesktop()
 
 const router = useRouter()
 const { currentUser, metadata, myGroups, realm, nodeInfo, realmInfo, usageInfo, loading, bootstrapped, sessionEpoch, refresh, loadInfo, listRecentMetadata } = useAruna()
@@ -203,7 +212,9 @@ const pageTitle = computed(() =>
 )
 const pageDescription = computed(() =>
   currentUser.value || authPending.value
-    ? 'Live data from the local Aruna API.'
+    ? desktop
+      ? 'Your realm and this computer at a glance.'
+      : 'Live data from the local Aruna API.'
     : 'You are browsing public data as a guest. Sign in to create datasets and manage your groups.',
 )
 </script>
@@ -253,6 +264,7 @@ const pageDescription = computed(() =>
 
       <template v-else>
       <SignInPanel v-if="!currentUser" />
+      <HomeCards v-if="desktop && currentUser" />
 
       <!-- First visit: the docs and the short tour first, tutorials behind them. -->
       <section

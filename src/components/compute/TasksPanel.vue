@@ -26,16 +26,18 @@ import { errorMessage, formatDuration, formatResourceGb, relativeTime, truncateM
 import { follow, onWake } from '@/lib/poll'
 import { deleteErrorMessage } from '@/lib/jobs'
 import { sessionRuntime } from '@/lib/notebook/submit'
+import { isDesktop } from '@/lib/desktop'
 import {
   TES_GROUP_TAG,
   isActiveTesState,
+  isLocalRun,
   isTerminalTesState,
   runListed,
   type TesServiceInfo,
   type TesState,
   type TesTask,
 } from '@/lib/tes'
-import { ChevronRight, Trash2 } from '@lucide/vue'
+import { ChevronRight, Laptop, Server, Trash2 } from '@lucide/vue'
 
 // Run list section of the unified Compute view. ComputeView gates the feature
 // flag and sign-in, but the panel tracks the session itself so a late or lost
@@ -112,13 +114,27 @@ const now = useNow(60_000)
 const shownTasks = computed(() => tasks.value.filter((task) => runListed(task, now.value)))
 const olderCount = computed(() => tasks.value.length - shownTasks.value.length)
 
+// The desktop lists the runs of this computer and of the realm in one table.
+const desktop = isDesktop()
+type Place = 'all' | 'local' | 'realm'
+const place = ref<Place>('all')
+const inPlace = (task: TesTask, where: Place) => where === 'all' || isLocalRun(task.tags) === (where === 'local')
+const placedTasks = computed(() => shownTasks.value.filter((task) => inPlace(task, place.value)))
+const placeOptions = computed(() =>
+  (['all', 'local', 'realm'] as const).map((where) => ({
+    value: where,
+    label: where === 'all' ? 'Everywhere' : where === 'local' ? 'This computer' : 'Realm',
+    count: shownTasks.value.filter((task) => inPlace(task, where)).length,
+  })),
+)
+
 function inGroup(task: TesTask, group: StateFilterGroup): boolean {
   return !!task.state && GROUP_STATES[group].includes(task.state)
 }
 const visibleTasks = computed(() => {
   const group = stateGroup.value
-  if (group === 'all') return shownTasks.value
-  return shownTasks.value.filter((task) => inGroup(task, group))
+  if (group === 'all') return placedTasks.value
+  return placedTasks.value.filter((task) => inGroup(task, group))
 })
 const emptyGroupLabel = computed(() => {
   const group = stateGroup.value
@@ -126,11 +142,11 @@ const emptyGroupLabel = computed(() => {
   return `${GROUP_LABELS[group].toLowerCase()} `
 })
 const chipOptions = computed(() => [
-  { value: 'all', label: 'All', count: shownTasks.value.length },
+  { value: 'all', label: 'All', count: placedTasks.value.length },
   ...(Object.keys(GROUP_LABELS) as StateFilterGroup[]).map((group) => ({
     value: group,
     label: GROUP_LABELS[group],
-    count: shownTasks.value.filter((task) => inGroup(task, group)).length,
+    count: placedTasks.value.filter((task) => inGroup(task, group)).length,
   })),
 ])
 
@@ -406,7 +422,13 @@ onUnmounted(() => {
       @retry="reload"
     >
       <template #filters>
-        <FilterChips v-model="stateGroup" :options="chipOptions" aria-label="Filter runs by state" />
+        <div class="flex flex-wrap items-center gap-3">
+          <template v-if="desktop">
+            <FilterChips v-model="place" :options="placeOptions" aria-label="Filter runs by place" />
+            <span class="h-4 w-px bg-border" aria-hidden="true" />
+          </template>
+          <FilterChips v-model="stateGroup" :options="chipOptions" aria-label="Filter runs by state" />
+        </div>
       </template>
       <template #tools>
         <span v-if="deleteError" class="text-[11px] text-destructive">{{ deleteError }}</span>
@@ -433,6 +455,7 @@ onUnmounted(() => {
           <tr>
             <th class="px-5 py-2 text-left font-semibold">Run</th>
             <th class="px-5 py-2 text-left font-semibold">State</th>
+            <th v-if="desktop" class="px-5 py-2 text-left font-semibold">Runs on</th>
             <th class="hidden px-5 py-2 text-left font-semibold md:table-cell">Group</th>
             <th class="hidden px-5 py-2 text-left font-semibold lg:table-cell">Resources</th>
             <th class="px-5 py-2 text-left font-semibold">Started</th>
@@ -463,6 +486,14 @@ onUnmounted(() => {
                 <Badge v-if="sessionRuntime(task.tags) !== null" variant="sky" size="sm" title="An interactive notebook kernel, not a batch run">Notebook</Badge>
               </div>
               <TesPlacementTags :tags="task.tags" compact class="mt-1" />
+            </td>
+            <td v-if="desktop" class="px-5 py-2.5 text-[13px]">
+              <span v-if="isLocalRun(task.tags)" class="inline-flex items-center gap-1.5 font-medium text-aruna-royal">
+                <Laptop class="h-3.5 w-3.5" /> This computer
+              </span>
+              <span v-else class="inline-flex items-center gap-1.5 text-muted-foreground">
+                <Server class="h-3.5 w-3.5" /> Realm
+              </span>
             </td>
             <td class="hidden px-5 py-2.5 text-[11px] text-muted-foreground md:table-cell">
               <span v-if="taskGroup(task)" :class="taskGroup(task)!.mono ? 'font-mono' : ''">{{ taskGroup(task)!.text }}</span>

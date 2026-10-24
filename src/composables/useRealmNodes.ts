@@ -3,8 +3,10 @@
 // loaded GET /info/realm (no extra requests).
 import { computed } from 'vue'
 import { useAruna } from './useAruna'
+import { useDeviceStatus } from './useDeviceStatus'
 import { nodeApiBase } from '@/components/nodes/node-probe'
 import { kindLabel } from '@/components/nodes/node-display'
+import { isDesktop } from '@/lib/desktop'
 import { truncateMiddle } from '@/lib/utils'
 import type { RealmNodeInfo } from '@/lib/api'
 
@@ -15,6 +17,8 @@ export interface RealmNodeDisplay {
   info: RealmNodeInfo['info']
   /** Human label: a published name label when set, else "<kind> <short-id>". */
   label: string
+  /** Hover text for the label: the node id, or kind and short id in the desktop. */
+  title?: string
   s3Url: string | null
   /** Published REST base including /api/v1, for cross-node API calls. */
   apiBase: string | null
@@ -31,19 +35,43 @@ function nodeLabel(node: RealmNodeInfo): string {
   return named || `${kindLabel[node.kind]} ${truncateMiddle(node.node_id, 8, 4)}`
 }
 
+function hostOf(url: string | null): string | null {
+  try {
+    return url ? new URL(url).host : null
+  } catch {
+    return null
+  }
+}
+
+// The desktop names places in words: this computer, a device by its enrolled
+// name, a node by its name or host with its location.
+function placeName(node: RealmNodeInfo, thisComputer: boolean): string {
+  if (thisComputer) return 'This computer'
+  const labels = node.info?.labels ?? {}
+  const named = labels['name'] || labels['display_name'] || labels['device']
+  const name = named || (node.kind === 'user' ? 'Device' : (hostOf(nodeApiBase(node)) ?? 'Node'))
+  // "default" is the backend's placeholder for a node without a location.
+  const location = node.placement?.location
+  return location && location !== 'default' ? `${name} · ${location}` : name
+}
+
 export function useRealmNodes() {
   const { nodeInfo, realmInfo } = useAruna()
+  const { identity } = useDeviceStatus()
+  const desktop = isDesktop()
 
   const localNodeId = computed(() => nodeInfo.value?.node.peer_id ?? null)
 
   const nodes = computed<RealmNodeDisplay[]>(() =>
     (realmInfo.value?.nodes ?? []).map((node) => {
       const isLocal = node.node_id === localNodeId.value
+      const thisComputer = node.node_id === identity.value?.nodeId
       return {
         nodeId: node.node_id,
         kind: node.kind,
         info: node.info,
-        label: nodeLabel(node),
+        label: desktop ? placeName(node, thisComputer) : nodeLabel(node),
+        title: desktop ? `${kindLabel[node.kind]} ${truncateMiddle(node.node_id, 8, 4)}` : node.node_id,
         // The connected node's own S3 endpoint comes from /info even when the
         // node has not published a realm record yet.
         s3Url:

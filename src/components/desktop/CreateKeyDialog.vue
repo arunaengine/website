@@ -16,21 +16,26 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceKeys } from '@/composables/useDeviceKeys'
+import type { CreateS3CredentialsResponse } from '@/lib/api'
 import { rememberKeyName } from '@/lib/keyNames'
 import { errorMessage } from '@/lib/utils'
 
 // A key lives a year; the list shows when, so nobody is surprised by it.
 const YEAR_SECONDS = 365 * 24 * 3600
 
-const props = defineProps<{ open: boolean }>()
+// `create` makes the key on another node; without it the key is this computer's.
+const props = defineProps<{
+  open: boolean
+  create?: (groupId: string, expiresInSeconds: number) => Promise<CreateS3CredentialsResponse>
+}>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
   (e: 'created', key: { accessKeyId: string; secret: string; name: string }): void
 }>()
 
 const { myGroups } = useAruna()
-// Keys belong to the node on this computer, never to the realm's node.
-const { available, create: createKey } = useDeviceKeys()
+const deviceKeys = useDeviceKeys()
+const available = computed(() => Boolean(props.create) || deviceKeys.available.value)
 
 const name = ref('')
 const groupId = ref('')
@@ -59,7 +64,7 @@ async function create(): Promise<void> {
   error.value = null
   const label = name.value.trim()
   try {
-    const made = await createKey(groupId.value, YEAR_SECONDS)
+    const made = await (props.create ?? deviceKeys.create)(groupId.value, YEAR_SECONDS)
     rememberKeyName(made.access_key_id, label)
     emit('created', { accessKeyId: made.access_key_id, secret: made.access_secret, name: label })
     emit('update:open', false)

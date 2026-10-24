@@ -187,16 +187,14 @@ async function mount() {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/app/sync', name: 'sync', component: Stub },
       { path: '/app/folders/:folderId', name: 'folder', component: Stub },
       { path: '/app/device', name: 'device', component: Stub },
-      { path: '/app/activity', name: 'activity', component: Stub },
       { path: '/app/buckets/:bucketId', name: 'bucket', component: Stub },
     ],
   })
   await router.push('/app/folders/f1')
   await router.isReady()
-  return mountApp(FolderDetailView, { router })
+  return { ...(await mountApp(FolderDetailView, { router })), router }
 }
 
 function row(root: HostNode, path: string): HostNode {
@@ -385,6 +383,7 @@ describe('the bucket and stopping', () => {
     stopDialog.confirm()
     await VueRuntime.nextTick()
     expect(unbind).toHaveBeenCalledWith('f1')
+    await vi.waitFor(() => expect(mounted.router.currentRoute.value.name).toBe('device'))
     mounted.app.unmount()
   })
 })
@@ -449,11 +448,9 @@ describe('answers for another filter or folder', () => {
       const made = createRouter({
         history: createMemoryHistory(),
         routes: [
-          { path: '/app/sync', name: 'sync', component: Stub },
-          { path: '/app/folders/:folderId', name: 'folder', component: Stub },
+              { path: '/app/folders/:folderId', name: 'folder', component: Stub },
           { path: '/app/device', name: 'device', component: Stub },
-          { path: '/app/activity', name: 'activity', component: Stub },
-          { path: '/app/buckets/:bucketId', name: 'bucket', component: Stub },
+              { path: '/app/buckets/:bucketId', name: 'bucket', component: Stub },
         ],
       })
       await made.push('/app/folders/f1')

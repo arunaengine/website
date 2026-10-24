@@ -210,6 +210,15 @@ export function tesPlacementTags(tags: Record<string, string> | undefined): TesP
   }
 }
 
+/**
+ * A run this computer holds for itself. Its node stamps the job id but no
+ * logical state, since a local run belongs to no realm family.
+ */
+export function isLocalRun(tags: Record<string, string> | undefined): boolean {
+  const placement = tesPlacementTags(tags)
+  return Boolean(placement.jobId) && !placement.logicalState
+}
+
 // The verdict needs both halves: an executor kind without an estimate cannot
 // say whether bytes moved, so it stays unplaced rather than guessing zero.
 export function tesPlacementLike(placement: TesPlacementTags): PlacementLike | null {

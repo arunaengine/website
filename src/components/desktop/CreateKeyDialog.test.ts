@@ -77,6 +77,21 @@ describe('creating a key', () => {
     mounted.app.unmount()
   })
 
+  it('makes the key on the node it is handed, even with this computer down', async () => {
+    available.value = false
+    const onNode = vi.fn().mockResolvedValue({ access_key_id: 'AKN1', access_secret: 'node-secret' })
+    const onCreated = vi.fn()
+    const mounted = await mountApp(CreateKeyDialog, { props: { open: true, create: onNode, onCreated } })
+
+    await typeValue(input(mounted.root, 'aria-label', 'Key name'), 'Lab server backup')
+    await click(button(mounted.root, 'Create key'))
+
+    expect(onNode).toHaveBeenCalledWith('g1', 365 * 24 * 3600)
+    expect(createKey).not.toHaveBeenCalled()
+    expect(onCreated).toHaveBeenCalledWith({ accessKeyId: 'AKN1', secret: 'node-secret', name: 'Lab server backup' })
+    mounted.app.unmount()
+  })
+
   it('shows the refusal and remembers no name when the node says no', async () => {
     createKey.mockRejectedValue(new Error('The group has no write access.'))
     const mounted = await mountApp(CreateKeyDialog, { props: { open: true } })

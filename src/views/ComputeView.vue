@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Tabs from '@/components/ui/Tabs.vue'
@@ -13,6 +13,15 @@ import JobsPanel from '@/components/jobs/JobsPanel.vue'
 import { useTes } from '@/composables/useTes'
 import { useJobs } from '@/composables/useJobs'
 import { useAruna } from '@/composables/useAruna'
+import { asyncChunkError } from '@/lib/chunk-recovery'
+import { isDesktop } from '@/lib/desktop'
+
+// The desktop shows whether this computer runs jobs; the web never loads it.
+const LocalCompute = defineAsyncComponent({
+  loader: () => import('@/components/desktop/LocalCompute.vue'),
+  onError: asyncChunkError,
+})
+const desktop = isDesktop()
 
 // One surface for both compute planes: the runs people start and the system
 // jobs the node produces. Each half degrades on its own feature flag.
@@ -43,7 +52,11 @@ function setTab(next: string) {
 
 <template>
   <div>
-    <PageHeader :title="pageTitle" description="The runs you start on this node, and the system jobs it produces." :docs="{ topic: 'compute-run', section: 'Follow the run' }">
+    <PageHeader
+      :title="pageTitle"
+      :description="desktop ? 'Your runs, on this computer or in the realm.' : 'The runs you start on this node, and the system jobs it produces.'"
+      :docs="{ topic: 'compute-run', section: 'Follow the run' }"
+    >
       <!-- One Run entry point; the menu explains the two ways to start one. -->
       <template v-if="tesEnabled && currentUser" #actions>
         <NewRunMenu size="sm" />
@@ -58,6 +71,7 @@ function setTab(next: string) {
       :redirect-to="route.fullPath"
     >
       <div class="container py-8">
+        <LocalCompute v-if="desktop" class="mb-5" />
         <Tabs v-if="bothEnabled" :model-value="tab" @update:model-value="setTab">
           <TabsList>
             <TabsTrigger value="tasks">Runs</TabsTrigger>

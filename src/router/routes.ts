@@ -27,35 +27,34 @@ function appLayout() {
   return isDesktop() ? import('@/views/DesktopLayout.vue') : import('@/views/AppLayout.vue')
 }
 
-// Home of the app shell: the machine in desktop mode, the realm dashboard on
-// the web. The route name stays 'dashboard' for every link that points at it.
+// Home of the app shell, on the web and in the desktop; the desktop adds its
+// own cards inside the view.
 function homeRoute(): RouteRecordRaw {
-  return {
-    path: '',
-    name: 'dashboard',
-    component: isDesktop()
-      ? () => import('@/views/desktop/DesktopHomeView.vue')
-      : () => import('@/views/DashboardView.vue'),
-  }
+  return { path: '', name: 'dashboard', component: () => import('@/views/DashboardView.vue') }
 }
 
 // Views that drive the node the shell embeds; a browser tab has no access to it.
 function desktopRoutes(): RouteRecordRaw[] {
   if (!isDesktop()) return []
   return [
-    { path: 'sync', name: 'sync', component: () => import('@/views/desktop/SyncView.vue') },
     {
       path: 'folders/:folderId',
       name: 'folder',
       component: () => import('@/views/desktop/FolderDetailView.vue'),
     },
-    // The old folder and transfer paths stay reachable.
-    { path: 'folders', redirect: { name: 'sync' } },
-    { path: 'transfers', redirect: { name: 'activity' } },
-    { path: 'activity', name: 'activity', component: () => import('@/views/desktop/ActivityView.vue') },
-    { path: 'tools', name: 'tools', component: () => import('@/views/desktop/ToolsView.vue') },
-    { path: 'runs', name: 'runs', component: () => import('@/views/desktop/RunsView.vue'), meta: { feature: 'compute' } },
-    { path: 'runs/:jobId', name: 'run', component: () => import('@/views/desktop/RunsView.vue'), meta: { feature: 'compute' } },
+    // The old Sync, Activity, Tools and Runs pages live in the plain sections now.
+    { path: 'sync', redirect: { name: 'device' } },
+    { path: 'folders', redirect: { name: 'device' } },
+    { path: 'activity', redirect: { name: 'device' } },
+    { path: 'transfers', redirect: { name: 'device' } },
+    { path: 'tools', redirect: { name: 'settings', query: { tab: 'access' } } },
+    { path: 'runs', redirect: { name: 'compute' } },
+    // A run's TES task id is its job id, so a local run opens in the Compute drawer.
+    {
+      path: 'runs/:jobId',
+      name: 'run',
+      redirect: (to) => ({ name: 'task', params: { taskId: to.params.jobId } }),
+    },
     { path: 'device', name: 'device', component: () => import('@/views/DeviceView.vue') },
   ]
 }

@@ -32,9 +32,8 @@ const ButtonStub = defineComponent({
   inheritAttrs: false,
   setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
 })
-const HeaderStub = defineComponent((_, { slots }) => () => h('div', [slots.actions?.()]))
 
-const ActivityView = compileClientComponent(new URL('./ActivityView.vue', import.meta.url), {
+const ActivityCard = compileClientComponent(new URL('./ActivityCard.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => Empty }),
   '@/components/ui/Badge.vue': moduleDefault(Passthrough),
@@ -43,7 +42,6 @@ const ActivityView = compileClientComponent(new URL('./ActivityView.vue', import
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
   '@/components/ui/Progress.vue': moduleDefault(Empty),
   '@/components/ui/Skeleton.vue': moduleDefault(Empty),
-  '@/components/dashboard/PageHeader.vue': moduleDefault(HeaderStub),
   '@/components/desktop/DeviceSurfaceState.vue': moduleDefault(Empty),
   '@/composables/useDeviceSync': {
     useDeviceSync: () => ({ status: ref({ realmReachable: true, lastSyncMs: null }), runSync: vi.fn(), load: vi.fn(async () => undefined) }),
@@ -82,13 +80,13 @@ beforeEach(() => {
   deviceClient.value = clientA
 })
 
-describe('the mounted Activity page when the device changes', () => {
+describe('the mounted Activity card when the device changes', () => {
   it('reads the decisions again for the new client instead of waiting for ever', async () => {
     const slow = deferred<DeviceApi.ActionRecord[]>()
     actionLog
       .mockReturnValueOnce(slow.promise)
       .mockResolvedValue([DeviceApi.readAction({ action: 'keep_local', path: 'new.csv', at_ms: 20 })])
-    const mounted = await mountApp(ActivityView)
+    const mounted = await mountApp(ActivityCard)
     await vi.waitFor(() => expect(content(mounted.root)).toContain('Reading your decisions…'))
 
     deviceClient.value = clientB
@@ -103,7 +101,7 @@ describe('the mounted Activity page when the device changes', () => {
 
   it('says unavailable while the device is gone and recovers when it returns', async () => {
     actionLog.mockResolvedValue([DeviceApi.readAction({ action: 'keep_local', path: 'a.csv', at_ms: 10 })])
-    const mounted = await mountApp(ActivityView)
+    const mounted = await mountApp(ActivityCard)
     await vi.waitFor(() => expect(content(mounted.root)).toContain('Kept your version of a.csv'))
 
     deviceClient.value = null

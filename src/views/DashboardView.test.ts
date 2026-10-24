@@ -28,6 +28,8 @@ const authStage = ref('idle')
 const authStageError = ref<string | null>(null)
 const dashboardRevision = ref(0)
 const scope = ref<'personal' | 'realm'>('personal')
+const desktopMode = ref(false)
+const HomeCardsStub = defineComponent(() => () => h('div', 'desktop-home-cards'))
 const setScope = vi.fn(async () => undefined)
 const refresh = vi.fn(async () => undefined)
 const loadInfo = vi.fn(async () => undefined)
@@ -203,6 +205,9 @@ beforeAll(async () => {
     '@/components/ui/StatCard.vue': moduleDefault(StatCardStub),
     '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
     '@/components/ui/EmptyState.vue': moduleDefault(EmptyStub),
+    '@/components/desktop/HomeCards.vue': moduleDefault(HomeCardsStub),
+    '@/lib/chunk-recovery': { asyncChunkError: vi.fn() },
+    '@/lib/desktop': { isDesktop: () => desktopMode.value },
   })
 })
 
@@ -224,6 +229,7 @@ beforeEach(() => {
   bootstrapped.value = true
   sessionEpoch.value = 0
   scope.value = 'personal'
+  desktopMode.value = false
   setScope.mockClear()
   authPending.value = false
   authStage.value = 'idle'
@@ -515,6 +521,29 @@ describe('welcome card', () => {
 
     expect(dismissOnboarding).toHaveBeenCalledTimes(1)
     expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+})
+
+describe('desktop home', () => {
+  it('adds the desktop cards and its own description in the desktop', async () => {
+    currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
+    desktopMode.value = true
+    const mounted = await mountApp(DashboardClient)
+    await flush()
+
+    expect(content(mounted.root)).toContain('desktop-home-cards')
+    expect(content(mounted.root)).toContain('Your realm and this computer at a glance.')
+    mounted.app.unmount()
+  })
+
+  it('keeps the web dashboard without them', async () => {
+    currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
+    const mounted = await mountApp(DashboardClient)
+    await flush()
+
+    expect(content(mounted.root)).not.toContain('desktop-home-cards')
+    expect(content(mounted.root)).toContain('Live data from the local Aruna API.')
     mounted.app.unmount()
   })
 })

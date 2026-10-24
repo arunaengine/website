@@ -64,7 +64,7 @@ async function wipe(): Promise<void> {
     <h2 class="font-display text-sm font-semibold text-destructive">Remove this computer</h2>
     <p class="text-xs leading-relaxed text-muted-foreground">
       Takes this computer out of {{ realmInfo.name }} and deletes the data Aruna keeps here. Data that exists only on
-      this computer is lost, and your folder links disappear. Files in your synced folders stay on disk.
+      this computer is lost, and your folder links disappear. Files in your linked folders stay on disk.
     </p>
     <Button v-if="!armed" variant="outline" size="sm" @click="armed = true">
       <Trash2 class="h-3.5 w-3.5" /> Remove this computer…

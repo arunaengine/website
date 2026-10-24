@@ -89,7 +89,7 @@ async function quit(): Promise<void> {
       <div>
         <h1 class="font-display text-lg font-semibold text-aruna-navy">Aruna Desktop needs an update</h1>
         <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
-          {{ lead }} They have to match to work together. Your files and your synced folders are safe.
+          {{ lead }} They have to match to work together. Your files and your linked folders are safe.
         </p>
       </div>
 
@@ -132,7 +132,7 @@ async function quit(): Promise<void> {
       <div class="space-y-2 border-t border-border pt-4">
         <p class="text-xs leading-relaxed text-muted-foreground">
           Update does not work? You can start from scratch. This deletes what Aruna keeps on this computer. Data that
-          exists only on this computer is lost, and your folder links disappear. The files in your synced folders stay
+          exists only on this computer is lost, and your folder links disappear. The files in your linked folders stay
           where they are.
         </p>
         <Button variant="outline" size="sm" @click="confirming = true">
@@ -153,7 +153,7 @@ async function quit(): Promise<void> {
           <DialogTitle>Remove local data and set up again?</DialogTitle>
           <DialogDescription>
             This deletes what Aruna keeps on this computer. Data that exists only on this computer is lost, and your
-            folder links disappear. The files in your synced folders stay where they are. You set up this computer
+            folder links disappear. The files in your linked folders stay where they are. You set up this computer
             again afterwards.
           </DialogDescription>
         </DialogHeader>

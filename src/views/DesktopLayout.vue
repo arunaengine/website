@@ -19,7 +19,6 @@ import { uploadQueueItems } from '@/composables/uploadQueueState'
 import { assistantAvailable, assistantOpen } from '@/composables/assistantState'
 import { bindTourRouter, tourActive } from '@/composables/useTour'
 import { bindTutorialRouter, tutorialActive } from '@/lib/tutorial/session'
-import { useDeviceCompute } from '@/composables/useDeviceCompute'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { appQuit } from '@/lib/desktopBridge'
 import { probeRealm, realmReach } from '@/lib/desktopBoot'
@@ -62,10 +61,7 @@ const quitError = ref<string | null>(null)
 const { bootstrapped, refresh, isRealmAdmin, canInspectUsers } = useAruna()
 const { shown } = usePortalFeatures()
 if (typeof window !== 'undefined' && !bootstrapped.value) void refresh()
-const { status, loaded, state, deviceClient, start: watchNode, stop: unwatchNode } = useDeviceStatus()
-const { compute, load: loadCompute } = useDeviceCompute()
-// Runs is on the sidebar only once the node itself says it runs jobs.
-watch(deviceClient, (client) => client && void loadCompute(), { immediate: true })
+const { status, loaded, state, start: watchNode, stop: unwatchNode } = useDeviceStatus()
 // The shell starts no node while the app and the realm differ; only this screen is left.
 const update = computed(() => status.value?.updateRequired ?? null)
 const nodeDown = computed(
@@ -93,7 +89,6 @@ const items = computed<NavEntry[]>(() =>
     isRealmAdmin: isRealmAdmin.value,
     canInspectUsers: canInspectUsers.value,
     assistant: assistantAvailable.value,
-    localRuns: compute.value?.enabled === true,
     shown,
   }),
 )
