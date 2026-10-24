@@ -9,6 +9,7 @@ import Button from '@/components/ui/Button.vue'
 import IconButton from '@/components/ui/IconButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { useCursorPage } from '@/composables/useCursorPage'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
@@ -42,6 +43,8 @@ const asking = ref<{ index: number; mapping: Mapping; count: number; complete: b
 let revision = 0
 const applied = ref<number | null>(null)
 const busy = ref(false)
+// The mapping whose Apply… is counting its files.
+const counting = ref<number | null>(null)
 const error = ref<string | null>(null)
 
 function client() {
@@ -120,6 +123,7 @@ async function askApply(index: number) {
   if (!current || !isSaved(current) || busy.value) return
   const mapping = { ...current }
   busy.value = true
+  counting.value = index
   error.value = null
   const link = props.link.import_id
   const asked = revision
@@ -132,6 +136,7 @@ async function askApply(index: number) {
     if (link === props.link.import_id) error.value = isUnsupportedEndpoint(err) ? 'This node cannot do this yet.' : organizeError(err)
   } finally {
     busy.value = false
+    counting.value = null
   }
 }
 
@@ -200,10 +205,11 @@ const COLUMNS = 'grid grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)_11rem] items
               size="sm"
               class="h-7 px-2 text-aruna-navy dark:text-foreground"
               :disabled="!isSaved(mapping) || busy || Boolean(job)"
+              :aria-busy="counting === index"
               :title="isSaved(mapping) ? undefined : 'Save first'"
               @click="askApply(index)"
             >
-              Apply…
+              <Spinner v-if="counting === index" label="Counting files" class="text-current" /> Apply…
             </Button>
             <IconButton label="Remove" @click="remove(index)"><X class="size-3.5" /></IconButton>
           </span>
@@ -256,9 +262,11 @@ const COLUMNS = 'grid grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)_11rem] items
             <Button
               size="sm"
               :disabled="busy || Boolean(job) || writesDisabled || (!asking.count && asking.complete)"
+              :aria-busy="busy && counting === null"
               :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
               @click="apply"
             >
+              <Spinner v-if="busy && counting === null" label="Starting the move" class="text-current" />
               Move {{ countWords(asking.count, asking.complete) }}
             </Button>
           </div>

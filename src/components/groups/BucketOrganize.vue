@@ -231,8 +231,8 @@ const blocked = computed(() => busy.value || Boolean(props.job) || writesDisable
         </PagedList>
         <div class="mt-2 flex justify-end gap-2">
           <Button variant="ghost" size="sm" @click="open = null">Cancel</Button>
-          <Button variant="destructive" size="sm" :disabled="blocked" :title="offline" @click="removeCopies">
-            {{ copyButton }}
+          <Button variant="destructive" size="sm" :disabled="blocked" :aria-busy="busy" :title="offline" @click="removeCopies">
+            <Spinner v-if="busy" label="Starting the removal" class="text-current" /> {{ copyButton }}
           </Button>
         </div>
       </div>
@@ -307,7 +307,9 @@ const blocked = computed(() => busy.value || Boolean(props.job) || writesDisable
         </PagedList>
         <div class="mt-2 flex justify-end gap-2">
           <Button variant="ghost" size="sm" @click="open = null">Cancel</Button>
-          <Button size="sm" :disabled="blocked" :title="offline" @click="rename">Rename {{ renameCount }}</Button>
+          <Button size="sm" :disabled="blocked" :aria-busy="busy" :title="offline" @click="rename">
+            <Spinner v-if="busy" label="Starting the rename" class="text-current" /> Rename {{ renameCount }}
+          </Button>
         </div>
       </div>
       <JobProgress v-if="job?.kind === 'rename'" class="mt-3" :job="job" :busy="controlling" @control="(action) => emit('control', action)" />

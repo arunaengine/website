@@ -262,6 +262,26 @@ describe('BucketOrganize rename start', () => {
     expect(buttonIn(root, 'Rename 3,877 files').props.disabled).toBeFalsy()
   })
 
+  it('shows the wait on Rename, starts it once and frees it when the start is refused', async () => {
+    let refuse: (err: Error) => void = () => {}
+    startImportRenames.mockReturnValue(new Promise((_, reject) => (refuse = reject)))
+    const { root } = await mount()
+    await click(buttonIn(stepOf(root), 'Review…'))
+    void (buttonIn(root, 'Rename 3,877 files').props.onClick as () => Promise<void>)()
+    await flush()
+    const waiting = buttonIn(root, 'Starting the rename Rename 3,877 files')
+    expect(waiting.props.disabled).toBe(true)
+    expect(waiting.props['aria-busy']).toBe(true)
+    await (waiting.props.onClick as () => Promise<void>)()
+    expect(startImportRenames).toHaveBeenCalledTimes(1)
+    refuse(new Error('refused'))
+    await flush()
+    const again = buttonIn(root, 'Rename 3,877 files')
+    expect(again.props.disabled).toBeFalsy()
+    expect(again.props['aria-busy']).toBe(false)
+    expect(content(root)).toContain('refused')
+  })
+
   it('locks the review and hides the list at once, before any read shows the step', async () => {
     const { useLinkState } = await import('@/composables/useLinkState')
     getOrganizeJob.mockReturnValue(new Promise(() => {}))

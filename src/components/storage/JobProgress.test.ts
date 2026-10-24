@@ -1,7 +1,7 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { button, click, compileClientComponent, content, element, mountApp, moduleDefault } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
 import * as Organize from '@/lib/organize'
 import type { ProgressJob } from '@/lib/organize'
 import * as Utils from '@/lib/utils'
@@ -37,6 +37,23 @@ describe('JobProgress', () => {
     expect(element(root, (node) => node.props.role === 'progressbar').props['aria-valuenow']).toBe(43)
     await click(button(root, 'Pause'))
     expect(actions).toEqual(['pause'])
+  })
+
+  it('shows the wait on the control that was sent until the node answers', async () => {
+    const busy = ref(false)
+    const mounted = await mountApp(
+      defineComponent(() => () => h(JobProgress, { job: JOB, busy: busy.value, onControl: () => (busy.value = true) })),
+    )
+    await click(button(mounted.root, 'Pause'))
+    const pause = button(mounted.root, 'Pausing')
+    expect(pause.props['aria-busy']).toBe(true)
+    expect(pause.props.disabled).toBe(true)
+    expect(button(mounted.root, 'Abort').props['aria-busy']).toBe(false)
+    expect(button(mounted.root, 'Abort').props.disabled).toBe(true)
+    busy.value = false
+    await flush()
+    expect(content(mounted.root)).not.toContain('Pausing')
+    expect(button(mounted.root, 'Pause').props.disabled).toBe(false)
   })
 
   it('offers Resume while paused', async () => {

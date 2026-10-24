@@ -34,6 +34,7 @@ const MappingList = compileClientComponent(new URL('./MappingList.vue', import.m
   '@/components/ui/IconButton.vue': moduleDefault(IconButtonStub),
   '@/components/ui/Input.vue': moduleDefault(defineComponent({ inheritAttrs: false, setup: (_, { attrs }) => () => h('input', attrs) })),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
+  '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('span', p.label) })),
   '@/composables/useAruna': {
     isUnsupportedEndpoint: () => false,
     useAruna: () => ({ apiBaseUrl: ref('https://api'), authToken: ref('t'), sessionEpoch: ref(0) }),
@@ -102,6 +103,36 @@ describe('MappingList', () => {
       expect.anything(),
     )
     expect(events).toEqual(['started'])
+  })
+
+  it('shows the wait on Apply… and Move, sends each once and frees Move when it is refused', async () => {
+    let count: (value: unknown) => void = () => {}
+    previewMove.mockReturnValueOnce(new Promise((resolve) => (count = resolve)))
+    let refuse: (err: Error) => void = () => {}
+    startMove.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+    const { root } = await mount()
+    const counted = (buttonIn(rows(root)[0], 'Apply…').props.onClick as () => Promise<void>)()
+    await flush()
+    const apply = buttonIn(rows(root)[0], 'Counting files Apply…')
+    expect(apply.props['aria-busy']).toBe(true)
+    expect(apply.props.disabled).toBe(true)
+    await (apply.props.onClick as () => Promise<void>)()
+    expect(previewMove).toHaveBeenCalledTimes(1)
+    count({ total: 9, complete: true, items: [] })
+    await counted
+    await flush()
+    expect(buttonIn(rows(root)[0], 'Apply…').props['aria-busy']).toBe(false)
+    const moved = (buttonIn(root, 'Move 9 files').props.onClick as () => Promise<void>)()
+    await flush()
+    const move = buttonIn(root, 'Starting the move Move 9 files')
+    expect(move.props['aria-busy']).toBe(true)
+    await (move.props.onClick as () => Promise<void>)()
+    expect(startMove).toHaveBeenCalledTimes(1)
+    refuse(new Error('refused'))
+    await moved
+    await flush()
+    expect(buttonIn(root, 'Move 9 files').props.disabled).toBe(false)
+    expect(content(root)).toContain('refused')
   })
 
   it('drops a pending confirm when the rule is edited before the count arrives', async () => {

@@ -110,6 +110,21 @@ describe('useLinkState', () => {
     scope.stop()
   })
 
+  it('sends one control at a time and frees the controls when it fails', async () => {
+    let refuse: (err: Error) => void = () => {}
+    controlJob.mockReturnValue(new Promise((_, reject) => (refuse = reject)))
+    const { scope, state } = setup()
+    const first = state.control('pause')
+    expect(state.controlling.value).toBe(true)
+    await state.control('pause')
+    expect(controlJob).toHaveBeenCalledTimes(1)
+    refuse(new Error('refused'))
+    await first
+    expect(state.controlling.value).toBe(false)
+    expect(state.error.value).toBe('refused')
+    scope.stop()
+  })
+
   it('keeps the running step when a poll fails and shows the error', async () => {
     getOrganizeJob.mockResolvedValue(RUNNING)
     const { scope, state } = setup()

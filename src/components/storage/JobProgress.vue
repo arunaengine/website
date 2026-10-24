@@ -10,10 +10,17 @@ defineProps<{ job: ProgressJob; busy?: boolean }>()
 const emit = defineEmits<{ (e: 'control', action: 'pause' | 'resume' | 'abort'): void }>()
 
 const asking = ref(false)
+// The control last sent; its button shows the wait while the node answers.
+const sent = ref<'pause' | 'resume' | 'abort' | null>(null)
+
+function send(action: 'pause' | 'resume' | 'abort') {
+  sent.value = action
+  emit('control', action)
+}
 
 function abort() {
   asking.value = false
-  emit('control', 'abort')
+  send('abort')
 }
 </script>
 
@@ -25,18 +32,28 @@ function abort() {
         {{ jobTitle(job) }}
       </span>
       <span v-if="job.controls" class="flex gap-2">
-        <Button v-if="job.state === 'paused'" variant="outline" size="sm" :disabled="busy" @click="emit('control', 'resume')">
-          Resume
+        <Button
+          v-if="job.state === 'paused'"
+          variant="outline"
+          size="sm"
+          :disabled="busy"
+          :aria-busy="busy && sent === 'resume'"
+          @click="send('resume')"
+        >
+          <Spinner v-if="busy && sent === 'resume'" label="Resuming" class="text-current" /> Resume
         </Button>
-        <Button v-else variant="outline" size="sm" :disabled="busy" @click="emit('control', 'pause')">Pause</Button>
+        <Button v-else variant="outline" size="sm" :disabled="busy" :aria-busy="busy && sent === 'pause'" @click="send('pause')">
+          <Spinner v-if="busy && sent === 'pause'" label="Pausing" class="text-current" /> Pause
+        </Button>
         <Button
           variant="outline"
           size="sm"
           class="border-destructive/30 text-destructive hover:text-destructive"
           :disabled="busy"
+          :aria-busy="busy && sent === 'abort'"
           @click="asking = true"
         >
-          Abort
+          <Spinner v-if="busy && sent === 'abort'" label="Aborting" class="text-current" /> Abort
         </Button>
       </span>
     </div>
