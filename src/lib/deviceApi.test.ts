@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from './api'
 import {
   bindFolder,
+  createRealmBucket,
   deviceSyncStatus,
   entryExpectation,
   isDeviceUnsupported,
@@ -289,6 +290,18 @@ describe('bind request wire shape', () => {
       mode: 'two_way',
       propagate_deletes: true,
     })
+    request.mockRestore()
+  })
+
+  it('asks for a realm bucket with only the three fields the node accepts', async () => {
+    const request = vi.spyOn(await import('./api'), 'apiRequest').mockResolvedValue({})
+    const client = { baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner-token' }
+    await createRealmBucket({ name: 'lab-data', group_id: 'g1', node_id: 'n1' }, client)
+
+    expect(request.mock.calls[0]?.[0]).toBe('/device/buckets')
+    expect(request.mock.calls[0]?.[1]?.method).toBe('POST')
+    expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).toEqual({ name: 'lab-data', group_id: 'g1', node_id: 'n1' })
+    expect(request.mock.calls[0]?.[2]).toEqual(client)
     request.mockRestore()
   })
 })

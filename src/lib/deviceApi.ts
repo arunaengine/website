@@ -375,6 +375,14 @@ export async function bindFolder(body: BindFolderRequest, client: DeviceClient):
   return readFolder(await post<unknown>('/device/folders', client, wire))
 }
 
+/** Asks this computer's node to create an empty bucket on a realm node, with no folder. */
+export function createRealmBucket(
+  body: { name: string; group_id: string; node_id: string },
+  client: DeviceClient,
+): Promise<{ name: string; node_id: string; group_id: string }> {
+  return post('/device/buckets', client, body)
+}
+
 /** Unbinds the folder. The files on disk are never touched. */
 export function unbindFolder(folderId: string, client: DeviceClient): Promise<void> {
   return request<void>(`/device/folders/${encodeURIComponent(folderId)}`, client, { method: 'DELETE' })

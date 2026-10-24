@@ -1,6 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/lib/api'
 import * as BucketName from '@/lib/bucketName'
 import * as BucketPlace from '@/lib/bucketPlace'
 import * as Utils from '@/lib/utils'
@@ -20,6 +21,8 @@ import {
 const activateContext = vi.fn()
 const createBucket = vi.fn()
 const apiRequest = vi.fn()
+const createRealmBucket = vi.fn()
+const device = { baseUrl: 'http://device/api/v1', token: 't' }
 const myGroups = ref([{ id: 'g1', name: 'Lab group' }])
 
 const Passthrough = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
@@ -73,6 +76,7 @@ const NewBucketDialog = compileClientComponent(new URL('./NewBucketDialog.vue', 
   '@/components/ui/Spinner.vue': moduleDefault(defineComponent(() => () => h('i'))),
   '@/components/groups/GroupSelect.vue': moduleDefault(InputStub),
   '@/composables/useAruna': { useAruna: () => ({ apiBaseUrl: ref('http://device/api/v1'), myGroups }) },
+  '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ deviceClient: ref(device) }) },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
       nodes: ref([
@@ -84,10 +88,10 @@ const NewBucketDialog = compileClientComponent(new URL('./NewBucketDialog.vue', 
   },
   '@/composables/useS3': {
     useS3: () => ({ activateContext, createBucket }),
-    isS3NetworkError: (err: unknown) => err instanceof TypeError,
     s3ErrorMessage: (err: Error) => err.message,
   },
-  '@/lib/api': { apiRequest },
+  '@/lib/api': { ApiError, apiRequest },
+  '@/lib/deviceApi': { createRealmBucket, requireDevice: (client: unknown) => client },
   '@/lib/bucketName': BucketName,
   '@/lib/bucketPlace': BucketPlace,
   '@/lib/desktop': { desktopContext: () => ({ realmUrl: 'https://aruna.example' }) },
@@ -113,6 +117,8 @@ beforeEach(() => {
   }))
   createBucket.mockReset()
   createBucket.mockResolvedValue(undefined)
+  createRealmBucket.mockReset()
+  createRealmBucket.mockResolvedValue({ name: 'lab-data', node_id: 'node-1', group_id: 'g1' })
   apiRequest.mockReset()
   apiRequest.mockResolvedValue({ services: { blob: { status: 'ok', backends: [{ quota_bytes: 2048, used_bytes: 1024 }] } } })
 })
@@ -144,7 +150,7 @@ describe('a new bucket in the desktop', () => {
     mounted.app.unmount()
   })
 
-  it('creates it on the chosen realm node when no folder is linked', async () => {
+  it('creates it on the chosen realm node through this computer when no folder is linked', async () => {
     const onCreated = vi.fn()
     const mounted = await mountNamed({ onCreated })
     const linkBox = input(mounted.root, 'aria-label', 'Then link a folder on this computer')
@@ -152,20 +158,34 @@ describe('a new bucket in the desktop', () => {
     await click(button(mounted.root, 'Create bucket'))
 
     expect(summary(mounted.root)).toBe('Creates lab-data on node-1 · Giessen for Lab group.')
-    expect(activateContext).toHaveBeenCalledWith('node-1', 'g1')
-    expect(createBucket).toHaveBeenCalledWith('lab-data', 'node-1', { nodeId: 'node-1', groupId: 'g1', accessKeyId: 'key-1' })
+    expect(createRealmBucket).toHaveBeenCalledWith({ name: 'lab-data', group_id: 'g1', node_id: 'node-1' }, device)
+    expect(activateContext).not.toHaveBeenCalled()
+    expect(createBucket).not.toHaveBeenCalled()
     expect(onCreated).toHaveBeenCalledWith({ bucket: 'lab-data', nodeId: 'node-1', groupId: 'g1' })
     mounted.app.unmount()
   })
 
-  it('says what to do when the node refuses the app', async () => {
-    createBucket.mockRejectedValue(new TypeError('Failed to fetch'))
+  it('names the place of a bucket that already exists there', async () => {
+    createRealmBucket.mockRejectedValue(new ApiError(409, 'bucket lab-data exists', 'bucket_exists'))
+    const onCreated = vi.fn()
+    const mounted = await mountNamed({ onCreated })
+    const linkBox = input(mounted.root, 'aria-label', 'Then link a folder on this computer')
+    await (linkBox.props.onChange as (event: unknown) => void)({ target: { checked: false } })
+    await click(button(mounted.root, 'Create bucket'))
+
+    expect(content(mounted.root)).toContain('A bucket named lab-data already exists on node-1 · Giessen.')
+    expect(onCreated).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('says when the realm node cannot be reached', async () => {
+    createRealmBucket.mockRejectedValue(new ApiError(502, 'remote node unreachable'))
     const mounted = await mountNamed()
     const linkBox = input(mounted.root, 'aria-label', 'Then link a folder on this computer')
     await (linkBox.props.onChange as (event: unknown) => void)({ target: { checked: false } })
     await click(button(mounted.root, 'Create bucket'))
 
-    expect(content(mounted.root)).toContain('Turn on "Then link a folder"')
+    expect(content(mounted.root)).toContain('node-1 · Giessen cannot be reached right now. Try again later.')
     mounted.app.unmount()
   })
 
@@ -180,6 +200,8 @@ describe('a new bucket in the desktop', () => {
 
     await click(button(mounted.root, 'Create bucket'))
     expect(activateContext).toHaveBeenCalledWith('device', 'g1')
+    expect(createBucket).toHaveBeenCalledWith('lab-data', 'device', { nodeId: 'device', groupId: 'g1', accessKeyId: 'key-1' })
+    expect(createRealmBucket).not.toHaveBeenCalled()
     mounted.app.unmount()
   })
 
