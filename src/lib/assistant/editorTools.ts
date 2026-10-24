@@ -24,7 +24,7 @@ import type { ProfileObligation, ProfilePropertyRule, ProfileValueKind } from '@
 import type { DraftContext } from './prompt'
 import { fetchOrcidRecord } from '@/lib/lookup/orcid'
 import { fetchRorRecord } from '@/lib/lookup/ror'
-import { errorMessage } from '@/lib/utils'
+import { errorMessage, stableJson } from '@/lib/utils'
 import { denied, type ApprovalGate } from './types'
 
 /** What the editor view lends the assistant; nothing reaches into the view. */
@@ -55,16 +55,6 @@ function schema<INPUT>(properties: Record<string, unknown>, required: string[] =
 
 const STRING = { type: 'string' } as const
 const ANY_MAP = { type: 'object', additionalProperties: true } as const
-
-/** Key-order independent, so a rewrite that reorders rows is not a change. */
-function stableJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`
-  if (value && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b))
-    return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${stableJson(entry)}`).join(',')}}`
-  }
-  return JSON.stringify(value) ?? 'null'
-}
 
 function jsonValue(value: DraftValue): unknown {
   if (value.kind === 'reference') return { '@id': value.value }

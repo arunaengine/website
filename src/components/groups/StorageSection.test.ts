@@ -356,6 +356,25 @@ describe('StorageSection', () => {
     }
   })
 
+  it('reports no change when the node sends the connection settings in another order', async () => {
+    vi.useFakeTimers()
+    try {
+      listBackendImports.mockResolvedValue([LINKS[0]])
+      const job = { kind: 'rename', state: 'running', done: 4, failed: 0 }
+      listStorageBuckets.mockResolvedValue({ buckets: [listed('genes', { import_id: 'i1', job })], next: null })
+      const onBackends = vi.fn()
+      await mount(null, onBackends)
+      const { endpoint, default_bucket } = STORAGE.public_config
+      listGroupBackends.mockResolvedValue({ backends: [{ ...STORAGE, public_config: { default_bucket, endpoint } }] })
+      await vi.advanceTimersByTimeAsync(3000)
+      await flush()
+      expect(listGroupBackends).toHaveBeenCalledTimes(2)
+      expect(onBackends).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('follows a step on a later page without dropping the pages shown', async () => {
     vi.useFakeTimers()
     try {

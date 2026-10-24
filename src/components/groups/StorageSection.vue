@@ -31,7 +31,7 @@ import { failedFiles, shownPattern, syncStatus } from '@/lib/bucketNaming'
 import { storeName } from '@/lib/linkedFolders'
 import { backendSchema } from '@/lib/storage'
 import { defaultBucket, runActive, splitPath, splitsBuckets } from '@/lib/storageRules'
-import { errorMessage } from '@/lib/utils'
+import { errorMessage, stableJson } from '@/lib/utils'
 
 const props = defineProps<{
   groupId: string
@@ -147,7 +147,8 @@ async function readAll(poll: boolean) {
     }
     // A poll that only moves a step leaves the storages and rules as they were.
     const seen = [list.backends, rules, bucketRouting?.rules ?? null]
-    const changed = JSON.stringify(seen) !== JSON.stringify([backends.value, routing.value, bucketRules])
+    // Key order is no change: the node sends connection settings as an unordered map.
+    const changed = stableJson(seen) !== stableJson([backends.value, routing.value, bucketRules])
     bucketRules = seen[2]
     backends.value = list.backends
     routing.value = rules
