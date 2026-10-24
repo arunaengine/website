@@ -135,6 +135,8 @@ async function readAll(poll: boolean) {
       next = more.next ?? null
       read++
     }
+    // A poll that only moves a step leaves the storages and rules as they were.
+    const changed = JSON.stringify([list.backends, rules]) !== JSON.stringify([backends.value, routing.value])
     backends.value = list.backends
     routing.value = rules
     links.value = imports
@@ -151,8 +153,8 @@ async function readAll(poll: boolean) {
     }
     if (editing.value) editing.value = imports.find((link) => link.import_id === editing.value?.import_id) ?? editing.value
     emit('count', list.backends.length)
-    // A poll changes no storage, so the dataset location below is not read again.
-    if (!poll) emit('backends', list.backends)
+    // The dataset location below reads again only after a load or a storage change.
+    if (!poll || changed) emit('backends', list.backends)
     follow(imports)
   } catch (err) {
     if (!current()) return

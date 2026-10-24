@@ -321,6 +321,31 @@ describe('StorageSection', () => {
     }
   })
 
+  it('reports a storage or rule changed elsewhere while it follows a step', async () => {
+    vi.useFakeTimers()
+    try {
+      listBackendImports.mockResolvedValue([LINKS[0]])
+      const job = { kind: 'rename', state: 'running', done: 4, failed: 0 }
+      listStorageBuckets.mockResolvedValue({ buckets: [listed('genes', { import_id: 'i1', job })], next: null })
+      const onBackends = vi.fn()
+      await mount(null, onBackends)
+      listGroupBackends.mockResolvedValue({ backends: [{ ...STORAGE, name: 'spire-old', disabled: true }] })
+      await vi.advanceTimersByTimeAsync(3000)
+      await flush()
+      expect(onBackends).toHaveBeenCalledTimes(2)
+      expect(onBackends).toHaveBeenLastCalledWith([{ ...STORAGE, name: 'spire-old', disabled: true }])
+      getGroupRouting.mockResolvedValue({ group_id: 'g1', default_target: null, warnings: [] })
+      await vi.advanceTimersByTimeAsync(3000)
+      await flush()
+      expect(onBackends).toHaveBeenCalledTimes(3)
+      await vi.advanceTimersByTimeAsync(3000)
+      await flush()
+      expect(onBackends).toHaveBeenCalledTimes(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('follows a step on a later page without dropping the pages shown', async () => {
     vi.useFakeTimers()
     try {
