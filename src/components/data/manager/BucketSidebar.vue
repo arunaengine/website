@@ -10,6 +10,7 @@ import BucketRow from '@/components/data/BucketRow.vue'
 import { useBucketJobs } from '@/composables/useBucketJobs'
 import BucketCreateResults from '@/components/data/BucketCreateResults.vue'
 import BucketStorageDialog from '@/components/data/BucketStorageDialog.vue'
+import DatabaseRows from '@/components/data/manager/DatabaseRows.vue'
 import MockBucketRows from '@/components/data/manager/MockBucketRows.vue'
 import { useBucketSearch } from '@/composables/useBucketSearch'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -88,7 +89,7 @@ const KINDS = [
   { value: 'buckets', label: 'Buckets' },
   { value: 'database', label: 'Databases' },
 ]
-const databaseMode = computed(() => mockEnabled() && bucketKind.value === 'database')
+const databaseMode = computed(() => bucketKind.value === 'database')
 // The example rows show even when the group has no bucket of its own.
 const examples = computed(() => (mockEnabled() ? exampleBuckets(bucketNameFilter.value) : []))
 const placement = ref(defaultPlacement())
@@ -208,7 +209,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           <Badge variant="outline" size="count">{{ searchList ? all.hits.value.length : nodeBuckets.length }}</Badge>
         </div>
       </header>
-      <div v-if="mockEnabled()" class="border-b border-border px-3 py-2">
+      <div class="border-b border-border px-3 py-2">
         <OptionToggle v-model="bucketKind" :options="KINDS" aria-label="Kind of bucket" />
       </div>
       <div class="border-b border-border px-3 py-2">
@@ -225,6 +226,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         />
       </div>
       <ul v-if="databaseMode" class="max-h-[420px] overflow-y-auto py-1">
+        <DatabaseRows :filter="bucketNameFilter" :active="bucket" @open="openBucketOn" />
         <MockBucketRows database-only :filter="bucketNameFilter" :active="bucket" @open="openBucket" />
       </ul>
       <template v-else-if="searchList">

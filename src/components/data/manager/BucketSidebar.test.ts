@@ -139,6 +139,7 @@ const sidebarModules = {
   '@/components/data/BucketRow.vue': moduleDefault(RowStub),
   '@/composables/useBucketJobs': { useBucketJobs: () => stepJobs },
   '@/components/data/manager/MockBucketRows.vue': moduleDefault(Empty),
+  '@/components/data/manager/DatabaseRows.vue': moduleDefault(Empty),
   '@/components/data/BucketStorageDialog.vue': moduleDefault(Empty),
   '@/components/data/BucketCreateResults.vue': moduleDefault(Empty),
   '@/components/ui/OptionToggle.vue': moduleDefault(Empty),
