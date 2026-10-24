@@ -87,6 +87,15 @@ describe('activity', () => {
     expect(html).toContain('In progress 2')
   })
 
+  it('draws an almost finished transfer as progress, not as a warning', async () => {
+    transfers.value = [transfer('a', 'transferring', { bytes_done: 95 })]
+    const html = await render()
+
+    expect(html).toContain('bg-aruna-gradient')
+    expect(html).not.toContain('bg-rose-500')
+    expect(html).not.toContain('bg-amber-500')
+  })
+
   it('shows total progress only from counted bytes', async () => {
     transfers.value = [transfer('a', 'transferring'), transfer('b', 'transferring')]
     expect(await render()).toContain('Total progress')

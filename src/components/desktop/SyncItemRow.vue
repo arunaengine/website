@@ -124,6 +124,8 @@ function moved(transfer: DeviceTransfer): string {
           :value="transferPercent(transfer) ?? 0"
           :indeterminate="transferPercent(transfer) === null && isMoving(transfer)"
           :label="transfer.path"
+          :warn="101"
+          :critical="101"
           class="h-1.5 w-28 shrink-0"
         />
       </div>

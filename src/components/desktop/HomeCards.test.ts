@@ -206,6 +206,10 @@ describe('desktop home cards', () => {
     expect(text).toContain('2 files need you')
     expect(text).toContain('1 file')
     expect(text).toContain('40 B of 100 B')
+    expect(element(mounted.root, (node) => node.props.label === 'Total progress').props).toMatchObject({
+      warn: 101,
+      critical: 101,
+    })
     expect(text).toContain('1 running')
     expect(text).toContain('docker, 1 job at a time')
     await click(button(mounted.root, 'Link a local folder'))

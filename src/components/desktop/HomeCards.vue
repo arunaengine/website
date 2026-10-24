@@ -207,6 +207,8 @@ onMounted(async () => {
               <Progress
                 :value="progress.total ? (progress.done / progress.total) * 100 : 0"
                 label="Total progress"
+                :warn="101"
+                :critical="101"
                 class="mt-1.5 h-1.5"
               />
               <div class="mt-1 text-xs text-muted-foreground">

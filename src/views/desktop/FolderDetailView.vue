@@ -427,6 +427,8 @@ const filesText = computed(() => {
                     :value="transferPercent(movingByPath.get(entry.path)!) ?? 0"
                     :indeterminate="transferPercent(movingByPath.get(entry.path)!) === null"
                     :label="entry.path"
+                    :warn="101"
+                    :critical="101"
                     class="mt-1.5 h-1.5 w-56"
                   />
                   <div class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[10px] text-muted-foreground">

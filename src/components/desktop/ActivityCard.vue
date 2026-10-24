@@ -195,6 +195,8 @@ const when = (ms: number | null): string => (ms ? relativeTime(new Date(ms).toIS
           <Progress
             :value="progress.total ? (progress.done / progress.total) * 100 : 0"
             label="Total progress"
+            :warn="101"
+            :critical="101"
             class="mt-1 h-1.5"
           />
         </div>
@@ -247,6 +249,8 @@ const when = (ms: number | null): string => (ms ? relativeTime(new Date(ms).toIS
             :value="transferPercent(row) ?? 0"
             :indeterminate="transferPercent(row) === null"
             :label="row.path"
+            :warn="101"
+            :critical="101"
             class="h-1.5 w-28 shrink-0"
           />
           <Button v-if="row.state === 'failed' && row.folder_id" variant="ghost" size="sm" :disabled="acting" @click="retry(row)">

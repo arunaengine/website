@@ -319,7 +319,8 @@ describe('the linked folders card', () => {
 
     expect(content(row(mounted.root, 'data'))).toContain('raw/scan.tiff')
     expect(content(row(mounted.root, 'other'))).not.toContain('raw/scan.tiff')
-    expect(nodes(row(mounted.root, 'data')).some((node) => node.props.role === 'progressbar')).toBe(true)
+    const bar = nodes(row(mounted.root, 'data')).find((node) => node.props.role === 'progressbar')
+    expect(bar?.props).toMatchObject({ warn: 101, critical: 101 })
     mounted.app.unmount()
   })
 
