@@ -5,6 +5,8 @@ import { NO_MANAGEMENT_NODE_MESSAGE, type CreateOnboardingSecretResponse } from 
 import type { DeviceWatch } from '@/composables/useDeviceEnrollment'
 
 const ENROLL_URL = 'aruna://enroll?secret=ab%2Bcd%2Fef%3D&seed=https%3A%2F%2Fnode.test&realm=R1'
+// The hosted website adds itself, so the device signs in through it.
+const SITE_URL = `${ENROLL_URL}&site=https%3A%2F%2Fportal.test`
 
 const PassThrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const InputStub = defineComponent((_, { attrs }) => () => h('input', attrs))
@@ -55,6 +57,7 @@ beforeAll(async () => {
   // SecretPanel arms its countdown through window timers, which the node test
   // environment has only under globalThis.
   vi.stubGlobal('window', globalThis)
+  vi.stubGlobal('location', { origin: 'https://portal.test' })
   for (const path of ['Tabs', 'TabsList', 'TabsTrigger', 'TabsContent', 'Button']) {
     vi.doMock(`@/components/ui/${path}.vue`, () => ({ default: PassThrough }))
   }
@@ -144,15 +147,15 @@ describe('device details step', () => {
 })
 
 describe('device hand-off step', () => {
-  it('hands the deep link to the anchor unchanged', async () => {
+  it('hands the deep link to the anchor with only the site added', async () => {
     // enroll_url is opaque: re-encoding its query would break the claim.
     minted.value = enrollment()
-    expect(await html(2)).toContain(`href="${ENROLL_URL}"`)
+    expect(await html(2)).toContain(`href="${SITE_URL}"`)
   })
 
   it('encodes the same deep link in the qr code', async () => {
     minted.value = enrollment()
-    expect(await text(2)).toContain(ENROLL_URL)
+    expect(await text(2)).toContain(SITE_URL)
   })
 
   it('says so when the node returned no deep link', async () => {
@@ -188,6 +191,8 @@ describe('hand-off inside the desktop app', () => {
     const markup = decode(await renderToString(createSSRApp({ render: () => h(inShell, { step: 2 }) })))
 
     expect(markup).not.toContain(`href="${ENROLL_URL}"`)
+    expect(markup).toContain(ENROLL_URL)
+    expect(markup).not.toContain('site=')
     expect(markup).toContain('Enroll this device now')
     expect(markup).toContain('already runs in Aruna Desktop')
   })

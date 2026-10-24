@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseEnrollInput } from './enrollLink'
+import { parseEnrollInput, withSite } from './enrollLink'
 
 const LINK = 'aruna://enroll?secret=ab%2Bcd%2Fef%3D&seed=https%3A%2F%2Fnode.test&realm=R1'
 
@@ -34,5 +34,19 @@ describe('parseEnrollInput', () => {
     expect(parseEnrollInput('   ')).toBeNull()
     expect(parseEnrollInput('short')).toBeNull()
     expect(parseEnrollInput('two words here')).toBeNull()
+  })
+})
+
+describe('withSite', () => {
+  const SITE = 'https://v3.aruna-engine.org'
+
+  it('adds the website after the node fields, which stay as minted', () => {
+    expect(withSite(LINK, SITE)).toBe(`${LINK}&site=https%3A%2F%2Fv3.aruna-engine.org`)
+    expect(parseEnrollInput(withSite(LINK, SITE))).toEqual(parseEnrollInput(LINK))
+  })
+
+  it('leaves a link that already names its site', () => {
+    const named = `${LINK}&site=https%3A%2F%2Fother.test`
+    expect(withSite(named, SITE)).toBe(named)
   })
 })

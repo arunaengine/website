@@ -22,6 +22,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useDeviceEnrollment } from '@/composables/useDeviceEnrollment'
 import { applyEnrollment, ENROLLMENT_TTL_SECS, watchStages } from '@/composables/useDeviceSetup'
 import { isDesktop } from '@/lib/desktop'
+import { withSite } from '@/lib/enrollLink'
 import { buildDeviceEnv, managementPortals } from '@/lib/onboarding-config'
 import { errorMessage } from '@/lib/utils'
 import {
@@ -99,9 +100,12 @@ const platformLabel = computed(
   () => PLATFORM_OPTIONS.find((option) => option.value === platform.value)?.label ?? '',
 )
 
-// Opaque: the backend already form-urlencoded secret/seed/realm into it, so it
-// goes into the anchor and the QR exactly as received.
-const enrollUrl = computed(() => minted.value?.enroll_url ?? null)
+// Opaque: the backend already form-urlencoded secret/seed/realm into it, so those
+// stay as received; the website only adds itself as `site`, the sign-in callback.
+const enrollUrl = computed(() => {
+  const link = minted.value?.enroll_url ?? null
+  return link && !inDesktop ? withSite(link, window.location.origin) : link
+})
 
 const capLabel = computed(() =>
   deviceLimit.value == null

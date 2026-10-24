@@ -40,3 +40,18 @@ export function parseEnrollInput(raw: string): EnrollInput | null {
   if (value.includes('://') || /\s/.test(value)) return null
   return value.length >= MIN_SECRET_LENGTH ? { secret: value } : null
 }
+
+/**
+ * Names the website that shows a minted link as `site`: the seed node serves no
+ * sign-in callback, the website does. The node's own fields stay as minted.
+ */
+export function withSite(link: string, site: string): string {
+  let url: URL
+  try {
+    url = new URL(link)
+  } catch {
+    return link
+  }
+  if (url.searchParams.has('site')) return link
+  return `${link}${url.search ? '&' : '?'}site=${encodeURIComponent(site)}`
+}
