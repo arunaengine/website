@@ -2,7 +2,7 @@
 // the local, unenrolled node, which has nothing to serve. The welcome routes
 // own the window until `validate_realm` gives the shell a realm to switch to,
 // the owner signed in, and the device prompt was answered.
-import { watch, type Ref } from 'vue'
+import { watch, type Ref, type WatchStopHandle } from 'vue'
 import { START_LOCATION, type RouteLocationNormalized, type RouteRecordName, type Router } from 'vue-router'
 import { desktopContext, isDesktop, refreshShellContext, shellContext } from './desktop'
 import { realmUnreachable } from './desktopBoot'
@@ -147,10 +147,12 @@ function settled(flag: Ref<boolean>, ms: number): Promise<void> {
   })
 }
 
+let lateCheck: WatchStopHandle | null = null
+
 // Signed out means no token, or a realm that refused the one held. A bootstrap
 // that failed on transport proves nothing, so the window stays where it is and
 // the realm probe surfaces a base that is not answering.
-async function signedOut(): Promise<boolean> {
+async function signedOut(rerun: () => void): Promise<boolean> {
   const [{ useAruna }, { restoring }] = await Promise.all([
     import('@/composables/useAruna'),
     import('@/composables/aruna/state'),
@@ -161,9 +163,18 @@ async function signedOut(): Promise<boolean> {
   if (!authToken.value && !restoring.value) return true
   if (!bootstrapped.value) await settled(bootstrapped, BOOTSTRAP_TIMEOUT_MS)
   // A finished bootstrap without a token is signed out; only a restore still running proves nothing.
-  if (!authToken.value) return bootstrapped.value || !restoring.value
-  if (!bootstrapped.value || currentUser.value) return false
-  return authRejected.value
+  if (!authToken.value && (bootstrapped.value || !restoring.value)) return true
+  if (currentUser.value) return false
+  if (bootstrapped.value) return authRejected.value
+  // A bootstrap that outlasted the wait is judged again once it settles; a refused one signs out.
+  lateCheck?.()
+  lateCheck = watch(bootstrapped, (done) => {
+    if (!done) return
+    lateCheck?.()
+    lateCheck = null
+    if (!authToken.value) rerun()
+  })
+  return false
 }
 
 let knownOnce: boolean | null = null
@@ -187,14 +198,17 @@ export function installDesktopGuard(router: Router): void {
   router.afterEach(() => {
     pending = null
   })
-  watch(shellContext, () => {
-    knownOnce = null
-    clearEnrolled()
+  const rerun = () => {
     // Nothing has landed and nothing is on its way: the next navigation reads
     // the new context by itself.
     const target = pending ?? router.currentRoute.value
     if (!pending && target === START_LOCATION) return
     void router.replace({ path: target.path, query: target.query, hash: target.hash, force: true })
+  }
+  watch(shellContext, () => {
+    knownOnce = null
+    clearEnrolled()
+    rerun()
   })
   // A deep link the shell followed is a route change, never a reload; a
   // sign-in window closed early puts the sign-in button back.
@@ -210,7 +224,7 @@ export function installDesktopGuard(router: Router): void {
     if (knownOnce === null) knownOnce = await realmKnown()
     // The device page enrolls from a code alone, so it stays reachable.
     if (!knownOnce) return to.name === 'welcome' || to.name === 'device' ? true : { name: 'welcome' }
-    if (await signedOut()) {
+    if (await signedOut(rerun)) {
       // The realm step is done; only an explicit change reopens the form.
       const changing = to.name === 'welcome' && to.query.change !== undefined
       return changing || to.name === 'welcome-sign-in' ? true : { name: 'welcome-sign-in' }
