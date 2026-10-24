@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fetchWithRetry, retryAfterMs } from './fetch'
+import { fetchWithRetry, fetchWithTimeout, retryAfterMs } from './fetch'
 
 function rateLimited(retryAfter?: string): Response {
   const headers = new Headers()
@@ -17,8 +17,34 @@ function stubFetch(responses: Response[]) {
   return { calls, spy }
 }
 
+// Like WebKit: an aborted fetch rejects with the engine's own error, not the signal reason.
+function webkitFetch() {
+  vi.stubGlobal('fetch', vi.fn((_input: unknown, init: RequestInit = {}) => new Promise<Response>((_, reject) => {
+    init.signal?.addEventListener('abort', () => reject(new DOMException('Fetch is aborted', 'AbortError')))
+  })))
+}
+
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
+})
+
+describe('fetchWithTimeout', () => {
+  it('reports its own timeout when the engine drops the reason', async () => {
+    vi.useFakeTimers()
+    webkitFetch()
+    const failure = fetchWithTimeout('https://example.test/x', {}, 1000).catch((err: unknown) => err)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(await failure).toMatchObject({ name: 'TimeoutError', message: 'Request timed out.' })
+  })
+
+  it('leaves a caller cancel as the engine reports it', async () => {
+    webkitFetch()
+    const caller = new AbortController()
+    const failure = fetchWithTimeout('https://example.test/x', { signal: caller.signal }, 1000).catch((err: unknown) => err)
+    caller.abort()
+    expect(await failure).toMatchObject({ name: 'AbortError', message: 'Fetch is aborted' })
+  })
 })
 
 describe('retryAfterMs', () => {
