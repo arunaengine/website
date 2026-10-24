@@ -37,10 +37,18 @@ import { RouterLink, useRouter } from 'vue-router'
 import { apiOrigin } from '@/lib/api'
 import { isDesktop } from '@/lib/desktop'
 import { errorMessage, relativeTime } from '@/lib/utils'
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { ChevronRight, ExternalLink, Eye, KeyRound, Palette, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, Plus, Save } from '@lucide/vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { SETTINGS_TAB_ANCHORS } from '@/components/layout/nav'
+import { asyncChunkError } from '@/lib/chunk-recovery'
+
+// The desktop's tools, keys and program setup; the web never loads them.
+const ConnectTools = defineAsyncComponent({
+  loader: () => import('@/components/settings/ConnectTools.vue'),
+  onError: asyncChunkError,
+})
+const desktop = isDesktop()
 
 const {
   apiBaseUrl,
@@ -295,6 +303,7 @@ async function revoke(accessKeyId: string) {
 
       <template v-else>
       <TabsContent value="access" class="container mt-0 min-w-0 space-y-5 py-6">
+        <ConnectTools v-if="desktop" />
         <section class="surface">
           <header class="border-b border-border px-5 py-4">
             <h3 class="font-display text-sm font-semibold text-aruna-navy">Session &amp; API connection</h3>
@@ -374,7 +383,8 @@ async function revoke(accessKeyId: string) {
 
         <SessionsPanel />
 
-        <section v-if="shown('s3-keys')" class="surface overflow-hidden">
+        <!-- The desktop lists every key above, with the place it works. -->
+        <section v-if="shown('s3-keys') && !desktop" class="surface overflow-hidden">
           <header class="flex items-center justify-between border-b border-border px-5 py-4">
             <div class="flex items-center gap-2">
               <KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">S3 access keys</h3><Badge size="sm" variant="secondary" class="uppercase">Advanced</Badge><Badge variant="outline" size="count">{{ visibleCredentials.length }}</Badge>

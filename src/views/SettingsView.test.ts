@@ -284,6 +284,8 @@ const SettingsView = compileClientComponent(new URL('./SettingsView.vue', import
   '@/components/settings/McpConnect.vue': moduleDefault(Empty),
   '@/components/federation/LinkAccount.vue': moduleDefault(Empty),
   '@/components/federation/LinkedLogins.vue': moduleDefault(Empty),
+  '@/components/settings/ConnectTools.vue': moduleDefault(labelled('Connect tools section')),
+  '@/lib/chunk-recovery': { asyncChunkError: vi.fn() },
 })
 
 async function mount(query: string) {
@@ -368,6 +370,27 @@ describe('SettingsView access tab', () => {
     expect(text).not.toContain('Signed in as')
     expect(text).not.toContain('Sign out')
     expect(text).toContain('Identity details')
+  })
+
+  it('puts the tools and the one key list first in the desktop', async () => {
+    desktop.value = true
+    const { root } = await mount('?tab=access')
+    await flush()
+    const text = panelText(root, 'access')
+    desktop.value = false
+
+    expect(text.indexOf('Connect tools section')).toBeGreaterThanOrEqual(0)
+    expect(text.indexOf('Connect tools section')).toBeLessThan(text.indexOf('API connection'))
+    expect(text).not.toContain('S3 access keys')
+  })
+
+  it('keeps the web access tab without the desktop tools', async () => {
+    const { root } = await mount('?tab=access')
+    await flush()
+    const text = panelText(root, 'access')
+
+    expect(text).not.toContain('Connect tools section')
+    expect(text).toContain('S3 access keys')
   })
 
   it('offers the API base URL on the web only', async () => {
