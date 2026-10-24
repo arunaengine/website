@@ -60,7 +60,7 @@ defineExpose({ reload: () => decisions.load(props.folderId) })
     </p>
     <p class="border-t border-border/70 px-4 py-2 text-[11px] text-muted-foreground">
       Every file is listed, not only these. Open
-      <RouterLink :to="{ name: 'activity' }" class="text-primary hover:underline">Activity</RouterLink>
+      <RouterLink :to="{ name: 'device' }" class="text-primary hover:underline">This computer</RouterLink>
       for what is moving now.
     </p>
   </section>

@@ -86,7 +86,7 @@ async function chooseStorage(): Promise<void> {
               <span class="truncate">{{ s3Url }}</span>
               <CopyButton :value="s3Url" label="Copy address" />
             </code>
-            <RouterLink :to="{ name: 'tools' }" class="text-xs font-medium text-primary hover:underline">
+            <RouterLink :to="{ name: 'settings', query: { tab: 'access' } }" class="text-xs font-medium text-primary hover:underline">
               Set up your tools
             </RouterLink>
           </div>

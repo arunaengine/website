@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { PortalFeature } from '@/lib/features'
-import { navEntries, type NavItem } from './nav'
+import { navEntries, navItemActive, type NavItem } from './nav'
 
-function paths(hidden: PortalFeature[] = [], desktop = false, localRuns = true): string[] {
+function paths(hidden: PortalFeature[] = [], desktop = false): string[] {
   return navEntries({
     desktop,
-    localRuns,
     isRealmAdmin: true,
     canInspectUsers: false,
     shown: (feature) => !hidden.includes(feature),
@@ -24,25 +23,23 @@ describe('navigation feature switches', () => {
     expect(visible).toContain('/app/datasets')
   })
 
-  it('drops the desktop runs with compute', () => {
-    expect(paths([], true)).toContain('/app/runs')
-    const visible = paths(['compute'], true)
-    expect(visible).not.toContain('/app/runs')
-    expect(visible).not.toContain('/app/compute')
-    expect(visible).toContain('/app/device')
+  it('adds only This computer to the web list in the desktop', () => {
+    const web = paths()
+    const desktop = paths([], true)
+
+    expect(desktop.filter((path) => !web.includes(path))).toEqual(['/app/device'])
+    expect(desktop.indexOf('/app/device')).toBe(desktop.indexOf('/app/groups') - 1)
+    for (const gone of ['/app/sync', '/app/activity', '/app/tools', '/app/runs']) expect(desktop).not.toContain(gone)
   })
 
-  it('shows the desktop runs only while local runs are on', () => {
-    expect(paths([], true, false)).not.toContain('/app/runs')
-    expect(paths([], true, true)).toContain('/app/runs')
-  })
+  it('keeps This computer marked on a folder page', () => {
+    const entry = navEntries({ desktop: true, isRealmAdmin: false, canInspectUsers: false })
+      .filter((item): item is NavItem => !('separator' in item))
+      .find((item) => item.to === '/app/device')!
 
-  it('lists the desktop entries in the approved order', () => {
-    const labels = navEntries({ desktop: true, isRealmAdmin: false, canInspectUsers: false, localRuns: true })
-      .filter((entry): entry is NavItem => !('separator' in entry))
-      .map((entry) => entry.label)
-    const start = labels.indexOf('Sync')
-    expect(labels.slice(start, start + 5)).toEqual(['Sync', 'Activity', 'Tools', 'Runs', 'This computer'])
+    expect(navItemActive(entry, '/app/folders/f-1')).toBe(true)
+    expect(navItemActive(entry, '/app/device')).toBe(true)
+    expect(navItemActive(entry, '/app/buckets')).toBe(false)
   })
 
   it('never hides admin pages', () => {

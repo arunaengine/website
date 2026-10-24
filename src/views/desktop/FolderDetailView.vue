@@ -227,7 +227,7 @@ async function detach(): Promise<void> {
   try {
     await unbind(folderId.value)
     stopOpen.value = false
-    void router.push({ name: 'sync' })
+    void router.push({ name: 'device' })
   } catch (err) {
     stopOpen.value = false
     actionError.value = errorMessage(err)
@@ -307,7 +307,7 @@ const filesText = computed(() => {
       </template>
       <template #actions>
         <Button variant="ghost" size="sm" as-child>
-          <RouterLink :to="{ name: 'sync' }"><ArrowLeft class="h-3.5 w-3.5" /> Sync</RouterLink>
+          <RouterLink :to="{ name: 'device' }"><ArrowLeft class="h-3.5 w-3.5" /> This computer</RouterLink>
         </Button>
         <Button v-if="folder" variant="outline" size="sm" @click="reveal(folder.root)">
           <FolderOpen class="h-3.5 w-3.5" /> Show on disk

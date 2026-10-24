@@ -16,7 +16,6 @@ async function build(injected?: unknown): Promise<AnyRoute[]> {
   vi.stubGlobal('window', { __ARUNA_DESKTOP__: injected })
   vi.doMock('@/views/DesktopLayout.vue', () => ({ default: 'desktop-layout' }))
   vi.doMock('@/views/AppLayout.vue', () => ({ default: 'app-layout' }))
-  vi.doMock('@/views/desktop/DesktopHomeView.vue', () => ({ default: 'desktop-home' }))
   vi.doMock('@/views/DashboardView.vue', () => ({ default: 'dashboard' }))
   const { portalRoutes } = await import('./routes')
   return portalRoutes() as unknown as AnyRoute[]
@@ -159,37 +158,44 @@ describe('desktop routes', () => {
     expect(typeof device?.component).toBe('function')
   })
 
-  it('mounts the machine views under the app shell', async () => {
+  it('mounts the folder page under the app shell', async () => {
     const routes = await build({ apiBaseUrl: '/api/v1' })
-    const expected = [
-      ['sync', 'sync'],
-      ['activity', 'activity'],
-      ['tools', 'tools'],
-      ['folders/:folderId', 'folder'],
-      ['runs', 'runs'],
-      ['runs/:jobId', 'run'],
+
+    expect(child(routes, 'folders/:folderId')?.name).toBe('folder')
+    expect(typeof child(routes, 'folders/:folderId')?.component).toBe('function')
+  })
+
+  it('sends the old desktop pages to their new places', async () => {
+    const routes = await build({ apiBaseUrl: '/api/v1' })
+    const expected: Array<[string, unknown]> = [
+      ['sync', { name: 'device' }],
+      ['folders', { name: 'device' }],
+      ['activity', { name: 'device' }],
+      ['transfers', { name: 'device' }],
+      ['tools', { name: 'settings', query: { tab: 'access' } }],
+      ['runs', { name: 'compute' }],
     ]
 
-    for (const [path, name] of expected) {
-      expect(child(routes, path)?.name).toBe(name)
-      expect(typeof child(routes, path)?.component).toBe('function')
+    for (const [path, target] of expected) {
+      expect(child(routes, path)?.redirect).toEqual(target)
+      expect(child(routes, path)?.component).toBeUndefined()
     }
   })
 
-  it('sends the old folder and transfer paths to the sync section', async () => {
+  it('opens an old run link in the Compute run drawer', async () => {
     const routes = await build({ apiBaseUrl: '/api/v1' })
+    const run = child(routes, 'runs/:jobId')
+    const redirect = run?.redirect as (to: { params: Record<string, string> }) => unknown
 
-    expect(child(routes, 'folders')?.redirect).toEqual({ name: 'sync' })
-    expect(child(routes, 'folders')?.component).toBeUndefined()
-    expect(child(routes, 'transfers')?.redirect).toEqual({ name: 'activity' })
-    expect(child(routes, 'transfers')?.component).toBeUndefined()
+    expect(run?.name).toBe('run')
+    expect(redirect({ params: { jobId: 'job-1' } })).toEqual({ name: 'task', params: { taskId: 'job-1' } })
   })
 
-  it('swaps the shell and the home view, keeping the dashboard name', async () => {
+  it('swaps the shell and keeps the dashboard as home', async () => {
     const routes = await build({ apiBaseUrl: '/api/v1' })
 
     await expect(resolved(find(routes, '/app'))).resolves.toBe('desktop-layout')
-    await expect(resolved(child(routes, ''))).resolves.toBe('desktop-home')
+    await expect(resolved(child(routes, ''))).resolves.toBe('dashboard')
     expect(child(routes, '')?.name).toBe('dashboard')
   })
 
