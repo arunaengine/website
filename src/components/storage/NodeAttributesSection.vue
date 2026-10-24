@@ -27,6 +27,8 @@ const saveError = ref<string | null>(null)
 const saveMessage = ref<string | null>(null)
 // The node whose save is on its way; the placement busy flag is shared with other controls.
 const saving = ref<string | null>(null)
+// Each save has its number; choosing a node makes the ones before it stale.
+let saveRun = 0
 
 const nodes = computed(() => realmInfo.value?.nodes ?? [])
 const options = computed(() =>
@@ -55,11 +57,16 @@ watch(nodes, (list) => {
 }, { immediate: true })
 watch(selected, reset, { immediate: true })
 // Another node starts without the wait and the result of the one before.
-watch(selected, () => (saving.value = null))
+watch(selected, () => {
+  saving.value = null
+  saveRun++
+})
 
 async function save() {
   if (!node.value || !dirty.value || busy.value || saving.value) return
   const nodeId = node.value.node_id
+  const run = ++saveRun
+  const current = () => run === saveRun
   saveError.value = null
   saveMessage.value = null
   saving.value = nodeId
@@ -73,11 +80,11 @@ async function save() {
         .filter((label) => label.key),
     })
     await loadInfo().catch(() => undefined)
-    if (selected.value === nodeId) saveMessage.value = 'Saved. That node now re-checks the copies it holds.'
+    if (current()) saveMessage.value = 'Saved. That node now re-checks the copies it holds.'
   } catch (error) {
-    if (selected.value === nodeId) saveError.value = apiErrorMessage(error)
+    if (current()) saveError.value = apiErrorMessage(error)
   } finally {
-    if (saving.value === nodeId) saving.value = null
+    if (current()) saving.value = null
   }
 }
 </script>

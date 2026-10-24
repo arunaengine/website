@@ -72,6 +72,32 @@ describe('NodeAttributesSection', () => {
     expect(content(root)).not.toContain('Saved.')
   })
 
+  it('keeps a second save of a node when the read after its first save ends', async () => {
+    mutateRealmPlacement.mockResolvedValueOnce(undefined)
+    mutateRealmPlacement.mockReturnValueOnce(new Promise(() => {}))
+    let read: () => void = () => {}
+    loadInfo.mockReturnValueOnce(new Promise<void>((resolve) => (read = resolve)))
+    const { root } = await mountApp(section)
+    await flush()
+    const location = () => element(root, (node) => node.tag === 'input' && node.props.id === 'node-location')
+    const pick = (id: string) =>
+      (element(root, (node) => node.tag === 'select').props['onUpdate:modelValue'] as (value: string) => void)(id)
+    await typeValue(location(), 'kassel')
+    void (button(root, 'Save attributes').props.onClick as () => Promise<void>)()
+    await flush()
+    pick('n2')
+    await flush()
+    pick('n1')
+    await flush()
+    await typeValue(location(), 'fulda')
+    void (button(root, 'Save attributes').props.onClick as () => Promise<void>)()
+    await flush()
+    read()
+    await flush()
+    expect(content(root)).not.toContain('Saved.')
+    expect(button(root, 'Saving the attributes').props['aria-busy']).toBe(true)
+  })
+
   it('shows the wait on Save attributes for its own save only, sends it once and frees it when it fails', async () => {
     let refuse: (err: unknown) => void = () => {}
     mutateRealmPlacement.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
