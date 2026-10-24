@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Group-admin controls: the encryption mode and format of new writes, the
 // longest unlock, and key rotation. Each change is confirmed with its notes.
-import { computed, ref, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -93,8 +93,8 @@ interface Pending {
   context: string
 }
 const pending = ref<Pending | null>(null)
-// The confirmed change is on its way.
-const sending = ref(false)
+// The confirmation whose change is on its way; a confirmation opened later is not it.
+const sending = shallowRef<Pending | null>(null)
 
 function contextOf(status: BucketEncryptionResponse): string {
   return JSON.stringify([status.bucket_id, status.key_generation, status.storage_generation, settingsOf(status)])
@@ -117,7 +117,7 @@ async function confirm() {
   const asked = pending.value
   if (!asked || stale.value || sending.value) return
   failure.value = null
-  sending.value = true
+  sending.value = asked
   try {
     if (asked.action === 'save') await props.save({ ...asked.draft, expected_generation: asked.generation })
     else await props.rotate(asked.generation)
@@ -125,7 +125,7 @@ async function confirm() {
   } catch (cause) {
     failure.value = actionError(cause)
   } finally {
-    sending.value = false
+    if (sending.value === asked) sending.value = null
   }
 }
 </script>
@@ -191,8 +191,12 @@ async function confirm() {
         <Notice v-if="failure" tone="error">{{ failure }}</Notice>
         <DialogFooter>
           <Button variant="outline" size="sm" @click="pending = null">Cancel</Button>
-          <Button size="sm" :disabled="busy || stale || sending" :aria-busy="sending" @click="confirm">
-            <Spinner v-if="sending" :label="pending?.action === 'rotate' ? 'Rotating the key' : 'Saving the change'" class="text-current" />
+          <Button size="sm" :disabled="busy || stale || sending !== null" :aria-busy="sending !== null && sending === pending" @click="confirm">
+            <Spinner
+              v-if="sending !== null && sending === pending"
+              :label="pending?.action === 'rotate' ? 'Rotating the key' : 'Saving the change'"
+              class="text-current"
+            />
             {{ pending?.action === 'rotate' ? 'Rotate' : 'Save' }}
           </Button>
         </DialogFooter>

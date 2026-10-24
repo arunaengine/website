@@ -166,6 +166,20 @@ describe('bucket encryption settings', () => {
     expect(content(root)).toContain('Uploads to this bucket are still open')
   })
 
+  it('keeps the wait of a closed confirmation off the next one', async () => {
+    rotate.mockReturnValueOnce(new Promise(() => {}))
+    const root = await render(status({ unlock: UNLOCKED }))
+    await click(button(root, 'Rotate key'))
+    void (button(dialog(root), 'Rotate').props.onClick as () => Promise<void>)()
+    await flush()
+    await click(button(dialog(root), 'Cancel'))
+    await click(button(root, 'Rotate key'))
+    const next = button(dialog(root), 'Rotate')
+    expect(next.props['aria-busy']).toBe(false)
+    expect(next.props.disabled).toBe(true)
+    expect(content(dialog(root))).not.toContain('Rotating the key')
+  })
+
   it('names the storage generation after a cipher change left the key generation as it was', async () => {
     const root = await render(status({ unlock: UNLOCKED }))
     await replace(status({ unlock: UNLOCKED, cipher: 'aes256_gcm', storage_generation: 2 }))
