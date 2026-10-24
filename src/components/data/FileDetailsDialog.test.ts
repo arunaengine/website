@@ -74,6 +74,7 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   '@/components/ui/TabsTrigger.vue': moduleDefault(Slotted('button')),
   '@/components/data/MockFileGeneral.vue': moduleDefault(Marker('mock file ids')),
   '@/components/data/MockFileStorage.vue': moduleDefault(Marker('mock file storage')),
+  '@/components/data/LinkedDatasets.vue': moduleDefault(Marker('datasets that link this')),
   '@/lib/distributedMock': { mockEnabled: () => false },
   '@/lib/distributedMockData': { mockFile: () => undefined },
   '@/components/data/ObjectLocationsPanel.vue': moduleDefault(Marker('copies of this version')),

@@ -24,6 +24,7 @@ import BucketEncryptionTab from '@/components/storage/BucketEncryptionTab.vue'
 import BucketPolicySection from '@/components/storage/BucketPolicySection.vue'
 import DistributionOverview from '@/components/storage/DistributionOverview.vue'
 import BucketSources from '@/components/storage/BucketSources.vue'
+import LinkedDatasets from '@/components/data/LinkedDatasets.vue'
 import LinkedBy from '@/components/storage/LinkedBy.vue'
 import DatabaseMark from '@/components/storage/DatabaseMark.vue'
 import CopiesOfBucket from '@/components/storage/CopiesOfBucket.vue'
@@ -156,6 +157,7 @@ const browserLink = computed(() => ({
         <FileSources v-if="example" :bucket="bucket" />
         <BucketSources v-else :bucket="bucket" :node-id="nodeId" />
         <LinkedBy v-if="example" :bucket="bucket" />
+        <LinkedDatasets v-else heading="Linked by datasets" card :target="{ bucket, key: '', folder: true, remote: Boolean(nodeId) }" />
         <DatabaseMark v-if="example" :bucket="bucket" />
         <Notice v-if="live" tone="info">
           This bucket is stored on {{ live.members.length }} nodes. Deleting it is not available yet.

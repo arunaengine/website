@@ -78,6 +78,7 @@ const view = compileClientComponent(new URL('./BucketStorageView.vue', import.me
   '@/components/distributed/AccessTab.vue': moduleDefault(Marker('grants on nodes')),
   '@/components/storage/DistributionOverview.vue': moduleDefault(Marker('stored on')),
   '@/components/storage/BucketSources.vue': moduleDefault(Marker('sources of files')),
+  '@/components/data/LinkedDatasets.vue': moduleDefault(Marker('datasets that link this bucket')),
   '@/components/distributed/GrantGuide.vue': moduleDefault(Marker('grant on every node')),
   '@/components/storage/BucketNodesTab.vue': moduleDefault(Marker('nodes of the bucket')),
   '@/components/storage/FileSources.vue': moduleDefault(Marker('file sources')),

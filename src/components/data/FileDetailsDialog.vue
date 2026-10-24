@@ -16,6 +16,7 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import MockFileGeneral from '@/components/data/MockFileGeneral.vue'
 import MockFileStorage from '@/components/data/MockFileStorage.vue'
+import LinkedDatasets from '@/components/data/LinkedDatasets.vue'
 import ObjectLocationsPanel from '@/components/data/ObjectLocationsPanel.vue'
 import ReferencedBy from '@/components/data/ReferencedBy.vue'
 import ObjectVersionsPanel from '@/components/data/ObjectVersionsPanel.vue'
@@ -418,6 +419,13 @@ const details = computed(() => props.folder ? [
             </li>
           </ul>
         </div>
+        <LinkedDatasets
+          v-if="props.open && !mock && !remote"
+          class="mt-4"
+          quiet-empty
+          :heading="props.folder ? 'Linked by datasets' : 'Part of'"
+          :target="{ bucket: props.bucket, key: props.objectKey, folder: Boolean(props.folder), remote: false }"
+        />
         <p v-if="props.referencedFrom" class="mt-3 text-xs text-muted-foreground">
           Referenced from {{ props.referencedFrom.label }}.
         </p>
