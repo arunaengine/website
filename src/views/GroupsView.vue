@@ -8,6 +8,7 @@ import AccessBadge from '@/components/ui/AccessBadge.vue'
 import ListShell from '@/components/ui/ListShell.vue'
 import ListSkeleton from '@/components/ui/ListSkeleton.vue'
 import SectionSkeleton from '@/components/ui/SectionSkeleton.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import GroupDetail from '@/components/groups/GroupDetail.vue'
 import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
@@ -26,7 +27,7 @@ import { Inbox, Plus, Users } from '@lucide/vue'
 import { errorMessage, relativeTime } from '@/lib/utils'
 import type { JoinRequest } from '@/lib/api'
 
-const { currentUser, myGroups, discoverableGroups, loading, bootstrapped, refresh } = useAruna()
+const { currentUser, myGroups, discoverableGroups, loading, bootstrapped, refresh, sessionEpoch } = useAruna()
 const { authPending } = useAuth()
 const {
   joinRequestsEnabled,
@@ -95,11 +96,24 @@ function groupNameFor(req: JoinRequest): string {
   return known?.name ?? req.group_display_name ?? req.group_id
 }
 
+// The request whose withdrawal is on its way, and the click that owns that wait.
+const withdrawing = ref<string | null>(null)
+let withdrawRun = 0
+watch(sessionEpoch, () => {
+  withdrawing.value = null
+  withdrawRun++
+})
+
 async function withdraw(req: JoinRequest) {
+  if (withdrawing.value) return
+  const run = ++withdrawRun
+  withdrawing.value = req.request_id
   try {
     await withdrawRequest(req)
   } catch (err) {
-    reportGlobalError(errorMessage(err))
+    if (run === withdrawRun) reportGlobalError(errorMessage(err))
+  } finally {
+    if (run === withdrawRun) withdrawing.value = null
   }
 }
 
@@ -246,10 +260,11 @@ const shellState = computed<'loading' | 'empty' | 'ready'>(() => {
               variant="ghost"
               size="sm"
               class="shrink-0"
-              :disabled="busy"
+              :disabled="busy || withdrawing !== null"
+              :aria-busy="withdrawing === req.request_id"
               @click="withdraw(req)"
             >
-              Withdraw
+              <Spinner v-if="withdrawing === req.request_id" label="Withdrawing the request" class="text-current" /> Withdraw
             </Button>
           </li>
         </ul>
