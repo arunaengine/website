@@ -1,17 +1,18 @@
 <script setup lang="ts">
 // A running step with its bar. Pause, Resume and Abort show only for steps that allow them.
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { abortSentence, abortTitle, jobTitle, percent, type ProgressJob } from '@/lib/organize'
 import { formatNumber } from '@/lib/utils'
 
-defineProps<{ job: ProgressJob; busy?: boolean }>()
+const props = defineProps<{ job: ProgressJob; busy?: boolean }>()
 const emit = defineEmits<{ (e: 'control', action: 'pause' | 'resume' | 'abort'): void }>()
 
 const asking = ref(false)
 // The control last sent; its button shows the wait while the node answers.
 const sent = ref<'pause' | 'resume' | 'abort' | null>(null)
+watch(() => props.busy, (busy) => busy || (sent.value = null))
 
 function send(action: 'pause' | 'resume' | 'abort') {
   sent.value = action

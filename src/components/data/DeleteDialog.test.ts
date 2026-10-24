@@ -80,10 +80,10 @@ const pagedStub = defineComponent({
 })
 
 const jobProgress = defineComponent({
-  props: { job: Object },
+  props: { job: Object, busy: Boolean },
   emits: ['control'],
   setup: (props, { emit }) => () =>
-    h('button', { onClick: () => emit('control', 'abort') }, `job ${(props.job as { state: string }).state} ${(props.job as { done: number }).done} of ${(props.job as { total: number }).total}`),
+    h('button', { 'data-busy': props.busy, onClick: () => emit('control', 'abort') }, `job ${(props.job as { state: string }).state} ${(props.job as { done: number }).done} of ${(props.job as { total: number }).total}`),
 })
 
 const ButtonStub = defineComponent({
@@ -699,6 +699,28 @@ describe('delete dialog', () => {
       expect(purgeControl).toHaveBeenCalledWith('abort', expect.anything())
     } finally {
       purgePaused.value = false
+      purgeStatus.value = null
+    }
+  })
+
+  it('marks the job controls busy while a control is on its way and sends one at a time', async () => {
+    let refuse: (err: unknown) => void = () => {}
+    purgeControl.mockReturnValueOnce(new Promise<undefined>((_, reject) => (refuse = reject)))
+    const sent = purgeControl.mock.calls.length
+    purgeStatus.value = { state: 'running' }
+    try {
+      const { root } = await open({ kind: 'folder', bucket: 'reef', nodeId: null, key: 'a/', option: 'delete-permanently' })
+      expect(button(root, 'job running').props['data-busy']).toBe(false)
+      void (button(root, 'job running').props.onClick as () => void)()
+      await flush()
+      expect(button(root, 'job running').props['data-busy']).toBe(true)
+      ;(button(root, 'job running').props.onClick as () => void)()
+      expect(purgeControl.mock.calls.length).toBe(sent + 1)
+      refuse(new Error('the node did not answer'))
+      await flush()
+      expect(button(root, 'job running').props['data-busy']).toBe(false)
+      expect(content(root)).toContain('the node did not answer')
+    } finally {
       purgeStatus.value = null
     }
   })

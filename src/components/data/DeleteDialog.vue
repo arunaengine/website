@@ -338,15 +338,21 @@ const selectionJob = computed<ProgressJob | null>(() => {
   }
 })
 
+// A Pause, Resume or Abort of the running delete is on its way.
+const controlling = ref(false)
+
 async function controlPurge(action: 'pause' | 'resume' | 'abort') {
   const client = apiClient()
-  if (!client || writesDisabled.value) return
+  if (!client || writesDisabled.value || controlling.value) return
   const id = requestId
+  controlling.value = true
   try {
     if (isSelection.value) await selection.controlAll(action, client)
     else await purge.control(action, client)
   } catch (caught) {
     if (id === requestId) error.value = organizeError(caught)
+  } finally {
+    controlling.value = false
   }
 }
 
@@ -763,7 +769,7 @@ onUnmounted(() => {
         <JobProgress
           v-if="purgeJob ?? selectionJob"
           :job="(purgeJob ?? selectionJob)!"
-          :busy="writesDisabled"
+          :busy="writesDisabled || controlling"
           @control="controlPurge"
         />
         <p v-if="isSelection && selection.starting.value && busy" class="text-muted-foreground">Starting…</p>

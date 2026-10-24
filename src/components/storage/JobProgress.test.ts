@@ -56,6 +56,21 @@ describe('JobProgress', () => {
     expect(button(mounted.root, 'Pause').props.disabled).toBe(false)
   })
 
+  it('marks no control for a busy state no control caused', async () => {
+    const busy = ref(false)
+    const mounted = await mountApp(defineComponent(() => () => h(JobProgress, { job: JOB, busy: busy.value })))
+    await click(button(mounted.root, 'Pause'))
+    // The node answered; later the controls are blocked for another reason, such as no connection.
+    busy.value = true
+    await flush()
+    busy.value = false
+    await flush()
+    busy.value = true
+    await flush()
+    expect(button(mounted.root, 'Pause').props['aria-busy']).toBe(false)
+    expect(content(mounted.root)).not.toContain('Pausing')
+  })
+
   it('offers Resume while paused', async () => {
     const { root, actions } = await mount({ ...JOB, state: 'paused' })
     expect(content(root)).toContain('(paused)')
