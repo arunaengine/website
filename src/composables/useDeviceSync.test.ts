@@ -185,6 +185,29 @@ describe('running a sync', () => {
     expect(sync.status.value.pendingTotal).toBe(0)
   })
 
+  it('ignores a late refusal', async () => {
+    const sync = await load()
+    await sync.load()
+    let refuse: (err: Error) => void = () => {}
+    run.mockImplementationOnce(() => new Promise((_, reject) => (refuse = reject)))
+    const stale = sync.runSync()
+    await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1))
+
+    client.value = { ...owner, token: 'next' }
+    await sync.load()
+    await sync.runSync()
+    refuse(new Error('The old session was refused.'))
+    await stale
+    expect(sync.running.value).toBe(true)
+    expect(sync.runError.value).toBeNull()
+
+    await sync.runSync()
+    expect(run).toHaveBeenCalledTimes(2)
+    answer = statusOf({ lastSyncMs: 2_000 })
+    await sync.load()
+    expect(sync.running.value).toBe(false)
+  })
+
   it('asks for one run at a time', async () => {
     const sync = await load()
     await sync.load()
