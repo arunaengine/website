@@ -38,14 +38,17 @@ export function useDatabaseRequests() {
   /** Runs one change; a failure is shown, and the lists are read again either way. */
   async function act(work: () => Promise<unknown>): Promise<boolean> {
     failure.value = null
+    let refused: string | null = null
     try {
       await work()
       return true
     } catch (cause) {
-      failure.value = apiErrorMessage(cause)
+      refused = apiErrorMessage(cause)
       return false
     } finally {
       await Promise.all([load(), databases.reload()])
+      // The refresh starts clean, so the refusal is shown after it.
+      if (refused) failure.value = refused
     }
   }
 
