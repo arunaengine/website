@@ -191,7 +191,7 @@ watch(filter, () => void loadPage())
 watch(
   () => [...movingByPath.value.keys()].join('\n'),
   () => {
-    if (!extended) void loadPage()
+    if (!extended && !loadingMore.value) void loadPage()
   },
 )
 // Another folder starts from nothing: no row of the last one stays under its actions.

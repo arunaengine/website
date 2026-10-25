@@ -357,6 +357,28 @@ describe('folder entries', () => {
     mounted.app.unmount()
   })
 
+  it('keeps a page the owner asked for when the file in flight changes meanwhile', async () => {
+    let resolveMore!: (page: DeviceApi.EntryPage) => void
+    entries
+      .mockResolvedValueOnce({ entries: rows, next_cursor: 'next' })
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveMore = resolve }))
+    const mounted = await mount()
+    const loading = click(button(mounted.root, 'Load more'))
+    const reads = entries.mock.calls.length
+
+    transfers.value = [
+      DeviceApi.readTransfer({ id: 't1', folder_id: 'f1', path: 'notes/a.md', state: 'running' }, 'upload'),
+    ]
+    await flush()
+    resolveMore({ entries: [entry({ path: 'notes/more.md' })], next_cursor: null })
+    await loading
+    await flush()
+
+    expect(entries.mock.calls.length).toBe(reads)
+    expect(content(row(mounted.root, 'notes/more.md'))).toContain('notes/more.md')
+    mounted.app.unmount()
+  })
+
   it('shows the skeleton only while there are no rows yet', async () => {
     entries.mockImplementationOnce(() => new Promise(() => {}))
     const mounted = await mount()
