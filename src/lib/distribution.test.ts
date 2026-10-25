@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { DistributedResponse } from '@/lib/api'
 import { defaultSettings, type Placement, type PresetId } from '@/lib/distributedMock'
-import { createRequest, degradedRanges, fromStatus, placementProblem } from './distribution'
+import { createRequest, degradedRanges, fromStatus, isDeleting, leaveBlock, openTransfers, placementProblem, transferChoice } from './distribution'
 
 const NODE_A = 'a'.repeat(64)
 const NODE_B = 'b'.repeat(64)
@@ -120,5 +120,67 @@ describe('create request', () => {
     expect(placementProblem(placement('sharding-replicas', [member('a'), member('b', 'stream')]))).toBe('A copy of each range needs two nodes that keep copies.')
     expect(placementProblem(placement('sharding', [member('a'), member('b')], { keys: 'm\nb' }))).toBe('Split keys must be in order, one per line.')
     expect(placementProblem(placement('sharding', [member('a'), member('b')], { keys: 'b\nm' }))).toBeNull()
+  })
+})
+
+describe('changes of a set', () => {
+  const member = (id: string, node: string, state: 'ready' | 'catching_up' | 'leaving' = 'ready', strategy: 'copy' | 'stream' = 'copy') => ({
+    member_id: id, node_id: node, state, coverage: 'all' as const, strategy, admitted: true,
+  })
+  const base = (extra: Partial<DistributedResponse> = {}): DistributedResponse => status({
+    members: [member('m1', NODE_A), member('m2', NODE_B), member('m3', NODE_C, 'catching_up'), member('m4', 'd'.repeat(64)), member('m5', 'e'.repeat(64), 'ready', 'stream')],
+    ranges: [
+      { range_id: 'r1', lower: '', upper: 'm', coordinator: 'm1', epoch: 2, replicas: ['m2', 'm3', 'm5'], degraded: false, lineage: 'r0' },
+      { range_id: 'r2', lower: 'm', coordinator: 'm1', epoch: 1, replicas: [], degraded: false },
+    ],
+    ...extra,
+  })
+
+  it('offers only ready copies of the range and says why the others are not offered', () => {
+    const bucket = fromStatus(base())
+    const choice = transferChoice(bucket, bucket.ranges[0])
+
+    expect(choice.offered.map((item) => item.memberId)).toEqual(['m2'])
+    expect(choice.refused.map((item) => [item.member.memberId, item.reason])).toEqual([
+      ['m3', 'Is catching up, not ready'],
+      ['m4', 'Keeps no copy of this range'],
+      ['m5', 'Keeps no full copy'],
+    ])
+    expect(transferChoice(bucket, bucket.ranges[1]).offered).toEqual([])
+  })
+
+  it('keeps the lineage of a split range', () => {
+    expect(fromStatus(base()).ranges.map((range) => range.lineage)).toEqual(['r0', undefined])
+  })
+
+  it('refuses to remove a coordinator or a member that is leaving', () => {
+    const bucket = fromStatus(base({ members: [member('m1', NODE_A), member('m2', NODE_B, 'leaving'), member('m3', NODE_C)], ranges: [
+      { range_id: 'r1', lower: '', coordinator: 'm1', epoch: 1, replicas: ['m2'], degraded: false },
+    ] }))
+
+    expect(leaveBlock(bucket, bucket.members[0])).toBe('Writes 1 range. Move them first.')
+    expect(leaveBlock(bucket, bucket.members[1])).toBe('Is leaving already')
+    expect(leaveBlock(bucket, bucket.members[2])).toBeNull()
+  })
+
+  it('names the nodes behind open transfers and a deletion that waits for a fence', () => {
+    const bucket = fromStatus(base({
+      transfers: [
+        { transfer_id: 't1', range_id: 'r1', from: 'm1', to: 'm2', epoch: 3, role: 'leave', fenced: true, completed: false },
+        { transfer_id: 't0', range_id: 'r2', from: 'm1', to: 'm2', epoch: 2, role: 'replica', fenced: true, completed: true },
+      ],
+      deletion: { committed: false, fenced: [], waiting: ['m1'] },
+    }))
+
+    expect(openTransfers(bucket)).toEqual([{ id: 't1', rangeId: 'r1', from: NODE_A, to: NODE_B, epoch: 3, role: 'leave', fenced: true, completed: false }])
+    expect(bucket.live?.deletion).toEqual({ committed: false, waiting: [NODE_A] })
+    expect(isDeleting(bucket)).toBe(true)
+    expect(isDeleting(fromStatus(base()))).toBe(false)
+  })
+
+  it('reads an older node without transfers or deletion as having none', () => {
+    const bucket = fromStatus(base())
+
+    expect(bucket.live).toMatchObject({ transfers: [], deletion: null, publicationsClosed: false })
   })
 })

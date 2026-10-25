@@ -14,6 +14,8 @@ import {
 } from '@/lib/distributedMock'
 
 export interface DistributedMember {
+  /** The id of the membership; a node that left and joined again has two. Absent in example data. */
+  memberId?: string
   nodeId: string
   state: MemberState
   strategy: DataStrategy
@@ -36,6 +38,11 @@ export interface DistributedRange {
   epoch: number
   /** Nodes that keep a copy of the range. */
   replicas: string[]
+  /** The member ids behind `coordinator` and `replicas`, for the changes that name members. */
+  coordinatorId?: string
+  replicaIds?: string[]
+  /** The range this one was split from. */
+  lineage?: string
   objects?: number
   bytes?: number
   refreshed?: string
@@ -65,6 +72,32 @@ export interface LiveState {
   conflicted: boolean
   changesUnavailable: boolean
   recommendedGrant: string
+  /** Open transfers of ranges, with nodes instead of member ids. */
+  transfers: LiveTransfer[]
+  /** Set once a deletion is prepared: writes have stopped. */
+  deletion: LiveDeletion | null
+  /** This node applies no more changes of the set: it leaves or the set is deleted. */
+  publicationsClosed: boolean
+}
+
+export interface LiveTransfer {
+  id: string
+  rangeId: string
+  from: string
+  to: string
+  epoch: number
+  /** What the former coordinator does afterwards. */
+  role: 'replica' | 'leave'
+  /** Writes to the range fail until the new coordinator takes over. */
+  fenced: boolean
+  completed: boolean
+}
+
+export interface LiveDeletion {
+  /** Every coordinator fenced its ranges, so the member buckets are being deleted. */
+  committed: boolean
+  /** The nodes of the coordinators that still have to fence their ranges. */
+  waiting: string[]
 }
 
 // An ordinary bucket lives on one node. Only a bucket on more nodes has the Nodes tab.
@@ -89,6 +122,46 @@ export function grantTargets(suffixes: readonly string[]): Map<string, string[]>
     named.set(bucket, [...(named.get(bucket) ?? []), node])
   }
   return named
+}
+
+/** The bucket is being deleted: writes have stopped. */
+export function isDeleting(bucket: DistributedBucket): boolean {
+  return Boolean(bucket.live?.deletion)
+}
+
+/** Transfers that are not finished yet. */
+export function openTransfers(bucket: DistributedBucket): LiveTransfer[] {
+  return (bucket.live?.transfers ?? []).filter((transfer) => !transfer.completed)
+}
+
+export interface TransferChoice {
+  /** Ready copies of the range: only these can take it over. */
+  offered: DistributedMember[]
+  /** The other members and why they cannot. */
+  refused: { member: DistributedMember; reason: string }[]
+}
+
+/** Who can take over a range. The new coordinator must already hold a ready copy of it. */
+export function transferChoice(bucket: DistributedBucket, range: DistributedRange): TransferChoice {
+  const copies = new Set(range.replicaIds ?? [])
+  const offered: DistributedMember[] = []
+  const refused: TransferChoice['refused'] = []
+  for (const member of bucket.members) {
+    if (member.memberId === range.coordinatorId) continue
+    const copy = member.memberId ? copies.has(member.memberId) : range.replicas.includes(member.nodeId)
+    if (!copy) refused.push({ member, reason: 'Keeps no copy of this range' })
+    else if (member.state !== 'ready') refused.push({ member, reason: `Is ${member.state}, not ready` })
+    else if (member.strategy !== 'copy') refused.push({ member, reason: 'Keeps no full copy' })
+    else offered.push(member)
+  }
+  return { offered, refused }
+}
+
+/** Why a member cannot be removed now, or null. */
+export function leaveBlock(bucket: DistributedBucket, member: DistributedMember): string | null {
+  if (member.state === 'leaving') return 'Is leaving already'
+  const writes = bucket.ranges.filter((range) => (range.coordinatorId ? range.coordinatorId === member.memberId : range.coordinator === member.nodeId)).length
+  return writes ? `Writes ${writes} ${writes === 1 ? 'range' : 'ranges'}. Move them first.` : null
 }
 
 const STATES: Record<MemberStateName, MemberState> = {
@@ -135,6 +208,9 @@ export function fromStatus(status: DistributedResponse): DistributedBucket {
     coordinator: range.coordinator_node ?? nodeOf.get(range.coordinator) ?? range.coordinator,
     epoch: range.epoch,
     replicas: range.replicas.map((id) => nodeOf.get(id) ?? id),
+    coordinatorId: range.coordinator,
+    replicaIds: range.replicas,
+    ...(range.lineage ? { lineage: range.lineage } : {}),
     degraded: range.degraded,
     degradedSince: isoTime(range.unreachable_since_ms),
   }))
@@ -145,6 +221,7 @@ export function fromStatus(status: DistributedResponse): DistributedBucket {
       .filter((time): time is string => Boolean(time))
       .sort()[0]
     return {
+      memberId: member.member_id,
       nodeId: member.node_id,
       state: STATES[member.state] ?? 'created',
       strategy: STRATEGIES[member.strategy] ?? 'copy',
@@ -167,6 +244,20 @@ export function fromStatus(status: DistributedResponse): DistributedBucket {
       conflicted: status.conflicted,
       changesUnavailable: status.configuration_changes_unavailable,
       recommendedGrant: status.recommended_grant,
+      transfers: (status.transfers ?? []).map((transfer): LiveTransfer => ({
+        id: transfer.transfer_id,
+        rangeId: transfer.range_id,
+        from: nodeOf.get(transfer.from) ?? transfer.from,
+        to: nodeOf.get(transfer.to) ?? transfer.to,
+        epoch: transfer.epoch,
+        role: transfer.role === 'leave' ? 'leave' : 'replica',
+        fenced: transfer.fenced,
+        completed: transfer.completed,
+      })),
+      deletion: status.deletion
+        ? { committed: status.deletion.committed, waiting: status.deletion.waiting.map((id) => nodeOf.get(id) ?? id) }
+        : null,
+      publicationsClosed: status.publications_closed ?? false,
     },
   }
 }
