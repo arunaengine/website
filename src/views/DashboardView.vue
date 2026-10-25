@@ -143,6 +143,17 @@ const panelRealm = computed(() => realmView.value?.realm ?? realmInfo.value)
 const infraNodes = computed(() => (panelRealm.value?.nodes ?? []).filter((node) => node.kind !== 'user'))
 const deviceNodes = computed(() => (panelRealm.value?.nodes ?? []).filter((node) => node.kind === 'user'))
 
+// This computer by its own /system/info, the device node: the realm nodes it is connected to now.
+const computer = computed(() => {
+  const info = nodeInfo.value
+  if (!desktop || !info?.connections) return null
+  const id = info.node.peer_id
+  const labels = deviceNodes.value.find((node) => node.node_id === id)?.info?.labels ?? {}
+  const name = labels['name'] || labels['display_name'] || labels['device'] || 'This computer'
+  const peers = info.connections.filter((peer) => peer.status === 'connected').map((peer) => peer.peer_id)
+  return { id, name, peers }
+})
+
 const onlineNodes = computed(() => infraNodes.value.filter((node) => node.present).length)
 
 // Honest realm figure: the sum of datasets each node reports holding (replicas
@@ -400,6 +411,7 @@ const pageDescription = computed(() =>
           :devices="deviceNodes"
           :replication-factor="realmInfo?.metadata_replication.default_replication_factor"
           :local-peer-id="(realmView?.info ?? nodeInfo)?.node.peer_id"
+          :computer="computer"
         />
       </section>
 

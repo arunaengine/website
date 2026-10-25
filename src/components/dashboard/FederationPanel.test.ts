@@ -118,3 +118,56 @@ describe('topology', () => {
     expect(html).not.toContain('Connections as seen by')
   })
 })
+
+describe('this computer', () => {
+  const nodes = [realmNode('aaaa-mgmt-1111', 'management'), realmNode('bbbb-server-2222', 'server')]
+  const devices = [device('dddd-device-4444', 'seen')]
+  const render = (computer: unknown) =>
+    renderToString(
+      createSSRApp({ render: () => h(FederationPanel, { nodes, devices, localPeerId: 'aaaa-mgmt-1111', computer }) }),
+    )
+  const laptop = { id: 'dddd-device-4444', name: 'Test-laptop!' }
+
+  beforeEach(() => {
+    desktop = true
+  })
+
+  it('draws one quiet line to each connected realm node', async () => {
+    const html = await render({ ...laptop, peers: ['aaaa-mgmt-1111', 'ffff-unknown-9999'] })
+
+    expect(html).toMatch(/>\s*Test-laptop!\s*<\/text>/)
+    expect(html).toMatch(/>\s*This computer\s*<\/text>/)
+    expect(html.match(/stroke-dasharray="4 4"/g)).toHaveLength(1)
+    expect(html.match(/class="fed-flow"/g)).toHaveLength(1)
+    expect(html).toContain('This computer shows its own.')
+    expect(html).toContain('1 enrolled, 1 active')
+  })
+
+  it('dims it without lines when not connected', async () => {
+    const html = await render({ ...laptop, peers: [] })
+
+    expect(html).toMatch(/<g opacity="0.5"[^>]*><title[^>]*>Test-laptop!<\/title>/)
+    expect(html).toContain('stroke-dasharray="2 2"')
+    expect(html).not.toContain('stroke-dasharray="4 4"')
+    expect(html).toMatch(/>\s*This computer, not connected\s*<\/text>/)
+    expect(html).toContain('This computer is not connected right now.')
+    expect(html).toContain('1 enrolled, 0 active')
+  })
+
+  it('adds nothing when its own info is missing', async () => {
+    const html = await render(null)
+
+    expect(html).not.toContain('Test-laptop!')
+    expect(html).not.toMatch(/>\s*This computer/)
+    expect(html).toContain('1 enrolled, 1 active')
+  })
+
+  it('stays out of the browser', async () => {
+    desktop = false
+
+    const html = await render({ ...laptop, peers: ['aaaa-mgmt-1111'] })
+
+    expect(html).not.toContain('Test-laptop!')
+    expect(html).not.toMatch(/>\s*This computer/)
+  })
+})

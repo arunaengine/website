@@ -8,7 +8,7 @@ export interface InfoResponse {
   api_version?: string
   portal?: PortalStatus | null
   my_addresses: string[]
-  connections?: unknown
+  connections?: PeerConnectionInfo[]
   services: {
     interfaces: InterfaceServicesStatus
     database?: { status: string }
@@ -16,6 +16,12 @@ export interface InfoResponse {
     blob?: BlobServiceStatus
   }
   warnings: string[]
+}
+
+// The answering node's own peer connections (info.rs PeerConnectionInfo).
+export interface PeerConnectionInfo {
+  peer_id: string
+  status: 'connected' | 'known' | 'unreachable'
 }
 
 export interface PortalStatus {

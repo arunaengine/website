@@ -20,6 +20,8 @@ const props = defineProps<{
   replicationFactor?: number | null
   /** id of the node this portal is connected to */
   localPeerId?: string
+  /** This computer in the desktop: its node id, name and the realm nodes it is connected to now. */
+  computer?: { id: string; name: string; peers: string[] } | null
 }>()
 
 const router = useRouter()
@@ -29,8 +31,12 @@ function openNode(id: string) {
 }
 
 const connectedCount = computed(() => props.nodes.filter((node) => node.connection_status === 'connected').length)
+// This computer counts as active by its own connections, as the graph shows it.
 const activeDevices = computed(
-  () => (props.devices ?? []).filter((device) => device.connection_status === 'seen').length,
+  () =>
+    (props.devices ?? []).filter((device) =>
+      device.node_id === computer.value?.id ? computer.value.connected : device.connection_status === 'seen',
+    ).length,
 )
 const replicationLabel = computed(() => {
   if (props.replicationFactor === null) return 'all eligible nodes'
@@ -87,6 +93,31 @@ const spokes = computed(() =>
     .filter((node) => node.node_id !== hub.value?.node_id)
     .sort((a, b) => a.node_id.localeCompare(b.node_id)),
 )
+
+// This computer sits at the right edge, with a quiet line to each realm node it is connected to.
+const PC_X = VW - 100
+const PC_Y = CY - 30
+const PC_RING = 9
+
+const computer = computed(() => {
+  if (!desktop || !hub.value || !props.computer) return null
+  const peers = new Set(props.computer.peers)
+  const lines = [{ node: hub.value, cx: CX, cy: CY }, ...placedSpokes.value]
+    .filter((placed) => peers.has(placed.node.node_id))
+    .map((placed) => {
+      const dx = placed.cx - PC_X
+      const dy = placed.cy - PC_Y
+      const len = Math.hypot(dx, dy) || 1
+      return {
+        id: placed.node.node_id,
+        x1: PC_X + (dx / len) * (PC_RING + 3),
+        y1: PC_Y + (dy / len) * (PC_RING + 3),
+        x2: placed.cx - (dx / len) * TRIM,
+        y2: placed.cy - (dy / len) * TRIM,
+      }
+    })
+  return { id: props.computer.id, name: props.computer.name, lines, connected: lines.length > 0 }
+})
 
 const showLabels = computed(() => spokes.value.length <= LABEL_CAP)
 
@@ -291,6 +322,19 @@ function loadArc(cx: number, cy: number, permille: number): string {
               />
             </g>
 
+            <line
+              v-for="l in computer?.lines ?? []"
+              :key="`pc-${l.id}`"
+              :x1="l.x1"
+              :y1="l.y1"
+              :x2="l.x2"
+              :y2="l.y2"
+              stroke="hsl(var(--muted-foreground))"
+              stroke-opacity="0.6"
+              stroke-dasharray="4 4"
+              stroke-width="1"
+            />
+
             <!-- Spoke nodes -->
             <g
               v-for="p in placedSpokes"
@@ -375,9 +419,43 @@ function loadArc(cx: number, cy: number, permille: number): string {
                 {{ hubName ?? 'this node' }}
               </text>
             </g>
+
+            <!-- This computer, desktop only -->
+            <g v-if="computer" :opacity="computer.connected ? 1 : 0.5">
+              <title>{{ computer.name }}</title>
+              <circle
+                :cx="PC_X"
+                :cy="PC_Y"
+                :r="PC_RING"
+                fill="hsl(var(--card))"
+                stroke="hsl(var(--muted-foreground))"
+                stroke-width="1.25"
+                :stroke-dasharray="computer.connected ? undefined : '2 2'"
+              />
+              <Laptop :x="PC_X - 5" :y="PC_Y - 5" :size="10" color="hsl(var(--muted-foreground))" />
+              <text
+                :x="PC_X"
+                :y="PC_Y + PC_RING + 14"
+                text-anchor="middle"
+                font-family="Inter, sans-serif"
+                font-size="10"
+                font-weight="600"
+                fill="hsl(var(--foreground))"
+              >
+                {{ computer.name }}
+              </text>
+              <text :x="PC_X" :y="PC_Y + PC_RING + 25" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="hsl(var(--muted-foreground))">
+                {{ computer.connected ? 'This computer' : 'This computer, not connected' }}
+              </text>
+            </g>
           </svg>
-          <p v-if="edges.length" class="border-t border-border/60 px-5 py-2 text-[11px] text-muted-foreground">
-            <template v-if="hubName">Connections as seen by {{ hubName }}.</template>
+          <p v-if="edges.length || computer" class="border-t border-border/60 px-5 py-2 text-[11px] text-muted-foreground">
+            <template v-if="hubName">
+              Connections as seen by {{ hubName }}.
+              <template v-if="computer">
+                {{ computer.connected ? 'This computer shows its own.' : 'This computer is not connected right now.' }}
+              </template>
+            </template>
             <template v-else>Edges show connections as seen by the node serving this portal, not full mesh topology.</template>
           </p>
         </div>
