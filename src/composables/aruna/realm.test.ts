@@ -128,6 +128,20 @@ describe('realm view from a realm node', () => {
     expect((await loadRealmView())?.info.node.peer_id).toBe('https://server.test/api/v1')
   })
 
+  it('cancels the sibling read when one fails', async () => {
+    let hanging: AbortSignal | undefined
+    vi.mocked(apiRequest).mockImplementation(async (path, options, client) => {
+      if (client?.baseUrl !== 'https://mgmt.test/api/v1') return path === '/system/info' ? {} : { realm_id: REALM_ID }
+      if (path === '/system/info') throw new TypeError('Failed to fetch')
+      hanging = options?.signal ?? undefined
+      return new Promise(() => {})
+    })
+
+    await loadRealmView()
+
+    expect(hanging?.aborted).toBe(true)
+  })
+
   it('answers null when no node of this realm answers', async () => {
     answer(['https://mgmt.test/api/v1'], 'other-realm')
 
