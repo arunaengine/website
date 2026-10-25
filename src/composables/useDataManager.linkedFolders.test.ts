@@ -3,6 +3,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flush, mountApp } from '@/test/clientRender'
 import type { SyncedFolder } from '@/lib/deviceApi'
+import type { BucketShortcut } from './useBucketShortcuts'
 
 // A cached session: activating a group the browser already holds resolves at once.
 const activeContext = ref<Record<string, unknown> | null>(null)
@@ -57,8 +58,14 @@ vi.mock('./useBuckets', () => ({
     refresh: vi.fn(async () => undefined),
   }),
 }))
+const shortcuts = vi.hoisted(() => ({ pinned: [] as BucketShortcut[], recent: [] as BucketShortcut[] }))
 vi.mock('./useBucketShortcuts', () => ({
-  useBucketShortcuts: () => ({ pinned: ref([]), recent: ref([]), recordRecent: vi.fn(), remove: vi.fn() }),
+  useBucketShortcuts: () => ({
+    pinned: ref(shortcuts.pinned),
+    recent: ref(shortcuts.recent),
+    recordRecent: vi.fn(),
+    remove: vi.fn(),
+  }),
 }))
 vi.mock('./useGroupSelection', () => ({
   useGroupContext: () => ({ groupsLoading: ref(false), hasGroups: ref(true) }),
@@ -109,6 +116,8 @@ beforeEach(() => {
   ensureLoaded.mockReset()
   load.mockReset()
   deviceClient.value = CLIENT
+  shortcuts.pinned = []
+  shortcuts.recent = []
   folders.value = [
     folder('reef-folder', 'n-local', 'reef'),
     folder('far-folder', 'n-far', 'archive'),
@@ -200,6 +209,22 @@ describe('buckets linked to a folder on this computer', () => {
 
     expect(load).toHaveBeenCalledTimes(1)
     expect(manager.currentLinkedFolder.value?.folder_id).toBe('scans')
+  })
+
+  it('keeps internal folder buckets out of pins and recents', async () => {
+    const internal = 'folder-01m5rs8b3hngjtjva82x7vv8ng'
+    shortcuts.pinned = [
+      { bucket: internal, nodeId: 'n-far' },
+      { bucket: 'kept', nodeId: 'n-far' },
+    ]
+    shortcuts.recent = [
+      { bucket: internal, nodeId: 'n-far', groupId: 'g-a' },
+      { bucket: 'seen', nodeId: 'n-far', groupId: 'g-a' },
+    ]
+    const manager = await start()
+
+    expect(manager.sidebarBuckets.value.map((entry) => entry.bucket)).toEqual(['kept', 'reef', 'archive'])
+    expect(manager.recentBuckets.value.map((entry) => entry.bucket)).toEqual(['seen'])
   })
 
   it('reads and links nothing on the web', async () => {

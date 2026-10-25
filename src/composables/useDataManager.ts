@@ -34,7 +34,7 @@ import { requestScope, type DeleteRequest, type DeletionResult } from '@/lib/del
 import type { DeletedObjectEntry } from '@/lib/objectVersions'
 import { deletedOnPage, lastListedKey, shownDeleted, shownEntries, type ListingShow } from '@/lib/objectListing'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
-import { isHiddenBucket, isWorkspaceBucket } from '@/lib/workspaces'
+import { isFolderBucket, isHiddenBucket, isWorkspaceBucket } from '@/lib/workspaces'
 import { useAllBuckets } from './useAllBuckets'
 import type { BucketSearchHit, SourceConnectorSummary, SyncRelationship, UsageResponse } from '@/lib/api'
 import { referenceSourceLabel, referenceSourceName, type ReferenceSourceGroup } from '@/lib/references'
@@ -506,12 +506,15 @@ export function useDataManager() {
   const workspaceBuckets = computed(() => buckets.value.filter((entry) => isWorkspaceBucket(entry.name)))
   const workspacesOpen = ref(false)
 
+  // Internal folder buckets stay out of pins and recents too, as they do out of the lists.
   const sidebarBuckets = computed<SidebarBucketEntry[]>(() => {
-    const pinned = shortcuts.pinned.value.map((entry) => ({
-      bucket: entry.bucket,
-      nodeId: entry.nodeId ?? null,
-      pinned: true,
-    }))
+    const pinned = shortcuts.pinned.value
+      .filter((entry) => !isFolderBucket(entry.bucket))
+      .map((entry) => ({
+        bucket: entry.bucket,
+        nodeId: entry.nodeId ?? null,
+        pinned: true,
+      }))
     // The listed buckets live on the node of the open session.
     const nodeId = remoteNodeId.value
     const pinnedLocal = new Set(pinned.filter((entry) => entry.nodeId === nodeId).map((entry) => entry.bucket))
@@ -523,7 +526,9 @@ export function useDataManager() {
 
   // Buckets of another group are not reachable with this group's S3 session.
   const groupRecents = computed(() =>
-    shortcuts.recent.value.filter((entry) => (entry.groupId ?? '') === selectedGroupId.value),
+    shortcuts.recent.value.filter(
+      (entry) => (entry.groupId ?? '') === selectedGroupId.value && !isFolderBucket(entry.bucket),
+    ),
   )
 
   // "Recently browsed" only surfaces targets the list above does not already
