@@ -74,8 +74,8 @@ const collection = computed(() => mockEnabled() && Boolean(mockBucket(props.buck
 const tab = ref(props.tab === 'connector' && !shown('connectors') ? 'local' : props.tab ?? 'local')
 
 // A chosen database is the source of the Other buckets tab.
-function chooseDatabase(name: string, nodeId: string) {
-  otherBuckets.pickSearchHit({ bucket: name, node_id: nodeId, arn: '', group_id: '', created_at: '' } satisfies BucketSearchHit)
+function chooseDatabase(name: string, nodeId: string, groupId: string) {
+  otherBuckets.pickSearchHit({ bucket: name, node_id: nodeId, arn: '', group_id: groupId, created_at: '' } satisfies BucketSearchHit)
   tab.value = 'other'
 }
 

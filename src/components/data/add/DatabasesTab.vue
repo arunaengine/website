@@ -1,26 +1,38 @@
 <script setup lang="ts">
 // The databases the user may use. A chosen one becomes the source in Other buckets, where its
 // files are added to this bucket as references (not copied) or copied.
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useDatabases } from '@/composables/useDatabases'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { openNode, STATE_NOTES, type DatabaseRow } from '@/lib/databases'
+import { NOT_HELD_HERE, STATE_NOTES, type DatabaseRow } from '@/lib/databases'
+import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{ bucket: string }>()
-const emit = defineEmits<{ (e: 'choose', bucket: string, nodeId: string): void }>()
+const emit = defineEmits<{ (e: 'choose', bucket: string, nodeId: string, groupId: string): void }>()
 
 const databases = useDatabases()
 const { localNodeId } = useRealmNodes()
+const problem = ref<string | null>(null)
+let choosing = 0
 
 onMounted(() => databases.ensure())
 
 // A bucket cannot be its own source.
 const rows = computed(() => databases.rows.value.filter((row) => row.bucket !== props.bucket))
 
-function choose(row: DatabaseRow) {
-  emit('choose', row.bucket, openNode(row, localNodeId.value ?? ''))
+async function choose(row: DatabaseRow) {
+  const run = ++choosing
+  problem.value = null
+  try {
+    const place = await databases.locate(row)
+    if (run !== choosing) return
+    if (!place) problem.value = NOT_HELD_HERE
+    else emit('choose', place.bucket, place.nodeId, row.ownerGroup)
+  } catch (cause) {
+    if (run === choosing) problem.value = errorMessage(cause)
+  }
 }
 </script>
 
@@ -42,5 +54,6 @@ function choose(row: DatabaseRow) {
     </ul>
     <p v-else class="text-xs text-muted-foreground">No database is listed for you yet.</p>
     <p v-if="!databases.complete.value" class="text-xs text-muted-foreground">The list is partial.</p>
+    <p v-if="problem" role="status" class="text-xs text-muted-foreground">{{ problem }}</p>
   </div>
 </template>

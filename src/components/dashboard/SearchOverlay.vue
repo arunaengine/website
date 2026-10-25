@@ -22,10 +22,10 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSearchSettings } from '@/composables/useSearchSettings'
 import { OBJECT_SEARCH_MODE_LABELS, useUnifiedSearch } from '@/composables/useUnifiedSearch'
 import { isLeafFile } from '@/lib/dataEntities'
-import { openNode } from '@/lib/databases'
+import { NOT_HELD_HERE, type DatabaseRow } from '@/lib/databases'
 import { mockEnabled } from '@/lib/distributedMock'
 import { searchFiles } from '@/lib/distributedMockData'
-import { truncateMiddle } from '@/lib/utils'
+import { errorMessage, truncateMiddle } from '@/lib/utils'
 import { Search, Settings2, X } from '@lucide/vue'
 import { useMediaQuery } from '@vueuse/core'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -41,6 +41,8 @@ interface QuickItem {
   routeName: string
   routeParams: Record<string, string>
   routeQuery?: Record<string, string>
+  /** A database opens where it is held, which is resolved on open. */
+  database?: DatabaseRow
 }
 
 // Declaration order is the order the summary line lists the kinds in.
@@ -69,7 +71,7 @@ const wrapperEl = ref<HTMLElement | null>(null)
 const isNarrowSearch = useMediaQuery(`(max-width: ${TOP_BAR_SEARCH_COLLAPSE_PX - 0.02}px)`)
 const { realm } = useRealm()
 const { authToken } = useAruna()
-const { displayName: nodeDisplayName, isLocalNode, localNodeId } = useRealmNodes()
+const { displayName: nodeDisplayName, isLocalNode } = useRealmNodes()
 const router = useRouter()
 const { objectSearchMode } = useSearchSettings()
 const { search: searchDatabases } = useMockDatabases()
@@ -132,18 +134,16 @@ const items = computed<QuickItem[]>(() => [
     },
   })),
   // The databases the user may use, by the dataset's title and the bucket name.
-  ...databases.search(q.value).map((row): QuickItem => {
-    const node = openNode(row, localNodeId.value ?? '')
-    return {
-      key: `db:${row.entryId}`,
-      section: 'databases',
-      title: row.title || row.bucket,
-      subtitle: `Bucket: ${row.bucket}`,
-      routeName: 'bucket',
-      routeParams: { bucketId: row.bucket },
-      routeQuery: { group: row.ownerGroup, ...(!isLocalNode(node) ? { node } : {}) },
-    }
-  }),
+  ...databases.search(q.value).map((row): QuickItem => ({
+    key: `db:${row.entryId}`,
+    section: 'databases',
+    title: row.title || row.bucket,
+    subtitle: `Bucket: ${row.bucket}`,
+    routeName: 'bucket',
+    routeParams: { bucketId: row.bucket },
+    routeQuery: { group: row.ownerGroup },
+    database: row,
+  })),
   // Databases and files of the example buckets (node mock).
   ...(mockEnabled() ? searchDatabases(q.value) : []).map((entry): QuickItem => ({
     key: `db:${entry.id}`,
@@ -208,6 +208,8 @@ const activeKey = computed(() => items.value[activeIndex.value]?.key ?? null)
 watch(items, () => (activeIndex.value = -1))
 watch(q, (value) => {
   activeIndex.value = -1
+  databaseProblem.value = null
+  opening++
   // The list of databases is read once, when the first search needs it.
   if (value.trim().length >= 2) databases.ensure()
 })
@@ -273,7 +275,26 @@ function navigateAfterPanel(callback: () => void) {
   else callback()
 }
 
-function openItem(item: QuickItem) {
+// Why a chosen database cannot open from here; a later choice drops an earlier answer.
+const databaseProblem = ref<string | null>(null)
+let opening = 0
+
+async function openItem(chosen: QuickItem) {
+  const run = ++opening
+  let item = chosen
+  databaseProblem.value = null
+  if (chosen.database) {
+    try {
+      const place = await databases.locate(chosen.database)
+      if (run !== opening) return
+      if (!place) return void (databaseProblem.value = NOT_HELD_HERE)
+      const node = isLocalNode(place.nodeId) ? {} : { node: place.nodeId }
+      item = { ...chosen, routeParams: { bucketId: place.bucket }, routeQuery: { group: chosen.database.ownerGroup, ...node } }
+    } catch (cause) {
+      if (run === opening) databaseProblem.value = errorMessage(cause)
+      return
+    }
+  }
   showResults.value = false
   q.value = ''
   navigateAfterPanel(() => void router.push({
@@ -301,7 +322,7 @@ function onInputKeydown(event: KeyboardEvent) {
     activeIndex.value = list.length ? (activeIndex.value - 1 + list.length) % list.length : -1
   } else if (event.key === 'Enter') {
     const item = list[activeIndex.value]
-    if (item) openItem(item)
+    if (item) void openItem(item)
     else if (q.value.trim()) openSearchPage()
   } else if (event.key === 'Escape') {
     showResults.value = false
@@ -558,6 +579,9 @@ onBeforeUnmount(() => {
                   </Button>
                 </div>
               </div>
+              <p v-if="databaseProblem" role="status" class="border-t border-border/70 px-3 py-1.5 text-[10px] text-muted-foreground">
+                {{ databaseProblem }}
+              </p>
               <p
                 v-if="quickObjectError"
                 role="status"

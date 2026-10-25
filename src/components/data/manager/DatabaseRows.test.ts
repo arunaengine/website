@@ -7,6 +7,7 @@ import { compileClientComponent, content, element, click, mountApp, moduleDefaul
 const state = ref('ready')
 const rows = ref<Databases.DatabaseRow[]>([])
 const complete = ref(true)
+const held = ref<{ id: string; bucket: string; prefix: string; held_here: boolean } | null>(null)
 
 const RowStub = defineComponent({
   props: { bucket: String, subtitle: String },
@@ -19,12 +20,16 @@ const component = compileClientComponent(new URL('./DatabaseRows.vue', import.me
   '@/components/data/BucketRow.vue': moduleDefault(RowStub),
   '@/components/ui/Spinner.vue': moduleDefault(defineComponent(() => () => h('i'))),
   '@/composables/useDatabases': {
-    useDatabases: () => ({ rows, state, error: ref('node busy'), complete, ensure: vi.fn() }),
+    useDatabases: () => ({
+      rows, state, error: ref('node busy'), complete, ensure: vi.fn(),
+      locate: async (item: Databases.DatabaseRow) => Databases.placeOf(item, held.value, 'n1'),
+    }),
   },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({ localNodeId: ref('n1'), isLocalNode: (id: string) => id === 'n1' }),
   },
   '@/lib/databases': Databases,
+  '@/lib/utils': { errorMessage: (cause: unknown) => String(cause) },
 })
 
 function row(bucket: string, extra: Partial<Databases.DatabaseRow> = {}): Databases.DatabaseRow {
@@ -73,5 +78,22 @@ describe('database rows', () => {
     complete.value = false
     expect(content((await render()).root)).toContain('The list is partial')
     complete.value = true
+  })
+
+  it('opens a set here only when this node holds it, and says so otherwise', async () => {
+    state.value = 'ready'
+    rows.value = [row('spire', { target: { kind: 'distributed', set_id: 's1' } })]
+    const opened: unknown[][] = []
+    const { root } = await mountApp(component, { props: { filter: '', active: '', onOpen: (...args: unknown[]) => opened.push(args) } })
+
+    held.value = { id: 'r', bucket: 'spire', prefix: '', held_here: false }
+    await click(element(root, (node) => node.props['data-bucket'] === 'spire'))
+    expect(opened).toEqual([])
+    expect(content(root)).toContain('This node holds no copy of this database.')
+
+    held.value = { ...held.value, held_here: true }
+    await click(element(root, (node) => node.props['data-bucket'] === 'spire'))
+    expect(opened).toEqual([['spire', null, 'g1']])
+    held.value = null
   })
 })

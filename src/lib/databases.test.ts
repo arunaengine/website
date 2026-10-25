@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DatabaseRequestView, DatabaseView } from '@/lib/api'
-import { briefOf, databaseOf, openNode, requestOf, rowOf, sameTarget, searchRows, targetOf } from './databases'
+import { briefOf, databaseOf, placeOf, requestOf, rowOf, sameTarget, searchRows, targetOf } from './databases'
 
 function view(bucket: string, target: DatabaseView['target'], extra: Partial<DatabaseView> = {}): DatabaseView {
   return { entry_id: `e-${bucket}`, dataset_id: `d-${bucket}`, owner_group: 'g1', target, bucket, state: 'active', public: false, title: `${bucket} database`, ...extra }
@@ -39,9 +39,13 @@ describe('database rows', () => {
     expect(sameTarget(set, ordinary('n1', 'lab'))).toBe(false)
   })
 
-  it('opens a set on the asked node and an ordinary bucket on its own', () => {
-    expect(openNode(rowOf(view('spire', set)), 'n9')).toBe('n9')
-    expect(openNode(rowOf(view('lab', ordinary('n1', 'lab'))), 'n9')).toBe('n1')
+  it('opens an ordinary bucket on its node and a set here only when this node holds it', () => {
+    const root = { id: 'r', bucket: 'spire-here', prefix: '', set_id: 's1', held_here: true }
+
+    expect(placeOf(rowOf(view('lab', ordinary('n1', 'lab'))), null, 'n9')).toEqual({ bucket: 'lab', nodeId: 'n1' })
+    expect(placeOf(rowOf(view('spire', set)), root, 'n9')).toEqual({ bucket: 'spire-here', nodeId: 'n9' })
+    expect(placeOf(rowOf(view('spire', set)), { ...root, held_here: false }, 'n9')).toBeNull()
+    expect(placeOf(rowOf(view('spire', set)), { ...root, bucket: null }, 'n9')).toBeNull()
   })
 
   it('matches a pending request to its target', () => {

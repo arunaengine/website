@@ -3,7 +3,8 @@
 import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { databaseOf, rowOf, searchRows, targetOf, type DatabaseRow } from '@/lib/databases'
+import { databaseOf, placeOf, rowOf, searchRows, targetOf, type DatabasePlace, type DatabaseRow } from '@/lib/databases'
+import { partId } from '@/lib/linkedPart'
 import { errorMessage } from '@/lib/utils'
 
 export type DatabasesState = 'idle' | 'loading' | 'ready' | 'failed'
@@ -23,7 +24,7 @@ let stateEpoch = -1
 let runs = 0
 
 export function useDatabases() {
-  const { listDatabases, sessionEpoch, authToken } = useAruna()
+  const { listDatabases, getPartTarget, nodeInfo, sessionEpoch, authToken } = useAruna()
   const { localNodeId } = useRealmNodes()
 
   const rows = computed(() => (listedEpoch.value === sessionEpoch.value ? listed.value : []))
@@ -74,8 +75,19 @@ export function useDatabases() {
     },
   )
 
+  /** Where a database opens; a set asks this node whether it holds a copy. */
+  async function locate(row: DatabaseRow): Promise<DatabasePlace | null> {
+    const local = localNodeId.value ?? ''
+    if (row.target.kind === 'ordinary') return placeOf(row, null, local)
+    const realmId = nodeInfo.value?.node.realm_id
+    if (!realmId || !local) return null
+    const root = partId({ realmId, nodeId: local, bucket: row.bucket, prefix: '', setId: row.target.set_id })
+    return placeOf(row, await getPartTarget(root), local)
+  }
+
   return {
     rows,
+    locate,
     state,
     error,
     complete,

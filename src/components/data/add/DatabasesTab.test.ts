@@ -12,10 +12,14 @@ const component = compileClientComponent(new URL('./DatabasesTab.vue', import.me
   '@/components/ui/Button.vue': moduleDefault(defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()) })),
   '@/components/ui/Spinner.vue': moduleDefault(defineComponent(() => () => h('i'))),
   '@/composables/useDatabases': {
-    useDatabases: () => ({ rows, state, error: ref('node busy'), complete: ref(true), ensure: () => undefined }),
+    useDatabases: () => ({
+      rows, state, error: ref('node busy'), complete: ref(true), ensure: () => undefined,
+      locate: async (item: Databases.DatabaseRow) => Databases.placeOf(item, null, 'n1'),
+    }),
   },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ localNodeId: ref('n1') }) },
   '@/lib/databases': Databases,
+  '@/lib/utils': { errorMessage: (cause: unknown) => String(cause) },
 })
 
 function row(bucket: string, target: Databases.DatabaseRow['target']): Databases.DatabaseRow {
@@ -34,7 +38,7 @@ describe('databases in Add data', () => {
 
     expect(content(root)).not.toContain('self title')
     await (button(root, 'Add from this database').props.onClick as () => void)()
-    expect(chosen).toEqual([['far', 'n2']])
+    expect(chosen).toEqual([['far', 'n2', 'g']])
   })
 
   it('shows a failed read instead of an empty list', async () => {

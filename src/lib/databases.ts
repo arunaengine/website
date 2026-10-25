@@ -1,6 +1,6 @@
 // What the portal shows of the realm's databases. The node answers with ids, the bucket name and a
 // state; the dataset's own texts are read from the dataset, with the dataset's access rules.
-import type { DatabaseRequestView, DatabaseStateName, DatabaseTarget, DatabaseView } from '@/lib/api'
+import type { DatabaseRequestView, DatabaseStateName, DatabaseTarget, DatabaseView, PartTargetResponse } from '@/lib/api'
 import { crateGraph, crateRootId, stringProp } from '@/lib/dataEntities'
 
 export interface DatabaseRow {
@@ -60,9 +60,20 @@ export function requestOf(requests: readonly DatabaseRequestView[], target: Data
   return requests.find((request) => sameTarget(request.entry.target, target))
 }
 
-/** The node whose bucket a database opens on; a set opens on the node asked. */
-export function openNode(row: DatabaseRow, localNodeId: string): string {
-  return row.target.kind === 'ordinary' ? row.target.node_id : localNodeId
+export interface DatabasePlace {
+  bucket: string
+  nodeId: string
+}
+
+export const NOT_HELD_HERE = 'This node holds no copy of this database.'
+
+/**
+ * Where a database opens: an ordinary bucket on its own node; a set on this node only when the
+ * part target of its root says this node holds it. Null when it cannot open here.
+ */
+export function placeOf(row: DatabaseRow, root: PartTargetResponse | null, localNodeId: string): DatabasePlace | null {
+  if (row.target.kind === 'ordinary') return { bucket: row.target.bucket, nodeId: row.target.node_id }
+  return root?.held_here && root.bucket ? { bucket: root.bucket, nodeId: localNodeId } : null
 }
 
 /** Rows whose title or bucket contain every word of the query. */

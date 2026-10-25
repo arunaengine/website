@@ -6,6 +6,8 @@ const aruna = vi.hoisted(() => ({
   sessionEpoch: { value: 1 },
   authToken: { value: 'token' },
   listDatabases: vi.fn(),
+  getPartTarget: vi.fn(),
+  nodeInfo: { value: { node: { realm_id: 'r1' } } },
 }))
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
 vi.mock('@/composables/useRealmNodes', () => ({ useRealmNodes: () => ({ localNodeId: ref('n1') }) }))
@@ -128,6 +130,21 @@ describe('databases', () => {
 
     expect(aruna.listDatabases).toHaveBeenCalledTimes(11)
     expect(databases.complete.value).toBe(true)
+    scope.stop()
+  })
+
+  it('opens a set here only when the part target of its root says this node holds it', async () => {
+    const { databases, scope } = start()
+    const [set] = [view('spire', { target: { kind: 'distributed', set_id: 'S1' } })].map((item) => ({
+      entryId: item.entry_id, datasetId: item.dataset_id, bucket: item.bucket, ownerGroup: 'g1', target: item.target,
+      state: item.state, title: null, documentPath: null, public: false,
+    }))
+    aruna.getPartTarget.mockResolvedValueOnce({ id: 'x', bucket: 'spire', prefix: '', held_here: true })
+    expect(await databases.locate(set)).toEqual({ bucket: 'spire', nodeId: 'n1' })
+    expect(aruna.getPartTarget).toHaveBeenCalledWith('https://w3id.org/aruna/data/r1/S1/')
+
+    aruna.getPartTarget.mockResolvedValueOnce({ id: 'x', bucket: 'spire', prefix: '', held_here: false })
+    expect(await databases.locate(set)).toBeNull()
     scope.stop()
   })
 })
