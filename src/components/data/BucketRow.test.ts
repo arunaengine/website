@@ -68,6 +68,14 @@ describe('BucketRow link column', () => {
     expect(nodes(empty[0]).filter((node) => node.kind === 'element')).toEqual([empty[0]])
   })
 
+  it('leaves the other node to the place column instead of a server icon', async () => {
+    const desktop = await mount({ nodeId: 'node-2', linkedTo: null })
+    const web = await mount({ nodeId: 'node-2' })
+
+    expect(content(desktop)).not.toContain('Stored on another node')
+    expect(content(web)).toContain('Stored on another node')
+  })
+
   it('adds no column outside the desktop', async () => {
     expect(column(await mount({}, link))).toHaveLength(0)
   })

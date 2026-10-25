@@ -424,6 +424,43 @@ describe('Bucket sidebar linked buckets', () => {
     expect(nodes(root).filter((node) => node.props['aria-label'] === 'Delete bucket…')).toHaveLength(2)
   })
 
+  it('names the place in one node’s list only on rows from another node', async () => {
+    const state = manager()
+    state.remoteNodeId = ref('node-2') as never
+    state.sidebarBuckets = ref([
+      { bucket: 'pinned-home', nodeId: null, pinned: true },
+      { bucket: 'pinned-far', nodeId: 'node-3', pinned: true },
+      { bucket: 'reef', nodeId: 'node-2', pinned: false },
+    ]) as never
+    state.recentBuckets = ref([
+      { bucket: 'seen-here', nodeId: 'node-2' },
+      { bucket: 'seen-far', nodeId: 'node-3' },
+    ]) as never
+    const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
+    await pickNode()
+    const places = nodes(root).filter((node) => node.props['data-testid'] === 'row-place')
+
+    expect(places.map((node) => content(node))).toEqual([
+      'pinned-home: This computer',
+      'pinned-far: name-node-3',
+      'seen-far: name-node-3',
+    ])
+    expect(columns(root)).toHaveLength(5)
+  })
+
+  it('names no place on rows of the connected node in its own list', async () => {
+    const state = manager()
+    state.sidebarBuckets = ref([
+      { bucket: 'reef', nodeId: null, pinned: false },
+      { bucket: 'pinned-far', nodeId: 'node-2', pinned: true },
+    ]) as never
+    const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
+    await pickNode()
+    const places = nodes(root).filter((node) => node.props['data-testid'] === 'row-place')
+
+    expect(places.map((node) => content(node))).toEqual(['pinned-far: node-2 · Giessen'])
+  })
+
   it('adds no link column on the web', async () => {
     desktopMode.on = false
     const { root } = await mountApp(BucketSidebar, { props: { manager: linkedManager() } })

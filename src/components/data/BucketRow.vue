@@ -34,7 +34,8 @@ const props = withDefaults(
     /** Readable place shown on the row; its title names kind and id. */
     place?: string | null
     placeTitle?: string | null
-    /** Desktop: the linked folder's name; null keeps an empty column so rows line up. */
+    /** Desktop: the linked folder's name; null keeps an empty column so rows line up.
+     *  The place column then names another node, so the server icon is left out. */
     linkedTo?: string | null
   }>(),
   {
@@ -132,7 +133,7 @@ function onClick() {
       <slot v-else name="link" />
     </span>
 
-    <Tooltip v-if="nodeId" side="right">
+    <Tooltip v-if="nodeId && linkedTo === undefined" side="right">
       <RouterLink
         :to="{ name: 'status', query: { node: nodeId } }"
         class="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"

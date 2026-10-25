@@ -371,7 +371,8 @@ async function createFolder() {
       <!-- Opening the session and loading its data share one placeholder. -->
       <DataViewSkeleton v-else-if="contextBusy || !viewReady" />
 
-      <section v-else class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <!-- The desktop's bucket rows carry a node and a link column, so its list is wider. -->
+      <section v-else class="grid gap-6" :class="desktop ? 'lg:grid-cols-[300px_minmax(0,1fr)]' : 'lg:grid-cols-[260px_minmax(0,1fr)]'">
         <Notice v-if="sessionWarning" tone="warning" class="lg:col-span-2">
           {{ sessionWarning }}
         </Notice>

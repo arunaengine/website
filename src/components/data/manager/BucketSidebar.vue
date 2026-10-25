@@ -98,6 +98,11 @@ function rowPlace(nodeId: string | null): { place: string | null; placeTitle: st
   }
   return { place: realmNodes.isLocalNode(nodeId) ? 'This computer' : realmNodes.displayName(nodeId), placeTitle: null }
 }
+// One node's list names a row's place only where it is not that node.
+function listPlace(nodeId: string | null): { place: string | null; placeTitle: string | null } {
+  const other = (id: string | null) => (id && !realmNodes.isLocalNode(id) ? id : null)
+  return other(nodeId) === other(remoteNodeId.value) ? { place: null, placeTitle: null } : rowPlace(nodeId)
+}
 // Arrow keys move through the shown rows of this group, then of other groups.
 const listId = `bucket-results-${useId()}`
 const groupOpeners = computed<(() => void)[]>(() => {
@@ -239,7 +244,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                 :synced="syncByBucket.has(syncKeyFor(entry.nodeId, entry.bucket))"
                 :job="entry.nodeId ? null : jobs.get(entry.bucket)"
                 :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
-                v-bind="rowPlace(entry.nodeId ?? null)"
+                v-bind="listPlace(entry.nodeId ?? null)"
                 :linked-to="linkedTo(entry.nodeId ?? null, entry.bucket)"
                 @open="openBucketOn(entry.bucket, entry.nodeId)"
                 @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
@@ -283,7 +288,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                   :pinned="false"
                   :synced="syncByBucket.has(syncKeyFor(entry.nodeId, entry.bucket))"
                   :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
-                  v-bind="rowPlace(entry.nodeId ?? null)"
+                  v-bind="listPlace(entry.nodeId ?? null)"
                   :linked-to="linkedTo(entry.nodeId ?? null, entry.bucket)"
                   @open="openBucketOn(entry.bucket, entry.nodeId)"
                   @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
