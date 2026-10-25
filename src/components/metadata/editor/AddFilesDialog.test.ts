@@ -366,7 +366,7 @@ describe('AddFilesDialog', () => {
     expect(updates).toHaveLength(0)
 
     items.value = items.value.map((item) => ({ ...item, state: 'done' }))
-    await flush()
+    await vi.waitFor(() => expect(updates).toHaveLength(1))
 
     expect(Editor.findEntity(updates[0], `https://w3id.org/aruna/data/${BLAKE3}`)).toMatchObject({
       types: ['File'],
