@@ -107,6 +107,22 @@ describe('dataset links', () => {
     expect(aruna.getBucketLinks).toHaveBeenLastCalledWith('lab', { key: 'raw/a.fq', parts_only: true, after: 'd1' })
     expect(links.documents.value.map((document) => document.document_id)).toEqual(['d1', 'd2'])
     expect(links.more.value).toBe(false)
+    // A complete later page does not make the first one complete or unhide what it hid.
+    expect([links.complete.value, links.hidden.value]).toEqual([false, true])
+    scope.stop()
+  })
+
+  it('keeps the pages read so far and says when a further page failed', async () => {
+    aruna.getBucketLinks.mockResolvedValueOnce(page(['d1'], { next_after: 'd1' }))
+    aruna.getBucketLinks.mockRejectedValueOnce(new ApiError(404, 'gone'))
+    const { links, scope } = start()
+    await vi.waitFor(() => expect(links.state.value).toBe('ready'))
+    await links.loadMore()
+
+    expect(links.state.value).toBe('ready')
+    expect(links.documents.value.map((document) => document.document_id)).toEqual(['d1'])
+    expect(links.error.value).toBe('gone')
+    expect(links.more.value).toBe(true)
     scope.stop()
   })
 

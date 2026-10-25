@@ -117,6 +117,7 @@ async function mark() {
       </div>
       <Button v-if="links.more.value" variant="ghost" size="sm" :disabled="links.loadingMore.value" @click="links.loadMore()">More datasets</Button>
       <p v-if="!links.complete.value" class="text-xs text-muted-foreground">The list may be incomplete: a node did not answer or is still indexing.</p>
+      <p v-if="links.error.value" class="text-xs text-muted-foreground">More datasets could not be read: {{ links.error.value }}</p>
     </template>
     <Notice v-if="pending" tone="warning" :title="`Waiting for the group admins${groupName ? ` of ${groupName}` : ''}`">
       The mark takes effect when they agree.

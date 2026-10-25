@@ -12,10 +12,15 @@ const props = defineProps<{ target: PartOfTarget }>()
 const part = useFilePartOf(computed(() => props.target))
 const all = ref(false)
 watch(() => [props.target.bucket, props.target.key], () => (all.value = false))
+// An empty answer hides only when it is complete and nothing more or hidden exists.
+const settledEmpty = computed(() => {
+  const found = part.found.value
+  return part.state.value === 'ready' && !found?.datasets.length && !found?.hidden_references_exist && Boolean(found?.complete) && !found?.more
+})
 </script>
 
 <template>
-  <section v-if="part.state.value !== 'missing' && !(part.state.value === 'ready' && !part.found.value?.datasets.length && !part.found.value?.hidden_references_exist)" class="space-y-2 border-t border-border pt-4">
+  <section v-if="part.state.value !== 'missing' && !settledEmpty" class="space-y-2 border-t border-border pt-4">
     <h3 class="text-sm font-medium text-foreground">Part of</h3>
     <Spinner v-if="part.state.value === 'loading'" label="Looking for datasets" />
     <p v-else-if="part.state.value === 'failed'" class="text-xs text-muted-foreground">

@@ -33,10 +33,11 @@ export function useDatasetLinks(target: Ref<LinkTarget | null>) {
   const loadingMore = ref(false)
   let runs = 0
 
+  // A later page never makes the pages before it complete or unhide what they hid.
   function take(page: DataLinksResponse, append: boolean) {
     documents.value = append ? [...documents.value, ...page.documents] : page.documents
-    complete.value = page.complete
-    hidden.value = page.hidden_references_exist
+    complete.value = (!append || complete.value) && page.complete
+    hidden.value = (append && hidden.value) || page.hidden_references_exist
     next.value = page.next_after ?? null
   }
 
@@ -62,7 +63,8 @@ export function useDatasetLinks(target: Ref<LinkTarget | null>) {
       error.value = null
     } catch (cause) {
       if (!current()) return
-      const missing = cause instanceof ApiError && cause.status === 404
+      // A failed further page keeps the pages read so far and says it failed.
+      const missing = !append && cause instanceof ApiError && cause.status === 404
       if (!append) documents.value = []
       state.value = append ? state.value : missing ? 'missing' : 'failed'
       error.value = missing ? null : errorMessage(cause)

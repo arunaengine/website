@@ -13,8 +13,11 @@ const target = computed(() => props.target)
 const links = useDatasetLinks(target)
 const documents = computed(() => links.documents.value.filter((document) => document.document_id !== props.exclude))
 
-// A node without the route shows nothing at all.
-const visible = computed(() => links.state.value !== 'missing' && !(props.quietEmpty && links.state.value === 'ready' && !documents.value.length && !links.hidden.value))
+// A node without the route shows nothing at all; an empty list hides only when it is the whole answer.
+const settledEmpty = computed(
+  () => links.state.value === 'ready' && !documents.value.length && !links.hidden.value && links.complete.value && !links.more.value && !links.error.value,
+)
+const visible = computed(() => links.state.value !== 'missing' && !(props.quietEmpty && settledEmpty.value))
 </script>
 
 <template>
@@ -30,7 +33,7 @@ const visible = computed(() => links.state.value !== 'missing' && !(props.quietE
         <button type="button" class="text-primary hover:underline" @click="links.reload()">Try again</button>
       </p>
       <template v-else>
-        <p v-if="!documents.length" class="text-xs text-muted-foreground">None you can read.</p>
+        <p v-if="!documents.length && !links.more.value" class="text-xs text-muted-foreground">None you can read.</p>
         <ul v-else class="space-y-1 text-xs">
           <li v-for="document in documents" :key="document.document_id">
             <RouterLink :to="{ name: 'dataset', params: { id: document.document_id } }" class="font-medium text-primary hover:underline">
@@ -41,6 +44,7 @@ const visible = computed(() => links.state.value !== 'missing' && !(props.quietE
         <Button v-if="links.more.value" variant="ghost" size="sm" :disabled="links.loadingMore.value" @click="links.loadMore()">More datasets</Button>
         <p v-if="links.hidden.value" class="text-xs text-muted-foreground">Some datasets are not visible to you.</p>
         <p v-if="!links.complete.value" class="text-xs text-muted-foreground">The list may be incomplete: a node did not answer or is still indexing.</p>
+        <p v-if="links.error.value" class="text-xs text-muted-foreground">More datasets could not be read: {{ links.error.value }}</p>
       </template>
     </div>
   </section>
