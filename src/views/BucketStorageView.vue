@@ -9,6 +9,7 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import DocsLink from '@/components/ui/DocsLink.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -172,8 +173,12 @@ const browserLink = computed(() => ({
           :group-name="group?.display_name ?? null"
           :can-admin="canAdminGroup"
         />
+        <Notice v-if="!example && distribution.error.value" tone="error">
+          How this bucket is stored could not be read: {{ distribution.error.value }}
+        </Notice>
         <SetDeleteSection v-if="live" :bucket="live" :admin="canAdminGroup" @changed="distribution.reload" />
-        <BucketDeleteSection v-else :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
+        <!-- A bucket still loading or unreadable is not taken for an ordinary one. -->
+        <BucketDeleteSection v-else-if="nodeId || distribution.state.value === 'ordinary'" :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
       </TabsContent>
 
       <TabsContent v-if="nodes && nodesTab" value="nodes" class="mt-0">

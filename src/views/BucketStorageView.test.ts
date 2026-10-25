@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import * as Distribution from '@/lib/distribution'
 import * as GroupAdmin from '@/lib/groupAdmin'
 import type { GroupDetailResponse } from '@/lib/api'
-import { compileClientComponent, content, mountApp, moduleDefault, nodes } from '@/test/clientRender'
+import { compileClientComponent, content, flush, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 
 const route = reactive<{ params: Record<string, string>; query: Record<string, string> }>({
   params: { bucketId: 'reef-survey' },
@@ -32,6 +32,8 @@ function groupDetail(admin: boolean): GroupDetailResponse {
 const isRealmAdmin = ref(false)
 // The set the node reports for the open bucket; null for an ordinary bucket.
 const setView = ref<unknown>(null)
+const setState = ref('ordinary')
+const setError = ref<string | null>(null)
 const group = ref<GroupDetailResponse>(groupDetail(false))
 
 const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
@@ -91,7 +93,7 @@ const view = compileClientComponent(new URL('./BucketStorageView.vue', import.me
   '@/lib/distributedMock': { mockEnabled: () => false },
   '@/lib/distributedMockData': { mockBucket: () => undefined },
   '@/composables/useBucketDistribution': {
-    useBucketDistribution: () => ({ view: setView, state: ref('ready'), error: ref(null), reload: () => undefined }),
+    useBucketDistribution: () => ({ view: setView, state: setState, error: setError, reload: () => undefined }),
   },
   '@/components/storage/BucketBackendTab.vue': moduleDefault(Marker('backend rules')),
   '@/components/storage/BucketDeleteSection.vue': moduleDefault(Marker('bucket deletion')),
@@ -129,6 +131,8 @@ const hiddenFeatures = new Set<string>()
 
 async function render(options: { admin?: boolean; realmAdmin?: boolean; stored?: unknown; query?: Record<string, string> } = {}) {
   setView.value = options.stored ?? null
+  setState.value = options.stored ? 'ready' : 'ordinary'
+  setError.value = null
   group.value = groupDetail(options.admin ?? false)
   isRealmAdmin.value = options.realmAdmin ?? false
   route.query = options.query ?? {}
@@ -226,6 +230,19 @@ describe('bucket storage page', () => {
     expect(content(root)).not.toContain('bucket deletion')
     expect(content(await render({ stored, query: { tab: 'nodes' } }))).toContain('nodes of the bucket')
     expect(content(await render({ stored, query: { tab: 'access' } }))).toContain('grant on every node')
+  })
+
+  it('offers no ordinary deletion while the storage is loading or unreadable, and says why', async () => {
+    const root = await render({ admin: true })
+    setState.value = 'loading'
+    await flush()
+    expect(content(root)).not.toContain('bucket deletion')
+
+    setState.value = 'unavailable'
+    setError.value = 'node busy'
+    await flush()
+    expect(content(root)).toContain('How this bucket is stored could not be read: node busy')
+    expect(content(root)).not.toContain('bucket deletion')
   })
 
   it('shows the database section on the overview', async () => {
