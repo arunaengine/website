@@ -13,8 +13,6 @@ import type { RealmNodeInfo } from '@/lib/api'
 export interface RealmNodeDisplay {
   nodeId: string
   kind: RealmNodeInfo['kind']
-  /** Where the operator placed the node; null until placement is set. */
-  location: string | null
   /** Latest advertised node record, including custom placement labels. */
   info: RealmNodeInfo['info']
   /** Human label: a published name label when set, else "<kind> <short-id>". */
@@ -81,7 +79,6 @@ export function useRealmNodes() {
       return {
         nodeId: node.node_id,
         kind: node.kind,
-        location: node.placement?.location ?? null,
         info: node.info,
         label: desktop ? placeName(node, thisComputer) : nodeLabel(node),
         name: desktop ? plainName(node, thisComputer) : nodeLabel(node),
