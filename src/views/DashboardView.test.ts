@@ -537,6 +537,19 @@ describe('desktop home', () => {
     mounted.app.unmount()
   })
 
+  it('puts the welcome banner above the desktop cards', async () => {
+    currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
+    isNewUser.value = true
+    desktopMode.value = true
+    const mounted = await mountApp(DashboardClient)
+    await flush()
+    const text = content(mounted.root)
+
+    expect(text.indexOf('New here? Start with the basics.')).toBeGreaterThan(-1)
+    expect(text.indexOf('New here? Start with the basics.')).toBeLessThan(text.indexOf('desktop-home-cards'))
+    mounted.app.unmount()
+  })
+
   it('keeps the web dashboard without them', async () => {
     currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
     const mounted = await mountApp(DashboardClient)
