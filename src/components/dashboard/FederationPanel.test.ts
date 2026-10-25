@@ -156,6 +156,15 @@ describe('this computer', () => {
     expect(html).toContain('1 enrolled, 0 active')
   })
 
+  it('cuts a long name', async () => {
+    const name = 'research-workstation-in-room-4711.example.org'
+    const html = await render({ id: laptop.id, name, peers: ['aaaa-mgmt-1111'] })
+
+    expect(html).toMatch(/>\s*research-workstation-in…\s*<\/text>/)
+    expect(html).toContain(`>${name}</title>`)
+    expect(html).toContain(`This computer, ${name}, is connected.`)
+  })
+
   it('adds nothing when its own info is missing', async () => {
     const html = await render(null)
 

@@ -98,6 +98,8 @@ const spokes = computed(() =>
 const PC_X = VW - 100
 const PC_Y = CY - 30
 const PC_RING = 9
+// A longer name is cut so it stays inside the right edge of the viewBox.
+const PC_NAME_MAX = 24
 
 const computer = computed(() => {
   if (!desktop || !hub.value || !props.computer) return null
@@ -116,7 +118,9 @@ const computer = computed(() => {
         y2: placed.cy - (dy / len) * TRIM,
       }
     })
-  return { id: props.computer.id, name: props.computer.name, lines, connected: lines.length > 0 }
+  const chars = Array.from(props.computer.name)
+  const shortName = chars.length > PC_NAME_MAX ? `${chars.slice(0, PC_NAME_MAX - 1).join('')}…` : props.computer.name
+  return { id: props.computer.id, name: props.computer.name, shortName, lines, connected: lines.length > 0 }
 })
 
 const topologyLabel = computed(() => {
@@ -448,7 +452,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
                 font-weight="600"
                 fill="hsl(var(--foreground))"
               >
-                {{ computer.name }}
+                {{ computer.shortName }}
               </text>
               <text :x="PC_X" :y="PC_Y + PC_RING + 25" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="hsl(var(--muted-foreground))">
                 {{ computer.connected ? 'This computer' : 'This computer, not connected' }}
