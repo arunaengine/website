@@ -11,22 +11,39 @@ import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
+import LinkedDatasets from '@/components/data/LinkedDatasets.vue'
+import { useRealmNodes } from '@/composables/useRealmNodes'
+import { useSetChanges } from '@/composables/useSetChanges'
 import { DELETE_PREVIEWS } from '@/lib/distributedMockData'
 import { degradedRanges, type DistributedBucket } from '@/lib/distribution'
 
 const props = defineProps<{ open: boolean; bucket: DistributedBucket }>()
-const emit = defineEmits<{ (e: 'update:open', value: boolean): void; (e: 'done', message: string): void }>()
+const emit = defineEmits<{
+  (e: 'update:open', value: boolean): void
+  (e: 'done', message: string): void
+  (e: 'changed'): void
+}>()
+
+const { displayName } = useRealmNodes()
+const changes = useSetChanges(computed(() => props.bucket.live))
 
 const typed = ref('')
 const understood = ref(false)
 
 const preview = computed(() => DELETE_PREVIEWS[props.bucket.name] ?? { datasets: [], reasons: [] })
-const complete = computed(() => preview.value.reasons.length === 0)
-const unreachable = computed(() => [...new Set(degradedRanges(props.bucket).map((range) => range.coordinator))])
+// The linked datasets of a real bucket come with their own coverage notes.
+const complete = computed(() => Boolean(props.bucket.live) || preview.value.reasons.length === 0)
+const unreachable = computed(() => [...new Set(degradedRanges(props.bucket).map((range) => displayName(range.coordinator)))])
 const ready = computed(() => typed.value === props.bucket.name && (complete.value || understood.value))
 
-function remove() {
-  emit('done', `${props.bucket.name} would be fenced on every coordinator, then deleted node by node.`)
+async function remove() {
+  if (!props.bucket.live) {
+    emit('done', `${props.bucket.name} would be fenced on every coordinator, then deleted node by node.`)
+    emit('update:open', false)
+    return
+  }
+  if (!(await changes.remove())) return
+  emit('changed')
   emit('update:open', false)
 }
 </script>
@@ -42,7 +59,12 @@ function remove() {
         </DialogDescription>
       </DialogHeader>
 
-      <div class="space-y-2">
+      <LinkedDatasets
+        v-if="bucket.live"
+        heading="Datasets that link this bucket"
+        :target="{ bucket: bucket.name, key: '', folder: true, remote: false }"
+      />
+      <div v-else class="space-y-2">
         <div class="flex items-center gap-2">
           <h3 class="text-sm font-medium text-foreground">Datasets that refer to this bucket</h3>
           <Badge :variant="complete ? 'success' : 'warn'" size="sm">{{ complete ? 'Complete' : 'Incomplete' }}</Badge>
@@ -61,6 +83,7 @@ function remove() {
       <Notice v-if="unreachable.length" tone="warning">
         {{ unreachable.join(', ') }} is unreachable. The last step waits until it is back.
       </Notice>
+      <Notice v-if="changes.failure.value" tone="error">{{ changes.failure.value }}</Notice>
 
       <label v-if="!complete" class="flex items-start gap-2 text-xs">
         <input v-model="understood" type="checkbox" class="mt-0.5" />
@@ -73,7 +96,7 @@ function remove() {
 
       <DialogFooter>
         <Button variant="outline" @click="emit('update:open', false)">Cancel</Button>
-        <Button variant="destructive" :disabled="!ready" @click="remove">Delete bucket</Button>
+        <Button variant="destructive" :disabled="!ready || changes.busy.value" @click="remove">Delete bucket</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

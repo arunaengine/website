@@ -78,6 +78,7 @@ const view = compileClientComponent(new URL('./BucketStorageView.vue', import.me
   '@/components/distributed/AccessTab.vue': moduleDefault(Marker('grants on nodes')),
   '@/components/storage/DistributionOverview.vue': moduleDefault(Marker('stored on')),
   '@/components/storage/BucketSources.vue': moduleDefault(Marker('sources of files')),
+  '@/components/storage/SetDeleteSection.vue': moduleDefault(Marker('deleting a bucket on more nodes')),
   '@/components/storage/DatabaseSettings.vue': moduleDefault(Marker('database settings')),
   '@/components/data/LinkedDatasets.vue': moduleDefault(Marker('datasets that link this bucket')),
   '@/components/distributed/GrantGuide.vue': moduleDefault(Marker('grant on every node')),
@@ -219,7 +220,7 @@ describe('bucket storage page', () => {
     const root = await render({ stored })
     expect(tabs(root)).toEqual(['overview', 'nodes', 'access', 'encryption', 'transfers'])
     expect(content(root)).toContain('stored on')
-    expect(content(root)).toContain('Deleting it is not available yet')
+    expect(content(root)).toContain('deleting a bucket on more nodes')
     expect(content(root)).not.toContain('bucket deletion')
     expect(content(await render({ stored, query: { tab: 'nodes' } }))).toContain('nodes of the bucket')
     expect(content(await render({ stored, query: { tab: 'access' } }))).toContain('grant on every node')

@@ -11,10 +11,18 @@ import { formatBytes, formatNumber } from '@/lib/utils'
 const props = defineProps<{ ranges: DistributedRange[] }>()
 
 const SHOWN = 8
+
+// A range that was split from another names it. The parent may be gone, so its id stands in.
+function parentBounds(id?: string): string {
+  if (!id) return ''
+  const parent = props.ranges.find((range) => range.id === id)
+  return parent ? `${parent.lower || '(start)'} to ${parent.upper || '(end)'}` : id
+}
 const all = ref(false)
 const rows = computed(() => (all.value ? props.ranges : props.ranges.slice(0, SHOWN)))
 // A node that reports no counts or refresh times gets no columns for them.
 const counted = computed(() => props.ranges.some((range) => range.objects !== undefined))
+const split = computed(() => props.ranges.some((range) => range.lineage))
 const refreshed = computed(() => props.ranges.some((range) => range.refreshed !== undefined))
 </script>
 
@@ -27,6 +35,7 @@ const refreshed = computed(() => props.ranges.some((range) => range.refreshed !=
             <th class="px-3 py-2 font-medium">Range</th>
             <th class="px-3 py-2 font-medium">Bounds</th>
             <th class="px-3 py-2 font-medium">Coordinator</th>
+            <th v-if="split" class="px-3 py-2 font-medium">Split from</th>
             <th class="px-3 py-2 font-medium">Epoch</th>
             <th class="px-3 py-2 font-medium">Replicas</th>
             <template v-if="counted">
@@ -44,6 +53,7 @@ const refreshed = computed(() => props.ranges.some((range) => range.refreshed !=
               <NodeLabel :node-id="range.coordinator" />
               <Badge v-if="isDegraded(range)" variant="warn" size="sm" class="ml-1">unreachable</Badge>
             </td>
+            <td v-if="split" class="max-w-[8rem] truncate px-3 py-2 font-mono" :title="range.lineage">{{ parentBounds(range.lineage) }}</td>
             <td class="px-3 py-2">{{ range.epoch }}</td>
             <td class="px-3 py-2">
               <template v-if="range.replicas.length">

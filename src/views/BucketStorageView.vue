@@ -23,6 +23,7 @@ import BucketNodesTab from '@/components/storage/BucketNodesTab.vue'
 import BucketEncryptionTab from '@/components/storage/BucketEncryptionTab.vue'
 import BucketPolicySection from '@/components/storage/BucketPolicySection.vue'
 import DistributionOverview from '@/components/storage/DistributionOverview.vue'
+import SetDeleteSection from '@/components/storage/SetDeleteSection.vue'
 import BucketSources from '@/components/storage/BucketSources.vue'
 import LinkedDatasets from '@/components/data/LinkedDatasets.vue'
 import LinkedBy from '@/components/storage/LinkedBy.vue'
@@ -32,7 +33,6 @@ import CopiesOfBucket from '@/components/storage/CopiesOfBucket.vue'
 import FileSources from '@/components/storage/FileSources.vue'
 import StorageOverviewTab from '@/components/storage/StorageOverviewTab.vue'
 import TransfersTab from '@/components/storage/TransfersTab.vue'
-import Notice from '@/components/ui/Notice.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useBucketDistribution } from '@/composables/useBucketDistribution'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -172,9 +172,7 @@ const browserLink = computed(() => ({
           :group-name="group?.display_name ?? null"
           :can-admin="canAdminGroup"
         />
-        <Notice v-if="live" tone="info">
-          This bucket is stored on {{ live.members.length }} nodes. Deleting it is not available yet.
-        </Notice>
+        <SetDeleteSection v-if="live" :bucket="live" :admin="canAdminGroup" @changed="distribution.reload" />
         <BucketDeleteSection v-else :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
       </TabsContent>
 

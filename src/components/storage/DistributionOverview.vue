@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import MockNotice from '@/components/distributed/MockNotice.vue'
 import RowList from '@/components/distributed/RowList.vue'
 import { presetById, stamp, storedLabel } from '@/lib/distributedMock'
-import { degradedRanges, isMulti, type DistributedBucket } from '@/lib/distribution'
+import { degradedRanges, isDeleting, isMulti, type DistributedBucket } from '@/lib/distribution'
 import { formatCount } from '@/lib/formatCount'
 import { formatBytes } from '@/lib/utils'
 import { HardDrive } from '@lucide/vue'
@@ -15,7 +15,7 @@ const rows = computed(() => {
   const bucket = props.bucket
   const counted = bucket.ranges.every((range) => range.objects !== undefined && range.bytes !== undefined)
   const nodes = bucket.members.map((member) => member.nodeId).join(', ')
-  const state = bucket.live?.pending ? 'Pending' : degradedRanges(bucket).length ? 'Degraded' : 'Active'
+  const state = isDeleting(bucket) ? 'Deleting' : bucket.live?.pending ? 'Pending' : degradedRanges(bucket).length ? 'Degraded' : 'Active'
   return [
     { label: 'State', value: state },
     ...(counted
