@@ -114,4 +114,18 @@ describe('databases', () => {
     expect(databases.rows.value.map((row) => row.bucket)).toEqual(['lab'])
     scope.stop()
   })
+
+  it('reads up to the 1024 databases a realm may hold', async () => {
+    aruna.listDatabases.mockImplementation(async ({ after }: { after?: string }) => {
+      const page = Number(after ?? 0)
+      return { databases: [view(`b${page}`)], next_after: page < 10 ? String(page + 1) : null }
+    })
+    const { databases, scope } = start()
+    databases.ensure()
+    await vi.waitFor(() => expect(databases.state.value).toBe('ready'))
+
+    expect(aruna.listDatabases).toHaveBeenCalledTimes(11)
+    expect(databases.complete.value).toBe(true)
+    scope.stop()
+  })
 })

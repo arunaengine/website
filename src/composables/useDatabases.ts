@@ -9,7 +9,8 @@ import { errorMessage } from '@/lib/utils'
 export type DatabasesState = 'idle' | 'loading' | 'ready' | 'failed'
 
 const PAGE = 100
-const PAGES = 5
+// A realm holds at most 1024 databases, so this reads all of them.
+const PAGES = Math.ceil(1024 / PAGE)
 
 // One list for the whole portal; it belongs to the session that read it.
 const listed = ref<DatabaseRow[]>([])
