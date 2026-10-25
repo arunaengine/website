@@ -249,6 +249,29 @@ describe('AddFilesDialog', () => {
     again.app.unmount()
   })
 
+  it('offers the node address of a copy source and names it only when the user confirms', async () => {
+    const source = 'https://w3id.org/aruna/data/arn:aruna:realm-1:node-2:s3/lab/raw/one.csv@01K8Y2B6D8F0H2K4M6P8R0T2V4'
+    getFileOrigin.mockResolvedValue({ projection: [{ property: 'isBasedOn', id: source }] })
+    const updates: Editor.CrateDraft[] = []
+    const mounted = await mount(updates)
+
+    await click(button(mounted.root, 'Pick objects'))
+    await flush()
+
+    const id = `https://w3id.org/aruna/data/${BLAKE3}`
+    expect(Editor.findEntity(updates[0], id)?.properties.isBasedOn).toBeUndefined()
+    expect(content(mounted.root)).toContain('1 added file was copied from files in other buckets.')
+
+    await mounted.app.unmount()
+    const confirmed: Editor.CrateDraft[] = []
+    const again = await mount(confirmed, { draft: updates[0] })
+    await click(button(again.root, 'Pick objects'))
+    await flush()
+    await click(button(again.root, 'Name the sources'))
+    expect(Editor.findEntity(confirmed.at(-1)!, id)?.properties.isBasedOn).toEqual([{ kind: 'reference', value: source }])
+    again.app.unmount()
+  })
+
   it('says when the origin or the datasets of a file could not be read', async () => {
     getFileOrigin.mockRejectedValue(new ApiError(503, 'busy'))
     const updates: Editor.CrateDraft[] = []

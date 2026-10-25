@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PartTargetResponse } from '@/lib/api'
-import { browseProblem, browseRoute, looksLikePart, partId } from './linkedPart'
+import { browseProblem, browseRoute, isNodeArn, looksLikePart, partId } from './linkedPart'
 
 const set = 'https://w3id.org/aruna/data/k3V9xQ2m/01K8Y2B6D8/'
 const target = (extra: Partial<PartTargetResponse>): PartTargetResponse => ({ id: set, bucket: 'bakrep', prefix: 'raw/2026/', held_here: true, ...extra })
@@ -14,6 +14,13 @@ describe('linked part', () => {
     expect(looksLikePart('https://w3id.org/aruna/data/k3V9xQ2m/01K8Y2B6D8')).toBe(false)
     expect(looksLikePart(`https://w3id.org/aruna/data/${'a'.repeat(64)}`)).toBe(false)
     expect(looksLikePart('https://example.org/data/a/b/c')).toBe(false)
+  })
+
+  it('tells a node address from a global or public id', () => {
+    expect(isNodeArn('arn:aruna:r:n:s3/lab/raw/a.fq@01K8Y2B6D8F0H2K4M6P8R0T2V4')).toBe(true)
+    expect(isNodeArn('https://w3id.org/aruna/data/arn:aruna:r:n:s3/lab/raw/a.fq@01K8Y2B6D8F0H2K4M6P8R0T2V4')).toBe(true)
+    expect(isNodeArn('https://w3id.org/aruna/data/k3V9xQ2m/01K8Y2B6D8')).toBe(false)
+    expect(isNodeArn('https://example.org/src/one.csv')).toBe(false)
   })
 
   it('names why the files cannot be listed from this node', () => {

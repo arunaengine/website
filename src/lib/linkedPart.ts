@@ -6,6 +6,11 @@ import { folderRoute } from '@/lib/crate/dataIdentity'
 const W3ID_DATA = 'https://w3id.org/aruna/data/'
 const CONTENT_ID = /^[0-9a-f]{64}$/
 
+/** Whether an id spells out the node, bucket and key of a stored file or folder, bare or as a web id. */
+export function isNodeArn(id: string): boolean {
+  return id.startsWith('arn:aruna:') || id.startsWith(`${W3ID_DATA}arn:aruna:`)
+}
+
 /**
  * Whether an id may name a bucket or a folder: the bucket-prefix ARN of an ordinary bucket, or the
  * global id URL of a set (`/{realm}/{set}/` or `/{realm}/{set}/{prefix}`). The node decides.

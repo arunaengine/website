@@ -46,7 +46,7 @@ import {
 import { isAbsoluteUri } from '@/lib/profiles/uri'
 import { isDataEntity } from '@/lib/dataEntities'
 import { ApiError, getStorageLocation, type MetadataDocumentListItem, type StorageLocation } from '@/lib/api'
-import { partId } from '@/lib/linkedPart'
+import { isNodeArn, partId } from '@/lib/linkedPart'
 import { formatBytes } from '@/lib/utils'
 import { FileJson2 } from '@lucide/vue'
 
@@ -129,6 +129,8 @@ function note(text: string) {
 // Other datasets a file is part of are only suggested: naming them could show a private dataset
 // to the readers of this one, so the user adds them.
 const suggested = ref<Array<{ part: FilePart; partOf: string[] }>>([])
+// A copy or sync source names a node, bucket and key. Like a private dataset, it is only suggested.
+const sources = ref<Array<{ part: FilePart; ids: string[] }>>([])
 const urlInvalid = computed(() => Boolean(url.value.trim()) && !isAbsoluteUri(url.value.trim()))
 
 watch(() => props.open, (open) => {
@@ -142,6 +144,7 @@ watch(() => props.open, (open) => {
   linked.value = new Set()
   notes.value = []
   suggested.value = []
+  sources.value = []
   database.value = null
   void loadBuckets()
 }, { immediate: true })
@@ -204,7 +207,9 @@ async function origins(bucketName: string, key: string, versionId: string | null
     getFilePartOf(bucketName, key),
   ])
   const projection = origin.status === 'fulfilled' ? origin.value?.projection ?? [] : []
-  const basedOn = projection.flatMap((item) => (item.property === 'isBasedOn' ? [item.id] : []))
+  const based = projection.flatMap((item) => (item.property === 'isBasedOn' ? [item.id] : []))
+  const basedOn = based.filter((id) => !isNodeArn(id))
+  const sourceIds = based.filter(isNodeArn)
   const createdBy = projection.flatMap((item) => (item.property === 'CreateAction' ? [item.run_id] : []))
   const partOf = parts.status === 'fulfilled'
     ? parts.value.datasets.filter((dataset) => dataset.document_id !== props.draft.documentId).map((dataset) => dataset.graph_iri)
@@ -213,7 +218,7 @@ async function origins(bucketName: string, key: string, versionId: string | null
     note('Some files may be part of more datasets than listed. Open the file in Data to see them all.')
   }
   if (failed(origin) || failed(parts)) note('The origin or the datasets of some files could not be read. They were added without them.')
-  return { found: { ...(basedOn.length ? { basedOn } : {}), ...(createdBy.length ? { createdBy } : {}) }, partOf }
+  return { found: { ...(basedOn.length ? { basedOn } : {}), ...(createdBy.length ? { createdBy } : {}) }, partOf, sourceIds }
 }
 
 // A file of a bucket on another node (`nodeId`) keeps that node in its identity. This node cannot
@@ -233,6 +238,7 @@ async function filePart(bucketName: string, key: string, name: string, size?: nu
     ...(size === undefined ? {} : { contentSize: String(size) }),
   }
   if (looked?.partOf.length) suggested.value = [...suggested.value, { part, partOf: looked.partOf }]
+  if (looked?.sourceIds.length) sources.value = [...sources.value, { part, ids: looked.sourceIds }]
   return part
 }
 
@@ -250,6 +256,17 @@ function addMemberships() {
     for (const iri of partOf) next = linkReference(next, id, 'isPartOf', iri)
   }
   suggested.value = []
+  emit('update', next)
+}
+
+// The user confirmed: each file names the source it was copied or synced from.
+function addSources() {
+  let next = props.draft
+  for (const { part, ids } of sources.value) {
+    const id = entityIdFor(next, part)
+    for (const source of ids) next = linkReference(next, id, 'isBasedOn', source)
+  }
+  sources.value = []
   emit('update', next)
 }
 
@@ -373,6 +390,11 @@ function addUrl() {
         {{ suggested.length }} added {{ suggested.length === 1 ? 'file is' : 'files are' }} part of other datasets.
         Name them here only if the readers of this dataset may see them.
         <Button size="sm" variant="outline" class="mt-2" @click="addMemberships">Name the other datasets</Button>
+      </Notice>
+      <Notice v-if="sources.length" tone="info" title="Copied from other files">
+        {{ sources.length }} added {{ sources.length === 1 ? 'file was' : 'files were' }} copied from files in other buckets.
+        Name the sources here only if the readers of this dataset may see where those files are stored.
+        <Button size="sm" variant="outline" class="mt-2" @click="addSources">Name the sources</Button>
       </Notice>
       <Tabs v-model="tab">
         <TabsList>
