@@ -83,11 +83,15 @@ vi.mock('./useUploadQueue', () => ({ useUploadQueue: () => ({ enqueue: vi.fn(), 
 const desktop = vi.hoisted(() => ({ on: true }))
 const folders = ref<SyncedFolder[]>([])
 const ensureLoaded = vi.fn(async () => undefined)
+const load = vi.fn(async () => undefined)
+const CLIENT = { baseUrl: 'http://127.0.0.1:34116/api/v1', token: 't' }
+const deviceClient = ref<typeof CLIENT | null>(CLIENT)
 vi.mock('@/lib/desktop', async (original) => ({
   ...(await original<typeof import('@/lib/desktop')>()),
   isDesktop: () => desktop.on,
 }))
-vi.mock('./useSyncedFolders', () => ({ useSyncedFolders: () => ({ folders, ensureLoaded }) }))
+vi.mock('./useSyncedFolders', () => ({ useSyncedFolders: () => ({ folders, ensureLoaded, load }) }))
+vi.mock('./useDeviceStatus', () => ({ useDeviceStatus: () => ({ deviceClient }) }))
 
 const { useDataManager } = await import('./useDataManager')
 
@@ -102,7 +106,9 @@ afterEach(() => unmount())
 
 beforeEach(() => {
   desktop.on = true
-  ensureLoaded.mockClear()
+  ensureLoaded.mockReset()
+  load.mockReset()
+  deviceClient.value = CLIENT
   folders.value = [
     folder('reef-folder', 'n-local', 'reef'),
     folder('far-folder', 'n-far', 'archive'),
@@ -164,6 +170,36 @@ describe('buckets linked to a folder on this computer', () => {
 
     expect(manager.linkedFolderFor('n-far', 'scans')?.folder_id).toBe('scans')
     expect(manager.currentLinkedFolder.value).toBeNull()
+  })
+
+  it('reads the folders once this computer answers', async () => {
+    // Opened straight into Data: the node answers only after the view asked for the folders.
+    const listed = folders.value
+    folders.value = []
+    deviceClient.value = null
+    ensureLoaded.mockImplementation(async () => {
+      if (deviceClient.value) folders.value = listed
+    })
+    const manager = await start()
+    expect(manager.linkedFolderFor('n-far', 'archive')).toBeNull()
+
+    deviceClient.value = CLIENT
+    await flush()
+
+    expect(ensureLoaded).toHaveBeenCalledTimes(2)
+    expect(manager.linkedFolderFor('n-far', 'archive')?.folder_id).toBe('far-folder')
+  })
+
+  it('reads the folders again on refresh', async () => {
+    const manager = await start()
+    load.mockImplementation(async () => {
+      folders.value = [folder('scans', 'n-local', 'reef')]
+    })
+
+    await manager.onRefresh()
+
+    expect(load).toHaveBeenCalledTimes(1)
+    expect(manager.currentLinkedFolder.value?.folder_id).toBe('scans')
   })
 
   it('reads and links nothing on the web', async () => {

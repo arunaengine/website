@@ -16,6 +16,7 @@ import { usePublicAccess } from './usePublicAccess'
 import { useRealmNodes } from './useRealmNodes'
 import { useRefresh } from './useRefresh'
 import { useStagingReferences } from './useStagingReferences'
+import { useDeviceStatus } from './useDeviceStatus'
 import { useSyncedFolders } from './useSyncedFolders'
 import { useUploadQueue } from './useUploadQueue'
 import {
@@ -433,7 +434,8 @@ export function useDataManager() {
 
   // Desktop only: the folder on this computer linked to each bucket, keyed like the syncs.
   const syncedFolders = isDesktop() ? useSyncedFolders() : null
-  void syncedFolders?.ensureLoaded()
+  // The node's client can arrive after the view opened, so the folders are read again then.
+  if (syncedFolders) watch(useDeviceStatus().deviceClient, () => void syncedFolders.ensureLoaded(), { immediate: true })
   const linkedFolders = computed(() => {
     const map = new Map<string, SyncedFolder>()
     for (const folder of syncedFolders?.folders.value ?? []) {
@@ -831,8 +833,9 @@ export function useDataManager() {
     await loadObjects()
   }
 
-  // Without an open bucket, only the shown bucket list reloads.
+  // Without an open bucket, only the shown bucket list reloads. The linked folders always do.
   function refreshAll(): Promise<unknown> {
+    void syncedFolders?.load()
     if (bucket.value) return refreshBucket()
     return bucketNodeChoice.value === null ? allBuckets.reload() : bucketList.refresh()
   }
