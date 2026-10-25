@@ -27,6 +27,7 @@ import { dataEntityIdentity, objectLocation } from '@/lib/crate/dataIdentity'
 import {
   addFilePart,
   addSubcratePart,
+  entityIdFor,
   linkReference,
   type FilePart,
   type ReferenceTarget,
@@ -116,7 +117,13 @@ const listed = computed(() => {
 })
 // Files added in one step get their origin and datasets looked up, up to this many.
 const LOOKUP_LIMIT = 100
-const originNote = ref('')
+const notes = ref<string[]>([])
+function note(text: string) {
+  if (!notes.value.includes(text)) notes.value = [...notes.value, text]
+}
+// Other datasets a file is part of are only suggested: naming them could show a private dataset
+// to the readers of this one, so the user adds them.
+const suggested = ref<Array<{ part: FilePart; partOf: string[] }>>([])
 const urlInvalid = computed(() => Boolean(url.value.trim()) && !isAbsoluteUri(url.value.trim()))
 
 watch(() => props.open, (open) => {
@@ -128,7 +135,8 @@ watch(() => props.open, (open) => {
   urlName.value = ''
   uploading.value = []
   linked.value = new Set()
-  originNote.value = ''
+  notes.value = []
+  suggested.value = []
   void loadBuckets()
 }, { immediate: true })
 
@@ -166,51 +174,73 @@ function formatOf(name: string): string | undefined {
 }
 
 // What the node needs to answer with a content identity; without it the
-// location stays the identity.
-function identityOptions(): ContentIdentityOptions {
+// location stays the identity. The version is read once, before.
+function identityOptions(versionId: string | null): ContentIdentityOptions {
   return {
     realmId: nodeInfo.value?.node.realm_id ?? null,
     nodeId: nodeInfo.value?.node.peer_id ?? null,
     apiBaseUrl: apiBaseUrl.value,
     authToken: authToken.value ?? null,
-    getVersionId: async (name: string, key: string) => (await s3.headObject(name, key)).versionId ?? null,
+    getVersionId: async () => versionId,
   }
 }
 
-// What the node lets a dataset say about a file: where it came from and the datasets it is part of.
-// A node that cannot say adds nothing, and the file is added as before.
-async function origins(bucketName: string, key: string): Promise<Pick<FilePart, 'basedOn' | 'partOf' | 'createdBy'>> {
-  const [origin, parts] = await Promise.allSettled([getFileOrigin(bucketName, { key }), getFilePartOf(bucketName, key)])
-  const basedOn = origin.status === 'fulfilled'
-    ? origin.value.projection.flatMap((item) => (item.property === 'isBasedOn' ? [item.id] : []))
-    : []
-  const createdBy = origin.status === 'fulfilled'
-    ? origin.value.projection.flatMap((item) => (item.property === 'CreateAction' ? [item.run_id] : []))
-    : []
+// A 404 means the node recorded nothing; any other failure is said, never read as "nothing".
+function failed(result: PromiseSettledResult<unknown>): boolean {
+  return result.status === 'rejected' && !(result.reason instanceof ApiError && result.reason.status === 404)
+}
+
+// What the node lets a dataset say about one version of a file: where it came from. The datasets
+// it is part of come back apart, as a suggestion. A version that is not known gets no origin.
+async function origins(bucketName: string, key: string, versionId: string | null) {
+  const [origin, parts] = await Promise.allSettled([
+    versionId ? getFileOrigin(bucketName, { key, version_id: versionId }) : Promise.resolve(null),
+    getFilePartOf(bucketName, key),
+  ])
+  const projection = origin.status === 'fulfilled' ? origin.value?.projection ?? [] : []
+  const basedOn = projection.flatMap((item) => (item.property === 'isBasedOn' ? [item.id] : []))
+  const createdBy = projection.flatMap((item) => (item.property === 'CreateAction' ? [item.run_id] : []))
   const partOf = parts.status === 'fulfilled'
     ? parts.value.datasets.filter((dataset) => dataset.document_id !== props.draft.documentId).map((dataset) => dataset.graph_iri)
     : []
-  if (parts.status === 'fulfilled' && parts.value.more) {
-    originNote.value = 'Some files are part of more datasets than the ten added. Open the file in Data to see them all.'
+  if (parts.status === 'fulfilled' && (parts.value.more || !parts.value.complete)) {
+    note('Some files may be part of more datasets than listed. Open the file in Data to see them all.')
   }
-  return { ...(basedOn.length ? { basedOn } : {}), ...(partOf.length ? { partOf } : {}), ...(createdBy.length ? { createdBy } : {}) }
+  if (failed(origin) || failed(parts)) note('The origin or the datasets of some files could not be read. They were added without them.')
+  return { found: { ...(basedOn.length ? { basedOn } : {}), ...(createdBy.length ? { createdBy } : {}) }, partOf }
 }
 
 async function filePart(bucketName: string, key: string, name: string, size?: number, lookup = true): Promise<FilePart> {
-  const identity = await dataEntityIdentity(bucketName, key, identityOptions())
-  return {
+  // One version names both the content and the origin, so both describe the same bytes.
+  const versionId = await s3.headObject(bucketName, key).then((head) => head.versionId ?? null, () => null)
+  const identity = await dataEntityIdentity(bucketName, key, identityOptions(versionId))
+  const looked = lookup ? await origins(bucketName, key, versionId) : null
+  const part: FilePart = {
     id: identity.id,
     name,
     contentUrl: identity.contentUrl,
-    ...(lookup ? await origins(bucketName, key) : {}),
+    ...looked?.found,
     ...(formatOf(name) ? { encodingFormat: formatOf(name) } : {}),
     ...(size === undefined ? {} : { contentSize: String(size) }),
   }
+  if (looked?.partOf.length) suggested.value = [...suggested.value, { part, partOf: looked.partOf }]
+  return part
 }
 
 function apply(parts: FilePart[]) {
   let next = props.draft
   for (const part of parts) next = addFilePart(next, part, props.target)
+  emit('update', next)
+}
+
+// The user confirmed: each suggested file names the other datasets it is part of.
+function addMemberships() {
+  let next = props.draft
+  for (const { part, partOf } of suggested.value) {
+    const id = entityIdFor(next, part)
+    for (const iri of partOf) next = linkReference(next, id, 'isPartOf', iri)
+  }
+  suggested.value = []
   emit('update', next)
 }
 
@@ -236,12 +266,12 @@ async function folderPart(bucketName: string, folder: FolderEntry): Promise<File
 
 async function addObjects(selection: { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[] }) {
   const parts: FilePart[] = []
-  originNote.value = ''
+  notes.value = []
   for (const [index, object] of selection.objects.entries()) {
     parts.push(await filePart(selection.bucket, object.key, object.name, object.size, index < LOOKUP_LIMIT))
   }
   if (selection.objects.length > LOOKUP_LIMIT) {
-    originNote.value = `The origin and the datasets were added for the first ${LOOKUP_LIMIT} files only.`
+    note(`The origin and the datasets were looked up for the first ${LOOKUP_LIMIT} files only.`)
   }
   for (const folder of selection.folders) parts.push(await folderPart(selection.bucket, folder))
   apply(parts)
@@ -319,7 +349,12 @@ function addUrl() {
         </DialogDescription>
       </DialogHeader>
 
-      <Notice v-if="originNote" tone="info">{{ originNote }}</Notice>
+      <Notice v-for="text in notes" :key="text" tone="info">{{ text }}</Notice>
+      <Notice v-if="suggested.length" tone="info" title="Also part of other datasets">
+        {{ suggested.length }} added {{ suggested.length === 1 ? 'file is' : 'files are' }} part of other datasets.
+        Name them here only if the readers of this dataset may see them.
+        <Button size="sm" variant="outline" class="mt-2" @click="addMemberships">Name the other datasets</Button>
+      </Notice>
       <Tabs v-model="tab">
         <TabsList>
           <TabsTrigger value="bucket">From a bucket</TabsTrigger>

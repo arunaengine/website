@@ -203,7 +203,7 @@ describe('AddFilesDialog', () => {
     mounted.app.unmount()
   })
 
-  it('adds the origin and the datasets of a picked file, and names a folder by its bucket and prefix', async () => {
+  it('adds the origin of the picked version and names other datasets only when the user confirms', async () => {
     getFileOrigin.mockResolvedValue({ projection: [{ property: 'isBasedOn', id: 'https://example.org/src/one.csv' }, { property: 'CreateAction', run_id: 'run1' }] })
     getFilePartOf.mockResolvedValue({
       datasets: [
@@ -211,6 +211,7 @@ describe('AddFilesDialog', () => {
         { document_id: 'd1', graph_iri: 'https://w3id.org/aruna/d1', part_ids: [] },
       ],
       more: false,
+      complete: true,
     })
     const updates: Editor.CrateDraft[] = []
     const mounted = await mount(updates, { draft: { ...Editor.newDraft(), documentId: 'd1' } })
@@ -218,12 +219,37 @@ describe('AddFilesDialog', () => {
     await click(button(mounted.root, 'Pick objects'))
     await flush()
 
-    expect(getFileOrigin).toHaveBeenCalledWith('reads', { key: 'raw/one.csv' })
+    // The origin is read for the same version that names the content.
+    expect(getFileOrigin).toHaveBeenCalledWith('reads', { key: 'raw/one.csv', version_id: '01VERSION' })
     const file = Editor.findEntity(updates[0], `https://w3id.org/aruna/data/${BLAKE3}`)
     expect(file?.properties.isBasedOn).toEqual([{ kind: 'reference', value: 'https://example.org/src/one.csv' }])
     expect(Editor.findEntity(updates[0], '#run-run1')?.properties.result).toEqual([{ kind: 'reference', value: `https://w3id.org/aruna/data/${BLAKE3}` }])
+    // Another dataset may be private, so it is not named without the user.
+    expect(file?.properties.isPartOf).toBeUndefined()
+    expect(content(mounted.root)).toContain('1 added file is part of other datasets.')
+
+    await mounted.app.unmount()
+    const confirmed: Editor.CrateDraft[] = []
+    const again = await mount(confirmed, { draft: { ...updates[0], documentId: 'd1' } })
+    await click(button(again.root, 'Pick objects'))
+    await flush()
+    await click(button(again.root, 'Name the other datasets'))
     // The dataset being edited is not named as one the file is part of.
-    expect(file?.properties.isPartOf).toEqual([{ kind: 'reference', value: 'https://w3id.org/aruna/d9' }])
+    const named = Editor.findEntity(confirmed.at(-1)!, `https://w3id.org/aruna/data/${BLAKE3}`)
+    expect(named?.properties.isPartOf).toEqual([{ kind: 'reference', value: 'https://w3id.org/aruna/d9' }])
+    again.app.unmount()
+  })
+
+  it('says when the origin or the datasets of a file could not be read', async () => {
+    getFileOrigin.mockRejectedValue(new ApiError(503, 'busy'))
+    const updates: Editor.CrateDraft[] = []
+    const mounted = await mount(updates)
+
+    await click(button(mounted.root, 'Pick objects'))
+    await flush()
+
+    expect(updates).toHaveLength(1)
+    expect(content(mounted.root)).toContain('could not be read. They were added without them.')
     mounted.app.unmount()
   })
 
