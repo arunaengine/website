@@ -16,7 +16,7 @@ import {
 import { useDeviceQuery } from '@/composables/useDeviceQuery'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { isDesktop } from '@/lib/desktop'
-import { follow, onWake, POLL_ACTIVE_MS, POLL_IDLE_MS } from '@/lib/poll'
+import { POLL_ACTIVE_MS, POLL_IDLE_MS, sharedPoll } from '@/lib/poll'
 import { errorMessage } from '@/lib/utils'
 
 const EMPTY: DeviceSyncStatus = {
@@ -86,17 +86,13 @@ async function runSync(): Promise<void> {
 const unserved = () => query.state.value === 'unsupported' || query.state.value === 'forbidden'
 
 // Re-armed after every read so a status that turns busy shortens the next wait.
-function watchStatus(): void {
-  const stop = follow(read, () => pollMs.value, unserved)
-  const unwake = onWake(() => void read())
-  onUnmounted(() => {
-    stop()
-    unwake()
-  })
-}
+const poll = sharedPoll(read, () => pollMs.value, unserved)
 
 export function useDeviceSync(options: { poll?: boolean } = {}) {
-  if (options.poll !== false) watchStatus()
+  if (options.poll !== false) {
+    poll.start()
+    onUnmounted(poll.stop)
+  }
   return {
     status,
     state: query.state,
