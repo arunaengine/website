@@ -1,5 +1,10 @@
 import {
+  changeSettings as requestSettings,
   createDistributedBucket as requestCreate,
+  deleteSet as requestDeleteSet,
+  joinMember as requestJoin,
+  leaveMember as requestLeave,
+  transferRange as requestTransfer,
   getBucketLinks as requestLinks,
   getBucketSources as requestSources,
   getFilePartOf as requestPartOf,
@@ -10,6 +15,10 @@ import {
   getBucketUsage as requestBucketUsage,
   retryAdmission as requestRetry,
   type AdmissionResponse,
+  type ChangeResponse,
+  type JoinMemberRequest,
+  type SettingsBody,
+  type TransferRangeRequest,
   type BlobLocationsResponse,
   type BucketRoutingResponse,
   type BucketLinksQuery,
@@ -113,6 +122,35 @@ export async function createDistributedBucket(
     saving.value = false
   }
 }
+
+async function change<T>(work: (client: ReturnType<typeof refreshContext>['client']) => Promise<T>): Promise<T> {
+  saving.value = true
+  try {
+    return await work(refreshContext().client)
+  } finally {
+    saving.value = false
+  }
+}
+
+/** Group ADMIN: adds a node to an active bucket stored on more nodes. */
+export const joinDistributedMember = (groupId: string, setId: string, body: JoinMemberRequest): Promise<AdmissionResponse> =>
+  change((client) => requestJoin(groupId, setId, body, client))
+
+/** Group ADMIN: marks a member leaving. */
+export const leaveDistributedMember = (groupId: string, setId: string, memberId: string): Promise<ChangeResponse> =>
+  change((client) => requestLeave(groupId, setId, memberId, client))
+
+/** Group ADMIN: opens a fenced transfer of one range. */
+export const transferDistributedRange = (groupId: string, setId: string, body: TransferRangeRequest): Promise<ChangeResponse> =>
+  change((client) => requestTransfer(groupId, setId, body, client))
+
+/** Group ADMIN: replaces the bucket-wide settings. */
+export const changeDistributedSettings = (groupId: string, setId: string, body: SettingsBody): Promise<ChangeResponse> =>
+  change((client) => requestSettings(groupId, setId, body, client))
+
+/** Group ADMIN: deletes the set with every member bucket. */
+export const deleteDistributedBucket = (groupId: string, setId: string): Promise<ChangeResponse> =>
+  change((client) => requestDeleteSet(groupId, setId, client))
 
 /** Asks the members that are not admitted yet to admit again. */
 export async function retryDistributedAdmission(groupId: string, setId: string): Promise<AdmissionResponse> {

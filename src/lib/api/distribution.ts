@@ -25,7 +25,36 @@ export interface CreateDistributedRequest {
     range_behaviour?: BehaviourName | null
     search_index?: boolean
     public?: boolean
+    /** A range splits once its coordinator counts more current objects; omitted never splits. */
+    split_objects?: number | null
+    /** A range splits once its current bytes exceed this; omitted never splits. */
+    split_bytes?: number | null
   }
+}
+
+export type SettingsBody = NonNullable<CreateDistributedRequest['settings']>
+
+export interface JoinMemberRequest {
+  node_id: string
+  coverage: 'all' | 'assigned'
+  strategy: StrategyName
+  range_behaviour?: BehaviourName | null
+  /** Ranges the member keeps a copy of; required for `assigned` coverage. */
+  ranges?: string[]
+}
+
+export interface TransferRangeRequest {
+  range_id: string
+  /** The member id that coordinates the range afterwards: a ready copy replica of it. */
+  to: string
+  /** What the former coordinator does: keep a copy, or give its copy up. */
+  role: 'replica' | 'leave'
+}
+
+export interface ChangeResponse {
+  set_id: string
+  /** The record revision that took the change. */
+  revision: number
 }
 
 export interface MemberOutcomeResponse {
@@ -59,6 +88,8 @@ export interface DistributedRangeResponse {
   lower: string
   /** Exclusive upper key bound; absent for the end of the key space. */
   upper?: string | null
+  /** The range this one was split from; absent for a range from the creation. */
+  lineage?: string | null
   /** The member id of the coordinator. */
   coordinator: string
   coordinator_node?: string | null
@@ -85,6 +116,38 @@ export interface DistributedResponse {
   ranges: DistributedRangeResponse[]
   /** The node glob grant that covers this bucket on every member node. */
   recommended_grant: string
+  /** Open transfers of ranges to another coordinator; absent on older nodes. */
+  transfers?: TransferResponse[]
+  /** The deletion of the set, once it is prepared. */
+  deletion?: DeletionResponse | null
+  /** Ranges this node fenced as their former coordinator. */
+  fenced_ranges?: string[]
+  /** This node applies no publication of the set anymore: it leaves or the set is deleted. */
+  publications_closed?: boolean
+}
+
+export interface TransferResponse {
+  transfer_id: string
+  range_id: string
+  /** The member id that coordinated the range. */
+  from: string
+  /** The member id that coordinates it once the transfer activates. */
+  to: string
+  epoch: number
+  /** `replica` or `leave`: what the former coordinator keeps. */
+  role: string
+  /** The former coordinator fenced the range; writes to it fail until the activation. */
+  fenced: boolean
+  completed: boolean
+}
+
+export interface DeletionResponse {
+  /** Every coordinator fenced its ranges; members purge their buckets. */
+  committed: boolean
+  /** Member ids. */
+  fenced: string[]
+  /** Member ids of the coordinators whose fence the commit still waits for. */
+  waiting: string[]
 }
 
 function setPath(groupId: string, setId?: string): string {
@@ -124,4 +187,44 @@ export function getBucketDistribution(
   signal?: AbortSignal,
 ): Promise<DistributedResponse> {
   return apiRequest(`/data/buckets/${encodeURIComponent(bucket)}/distribution`, { signal }, client)
+}
+
+/** Adds a member node to an active bucket; it creates and admits its local bucket. */
+export function joinMember(
+  groupId: string,
+  setId: string,
+  body: JoinMemberRequest,
+  client: ApiClientOptions = {},
+): Promise<AdmissionResponse> {
+  return apiRequest(`${setPath(groupId, setId)}/members`, { method: 'POST', body: JSON.stringify(body) }, client)
+}
+
+/** Marks a member leaving. A member that coordinates a range is refused. */
+export function leaveMember(groupId: string, setId: string, memberId: string, client: ApiClientOptions = {}): Promise<ChangeResponse> {
+  return apiRequest(`${setPath(groupId, setId)}/members/${encodeURIComponent(memberId)}`, { method: 'DELETE' }, client)
+}
+
+/** Opens a fenced transfer of one range to a ready copy replica of it. */
+export function transferRange(
+  groupId: string,
+  setId: string,
+  body: TransferRangeRequest,
+  client: ApiClientOptions = {},
+): Promise<ChangeResponse> {
+  return apiRequest(`${setPath(groupId, setId)}/transfers`, { method: 'POST', body: JSON.stringify(body) }, client)
+}
+
+/** Replaces the bucket-wide settings: omitted fields take their defaults. */
+export function changeSettings(
+  groupId: string,
+  setId: string,
+  body: SettingsBody,
+  client: ApiClientOptions = {},
+): Promise<ChangeResponse> {
+  return apiRequest(`${setPath(groupId, setId)}/settings`, { method: 'PUT', body: JSON.stringify(body) }, client)
+}
+
+/** Prepares the deletion of the set with every member bucket. */
+export function deleteSet(groupId: string, setId: string, client: ApiClientOptions = {}): Promise<ChangeResponse> {
+  return apiRequest(setPath(groupId, setId), { method: 'DELETE' }, client)
 }

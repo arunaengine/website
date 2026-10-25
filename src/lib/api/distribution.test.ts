@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createDistributedBucket, getBucketDistribution, retryAdmission } from './distribution'
+import {
+  changeSettings,
+  createDistributedBucket,
+  deleteSet,
+  getBucketDistribution,
+  joinMember,
+  leaveMember,
+  retryAdmission,
+  transferRange,
+} from './distribution'
 
 const client = { baseUrl: 'https://api.test/api/v1', token: 'tok' }
 
@@ -51,5 +60,44 @@ describe('distributed bucket requests', () => {
 
     await expect(getBucketDistribution('lab data', client)).rejects.toMatchObject({ status: 404 })
     expect(calls[0].url).toBe('https://api.test/api/v1/data/buckets/lab%20data/distribution')
+  })
+})
+
+describe('set change requests', () => {
+  const base = 'https://api.test/api/v1/data/groups/g1/distributed-buckets/s1'
+
+  it('adds a member with its coverage, strategy and ranges', async () => {
+    const calls = stubFetch(201, { set_id: 's1', active: true, members: [] })
+    const body = { node_id: 'n3', coverage: 'assigned' as const, strategy: 'copy' as const, ranges: ['r1'] }
+
+    await joinMember('g1', 's1', body, client)
+
+    expect(calls[0]).toMatchObject({ url: `${base}/members`, method: 'POST', body })
+  })
+
+  it('removes a member by its id', async () => {
+    const calls = stubFetch(200, { set_id: 's1', revision: 7 })
+
+    expect(await leaveMember('g1', 's1', 'm 1', client)).toEqual({ set_id: 's1', revision: 7 })
+    expect(calls[0]).toMatchObject({ url: `${base}/members/m%201`, method: 'DELETE' })
+  })
+
+  it('opens a transfer of one range', async () => {
+    const calls = stubFetch(202, { set_id: 's1', revision: 8 })
+    const body = { range_id: 'r1', to: 'm2', role: 'leave' as const }
+
+    await transferRange('g1', 's1', body, client)
+
+    expect(calls[0]).toMatchObject({ url: `${base}/transfers`, method: 'POST', body })
+  })
+
+  it('replaces the settings and deletes the set', async () => {
+    const calls = stubFetch(200, { set_id: 's1', revision: 9 })
+
+    await changeSettings('g1', 's1', { refresh_secs: 3600, split_objects: 250_000 }, client)
+    await deleteSet('g1', 's1', client)
+
+    expect(calls[0]).toMatchObject({ url: `${base}/settings`, method: 'PUT', body: { refresh_secs: 3600, split_objects: 250_000 } })
+    expect(calls[1]).toMatchObject({ url: base, method: 'DELETE' })
   })
 })

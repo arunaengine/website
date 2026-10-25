@@ -117,7 +117,9 @@ import {
   removeDatabase,
 } from './aruna/databases'
 import {
+  changeDistributedSettings,
   createDistributedBucket,
+  deleteDistributedBucket,
   getBlobLocations,
   getBucketDistribution,
   getBucketLinks,
@@ -133,6 +135,9 @@ import {
   putGroupRouting,
   replicateBlob,
   retryDistributedAdmission,
+  joinDistributedMember,
+  leaveDistributedMember,
+  transferDistributedRange,
 } from './aruna/storage'
 import {
   createSyncRelationship,
@@ -284,6 +289,11 @@ export function useAruna() {
     dropDatabaseRequest,
     createDistributedBucket,
     retryDistributedAdmission,
+    joinDistributedMember,
+    leaveDistributedMember,
+    transferDistributedRange,
+    changeDistributedSettings,
+    deleteDistributedBucket,
     putBucketRouting,
     getBlobLocations,
     replicateBlob,
