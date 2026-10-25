@@ -160,14 +160,14 @@ describe('portal chrome', () => {
 })
 
 describe('desktop chrome', () => {
-  it('replaces the switcher with this device and its realm', async () => {
+  it('leads with this device, then the group switcher that names the realm', async () => {
     const mounted = await mountApp(TopBar, { props: { variant: 'desktop' } })
     const html = content(mounted.root)
 
-    expect(html).not.toContain('context switcher')
     expect(html).not.toContain('Create dataset')
     expect(html).toContain('online')
-    expect(html).toContain('Testrealm')
+    expect(html.indexOf('online')).toBeLessThan(html.indexOf('context switcher'))
+    expect(html).not.toContain('Testrealm')
     expect(html).toContain('datasets')
     expect(html).toContain('bell')
     expect(watchNode).toHaveBeenCalled()

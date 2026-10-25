@@ -19,6 +19,7 @@ import type { VerifiedRealm } from '@/lib/federation/descriptor'
 import { useAruna } from '@/composables/useAruna'
 import { useRealm } from '@/composables/useRealm'
 import { activeGroupId, setActiveGroup } from '@/composables/useGroupSelection'
+import { isDesktop } from '@/lib/desktop'
 import { truncateMiddle } from '@/lib/utils'
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -33,6 +34,8 @@ const activeGroup = computed(() => myGroups.value.find((group) => group.id === a
 const hasGroups = computed(() => Boolean(currentUser.value) && myGroups.value.length > 0)
 
 // Another realm is another portal: opening it leaves this one, and its session stays there.
+// The desktop never leaves the app; it changes its realm on its own welcome step.
+const desktop = isDesktop()
 const pickerOpen = ref(false)
 function openRealm(target: VerifiedRealm) {
   pickerOpen.value = false
@@ -139,7 +142,12 @@ function roleOf(id: string) {
             </div>
             <Check v-if="r.id === activeRealmId" class="mt-1 h-3.5 w-3.5 shrink-0 text-primary" />
           </DropdownMenuItem>
-          <DropdownMenuItem class="flex items-center gap-2" @click="pickerOpen = true">
+          <DropdownMenuItem v-if="desktop" as-child>
+            <RouterLink :to="{ name: 'welcome', query: { change: '1' } }" class="flex w-full items-center gap-2">
+              <ArrowLeftRight class="h-3.5 w-3.5 text-muted-foreground" /> Change realm
+            </RouterLink>
+          </DropdownMenuItem>
+          <DropdownMenuItem v-else class="flex items-center gap-2" @click="pickerOpen = true">
             <ArrowLeftRight class="h-3.5 w-3.5 text-muted-foreground" /> Other realms
           </DropdownMenuItem>
           <DropdownMenuSeparator />
