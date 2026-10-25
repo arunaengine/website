@@ -55,6 +55,18 @@ describe('set changes', () => {
     expect(changes.failure.value).toBe('the node is busy')
   })
 
+  it('says when a member was not admitted although the answer names no error', async () => {
+    aruna.joinDistributedMember.mockResolvedValue({
+      set_id: 's1',
+      active: true,
+      members: [{ member_id: 'm3', node_id: 'n3', admitted: false, error: 'the member could not sign' }],
+    })
+    const changes = useSetChanges(live)
+
+    expect(await changes.join({ node_id: 'n3', coverage: 'all', strategy: 'copy' })).toBe(true)
+    expect(changes.failure.value).toBe('the member could not sign')
+  })
+
   it('does nothing for a bucket the node did not report', async () => {
     const changes = useSetChanges(ref(undefined))
 

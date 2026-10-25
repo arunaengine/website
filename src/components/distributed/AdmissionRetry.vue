@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// A bucket stays pending until every coordinator and replica is admitted.
-// A group admin asks the members that failed to admit again.
+// A bucket stays pending until every coordinator and replica is admitted; an active one may still
+// have members that are not. A group admin asks the members that failed to admit again.
 import { ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
@@ -34,8 +34,11 @@ async function retry() {
 
 <template>
   <div class="space-y-3">
-    <Notice tone="warning" title="The bucket is pending">
+    <Notice v-if="live.pending" tone="warning" title="The bucket is pending">
       It starts serving when every coordinator and replica is admitted. Members that were created are kept.
+    </Notice>
+    <Notice v-else tone="warning" title="Some members are not admitted">
+      The bucket serves. The members that are not admitted hold no data until they are.
     </Notice>
     <Button variant="outline" size="sm" :disabled="busy" @click="retry">
       <RefreshCw class="size-3.5" :class="busy ? 'animate-spin' : ''" /> Retry admission

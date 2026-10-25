@@ -37,7 +37,9 @@ export function useSetChanges(live: Ref<LiveState | undefined>) {
       const answer = await run(({ groupId, setId }) => aruna.joinDistributedMember(groupId, setId, body))
       admission.value = answer
       // The member exists even when its admission stopped; the retry is in the Nodes tab.
+      const refused = answer?.members.filter((member) => !member.admitted) ?? []
       if (answer?.error) failure.value = answer.error
+      else if (refused.length) failure.value = refused.map((member) => member.error ?? 'A member is not admitted yet.').join(' ')
       return Boolean(answer)
     },
     async leave(memberId: string): Promise<boolean> {

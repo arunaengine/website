@@ -42,6 +42,8 @@ const settings = computed(() => {
   ]
 })
 const transfers = computed(() => openTransfers(props.bucket))
+// A pending bucket, or an active one with a member that is not admitted, can retry the admission.
+const unadmitted = computed(() => Boolean(props.bucket.live?.pending || props.bucket.members.some((member) => member.admitted === false)))
 const state = computed(() => (isDeleting(props.bucket) ? 'Deleting' : props.bucket.live?.pending ? 'Pending' : degraded.value.length ? 'Degraded' : 'Active'))
 </script>
 
@@ -68,7 +70,7 @@ const state = computed(() => (isDeleting(props.bucket) ? 'Deleting' : props.buck
     <Notice v-else-if="bucket.live?.changesUnavailable" tone="warning" title="Configuration changes wait">
       The node that publishes the configuration cannot be reached. Reads and writes continue.
     </Notice>
-    <AdmissionRetry v-if="bucket.live?.pending && admin" :live="bucket.live" @done="emit('reload')" />
+    <AdmissionRetry v-if="bucket.live && unadmitted && admin" :live="bucket.live" @done="emit('reload')" />
     <TransferStatus v-if="transfers.length" :bucket="bucket" :transfers="transfers" />
     <DegradedNotice v-for="range in degraded.slice(0, NOTICED)" :key="range.id" :range="range" />
     <p v-if="degraded.length > NOTICED" class="text-xs text-muted-foreground">

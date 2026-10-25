@@ -6,8 +6,11 @@ import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import type { AdmissionResponse } from '@/lib/api'
 import { RefreshCw } from '@lucide/vue'
+import { computed } from 'vue'
 
-defineProps<{ name: string; outcome: AdmissionResponse; busy: boolean; failure: string | null }>()
+const props = defineProps<{ name: string; outcome: AdmissionResponse; busy: boolean; failure: string | null }>()
+// Active needs the coordinators and replicas only; other members may still be waiting.
+const allAdmitted = computed(() => props.outcome.members.every((member) => member.admitted))
 const emit = defineEmits<{ (e: 'retry'): void; (e: 'done'): void }>()
 </script>
 
@@ -23,7 +26,10 @@ const emit = defineEmits<{ (e: 'retry'): void; (e: 'done'): void }>()
       It starts serving when every coordinator and replica is admitted. Members that were created are kept.
       Retry the admission of the members that failed.
     </Notice>
-    <Notice v-else tone="success" title="Every member is admitted">The bucket is active on {{ outcome.members.length }} nodes.</Notice>
+    <Notice v-else-if="allAdmitted" tone="success" title="Every member is admitted">The bucket is active on {{ outcome.members.length }} nodes.</Notice>
+    <Notice v-else tone="warning" title="Some members are not admitted">
+      The bucket is active. Retry the admission of the members that failed.
+    </Notice>
     <Notice v-if="outcome.error" tone="warning">{{ outcome.error }}</Notice>
     <Notice v-if="failure" tone="error">{{ failure }}</Notice>
 
@@ -51,7 +57,7 @@ const emit = defineEmits<{ (e: 'retry'): void; (e: 'done'): void }>()
       </table>
     </div>
     <div class="flex justify-end gap-2">
-      <Button v-if="!outcome.active" size="sm" variant="outline" :disabled="busy" @click="emit('retry')">
+      <Button v-if="!outcome.active || !allAdmitted" size="sm" variant="outline" :disabled="busy" @click="emit('retry')">
         <RefreshCw class="size-3.5" :class="busy ? 'animate-spin' : ''" /> Retry admission
       </Button>
       <Button size="sm" :disabled="busy" @click="emit('done')">Done</Button>
