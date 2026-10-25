@@ -10,7 +10,8 @@ export function isWorkspaceBucket(name: string): boolean {
 }
 
 // The desktop node offers each linked folder as an internal bucket: folder-<ULID>.
-const FOLDER_BUCKET_RE = /^folder-[0-9a-hjkmnp-tv-z]{26}$/
+// A ULID's first character is 0-7, since a larger one would overflow 128 bits.
+const FOLDER_BUCKET_RE = /^folder-[0-7][0-9a-hjkmnp-tv-z]{25}$/
 
 export function isFolderBucket(name: string): boolean {
   return FOLDER_BUCKET_RE.test(name)

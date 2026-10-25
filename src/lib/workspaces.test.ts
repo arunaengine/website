@@ -14,6 +14,13 @@ describe('isFolderBucket', () => {
     expect(isFolderBucket('my-folder-01m5rs8b3hngjtjva82x7vv8ng')).toBe(false)
     expect(isFolderBucket('folder-01m5rs8b3hngjtjva82x7vvlng')).toBe(false)
   })
+
+  it('keeps names that would overflow a ULID visible', () => {
+    expect(isFolderBucket('folder-7zzzzzzzzzzzzzzzzzzzzzzzzz')).toBe(true)
+    expect(isFolderBucket('folder-8zzzzzzzzzzzzzzzzzzzzzzzzz')).toBe(false)
+    expect(isFolderBucket('folder-zzzzzzzzzzzzzzzzzzzzzzzzzz')).toBe(false)
+    expect(isHiddenBucket('folder-zzzzzzzzzzzzzzzzzzzzzzzzzz')).toBe(false)
+  })
 })
 
 describe('isHiddenBucket', () => {
