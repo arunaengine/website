@@ -160,9 +160,12 @@ describe('this computer', () => {
     const name = 'research-workstation-in-room-4711.example.org'
     const html = await render({ id: laptop.id, name, peers: ['aaaa-mgmt-1111'] })
 
-    expect(html).toMatch(/>\s*research-workstation-in…\s*<\/text>/)
+    expect(html).toMatch(/>\s*research-workstatio…\s*<\/text>/)
     expect(html).toContain(`>${name}</title>`)
     expect(html).toContain(`This computer, ${name}, is connected.`)
+
+    const wide = await render({ id: laptop.id, name: 'W'.repeat(30), peers: ['aaaa-mgmt-1111'] })
+    expect(wide).toMatch(new RegExp(`>\\s*${'W'.repeat(19)}…\\s*</text>`))
   })
 
   it('adds nothing when its own info is missing', async () => {

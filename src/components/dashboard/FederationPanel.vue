@@ -99,7 +99,7 @@ const PC_X = VW - 100
 const PC_Y = CY - 30
 const PC_RING = 9
 // A longer name is cut so it stays inside the right edge of the viewBox.
-const PC_NAME_MAX = 24
+const PC_NAME_MAX = 20
 
 const computer = computed(() => {
   if (!desktop || !hub.value || !props.computer) return null
