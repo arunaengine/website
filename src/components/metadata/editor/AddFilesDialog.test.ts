@@ -11,6 +11,7 @@ import {
   flush,
   moduleDefault,
   mountApp,
+  nodes,
   typeValue,
 } from '@/test/clientRender'
 import { ApiError } from '@/lib/api'
@@ -109,6 +110,11 @@ const AddFilesDialog = compileClientComponent(new URL('./AddFilesDialog.vue', im
   '@/components/ui/TabsContent.vue': moduleDefault(Passthrough),
   '@/components/data/ObjectBrowserPanel.vue': moduleDefault(BrowserStub),
   '@/components/data/add/UploadTab.vue': moduleDefault(UploadStub),
+  '@/components/data/add/DatabasesTab.vue': moduleDefault(defineComponent({
+    emits: ['choose'],
+    setup: (_, { emit }) => () => h('button', { onClick: () => emit('choose', 'reads', 'node-2', 'group-9') }, 'Choose a database'),
+  })),
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'node-1' }) },
   '@/components/metadata/SubcratePickerDialog.vue': moduleDefault(EmptyStub),
   '@/composables/useAruna': {
     useAruna: () => ({
@@ -253,6 +259,22 @@ describe('AddFilesDialog', () => {
 
     expect(updates).toHaveLength(1)
     expect(content(mounted.root)).toContain('could not be read. They were added without them.')
+    mounted.app.unmount()
+  })
+
+  it('adds files of a database on another node with that node in their ids', async () => {
+    const updates: Editor.CrateDraft[] = []
+    const mounted = await mount(updates)
+
+    await click(button(mounted.root, 'Choose a database'))
+    expect(content(mounted.root)).toContain('Choose another database')
+    const pickers = nodes(mounted.root).filter((node) => node.tag === 'button' && content(node).trim() === 'Pick objects')
+    await click(pickers[pickers.length - 1])
+    await flush()
+
+    expect(getFileOrigin).not.toHaveBeenCalled()
+    expect(Editor.findEntity(updates[0], 'arn:aruna:realm-1:node-2:s3/reads/raw/nested/')?.types).toEqual(['Dataset'])
+    expect(content(mounted.root)).toContain('Files of a bucket on another node were added without their origin and datasets.')
     mounted.app.unmount()
   })
 
