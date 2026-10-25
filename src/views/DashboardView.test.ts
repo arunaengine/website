@@ -600,6 +600,28 @@ describe('desktop realm nodes panel', () => {
     mounted.app.unmount()
   })
 
+  it('keeps a slow answer that lands after periodic refreshes', async () => {
+    desktopMode.value = true
+    let answer: (view: unknown) => void = () => undefined
+    loadRealmView.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
+    loadRealmView.mockImplementation(() => new Promise(() => undefined))
+    const mounted = await mountApp(DashboardClient)
+    await flush()
+    // Each periodic read replaces the realm info with a fresh object of the same realm.
+    realmInfo.value = { ...realmInfo.value }
+    await flush()
+    realmInfo.value = { ...realmInfo.value }
+    await flush()
+
+    answer({ info: { node: { peer_id: 'mgmt-node' } }, realm: { nodes: [beat('mgmt-node', 'management', 9000)] } })
+    await flush()
+
+    expect(loadRealmView).toHaveBeenCalledTimes(3)
+    expect(content(mounted.root)).toContain('hub mgmt-node')
+    expect(content(mounted.root)).toContain('mgmt-node beat 9000')
+    mounted.app.unmount()
+  })
+
   it('keeps the device view when no realm node answers', async () => {
     desktopMode.value = true
     const mounted = await mountApp(DashboardClient)

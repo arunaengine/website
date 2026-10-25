@@ -64,23 +64,58 @@ function realmNodeBases(known: RealmInfoResponse): string[] {
   return [...new Set([...published, ...members])].filter((base): base is string => !!base)
 }
 
+// A dead candidate gives up after this, so the next one is tried well within a refresh.
+const PANEL_READ_TIMEOUT_MS = 5_000
+// The node that answered last, tried first on the next read in the same session and realm.
+let lastAnswered: { key: string; base: string } | null = null
+let running: { key: string; view: Promise<RealmView | null> } | null = null
+
+async function readRealmNode(baseUrl: string, context: ReturnType<typeof refreshContext>) {
+  const client = { ...context.client, baseUrl }
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), PANEL_READ_TIMEOUT_MS)
+  try {
+    return await Promise.all([
+      apiRequest<InfoResponse>('/system/info', { signal: controller.signal }, client),
+      apiRequest<RealmInfoResponse>('/system/realm', { signal: controller.signal }, client),
+    ])
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function findRealmView(known: RealmInfoResponse, context: ReturnType<typeof refreshContext>, key: string) {
+  const bases = realmNodeBases(known)
+  const last = lastAnswered?.key === key ? lastAnswered.base : null
+  if (last && bases.includes(last)) bases.unshift(...bases.splice(bases.indexOf(last), 1))
+  for (const baseUrl of bases) {
+    const view = await readRealmNode(baseUrl, context)
+    // An answer without the realm members is the anonymous view, no better than the device's.
+    if (view?.[1].realm_id === known.realm_id && view[1].nodes?.length) {
+      lastAnswered = { key, base: baseUrl }
+      return { info: view[0], realm: view[1] }
+    }
+  }
+  return null
+}
+
 /**
  * The realm as one of its nodes sees it, for the desktop's realm nodes panel: a device node
  * takes no part in the live heartbeat protocol. Null when no realm node of this realm answers.
+ * Calls in the same session and realm share one running lookup.
  */
-export async function loadRealmView(context = refreshContext()): Promise<RealmView | null> {
+export function loadRealmView(context = refreshContext()): Promise<RealmView | null> {
   const known = realmInfo.value
-  if (!known) return null
-  for (const baseUrl of realmNodeBases(known)) {
-    const client = { ...context.client, baseUrl }
-    const view = await Promise.all([
-      apiRequest<InfoResponse>('/system/info', {}, client),
-      apiRequest<RealmInfoResponse>('/system/realm', {}, client),
-    ]).catch(() => null)
-    // An answer without the realm members is the anonymous view, no better than the device's.
-    if (view?.[1].realm_id === known.realm_id && view[1].nodes?.length) return { info: view[0], realm: view[1] }
-  }
-  return null
+  if (!known) return Promise.resolve(null)
+  const key = `${context.epoch}:${known.realm_id}`
+  if (running?.key === key) return running.view
+  const view = findRealmView(known, context, key).finally(() => {
+    if (running?.view === view) running = null
+  })
+  running = { key, view }
+  return view
 }
 
 export async function setRealmQuota(config: RealmQuotaConfig): Promise<RealmQuotaConfig> {

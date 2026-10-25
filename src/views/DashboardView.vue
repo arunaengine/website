@@ -129,9 +129,15 @@ onUnmounted(() => {
   stopWake()
 })
 
+// Only a session or realm change drops a running lookup; a periodic refresh shares it.
+watch(() => realmInfo.value?.realm_id, () => {
+  realmViewGeneration++
+  realmView.value = null
+}, { flush: 'sync' })
+
 async function loadPanelRealm() {
   if (!desktop) return
-  const generation = ++realmViewGeneration
+  const generation = realmViewGeneration
   const view = await loadRealmView()
   if (generation === realmViewGeneration) realmView.value = view
 }

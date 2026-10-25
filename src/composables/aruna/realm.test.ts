@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, apiRequest } from '@/lib/api'
 import { toBase64Url } from '@/lib/federation/descriptor'
 
@@ -132,5 +132,54 @@ describe('realm view from a realm node', () => {
     answer(['https://mgmt.test/api/v1'], 'other-realm')
 
     expect(await loadRealmView()).toBeNull()
+  })
+})
+
+describe('realm view while refreshing', () => {
+  const member = (node_id: string, kind: string, api?: string) => ({ node_id, kind, info: api ? { urls: { api } } : undefined })
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    state.realmInfo.value = {
+      realm_id: REALM_ID,
+      management_urls: ['https://dead.test/'],
+      nodes: [member('server', 'server', 'https://server.test')],
+    } as never
+    // The first candidate never answers until its read is aborted.
+    vi.mocked(apiRequest).mockImplementation((path, options, client) => {
+      if (client?.baseUrl === 'https://dead.test/api/v1') {
+        return new Promise((_, reject) => options?.signal?.addEventListener('abort', () => reject(new Error('aborted'))))
+      }
+      return Promise.resolve(path === '/system/info' ? { node: { peer_id: client?.baseUrl } } : { realm_id: REALM_ID, nodes: [member('server', 'server')] })
+    })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('shares one lookup and falls back past a hanging node', async () => {
+    const first = loadRealmView()
+    const refreshes = [loadRealmView(), loadRealmView()]
+    await vi.advanceTimersByTimeAsync(5_000)
+
+    const views = await Promise.all([first, ...refreshes])
+
+    expect(views.map((view) => view?.info.node.peer_id)).toEqual(Array(3).fill('https://server.test/api/v1'))
+    expect(views[1]).toBe(views[0])
+    const bases = vi.mocked(apiRequest).mock.calls.map(([, , client]) => client?.baseUrl)
+    expect(bases.filter((base) => base === 'https://dead.test/api/v1')).toHaveLength(2)
+  })
+
+  it('tries the node that answered last first on the next refresh', async () => {
+    const first = loadRealmView()
+    await vi.advanceTimersByTimeAsync(5_000)
+    await first
+    vi.mocked(apiRequest).mockClear()
+
+    const view = await loadRealmView()
+
+    expect(view?.info.node.peer_id).toBe('https://server.test/api/v1')
+    expect(vi.mocked(apiRequest).mock.calls.map(([, , client]) => client?.baseUrl)).not.toContain('https://dead.test/api/v1')
   })
 })
