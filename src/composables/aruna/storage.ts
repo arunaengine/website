@@ -36,6 +36,7 @@ import {
   type RoutingTarget,
   type StorageRoutingRule,
 } from '@/lib/api'
+import { getStorageDeletionPreflight, type StorageDeletionPreflight } from '@/lib/storageDeletion'
 import { refreshContext, request, saving } from './state'
 
 // ── Storage routing (group default and per-bucket rules) ────────────────────
@@ -73,6 +74,11 @@ export async function getBucketRouting(bucket: string): Promise<BucketRoutingRes
 /** What the serving node counts in one bucket; 404 means the node lacks the route. */
 export function getBucketUsage(bucket: string): Promise<BucketUsageResponse> {
   return requestBucketUsage(bucket, refreshContext().client)
+}
+
+/** What deleting a whole bucket removes; a bucket stored on more nodes also lists the datasets that link it. */
+export function getSetDeletion(bucket: string): Promise<StorageDeletionPreflight> {
+  return getStorageDeletionPreflight({ kind: 'bucket', bucket }, refreshContext().client)
 }
 
 /** Datasets that link a file, a folder or the root of a bucket on this node. */

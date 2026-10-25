@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Deleting a bucket stored on several nodes. The preview lists datasets that refer to it and says if the list is complete.
 import { computed, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -11,9 +12,10 @@ import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
-import LinkedDatasets from '@/components/data/LinkedDatasets.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSetChanges } from '@/composables/useSetChanges'
+import { coverageNotes, useSetPreflight } from '@/composables/useSetPreflight'
 import { DELETE_PREVIEWS } from '@/lib/distributedMockData'
 import { degradedRanges, type DistributedBucket } from '@/lib/distribution'
 
@@ -31,10 +33,17 @@ const typed = ref('')
 const understood = ref(false)
 
 const preview = computed(() => DELETE_PREVIEWS[props.bucket.name] ?? { datasets: [], reasons: [] })
-// The linked datasets of a real bucket come with their own coverage notes.
-const complete = computed(() => Boolean(props.bucket.live) || preview.value.reasons.length === 0)
+// A real bucket asks the node, which names the datasets and says if every node answered.
+const lookup = useSetPreflight(computed(() => (props.open && props.bucket.live ? props.bucket.name : null)))
+const linked = computed(() => lookup.preflight.value?.linked_datasets ?? [])
+const notes = computed(() => {
+  if (lookup.error.value) return [`The datasets could not be read: ${lookup.error.value}`]
+  const coverage = lookup.preflight.value?.reference_coverage
+  return coverage ? coverageNotes(coverage) : []
+})
+const complete = computed(() => (props.bucket.live ? !lookup.loading.value && Boolean(lookup.preflight.value) && !notes.value.length : preview.value.reasons.length === 0))
 const unreachable = computed(() => [...new Set(degradedRanges(props.bucket).map((range) => displayName(range.coordinator)))])
-const ready = computed(() => typed.value === props.bucket.name && (complete.value || understood.value))
+const ready = computed(() => typed.value === props.bucket.name && !lookup.loading.value && (complete.value || understood.value))
 
 async function remove() {
   if (!props.bucket.live) {
@@ -59,11 +68,26 @@ async function remove() {
         </DialogDescription>
       </DialogHeader>
 
-      <LinkedDatasets
-        v-if="bucket.live"
-        heading="Datasets that link this bucket"
-        :target="{ bucket: bucket.name, key: '', folder: true, remote: false }"
-      />
+      <div v-if="bucket.live" class="space-y-2">
+        <div class="flex items-center gap-2">
+          <h3 class="text-sm font-medium text-foreground">Datasets that link this bucket</h3>
+          <Badge v-if="!lookup.loading.value" :variant="complete ? 'success' : 'warn'" size="sm">{{ complete ? 'Complete' : 'Incomplete' }}</Badge>
+        </div>
+        <Spinner v-if="lookup.loading.value" label="Looking for datasets" />
+        <template v-else>
+          <ul v-if="linked.length" class="space-y-1 text-xs">
+            <li v-for="document in linked" :key="document.document_id">
+              <RouterLink :to="{ name: 'dataset', params: { id: document.document_id } }" class="font-medium text-primary hover:underline">
+                {{ document.title || document.document_path }}
+              </RouterLink>
+            </li>
+          </ul>
+          <p v-else-if="lookup.preflight.value" class="text-xs text-muted-foreground">None you can read.</p>
+          <Notice v-if="notes.length" tone="warning" title="The list may miss datasets" :lines="notes" />
+          <button v-if="lookup.error.value" type="button" class="text-xs text-primary hover:underline" @click="lookup.reload()">Try again</button>
+        </template>
+        <p class="text-xs text-muted-foreground">Datasets keep their entries. The files they point to are gone.</p>
+      </div>
       <div v-else class="space-y-2">
         <div class="flex items-center gap-2">
           <h3 class="text-sm font-medium text-foreground">Datasets that refer to this bucket</h3>
