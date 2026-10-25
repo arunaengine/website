@@ -288,6 +288,8 @@ const isSharded = (placement: Placement) => placement.preset.startsWith('shardin
 /** The reason a placement cannot be created yet, or null. */
 export function placementProblem(placement: Placement): string | null {
   const copies = placement.members.filter((member) => member.strategy === 'copy')
+  const limits = draftProblem({ ...defaultDraft(), splitObjects: placement.settings.splitObjects, splitBytes: placement.settings.splitBytes })
+  if (limits) return limits
   if (placement.members.length < MIN_MEMBERS) return 'Choose at least two nodes.'
   if (!copies.length) return 'Choose at least one node that keeps copies.'
   if (!isSharded(placement)) return null
@@ -314,6 +316,8 @@ export function createRequest(name: string, placement: Placement): CreateDistrib
       refresh_secs: REFRESH_SECONDS[settings.refresh],
       range_behaviour: BEHAVIOURS[settings.mode],
       search_index: settings.index,
+      split_objects: wholeNumber(settings.splitObjects),
+      split_bytes: wholeNumber(settings.splitBytes),
     },
   }
 }

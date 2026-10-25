@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Key ranges, refresh, range requests and search for a bucket stored on several nodes.
 import { computed } from 'vue'
+import Input from '@/components/ui/Input.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import OptionToggle from '@/components/ui/OptionToggle.vue'
 import Select from '@/components/ui/Select.vue'
@@ -91,6 +92,16 @@ function set<K extends keyof CreateSettings>(key: K, value: CreateSettings[K]) {
           <span class="text-xs font-medium text-foreground">Range requests</span>
           <OptionToggle :model-value="modelValue.mode" :options="modeOptions" aria-label="Range request behaviour" @update:model-value="set('mode', $event as RangeMode)" />
           <p class="text-xs text-muted-foreground">{{ modeHint }}</p>
+        </div>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <div class="space-y-1">
+          <label class="text-xs font-medium text-foreground" for="dm-split-objects">Split a range above (files)</label>
+          <Input id="dm-split-objects" :model-value="modelValue.splitObjects" inputmode="numeric" placeholder="Never" @update:model-value="set('splitObjects', String($event))" />
+        </div>
+        <div class="space-y-1">
+          <label class="text-xs font-medium text-foreground" for="dm-split-bytes">Split a range above (bytes)</label>
+          <Input id="dm-split-bytes" :model-value="modelValue.splitBytes" inputmode="numeric" placeholder="Never" @update:model-value="set('splitBytes', String($event))" />
         </div>
       </div>
       <label class="flex items-start gap-3 text-sm">

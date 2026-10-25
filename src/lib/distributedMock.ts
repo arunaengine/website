@@ -198,6 +198,9 @@ export function nodeGlob(bucket: string): string {
 }
 
 export interface CreateSettings {
+  /** Whole numbers as typed; empty means a range never splits on that limit. */
+  splitObjects: string
+  splitBytes: string
   keys: string
   refresh: string
   mode: RangeMode
@@ -216,7 +219,7 @@ export const REFRESH_OPTIONS = [
 export const MAX_RANGES = 4096
 
 export function defaultSettings(preset: PresetId): CreateSettings {
-  return { keys: '', refresh: 'off', mode: presetById(preset).mode, index: true }
+  return { splitObjects: '', splitBytes: '', keys: '', refresh: 'off', mode: presetById(preset).mode, index: true }
 }
 
 // The lower bounds of the second and later ranges, one per line.

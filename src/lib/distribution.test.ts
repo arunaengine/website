@@ -114,12 +114,20 @@ describe('create request', () => {
     expect(createRequest('a', placement('mirror', [member('a'), member('b')])).settings?.refresh_secs).toBeUndefined()
   })
 
+  it('sends the split limits and leaves them out when empty', () => {
+    const limited = createRequest('a', placement('mirror', [member('a'), member('b')], { splitObjects: '250000', splitBytes: ' 1000000 ' }))
+
+    expect(limited.settings).toMatchObject({ split_objects: 250_000, split_bytes: 1_000_000 })
+    expect(createRequest('a', placement('mirror', [member('a'), member('b')])).settings).toMatchObject({ split_objects: null, split_bytes: null })
+  })
+
   it('names what is missing before anything is sent', () => {
     expect(placementProblem(placement('mirror', [member('a')]))).toBe('Choose at least two nodes.')
     expect(placementProblem(placement('stream-edge', [member('a', 'stream'), member('b', 'stream')]))).toBe('Choose at least one node that keeps copies.')
     expect(placementProblem(placement('sharding-replicas', [member('a'), member('b', 'stream')]))).toBe('A copy of each range needs two nodes that keep copies.')
     expect(placementProblem(placement('sharding', [member('a'), member('b')], { keys: 'm\nb' }))).toBe('Split keys must be in order, one per line.')
     expect(placementProblem(placement('sharding', [member('a'), member('b')], { keys: 'b\nm' }))).toBeNull()
+    expect(placementProblem(placement('mirror', [member('a'), member('b')], { splitObjects: '12x' }))).toContain('objects')
   })
 })
 
