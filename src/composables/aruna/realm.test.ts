@@ -4,6 +4,12 @@ import { toBase64Url } from '@/lib/federation/descriptor'
 
 vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), apiRequest: vi.fn() }))
 
+const desktop = vi.hoisted(() => ({ on: false }))
+vi.mock('@/lib/desktop', async (original) => ({
+  ...(await original<typeof import('@/lib/desktop')>()),
+  isDesktop: () => desktop.on,
+}))
+
 const BYTES = Array.from({ length: 32 }, (_, index) => index)
 const REALM_ID = toBase64Url(Uint8Array.from(BYTES))
 
@@ -195,5 +201,116 @@ describe('realm view while refreshing', () => {
 
     expect(view?.info.node.peer_id).toBe('https://server.test/api/v1')
     expect(vi.mocked(apiRequest).mock.calls.map(([, , client]) => client?.baseUrl)).not.toContain('https://dead.test/api/v1')
+  })
+})
+
+describe('usage on the desktop', () => {
+  const member = (node_id: string, kind: string, api?: string) => ({ node_id, kind, info: api ? { urls: { api } } : undefined })
+  const totals = (objects: number) => ({ buckets: 1, objects, logical_bytes: 0, referenced_bytes: 0 })
+  const DEVICE = 'http://127.0.0.1:34115/api/v1'
+  const MGMT = 'https://mgmt.test/api/v1'
+
+  function serveUsage(realmOnline: boolean) {
+    vi.mocked(apiRequest).mockImplementation(async (path, _options, client) => {
+      const base = client?.baseUrl ?? ''
+      if (path === '/system/realm') {
+        return { realm_id: REALM_ID, nodes: [member('server', 'server')], oidc_providers: [], management_urls: ['https://mgmt.test/'] }
+      }
+      if (path === '/system/usage') {
+        if (base === DEVICE || base === '') return { buckets: 1, objects: 3, referenced_bytes: 5, realm: totals(3), metadata_documents: 1 }
+        if (!realmOnline) throw new TypeError('Failed to fetch')
+        return { buckets: 9, objects: 90, referenced_bytes: 9, realm: totals(90), metadata_documents: 40 }
+      }
+      if (path === '/system/info') return { node: { peer_id: base } }
+      throw new ApiError(404, 'none')
+    })
+  }
+
+  beforeEach(() => {
+    desktop.on = true
+    state.usageInfo.value = null
+    state.apiBaseUrl.value = DEVICE
+  })
+
+  afterEach(() => {
+    desktop.on = false
+  })
+
+  it('takes the realm part from a realm node and keeps the device top level', async () => {
+    serveUsage(true)
+
+    await loadInfo()
+    expect(state.usageInfo.value?.realm).toBeUndefined()
+    await vi.waitFor(() => expect(state.usageInfo.value?.realm?.objects).toBe(90))
+
+    expect(state.usageInfo.value).toMatchObject({ objects: 3, referenced_bytes: 5, metadata_documents: 40 })
+    const reads = vi.mocked(apiRequest).mock.calls.filter(([path, , client]) => path === '/system/usage' && client?.baseUrl === MGMT)
+    expect(reads).toHaveLength(1)
+  })
+
+  it('keeps the realm part of the same session and realm across a refresh', async () => {
+    serveUsage(true)
+    await loadInfo()
+    await vi.waitFor(() => expect(state.usageInfo.value?.realm?.objects).toBe(90))
+
+    await loadInfo()
+
+    expect(state.usageInfo.value).toMatchObject({ objects: 3, realm: { objects: 90 }, metadata_documents: 40 })
+  })
+
+  it('does not carry the realm part into a new session', async () => {
+    serveUsage(true)
+    await loadInfo()
+    await vi.waitFor(() => expect(state.usageInfo.value?.realm?.objects).toBe(90))
+    serveUsage(false)
+    state.sessionEpoch.value++
+    await loadInfo()
+
+    expect(state.usageInfo.value?.realm).toBeUndefined()
+    expect(state.usageInfo.value?.metadata_documents).toBeUndefined()
+  })
+
+  it('ignores a late realm answer of a previous session', async () => {
+    let release: (usage: unknown) => void = () => {}
+    let asked = false
+    vi.mocked(apiRequest).mockImplementation(async (path, _options, client) => {
+      const base = client?.baseUrl ?? ''
+      if (path === '/system/realm') return { realm_id: REALM_ID, nodes: [member('server', 'server')], oidc_providers: [], management_urls: ['https://mgmt.test/'] }
+      if (path === '/system/info') return { node: { peer_id: base } }
+      if (path === '/system/usage' && base === MGMT) {
+        asked = true
+        return new Promise((resolve) => (release = resolve))
+      }
+      if (path === '/system/usage') return { buckets: 1, objects: 3, referenced_bytes: 5, realm: totals(3) }
+      throw new ApiError(404, 'none')
+    })
+    await loadInfo()
+    await vi.waitFor(() => expect(asked).toBe(true))
+    state.sessionEpoch.value++
+    release({ buckets: 9, objects: 90, referenced_bytes: 9, realm: totals(90), metadata_documents: 40 })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(state.usageInfo.value?.realm).toBeUndefined()
+  })
+
+  it('leaves the realm part unknown when no realm node answers', async () => {
+    serveUsage(false)
+
+    await loadInfo()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(state.usageInfo.value).toMatchObject({ objects: 3, referenced_bytes: 5 })
+    expect(state.usageInfo.value?.realm).toBeUndefined()
+    expect(state.usageInfo.value?.metadata_documents).toBeUndefined()
+  })
+
+  it('shows the node answer unchanged on the web', async () => {
+    desktop.on = false
+    serveUsage(true)
+
+    await loadInfo()
+
+    expect(state.usageInfo.value).toMatchObject({ objects: 3, realm: { objects: 3 }, metadata_documents: 1 })
+    expect(vi.mocked(apiRequest).mock.calls.filter(([path]) => path === '/system/usage')).toHaveLength(1)
   })
 })

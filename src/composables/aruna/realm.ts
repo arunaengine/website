@@ -9,6 +9,7 @@ import {
   type RealmQuotaConfig,
   type UsageResponse,
 } from '@/lib/api'
+import { isDesktop } from '@/lib/desktop'
 import { realmIdText, type RealmDescriptor, type Signed } from '@/lib/federation/descriptor'
 import { colorFor, shortId, truncateLabel } from './format'
 import {
@@ -22,6 +23,35 @@ import {
   sessionEpoch,
   usageInfo,
 } from './state'
+
+type RealmPart = Pick<UsageResponse, 'realm' | 'metadata_documents'>
+
+// The realm totals last read from a realm node, for one session and realm.
+let realmPart: { key: string; part: RealmPart } | null = null
+
+function usageKey(context: ReturnType<typeof refreshContext>) {
+  return `${context.epoch}:${realmInfo.value?.realm_id}`
+}
+
+// A device holds only its own counters, so its realm totals are never shown as realm totals.
+function deviceUsage(usage: UsageResponse, key: string): UsageResponse {
+  const { realm: _realm, metadata_documents: _documents, ...own } = usage
+  return realmPart?.key === key ? { ...own, ...realmPart.part } : own
+}
+
+async function readRealmUsage(context: ReturnType<typeof refreshContext>, key: string) {
+  try {
+    const baseUrl = await realmNodeBase(context)
+    if (!baseUrl) return
+    const usage = await apiRequest<UsageResponse>('/system/usage', {}, { ...context.client, baseUrl })
+    if (context.epoch !== sessionEpoch.value || key !== usageKey(context) || !usageInfo.value) return
+    const part = { realm: usage.realm, metadata_documents: usage.metadata_documents }
+    realmPart = { key, part }
+    usageInfo.value = { ...usageInfo.value, ...part }
+  } catch {
+    // The realm totals stay as they were.
+  }
+}
 
 export async function loadInfo(context = refreshContext()) {
   // Partial tolerance: one endpoint failing or degrading (e.g. realm
@@ -39,7 +69,11 @@ export async function loadInfo(context = refreshContext()) {
   const known = realmInfo.value?.realm_id
   if (info.status === 'fulfilled') nodeInfo.value = info.value
   if (realm.status === 'fulfilled') realmInfo.value = realm.value
-  usageInfo.value = usage.status === 'fulfilled' ? usage.value : null
+  const key = usageKey(context)
+  const onDesktop = isDesktop()
+  if (usage.status !== 'fulfilled') usageInfo.value = null
+  else usageInfo.value = onDesktop ? deviceUsage(usage.value, key) : usage.value
+  if (usage.status === 'fulfilled' && onDesktop) void readRealmUsage(context, key)
   const signed = descriptor.status === 'fulfilled' ? descriptor.value?.payload : undefined
   const own = signed && realmIdText(signed.realm_id) === realmInfo.value?.realm_id
   // Only this realm's descriptor or a 404 decides the name; other failures keep a known one.
