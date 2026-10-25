@@ -7,6 +7,7 @@ import Notice from '@/components/ui/Notice.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Progress from '@/components/ui/Progress.vue'
 import { folderName, isMoving, type DeviceTransfer } from '@/lib/deviceApi'
+import { formatCount } from '@/lib/formatCount'
 import { stateVariant } from '@/lib/stateBadge'
 import { itemChip, transferLabel, transferPercent, type SyncItem } from '@/lib/syncStates'
 import { formatBytes } from '@/lib/utils'
@@ -21,6 +22,14 @@ const emit = defineEmits<{ (event: 'sync'): void; (event: 'pause'): void }>()
 const folder = computed(() => (props.item.kind === 'folder' ? props.item.folder : null))
 const document = computed(() => (props.item.kind === 'document' ? props.item.document : null))
 const chip = computed(() => itemChip(props.item))
+
+// Files found on disk at the last check; hidden while the folder links or is removed.
+const fileCount = computed(() => {
+  const current = folder.value
+  const files = current?.counters.observed ?? 0
+  if (!current || !files || current.state === 'binding' || current.state === 'deleting') return null
+  return `${formatCount(files)} ${files === 1 ? 'file' : 'files'}`
+})
 
 const to = computed<RouteLocationRaw>(() =>
   props.item.kind === 'folder'
@@ -81,6 +90,7 @@ function moved(transfer: DeviceTransfer): string {
             >{{ title }}</RouterLink
           >
           <Badge :variant="chip.variant" size="sm">{{ chip.label }}</Badge>
+          <span v-if="fileCount" class="text-[11px] text-muted-foreground">{{ fileCount }}</span>
         </div>
 
         <p v-if="folder" class="mt-1 truncate text-[11px] text-muted-foreground" :title="folder.root">

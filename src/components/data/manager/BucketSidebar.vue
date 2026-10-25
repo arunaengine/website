@@ -14,6 +14,7 @@ import type { DataManager } from '@/composables/useDataManager'
 import type { BucketSearchHit } from '@/lib/api'
 import { isDesktop } from '@/lib/desktop'
 import type { BindSource } from '@/lib/bindSource'
+import { folderName } from '@/lib/deviceApi'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
 import { isHiddenBucket } from '@/lib/workspaces'
 import { ArrowLeftRight, Boxes, ChevronRight, FolderPlus, FolderSync, History, KeyRound, Plus, Trash2 } from '@lucide/vue'
@@ -63,6 +64,7 @@ const {
   createBucketError,
   requestDelete,
   bindSourceFor,
+  linkedFolderFor,
 } = props.manager
 
 // Steps running on this node's buckets of the group; rows of other nodes show none.
@@ -95,6 +97,11 @@ function rowPlace(nodeId: string | null): { place: string | null; placeTitle: st
     return { place: short, placeTitle: `${placeName(node)} (${placeTitle(node)})` }
   }
   return { place: realmNodes.isLocalNode(nodeId) ? 'This computer' : realmNodes.displayName(nodeId), placeTitle: null }
+}
+// One node's list names a row's place only where it is not that node.
+function listPlace(nodeId: string | null): { place: string | null; placeTitle: string | null } {
+  const other = (id: string | null) => (id && !realmNodes.isLocalNode(id) ? id : null)
+  return other(nodeId) === other(remoteNodeId.value) ? { place: null, placeTitle: null } : rowPlace(nodeId)
 }
 // Arrow keys move through the shown rows of this group, then of other groups.
 const listId = `bucket-results-${useId()}`
@@ -131,6 +138,13 @@ function openHit(hit: BucketSearchHit) {
 
 function emitSync(source: BindSource | null) {
   if (source) emit('sync-computer', source)
+}
+
+// Every desktop row keeps a link column, empty or not, so the rows line up.
+function linkedTo(nodeId: string | null, name: string): string | null | undefined {
+  if (!desktop) return undefined
+  const folder = linkedFolderFor(nodeId, name)
+  return folder ? folderName(folder.root) : null
 }
 
 // A hit names its own node and group; nothing falls back to the connected node.
@@ -184,11 +198,12 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               :job="realmNodes.isLocalNode(hit.node_id) ? jobs.get(hit.bucket) : null"
               :active="hit.bucket === bucket && (realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id) === remoteNodeId"
               v-bind="rowPlace(hit.node_id)"
+              :linked-to="linkedTo(hit.node_id, hit.bucket)"
               @open="openHit(hit)"
             >
               <template #tooltip>{{ rowNode(hit.node_id) }}</template>
-              <template v-if="hitSource(hit)" #actions>
-                <IconButton :label="`Link a local folder to ${hit.bucket}…`" side="right" @click="emitSync(hitSource(hit))">
+              <template #link>
+                <IconButton v-if="hitSource(hit)" :label="`Link a local folder to ${hit.bucket}…`" side="right" @click="emitSync(hitSource(hit))">
                   <FolderSync class="h-3 w-3" />
                 </IconButton>
               </template>
@@ -229,20 +244,23 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                 :synced="syncByBucket.has(syncKeyFor(entry.nodeId, entry.bucket))"
                 :job="entry.nodeId ? null : jobs.get(entry.bucket)"
                 :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
-                v-bind="rowPlace(entry.nodeId ?? null)"
+                v-bind="listPlace(entry.nodeId ?? null)"
+                :linked-to="linkedTo(entry.nodeId ?? null, entry.bucket)"
                 @open="openBucketOn(entry.bucket, entry.nodeId)"
                 @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
               >
                 <template #tooltip>{{ rowNode(entry.nodeId) }}</template>
-                <template #actions>
+                <template #link>
                   <IconButton
-                    v-if="desktop && bindSourceFor(entry.bucket, entry.nodeId ?? null, selectedGroupId)"
+                    v-if="bindSourceFor(entry.bucket, entry.nodeId ?? null, selectedGroupId)"
                     :label="`Link a local folder to ${entry.bucket}…`"
                     side="right"
                     @click="emitSync(bindSourceFor(entry.bucket, entry.nodeId ?? null, selectedGroupId))"
                   >
                     <FolderSync class="h-3 w-3" />
                   </IconButton>
+                </template>
+                <template #actions>
                   <IconButton
                     label="Delete bucket…"
                     class="text-muted-foreground hover:text-destructive"
@@ -270,7 +288,8 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                   :pinned="false"
                   :synced="syncByBucket.has(syncKeyFor(entry.nodeId, entry.bucket))"
                   :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
-                  v-bind="rowPlace(entry.nodeId ?? null)"
+                  v-bind="listPlace(entry.nodeId ?? null)"
+                  :linked-to="linkedTo(entry.nodeId ?? null, entry.bucket)"
                   @open="openBucketOn(entry.bucket, entry.nodeId)"
                   @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
                 >
@@ -320,17 +339,18 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               :subtitle="hit.group_name || null"
               :pinnable="false"
               v-bind="rowPlace(hit.node_id)"
+              :linked-to="linkedTo(hit.node_id, hit.bucket)"
               @open="openSearchHit(hit)"
             >
               <template #tooltip>{{ rowNode(hit.node_id) }}</template>
-              <template v-if="desktop ? hitSource(hit) : !realmNodes.isLocalNode(hit.node_id)" #actions>
-                <IconButton
-                  :label="desktop ? `Link a local folder to ${hit.bucket}…` : `Sync ${hit.bucket} to this node…`"
-                  side="right"
-                  @click="desktop ? emitSync(hitSource(hit)) : emit('sync', hit)"
-                >
-                  <FolderSync v-if="desktop" class="h-3 w-3" />
-                  <ArrowLeftRight v-else class="h-3 w-3" />
+              <template #link>
+                <IconButton v-if="hitSource(hit)" :label="`Link a local folder to ${hit.bucket}…`" side="right" @click="emitSync(hitSource(hit))">
+                  <FolderSync class="h-3 w-3" />
+                </IconButton>
+              </template>
+              <template v-if="!desktop && !realmNodes.isLocalNode(hit.node_id)" #actions>
+                <IconButton :label="`Sync ${hit.bucket} to this node…`" side="right" @click="emit('sync', hit)">
+                  <ArrowLeftRight class="h-3 w-3" />
                 </IconButton>
               </template>
             </BucketRow>

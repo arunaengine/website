@@ -16,6 +16,7 @@ import { usePublicAccess } from './usePublicAccess'
 import { useRealmNodes } from './useRealmNodes'
 import { useRefresh } from './useRefresh'
 import { useStagingReferences } from './useStagingReferences'
+import { useSyncedFolders } from './useSyncedFolders'
 import { useUploadQueue } from './useUploadQueue'
 import {
   useS3,
@@ -37,6 +38,8 @@ import { useAllBuckets } from './useAllBuckets'
 import type { BucketSearchHit, SourceConnectorSummary, SyncRelationship, UsageResponse } from '@/lib/api'
 import { referenceSourceLabel, referenceSourceName, type ReferenceSourceGroup } from '@/lib/references'
 import { bindSource, type BindSource } from '@/lib/bindSource'
+import { isDesktop } from '@/lib/desktop'
+import type { SyncedFolder } from '@/lib/deviceApi'
 import { parseArunaArn, prefixesOverlap, syncBucketKey } from '@/lib/sync'
 import { dataWatchPathPrefix, s3EndpointNodeId } from '@/lib/watches'
 
@@ -427,6 +430,25 @@ export function useDataManager() {
   function bindSourceFor(name: string, nodeId: string | null, groupId: string | null | undefined): BindSource | null {
     return bindSource(realmNodes.nodes.value, name, nodeId ?? realmNodes.localNodeId.value, groupId)
   }
+
+  // Desktop only: the folder on this computer linked to each bucket, keyed like the syncs.
+  const syncedFolders = isDesktop() ? useSyncedFolders() : null
+  void syncedFolders?.ensureLoaded()
+  const linkedFolders = computed(() => {
+    const map = new Map<string, SyncedFolder>()
+    for (const folder of syncedFolders?.folders.value ?? []) {
+      const { node_id: nodeId, bucket: name } = folder.remote
+      const key = syncKeyFor(nodeId, name)
+      if (nodeId && name && !map.has(key)) map.set(key, folder)
+    }
+    return map
+  })
+
+  function linkedFolderFor(nodeId: string | null | undefined, name: string): SyncedFolder | null {
+    return linkedFolders.value.get(syncKeyFor(nodeId, name)) ?? null
+  }
+
+  const currentLinkedFolder = computed(() => (bucket.value ? linkedFolderFor(remoteNodeId.value, bucket.value) : null))
 
   const showSyncButton = computed(
     () => Boolean(bucket.value) && !isWorkspaceBucket(bucket.value) && Boolean(authToken.value),
@@ -1421,6 +1443,8 @@ export function useDataManager() {
     showSyncButton,
     bindSourceFor,
     currentBindSource,
+    linkedFolderFor,
+    currentLinkedFolder,
     loadSyncOverview,
     references,
     referenceStats,

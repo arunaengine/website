@@ -4,6 +4,7 @@ import * as RouterRuntime from 'vue-router'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as DeviceApi from '@/lib/deviceApi'
+import * as FormatCount from '@/lib/formatCount'
 import * as StateBadge from '@/lib/stateBadge'
 import * as SyncStates from '@/lib/syncStates'
 import * as Utils from '@/lib/utils'
@@ -151,6 +152,7 @@ const SyncItemRow = compileClientComponent(new URL('./SyncItemRow.vue', import.m
   '@/components/ui/Progress.vue': moduleDefault(ProgressStub),
   '@/components/ui/Spinner.vue': moduleDefault(ProgressStub),
   '@/lib/deviceApi': DeviceApi,
+  '@/lib/formatCount': FormatCount,
   '@/lib/stateBadge': StateBadge,
   '@/lib/syncStates': SyncStates,
   '@/lib/utils': Utils,
@@ -309,6 +311,20 @@ describe('the linked folders card', () => {
     expect(badge(target, 'Deleting').props['data-variant']).toBe('sky')
     expect(() => rowButton(mounted.root, 'data', 'Sync now')).toThrow()
     expect(() => rowButton(mounted.root, 'data', 'Pause')).toThrow()
+    mounted.app.unmount()
+  })
+
+  it('shows the files found at the last check, but not while a folder links', async () => {
+    folders.value = [
+      folder({ counters: { ...folder().counters, observed: 297 } }),
+      folder({ folder_id: 'f2', root: '/home/me/other', state: 'binding', counters: { ...folder().counters, observed: 3 } }),
+      folder({ folder_id: 'f3', root: '/home/me/empty' }),
+    ]
+    const mounted = await mount()
+
+    expect(content(row(mounted.root, '/home/me/data'))).toContain('297 files')
+    expect(content(row(mounted.root, 'other'))).not.toContain('files')
+    expect(content(row(mounted.root, 'empty'))).not.toContain('files')
     mounted.app.unmount()
   })
 

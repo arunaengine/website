@@ -16,6 +16,7 @@ import {
 import { BUCKET_NAME_REQUIREMENT, bucketNameProblem } from '@/lib/bucketName'
 import * as Workspaces from '@/lib/workspaces'
 import * as BucketPlace from '@/lib/bucketPlace'
+import * as DeviceApi from '@/lib/deviceApi'
 import { bindSource } from '@/lib/bindSource'
 
 const aruna = vi.hoisted(() => ({ authToken: { value: 'token' }, searchBuckets: vi.fn() }))
@@ -72,6 +73,7 @@ const RowStub = defineComponent({
     job: { type: Object, default: null },
     place: { type: String, default: null },
     placeTitle: { type: String, default: null },
+    linkedTo: { type: String, default: undefined },
   },
   emits: ['open'],
   setup: (props, { slots, emit }) => () =>
@@ -84,6 +86,11 @@ const RowStub = defineComponent({
       h('span', { role: 'tooltip' }, slots.tooltip?.()),
       props.job ? h('em', { 'data-testid': 'row-job' }, `${props.bucket}: ${(props.job as { kind: string }).kind}`) : null,
       props.place ? h('small', { 'data-testid': 'row-place', title: props.placeTitle }, `${props.bucket}: ${props.place}`) : null,
+      props.linkedTo === undefined
+        ? null
+        : h('span', { 'data-testid': 'link-column' }, [
+            props.linkedTo ? h('span', { role: 'img', 'aria-label': `Linked to ${props.linkedTo}` }) : slots.link?.(),
+          ]),
       slots.actions?.(),
     ]),
 })
@@ -136,6 +143,7 @@ const sidebarModules = {
   },
   '@/lib/workspaces': Workspaces,
   '@/lib/bucketPlace': BucketPlace,
+  '@/lib/deviceApi': DeviceApi,
   '@/lib/desktop': { isDesktop: () => desktopMode.on },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
@@ -210,6 +218,7 @@ function manager() {
         nodeId ?? 'home',
         groupId,
       ),
+    linkedFolderFor: (_nodeId: string | null, _name: string) => null as { root: string } | null,
   }
 }
 
@@ -351,6 +360,113 @@ describe('Bucket sidebar link a local folder', () => {
 
     expect(onSyncComputer).toHaveBeenCalledWith({ bucket: 'results', nodeId: 'node-2', groupId: 'g7' })
     expect(() => element(root, (node) => node.props['aria-label'] === 'Link a local folder to private…')).toThrow()
+  })
+})
+
+describe('Bucket sidebar linked buckets', () => {
+  const linkLabel = (name: string) => `Link a local folder to ${name}…`
+  const hasNode = (root: Parameters<typeof content>[0], label: string) =>
+    nodes(root).some((node) => node.props['aria-label'] === label)
+  const columns = (root: Parameters<typeof content>[0]) =>
+    nodes(root).filter((node) => node.props['data-testid'] === 'link-column')
+  // test on node-2 is linked to the folder test-data on this computer.
+  const linkedManager = (state = manager()) => ({
+    ...state,
+    linkedFolderFor: (nodeId: string | null, name: string) =>
+      nodeId === 'node-2' && name === 'test' ? { root: '/home/me/test-data' } : null,
+  })
+
+  beforeEach(() => {
+    nodeChoice.value = null
+    allBuckets.hits.value = [
+      { bucket: 'raw-reads', node_id: 'node-2', group_id: 'g1' },
+      { bucket: 'test', node_id: 'node-2', group_id: 'g1' },
+      { bucket: 'private', node_id: 'laptop', group_id: 'g1' },
+    ]
+    desktopMode.on = true
+  })
+  afterEach(() => {
+    desktopMode.on = false
+    allBuckets.hits.value = []
+  })
+
+  it('marks the linked row and offers the link only on the others', async () => {
+    const { root } = await mountApp(BucketSidebar, { props: { manager: linkedManager() } })
+
+    expect(hasNode(root, 'Linked to test-data')).toBe(true)
+    expect(hasNode(root, linkLabel('test'))).toBe(false)
+    expect(hasNode(root, linkLabel('raw-reads'))).toBe(true)
+  })
+
+  it('gives every desktop row the same link column, empty where nothing applies', async () => {
+    const { root } = await mountApp(BucketSidebar, { props: { manager: linkedManager() } })
+    const [raw, test, own] = columns(root)
+
+    expect(columns(root)).toHaveLength(3)
+    expect(hasNode(raw, linkLabel('raw-reads'))).toBe(true)
+    expect(hasNode(test, 'Linked to test-data')).toBe(true)
+    expect(content(own)).toBe('')
+    expect(nodes(own).filter((node) => node.kind === 'element')).toEqual([own])
+  })
+
+  it('marks the linked row in the list of one node too', async () => {
+    const state = manager()
+    state.sidebarBuckets = ref([
+      { bucket: 'test', nodeId: 'node-2', pinned: false },
+      { bucket: 'raw-reads', nodeId: 'node-2', pinned: false },
+    ]) as never
+    const { root } = await mountApp(BucketSidebar, { props: { manager: linkedManager(state) } })
+    await pickNode()
+
+    expect(hasNode(root, 'Linked to test-data')).toBe(true)
+    expect(hasNode(root, linkLabel('test'))).toBe(false)
+    expect(hasNode(root, linkLabel('raw-reads'))).toBe(true)
+    expect(nodes(root).filter((node) => node.props['aria-label'] === 'Delete bucket…')).toHaveLength(2)
+  })
+
+  it('names the place in one node’s list only on rows from another node', async () => {
+    const state = manager()
+    state.remoteNodeId = ref('node-2') as never
+    state.sidebarBuckets = ref([
+      { bucket: 'pinned-home', nodeId: null, pinned: true },
+      { bucket: 'pinned-far', nodeId: 'node-3', pinned: true },
+      { bucket: 'reef', nodeId: 'node-2', pinned: false },
+    ]) as never
+    state.recentBuckets = ref([
+      { bucket: 'seen-here', nodeId: 'node-2' },
+      { bucket: 'seen-far', nodeId: 'node-3' },
+    ]) as never
+    const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
+    await pickNode()
+    const places = nodes(root).filter((node) => node.props['data-testid'] === 'row-place')
+
+    expect(places.map((node) => content(node))).toEqual([
+      'pinned-home: This computer',
+      'pinned-far: name-node-3',
+      'seen-far: name-node-3',
+    ])
+    expect(columns(root)).toHaveLength(5)
+  })
+
+  it('names no place on rows of the connected node in its own list', async () => {
+    const state = manager()
+    state.sidebarBuckets = ref([
+      { bucket: 'reef', nodeId: null, pinned: false },
+      { bucket: 'pinned-far', nodeId: 'node-2', pinned: true },
+    ]) as never
+    const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
+    await pickNode()
+    const places = nodes(root).filter((node) => node.props['data-testid'] === 'row-place')
+
+    expect(places.map((node) => content(node))).toEqual(['pinned-far: node-2 · Giessen'])
+  })
+
+  it('adds no link column on the web', async () => {
+    desktopMode.on = false
+    const { root } = await mountApp(BucketSidebar, { props: { manager: linkedManager() } })
+
+    expect(columns(root)).toHaveLength(0)
+    expect(hasNode(root, 'Linked to test-data')).toBe(false)
   })
 })
 

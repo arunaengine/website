@@ -20,6 +20,7 @@ import { useAruna } from '@/composables/useAruna'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { isDesktop } from '@/lib/desktop'
 import type { BindSource } from '@/lib/bindSource'
+import { folderName } from '@/lib/deviceApi'
 import { useBrokenFiles } from '@/composables/useBrokenFiles'
 import { useLockedBucket } from '@/composables/useLockedBucket'
 import { useProviderBucket } from '@/composables/useProviderBucket'
@@ -124,6 +125,7 @@ const {
   bucketSyncCount,
   showSyncButton,
   currentBindSource,
+  currentLinkedFolder,
   selectedObjectKeys,
   selectedPrefixes,
   selectedCount,
@@ -476,7 +478,7 @@ async function onDrop(event: DragEvent) {
             </template>
           </Popover>
           <!-- The Add data pipeline always targets the connected node. -->
-          <Button v-if="desktop && currentBindSource && !remoteBlocked" variant="outline" size="sm" aria-label="Link a local folder" title="Keep a folder on this computer and this bucket in step" @click="emit('sync-to-computer', currentBindSource)"><FolderSync class="h-4 w-4" /><span :class="toolbarLabel">Link a local folder</span></Button>
+          <Button v-if="desktop && currentBindSource && !currentLinkedFolder && !remoteBlocked" variant="outline" size="sm" aria-label="Link a local folder" title="Keep a folder on this computer and this bucket in step" @click="emit('sync-to-computer', currentBindSource)"><FolderSync class="h-4 w-4" /><span :class="toolbarLabel">Link a local folder</span></Button>
           <Button v-if="!remoteBlocked" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="New folder" :title="writeRestrictionMessage ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /><span :class="toolbarLabel">New folder</span></Button>
           <Button v-if="notebooks && !remoteNodeId" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="New notebook" :title="writeRestrictionMessage ?? 'Create a notebook here'" @click="emit('new-notebook')"><NotebookPen class="h-4 w-4" /><span :class="toolbarLabel">New notebook</span></Button>
           <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="Add data" :title="writeRestrictionMessage ?? 'Add data'" @click="emit('add-data')"><Plus class="h-4 w-4" /><span :class="toolbarLabel">Add data</span></Button>
@@ -489,6 +491,19 @@ async function onDrop(event: DragEvent) {
         </p>
       </div>
       <Notice v-if="deletedError" tone="warning">{{ deletedError }}</Notice>
+      <Notice v-if="desktop && currentLinkedFolder" class="flex flex-wrap items-center gap-3" data-testid="linked-folder-note">
+        <FolderSync class="h-4 w-4 shrink-0 text-primary" />
+        <p class="min-w-0 flex-1">
+          <span class="font-medium text-foreground">Linked to {{ folderName(currentLinkedFolder.root) }}.</span>
+          It stays in step with <span class="hash">{{ currentLinkedFolder.root }}</span> on this computer.
+        </p>
+        <RouterLink
+          :to="{ name: 'folder', params: { folderId: currentLinkedFolder.folder_id } }"
+          class="text-xs font-medium text-primary hover:underline"
+        >
+          Open folder
+        </RouterLink>
+      </Notice>
       <Notice v-if="onThisComputer" class="flex flex-wrap items-center gap-3" data-testid="device-bucket-note">
         <Laptop class="h-4 w-4 shrink-0" />
         <p class="min-w-0 flex-1">
@@ -518,7 +533,7 @@ async function onDrop(event: DragEvent) {
         <div class="mt-4 flex justify-center gap-2">
           <RefreshButton v-if="!remoteEndpointMissing" :busy="retrySpinning" label="Try again" @click="onRetryObjects" />
           <Button
-            v-if="showSyncButton && (!desktop || currentBindSource)"
+            v-if="showSyncButton && (!desktop || (currentBindSource && !currentLinkedFolder))"
             size="sm"
             @click="currentBindSource && desktop ? emit('sync-to-computer', currentBindSource) : emit('sync-to-node')"
           >

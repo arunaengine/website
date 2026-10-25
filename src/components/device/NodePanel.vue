@@ -36,12 +36,8 @@ const running = computed(() => pill.value.label === 'Running')
 const canPause = computed(() => status.value !== null && status.value.state !== 'stopped' && status.value.state !== 'error')
 
 const sentence = computed(() => {
-  const current = status.value
-  if (!current) return 'Looking for Aruna on this computer.'
-  if (running.value) {
-    const time = current.uptimeSeconds == null ? '' : `Aruna has run on this computer for ${plainDuration(current.uptimeSeconds)}. `
-    return `${time}Syncing, tools and local runs are working.`
-  }
+  if (!status.value) return 'Looking for Aruna on this computer.'
+  if (running.value) return 'Syncing, tools and local runs are working.'
   if (pill.value.label === 'Paused') return 'Aruna is paused. Syncing, tools and local runs wait until you resume it.'
   if (pill.value.label === 'Starting' || pill.value.label === 'Connecting') return 'Aruna is starting. This takes a few seconds.'
   return 'Aruna is not running. Syncing, tools and local runs wait until it runs again.'
@@ -70,37 +66,35 @@ async function start(): Promise<void> {
 
 <template>
   <section class="surface overflow-hidden">
-    <div class="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
-      <div class="min-w-0">
+    <div class="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3">
+      <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
         <div class="flex items-center gap-2">
           <h2 class="font-display text-sm font-semibold text-aruna-navy">Status</h2>
           <Badge :variant="pill.variant">{{ pill.label }}</Badge>
         </div>
-        <p class="mt-1 text-xs text-muted-foreground">{{ sentence }}</p>
+        <p class="text-xs text-muted-foreground">{{ sentence }}</p>
       </div>
-      <div class="flex shrink-0 items-center gap-2">
-        <Button v-if="canPause" variant="outline" size="sm" :disabled="control.busy.value" @click="pause">
-          <Pause class="h-3.5 w-3.5" /> Pause
-        </Button>
-        <Button v-else variant="outline" size="sm" :disabled="control.busy.value" @click="start">
-          <Play class="h-3.5 w-3.5" /> {{ paused ? 'Resume' : 'Start' }}
-        </Button>
-      </div>
+      <dl class="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
+        <div v-for="tile in tiles" :key="tile.label" class="flex items-center gap-1.5">
+          <dt class="text-muted-foreground">{{ tile.label }}</dt>
+          <dd :class="tile.mono ? 'font-mono' : ''" class="text-foreground">{{ tile.value }}</dd>
+        </div>
+      </dl>
+      <Button v-if="canPause" variant="outline" size="sm" :disabled="control.busy.value" @click="pause">
+        <Pause class="h-3.5 w-3.5" /> Pause
+      </Button>
+      <Button v-else variant="outline" size="sm" :disabled="control.busy.value" @click="start">
+        <Play class="h-3.5 w-3.5" /> {{ paused ? 'Resume' : 'Start' }}
+      </Button>
     </div>
 
-    <div class="space-y-3 border-t border-border px-5 py-4">
+    <div class="space-y-3 border-t border-border px-5 py-4 empty:hidden">
       <Notice v-if="statusError" tone="error">{{ statusError }}</Notice>
       <Notice v-if="control.error.value" tone="error">{{ control.error.value }}</Notice>
       <Notice v-if="status?.message && !running && pill.label !== 'Paused'" tone="warning">{{ status.message }}</Notice>
       <Notice v-if="status && !status.enrolled && !status.enrolling" tone="info">
         This computer has not joined a realm yet.
       </Notice>
-      <dl class="space-y-2 text-xs">
-        <div v-for="tile in tiles" :key="tile.label" class="flex justify-between gap-3">
-          <dt class="text-muted-foreground">{{ tile.label }}</dt>
-          <dd :class="tile.mono ? 'font-mono' : ''" class="text-right text-foreground">{{ tile.value }}</dd>
-        </div>
-      </dl>
     </div>
   </section>
 </template>
