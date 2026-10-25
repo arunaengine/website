@@ -118,20 +118,27 @@ watch(detailId, () => {
   resetBacklinks()
 })
 
+// A version of a bucket stored on more nodes: its id is no web page, so it is never opened as a link.
+function globalVersion(row: DataEntity): string | null {
+  return identityOf(row).global?.versionId ?? null
+}
+
 function entityLink(row: DataEntity): string | undefined {
+  if (globalVersion(row)) return undefined
   const target = row.contentUrl ?? (contentW3id(row) ? '' : row.id)
   return target.startsWith('http') ? target : undefined
 }
 
 // A file kept at its source, such as another realm: its identity is a web address there.
 function externalHost(row: DataEntityNode): string | null {
-  if (row.directory || !isHttpUrl(row.id) || identityOf(row).s3 || contentW3id(row)) return null
+  if (row.directory || !isHttpUrl(row.id) || identityOf(row).s3 || contentW3id(row) || globalVersion(row)) return null
   return new URL(row.id).host
 }
 
 // Where the bytes are: the S3 path when any form names one, else the written contentUrl.
 function locationText(row: DataEntity): string {
   const s3 = identityOf(row).s3
+  if (!s3 && globalVersion(row)) return ''
   return s3 ? objectLocation(s3.bucket, s3.key) : row.contentUrl ?? ''
 }
 
@@ -214,6 +221,9 @@ function openPreview(row: DataEntity) {
                   <RouterLink v-if="browserRoute(row)" :to="browserRoute(row)!" class="font-mono text-primary hover:underline" @click.stop>{{ locationText(row) }}</RouterLink>
                   <a v-else-if="entityLink(row)" :href="entityLink(row)" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline" @click.stop>{{ row.contentUrl }}</a>
                   <span v-else class="font-mono">{{ locationText(row) }}</span>
+                </span>
+                <span v-if="globalVersion(row)" class="mt-0.5 block break-all font-mono text-[10px] font-normal text-muted-foreground">
+                  Version: {{ globalVersion(row) }}
                 </span>
                 <LinkedPartActions v-if="linkedPart(row)" :id="row.id" :dataset-id="detailId" />
                 <span v-if="referencedBy.get(row.id)?.length" class="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11px] font-normal text-muted-foreground">

@@ -53,11 +53,21 @@ describe('dataEntityIdentity', () => {
 describe('parseDataIdentity', () => {
   const CONTENT = `https://w3id.org/aruna/data/${BLAKE3}`
 
+  it('reads the global id of a version, and not that of a bucket or folder', () => {
+    const id = 'https://w3id.org/aruna/data/k3V9xQ2m/01K8Y2B6D8F0H2K4M6P8R0T2V4'
+
+    expect(parseDataIdentity({ id }).global).toEqual({ realmId: 'k3V9xQ2m', versionId: '01K8Y2B6D8F0H2K4M6P8R0T2V4' })
+    expect(parseDataIdentity({ id: 'x', contentUrl: id }).global?.versionId).toBe('01K8Y2B6D8F0H2K4M6P8R0T2V4')
+    expect(parseDataIdentity({ id: 'https://w3id.org/aruna/data/k3V9xQ2m/01K8Y2B6D8F0H2K4M6P8R0T2V4/' }).global).toBeNull()
+    expect(parseDataIdentity({ id: CONTENT }).global).toBeNull()
+  })
+
   it('reads the current form', () => {
     expect(parseDataIdentity({ id: CONTENT, contentUrl: 's3://reads/raw/one.csv', localPath: 'raw/one.csv' })).toEqual({
       contentId: CONTENT,
       s3: { bucket: 'reads', key: 'raw/one.csv' },
       arn: null,
+      global: null,
       localPath: 'raw/one.csv',
     })
   })
@@ -68,6 +78,7 @@ describe('parseDataIdentity', () => {
       contentId: CONTENT,
       s3: { bucket: 'reads', key: 'raw/two words.csv' },
       arn: { realmId: 'realm-1', nodeId: 'node-1', version: '01JABCDEF0123456789ABCDEFG' },
+      global: null,
       localPath: null,
     })
   })
@@ -90,6 +101,7 @@ describe('parseDataIdentity', () => {
       contentId: null,
       s3: null,
       arn: null,
+      global: null,
       localPath: 'data/one.csv',
     })
   })
@@ -99,6 +111,7 @@ describe('parseDataIdentity', () => {
       contentId: null,
       s3: null,
       arn: null,
+      global: null,
       localPath: null,
     })
   })

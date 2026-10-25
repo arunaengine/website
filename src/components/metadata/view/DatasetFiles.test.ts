@@ -118,6 +118,18 @@ describe('DatasetFiles', () => {
     mounted.app.unmount()
   })
 
+  it('shows the global id of a version as a version, not as an external link', async () => {
+    const id = 'https://w3id.org/aruna/data/k3V9xQ2m/01K8Y2B6D8F0H2K4M6P8R0T2V4'
+    const mounted = await render({ '@id': id, contentUrl: id })
+    const text = content(mounted.root)
+
+    expect(text).toContain('Version: 01K8Y2B6D8F0H2K4M6P8R0T2V4')
+    expect(text).not.toContain('External')
+    expect(text).not.toContain('Location:')
+    expect(nodes(mounted.root).some((node) => node.tag === 'a' && node.props.href)).toBe(false)
+    mounted.app.unmount()
+  })
+
   it('marks a file kept at another realm as external', async () => {
     const mounted = await render({ '@id': 'https://data.giessen.example/api/v1/objects/one.csv' })
     expect(content(mounted.root)).toContain('External')
