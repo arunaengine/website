@@ -67,6 +67,11 @@ async function connect(): Promise<void> {
   }
 }
 
+// A change opens over a working app, so leaving it returns Home without asking the shell.
+function cancel(): void {
+  void router.replace({ name: 'dashboard' })
+}
+
 function toEnroll(): void {
   void router.push({ name: 'device', query: { tab: 'enroll' } })
 }
@@ -115,6 +120,7 @@ function toEnroll(): void {
           <Button variant="outline" class="w-full" as-child>
             <RouterLink :to="{ name: 'device', hash: '#wipe' }">Remove this computer</RouterLink>
           </Button>
+          <Button variant="ghost" class="w-full" @click="cancel">Cancel</Button>
         </div>
 
         <div v-else class="flex flex-col justify-center gap-4 p-6 md:p-7">
@@ -146,6 +152,7 @@ function toEnroll(): void {
           <Button class="w-full" :disabled="!address.trim() || checking" @click="connect">
             {{ action }} <ArrowRight class="h-4 w-4" />
           </Button>
+          <Button v-if="changing" variant="ghost" class="w-full" :disabled="checking" @click="cancel">Cancel</Button>
 
           <div class="border-t border-border/70 pt-3">
             <Button variant="ghost" size="sm" class="-ml-2" @click="toEnroll">

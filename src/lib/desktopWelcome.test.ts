@@ -1,6 +1,9 @@
+import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
+import * as RouterRuntime from 'vue-router'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { button, click, compileClientComponent, moduleDefault, mountApp } from '@/test/clientRender'
 
 const LOCAL = 'http://127.0.0.1:34116/api/v1'
 const REALM = 'https://aruna.example/api/v1'
@@ -613,6 +616,38 @@ describe('device setup gate', () => {
     await router.push({ name: 'welcome', query: { change: '1' } })
     expect(router.currentRoute.value.name).toBe('welcome')
     expect(await welcome.deviceEnrolled()).toBe(true)
+  })
+
+  it.each([true, false])('returns a signed in owner Home on cancel (enrolled: %s)', async (enrolled) => {
+    const welcome = await load({ state: 'running', enrolled, apiBaseUrl: LOCAL }, REALM, 'https://aruna.example')
+    if (!enrolled) welcome.skipSetup()
+    const router = await routerWith(welcome, '/app/settings')
+    await router.push({ name: 'welcome', query: { change: '1' } })
+    const validateRealm = vi.fn()
+    const Button = defineComponent({
+      inheritAttrs: false,
+      setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
+    })
+    const WelcomeView = compileClientComponent(new URL('../views/WelcomeView.vue', import.meta.url), {
+      vue: VueRuntime,
+      'vue-router': RouterRuntime,
+      '@lucide/vue': new Proxy({}, { get: () => Blank }),
+      '@/assets/brand/icon-mark.avif': '/icon-mark.avif',
+      '@/components/layout/AppLogo.vue': moduleDefault(Blank),
+      '@/components/ui/Button.vue': moduleDefault(Button),
+      '@/components/ui/Input.vue': moduleDefault(Blank),
+      '@/components/ui/Notice.vue': moduleDefault(Blank),
+      '@/lib/utils': { errorMessage: String },
+      '@/lib/desktopBridge': { validateRealm },
+      '@/lib/desktopBoot': { realmOrigin: () => 'https://aruna.example' },
+      '@/lib/desktopWelcome': welcome,
+    })
+    const mounted = await mountApp(WelcomeView, { router })
+
+    await click(button(mounted.root, 'Cancel'))
+    await lands(router, 'dashboard')
+    expect(validateRealm).not.toHaveBeenCalled()
+    mounted.app.unmount()
   })
 
   it('asks no more once the prompt was answered', async () => {
