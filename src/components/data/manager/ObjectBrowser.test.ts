@@ -271,7 +271,11 @@ describe('object browser link a local folder', () => {
 
 describe('object browser linked bucket', () => {
   const source = { bucket: 'reef', nodeId: 'realm-1', groupId: 'g1' }
-  const linked = { folder_id: 'f1', root: '/home/me/Documents/test-data' }
+  const linked = {
+    folder_id: 'f1',
+    root: '/home/me/Documents/test-data',
+    remote: { node_id: 'realm-1', bucket: 'reef', prefix: '' },
+  }
   const note = (root: HostNode) => element(root, (node) => node.props['data-testid'] === 'linked-folder-note')
 
   afterEach(() => {
@@ -287,10 +291,20 @@ describe('object browser linked bucket', () => {
     })
 
     expect(content(note(root))).toContain('Linked to test-data.')
+    expect(content(note(root))).not.toContain('only')
     expect(content(note(root))).toContain('/home/me/Documents/test-data')
     const open = element(note(root), (node) => node.tag === 'a' && content(node).trim() === 'Open folder')
     expect(open.props.to).toEqual({ name: 'folder', params: { folderId: 'f1' } })
     expect(() => action(root, 'Link a local folder')).toThrow()
+  })
+
+  it('names the part of the bucket a prefix link covers', async () => {
+    desktopMode.on = true
+    for (const prefix of ['2026/run-17', '2026/run-17/']) {
+      const root = await render({ currentLinkedFolder: computed(() => ({ ...linked, remote: { ...linked.remote, prefix } })) })
+
+      expect(content(note(root))).toContain('Linked to test-data (only 2026/run-17/).')
+    }
   })
 
   it('also drops the link button when the bucket cannot be browsed', async () => {

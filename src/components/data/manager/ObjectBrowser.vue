@@ -155,6 +155,12 @@ const {
   publicAccess,
 } = props.manager
 
+// A link to part of the bucket names that part, so the note never claims the whole bucket.
+const linkedPart = computed(() => {
+  const prefix = currentLinkedFolder.value?.remote.prefix.replace(/\/+$/, '')
+  return prefix ? ` (only ${prefix}/)` : ''
+})
+
 // A bucket on this computer: its files are already here, so no folder can be linked.
 const onThisComputer = computed(
   () =>
@@ -494,7 +500,7 @@ async function onDrop(event: DragEvent) {
       <Notice v-if="desktop && currentLinkedFolder" class="flex flex-wrap items-center gap-3" data-testid="linked-folder-note">
         <FolderSync class="h-4 w-4 shrink-0 text-primary" />
         <p class="min-w-0 flex-1">
-          <span class="font-medium text-foreground">Linked to {{ folderName(currentLinkedFolder.root) }}.</span>
+          <span class="font-medium text-foreground">Linked to {{ folderName(currentLinkedFolder.root) }}{{ linkedPart }}.</span>
           It stays in step with <span class="hash">{{ currentLinkedFolder.root }}</span> on this computer.
         </p>
         <RouterLink
