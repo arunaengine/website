@@ -1,6 +1,7 @@
 import { computed, defineComponent, h, inject, provide, reactive, ref, type ComputedRef } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import * as Distribution from '@/lib/distribution'
 import * as GroupAdmin from '@/lib/groupAdmin'
 import type { GroupDetailResponse } from '@/lib/api'
 import { compileClientComponent, content, mountApp, moduleDefault, nodes } from '@/test/clientRender'
@@ -120,6 +121,7 @@ const view = compileClientComponent(new URL('./BucketStorageView.vue', import.me
       }),
   },
   '@/composables/useS3': { useS3: () => ({ activeContext: ref({ groupId: 'g-1' }) }) },
+  '@/lib/distribution': Distribution,
   '@/lib/groupAdmin': GroupAdmin,
 })
 
