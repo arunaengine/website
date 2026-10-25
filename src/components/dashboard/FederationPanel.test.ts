@@ -140,6 +140,7 @@ describe('this computer', () => {
     expect(html.match(/stroke-dasharray="4 4"/g)).toHaveLength(1)
     expect(html.match(/class="fed-flow"/g)).toHaveLength(1)
     expect(html).toContain('This computer shows its own.')
+    expect(html).toContain('aria-label="Realm node topology. This computer, Test-laptop!, is connected."')
     expect(html).toContain('1 enrolled, 1 active')
   })
 
@@ -151,6 +152,7 @@ describe('this computer', () => {
     expect(html).not.toContain('stroke-dasharray="4 4"')
     expect(html).toMatch(/>\s*This computer, not connected\s*<\/text>/)
     expect(html).toContain('This computer is not connected right now.')
+    expect(html).toContain('aria-label="Realm node topology. This computer, Test-laptop!, is not connected."')
     expect(html).toContain('1 enrolled, 0 active')
   })
 

@@ -119,6 +119,12 @@ const computer = computed(() => {
   return { id: props.computer.id, name: props.computer.name, lines, connected: lines.length > 0 }
 })
 
+const topologyLabel = computed(() => {
+  if (!computer.value) return 'Realm node topology'
+  const { name, connected } = computer.value
+  return `Realm node topology. This computer, ${name}, is ${connected ? 'connected' : 'not connected'}.`
+})
+
 const showLabels = computed(() => spokes.value.length <= LABEL_CAP)
 
 type Placed = { node: RealmNodeInfo; cx: number; cy: number }
@@ -263,7 +269,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
             preserveAspectRatio="xMidYMid meet"
             class="block h-auto w-full"
             role="img"
-            aria-label="Realm node topology"
+            :aria-label="topologyLabel"
           >
             <defs>
               <pattern id="fed-grid" width="32" height="32" patternUnits="userSpaceOnUse">
