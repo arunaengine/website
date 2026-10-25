@@ -17,9 +17,16 @@ describe('linked part', () => {
   })
 
   it('names why the files cannot be listed from this node', () => {
-    expect(browseProblem(target({}))).toBeNull()
-    expect(browseProblem(target({ bucket: null }))).toBe('This node has no record of the bucket yet.')
-    expect(browseProblem(target({ held_here: false }))).toContain('holds no copy')
+    const local = (id: string) => id === 'n1'
+
+    expect(browseProblem(target({}), local)).toBeNull()
+    expect(browseProblem(target({ bucket: null }), local)).toBe('This node has no record of the bucket yet.')
+    expect(browseProblem(target({ held_here: false }), local)).toContain('holds no copy')
+    expect(browseProblem(target({ held_here: false, node_id: 'n1' }), local)).toContain('holds no copy')
+  })
+
+  it('lets an ordinary bucket of another node open on that node', () => {
+    expect(browseProblem(target({ held_here: false, node_id: 'n2', set_id: null }), (id) => id === 'n1')).toBeNull()
   })
 
   it('opens the folder of the part, on the node of an ordinary bucket that is not this one', () => {
@@ -38,6 +45,13 @@ describe('linked part', () => {
     expect(partId({ ...where, setId: '01K8Y2' })).toBe('https://w3id.org/aruna/data/k3V9/01K8Y2/cmF3LzIwMjYv')
     expect(partId({ ...where, setId: '01K8Y2', prefix: '' })).toBe('https://w3id.org/aruna/data/k3V9/01K8Y2/')
     expect(looksLikePart(partId({ ...where, setId: '01K8Y2' }))).toBe(true)
+  })
+
+  it('keeps a prefix that starts with a slash exactly', () => {
+    const where = { realmId: 'k3V9', nodeId: 'ae58', bucket: 'lab', prefix: '/raw/', setId: null }
+
+    expect(partId(where)).toBe('arn:aruna:k3V9:ae58:s3/lab//raw/')
+    expect(partId({ ...where, setId: 'S' })).not.toBe(partId({ ...where, prefix: 'raw/', setId: 'S' }))
   })
 
   it('encodes a prefix of any bytes without padding or url characters', () => {

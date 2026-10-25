@@ -27,7 +27,7 @@ async function browse() {
   problem.value = null
   try {
     const target = await getPartTarget(props.id)
-    problem.value = browseProblem(target)
+    problem.value = browseProblem(target, isLocalNode)
     if (!problem.value) await router.push(browseRoute(target, isLocalNode))
   } catch (cause) {
     problem.value = apiErrorMessage(cause)

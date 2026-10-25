@@ -29,16 +29,17 @@ function encodePrefix(prefix: string): string {
  * ARN of an ordinary bucket on a node. The root of a bucket has an empty prefix.
  */
 export function partId(where: { realmId: string; nodeId: string; bucket: string; prefix: string; setId: string | null }): string {
-  const prefix = where.prefix.replace(/^\/+/, '')
+  // S3 keys may start with "/", so the prefix is kept exactly.
+  const prefix = where.prefix
   if (where.setId) return `${W3ID_DATA}${where.realmId}/${where.setId}/${prefix ? encodePrefix(prefix) : ''}`
   return `arn:aruna:${where.realmId}:${where.nodeId}:s3/${where.bucket}/${prefix}`
 }
 
-/** The reason the files of a part cannot be listed from this node, or null. */
-export function browseProblem(target: PartTargetResponse): string | null {
+/** The reason the files of a part cannot be listed from here, or null. Another node's bucket opens there. */
+export function browseProblem(target: PartTargetResponse, isLocalNode: (nodeId: string) => boolean): string | null {
   if (!target.bucket) return 'This node has no record of the bucket yet.'
-  if (!target.held_here) return 'This node holds no copy of the bucket. Open the dataset on a node that does.'
-  return null
+  if (target.held_here || (target.node_id && !isLocalNode(target.node_id))) return null
+  return 'This node holds no copy of the bucket. Open the dataset on a node that does.'
 }
 
 /** The Data section at the folder of a part. A bucket of another node opens on that node. */
