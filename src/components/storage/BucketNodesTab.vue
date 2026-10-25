@@ -4,6 +4,8 @@ import { computed, ref } from 'vue'
 import AdmissionRetry from '@/components/distributed/AdmissionRetry.vue'
 import BucketActions from '@/components/distributed/BucketActions.vue'
 import DegradedNotice from '@/components/distributed/DegradedNotice.vue'
+import DeletionNotice from '@/components/distributed/DeletionNotice.vue'
+import TransferStatus from '@/components/distributed/TransferStatus.vue'
 import MemberTable from '@/components/distributed/MemberTable.vue'
 import MockNotice from '@/components/distributed/MockNotice.vue'
 import RangeTable from '@/components/distributed/RangeTable.vue'
@@ -14,7 +16,7 @@ import OptionToggle from '@/components/ui/OptionToggle.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import { presetById, stamp } from '@/lib/distributedMock'
-import { degradedRanges, type DistributedBucket } from '@/lib/distribution'
+import { degradedRanges, isDeleting, openTransfers, type DistributedBucket } from '@/lib/distribution'
 
 const props = defineProps<{ bucket: DistributedBucket; admin?: boolean; busy?: boolean }>()
 const emit = defineEmits<{ (e: 'reload'): void }>()
@@ -39,7 +41,8 @@ const settings = computed(() => {
     ...(created ? [{ label: 'Created', value: stamp(created) }] : []),
   ]
 })
-const state = computed(() => (props.bucket.live?.pending ? 'Pending' : degraded.value.length ? 'Degraded' : 'Active'))
+const transfers = computed(() => openTransfers(props.bucket))
+const state = computed(() => (isDeleting(props.bucket) ? 'Deleting' : props.bucket.live?.pending ? 'Pending' : degraded.value.length ? 'Degraded' : 'Active'))
 </script>
 
 <template>
@@ -58,6 +61,7 @@ const state = computed(() => (props.bucket.live?.pending ? 'Pending' : degraded.
       <StatCard label="Nodes" :value="bucket.members.length" />
       <StatCard label="Ranges" :value="bucket.ranges.length" />
     </div>
+    <DeletionNotice v-if="bucket.live?.deletion" :deletion="bucket.live.deletion" />
     <Notice v-if="bucket.live?.conflicted" tone="error" title="Configuration changes are stopped">
       The node that publishes the configuration signed two different versions. Data service continues.
     </Notice>
@@ -65,6 +69,7 @@ const state = computed(() => (props.bucket.live?.pending ? 'Pending' : degraded.
       The node that publishes the configuration cannot be reached. Reads and writes continue.
     </Notice>
     <AdmissionRetry v-if="bucket.live?.pending && admin" :live="bucket.live" @done="emit('reload')" />
+    <TransferStatus v-if="transfers.length" :bucket="bucket" :transfers="transfers" />
     <DegradedNotice v-for="range in degraded.slice(0, NOTICED)" :key="range.id" :range="range" />
     <p v-if="degraded.length > NOTICED" class="text-xs text-muted-foreground">
       {{ degraded.length - NOTICED }} more ranges are degraded.
@@ -76,7 +81,7 @@ const state = computed(() => (props.bucket.live?.pending ? 'Pending' : degraded.
       </header>
       <div class="space-y-3 p-5">
         <MemberTable :bucket="bucket" />
-        <BucketActions v-if="!bucket.live" :bucket="bucket" :admin="viewer === 'admin'" />
+        <BucketActions :bucket="bucket" :admin="bucket.live ? Boolean(admin) : viewer === 'admin'" @changed="emit('reload')" />
       </div>
     </section>
     <section class="surface">
