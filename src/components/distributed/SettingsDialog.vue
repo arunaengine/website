@@ -65,10 +65,6 @@ async function save() {
           <Switch :checked="draft.index" aria-label="Search index" @update:checked="set('index', $event)" />
           <span class="font-medium text-foreground">Search index</span>
         </label>
-        <label class="flex items-start gap-3 text-sm">
-          <Switch :checked="draft.public" aria-label="Public" @update:checked="set('public', $event)" />
-          <span class="font-medium text-foreground">Public</span>
-        </label>
         <div class="grid gap-3 sm:grid-cols-2">
           <div class="space-y-1">
             <label class="text-xs font-medium text-foreground" for="set-split-objects">Split a range above (files)</label>
