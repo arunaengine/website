@@ -35,16 +35,25 @@ export function partId(where: { realmId: string; nodeId: string; bucket: string;
   return `arn:aruna:${where.realmId}:${where.nodeId}:s3/${where.bucket}/${prefix}`
 }
 
+// The Data section lists the folder `<prefix>/`, so only a prefix of that shape is listed exactly.
+function folderPrefix(prefix: string): string | null {
+  if (!prefix) return ''
+  return prefix.length > 1 && prefix.endsWith('/') ? prefix.slice(0, -1) : null
+}
+
 /** The reason the files of a part cannot be listed from here, or null. Another node's bucket opens there. */
 export function browseProblem(target: PartTargetResponse, isLocalNode: (nodeId: string) => boolean): string | null {
   if (!target.bucket) return 'This node has no record of the bucket yet.'
+  if (folderPrefix(target.prefix) === null) return 'The Data section cannot list this part as a folder, because its path does not end in a slash.'
   if (target.held_here || (target.node_id && !isLocalNode(target.node_id))) return null
   return 'This node holds no copy of the bucket. Open the dataset on a node that does.'
 }
 
 /** The Data section at the folder of a part. A bucket of another node opens on that node. */
 export function browseRoute(target: PartTargetResponse, isLocalNode: (nodeId: string) => boolean) {
-  const route = folderRoute(target.bucket ?? '', target.prefix)
+  const folder = folderPrefix(target.prefix)
+  const route = folderRoute(target.bucket ?? '', '')
   const node = target.node_id && !isLocalNode(target.node_id) ? { node: target.node_id } : {}
-  return { ...route, query: { ...route.query, ...node } }
+  // The prefix is kept as the part names it: no slash is trimmed from its start.
+  return { ...route, query: { ...(folder ? { prefix: folder } : {}), ...node } }
 }

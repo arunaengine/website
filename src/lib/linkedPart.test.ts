@@ -37,6 +37,16 @@ describe('linked part', () => {
     expect(browseRoute(target({ set_id: 's1' }), local).query).toEqual({ prefix: 'raw/2026' })
   })
 
+  it('keeps the prefix of a part exactly, or says it cannot be listed', () => {
+    const local = (id: string) => id === 'n1'
+
+    expect(browseRoute(target({ node_id: 'n1', prefix: '/raw/' }), local).query).toEqual({ prefix: '/raw' })
+    expect(browseRoute(target({ node_id: 'n1', prefix: 'raw//' }), local).query).toEqual({ prefix: 'raw/' })
+    expect(browseProblem(target({ prefix: 'raw' }), local)).toContain('does not end in a slash')
+    expect(browseProblem(target({ prefix: '/' }), local)).toContain('does not end in a slash')
+    expect(browseProblem(target({ prefix: '/raw/' }), local)).toBeNull()
+  })
+
   it('writes the id of a folder as the node reads it', () => {
     const where = { realmId: 'k3V9', nodeId: 'ae58', bucket: 'lab', prefix: 'raw/2026/', setId: null }
 
