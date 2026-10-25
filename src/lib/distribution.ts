@@ -269,13 +269,13 @@ const STRATEGY_NAMES: Record<DataStrategy, StrategyName> = {
   stream: 'stream',
 }
 
-const BEHAVIOURS: Record<RangeMode, BehaviourName> = {
+export const BEHAVIOURS: Record<RangeMode, BehaviourName> = {
   passthrough: 'passthrough',
   'fill first': 'fill_first',
   'serve and fill': 'serve_and_fill',
 }
 
-const REFRESH_SECONDS: Record<string, number> = {
+export const REFRESH_SECONDS: Record<string, number> = {
   '15m': 900,
   '1h': 3_600,
   '6h': 21_600,
@@ -315,5 +315,45 @@ export function createRequest(name: string, placement: Placement): CreateDistrib
       range_behaviour: BEHAVIOURS[settings.mode],
       search_index: settings.index,
     },
+  }
+}
+
+export interface SettingsDraft {
+  refresh: string
+  /** `member` leaves the behaviour to each node's data strategy. */
+  mode: RangeMode | 'member'
+  index: boolean
+  public: boolean
+  /** Whole numbers as typed; empty means never. */
+  splitObjects: string
+  splitBytes: string
+}
+
+/** What a missing field means to the node, which replaces the whole object. */
+export function defaultDraft(): SettingsDraft {
+  return { refresh: 'off', mode: 'member', index: false, public: false, splitObjects: '', splitBytes: '' }
+}
+
+function wholeNumber(value: string): number | null {
+  const text = value.trim()
+  return /^\d+$/.test(text) && Number(text) > 0 ? Number(text) : null
+}
+
+/** The reason the typed limits cannot be sent, or null. */
+export function draftProblem(draft: SettingsDraft): string | null {
+  for (const [value, name] of [[draft.splitObjects, 'objects'], [draft.splitBytes, 'bytes']] as const) {
+    if (value.trim() && wholeNumber(value) === null) return `The split limit for ${name} must be a whole number above zero.`
+  }
+  return null
+}
+
+export function settingsBody(draft: SettingsDraft): NonNullable<CreateDistributedRequest['settings']> {
+  return {
+    refresh_secs: REFRESH_SECONDS[draft.refresh] ?? null,
+    range_behaviour: draft.mode === 'member' ? null : BEHAVIOURS[draft.mode],
+    search_index: draft.index,
+    public: draft.public,
+    split_objects: wholeNumber(draft.splitObjects),
+    split_bytes: wholeNumber(draft.splitBytes),
   }
 }

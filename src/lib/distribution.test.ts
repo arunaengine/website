@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { DistributedResponse } from '@/lib/api'
 import { defaultSettings, type Placement, type PresetId } from '@/lib/distributedMock'
-import { createRequest, degradedRanges, fromStatus, isDeleting, leaveBlock, openTransfers, placementProblem, transferChoice } from './distribution'
+import { createRequest, defaultDraft, degradedRanges, draftProblem, fromStatus, isDeleting, leaveBlock, openTransfers, placementProblem, settingsBody, transferChoice } from './distribution'
 
 const NODE_A = 'a'.repeat(64)
 const NODE_B = 'b'.repeat(64)
@@ -182,5 +182,37 @@ describe('changes of a set', () => {
     const bucket = fromStatus(base())
 
     expect(bucket.live).toMatchObject({ transfers: [], deletion: null, publicationsClosed: false })
+  })
+})
+
+describe('settings of a set', () => {
+  it('starts from what a missing field means to the node', () => {
+    expect(settingsBody(defaultDraft())).toEqual({
+      refresh_secs: null,
+      range_behaviour: null,
+      search_index: false,
+      public: false,
+      split_objects: null,
+      split_bytes: null,
+    })
+  })
+
+  it('sends the typed refresh, behaviour, index and split limits', () => {
+    const body = settingsBody({ refresh: '1h', mode: 'serve and fill', index: true, public: true, splitObjects: ' 250000 ', splitBytes: '' })
+
+    expect(body).toEqual({
+      refresh_secs: 3600,
+      range_behaviour: 'serve_and_fill',
+      search_index: true,
+      public: true,
+      split_objects: 250_000,
+      split_bytes: null,
+    })
+  })
+
+  it('refuses limits that are not whole numbers above zero', () => {
+    expect(draftProblem({ ...defaultDraft(), splitObjects: '12x' })).toContain('objects')
+    expect(draftProblem({ ...defaultDraft(), splitBytes: '0' })).toContain('bytes')
+    expect(draftProblem({ ...defaultDraft(), splitObjects: '5', splitBytes: '' })).toBeNull()
   })
 })
