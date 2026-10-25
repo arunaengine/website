@@ -144,6 +144,14 @@ describe('folder item chips', () => {
     expect(itemChip({ kind: 'folder', folder: stale }).label).toBe('Sending 210 files')
   })
 
+  it('counts uploads waiting to retry as not yet sent', () => {
+    const retrying = { ...failedTransfer(null), state: 'retrying' as const, folder_id: 'f1' }
+    const queued = { ...retrying, state: 'queued' as const }
+
+    expect(itemChip({ kind: 'folder', folder: folder(), transfers: [retrying] }).label).toBe('Retrying 1 file')
+    expect(itemChip({ kind: 'folder', folder: folder(), transfers: [retrying, queued] }).label).toBe('Sending 2 files')
+  })
+
   it('says when an otherwise quiet folder has never been checked', () => {
     expect(itemChip({ kind: 'folder', folder: folder({ last_reconcile_ms: null }) })).toEqual({
       label: 'In sync',
