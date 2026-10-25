@@ -24,8 +24,8 @@ import { assistantAvailable, assistantUnread, assistantWarning } from '@/composa
 import { statusTone } from '@/components/nodes/node-display'
 import { homeRealmLabel } from '@/composables/useFederation'
 
-// 'desktop' is the Aruna Desktop chrome: no realm switcher and no dataset
-// shortcut, and this computer's own node takes the leading slot instead.
+// 'desktop' is the Aruna Desktop chrome: no dataset shortcut, and this
+// computer's own node leads, before the group switcher.
 const props = withDefaults(defineProps<{ variant?: 'portal' | 'desktop' }>(), { variant: 'portal' })
 
 const { realm, role } = useRealm()
@@ -83,7 +83,7 @@ async function handleSignOut() {
 <template>
   <div class="sticky top-0 z-30 border-b border-border/80 bg-background/90 backdrop-blur-xl">
     <div class="container flex h-14 items-center gap-1 min-[480px]:gap-3">
-      <!-- The device plate: this computer's node, and the realm it answers to. -->
+      <!-- The device plate: this computer's node. The switcher after it shows the realm. -->
       <RouterLink
         v-if="desktop"
         :to="{ name: 'device' }"
@@ -92,12 +92,8 @@ async function handleSignOut() {
       >
         <StatusDot :tone="nodeTone" :label="nodeLabel" class="size-1.5" />
         <span class="text-[12px] font-medium leading-none text-foreground">{{ nodeLabel }}</span>
-        <span class="hidden h-3 w-px shrink-0 bg-border sm:block" aria-hidden="true" />
-        <span class="hidden max-w-32 truncate text-[12px] leading-none text-muted-foreground sm:block">{{
-          realm.shortName
-        }}</span>
       </RouterLink>
-      <ContextSwitcher v-else />
+      <ContextSwitcher />
 
       <SearchOverlay />
 

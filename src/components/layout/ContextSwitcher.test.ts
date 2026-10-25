@@ -14,6 +14,7 @@ const setActiveGroup = vi.fn((id: string) => {
   active.value = id
 })
 const setRealm = vi.fn()
+const desktopMode = ref(false)
 const realm = ref({ id: 'realm-1', name: 'Demo realm', shortName: 'Demo', color: '#336699' })
 const realms = ref([
   { id: 'realm-1', name: 'Demo realm', shortName: 'Demo', color: '#336699' },
@@ -82,6 +83,7 @@ const ContextSwitcher = compileClientComponent(new URL('./ContextSwitcher.vue', 
     activeGroupId: computed(() => active.value),
     setActiveGroup,
   },
+  '@/lib/desktop': { isDesktop: () => desktopMode.value },
   '@/lib/utils': Utils,
 })
 
@@ -95,6 +97,7 @@ beforeEach(() => {
   realm.value = { id: 'realm-1', name: 'Demo realm', shortName: 'Demo', color: '#336699' }
   setActiveGroup.mockClear()
   setRealm.mockClear()
+  desktopMode.value = false
 })
 
 describe('ContextSwitcher', () => {
@@ -124,12 +127,22 @@ describe('ContextSwitcher', () => {
     const assign = vi.fn()
     vi.stubGlobal('window', { location: { assign } })
     const { root } = await mountApp(ContextSwitcher)
+    expect(content(root)).not.toContain('Change realm')
     await click(element(root, (node) => content(node).includes('Other realms') && node.tag === 'button'))
     const picker = element(root, (node) => node.props['data-picker'] !== undefined)
     expect(picker.props['data-picker']).toBe('realm-1')
     await click(picker)
     expect(assign).toHaveBeenCalledWith('https://archive.example/')
     vi.unstubAllGlobals()
+  })
+
+  it('changes the realm inside the desktop app, never in another portal', async () => {
+    desktopMode.value = true
+    const { root } = await mountApp(ContextSwitcher)
+
+    expect(content(root)).not.toContain('Other realms')
+    const change = element(root, (node) => node.tag === 'a' && content(node).includes('Change realm'))
+    expect(JSON.parse(String(change.props['data-to']))).toEqual({ name: 'welcome', query: { change: '1' } })
   })
 
   it('offers the group id and the groups page', async () => {

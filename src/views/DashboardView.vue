@@ -264,7 +264,6 @@ const pageDescription = computed(() =>
 
       <template v-else>
       <SignInPanel v-if="!currentUser" />
-      <HomeCards v-if="desktop && currentUser" />
 
       <!-- First visit: the docs and the short tour first, tutorials behind them. -->
       <section
@@ -297,6 +296,8 @@ const pageDescription = computed(() =>
           <Button variant="ghost" size="sm" @click="dismissOnboarding">Not now</Button>
         </div>
       </section>
+
+      <HomeCards v-if="desktop && currentUser" />
 
       <!-- One statistics section at a time; the stored scope decides which. -->
       <section v-if="currentUser && scope === 'personal'" aria-labelledby="my-statistics-heading" class="space-y-3.5">

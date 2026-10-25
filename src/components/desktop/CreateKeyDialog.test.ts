@@ -7,6 +7,7 @@ import { button, click, compileClientComponent, content, flush, input, moduleDef
 const createKey = vi.fn()
 const available = ref(true)
 const myGroups = ref([{ id: 'g1', name: 'Lab group' }])
+const activeGroupId = ref('g1')
 const stored: Record<string, string> = {}
 
 const Passthrough = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
@@ -41,6 +42,7 @@ const CreateKeyDialog = compileClientComponent(new URL('./CreateKeyDialog.vue', 
   '@/components/ui/Spinner.vue': moduleDefault(Empty),
   '@/composables/useAruna': { useAruna: () => ({ myGroups }) },
   '@/composables/useDeviceKeys': { useDeviceKeys: () => ({ available, create: createKey }) },
+  '@/composables/useGroupSelection': { activeGroupId },
   '@/lib/keyNames': { rememberKeyName: (id: string, name: string) => (stored[id] = name) },
   '@/lib/utils': Utils,
 })
@@ -48,6 +50,8 @@ const CreateKeyDialog = compileClientComponent(new URL('./CreateKeyDialog.vue', 
 beforeEach(() => {
   createKey.mockReset().mockResolvedValue({ access_key_id: 'ARK1', access_secret: 'secret' })
   available.value = true
+  myGroups.value = [{ id: 'g1', name: 'Lab group' }]
+  activeGroupId.value = 'g1'
   for (const id of Object.keys(stored)) delete stored[id]
 })
 
@@ -62,6 +66,18 @@ describe('creating a key', () => {
     expect(createKey).toHaveBeenCalledWith('g1', 365 * 24 * 3600)
     expect(onCreated).toHaveBeenCalledWith({ accessKeyId: 'ARK1', secret: 'secret', name: 'Laptop tools' })
     expect(stored).toEqual({ ARK1: 'Laptop tools' })
+    mounted.app.unmount()
+  })
+
+  it('gives the key to the active group by default', async () => {
+    myGroups.value = [{ id: 'g1', name: 'Lab group' }, { id: 'g2', name: 'Field group' }]
+    activeGroupId.value = 'g2'
+    const mounted = await mountApp(CreateKeyDialog, { props: { open: true } })
+
+    await typeValue(input(mounted.root, 'aria-label', 'Key name'), 'Field tools')
+    await click(button(mounted.root, 'Create key'))
+
+    expect(createKey).toHaveBeenCalledWith('g2', 365 * 24 * 3600)
     mounted.app.unmount()
   })
 

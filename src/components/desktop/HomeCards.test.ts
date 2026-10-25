@@ -6,6 +6,7 @@ import * as DeviceApi from '@/lib/deviceApi'
 import * as NodePill from '@/lib/nodePill'
 import * as SyncStates from '@/lib/syncStates'
 import * as Utils from '@/lib/utils'
+import * as Workspaces from '@/lib/workspaces'
 import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp, type HostNode } from '@/test/clientRender'
 import type { DeviceCompute, DeviceTransfer, SyncedFolder } from '@/lib/deviceApi'
 import type { NodeStatus } from '@/lib/desktopBridge'
@@ -23,6 +24,9 @@ const credentials = ref<Array<{ access_key_id: string; status: string }>>([])
 const keysState = ref('ready')
 const startHidden = ref(false)
 const loadCompute = vi.fn(async () => undefined)
+const myGroups = ref([{ id: 'g1', name: 'Lab group' }])
+type Page = { hits: Array<{ bucket: string }>; next_cursor?: string | null }
+const searchBuckets = vi.fn(async (): Promise<Page> => ({ hits: [] }))
 
 function folder(overrides: Partial<SyncedFolder> = {}): SyncedFolder {
   return {
@@ -66,8 +70,21 @@ const ButtonStub = defineComponent({
   setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
 })
 const BindStub = defineComponent({
+  props: { open: Boolean, bucket: String, newBucket: Boolean },
+  setup: (props) => () => h('div', props.open ? `bind-dialog-open ${props.bucket ?? ''} ${props.newBucket}` : ''),
+})
+// Opens to a marker and hands up a made or linked bucket on demand.
+const NewBucketStub = defineComponent({
   props: { open: Boolean },
-  setup: (props) => () => h('div', props.open ? 'bind-dialog-open' : ''),
+  emits: ['created', 'link'],
+  setup: (props, { emit }) => () =>
+    props.open
+      ? h('div', [
+          'new-bucket-open',
+          h('button', { onClick: () => emit('created', { bucket: 'lab', nodeId: 'n1', groupId: 'g1' }) }, 'Make it'),
+          h('button', { onClick: () => emit('link', { bucket: 'lab', nodeId: 'n1', groupId: 'g1' }) }, 'Link it'),
+        ])
+      : null,
 })
 
 const HomeCards = compileClientComponent(new URL('./HomeCards.vue', import.meta.url), {
@@ -80,6 +97,8 @@ const HomeCards = compileClientComponent(new URL('./HomeCards.vue', import.meta.
   '@/components/ui/Notice.vue': moduleDefault(Plain),
   '@/components/ui/Progress.vue': moduleDefault(Plain),
   '@/components/desktop/BindFolderDialog.vue': moduleDefault(BindStub),
+  '@/components/desktop/NewBucketDialog.vue': moduleDefault(NewBucketStub),
+  '@/composables/useAruna': { useAruna: () => ({ myGroups, searchBuckets, sessionEpoch: ref(1) }) },
   '@/composables/usePortalFeatures': {
     usePortalFeatures: () => ({ shown: (feature: string) => feature !== 'compute' || computeShown.value }),
   },
@@ -115,6 +134,7 @@ const HomeCards = compileClientComponent(new URL('./HomeCards.vue', import.meta.
   '@/lib/nodePill': NodePill,
   '@/lib/syncStates': SyncStates,
   '@/lib/utils': Utils,
+  '@/lib/workspaces': Workspaces,
 })
 
 function step(root: HostNode, title: string): HostNode {
@@ -140,13 +160,15 @@ beforeEach(() => {
   keysState.value = 'ready'
   startHidden.value = false
   loadCompute.mockClear()
+  myGroups.value = [{ id: 'g1', name: 'Lab group' }]
+  searchBuckets.mockReset().mockResolvedValue({ hits: [] })
 })
 
 describe('desktop home cards', () => {
   it('gives every open step a button that leads to its action', async () => {
     const mounted = await mountApp(HomeCards)
 
-    expect(content(mounted.root)).toContain('0 of 3 done')
+    expect(content(mounted.root)).toContain('0 of 4 done')
     expect(link(step(mounted.root, 'Connect your tools'), 'Create a key')).toEqual({
       name: 'settings',
       query: { tab: 'access', create: 'key' },
@@ -167,7 +189,7 @@ describe('desktop home cards', () => {
     const mounted = await mountApp(HomeCards)
     const text = content(mounted.root)
 
-    expect(text).toContain('2 of 3 done')
+    expect(text).toContain('2 of 4 done')
     expect(text).toContain('data-2026 is linked.')
     expect(text).toContain('Key "Laptop tools" is ready.')
     expect(() => link(step(mounted.root, 'Connect your tools'), 'Create a key')).toThrow()
@@ -175,6 +197,7 @@ describe('desktop home cards', () => {
   })
 
   it('drops the list once every step is done or while a list is still read', async () => {
+    searchBuckets.mockResolvedValue({ hits: [{ bucket: 'lab' }] })
     folders.value = [folder()]
     credentials.value = [{ access_key_id: 'AK1', status: 'active' }]
     compute.value = enabledCompute()
@@ -187,13 +210,74 @@ describe('desktop home cards', () => {
     mounted = await mountApp(HomeCards)
     expect(content(mounted.root)).not.toContain('Get started')
     mounted.app.unmount()
+
+    keysState.value = 'ready'
+    searchBuckets.mockReturnValue(new Promise<Page>(() => undefined))
+    mounted = await mountApp(HomeCards)
+    expect(content(mounted.root)).not.toContain('Get started')
+    mounted.app.unmount()
+  })
+
+  it('counts a bucket only once the user can see one', async () => {
+    const folderBucket = 'folder-01k7zq3m8v2t6r9b4n5c1d0e7f'
+    searchBuckets.mockResolvedValueOnce({ hits: [{ bucket: 'ws-run-1' }, { bucket: folderBucket }], next_cursor: 'c2' })
+    searchBuckets.mockResolvedValueOnce({ hits: [{ bucket: 'lab' }], next_cursor: 'c3' })
+    const mounted = await mountApp(HomeCards)
+    await flush()
+
+    expect(searchBuckets).toHaveBeenCalledTimes(2)
+    expect(searchBuckets).toHaveBeenLastCalledWith('', { limit: 50, cursor: 'c2' })
+    expect(content(mounted.root)).toContain('1 of 4 done')
+    expect(content(step(mounted.root, 'Create a bucket'))).toContain('You have a bucket.')
+    mounted.app.unmount()
+
+    searchBuckets.mockResolvedValue({ hits: [{ bucket: folderBucket }] })
+    const hidden = await mountApp(HomeCards)
+    expect(content(step(hidden.root, 'Create a bucket'))).toContain('A bucket holds your data in the realm.')
+    expect(content(hidden.root)).toContain('0 of 4 done')
+    hidden.app.unmount()
+  })
+
+  it('gives only the first open step the primary button', async () => {
+    const mounted = await mountApp(HomeCards)
+    const folderButton = () => element(step(mounted.root, 'Keep a folder'), (node) => node.tag === 'button')
+
+    expect(button(step(mounted.root, 'Create a bucket'), 'New bucket').props.variant).toBe('default')
+    expect(folderButton().props.variant).toBe('outline')
+
+    await click(button(mounted.root, 'New bucket'))
+    expect(content(mounted.root)).toContain('new-bucket-open')
+    await click(button(mounted.root, 'Make it'))
+
+    expect(content(mounted.root)).toContain('1 of 4 done')
+    expect(folderButton().props.variant).toBe('default')
+    mounted.app.unmount()
+  })
+
+  it('hands a bucket made for a folder on to the link', async () => {
+    const mounted = await mountApp(HomeCards)
+
+    await click(button(mounted.root, 'New bucket'))
+    await click(button(mounted.root, 'Link it'))
+
+    expect(content(mounted.root)).toContain('bind-dialog-open lab true')
+    mounted.app.unmount()
+  })
+
+  it('asks for a group before a bucket', async () => {
+    myGroups.value = []
+    const mounted = await mountApp(HomeCards)
+
+    expect(link(step(mounted.root, 'Create a bucket'), 'Create a group first')).toEqual({ name: 'groups' })
+    expect(() => button(mounted.root, 'New bucket')).toThrow()
+    mounted.app.unmount()
   })
 
   it('leaves out the runs step and tile while compute is hidden', async () => {
     computeShown.value = false
     const mounted = await mountApp(HomeCards)
 
-    expect(content(mounted.root)).toContain('0 of 2 done')
+    expect(content(mounted.root)).toContain('0 of 3 done')
     expect(content(mounted.root)).not.toContain('Local runs')
     mounted.app.unmount()
   })
