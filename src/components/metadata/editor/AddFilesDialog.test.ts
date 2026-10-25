@@ -31,6 +31,7 @@ const getStorageLocation = vi.fn()
 const getFileOrigin = vi.fn()
 const getFilePartOf = vi.fn()
 const getBucketDistribution = vi.fn()
+const getPartTarget = vi.fn()
 
 interface QueuedUpload {
   id: number
@@ -118,6 +119,7 @@ const AddFilesDialog = compileClientComponent(new URL('./AddFilesDialog.vue', im
       getFileOrigin,
       getFilePartOf,
       getBucketDistribution,
+      getPartTarget,
     }),
   },
   '@/composables/useS3': {
@@ -172,6 +174,7 @@ beforeEach(() => {
   getFileOrigin.mockReset().mockRejectedValue(new ApiError(404, 'not found'))
   getFilePartOf.mockReset().mockRejectedValue(new ApiError(404, 'not found'))
   getBucketDistribution.mockReset().mockRejectedValue(new ApiError(404, 'not found'))
+  getPartTarget.mockReset().mockResolvedValue({ id: NESTED, bucket: 'reads', prefix: 'raw/nested/', node_id: 'node-1', held_here: true })
 })
 
 const NESTED = 'arn:aruna:realm-1:node-1:s3/reads/raw/nested/'
@@ -275,6 +278,21 @@ describe('AddFilesDialog', () => {
     await click(button(mounted.root, 'Pick objects'))
     await flush()
 
+    expect(Editor.findEntity(updates[0], 's3://reads/raw/nested/')?.types).toEqual(['Dataset'])
+    expect(content(mounted.root)).toContain('keep their location as their name')
+    mounted.app.unmount()
+  })
+
+  it('names a folder by this node only when the node confirms the bucket is ordinary', async () => {
+    getPartTarget.mockResolvedValue({ id: NESTED, bucket: 'reads', prefix: 'raw/nested/', node_id: 'node-1', held_here: false })
+    const updates: Editor.CrateDraft[] = []
+    const mounted = await mount(updates)
+
+    await click(button(mounted.root, 'Pick objects'))
+    await flush()
+
+    expect(getPartTarget).toHaveBeenCalledWith(NESTED)
+    expect(Editor.findEntity(updates[0], NESTED)).toBeUndefined()
     expect(Editor.findEntity(updates[0], 's3://reads/raw/nested/')?.types).toEqual(['Dataset'])
     mounted.app.unmount()
   })

@@ -61,7 +61,7 @@ const emit = defineEmits<{
   (e: 'update', draft: CrateDraft): void
 }>()
 
-const { apiBaseUrl, authToken, nodeInfo, getGroup, getFileOrigin, getFilePartOf, getBucketDistribution } = useAruna()
+const { apiBaseUrl, authToken, nodeInfo, getGroup, getFileOrigin, getFilePartOf, getBucketDistribution, getPartTarget } = useAruna()
 const s3 = useS3()
 const queue = useUploadQueue()
 
@@ -245,22 +245,26 @@ function addMemberships() {
 }
 
 // A folder is a linked part: it is named by its bucket and prefix, and every file under it is part
-// of the dataset. Without the ids of this node it keeps its location as the name.
+// of the dataset. A 404 may also mean a set whose record is not here yet, so the node confirms
+// that the bucket is ordinary. Without that the folder keeps its location as the name, and says so.
 async function folderPart(bucketName: string, folder: FolderEntry): Promise<FilePart> {
   const location = objectLocation(bucketName, folder.prefix)
   const realmId = nodeInfo.value?.node.realm_id
   const nodeId = nodeInfo.value?.node.peer_id
   let id = location
   if (realmId && nodeId) {
+    const where = { realmId, nodeId, bucket: bucketName, prefix: folder.prefix }
     try {
-      const setId = (await getBucketDistribution(bucketName)).set_id
-      id = partId({ realmId, nodeId, bucket: bucketName, prefix: folder.prefix, setId })
+      id = partId({ ...where, setId: (await getBucketDistribution(bucketName)).set_id })
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
-        id = partId({ realmId, nodeId, bucket: bucketName, prefix: folder.prefix, setId: null })
+        const ordinary = partId({ ...where, setId: null })
+        const target = await getPartTarget(ordinary).catch(() => null)
+        if (target?.held_here) id = ordinary
       }
     }
   }
+  if (id === location) note('Some folders keep their location as their name: the node could not say which bucket holds them.')
   return { id, name: folder.name, type: 'Dataset', contentUrl: location }
 }
 
