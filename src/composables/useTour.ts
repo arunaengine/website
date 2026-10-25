@@ -30,6 +30,7 @@ let anchorEl: HTMLElement | null = null
 let poll: ReturnType<typeof setInterval> | null = null
 let pollToken = 0
 let listening = false
+let forward = true
 
 export const tourActive = computed(() => active.value)
 export const currentStep = computed<TourStep | null>(() => steps.value[index.value] ?? null)
@@ -47,6 +48,7 @@ export function startTour(next: TourStep[]) {
   steps.value = next
   index.value = 0
   active.value = true
+  forward = true
   listen()
   void enter()
 }
@@ -64,12 +66,23 @@ export function stopTour() {
 export function nextStep() {
   if (index.value + 1 >= steps.value.length) return stopTour()
   index.value += 1
+  forward = true
   void enter()
 }
 
 export function prevStep() {
   if (index.value === 0) return
   index.value -= 1
+  forward = false
+  void enter()
+}
+
+// A control this view does not show drops its step, so the count, Next and Back stay true.
+function skipStep() {
+  const at = index.value
+  steps.value = steps.value.filter((_, position) => position !== at)
+  if (!forward) index.value = Math.max(at - 1, 0)
+  if (index.value >= steps.value.length) return stopTour()
   void enter()
 }
 
@@ -103,6 +116,7 @@ function locate(anchor: string) {
       measure()
     } else if (Date.now() > deadline) {
       clearPoll()
+      skipStep()
     }
   }
   tick()
