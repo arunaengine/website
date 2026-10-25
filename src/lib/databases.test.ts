@@ -16,12 +16,19 @@ describe('database rows', () => {
     expect(row).toMatchObject({ entryId: 'e-spire', datasetId: 'd-spire', bucket: 'spire', title: null, state: 'description_unavailable' })
   })
 
-  it('finds the database of a bucket by name, and for an ordinary bucket by node', () => {
+  it('finds the database of a set by its id and of an ordinary bucket by node and name', () => {
     const rows = [rowOf(view('spire', set)), rowOf(view('lab', ordinary('n1', 'lab')))]
 
-    expect(databaseOf(rows, 'spire', 'n9')?.entryId).toBe('e-spire')
-    expect(databaseOf(rows, 'lab', 'n1')?.entryId).toBe('e-lab')
-    expect(databaseOf(rows, 'lab', 'n2')).toBeUndefined()
+    expect(databaseOf(rows, set)?.entryId).toBe('e-spire')
+    expect(databaseOf(rows, ordinary('n1', 'lab'))?.entryId).toBe('e-lab')
+    expect(databaseOf(rows, ordinary('n2', 'lab'))).toBeUndefined()
+  })
+
+  it('never takes the database of another set or an ordinary bucket that only shares the name', () => {
+    const rows = [rowOf(view('spire', set))]
+
+    expect(databaseOf(rows, { kind: 'distributed', set_id: 's2' })).toBeUndefined()
+    expect(databaseOf(rows, ordinary('n1', 'spire'))).toBeUndefined()
   })
 
   it('names the target of a bucket by its set or by node and name', () => {

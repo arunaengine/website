@@ -8,12 +8,18 @@ import { useDatasetBrief } from '@/composables/useDatasetBrief'
 import { STATE_NOTES } from '@/lib/databases'
 import { cn } from '@/lib/utils'
 
-const props = defineProps<{ bucket: string; nodeId: string | null; bare?: boolean }>()
+const props = defineProps<{
+  bucket: string
+  nodeId: string | null
+  /** The set of a bucket of this node; null for an ordinary one, undefined while it is not known. */
+  setId?: string | null
+  bare?: boolean
+}>()
 
 const databases = useDatabases()
 onMounted(() => databases.ensure())
 
-const entry = computed(() => databases.find(props.bucket, props.nodeId))
+const entry = computed(() => databases.find(props.bucket, props.nodeId, props.setId))
 const brief = useDatasetBrief(computed(() => entry.value?.datasetId ?? null))
 const title = computed(() => brief.value?.name || entry.value?.title || '')
 const facts = computed(() => [brief.value?.license, entry.value?.public ? 'Public' : '', STATE_NOTES[entry.value?.state ?? 'active']].filter(Boolean).join(' · '))

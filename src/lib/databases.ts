@@ -51,11 +51,9 @@ export function targetOf(bucket: string, nodeId: string, setId: string | null): 
   return setId ? { kind: 'distributed', set_id: setId } : { kind: 'ordinary', node_id: nodeId, bucket }
 }
 
-/** The database a bucket is, by name. An ordinary bucket also needs its node to match. */
-export function databaseOf(rows: readonly DatabaseRow[], bucket: string, nodeId: string): DatabaseRow | undefined {
-  return rows.find(
-    (row) => row.bucket === bucket && (row.target.kind === 'distributed' || row.target.node_id === nodeId),
-  )
+/** The database a bucket is: a set by its id, an ordinary bucket by its node and name. */
+export function databaseOf(rows: readonly DatabaseRow[], target: DatabaseTarget): DatabaseRow | undefined {
+  return rows.find((row) => sameTarget(row.target, target))
 }
 
 export function requestOf(requests: readonly DatabaseRequestView[], target: DatabaseTarget): DatabaseRequestView | undefined {

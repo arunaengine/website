@@ -3,7 +3,7 @@
 import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { databaseOf, rowOf, searchRows, type DatabaseRow } from '@/lib/databases'
+import { databaseOf, rowOf, searchRows, targetOf, type DatabaseRow } from '@/lib/databases'
 import { errorMessage } from '@/lib/utils'
 
 export type DatabasesState = 'idle' | 'loading' | 'ready' | 'failed'
@@ -81,8 +81,15 @@ export function useDatabases() {
     complete,
     ensure,
     reload: load,
-    /** The database a bucket of the given node is, if it is one. */
-    find: (bucket: string, nodeId: string | null) => databaseOf(rows.value, bucket, nodeId ?? localNodeId.value ?? ''),
+    /**
+     * The database a bucket is. A bucket of this node needs its set first (null when ordinary);
+     * a bucket of another node is matched by node and name.
+     */
+    find: (bucket: string, nodeId: string | null, setId?: string | null) => {
+      const node = nodeId ?? localNodeId.value
+      if (!node || (setId === undefined && !nodeId)) return undefined
+      return databaseOf(rows.value, targetOf(bucket, node, setId ?? null))
+    },
     search: (query: string) => searchRows(rows.value, query),
   }
 }

@@ -179,6 +179,7 @@ const exampleBucket = computed(() => (mockEnabled() ? mockBucket(bucket.value) :
 // A bucket of this node that is stored on more nodes shows its state above the files.
 const distribution = useBucketDistribution(bucket, remoteNodeId)
 const storedBucket = computed(() => exampleBucket.value ?? distribution.view.value ?? undefined)
+const bucketSetId = computed(() => distribution.view.value?.live?.setId ?? (distribution.state.value === 'ordinary' ? null : undefined))
 // Without a session the example buckets still show, from static data.
 const mockOnly = computed(
   () =>
@@ -403,7 +404,7 @@ async function createFolder() {
 
         <div class="min-w-0 space-y-4">
           <DistributionBanner v-if="storedBucket" :bucket="storedBucket" />
-          <DatabaseHeader v-if="bucket && !exampleBucket" :bucket="bucket" :node-id="remoteNodeId" />
+          <DatabaseHeader v-if="bucket && !exampleBucket" :bucket="bucket" :node-id="remoteNodeId" :set-id="bucketSetId" />
           <ObjectBrowser
             :manager="manager"
             :notebooks="notebooksView"

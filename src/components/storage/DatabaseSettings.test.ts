@@ -5,8 +5,9 @@ import { ApiError, type DatabaseRequestView } from '@/lib/api'
 import * as Databases from '@/lib/databases'
 import { button, compileClientComponent, content, flush, mountApp, moduleDefault } from '@/test/clientRender'
 
-const aruna = vi.hoisted(() => ({ listDatabases: vi.fn(), removeDatabase: vi.fn() }))
+const aruna = vi.hoisted(() => ({ listDatabases: vi.fn(), removeDatabase: vi.fn(), sessionEpoch: { value: 1 } }))
 const rows = ref<Databases.DatabaseRow[]>([])
+const listState = ref('ready')
 const pendingList = ref<DatabaseRequestView[]>([])
 const reload = vi.fn()
 
@@ -30,7 +31,11 @@ const component = compileClientComponent(new URL('./DatabaseSettings.vue', impor
     useDatabases: () => ({
       ensure: vi.fn(),
       reload,
-      find: (bucket: string, nodeId: string | null) => Databases.databaseOf(rows.value, bucket, nodeId ?? 'n1'),
+      state: listState,
+      complete: ref(true),
+      error: ref('node busy'),
+      find: (bucket: string, nodeId: string | null, setId?: string | null) =>
+        setId === undefined && !nodeId ? undefined : Databases.databaseOf(rows.value, Databases.targetOf(bucket, nodeId ?? 'n1', setId ?? null)),
     }),
   },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ localNodeId: ref('n1') }) },
@@ -52,6 +57,7 @@ async function render(props: Record<string, unknown> = {}) {
 describe('database settings', () => {
   beforeEach(() => {
     rows.value = []
+    listState.value = 'ready'
     pendingList.value = []
     aruna.listDatabases.mockReset().mockResolvedValue({ databases: [] })
     aruna.removeDatabase.mockReset().mockResolvedValue(undefined)
@@ -108,5 +114,32 @@ describe('database settings', () => {
     pendingList.value = [{ request_id: 'r1', entry: { entry_id: 'e1', dataset_id: 'd1', owner_group: 'g1', target: { kind: 'ordinary', node_id: 'n1', bucket: 'other' } }, curator: 'u1', created_at_ms: 1 }]
 
     expect(content(await render())).toContain('Not a database.')
+  })
+
+  it('does not say "Not a database" while the list loads, failed or the set is not known', async () => {
+    listState.value = 'loading'
+    expect(content(await render())).toContain('Not known yet')
+    listState.value = 'failed'
+    expect(content(await render())).toContain('The databases could not be read: node busy')
+    listState.value = 'ready'
+    expect(content(await render({ setId: undefined }))).toContain('Not known yet')
+  })
+
+  it('finds a mark that only the curator view lists, by the set of the bucket', async () => {
+    const hidden = { ...entry, entry_id: 'e9', bucket: '', state: 'dataset_hidden', target: { kind: 'distributed', set_id: 's1' } }
+    aruna.listDatabases.mockResolvedValue({ databases: [{ ...hidden, dataset_id: 'd9', owner_group: 'g1', public: false }] })
+    const root = await render({ setId: 's1' })
+
+    expect(content(root)).toContain('Marked as a database.')
+    expect(content(root)).toContain('You cannot read the dataset')
+    expect(content(await render({ setId: 's2' }))).toContain('Not a database.')
+  })
+
+  it('never offers to remove the database of another set with the same bucket name', async () => {
+    rows.value = [{ ...entry, target: { kind: 'distributed', set_id: 's1' } }]
+    const root = await render({ setId: 's2' })
+
+    expect(content(root)).not.toContain('Remove the database mark')
+    expect(content(root)).toContain('Not a database.')
   })
 })

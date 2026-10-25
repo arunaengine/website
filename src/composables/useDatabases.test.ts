@@ -48,8 +48,10 @@ describe('databases', () => {
     expect(aruna.listDatabases).toHaveBeenNthCalledWith(2, { limit: 100, after: 'e-lab' })
     expect(databases.rows.value.map((row) => row.bucket)).toEqual(['lab', 'spire'])
     expect(databases.complete.value).toBe(true)
-    expect(databases.find('lab', null)?.title).toBe('lab database')
+    expect(databases.find('lab', null, null)?.title).toBe('lab database')
+    expect(databases.find('lab', null)).toBeUndefined()
     expect(databases.find('lab', 'n2')).toBeUndefined()
+    expect(databases.find('lab', null, 's1')).toBeUndefined()
     scope.stop()
   })
 
