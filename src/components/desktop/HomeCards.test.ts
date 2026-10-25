@@ -24,6 +24,8 @@ const credentials = ref<Array<{ access_key_id: string; status: string }>>([])
 const keysState = ref('ready')
 const startHidden = ref(false)
 const loadCompute = vi.fn(async () => undefined)
+const refreshStatus = vi.fn(async (): Promise<void> => undefined)
+const deviceClient = ref<{ baseUrl: string; token: string } | null>(null)
 const myGroups = ref([{ id: 'g1', name: 'Lab group' }])
 type Page = { hits: Array<{ bucket: string }>; next_cursor?: string | null }
 const searchBuckets = vi.fn(async (): Promise<Page> => ({ hits: [] }))
@@ -112,7 +114,7 @@ const HomeCards = compileClientComponent(new URL('./HomeCards.vue', import.meta.
     }),
   },
   '@/composables/useDeviceStatus': {
-    useDeviceStatus: () => ({ status, state: nodeState, refresh: vi.fn(async () => undefined) }),
+    useDeviceStatus: () => ({ status, state: nodeState, refresh: refreshStatus, deviceClient }),
   },
   '@/composables/useDeviceTransfers': {
     useDeviceTransfers: () => ({ all: transfers, state: transfersState, load: vi.fn(async () => undefined) }),
@@ -160,6 +162,8 @@ beforeEach(() => {
   keysState.value = 'ready'
   startHidden.value = false
   loadCompute.mockClear()
+  refreshStatus.mockReset().mockResolvedValue(undefined)
+  deviceClient.value = null
   myGroups.value = [{ id: 'g1', name: 'Lab group' }]
   searchBuckets.mockReset().mockResolvedValue({ hits: [] })
 })
@@ -311,6 +315,19 @@ describe('desktop home cards', () => {
       expect(loadCompute).toHaveBeenCalledTimes(visit)
       mounted.app.unmount()
     }
+  })
+
+  it('reads at once when the node is known and waits for its status otherwise', async () => {
+    refreshStatus.mockImplementation(() => new Promise(() => {}))
+    deviceClient.value = { baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner' }
+    const known = await mountApp(HomeCards)
+    expect(loadCompute).toHaveBeenCalledTimes(1)
+    known.app.unmount()
+
+    deviceClient.value = null
+    const unknown = await mountApp(HomeCards)
+    expect(loadCompute).toHaveBeenCalledTimes(1)
+    unknown.app.unmount()
   })
 
   it('says reading or unavailable instead of a zero', async () => {
