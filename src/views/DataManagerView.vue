@@ -54,6 +54,7 @@ const {
   bucket,
   s3Prefix,
   remoteNodeId,
+  realmNodes,
   selectedGroupId,
   selectedGroupName,
   groupsLoading,
