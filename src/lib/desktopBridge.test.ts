@@ -240,6 +240,28 @@ describe('bridge commands', () => {
     await bridge.appQuit()
     expect(invoke).toHaveBeenCalledWith('app_quit', undefined)
   })
+
+  it('reads an in-app update offer and its absence', async () => {
+    const offered = await withShell(() => ({ version: ' 3.0.0-alpha.140 ' }))
+    await expect(offered.updateCheck()).resolves.toEqual({ version: '3.0.0-alpha.140' })
+    expect(invoke).toHaveBeenCalledWith('update_check', undefined)
+
+    const none = await withShell(() => null)
+    await expect(none.updateCheck()).resolves.toBeNull()
+  })
+
+  it('rejects an update offer without a version', async () => {
+    const bridge = await withShell(() => ({ version: '' }))
+    await expect(bridge.updateCheck()).rejects.toBeInstanceOf(bridge.BridgeFailure)
+  })
+
+  it('carries a failed install through as written', async () => {
+    const bridge = await withShell(() => {
+      throw 'the update signature does not match'
+    })
+    await expect(bridge.updateInstall()).rejects.toThrow('the update signature does not match')
+    expect(invoke).toHaveBeenCalledWith('update_install', undefined)
+  })
 })
 
 describe('system-browser auth', () => {

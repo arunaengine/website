@@ -9,8 +9,15 @@ const STATUS_EVENT = 'node-status'
 const CONTEXT_EVENT = 'context-changed'
 const NAVIGATE_EVENT = 'navigate'
 const AUTH_CANCELLED_EVENT = 'auth-cancelled'
+const UPDATE_PROGRESS_EVENT = 'update-progress'
 
 export type Unlisten = () => void
+
+/** How far the download of an in-app update is; `total` is null when the server sent no size. */
+export interface UpdateProgress {
+  downloaded: number
+  total: number | null
+}
 
 async function subscribe(event: string, handler: (payload: unknown) => void): Promise<Unlisten | null> {
   if (!desktopBridge()) return null
@@ -63,4 +70,13 @@ export function onAuthCancelled(handler: () => void): Promise<Unlisten | null> {
  */
 export function onEnrollInvite(handler: (invite: EnrollInvite) => void): Promise<Unlisten | null> {
   return subscribe(ENROLL_EVENT, (payload) => handler(readInvite(payload)))
+}
+
+/** Watches the download of an in-app update the shell is installing. */
+export function onUpdateProgress(handler: (progress: UpdateProgress) => void): Promise<Unlisten | null> {
+  return subscribe(UPDATE_PROGRESS_EVENT, (payload) => {
+    const raw = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {}
+    const count = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null)
+    handler({ downloaded: count(raw.downloaded) ?? 0, total: count(raw.total) })
+  })
 }
