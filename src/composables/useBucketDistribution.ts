@@ -49,7 +49,7 @@ export function useBucketDistribution(bucket: Ref<string>, nodeId: Ref<string | 
   }
 
   watch(
-    [bucket, nodeId],
+    [bucket, nodeId, () => sessionEpoch.value],
     () => {
       view.value = null
       state.value = 'loading'

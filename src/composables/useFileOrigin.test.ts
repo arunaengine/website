@@ -2,7 +2,10 @@ import { effectScope, nextTick, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, type OriginResponse } from '@/lib/api'
 
-const aruna = vi.hoisted(() => ({ sessionEpoch: { value: 1 }, getFileOrigin: vi.fn() }))
+const aruna = await vi.hoisted(async () => {
+  const { ref } = await import('vue')
+  return { sessionEpoch: ref(1), getFileOrigin: vi.fn() }
+})
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
 
 const { useFileOrigin } = await import('@/composables/useFileOrigin')
@@ -55,6 +58,18 @@ describe('file origin', () => {
     await nextTick()
 
     expect(found.origin.value?.version_id).toBe('v2')
+    scope.stop()
+  })
+
+  it('reads the origin again for a new session and drops the answer of the session before', async () => {
+    aruna.getFileOrigin.mockResolvedValueOnce(answer('v1'))
+    const { found, scope } = start()
+    await vi.waitFor(() => expect(found.origin.value?.version_id).toBe('v1'))
+
+    aruna.getFileOrigin.mockRejectedValueOnce(new ApiError(403, 'no access'))
+    aruna.sessionEpoch.value += 1
+    await vi.waitFor(() => expect(found.state.value).toBe('failed'))
+    expect(found.origin.value).toBeNull()
     scope.stop()
   })
 })

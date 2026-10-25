@@ -17,7 +17,7 @@ export function useBucketSources(bucket: Ref<string>, nodeId: Ref<string | null>
   let runs = 0
 
   watch(
-    [bucket, nodeId],
+    [bucket, nodeId, () => sessionEpoch.value],
     async () => {
       const run = ++runs
       const epoch = sessionEpoch.value

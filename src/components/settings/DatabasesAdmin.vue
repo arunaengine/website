@@ -57,6 +57,16 @@ onMounted(() => {
   requests.reload()
 })
 
+// Another account or realm: nothing of the session before stays listed.
+watch(sessionEpoch, () => {
+  listed.value = []
+  next.value = null
+  failure.value = null
+  chosen.value = null
+  void load()
+  requests.reload()
+})
+
 async function remove(row: DatabaseRow) {
   failure.value = null
   try {

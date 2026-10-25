@@ -1,6 +1,6 @@
 // The databases the signed-in user may use, shared by the bucket list, Add data, search and the
 // bucket header. The node filters by what the user may read; a failed read is not an empty list.
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { databaseOf, rowOf, searchRows, type DatabaseRow } from '@/lib/databases'
@@ -17,6 +17,8 @@ const listedEpoch = ref(-1)
 const state = ref<DatabasesState>('idle')
 const error = ref<string | null>(null)
 const complete = ref(true)
+// The session the state belongs to; a load of an earlier session never blocks a new one.
+let stateEpoch = -1
 let runs = 0
 
 export function useDatabases() {
@@ -28,6 +30,7 @@ export function useDatabases() {
   async function load() {
     const run = ++runs
     const epoch = sessionEpoch.value
+    stateEpoch = epoch
     if (!authToken.value) {
       listed.value = []
       state.value = 'idle'
@@ -58,9 +61,17 @@ export function useDatabases() {
 
   /** Reads the list once for this session; later calls only reread after `reload`. */
   function ensure() {
-    if (state.value === 'loading') return
+    if (state.value === 'loading' && stateEpoch === sessionEpoch.value) return
     if (state.value === 'idle' || listedEpoch.value !== sessionEpoch.value) void load()
   }
+
+  // A list in use is read again for the new session.
+  watch(
+    () => sessionEpoch.value,
+    () => {
+      if (state.value !== 'idle') ensure()
+    },
+  )
 
   return {
     rows,

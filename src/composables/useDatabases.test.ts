@@ -101,4 +101,17 @@ describe('databases', () => {
     expect(databases.search('microbiome').map((row) => row.bucket)).toEqual(['spire'])
     scope.stop()
   })
+
+  it('starts a new read when the session changed during a read', async () => {
+    aruna.listDatabases.mockImplementationOnce(() => new Promise(() => {}))
+    aruna.listDatabases.mockResolvedValueOnce({ databases: [view('lab')] })
+    const { databases, scope } = start()
+    databases.ensure()
+    aruna.sessionEpoch.value += 1
+    databases.ensure()
+    await vi.waitFor(() => expect(databases.state.value).toBe('ready'))
+
+    expect(databases.rows.value.map((row) => row.bucket)).toEqual(['lab'])
+    scope.stop()
+  })
 })

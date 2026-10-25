@@ -22,7 +22,7 @@ export function useFileOrigin(target: Ref<OriginTarget | null>) {
   let runs = 0
 
   watch(
-    () => [target.value?.bucket, target.value?.key, target.value?.versionId],
+    () => [target.value?.bucket, target.value?.key, target.value?.versionId, sessionEpoch.value],
     async () => {
       const asked = target.value
       const run = ++runs

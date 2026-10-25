@@ -43,7 +43,7 @@ export function useFilePartOf(target: Ref<PartOfTarget | null>) {
     }
   }
 
-  watch(() => [target.value?.bucket, target.value?.key], () => void load(), { immediate: true })
+  watch(() => [target.value?.bucket, target.value?.key, sessionEpoch.value], () => void load(), { immediate: true })
 
   return { found, state, error, reload: load }
 }

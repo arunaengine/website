@@ -2,7 +2,10 @@ import { effectScope, nextTick, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, type FileSourcesResponse } from '@/lib/api'
 
-const aruna = vi.hoisted(() => ({ sessionEpoch: { value: 1 }, getBucketSources: vi.fn() }))
+const aruna = await vi.hoisted(async () => {
+  const { ref } = await import('vue')
+  return { sessionEpoch: ref(1), getBucketSources: vi.fn() }
+})
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
 
 const { useBucketSources } = await import('@/composables/useBucketSources')
@@ -52,6 +55,18 @@ describe('bucket sources', () => {
 
     expect(sources.state.value).toBe('missing')
     expect(aruna.getBucketSources).not.toHaveBeenCalled()
+    scope.stop()
+  })
+
+  it('reads the sources again for a new session', async () => {
+    aruna.getBucketSources.mockResolvedValueOnce(answer())
+    const { sources, scope } = start()
+    await vi.waitFor(() => expect(sources.sources.value).toHaveLength(1))
+
+    aruna.getBucketSources.mockRejectedValueOnce(new ApiError(403, 'no access'))
+    aruna.sessionEpoch.value += 1
+    await vi.waitFor(() => expect(sources.state.value).toBe('failed'))
+    expect(sources.sources.value).toEqual([])
     scope.stop()
   })
 })

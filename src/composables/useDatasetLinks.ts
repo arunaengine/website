@@ -72,7 +72,7 @@ export function useDatasetLinks(target: Ref<LinkTarget | null>) {
   }
 
   watch(
-    () => [target.value?.bucket, target.value?.key, target.value?.folder, target.value?.remote, target.value?.id],
+    () => [target.value?.bucket, target.value?.key, target.value?.folder, target.value?.remote, target.value?.id, sessionEpoch.value],
     () => {
       documents.value = []
       next.value = null
