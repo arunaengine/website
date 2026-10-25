@@ -1,17 +1,19 @@
-import { defineComponent, h, ref } from 'vue'
+import { defineComponent, h, shallowRef } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readTransfer, type DeviceTransfers } from '@/lib/deviceApi'
 import { mountApp } from '@/test/clientRender'
 
 let answer: DeviceTransfers = { uploads: [], downloads: [] }
 const read = vi.fn(async () => answer)
+const owner = { baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner' }
+const client = shallowRef<typeof owner | null>(owner)
 
 vi.mock('@/lib/deviceApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/deviceApi')>()
   return { ...actual, getTransfers: () => read() }
 })
 vi.mock('@/composables/useDeviceStatus', () => ({
-  useDeviceStatus: () => ({ deviceClient: ref({ baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner' }) }),
+  useDeviceStatus: () => ({ deviceClient: client }),
 }))
 
 const upload = (state: string) => readTransfer({ id: state, folder_id: 'f1', path: `${state}.txt`, state }, 'upload')
@@ -29,6 +31,7 @@ async function load() {
 
 beforeEach(() => {
   answer = { uploads: [], downloads: [] }
+  client.value = owner
   read.mockClear()
   vi.useFakeTimers()
   vi.stubGlobal('window', globalThis)
@@ -87,5 +90,37 @@ describe('device transfers', () => {
     await vi.advanceTimersByTimeAsync(1_000)
     expect(read).toHaveBeenCalledTimes(3)
     page.app.unmount()
+  })
+
+  it('drops a read from the previous session and loads the new one', async () => {
+    const { useDeviceTransfers } = await load()
+    const { all, state, load: run } = useDeviceTransfers({ poll: false })
+    let finish: (value: DeviceTransfers) => void = () => {}
+    read.mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)))
+    const old = run()
+
+    client.value = null
+    client.value = { ...owner, token: 'next' }
+    expect(state.value).toBe('idle')
+    answer = { uploads: [upload('queued')], downloads: [] }
+    const next = run()
+    finish({ uploads: [upload('running')], downloads: [] })
+    await Promise.all([old, next])
+
+    expect(read).toHaveBeenCalledTimes(2)
+    expect(state.value).toBe('ready')
+    expect(all.value.map((transfer) => transfer.path)).toEqual(['queued.txt'])
+  })
+
+  it('starts the new session empty', async () => {
+    answer = { uploads: [upload('queued')], downloads: [] }
+    const { useDeviceTransfers } = await load()
+    await useDeviceTransfers({ poll: false }).load()
+
+    client.value = { ...owner, token: 'next' }
+
+    const later = useDeviceTransfers({ poll: false })
+    expect(later.state.value).toBe('idle')
+    expect(later.all.value).toEqual([])
   })
 })

@@ -1,7 +1,7 @@
 // One read of the device's REST surface, with the states every desktop view
 // renders: the node absent, the route unserved, the token refused, or a plain
 // failure. The three device composables share it so they cannot drift apart.
-import { shallowRef, type Ref } from 'vue'
+import { shallowRef, watch, type Ref } from 'vue'
 import { classify, type DeviceClient, type DeviceState } from '@/lib/deviceApi'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { errorMessage } from '@/lib/utils'
@@ -20,10 +20,21 @@ export function useDeviceQuery<T>(read: (client: DeviceClient) => Promise<T>, em
   const state = shallowRef<DeviceState>('idle')
   const error = shallowRef<string | null>(null)
 
-  let inflight: Promise<void> | null = null
+  let inflight: { client: DeviceClient | null; done: Promise<void> } | null = null
 
-  async function readOnce(): Promise<void> {
-    const client = deviceClient.value
+  // Another client is another node or session: its answer starts empty and old reads are dropped.
+  watch(
+    deviceClient,
+    () => {
+      inflight = null
+      data.value = empty
+      state.value = 'idle'
+      error.value = null
+    },
+    { flush: 'sync' },
+  )
+
+  async function readOnce(client: DeviceClient | null): Promise<void> {
     if (!client) {
       data.value = empty
       state.value = 'offline'
@@ -31,21 +42,30 @@ export function useDeviceQuery<T>(read: (client: DeviceClient) => Promise<T>, em
     }
     if (state.value !== 'ready') state.value = 'loading'
     try {
-      data.value = await read(client)
+      const next = await read(client)
+      if (deviceClient.value !== client) return
+      data.value = next
       state.value = 'ready'
       error.value = null
     } catch (err) {
+      if (deviceClient.value !== client) return
       state.value = classify(err)
       error.value = errorMessage(err)
     }
   }
 
-  /** One read at a time: a caller that asks again joins the one in flight. */
+  /** One read at a time per client: a caller that asks again joins the one in flight. */
   function run(): Promise<void> {
-    inflight ??= readOnce().finally(() => {
-      inflight = null
-    })
-    return inflight
+    const client = deviceClient.value
+    if (inflight?.client === client) return inflight.done
+    const current = {
+      client,
+      done: readOnce(client).finally(() => {
+        if (inflight === current) inflight = null
+      }),
+    }
+    inflight = current
+    return current.done
   }
 
   return { data, state, error, run }

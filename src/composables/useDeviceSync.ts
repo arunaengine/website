@@ -38,6 +38,17 @@ const { deviceClient } = useDeviceStatus()
 // a later read shows the run actually moved.
 let mark: { lastSyncMs: number | null; pendingTotal: number } | null = null
 
+// A new node or session has not asked for a run yet.
+watch(
+  deviceClient,
+  () => {
+    running.value = false
+    runError.value = null
+    mark = null
+  },
+  { flush: 'sync' },
+)
+
 /** Reads the status once, then decides whether an asked-for run has moved. */
 async function read(): Promise<void> {
   await query.run()
