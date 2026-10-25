@@ -1,23 +1,22 @@
 <script setup lang="ts">
 // Where a file version came from, as the node recorded it when the version was made. A sync adds
 // the version it copied from. The ids and what a dataset may say about the file wait in Details.
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import OriginLine from '@/components/data/OriginLine.vue'
 import GlobalId from '@/components/distributed/GlobalId.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import { useAruna } from '@/composables/useAruna'
 import { useDatabases } from '@/composables/useDatabases'
 import { useFileOrigin, type OriginTarget } from '@/composables/useFileOrigin'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { apiUrl } from '@/lib/api'
+import { s3ErrorMessage, useS3 } from '@/composables/useS3'
 import { hopFrom, originFrom, projectionRows } from '@/lib/fileOrigin'
 import { shortUserId, truncateMiddle } from '@/lib/utils'
 
 const props = defineProps<{ target: OriginTarget }>()
 
 const { displayName } = useRealmNodes()
-const { apiBaseUrl } = useAruna()
+const s3 = useS3()
 const databases = useDatabases()
 const found = useFileOrigin(computed(() => props.target))
 
@@ -36,12 +35,25 @@ const origin = computed(() =>
 )
 const hop = computed(() => (found.origin.value ? hopFrom(found.origin.value) : null))
 const rows = computed(() => projectionRows(found.origin.value?.projection ?? []))
-// The node route behind the w3id URL: it serves the bytes or redirects to a holder it chooses.
-const downloadUrl = computed(() => {
-  const id = found.origin.value?.global_id
-  const rest = id?.replace(/^https:\/\/w3id\.org\/aruna\/data\//, '')
-  return id && rest !== id ? apiUrl(`/resolve/${rest}`, {}, { baseUrl: apiBaseUrl.value }).toString() : null
-})
+// The version downloads through this session's short-lived signed URL, never with the token in a URL.
+const downloadError = ref<string | null>(null)
+async function download() {
+  const version = found.origin.value?.version_id
+  if (!version) return
+  downloadError.value = null
+  try {
+    const name = props.target.key.split('/').pop() || props.target.key
+    const anchor = document.createElement('a')
+    anchor.href = await s3.downloadUrl(props.target.bucket, props.target.key, null, version, name)
+    anchor.download = name
+    anchor.rel = 'noopener'
+    document.body.append(anchor)
+    anchor.click()
+    anchor.remove()
+  } catch (cause) {
+    downloadError.value = s3ErrorMessage(cause)
+  }
+}
 // A version minted without a record is said so, never guessed.
 const recorded = computed(() => Boolean(origin.value || hop.value))
 </script>
@@ -63,9 +75,8 @@ const recorded = computed(() => Boolean(origin.value || hop.value))
           Send your token with the request unless the file is public.
         </p>
         <GlobalId :global-url="found.origin.value.global_id" />
-        <a v-if="downloadUrl" :href="downloadUrl" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">
-          Open the download link on this node
-        </a>
+        <button type="button" class="text-primary hover:underline" @click="download">Download this version</button>
+        <p v-if="downloadError" class="text-destructive">{{ downloadError }}</p>
       </div>
       <details v-if="recorded" class="border-t border-border pt-3 text-xs">
         <summary class="cursor-pointer text-sm font-medium text-foreground">Details</summary>
