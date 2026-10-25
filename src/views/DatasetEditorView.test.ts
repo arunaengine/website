@@ -17,6 +17,8 @@ import * as Editor from '@/lib/crate/editor'
 import * as ProfileSeed from '@/lib/crate/profileSeed'
 import * as Issues from '@/lib/crate/issues'
 import * as Paths from '@/lib/crate/paths'
+import * as References from '@/lib/crate/references'
+import * as LinkedPart from '@/lib/linkedPart'
 import * as DataIdentity from '@/lib/crate/dataIdentity'
 import * as Api from '@/lib/api'
 import * as Emit from '@/lib/profiles/emit'
@@ -396,6 +398,8 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/lib/crate/issues': Issues,
   '@/lib/crate/paths': Paths,
   '@/lib/crate/dataIdentity': DataIdentity,
+  '@/lib/crate/references': References,
+  '@/lib/linkedPart': LinkedPart,
 })
 
 // An accepted verdict that still names two files not everyone can read.
@@ -488,6 +492,14 @@ describe('DatasetEditorView', () => {
     expect(content(mounted.root)).toContain('datasets/')
     expect(content(mounted.root)).toContain('reads-2026')
     expect(button(mounted.root, 'Create dataset').props.disabled).toBe(false)
+    mounted.app.unmount()
+  })
+
+  it('starts a new dataset with the bucket root a create link names as its linked part', async () => {
+    route.query = { part: 'arn:aruna:r1:n1:s3/lab/', partName: 'lab' }
+    const mounted = await mountApp(DatasetEditorView)
+
+    expect(content(mounted.root)).toContain('Entities 2')
     mounted.app.unmount()
   })
 
