@@ -10,6 +10,8 @@ import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Progress from '@/components/ui/Progress.vue'
 import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
+import NewBucketDialog from '@/components/desktop/NewBucketDialog.vue'
+import { useAruna } from '@/composables/useAruna'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { useDeviceCompute } from '@/composables/useDeviceCompute'
 import { useDeviceKeys } from '@/composables/useDeviceKeys'
@@ -18,13 +20,16 @@ import { useDeviceTransfers } from '@/composables/useDeviceTransfers'
 import { useNodeControl } from '@/composables/useNodeControl'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
 import { totalProgress } from '@/lib/activityGroups'
+import type { BindSource } from '@/lib/bindSource'
 import { folderName, isMoving } from '@/lib/deviceApi'
 import { keyNames } from '@/lib/keyNames'
 import { nodePill } from '@/lib/nodePill'
 import { needsYouCount } from '@/lib/syncStates'
 import { formatBytes } from '@/lib/utils'
-import { ArrowRight, Check, FolderPlus, Laptop, ListChecks, Play } from '@lucide/vue'
+import { isHiddenBucket } from '@/lib/workspaces'
+import { ArrowRight, Check, FolderPlus, Laptop, ListChecks, Play, Plus } from '@lucide/vue'
 
+const { myGroups, searchBuckets, sessionEpoch } = useAruna()
 const deviceKeys = useDeviceKeys()
 const { shown } = usePortalFeatures()
 const { status, state: nodeState, refresh } = useDeviceStatus()
@@ -34,7 +39,39 @@ const { compute, state: computeState, load: loadCompute } = useDeviceCompute()
 const control = useNodeControl()
 
 const showBind = ref(false)
+const showNewBucket = ref(false)
+// The bucket New bucket hands on to the link; empty lets the owner pick one.
+const bindTarget = ref<Partial<BindSource> & { newBucket?: boolean }>({})
+// Null until the buckets were read; only a bucket the user can see counts.
+const hasBucket = ref<boolean | null>(null)
 const startHidden = useLocalStorage('aruna:desktop:get-started-hidden', false)
+
+function openBind(target: Partial<BindSource> & { newBucket?: boolean } = {}) {
+  bindTarget.value = target
+  showBind.value = true
+}
+
+// A linked folder always has its bucket.
+function onBound() {
+  hasBucket.value = true
+  void loadFolders()
+}
+
+async function loadBuckets() {
+  const epoch = sessionEpoch.value
+  let found = false
+  try {
+    let cursor: string | undefined
+    do {
+      const page = await searchBuckets('', { limit: 50, cursor })
+      found = page.hits.some((hit) => !isHiddenBucket(hit.bucket))
+      cursor = page.next_cursor ?? undefined
+    } while (cursor && !found)
+  } catch {
+    // A failed read leaves the step open; its button works either way.
+  }
+  if (epoch === sessionEpoch.value) hasBucket.value = found
+}
 
 const pill = computed(() => nodePill(status.value))
 const notRunning = computed(() => nodeState.value === 'stopped' || nodeState.value === 'error')
@@ -49,6 +86,12 @@ const firstKeyName = computed(() => {
 const steps = computed(() => {
   const first = folders.value[0]
   return [
+    {
+      key: 'bucket',
+      title: 'Create a bucket',
+      done: hasBucket.value === true,
+      text: hasBucket.value ? 'You have a bucket.' : 'A bucket holds your data in the realm.',
+    },
     {
       key: 'folder',
       title: 'Link a local folder',
@@ -74,10 +117,14 @@ const steps = computed(() => {
   ]
 })
 const stepsDone = computed(() => steps.value.filter((step) => step.done).length)
+// One primary button: the first step still open leads.
+const firstOpen = computed(() => steps.value.find((step) => !step.done)?.key)
+const stepVariant = (key: string) => (key === firstOpen.value ? 'default' : 'outline')
 // Only loaded lists can say a step is open, so nothing shows before that.
 const showSteps = computed(
   () =>
     !startHidden.value &&
+    hasBucket.value !== null &&
     foldersState.value === 'ready' &&
     deviceKeys.state.value !== 'idle' &&
     deviceKeys.state.value !== 'loading' &&
@@ -103,6 +150,7 @@ const runsText = computed(() => {
 })
 
 onMounted(async () => {
+  void loadBuckets()
   await refresh()
   // Running counts change all the time, so they are read again on every visit.
   await Promise.all([ensureFolders(), loadTransfers(), loadCompute()])
@@ -156,13 +204,22 @@ onMounted(async () => {
             <p class="mt-0.5 text-[11px] text-muted-foreground">{{ step.text }}</p>
           </div>
           <template v-if="!step.done">
-            <Button v-if="step.key === 'folder'" size="sm" @click="showBind = true">
+            <template v-if="step.key === 'bucket'">
+              <!-- A bucket belongs to a group, so a group comes first. -->
+              <Button v-if="myGroups.length" :variant="stepVariant(step.key)" size="sm" @click="showNewBucket = true">
+                <Plus class="h-3.5 w-3.5" /> New bucket
+              </Button>
+              <Button v-else :variant="stepVariant(step.key)" size="sm" as-child>
+                <RouterLink :to="{ name: 'groups' }">Create a group first</RouterLink>
+              </Button>
+            </template>
+            <Button v-else-if="step.key === 'folder'" :variant="stepVariant(step.key)" size="sm" @click="openBind()">
               <FolderPlus class="h-3.5 w-3.5" /> Link a local folder
             </Button>
-            <Button v-else-if="step.key === 'tools'" variant="outline" size="sm" as-child>
+            <Button v-else-if="step.key === 'tools'" :variant="stepVariant(step.key)" size="sm" as-child>
               <RouterLink :to="{ name: 'settings', query: { tab: 'access', create: 'key' } }">Create a key</RouterLink>
             </Button>
-            <Button v-else variant="outline" size="sm" as-child>
+            <Button v-else :variant="stepVariant(step.key)" size="sm" as-child>
               <RouterLink :to="{ name: 'device', query: { section: 'local-runs' } }">Turn on</RouterLink>
             </Button>
           </template>
@@ -179,7 +236,7 @@ onMounted(async () => {
           <Badge :variant="pill.variant" size="sm">{{ pill.label }}</Badge>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" @click="showBind = true">
+          <Button variant="outline" size="sm" @click="openBind()">
             <FolderPlus class="h-3.5 w-3.5" /> Link a local folder
           </Button>
           <Button variant="ghost" size="sm" as-child>
@@ -230,6 +287,11 @@ onMounted(async () => {
       </div>
     </section>
 
-    <BindFolderDialog v-model:open="showBind" @bound="loadFolders" />
+    <BindFolderDialog v-model:open="showBind" v-bind="bindTarget" @bound="onBound" />
+    <NewBucketDialog
+      v-model:open="showNewBucket"
+      @created="hasBucket = true"
+      @link="(target: BindSource) => openBind({ ...target, newBucket: true })"
+    />
   </div>
 </template>
