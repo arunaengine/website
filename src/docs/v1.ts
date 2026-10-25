@@ -36,6 +36,8 @@ export interface DocsTourStep {
   anchor: string
   title: string
   body: string
+  /** False for a control Aruna Desktop never shows; its tour leaves the step out. */
+  desktop?: false
 }
 
 export interface DocsTopic {
@@ -83,6 +85,7 @@ export const docsTopics: DocsTopic[] = [
         anchor: 'top-create-dataset',
         title: 'Create dataset',
         body: 'Create dataset jumps straight into the dataset editor.',
+        desktop: false,
       },
       {
         route: '/app',
@@ -415,6 +418,7 @@ export const docsTopics: DocsTopic[] = [
         anchor: 'top-create-dataset',
         title: 'Create dataset',
         body: 'The top bar opens a fresh, unsaved dataset in the editor.',
+        desktop: false,
       },
       {
         route: '/app/datasets/new',

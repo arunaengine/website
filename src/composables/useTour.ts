@@ -2,12 +2,14 @@
 // and spotlights real controls by their `data-tour` anchor; nothing is faked.
 import { computed, ref, shallowRef } from 'vue'
 import type { Router } from 'vue-router'
+import { isDesktop } from '@/lib/desktop'
 
 export interface TourStep {
   route: string
   anchor: string
   title: string
   body: string
+  desktop?: false
 }
 
 export interface TourRect {
@@ -43,7 +45,9 @@ export function bindTourRouter(next: Router) {
   router = next
 }
 
-export function startTour(next: TourStep[]) {
+export function startTour(tour: TourStep[]) {
+  // A step whose control the desktop never shows is left out up front.
+  const next = isDesktop() ? tour.filter((step) => step.desktop !== false) : tour
   if (!next.length) return
   steps.value = next
   index.value = 0

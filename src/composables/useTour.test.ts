@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Router } from 'vue-router'
+import { docsTopicBySlug } from '@/docs/v1'
 import { flush } from '@/test/clientRender'
 import {
   bindTourRouter,
@@ -13,6 +14,9 @@ import {
   tourIndex,
   type TourStep,
 } from './useTour'
+
+const desktop = vi.hoisted(() => ({ on: false }))
+vi.mock('@/lib/desktop', () => ({ isDesktop: () => desktop.on }))
 
 const STEPS: TourStep[] = [
   { route: '/app', anchor: 'top-search', title: 'Search', body: 'Find datasets, objects, groups and users.' },
@@ -31,6 +35,7 @@ const router = {
 
 beforeEach(() => {
   stopTour()
+  desktop.on = false
   pushed.length = 0
   route.value = { fullPath: '/app' }
   bindTourRouter(router)
@@ -165,6 +170,28 @@ describe('guided tour', () => {
     await flush()
 
     expect(tourActive.value).toBe(false)
+  })
+
+  it('leaves a control the desktop never shows out of its tour only', () => {
+    const tour = docsTopicBySlug('portal-tour')?.tour ?? []
+    const walk = () => {
+      const seen: string[] = []
+      while (tourActive.value) {
+        seen.push(currentStep.value?.anchor ?? '')
+        nextStep()
+      }
+      return seen
+    }
+
+    desktop.on = true
+    startTour(tour)
+    expect(tourCount.value).toBe(tour.length - 1)
+    expect(walk()).not.toContain('top-create-dataset')
+
+    desktop.on = false
+    startTour(tour)
+    expect(tourCount.value).toBe(tour.length)
+    expect(walk()).toContain('top-create-dataset')
   })
 
   it('clears its state when stopped', () => {
