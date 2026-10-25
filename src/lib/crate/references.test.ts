@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addFilePart,
+  entityIdFor,
   addSubcratePart,
   linkReference,
   orphanAfterUnlink,
@@ -184,11 +185,23 @@ describe('addFilePart origin', () => {
     ])
   })
 
-  it('reuses the entity for the same file or the same origin', () => {
+  it('reuses the entity only for the same origin, memberships and runs', () => {
     const first = addFilePart(newDraft(), { ...file, basedOn: ['https://a.example/x'] })
 
     expect(addFilePart(first, { ...file, basedOn: ['https://a.example/x'] }).entities).toHaveLength(2)
-    expect(addFilePart(first, { ...file, basedOn: ['https://other.example/x'] }).entities).toHaveLength(2)
     expect(addFilePart(first, { ...file, contentUrl: 's3://reads/copy/one.csv', basedOn: ['https://a.example/x'] }).entities).toHaveLength(2)
+  })
+
+  it('keeps the same location with another origin, membership or run as a separate entity', () => {
+    const first = addFilePart(newDraft(), { ...file, basedOn: ['https://a.example/x'], createdBy: ['01RUN'] })
+    const same = { ...file, basedOn: ['https://a.example/x'], createdBy: ['01RUN'] }
+
+    expect(entityIdFor(first, same)).toBe(file.id)
+    expect(entityIdFor(first, { ...same, basedOn: ['https://other.example/x'] })).toBe(file.contentUrl)
+    expect(entityIdFor(first, { ...same, partOf: ['https://w3id.org/aruna/01DS'] })).toBe(file.contentUrl)
+    expect(entityIdFor(first, { ...same, createdBy: ['01OTHER'] })).toBe(file.contentUrl)
+    expect(findEntity(addFilePart(first, { ...same, basedOn: ['https://other.example/x'] }), file.id)?.properties.isBasedOn).toEqual([
+      { kind: 'reference', value: 'https://a.example/x' },
+    ])
   })
 })

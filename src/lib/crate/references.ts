@@ -126,17 +126,29 @@ function textValue(value: string): DraftValue[] {
   return [{ kind: textKind(value), value }]
 }
 
+function sorted(values: readonly string[]): string {
+  return [...values].sort().join('\n')
+}
+
+/** The origin, the memberships and the runs a draft records for one entity. */
+function provenanceOf(draft: CrateDraft, id: string): string[] {
+  const entity = findEntity(draft, id)
+  const values = (property: string) => (entity?.properties[property] ?? []).map((value) => value.value)
+  const runs = draft.entities
+    .filter((item) => item.types.includes('CreateAction') && (item.properties.result ?? []).some((value) => value.value === id))
+    .map((item) => item.properties.identifier?.[0]?.value ?? item.id)
+  return [sorted(values('isBasedOn')), sorted(values('isPartOf')), sorted(runs)]
+}
+
 /**
- * Identical bytes have one content id. A second file with the same id but another origin stays a
- * separate entity under its location, so the origin of the first is not lost.
+ * Identical bytes have one content id. A second file with the same id but another origin,
+ * membership or run stays a separate entity under its location, so nothing of the first is lost.
  */
-function entityIdFor(draft: CrateDraft, part: FilePart): string {
-  const existing = findEntity(draft, part.id)
-  if (!existing || !part.contentUrl) return part.id
-  const known = (existing.properties.isBasedOn ?? []).map((value) => value.value).sort().join('\n')
-  const incoming = [...(part.basedOn ?? [])].sort().join('\n')
-  const sameFile = (existing.properties.contentUrl ?? []).some((value) => value.value === part.contentUrl)
-  return known === incoming || sameFile ? part.id : part.contentUrl
+export function entityIdFor(draft: CrateDraft, part: FilePart): string {
+  if (!findEntity(draft, part.id) || !part.contentUrl) return part.id
+  const incoming = [sorted(part.basedOn ?? []), sorted(part.partOf ?? []), sorted(part.createdBy ?? [])]
+  const known = provenanceOf(draft, part.id)
+  return known.every((value, index) => value === incoming[index]) ? part.id : part.contentUrl
 }
 
 /**
