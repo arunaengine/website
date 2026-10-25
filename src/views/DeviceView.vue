@@ -52,17 +52,16 @@ function onEnrolled() {
 
     <div class="container space-y-5 py-5">
       <EnrollPanel v-if="showEnroll" :invite="invite" @enrolled="onEnrolled" />
-      <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div class="min-w-0 space-y-5">
-          <LinkedFolders />
-          <ActivityCard />
-        </div>
-        <div class="min-w-0 space-y-5">
-          <NodePanel />
-          <LocalBuckets />
-          <ComputePanel id="local-runs" />
-          <LocalPanel />
-          <WipePanel id="wipe" @wiped="refresh" />
+      <NodePanel />
+      <LinkedFolders />
+      <ActivityCard />
+      <div class="space-y-3.5 pt-2">
+        <h2 class="font-display text-[15px] font-semibold text-foreground/85">Settings for this computer</h2>
+        <div class="grid items-start gap-5 lg:grid-cols-2">
+          <ComputePanel id="local-runs" class="min-w-0" />
+          <LocalPanel class="min-w-0" />
+          <LocalBuckets class="min-w-0" />
+          <WipePanel id="wipe" class="min-w-0" @wiped="refresh" />
         </div>
       </div>
     </div>

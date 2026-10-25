@@ -44,7 +44,8 @@ describe('the status card', () => {
     const html = await render()
 
     expect(html).toContain('Running')
-    expect(html).toContain('Aruna has run on this computer for 2 days 4 hours.')
+    expect(html).toContain('Syncing, tools and local runs are working.')
+    expect(html).toContain('2 days 4 hours')
     expect(html).toContain('3.0.0-alpha.131')
     expect(html).toContain('Test realm')
     expect(html).toContain('Pause')
@@ -67,7 +68,7 @@ describe('the status card', () => {
     const html = await render()
 
     expect(html).toContain('Starting')
-    expect(html).not.toContain('has run on this computer')
+    expect(html).not.toContain('1 day')
   })
 
   it('says a computer that joined no realm has not', async () => {
