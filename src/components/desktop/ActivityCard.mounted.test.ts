@@ -6,7 +6,7 @@ import * as DeviceApi from '@/lib/deviceApi'
 import * as StateBadge from '@/lib/stateBadge'
 import * as SyncStates from '@/lib/syncStates'
 import * as Utils from '@/lib/utils'
-import { compileClientComponent, content, moduleDefault, mountApp } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, moduleDefault, mountApp } from '@/test/clientRender'
 
 type Client = { baseUrl: string; token: string }
 const clientA: Client = { baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'a' }
@@ -20,6 +20,7 @@ const { deviceClient, folders } = await vi.hoisted(async () => {
   }
 })
 const actionLog = vi.fn()
+const setPaused = vi.fn()
 
 vi.mock('@/composables/useDeviceStatus', () => ({ useDeviceStatus: () => ({ deviceClient }) }))
 vi.mock('@/composables/useSyncedFolders', () => ({ useSyncedFolders: () => ({ folders, actionLog }) }))
@@ -63,7 +64,7 @@ const ActivityCard = compileClientComponent(new URL('./ActivityCard.vue', import
       listState: ref('ready'),
       listError: ref(null),
       ensureLoaded: vi.fn(async () => undefined),
-      setPaused: vi.fn(),
+      setPaused,
       sync: vi.fn(),
     }),
   },
@@ -82,6 +83,7 @@ function deferred<T>() {
 
 beforeEach(() => {
   actionLog.mockReset()
+  setPaused.mockReset()
   folders.value = [DeviceApi.readFolder({ folder_id: 'f1', root: '/home/me/Runs' })]
   deviceClient.value = clientA
 })
@@ -116,6 +118,24 @@ describe('the mounted Activity card when the device changes', () => {
 
     deviceClient.value = clientB
     await vi.waitFor(() => expect(content(mounted.root)).toContain('Kept your version of a.csv'))
+    mounted.app.unmount()
+  })
+})
+
+describe('pausing every folder', () => {
+  it('resumes the paused folders while another one is still being linked', async () => {
+    actionLog.mockResolvedValue([])
+    folders.value = [
+      DeviceApi.readFolder({ folder_id: 'f1', root: '/home/me/Runs', state: 'paused' }),
+      DeviceApi.readFolder({ folder_id: 'f2', root: '/home/me/New', state: 'binding' }),
+    ]
+    const mounted = await mountApp(ActivityCard)
+
+    const resume = button(mounted.root, 'Resume all')
+    expect(resume.props.disabled).toBe(false)
+    await click(resume)
+    expect(setPaused).toHaveBeenCalledTimes(1)
+    expect(setPaused).toHaveBeenCalledWith('f1', false)
     mounted.app.unmount()
   })
 })
