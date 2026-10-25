@@ -299,8 +299,9 @@ async function openItem(chosen: QuickItem) {
       const place = await databases.locate(chosen.database)
       if (run !== opening) return
       if (!place) return void (databaseProblem.value = NOT_HELD_HERE)
-      const node = isLocalNode(place.nodeId) ? {} : { node: place.nodeId }
-      item = { ...chosen, routeParams: { bucketId: place.bucket }, routeQuery: { group: chosen.database.ownerGroup, ...node } }
+      const routeQuery: Record<string, string> = { group: chosen.database.ownerGroup }
+      if (!isLocalNode(place.nodeId)) routeQuery.node = place.nodeId
+      item = { ...chosen, routeParams: { bucketId: place.bucket }, routeQuery }
     } catch (cause) {
       if (run === opening) databaseProblem.value = errorMessage(cause)
       return
