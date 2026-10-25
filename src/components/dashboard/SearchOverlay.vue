@@ -182,9 +182,20 @@ const items = computed<QuickItem[]>(() => [
 // rather than read as the answer to what was just typed.
 const quickStale = computed(() => quickPending.value && items.value.length > 0)
 // One icon carries the whole answer; the numbers live on the search page.
-const quickCoverageShown = computed(() =>
-  quickSearched.value || quickObjectSearched.value || Boolean(quickError.value),
+// The databases are matched from the list read for the session, so it counts towards coverage.
+const databasesSearched = computed(() => Boolean(authToken.value) && q.value.trim().length >= 2)
+const databasesCovered = computed(
+  () => !databasesSearched.value || (databases.state.value === 'ready' && databases.complete.value),
 )
+const coverageComplete = computed(() => quickComplete.value && databasesCovered.value)
+const quickCoverageShown = computed(() =>
+  quickSearched.value || quickObjectSearched.value || Boolean(quickError.value) || !databasesCovered.value,
+)
+
+function retryAll() {
+  if (!databasesCovered.value) void databases.reload()
+  if (!quickComplete.value) retrySearch()
+}
 const quickObjectErrorDetail = computed(() => {
   if (!quickObjectError.value) return ''
   const strict = objectSearchMode.value === 'distributed_strict'
@@ -565,15 +576,15 @@ onBeforeUnmount(() => {
                   role="status"
                   class="ml-auto flex shrink-0 items-center gap-1"
                 >
-                  <CoverageIcon compact :complete="quickComplete" @mousedown.prevent @click="openSearchPage" />
+                  <CoverageIcon compact :complete="coverageComplete" @mousedown.prevent @click="openSearchPage" />
                   <Button
-                    v-if="!quickComplete"
+                    v-if="!coverageComplete"
                     variant="ghost"
                     size="sm"
                     class="h-8 shrink-0 px-2 text-[10px]"
                     :disabled="quickPending"
                     @mousedown.prevent
-                    @click="retrySearch"
+                    @click="retryAll"
                   >
                     Retry
                   </Button>

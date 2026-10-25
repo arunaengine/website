@@ -33,6 +33,8 @@ const moduleDefault = (component: Component) => ({ __esModule: true, default: co
 const narrow = ref(true)
 let databaseRows: Databases.DatabaseRow[] = []
 const databaseHits = (query: string) => Databases.searchRows(databaseRows, query)
+const databaseState = ref('ready')
+const databaseReload = vi.fn()
 const authToken = ref<string | null>('token-a')
 const objectSearchMode = ref('distributed_best_effort')
 const mediaQuery = vi.fn(() => narrow)
@@ -122,6 +124,9 @@ const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.me
     useDatabases: () => ({
       search: (query: string) => databaseHits(query),
       ensure: () => undefined,
+      reload: databaseReload,
+      state: databaseState,
+      complete: ref(true),
       locate: async (row: Databases.DatabaseRow) => Databases.placeOf(row, null, 'node-a'),
     }),
   },
@@ -831,6 +836,19 @@ describe('narrow TopBar search panel', () => {
     expect(text).toContain('Strict mode did not fall back to best-effort')
     expect(text).not.toContain('reads/sample.fastq')
     expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('reports partial coverage when the databases could not be read, and reads them again on retry', async () => {
+    databaseState.value = 'failed'
+    const mounted = await mount()
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
+    await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'sample')
+
+    expect(allNodes(mounted.root).some((node) => node.props['aria-label'] === 'Search coverage: partial')).toBe(true)
+    await click(element(mounted.root, (node) => node.tag === 'button' && content(node).trim() === 'Retry'))
+    expect(databaseReload).toHaveBeenCalled()
+    databaseState.value = 'ready'
     mounted.app.unmount()
   })
 })
