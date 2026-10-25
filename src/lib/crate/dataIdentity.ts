@@ -22,12 +22,14 @@ export function objectLocation(bucket: string, key: string): string {
   return `s3://${bucket}/${key}`
 }
 
+/** A picked version is pinned, so the location never resolves to a newer one. */
 export async function dataEntityIdentity(
   bucket: string,
   key: string,
   options: ContentIdentityOptions = {},
+  versionId?: string | null,
 ): Promise<DataEntityIdentity> {
-  const contentUrl = objectLocation(bucket, key)
+  const contentUrl = `${objectLocation(bucket, key)}${versionId ? `?versionId=${versionId}` : ''}`
   const resolved = arunaContentReference(contentUrl, await resolveContentIdentity(bucket, key, options))
   return { id: resolved.id, contentUrl }
 }

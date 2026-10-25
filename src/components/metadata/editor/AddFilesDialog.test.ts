@@ -140,10 +140,10 @@ const AddFilesDialog = compileClientComponent(new URL('./AddFilesDialog.vue', im
   '@/lib/contentIdentity': ContentIdentity,
   '@/lib/crate/dataIdentity': {
     objectLocation: (bucket: string, key: string) => `s3://${bucket}/${key}`,
-    dataEntityIdentity: async (bucket: string, key: string) => ({
-      id: resolvable ? `https://w3id.org/aruna/data/${BLAKE3}` : `s3://${bucket}/${key}`,
-      contentUrl: `s3://${bucket}/${key}`,
-    }),
+    dataEntityIdentity: async (bucket: string, key: string, _options: unknown, versionId?: string | null) => {
+      const location = `s3://${bucket}/${key}${versionId ? `?versionId=${versionId}` : ''}`
+      return { id: resolvable ? `https://w3id.org/aruna/data/${BLAKE3}` : location, contentUrl: location }
+    },
   },
   '@/lib/api': { ApiError, getStorageLocation },
   '@/lib/linkedPart': LinkedPart,
@@ -198,7 +198,7 @@ describe('AddFilesDialog', () => {
       types: ['File'],
       properties: {
         name: [{ value: 'one.csv' }],
-        contentUrl: [{ value: 's3://reads/raw/one.csv' }],
+        contentUrl: [{ value: 's3://reads/raw/one.csv?versionId=01VERSION' }],
         encodingFormat: [{ value: 'text/csv' }],
         contentSize: [{ value: '2048' }],
       },
@@ -327,7 +327,7 @@ describe('AddFilesDialog', () => {
     await click(button(mounted.root, 'Pick objects'))
     await flush()
 
-    expect(Editor.findEntity(updates[0], 's3://reads/raw/one.csv')?.types).toEqual(['File'])
+    expect(Editor.findEntity(updates[0], 's3://reads/raw/one.csv?versionId=01VERSION')?.types).toEqual(['File'])
     mounted.app.unmount()
   })
 
@@ -437,7 +437,7 @@ describe('AddFilesDialog', () => {
     expect(Editor.findEntity(updates[0], `https://w3id.org/aruna/data/${BLAKE3}`)).toMatchObject({
       types: ['File'],
       properties: {
-        contentUrl: [{ value: 's3://reads/two.json' }],
+        contentUrl: [{ value: 's3://reads/two.json?versionId=01VERSION' }],
         encodingFormat: [{ value: 'application/json' }],
         contentSize: [{ value: '64' }],
       },

@@ -221,7 +221,7 @@ async function origins(bucketName: string, key: string, versionId: string | null
 async function filePart(bucketName: string, key: string, name: string, size?: number, lookup = true, nodeId: string | null = null): Promise<FilePart> {
   // One version names both the content and the origin, so both describe the same bytes.
   const versionId = await s3.headObject(bucketName, key, nodeId).then((head) => head.versionId ?? null, () => null)
-  const identity = await dataEntityIdentity(bucketName, key, identityOptions(versionId, nodeId))
+  const identity = await dataEntityIdentity(bucketName, key, identityOptions(versionId, nodeId), versionId)
   if (lookup && nodeId) note('Files of a bucket on another node were added without their origin and datasets.')
   const looked = lookup && !nodeId ? await origins(bucketName, key, versionId) : null
   const part: FilePart = {

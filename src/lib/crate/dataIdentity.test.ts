@@ -30,6 +30,17 @@ describe('dataEntityIdentity', () => {
     })
   })
 
+  it('pins the picked version in the location', async () => {
+    const version = '01JABCDEF0123456789ABCDEFG'
+
+    expect(await dataEntityIdentity('reads', 'raw/one.csv', {}, version)).toEqual({
+      id: `s3://reads/raw/one.csv?versionId=${version}`,
+      contentUrl: `s3://reads/raw/one.csv?versionId=${version}`,
+    })
+    expect(parseDataIdentity({ id: 's3://reads/raw/one.csv', contentUrl: `s3://reads/raw/one.csv?versionId=${version}` }).s3)
+      .toEqual({ bucket: 'reads', key: 'raw/one.csv' })
+  })
+
   it('falls back to the location without a node to ask', async () => {
     expect(await dataEntityIdentity('reads', 'raw/one.csv')).toEqual({
       id: 's3://reads/raw/one.csv',
