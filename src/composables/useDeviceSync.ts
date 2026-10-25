@@ -83,14 +83,17 @@ async function runSync(): Promise<void> {
   runError.value = null
   running.value = true
   mark = { lastSyncMs: status.value.lastSyncMs, pendingTotal: status.value.pendingTotal }
+  const client = deviceClient.value
   try {
-    await runDeviceSync(requireDevice(deviceClient.value, 'a sync'))
+    await runDeviceSync(requireDevice(client, 'a sync'))
   } catch (err) {
+    if (deviceClient.value !== client) return
     running.value = false
     mark = null
     runError.value = errorMessage(err)
     return
   }
+  if (deviceClient.value !== client) return
   await read()
 }
 

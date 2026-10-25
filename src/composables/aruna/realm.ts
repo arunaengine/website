@@ -83,6 +83,7 @@ async function readRealmNode(baseUrl: string, context: ReturnType<typeof refresh
     return null
   } finally {
     clearTimeout(timer)
+    controller.abort()
   }
 }
 
