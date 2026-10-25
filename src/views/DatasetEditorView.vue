@@ -57,6 +57,8 @@ import {
   type LiveIssue,
   type ProfileExpectation,
 } from '@/lib/crate/editor'
+import { addFilePart } from '@/lib/crate/references'
+import { looksLikePart } from '@/lib/linkedPart'
 import { FileJson2, FolderTree } from '@lucide/vue'
 
 // The graph carries Vue Flow and dagre; only the Graph tab pays for them.
@@ -503,6 +505,13 @@ watch([() => String(route.query?.profile ?? ''), selectableProfiles], ([wanted, 
   if (mode.value !== 'create' || !wanted || profileId.value) return
   const match = available.find((profile) => profile.documentId === wanted || profile.id === wanted)
   if (match) keepSettled(() => pickProfile(match.id))
+}, { immediate: true })
+
+// A create link may name a bucket root or folder that the new dataset starts with as a linked part.
+watch(() => String(route.query?.part ?? ''), (part) => {
+  if (mode.value !== 'create' || !looksLikePart(part) || findEntity(draft.value, part)) return
+  const name = String(route.query?.partName ?? '') || part
+  draft.value = addFilePart(draft.value, { id: part, name, type: 'Dataset' })
 }, { immediate: true })
 
 // Leaving the editor or switching to another dataset (Discard, a nav click,
