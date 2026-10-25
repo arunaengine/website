@@ -599,6 +599,22 @@ describe('device setup gate', () => {
     expect(router.currentRoute.value.name).toBe('dashboard')
   })
 
+  it('opens the realm form for a signed in owner who asks to change', async () => {
+    const welcome = await load(
+      { state: 'running', enrolled: true, apiBaseUrl: LOCAL },
+      REALM,
+      'https://aruna.example',
+    )
+    const router = await routerWith(welcome, '/app/settings')
+
+    // Only the explicit request reopens the form; the device stays enrolled.
+    await router.push({ name: 'welcome' })
+    expect(router.currentRoute.value.name).toBe('dashboard')
+    await router.push({ name: 'welcome', query: { change: '1' } })
+    expect(router.currentRoute.value.name).toBe('welcome')
+    expect(await welcome.deviceEnrolled()).toBe(true)
+  })
+
   it('asks no more once the prompt was answered', async () => {
     const welcome = await load(
       { state: 'running', enrolled: false, apiBaseUrl: LOCAL },

@@ -224,10 +224,10 @@ export function installDesktopGuard(router: Router): void {
     if (knownOnce === null) knownOnce = await realmKnown()
     // The device page enrolls from a code alone, so it stays reachable.
     if (!knownOnce) return to.name === 'welcome' || to.name === 'device' ? true : { name: 'welcome' }
+    // The realm step is done; only an explicit change reopens the form, signed in or not.
+    if (to.name === 'welcome' && to.query.change !== undefined) return true
     if (await signedOut(rerun)) {
-      // The realm step is done; only an explicit change reopens the form.
-      const changing = to.name === 'welcome' && to.query.change !== undefined
-      return changing || to.name === 'welcome-sign-in' ? true : { name: 'welcome-sign-in' }
+      return to.name === 'welcome-sign-in' ? true : { name: 'welcome-sign-in' }
     }
     if (to.name === 'device') return true
     if (!setupSkipped() && !(await deviceEnrolled())) {
