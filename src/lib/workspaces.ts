@@ -8,3 +8,14 @@ const WORKSPACE_BUCKET_RE = /^ws-/
 export function isWorkspaceBucket(name: string): boolean {
   return WORKSPACE_BUCKET_RE.test(name)
 }
+
+// The desktop node offers each linked folder as an internal bucket: folder-<ULID>.
+const FOLDER_BUCKET_RE = /^folder-[0-9a-hjkmnp-tv-z]{26}$/
+
+export function isFolderBucket(name: string): boolean {
+  return FOLDER_BUCKET_RE.test(name)
+}
+
+export function isHiddenBucket(name: string): boolean {
+  return isWorkspaceBucket(name) || isFolderBucket(name)
+}

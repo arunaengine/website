@@ -3,7 +3,7 @@
 import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError, type BucketSearchHit } from '@/lib/api'
-import { isWorkspaceBucket } from '@/lib/workspaces'
+import { isHiddenBucket } from '@/lib/workspaces'
 import { errorMessage } from '@/lib/utils'
 
 export const BUCKET_PAGE = 25
@@ -60,7 +60,7 @@ export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled:
       if (id !== seq) return
       // Older nodes ignore the group filter, so it is applied here as well.
       const page = response.hits.filter(
-        (hit) => hit.group_id === groupId.value && !isWorkspaceBucket(hit.bucket),
+        (hit) => hit.group_id === groupId.value && !isHiddenBucket(hit.bucket),
       )
       hits.value = after ? [...hits.value, ...page] : page
       cursor = response.next_cursor ?? null

@@ -18,7 +18,7 @@ import {
 } from '@/lib/api'
 import { useAruna } from '@/composables/useAruna'
 import { errorMessage } from '@/lib/utils'
-import { isWorkspaceBucket } from '@/lib/workspaces'
+import { isHiddenBucket } from '@/lib/workspaces'
 
 export const UNIFIED_DEBOUNCE_MS = 250
 // Backend rejects a query shorter than two characters with 400.
@@ -139,7 +139,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
       truncated.value = response.documents.truncated
     }
     if (response.buckets) {
-      buckets.value = response.buckets.hits.filter((hit) => !isWorkspaceBucket(hit.bucket))
+      buckets.value = response.buckets.hits.filter((hit) => !isHiddenBucket(hit.bucket))
       bucketNodesFailed.value = response.buckets.nodes_failed
     }
     if (response.groups) {

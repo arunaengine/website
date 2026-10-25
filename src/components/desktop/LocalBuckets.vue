@@ -8,7 +8,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import type { BucketSearchHit } from '@/lib/api'
-import { isWorkspaceBucket } from '@/lib/workspaces'
+import { isHiddenBucket } from '@/lib/workspaces'
 import { errorMessage } from '@/lib/utils'
 import { Boxes } from '@lucide/vue'
 
@@ -31,7 +31,7 @@ async function load(nodeId: string | undefined): Promise<void> {
     do {
       const page = await searchBuckets('', { limit: 50, cursor })
       if (mine !== seq) return
-      found.push(...page.hits.filter((hit) => hit.node_id === nodeId && !isWorkspaceBucket(hit.bucket)))
+      found.push(...page.hits.filter((hit) => hit.node_id === nodeId && !isHiddenBucket(hit.bucket)))
       cursor = page.next_cursor ?? undefined
     } while (cursor)
     hits.value = found

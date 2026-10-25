@@ -18,7 +18,7 @@ import { useSearchSettings } from '@/composables/useSearchSettings'
 import { useCatalogBrowse, type CatalogPageParams } from '@/composables/useCatalogBrowse'
 import { datasetPurposeMatches, datasetPurposeOf, type DatasetPurpose } from '@/lib/datasetPurpose'
 import { errorMessage, formatNumber, truncateMiddle } from '@/lib/utils'
-import { isWorkspaceBucket } from '@/lib/workspaces'
+import { isHiddenBucket } from '@/lib/workspaces'
 import type { MetadataDoc } from '@/data/types'
 import type {
   BucketSearchHit,
@@ -592,7 +592,7 @@ export function useDatasetSearch(searchBox: Ref<{ focus: () => void } | null>) {
     try {
       const response = await searchUnified(term, { types: ['buckets'], limit: 10 })
       if (seq !== bucketSeq) return
-      bucketResults.value = (response.buckets?.hits ?? []).filter((hit) => !isWorkspaceBucket(hit.bucket))
+      bucketResults.value = (response.buckets?.hits ?? []).filter((hit) => !isHiddenBucket(hit.bucket))
       bucketNodesQueried.value = response.buckets?.nodes_queried ?? 0
       bucketNodesFailed.value = response.buckets?.nodes_failed ?? 0
     } catch (err) {

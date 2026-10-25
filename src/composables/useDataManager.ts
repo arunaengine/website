@@ -32,7 +32,7 @@ import { requestScope, type DeleteRequest, type DeletionResult } from '@/lib/del
 import type { DeletedObjectEntry } from '@/lib/objectVersions'
 import { deletedOnPage, lastListedKey, shownDeleted, shownEntries, type ListingShow } from '@/lib/objectListing'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
-import { isWorkspaceBucket } from '@/lib/workspaces'
+import { isHiddenBucket, isWorkspaceBucket } from '@/lib/workspaces'
 import { useAllBuckets } from './useAllBuckets'
 import type { BucketSearchHit, SourceConnectorSummary, SyncRelationship, UsageResponse } from '@/lib/api'
 import { referenceSourceLabel, referenceSourceName, type ReferenceSourceGroup } from '@/lib/references'
@@ -478,7 +478,7 @@ export function useDataManager() {
   // collapsed "System workspaces" group at the bottom of the sidebar. Deep links
   // into a ws- bucket still open it (the route drives the listing), and the
   // group auto-expands so the open bucket is visible in the sidebar.
-  const regularBuckets = computed(() => buckets.value.filter((entry) => !isWorkspaceBucket(entry.name)))
+  const regularBuckets = computed(() => buckets.value.filter((entry) => !isHiddenBucket(entry.name)))
   const workspaceBuckets = computed(() => buckets.value.filter((entry) => isWorkspaceBucket(entry.name)))
   const workspacesOpen = ref(false)
 

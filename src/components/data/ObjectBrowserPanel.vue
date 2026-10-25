@@ -19,7 +19,7 @@ import { contextKey, shouldOpenContext } from '@/composables/s3/context'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useStagingReferences } from '@/composables/useStagingReferences'
 import { formatBytes, relativeTime } from '@/lib/utils'
-import { isWorkspaceBucket } from '@/lib/workspaces'
+import { isHiddenBucket } from '@/lib/workspaces'
 import { computed, ref, watch } from 'vue'
 import { Boxes, Check, ChevronsUpDown, KeyRound, Link2, ShieldAlert } from '@lucide/vue'
 
@@ -163,7 +163,7 @@ const bucketsLoading = ref(false)
 const bucketsError = ref<string | null>(null)
 
 // Pickers never offer per-run ws-<jobId> scratch buckets.
-const visibleBuckets = computed(() => buckets.value.filter((entry) => !isWorkspaceBucket(entry.name)))
+const visibleBuckets = computed(() => buckets.value.filter((entry) => !isHiddenBucket(entry.name)))
 
 const folders = ref<FolderEntry[]>([])
 const objects = ref<ObjectEntry[]>([])

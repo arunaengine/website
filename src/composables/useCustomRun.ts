@@ -57,7 +57,7 @@ import {
   type DependencyVerificationResult,
 } from '@/lib/quickDependencies'
 import { bucketNameProblem, objectKeyProblem } from '@/lib/bucketName'
-import { isWorkspaceBucket } from '@/lib/workspaces'
+import { isHiddenBucket } from '@/lib/workspaces'
 import { quoteCommand, tokenizeCommand } from '@/lib/shellwords'
 import { errorMessage } from '@/lib/utils'
 import { targetProblems as collectTargetProblems } from '@/lib/runTarget'
@@ -643,7 +643,7 @@ function createStore(deps: CustomRunDeps) {
     bucketsLoading.value = true
     try {
       // System-managed ws-… buckets are never run targets.
-      buckets.value = (await s3.listBuckets()).map((b) => b.name).filter((n) => !isWorkspaceBucket(n))
+      buckets.value = (await s3.listBuckets()).map((b) => b.name).filter((n) => !isHiddenBucket(n))
       bucketsLoaded.value = true
       if (!stagingBucket.value && buckets.value.length) stagingBucket.value = buckets.value[0]
     } catch {

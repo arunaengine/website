@@ -37,7 +37,7 @@ describe('buckets stored on this computer', () => {
   it('reads every page and keeps only the buckets of this node', async () => {
     searchBuckets
       .mockResolvedValueOnce({ hits: [hit('lab', 'node-1'), hit('notes', 'device-1')], next_cursor: 'c2' })
-      .mockResolvedValueOnce({ hits: [hit('ws-01abc', 'device-1'), hit('scans', 'device-1')], next_cursor: null })
+      .mockResolvedValueOnce({ hits: [hit('ws-01abc', 'device-1'), hit('folder-01m5rs8b3hngjtjva82x7vv8ng', 'device-1'), hit('scans', 'device-1')], next_cursor: null })
     const mounted = await mountApp(LocalBuckets)
     await flush()
 
@@ -47,6 +47,7 @@ describe('buckets stored on this computer', () => {
     expect(text).toContain('scans')
     expect(text).not.toContain('lab')
     expect(text).not.toContain('ws-01abc')
+    expect(text).not.toContain('folder-01m5')
     mounted.app.unmount()
   })
 

@@ -14,7 +14,7 @@ import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import { useBuckets } from '@/composables/useBuckets'
-import { isWorkspaceBucket } from '@/lib/workspaces'
+import { isHiddenBucket } from '@/lib/workspaces'
 
 const props = defineProps<{
   open: boolean
@@ -37,7 +37,7 @@ const prefix = ref('')
 const bucketOptions = computed(() =>
   bucketList.buckets.value
     .map((entry) => entry.name)
-    .filter((name) => !isWorkspaceBucket(name))
+    .filter((name) => !isHiddenBucket(name))
     .map((name) => ({ value: name, label: name })),
 )
 

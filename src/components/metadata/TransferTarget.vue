@@ -12,7 +12,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useBuckets } from '@/composables/useBuckets'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { useS3 } from '@/composables/useS3'
-import { isWorkspaceBucket } from '@/lib/workspaces'
+import { isHiddenBucket } from '@/lib/workspaces'
 import { FolderPlus, FolderTree } from '@lucide/vue'
 
 const props = defineProps<{ active: boolean }>()
@@ -42,7 +42,7 @@ const newSegment = ref('')
 const bucketOptions = computed(() => {
   const names = bucketList.buckets.value
     .map((entry) => entry.name)
-    .filter((name) => !isWorkspaceBucket(name))
+    .filter((name) => !isHiddenBucket(name))
   const typed = bucket.value.trim()
   // A hand-typed target stays selected when the list arrives later.
   if (typed && !names.includes(typed)) names.push(typed)

@@ -8,7 +8,7 @@ import { useBucketSearch } from '@/composables/useBucketSearch'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import type { BucketSearchHit } from '@/lib/api'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
-import { isWorkspaceBucket } from '@/lib/workspaces'
+import { isHiddenBucket } from '@/lib/workspaces'
 import { Boxes, Laptop, Plus, Search, Server } from '@lucide/vue'
 
 const query = defineModel<string>({ default: '' })
@@ -23,7 +23,7 @@ const open = ref(false)
 
 const rows = computed(() =>
   hits.value
-    .filter((hit) => !isWorkspaceBucket(hit.bucket))
+    .filter((hit) => !isHiddenBucket(hit.bucket))
     .map((hit) => {
       const node = realmNodes.nodeById(hit.node_id)
       const here = realmNodes.isLocalNode(hit.node_id)

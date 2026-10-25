@@ -8,7 +8,7 @@ import { MIN_CHARS, useBucketSearch } from '@/composables/useBucketSearch'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { syncBucketKey } from '@/lib/sync'
-import { isWorkspaceBucket } from '@/lib/workspaces'
+import { isHiddenBucket } from '@/lib/workspaces'
 import type { BucketSearchHit } from '@/lib/api'
 import { computed, ref, useId, watch } from 'vue'
 import { AlertTriangle, ArrowLeftRight, Search, X } from '@lucide/vue'
@@ -80,7 +80,7 @@ const partial = computed(() => nodesFailed.value > 0)
 
 const visibleHits = computed(() =>
   hits.value.filter((hit) => {
-    if (isWorkspaceBucket(hit.bucket)) return false
+    if (isHiddenBucket(hit.bucket)) return false
     if (props.filterNodeId && hit.node_id !== props.filterNodeId) return false
     if (props.excludeLocalBucket === hit.bucket && isLocalNode(hit.node_id)) return false
     return true

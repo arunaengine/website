@@ -15,7 +15,7 @@ import type { BucketSearchHit } from '@/lib/api'
 import { isDesktop } from '@/lib/desktop'
 import type { BindSource } from '@/lib/bindSource'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
-import { isWorkspaceBucket } from '@/lib/workspaces'
+import { isHiddenBucket } from '@/lib/workspaces'
 import { ArrowLeftRight, Boxes, ChevronRight, FolderPlus, FolderSync, History, KeyRound, Plus, Trash2 } from '@lucide/vue'
 import { computed, ref, useId, watch } from 'vue'
 
@@ -80,7 +80,7 @@ const nodeBuckets = computed(() => {
 // Matches in other groups for the same query, below this group's list.
 const search = useBucketSearch(bucketNameFilter)
 const otherHits = computed(() =>
-  search.hits.value.filter((hit) => hit.group_id !== selectedGroupId.value && !isWorkspaceBucket(hit.bucket)),
+  search.hits.value.filter((hit) => hit.group_id !== selectedGroupId.value && !isHiddenBucket(hit.bucket)),
 )
 // Hover text of a row; a row without a node is on this node.
 function rowNode(nodeId: string | null): string {
