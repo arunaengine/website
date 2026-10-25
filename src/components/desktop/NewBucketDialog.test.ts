@@ -27,6 +27,7 @@ const createRealmBucket = vi.fn()
 const device = { baseUrl: 'http://device/api/v1', token: 't' }
 const myGroups = ref([{ id: 'g1', name: 'Lab group' }])
 const sessionEpoch = ref(1)
+const activeGroupId = ref('g1')
 
 const Passthrough = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 const ButtonStub = defineComponent({
@@ -81,6 +82,7 @@ const NewBucketDialog = compileClientComponent(new URL('./NewBucketDialog.vue', 
   '@/components/groups/GroupSelect.vue': moduleDefault(InputStub),
   '@/composables/useAruna': { useAruna: () => ({ apiBaseUrl: ref('http://device/api/v1'), myGroups, sessionEpoch }) },
   '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ deviceClient: ref(device) }) },
+  '@/composables/useGroupSelection': { activeGroupId },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
       nodes: ref([
@@ -125,6 +127,8 @@ beforeEach(() => {
   createRealmBucket.mockResolvedValue({ name: 'lab-data', node_id: 'node-1', group_id: 'g1' })
   apiRequest.mockReset()
   apiRequest.mockResolvedValue({ services: { blob: { status: 'ok', backends: [{ quota_bytes: 2048, used_bytes: 1024 }] } } })
+  myGroups.value = [{ id: 'g1', name: 'Lab group' }]
+  activeGroupId.value = 'g1'
 })
 
 describe('a new bucket in the desktop', () => {
@@ -142,6 +146,18 @@ describe('a new bucket in the desktop', () => {
     expect(createBucket).not.toHaveBeenCalled()
     expect(activateContext).not.toHaveBeenCalled()
     mounted.app.unmount()
+  })
+
+  it('starts on the active group unless a group is handed in', async () => {
+    myGroups.value = [{ id: 'g1', name: 'Lab group' }, { id: 'g2', name: 'Field group' }]
+    activeGroupId.value = 'g2'
+    const active = await mountNamed()
+    expect(summary(active.root)).toContain('for Field group')
+    active.app.unmount()
+
+    const handed = await mountNamed({ groupId: 'g1' })
+    expect(summary(handed.root)).toContain('for Lab group')
+    handed.app.unmount()
   })
 
   it('hands the bucket to the link step instead of creating it', async () => {

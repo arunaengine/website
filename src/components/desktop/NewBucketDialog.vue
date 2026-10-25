@@ -19,6 +19,7 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import GroupSelect from '@/components/groups/GroupSelect.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
+import { activeGroupId } from '@/composables/useGroupSelection'
 import { useRealmNodes, type RealmNodeDisplay } from '@/composables/useRealmNodes'
 import { s3ErrorMessage, useS3 } from '@/composables/useS3'
 import { ApiError, apiRequest, type InfoResponse } from '@/lib/api'
@@ -130,7 +131,7 @@ watch(
     if (!open) return
     creating.value = false
     name.value = props.name ?? ''
-    groupId.value = props.groupId || groupOptions.value[0]?.value || ''
+    groupId.value = props.groupId || activeGroupId.value
     link.value = true
     error.value = null
     suggest()

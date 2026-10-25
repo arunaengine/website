@@ -16,6 +16,7 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceKeys } from '@/composables/useDeviceKeys'
+import { activeGroupId } from '@/composables/useGroupSelection'
 import type { CreateS3CredentialsResponse } from '@/lib/api'
 import { rememberKeyName } from '@/lib/keyNames'
 import { errorMessage } from '@/lib/utils'
@@ -62,7 +63,7 @@ watch(
       return
     }
     name.value = ''
-    groupId.value = groupOptions.value[0]?.value ?? ''
+    groupId.value = activeGroupId.value
     error.value = null
   },
   { immediate: true },
