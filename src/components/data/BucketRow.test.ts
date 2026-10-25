@@ -56,6 +56,9 @@ describe('BucketRow link column', () => {
 
     expect(mark?.props['aria-label']).toBe('Linked to test-data')
     expect(nodes(root).some((node) => node.props['aria-label'] === 'Link a local folder')).toBe(false)
+    // The tooltip opens on focus too, inside the same fixed column.
+    expect(mark?.props.tabindex).toBe('0')
+    expect(nodes(column(root)[0])).toContain(mark)
   })
 
   it('keeps the same column on unlinked rows, with the button or empty', async () => {

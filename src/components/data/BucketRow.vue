@@ -128,7 +128,15 @@ function onClick() {
 
     <span v-if="linkedTo !== undefined" class="flex h-7 w-7 shrink-0 items-center justify-center">
       <Tooltip v-if="linkedTo" :label="`Linked to ${linkedTo}`" side="right">
-        <span role="img" :aria-label="`Linked to ${linkedTo}`" class="p-1"><FolderSync class="h-3 w-3 text-primary" /></span>
+        <!-- Focusable, so keyboard users can open the tooltip with the folder name. -->
+        <span
+          role="img"
+          tabindex="0"
+          :aria-label="`Linked to ${linkedTo}`"
+          class="rounded p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <FolderSync class="h-3 w-3 text-primary" />
+        </span>
       </Tooltip>
       <slot v-else name="link" />
     </span>
