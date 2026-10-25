@@ -4,9 +4,10 @@
 import { computed, onMounted, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import { useBucketDistribution } from '@/composables/useBucketDistribution'
 import { useDatabases } from '@/composables/useDatabases'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { NOT_HELD_HERE, STATE_NOTES, type DatabaseRow } from '@/lib/databases'
+import { NOT_HELD_HERE, sameTarget, STATE_NOTES, targetOf, type DatabaseRow } from '@/lib/databases'
 import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{ bucket: string }>()
@@ -19,8 +20,19 @@ let choosing = 0
 
 onMounted(() => databases.ensure())
 
-// A bucket cannot be its own source.
-const rows = computed(() => databases.rows.value.filter((row) => row.bucket !== props.bucket))
+// A bucket cannot be its own source. The open bucket is on this node and is known by its set; until
+// the set is known, a set with the same bucket name is left out too.
+const distribution = useBucketDistribution(computed(() => props.bucket), ref(null))
+const destination = computed(() => {
+  if (distribution.state.value === 'ordinary') return targetOf(props.bucket, localNodeId.value ?? '', null)
+  return distribution.view.value?.live ? targetOf(props.bucket, '', distribution.view.value.live.setId) : null
+})
+const rows = computed(() =>
+  databases.rows.value.filter((row) => {
+    if (destination.value) return !sameTarget(row.target, destination.value)
+    return row.target.kind === 'ordinary' ? !sameTarget(row.target, targetOf(props.bucket, localNodeId.value ?? '', null)) : row.bucket !== props.bucket
+  }),
+)
 
 async function choose(row: DatabaseRow) {
   const run = ++choosing

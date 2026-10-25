@@ -6,6 +6,7 @@ import { button, compileClientComponent, content, mountApp, moduleDefault } from
 
 const rows = ref<Databases.DatabaseRow[]>([])
 const state = ref('ready')
+const distribution = { state: ref('loading'), view: ref<{ live?: { setId: string } } | null>(null) }
 
 const component = compileClientComponent(new URL('./DatabasesTab.vue', import.meta.url), {
   vue: VueRuntime,
@@ -18,6 +19,7 @@ const component = compileClientComponent(new URL('./DatabasesTab.vue', import.me
     }),
   },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ localNodeId: ref('n1') }) },
+  '@/composables/useBucketDistribution': { useBucketDistribution: () => distribution },
   '@/lib/databases': Databases,
   '@/lib/utils': { errorMessage: (cause: unknown) => String(cause) },
 })
@@ -49,5 +51,23 @@ describe('databases in Add data', () => {
     expect(content(root)).toContain('node busy')
     expect(content(root)).not.toContain('No database is listed')
     state.value = 'ready'
+  })
+
+  it('leaves out only the open bucket by its identity once its set is known', async () => {
+    rows.value = [
+      row('self', { kind: 'ordinary', node_id: 'n2', bucket: 'self' }),
+      row('self-set', { kind: 'distributed', set_id: 's1' }),
+      row('other-set', { kind: 'distributed', set_id: 's2' }),
+    ]
+    rows.value[1].bucket = 'self'
+    distribution.state.value = 'ready'
+    distribution.view.value = { live: { setId: 's1' } }
+    const text = content((await mountApp(component, { props: { bucket: 'self' } })).root)
+
+    expect(text).toContain('self title')
+    expect(text).not.toContain('self-set title')
+    expect(text).toContain('other-set title')
+    distribution.state.value = 'loading'
+    distribution.view.value = null
   })
 })
