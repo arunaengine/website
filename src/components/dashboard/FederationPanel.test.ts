@@ -72,3 +72,12 @@ describe('replication policy rendering', () => {
     expect(await renderReplication()).toContain('replication unknown')
   })
 })
+
+describe('topology', () => {
+  it('draws a connected edge from the hub to every other node', async () => {
+    const nodes = [realmNode('aaaa-mgmt-1111', 'management'), realmNode('bbbb-server-2222', 'server'), realmNode('cccc-server-3333', 'server')]
+    const app = createSSRApp({ render: () => h(FederationPanel, { nodes, localPeerId: 'aaaa-mgmt-1111' }) })
+
+    expect((await renderToString(app)).match(/class="fed-flow"/g)).toHaveLength(2)
+  })
+})

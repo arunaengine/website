@@ -1,4 +1,5 @@
 import { computed } from 'vue'
+import { nodeApiBase } from '@/components/nodes/node-probe'
 import type { Node, Realm } from '@/data/types'
 import {
   ApiError,
@@ -46,6 +47,40 @@ export async function loadInfo(context = refreshContext()) {
   if (own) federationName.value = signed.name?.trim() ?? ''
   else if (absent || realmInfo.value?.realm_id !== known) federationName.value = ''
   if (info.status === 'rejected' && realm.status === 'rejected') throw info.reason
+}
+
+export interface RealmView {
+  info: InfoResponse
+  realm: RealmInfoResponse
+}
+
+// The published management urls first, then every other realm member; never a device.
+function realmNodeBases(known: RealmInfoResponse): string[] {
+  const published = (known.management_urls ?? []).map((url) => {
+    const base = url.replace(/\/+$/, '')
+    return base.endsWith('/api/v1') ? base : `${base}/api/v1`
+  })
+  const members = (known.nodes ?? []).filter((node) => node.kind !== 'user').map(nodeApiBase)
+  return [...new Set([...published, ...members])].filter((base): base is string => !!base)
+}
+
+/**
+ * The realm as one of its nodes sees it, for the desktop's realm nodes panel: a device node
+ * takes no part in the live heartbeat protocol. Null when no realm node of this realm answers.
+ */
+export async function loadRealmView(context = refreshContext()): Promise<RealmView | null> {
+  const known = realmInfo.value
+  if (!known) return null
+  for (const baseUrl of realmNodeBases(known)) {
+    const client = { ...context.client, baseUrl }
+    const view = await Promise.all([
+      apiRequest<InfoResponse>('/system/info', {}, client),
+      apiRequest<RealmInfoResponse>('/system/realm', {}, client),
+    ]).catch(() => null)
+    // An answer without the realm members is the anonymous view, no better than the device's.
+    if (view?.[1].realm_id === known.realm_id && view[1].nodes?.length) return { info: view[0], realm: view[1] }
+  }
+  return null
 }
 
 export async function setRealmQuota(config: RealmQuotaConfig): Promise<RealmQuotaConfig> {

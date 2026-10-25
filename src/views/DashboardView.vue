@@ -12,6 +12,7 @@ import StatCard from '@/components/ui/StatCard.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import type { MetadataDoc } from '@/data/types'
+import type { RealmView } from '@/composables/aruna/realm'
 import { ArrowRight, BookOpen, Boxes, Database, FileJson2, Files, FolderOpen, Plus, Activity, Users } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
@@ -39,7 +40,7 @@ const HomeCards = defineAsyncComponent({
 const desktop = isDesktop()
 
 const router = useRouter()
-const { currentUser, metadata, myGroups, realm, nodeInfo, realmInfo, usageInfo, loading, bootstrapped, sessionEpoch, refresh, loadInfo, listRecentMetadata } = useAruna()
+const { currentUser, metadata, myGroups, realm, nodeInfo, realmInfo, usageInfo, loading, bootstrapped, sessionEpoch, refresh, loadInfo, loadRealmView, listRecentMetadata } = useAruna()
 const { authPending } = useAuth()
 const { dashboardRevision } = useNotifications()
 const { scope, setScope } = useDashboardScope()
@@ -54,10 +55,16 @@ const recentDocs = ref<MetadataDoc[] | null>(null)
 const recentSettled = ref(false)
 let recentGeneration = 0
 let refreshQueued = false
+// On the desktop the API base is the device node, which sees no live heartbeats and no
+// connections between realm nodes, so the nodes panel reads them from a realm node.
+const realmView = ref<RealmView | null>(null)
+let realmViewGeneration = 0
 
 watch(sessionEpoch, () => {
   recentGeneration++
   recentSettled.value = false
+  realmViewGeneration++
+  realmView.value = null
 }, { flush: 'sync' })
 
 // Null keeps the tile on the window-derived list, so a node that cannot order
@@ -122,10 +129,19 @@ onUnmounted(() => {
   stopWake()
 })
 
+async function loadPanelRealm() {
+  if (!desktop) return
+  const generation = ++realmViewGeneration
+  const view = await loadRealmView()
+  if (generation === realmViewGeneration) realmView.value = view
+}
+watch(realmInfo, () => void loadPanelRealm(), { immediate: true })
+const panelRealm = computed(() => realmView.value?.realm ?? realmInfo.value)
+
 // Devices (kind 'user') run on their owner's computer, not on realm
 // infrastructure: they are summarized only, never listed or aggregated.
-const infraNodes = computed(() => (realmInfo.value?.nodes ?? []).filter((node) => node.kind !== 'user'))
-const deviceNodes = computed(() => (realmInfo.value?.nodes ?? []).filter((node) => node.kind === 'user'))
+const infraNodes = computed(() => (panelRealm.value?.nodes ?? []).filter((node) => node.kind !== 'user'))
+const deviceNodes = computed(() => (panelRealm.value?.nodes ?? []).filter((node) => node.kind === 'user'))
 
 const onlineNodes = computed(() => infraNodes.value.filter((node) => node.present).length)
 
@@ -383,7 +399,7 @@ const pageDescription = computed(() =>
           :nodes="infraNodes"
           :devices="deviceNodes"
           :replication-factor="realmInfo?.metadata_replication.default_replication_factor"
-          :local-peer-id="nodeInfo?.node.peer_id"
+          :local-peer-id="(realmView?.info ?? nodeInfo)?.node.peer_id"
         />
       </section>
 

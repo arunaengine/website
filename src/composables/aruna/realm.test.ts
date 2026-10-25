@@ -8,7 +8,7 @@ const BYTES = Array.from({ length: 32 }, (_, index) => index)
 const REALM_ID = toBase64Url(Uint8Array.from(BYTES))
 
 const state = await import('./state')
-const { loadInfo, realm } = await import('./realm')
+const { loadInfo, loadRealmView, realm } = await import('./realm')
 
 function serve(descriptor: unknown, description = 'Test_Deploy_Realm', realmId = REALM_ID) {
   vi.mocked(apiRequest).mockImplementation(async (path) => {
@@ -76,5 +76,61 @@ describe('realm name', () => {
     serve(new ApiError(404, 'No federation settings'), '')
     await loadInfo()
     expect(realm.value.name).toBe(REALM_ID.slice(0, 8))
+  })
+})
+
+describe('realm view from a realm node', () => {
+  const member = (node_id: string, kind: string, api?: string) => ({ node_id, kind, info: api ? { urls: { api } } : undefined })
+
+  beforeEach(() => {
+    state.authToken.value = 'session-token'
+    state.realmInfo.value = {
+      realm_id: REALM_ID,
+      management_urls: ['https://mgmt.test/'],
+      nodes: [member('device', 'user', 'http://127.0.0.1:34115'), member('server', 'server', 'https://server.test')],
+    } as never
+  })
+
+  function answer(failing: string[] = [], realmId = REALM_ID, anonymous: string[] = []) {
+    vi.mocked(apiRequest).mockImplementation(async (path, _options, client) => {
+      const base = client?.baseUrl ?? ''
+      if (failing.includes(base)) throw new TypeError('Failed to fetch')
+      if (path === '/system/info') return { node: { peer_id: base } }
+      return { realm_id: realmId, nodes: anonymous.includes(base) ? [] : [member('server', 'server')] }
+    })
+  }
+
+  it('reads the management node with the session token', async () => {
+    answer()
+
+    const view = await loadRealmView()
+
+    expect(view?.info.node.peer_id).toBe('https://mgmt.test/api/v1')
+    expect(vi.mocked(apiRequest).mock.calls.map(([path, , client]) => [path, client?.baseUrl, client?.token])).toEqual([
+      ['/system/info', 'https://mgmt.test/api/v1', 'session-token'],
+      ['/system/realm', 'https://mgmt.test/api/v1', 'session-token'],
+    ])
+  })
+
+  it('falls back to another realm member, never the device', async () => {
+    answer(['https://mgmt.test/api/v1'])
+
+    const view = await loadRealmView()
+
+    expect(view?.info.node.peer_id).toBe('https://server.test/api/v1')
+    const bases = vi.mocked(apiRequest).mock.calls.map(([, , client]) => client?.baseUrl)
+    expect(bases).not.toContain('http://127.0.0.1:34115/api/v1')
+  })
+
+  it('skips a node that answers without the realm members', async () => {
+    answer([], REALM_ID, ['https://mgmt.test/api/v1'])
+
+    expect((await loadRealmView())?.info.node.peer_id).toBe('https://server.test/api/v1')
+  })
+
+  it('answers null when no node of this realm answers', async () => {
+    answer(['https://mgmt.test/api/v1'], 'other-realm')
+
+    expect(await loadRealmView()).toBeNull()
   })
 })
