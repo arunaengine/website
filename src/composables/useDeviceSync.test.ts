@@ -1,4 +1,4 @@
-import { defineComponent, h, ref } from 'vue'
+import { defineComponent, h, shallowRef } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DeviceSyncStatus, SyncDataset, SyncDocument } from '@/lib/deviceApi'
 import { mountApp } from '@/test/clientRender'
@@ -37,13 +37,15 @@ function dataset(overrides: Partial<SyncDataset> = {}): SyncDataset {
 let answer: DeviceSyncStatus = statusOf()
 const read = vi.fn(async () => answer)
 const run = vi.fn(async () => true)
+const owner = { baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner' }
+const client = shallowRef<typeof owner | null>(owner)
 
 vi.mock('@/lib/deviceApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/deviceApi')>()
   return { ...actual, deviceSyncStatus: () => read(), runDeviceSync: () => run() }
 })
 vi.mock('@/composables/useDeviceStatus', () => ({
-  useDeviceStatus: () => ({ deviceClient: ref({ baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner' }) }),
+  useDeviceStatus: () => ({ deviceClient: client }),
 }))
 
 // The status is a module singleton, so each case takes a graph of its own
@@ -55,6 +57,7 @@ async function load() {
 
 beforeEach(() => {
   answer = statusOf()
+  client.value = owner
   read.mockClear()
   run.mockClear()
 })
@@ -161,6 +164,25 @@ describe('running a sync', () => {
     answer = statusOf({ lastSyncMs: 2_000, pendingTotal: 1 })
     await sync.load()
     expect(sync.running.value).toBe(false)
+  })
+
+  it('forgets the last session when the owner signs in again', async () => {
+    answer = statusOf({ pendingTotal: 2 })
+    const sync = await load()
+    await sync.load()
+    let finish: (value: DeviceSyncStatus) => void = () => {}
+    read.mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)))
+    const asked = sync.runSync()
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(2))
+
+    client.value = null
+    client.value = { ...owner, token: 'next' }
+    expect(sync.running.value).toBe(false)
+    expect(sync.status.value.pendingTotal).toBe(0)
+
+    finish(statusOf({ pendingTotal: 7 }))
+    await asked
+    expect(sync.status.value.pendingTotal).toBe(0)
   })
 
   it('asks for one run at a time', async () => {

@@ -79,13 +79,17 @@ export function itemChip(item: SyncItem): ItemChip {
     return { label: `${needsYou} ${needsYou === 1 ? 'file needs' : 'files need'} you`, variant: toneVariant('attention') }
   }
 
-  const activeTransfers = folderTransfers.filter((transfer) => transfer.state === 'queued' || isMoving(transfer))
+  const activeTransfers = folderTransfers.filter(
+    (transfer) => transfer.state === 'queued' || transfer.state === 'retrying' || isMoving(transfer),
+  )
   // Read transfers are live; the folder counter is only as fresh as the last folder read.
   const syncing = item.transfers ? activeTransfers.length : folder.counters.uploading
   if (syncing) {
     const receiving = item.transfers !== undefined && activeTransfers.every((transfer) => transfer.direction === 'download')
+    const retrying = item.transfers !== undefined && activeTransfers.every((transfer) => transfer.state === 'retrying')
     const noun = syncing === 1 ? 'file' : 'files'
-    return { label: `${receiving ? 'Receiving' : 'Sending'} ${syncing} ${noun}`, variant: toneVariant('progress') }
+    const verb = retrying ? 'Retrying' : receiving ? 'Receiving' : 'Sending'
+    return { label: `${verb} ${syncing} ${noun}`, variant: toneVariant('progress') }
   }
 
   return {
