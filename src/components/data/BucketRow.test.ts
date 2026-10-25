@@ -44,3 +44,40 @@ describe('BucketRow step label', () => {
     expect(labels(await mount({ job: null }, { tooltip: () => 'On home' }))).toHaveLength(0)
   })
 })
+
+describe('BucketRow link column', () => {
+  const column = (root: Parameters<typeof content>[0]) =>
+    nodes(root).filter((node) => String(node.props.class ?? '').includes('h-7 w-7'))
+  const link = { link: () => h('button', { 'aria-label': 'Link a local folder' }) }
+
+  it('marks a linked bucket with its folder in place of the link button', async () => {
+    const root = await mount({ linkedTo: 'test-data' }, link)
+    const mark = nodes(root).find((node) => node.props.role === 'img')
+
+    expect(mark?.props['aria-label']).toBe('Linked to test-data')
+    expect(nodes(root).some((node) => node.props['aria-label'] === 'Link a local folder')).toBe(false)
+  })
+
+  it('keeps the same column on unlinked rows, with the button or empty', async () => {
+    const offered = column(await mount({ linkedTo: null }, link))
+    const empty = column(await mount({ linkedTo: null }))
+
+    expect(offered).toHaveLength(1)
+    expect(nodes(offered[0]).some((node) => node.props['aria-label'] === 'Link a local folder')).toBe(true)
+    expect(empty).toHaveLength(1)
+    expect(nodes(empty[0]).filter((node) => node.kind === 'element')).toEqual([empty[0]])
+  })
+
+  it('adds no column outside the desktop', async () => {
+    expect(column(await mount({}, link))).toHaveLength(0)
+  })
+
+  it('gives the place a fixed width after the other row marks', async () => {
+    const root = await mount({ place: 'This computer', job: JOB, synced: true })
+    const place = nodes(root).find((node) => content(node) === 'This computer' && node.tag === 'span')
+    const group = nodes(root).find((node) => node.children?.includes(place as never))
+
+    expect(String(place?.props.class)).toContain('w-20')
+    expect(group?.children.at(-1)).toBe(place)
+  })
+})

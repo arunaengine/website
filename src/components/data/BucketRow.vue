@@ -3,7 +3,7 @@ import BucketJobLabel from '@/components/storage/BucketJobLabel.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import type { BucketJob } from '@/lib/api'
-import { ArrowLeftRight, Boxes, Pin, Server } from '@lucide/vue'
+import { ArrowLeftRight, Boxes, FolderSync, Pin, Server } from '@lucide/vue'
 import { RouterLink } from 'vue-router'
 
 // One shared row for every bucket list surface (sidebar pins/locals, recently
@@ -34,6 +34,8 @@ const props = withDefaults(
     /** Readable place shown on the row; its title names kind and id. */
     place?: string | null
     placeTitle?: string | null
+    /** Desktop: the linked folder's name; null keeps an empty column so rows line up. */
+    linkedTo?: string | null
   }>(),
   {
     nodeId: null,
@@ -86,13 +88,13 @@ function onClick() {
           <span v-if="subtitle" class="block truncate text-[10px] font-normal text-muted-foreground">{{ subtitle }}</span>
         </span>
         <span class="flex shrink-0 items-center gap-1">
-          <span v-if="place" class="max-w-32 truncate text-[11px] text-muted-foreground" :title="placeTitle ?? undefined">{{ place }}</span>
           <BucketJobLabel v-if="job" :job="job" />
           <ArrowLeftRight
             v-if="synced"
             class="h-3 w-3 shrink-0 text-primary/60"
             aria-label="Sync relationships configured"
           />
+          <span v-if="place" class="w-20 truncate text-[11px] text-muted-foreground" :title="placeTitle ?? undefined">{{ place }}</span>
         </span>
       </button>
       <template #content><slot name="tooltip" /></template>
@@ -113,15 +115,22 @@ function onClick() {
         <span v-if="subtitle" class="block truncate text-[10px] font-normal text-muted-foreground">{{ subtitle }}</span>
       </span>
       <span class="flex shrink-0 items-center gap-1">
-        <span v-if="place" class="max-w-32 truncate text-[11px] text-muted-foreground" :title="placeTitle ?? undefined">{{ place }}</span>
         <BucketJobLabel v-if="job" :job="job" />
         <ArrowLeftRight
           v-if="synced"
           class="h-3 w-3 shrink-0 text-primary/60"
           aria-label="Sync relationships configured"
         />
+        <span v-if="place" class="w-20 truncate text-[11px] text-muted-foreground" :title="placeTitle ?? undefined">{{ place }}</span>
       </span>
     </button>
+
+    <span v-if="linkedTo !== undefined" class="flex h-7 w-7 shrink-0 items-center justify-center">
+      <Tooltip v-if="linkedTo" :label="`Linked to ${linkedTo}`" side="right">
+        <span role="img" :aria-label="`Linked to ${linkedTo}`" class="p-1"><FolderSync class="h-3 w-3 text-primary" /></span>
+      </Tooltip>
+      <slot v-else name="link" />
+    </span>
 
     <Tooltip v-if="nodeId" side="right">
       <RouterLink

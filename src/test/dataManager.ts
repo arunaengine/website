@@ -5,6 +5,7 @@ import { computed, defineComponent, h, ref, type Component, type Ref } from 'vue
 import * as VueRuntime from 'vue'
 import { vi } from 'vitest'
 import * as DeletionRequest from '@/lib/deletion/request'
+import * as DeviceApi from '@/lib/deviceApi'
 import * as StateBadge from '@/lib/stateBadge'
 import * as DropEntries from '@/lib/upload/dropEntries'
 import * as NotebookDocument from '@/lib/notebook/document'
@@ -156,6 +157,7 @@ export function objectBrowser(): Component {
       '@lucide/vue': new Proxy({}, { get: () => IconStub }),
       '@/lib/config': { featureEnabled: () => false },
       '@/lib/deletion/request': DeletionRequest,
+      '@/lib/deviceApi': DeviceApi,
       '@/lib/stateBadge': StateBadge,
       '@/lib/upload/dropEntries': DropEntries,
       '@/lib/notebook/document': NotebookDocument,
@@ -274,6 +276,7 @@ export function fakeManager(overrides: Record<string, unknown> = {}) {
     showSyncButton: computed(() => false),
     bindSourceFor: () => null,
     currentBindSource: computed(() => null),
+    currentLinkedFolder: computed(() => null),
     selectedObjectKeys,
     selectedPrefixes,
     selectedCount: computed(() => selectedObjectKeys.value.size + selectedPrefixes.value.size),

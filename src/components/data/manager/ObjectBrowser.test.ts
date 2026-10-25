@@ -269,6 +269,51 @@ describe('object browser link a local folder', () => {
   })
 })
 
+describe('object browser linked bucket', () => {
+  const source = { bucket: 'reef', nodeId: 'realm-1', groupId: 'g1' }
+  const linked = { folder_id: 'f1', root: '/home/me/Documents/test-data' }
+  const note = (root: HostNode) => element(root, (node) => node.props['data-testid'] === 'linked-folder-note')
+
+  afterEach(() => {
+    desktopMode.on = false
+  })
+
+  it('names the linked folder and opens it instead of offering a new link', async () => {
+    desktopMode.on = true
+    const root = await render({
+      showSyncButton: computed(() => true),
+      currentBindSource: computed(() => source),
+      currentLinkedFolder: computed(() => linked),
+    })
+
+    expect(content(note(root))).toContain('Linked to test-data.')
+    expect(content(note(root))).toContain('/home/me/Documents/test-data')
+    const open = element(note(root), (node) => node.tag === 'a' && content(node).trim() === 'Open folder')
+    expect(open.props.to).toEqual({ name: 'folder', params: { folderId: 'f1' } })
+    expect(() => action(root, 'Link a local folder')).toThrow()
+  })
+
+  it('also drops the link button when the bucket cannot be browsed', async () => {
+    desktopMode.on = true
+    const root = await render({
+      showSyncButton: computed(() => true),
+      currentBindSource: computed(() => source),
+      currentLinkedFolder: computed(() => linked),
+      remoteNodeId: ref('realm-1'),
+      remoteBlocked: computed(() => true),
+    })
+
+    expect(content(note(root))).toContain('Linked to test-data.')
+    expect(() => button(root, 'Link a local folder')).toThrow()
+  })
+
+  it('shows no line on the web', async () => {
+    const root = await render({ currentLinkedFolder: computed(() => linked) })
+
+    expect(() => note(root)).toThrow()
+  })
+})
+
 describe('object browser bucket on this computer', () => {
   const device = { nodeId: 'dev', kind: 'user', label: 'device dev', isLocal: true }
   const realmNodes = {
