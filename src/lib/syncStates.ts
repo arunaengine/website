@@ -80,9 +80,10 @@ export function itemChip(item: SyncItem): ItemChip {
   }
 
   const activeTransfers = folderTransfers.filter((transfer) => transfer.state === 'queued' || isMoving(transfer))
-  const syncing = folder.counters.uploading || activeTransfers.length
+  // Read transfers are live; the folder counter is only as fresh as the last folder read.
+  const syncing = item.transfers ? activeTransfers.length : folder.counters.uploading
   if (syncing) {
-    const receiving = !folder.counters.uploading && activeTransfers.every((transfer) => transfer.direction === 'download')
+    const receiving = item.transfers !== undefined && activeTransfers.every((transfer) => transfer.direction === 'download')
     const noun = syncing === 1 ? 'file' : 'files'
     return { label: `${receiving ? 'Receiving' : 'Sending'} ${syncing} ${noun}`, variant: toneVariant('progress') }
   }
@@ -104,8 +105,8 @@ export interface EntryMeta {
 
 export const ENTRY_META: Record<EntryState, EntryMeta> = {
   in_sync: { label: 'Synced', tone: 'settled', hint: 'Same on this computer and in Aruna.' },
-  local_new: { label: 'Sending', tone: 'moving', hint: 'Waiting to be sent to Aruna.' },
-  local_changed: { label: 'Sending', tone: 'moving', hint: 'Your edit is on its way to Aruna.' },
+  local_new: { label: 'Waiting', tone: 'moving', hint: 'Waiting to be sent to Aruna.' },
+  local_changed: { label: 'Waiting', tone: 'moving', hint: 'Your edit is on its way to Aruna.' },
   remote_new: { label: 'Receiving', tone: 'moving', hint: 'Coming from Aruna into this folder.' },
   remote_changed: {
     label: 'Receiving',
@@ -156,11 +157,12 @@ export function replaceableCount(counters: FolderCounters): number {
 
 const TONE_ORDER: Record<EntryTone, number> = { decide: 0, error: 1, moving: 2, settled: 3 }
 
-/** Decisions first, then work in flight, then the quiet files. */
-export function orderEntries(entries: FolderEntry[]): FolderEntry[] {
+/** Decisions first, then work in flight, then the quiet files; a file in flight leads its group. */
+export function orderEntries(entries: FolderEntry[], moving?: { has(path: string): boolean }): FolderEntry[] {
   return [...entries].sort((a, b) => {
     const byTone = TONE_ORDER[entryMeta(a.state).tone] - TONE_ORDER[entryMeta(b.state).tone]
-    return byTone !== 0 ? byTone : a.path.localeCompare(b.path)
+    const byMoving = Number(moving?.has(b.path) ?? false) - Number(moving?.has(a.path) ?? false)
+    return byTone || byMoving || a.path.localeCompare(b.path)
   })
 }
 
@@ -251,15 +253,11 @@ export function transferLabel(transfer: DeviceTransfer): string {
   }
 }
 
-/**
- * How far a transfer got, or null while that is not known. Only a node that
- * reports the transferring state counts bytes for real, so a transfer it
- * calls running shows no percentage instead of an invented one.
- */
+/** How far a transfer got, or null while that is not known. */
 export function transferPercent(transfer: DeviceTransfer): number | null {
   if (transfer.state === 'done') return 100
   if (transfer.state === 'queued') return 0
-  if (transfer.state !== 'transferring') return null
+  if (!isMoving(transfer)) return null
   if (!transfer.bytes_total || transfer.bytes_done === null) return null
   return Math.min(100, Math.floor((transfer.bytes_done / transfer.bytes_total) * 100))
 }

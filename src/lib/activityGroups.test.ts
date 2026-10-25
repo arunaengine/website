@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFolder, readTransfer, type DeviceTransfer } from './deviceApi'
-import { activityCounts, groupActivity, totalProgress } from './activityGroups'
+import { activityCounts, groupActivity, totalProgress, transferOrder } from './activityGroups'
 
 const folders = [
   readFolder({ folder_id: 'f1', root: '/home/me/Runs' }),
@@ -63,13 +63,28 @@ describe('activity groups', () => {
   })
 })
 
+describe('transfer order', () => {
+  it('puts the file in flight before waiting ones and compares paths plainly', () => {
+    const sorted = [
+      transfer('b', 'queued'),
+      transfer('Z', 'queued'),
+      transfer('c', 'running'),
+      transfer('a', 'retrying'),
+      transfer('d', 'failed'),
+    ].sort(transferOrder)
+
+    expect(sorted.map((row) => row.id)).toEqual(['d', 'c', 'a', 'Z', 'b'])
+  })
+})
+
 describe('total progress', () => {
   it('sums the bytes of open transfers when each one is counted', () => {
     expect(totalProgress([rows[2]!, rows[3]!])).toEqual({ done: 40, total: 150 })
+    expect(totalProgress([transfer('x', 'running', { bytes_total: 10, bytes_done: 4 })])).toEqual({ done: 4, total: 10 })
   })
 
   it('says nothing while any open transfer has no counted bytes', () => {
-    expect(totalProgress([rows[2]!, transfer('x', 'running', { bytes_total: 10, bytes_done: 0 })])).toBeNull()
+    expect(totalProgress([rows[2]!, transfer('x', 'running', { bytes_total: 10 })])).toBeNull()
     expect(totalProgress([transfer('y', 'queued')])).toBeNull()
     expect(totalProgress([rows[0]!])).toBeNull()
   })

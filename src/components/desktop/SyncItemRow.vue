@@ -6,6 +6,7 @@ import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Progress from '@/components/ui/Progress.vue'
+import { transferOrder } from '@/lib/activityGroups'
 import { folderName, isMoving, type DeviceTransfer } from '@/lib/deviceApi'
 import { formatCount } from '@/lib/formatCount'
 import { stateVariant } from '@/lib/stateBadge'
@@ -57,11 +58,7 @@ const noticeTone = computed<'error' | 'warning' | null>(() =>
 
 const transfers = computed(() => {
   if (props.item.kind !== 'folder') return []
-  return [...(props.item.transfers ?? [])].sort((left, right) => {
-    const leftRank = left.state === 'failed' ? 0 : 1
-    const rightRank = right.state === 'failed' ? 0 : 1
-    return leftRank - rightRank || left.path.localeCompare(right.path)
-  })
+  return [...(props.item.transfers ?? [])].sort(transferOrder)
 })
 
 const shownTransfers = computed(() => (props.compact ? [] : transfers.value.slice(0, 3)))
