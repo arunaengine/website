@@ -8,9 +8,11 @@ import {
   click,
   compileClientComponent,
   content,
+  element,
   input,
   moduleDefault,
   mountApp,
+  nodes,
   typeValue,
 } from '@/test/clientRender'
 
@@ -24,6 +26,7 @@ const validateRealm = vi.fn(async (_input: string) => ({
   redirectedFrom: null as string | null,
 }))
 const awaitRealm = vi.fn(async (_origin: string) => true)
+const deviceEnrolled = vi.fn(async () => false)
 
 const EmptyStub = defineComponent(() => () => null)
 const ButtonStub = defineComponent({
@@ -60,10 +63,11 @@ const WelcomeView = compileClientComponent(new URL('./WelcomeView.vue', import.m
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/lib/utils': { errorMessage: (err: unknown) => (err instanceof Error ? err.message : String(err)) },
   '@/lib/desktopBridge': { validateRealm },
-  '@/lib/desktopWelcome': { awaitRealm, insecureRealm: () => false },
+  '@/lib/desktopBoot': { realmOrigin: () => ORIGIN },
+  '@/lib/desktopWelcome': { awaitRealm, deviceEnrolled, insecureRealm: () => false },
 })
 
-function routed(): Promise<Router> {
+function routed(start = '/welcome'): Promise<Router> {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -72,7 +76,7 @@ function routed(): Promise<Router> {
       { path: '/app/device', name: 'device', component: EmptyStub },
     ],
   })
-  return router.push('/welcome').then(() => router.isReady().then(() => router))
+  return router.push(start).then(() => router.isReady().then(() => router))
 }
 
 async function connect(router: Router, address = 'aruna.example') {
@@ -85,6 +89,7 @@ async function connect(router: Router, address = 'aruna.example') {
 beforeEach(() => {
   vi.clearAllMocks()
   awaitRealm.mockResolvedValue(true)
+  deviceEnrolled.mockResolvedValue(false)
 })
 
 describe('connecting to a realm', () => {
@@ -134,6 +139,23 @@ describe('connecting to a realm', () => {
 
     expect(router.currentRoute.value.name).toBe('welcome')
     expect(content(mounted.root)).toContain('serves no Aruna realm')
+    mounted.app.unmount()
+  })
+})
+
+describe('changing realms', () => {
+  it('asks an enrolled computer to leave its realm first', async () => {
+    // The shell refuses another realm for an enrolled computer, so no form is offered.
+    deviceEnrolled.mockResolvedValue(true)
+    const router = await routed('/welcome?change=1')
+    const mounted = await mountApp(WelcomeView, { router })
+
+    expect(content(mounted.root)).toContain(`This computer belongs to ${ORIGIN}.`)
+    const remove = element(mounted.root, (node) => node.tag === 'a' && content(node) === 'Remove this computer')
+    expect(remove.props.href).toBe('/app/device#wipe')
+    expect(nodes(mounted.root).some((node) => node.tag === 'input')).toBe(false)
+    expect(content(mounted.root)).not.toContain('Connect')
+    expect(validateRealm).not.toHaveBeenCalled()
     mounted.app.unmount()
   })
 })

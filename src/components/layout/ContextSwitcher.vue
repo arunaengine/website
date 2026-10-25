@@ -20,9 +20,10 @@ import { useAruna } from '@/composables/useAruna'
 import { useRealm } from '@/composables/useRealm'
 import { activeGroupId, setActiveGroup } from '@/composables/useGroupSelection'
 import { isDesktop } from '@/lib/desktop'
+import { deviceEnrolled } from '@/lib/desktopWelcome'
 import { truncateMiddle } from '@/lib/utils'
 import { computed, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { ArrowLeftRight, Check, ChevronsUpDown, Globe2, Users } from '@lucide/vue'
 
 const { currentUser, myGroups } = useAruna()
@@ -40,6 +41,13 @@ const pickerOpen = ref(false)
 function openRealm(target: VerifiedRealm) {
   pickerOpen.value = false
   window.location.assign(target.portalUrl)
+}
+
+// The shell refuses another realm while this computer is enrolled, so it is removed first.
+const router = useRouter()
+async function changeRealm() {
+  const enrolled = await deviceEnrolled()
+  void router.push(enrolled ? { name: 'device', hash: '#wipe' } : { name: 'welcome', query: { change: '1' } })
 }
 
 function roleOf(id: string) {
@@ -142,10 +150,8 @@ function roleOf(id: string) {
             </div>
             <Check v-if="r.id === activeRealmId" class="mt-1 h-3.5 w-3.5 shrink-0 text-primary" />
           </DropdownMenuItem>
-          <DropdownMenuItem v-if="desktop" as-child>
-            <RouterLink :to="{ name: 'welcome', query: { change: '1' } }" class="flex w-full items-center gap-2">
-              <ArrowLeftRight class="h-3.5 w-3.5 text-muted-foreground" /> Change realm
-            </RouterLink>
+          <DropdownMenuItem v-if="desktop" class="flex items-center gap-2" @click="changeRealm">
+            <ArrowLeftRight class="h-3.5 w-3.5 text-muted-foreground" /> Change realm
           </DropdownMenuItem>
           <DropdownMenuItem v-else class="flex items-center gap-2" @click="pickerOpen = true">
             <ArrowLeftRight class="h-3.5 w-3.5 text-muted-foreground" /> Other realms

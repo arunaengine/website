@@ -14,6 +14,8 @@ const setActiveGroup = vi.fn((id: string) => {
   active.value = id
 })
 const setRealm = vi.fn()
+const push = vi.fn()
+const deviceEnrolled = vi.fn(async () => false)
 const desktopMode = ref(false)
 const realm = ref({ id: 'realm-1', name: 'Demo realm', shortName: 'Demo', color: '#336699' })
 const realms = ref([
@@ -49,7 +51,7 @@ const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
 const ContextSwitcher = compileClientComponent(new URL('./ContextSwitcher.vue', import.meta.url), {
   vue: VueRuntime,
-  'vue-router': { RouterLink: RouterLinkStub },
+  'vue-router': { RouterLink: RouterLinkStub, useRouter: () => ({ push }) },
   '@lucide/vue': icons,
   '@/components/ui/DropdownMenu.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Passthrough),
@@ -84,6 +86,7 @@ const ContextSwitcher = compileClientComponent(new URL('./ContextSwitcher.vue', 
     setActiveGroup,
   },
   '@/lib/desktop': { isDesktop: () => desktopMode.value },
+  '@/lib/desktopWelcome': { deviceEnrolled },
   '@/lib/utils': Utils,
 })
 
@@ -97,6 +100,8 @@ beforeEach(() => {
   realm.value = { id: 'realm-1', name: 'Demo realm', shortName: 'Demo', color: '#336699' }
   setActiveGroup.mockClear()
   setRealm.mockClear()
+  push.mockClear()
+  deviceEnrolled.mockResolvedValue(false)
   desktopMode.value = false
 })
 
@@ -141,8 +146,18 @@ describe('ContextSwitcher', () => {
     const { root } = await mountApp(ContextSwitcher)
 
     expect(content(root)).not.toContain('Other realms')
-    const change = element(root, (node) => node.tag === 'a' && content(node).includes('Change realm'))
-    expect(JSON.parse(String(change.props['data-to']))).toEqual({ name: 'welcome', query: { change: '1' } })
+    await click(element(root, (node) => node.tag === 'button' && content(node).includes('Change realm')))
+    expect(push).toHaveBeenCalledWith({ name: 'welcome', query: { change: '1' } })
+  })
+
+  it('removes an enrolled computer from its realm before another one', async () => {
+    // The shell refuses another realm for an enrolled computer.
+    desktopMode.value = true
+    deviceEnrolled.mockResolvedValue(true)
+    const { root } = await mountApp(ContextSwitcher)
+
+    await click(element(root, (node) => node.tag === 'button' && content(node).includes('Change realm')))
+    expect(push).toHaveBeenCalledWith({ name: 'device', hash: '#wipe' })
   })
 
   it('offers the group id and the groups page', async () => {

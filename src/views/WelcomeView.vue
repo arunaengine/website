@@ -3,25 +3,39 @@
 // so it asks for one instead of enrolling. The shell validates the address,
 // remembers it and switches this window's context to that realm; nothing is
 // reopened, so the step just waits for the context and moves on.
-import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppLogo from '@/components/layout/AppLogo.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import { errorMessage } from '@/lib/utils'
 import { validateRealm } from '@/lib/desktopBridge'
-import { awaitRealm, insecureRealm } from '@/lib/desktopWelcome'
+import { realmOrigin } from '@/lib/desktopBoot'
+import { awaitRealm, deviceEnrolled, insecureRealm } from '@/lib/desktopWelcome'
 import iconMark from '@/assets/brand/icon-mark.avif'
 import { ArrowRight, KeyRound } from '@lucide/vue'
 
 const router = useRouter()
+const route = useRoute()
 const address = ref('')
 // Courtesy only: the warning never blocks the shell's own validation.
 const insecure = computed(() => insecureRealm(address.value))
 const checking = ref(false)
 const failure = ref<string | null>(null)
 const connecting = ref<string | null>(null)
+
+// The shell refuses another realm while this computer is enrolled, so a change asks to remove it first.
+const changing = computed(() => route.query.change !== undefined)
+const enrolled = ref(false)
+const origin = computed(() => realmOrigin())
+watch(
+  changing,
+  async (change) => {
+    enrolled.value = change && (await deviceEnrolled())
+  },
+  { immediate: true },
+)
 
 const action = computed(() => {
   if (connecting.value) return 'Connecting…'
@@ -95,7 +109,15 @@ function toEnroll(): void {
           </div>
         </div>
 
-        <div class="flex flex-col justify-center gap-4 p-6 md:p-7">
+        <div v-if="enrolled" class="flex flex-col justify-center gap-4 p-6 md:p-7">
+          <h1 class="font-display text-lg font-semibold tracking-tight text-aruna-navy">Change realm</h1>
+          <Notice>This computer belongs to {{ origin }}. Remove it from that realm first to use another one.</Notice>
+          <Button variant="outline" class="w-full" as-child>
+            <RouterLink :to="{ name: 'device', hash: '#wipe' }">Remove this computer</RouterLink>
+          </Button>
+        </div>
+
+        <div v-else class="flex flex-col justify-center gap-4 p-6 md:p-7">
           <h1 class="font-display text-lg font-semibold tracking-tight text-aruna-navy">Connect to your realm</h1>
 
           <div>
