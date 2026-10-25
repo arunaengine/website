@@ -3,6 +3,8 @@
 // one. Nothing polls while the window is hidden, and every surface reads once
 // more the moment the owner comes back to it.
 
+/** A file is being sent; small files finish in under a second each. */
+export const POLL_FAST_MS = 1_000
 /** Something is in flight: a sync run, a transfer, an active job. */
 export const POLL_ACTIVE_MS = 3_000
 /** The node at rest, and realm lists that change on someone else's action. */
@@ -37,6 +39,33 @@ export function follow(run: () => Promise<void>, delay: () => number, skip?: () 
     stopped = true
     window.clearTimeout(timer)
   }
+}
+
+/**
+ * One poll for every surface that shows the same read: the first start runs it,
+ * the last stop ends it. Balance every start with a stop.
+ */
+export function sharedPoll(run: () => Promise<void>, delay: () => number, skip?: () => boolean) {
+  let holders = 0
+  let release: (() => void) | null = null
+  function start(): void {
+    holders += 1
+    if (holders > 1) return
+    const stop = follow(run, delay, skip)
+    const unwake = onWake(() => void run())
+    release = () => {
+      stop()
+      unwake()
+    }
+  }
+  function stop(): void {
+    if (holders === 0) return
+    holders -= 1
+    if (holders > 0) return
+    release?.()
+    release = null
+  }
+  return { start, stop }
 }
 
 /** Reads once more as soon as the window is back in front. Returns the stop. */

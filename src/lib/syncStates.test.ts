@@ -135,6 +135,15 @@ describe('folder item chips', () => {
     ).toBe('Sending 3 files')
   })
 
+  it('counts from read transfers rather than an older folder counter', () => {
+    const queued = { ...failedTransfer(null), state: 'queued' as const, folder_id: 'f1' }
+    const stale = folder({ counters: { ...folder().counters, uploading: 210 } })
+
+    expect(itemChip({ kind: 'folder', folder: stale, transfers: [queued, queued] }).label).toBe('Sending 2 files')
+    expect(itemChip({ kind: 'folder', folder: stale, transfers: [] }).label).toBe('In sync')
+    expect(itemChip({ kind: 'folder', folder: stale }).label).toBe('Sending 210 files')
+  })
+
   it('says when an otherwise quiet folder has never been checked', () => {
     expect(itemChip({ kind: 'folder', folder: folder({ last_reconcile_ms: null }) })).toEqual({
       label: 'In sync',
@@ -178,6 +187,12 @@ describe('entry wording', () => {
     }
   })
 
+  it('calls files that wait to be sent waiting, not sending', () => {
+    expect(entryMeta('local_new').label).toBe('Waiting')
+    expect(entryMeta('local_changed').label).toBe('Waiting')
+    expect(transferLabel({ ...failedTransfer(null), state: 'running', direction: 'upload' })).toBe('Sending')
+  })
+
   it('never describes an automatic overwrite of local bytes', () => {
     expect(entryMeta('conflict').hint).toContain('Nothing was replaced')
     expect(entryMeta('pending_replace').tone).toBe('decide')
@@ -204,6 +219,12 @@ describe('entry ordering', () => {
     ])
 
     expect(ordered.map((row) => row.path)).toEqual(['d.txt', 'e.txt', 'a.txt', 'b.txt', 'c.txt'])
+  })
+
+  it('puts the file in flight first among the moving ones', () => {
+    const rows = [entry('a.txt', 'local_new'), entry('z.txt', 'local_new'), entry('d.txt', 'conflict')]
+
+    expect(orderEntries(rows, new Set(['z.txt'])).map((row) => row.path)).toEqual(['d.txt', 'z.txt', 'a.txt'])
   })
 
   it('sorts by path inside one group and leaves the input alone', () => {
@@ -285,7 +306,8 @@ describe('transfer wording and progress', () => {
 
   it('counts bytes only for a node that reports them for real', () => {
     expect(transferPercent(moving)).toBe(25)
-    expect(transferPercent({ ...moving, state: 'running' })).toBeNull()
+    expect(transferPercent({ ...moving, state: 'running' })).toBe(25)
+    expect(transferPercent({ ...moving, state: 'retrying' })).toBeNull()
     expect(transferPercent({ ...moving, bytes_done: null })).toBeNull()
     expect(transferPercent({ ...moving, bytes_total: null })).toBeNull()
     expect(transferPercent({ ...moving, bytes_done: 900 })).toBe(100)

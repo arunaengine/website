@@ -1,6 +1,7 @@
-import { ref } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h, ref } from 'vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DeviceSyncStatus, SyncDataset, SyncDocument } from '@/lib/deviceApi'
+import { mountApp } from '@/test/clientRender'
 
 function statusOf(overrides: Partial<DeviceSyncStatus> = {}): DeviceSyncStatus {
   return { realmReachable: true, lastSyncMs: 1_000, pendingTotal: 0, documents: [], datasets: [], ...overrides }
@@ -58,6 +59,11 @@ beforeEach(() => {
   run.mockClear()
 })
 
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.useRealTimers()
+})
+
 describe('sync state', () => {
   it('separates work in flight from what waits for the owner', async () => {
     answer = statusOf({
@@ -97,6 +103,28 @@ describe('sync polling', () => {
     answer = statusOf({ pendingTotal: 2 })
     await sync.load()
     expect(sync.pollMs.value).toBe(3_000)
+  })
+
+  it('runs one poll for all open pages and stops with the last one', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('window', globalThis)
+    vi.resetModules()
+    const { useDeviceSync } = await import('./useDeviceSync')
+    const Page = defineComponent(() => {
+      useDeviceSync()
+      return () => h('div')
+    })
+    const first = await mountApp(Page)
+    const second = await mountApp(Page)
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(read).toHaveBeenCalledTimes(1)
+    first.app.unmount()
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(read).toHaveBeenCalledTimes(2)
+    second.app.unmount()
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(read).toHaveBeenCalledTimes(2)
   })
 
   it('reads once for two callers at the same time', async () => {

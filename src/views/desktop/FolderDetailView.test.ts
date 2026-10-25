@@ -14,6 +14,7 @@ import {
   compileClientComponent,
   content,
   element,
+  flush,
   moduleDefault,
   mountApp,
   nodes,
@@ -132,6 +133,7 @@ const StopDialogStub = defineComponent({
   },
 })
 const HistoryStub = defineComponent({ setup: (_, { expose }) => { expose({ reload: async () => {} }); return () => h('div', 'history') } })
+const SkeletonStub = defineComponent(() => () => h('div', 'loading rows'))
 const SpinnerStub = defineComponent({ props: { label: String }, setup: (props) => () => h('span', props.label) })
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
@@ -153,7 +155,7 @@ const FolderDetailView = compileClientComponent(new URL('./FolderDetailView.vue'
   '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/components/ui/FilterChips.vue': moduleDefault(ChipsStub),
   '@/components/ui/Progress.vue': moduleDefault(ProgressStub),
-  '@/components/ui/Skeleton.vue': moduleDefault(Passthrough),
+  '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
   '@/components/ui/Spinner.vue': moduleDefault(SpinnerStub),
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
   '@/components/desktop/ReplaceLocalDialog.vue': moduleDefault(ReplaceLocalDialogStub),
@@ -318,8 +320,8 @@ describe('folder entries', () => {
 
   it('shows progress on a file the node is moving and no invented percent otherwise', async () => {
     transfers.value = [
-      DeviceApi.readTransfer({ id: 't1', folder_id: 'f1', path: 'notes/kept.md', state: 'transferring', bytes_total: 200, bytes_done: 50 }, 'upload'),
-      DeviceApi.readTransfer({ id: 't2', folder_id: 'f1', path: 'notes/bad.md', state: 'running', bytes_total: 200, bytes_done: 0 }, 'upload'),
+      DeviceApi.readTransfer({ id: 't1', folder_id: 'f1', path: 'notes/kept.md', state: 'running', bytes_total: 200, bytes_done: 50 }, 'upload'),
+      DeviceApi.readTransfer({ id: 't2', folder_id: 'f1', path: 'notes/bad.md', state: 'running', bytes_total: 200 }, 'upload'),
     ]
     const mounted = await mount()
 
@@ -327,6 +329,39 @@ describe('folder entries', () => {
     expect(content(row(mounted.root, 'notes/kept.md'))).toContain('50 B of 200 B sent.')
     const unknown = nodes(row(mounted.root, 'notes/bad.md')).find((node) => node.props['data-progress'])
     expect(unknown?.props['data-progress']).toBe('unknown')
+    mounted.app.unmount()
+  })
+
+  it('reloads the rows quietly when the file in flight changes', async () => {
+    const sending = (path: string) =>
+      DeviceApi.readTransfer({ id: path, folder_id: 'f1', path, state: 'running', bytes_total: 10, bytes_done: 1 }, 'upload')
+    const waiting = [entry({ path: 'notes/a.md', state: 'local_new' }), entry({ path: 'notes/b.md', state: 'local_new' })]
+    entries.mockResolvedValue({ entries: waiting, next_cursor: null })
+    transfers.value = [sending('notes/a.md')]
+    const mounted = await mount()
+    const reads = entries.mock.calls.length
+    let release!: (page: DeviceApi.EntryPage) => void
+    entries.mockImplementationOnce(() => new Promise((resolve) => { release = resolve }))
+
+    transfers.value = [sending('notes/b.md')]
+    await flush()
+    const paths = nodes(mounted.root).filter((node) => node.tag === 'li').map((node) => content(node))
+
+    expect(entries.mock.calls.length).toBe(reads + 1)
+    expect(content(mounted.root)).not.toContain('loading rows')
+    expect(paths[0]).toContain('notes/b.md')
+    release({ entries: [{ ...waiting[0]!, state: 'in_sync' }, waiting[1]!], next_cursor: null })
+    await flush()
+    expect(content(row(mounted.root, 'notes/a.md'))).toContain('Synced')
+    expect(content(row(mounted.root, 'notes/b.md'))).toContain('Sending 10%')
+    mounted.app.unmount()
+  })
+
+  it('shows the skeleton only while there are no rows yet', async () => {
+    entries.mockImplementationOnce(() => new Promise(() => {}))
+    const mounted = await mount()
+
+    expect(content(mounted.root)).toContain('loading rows')
     mounted.app.unmount()
   })
 

@@ -34,6 +34,11 @@ const ORDER: Record<DeviceTransfer['state'], number> = {
 
 export const OTHER_KEY = 'other'
 
+/** Activity order, then paths compared plainly, the way the node sorts them. */
+export function transferOrder(a: DeviceTransfer, b: DeviceTransfer): number {
+  return ORDER[a.state] - ORDER[b.state] || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)
+}
+
 const inProgress = (transfer: DeviceTransfer) => transfer.state !== 'failed' && transfer.state !== 'done'
 
 export function activityCounts(transfers: readonly DeviceTransfer[], decisions: readonly Decision[]): ActivityCounts {
@@ -101,7 +106,7 @@ export function totalProgress(transfers: readonly DeviceTransfer[]): { done: num
   let total = 0
   for (const transfer of open) {
     if (!transfer.bytes_total) return null
-    if (isMoving(transfer) && (transfer.state !== 'transferring' || transfer.bytes_done === null)) return null
+    if (isMoving(transfer) && transfer.bytes_done === null) return null
     done += transfer.bytes_done ?? 0
     total += transfer.bytes_total
   }

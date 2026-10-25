@@ -1,7 +1,7 @@
 import * as VueRuntime from 'vue'
 import { createSSRApp, defineComponent, h, ref, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Nav from '@/components/layout/nav'
 import * as Utils from '@/lib/utils'
 import { button, click, compileClientComponent, content, moduleDefault, mountApp } from '@/test/clientRender'
@@ -24,6 +24,9 @@ const nodeStatus = ref<{
 } | null>(null)
 const nodeState = ref<'stopped' | 'starting' | 'running' | 'error' | 'unknown'>('unknown')
 const nodeLoaded = ref(false)
+let desktopMode = false
+const pageLoader = vi.fn(async () => ({}))
+const resolveRoute = vi.fn((_to: string) => ({ matched: [{ components: { default: pageLoader } }] }))
 
 const RouterLinkStub = defineComponent({
   props: { to: { type: [String, Object], required: true } },
@@ -60,7 +63,11 @@ const Notice = compileClientComponent(new URL('../components/ui/Notice.vue', imp
 
 const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue', import.meta.url), {
   vue: VueRuntime,
-  'vue-router': { RouterView: RouterViewStub, useRoute: () => route, useRouter: () => ({ push: () => {} }) },
+  'vue-router': {
+    RouterView: RouterViewStub,
+    useRoute: () => route,
+    useRouter: () => ({ push: () => {}, resolve: resolveRoute }),
+  },
   '@lucide/vue': icons,
   '@/components/layout/SideNav.vue': moduleDefault(SideNavStub),
   '@/components/dashboard/TopBar.vue': moduleDefault(TopBarStub),
@@ -76,7 +83,7 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
   '@/composables/uploadQueueState': { uploadQueueItems: ref([]) },
   '@/lib/chunk-recovery': { asyncChunkError: vi.fn() },
   '@/components/ui/Notice.vue': moduleDefault(Notice),
-  '@/composables/useAruna': { useAruna: () => permissions },
+  '@/composables/useAruna': { useAruna: () => ({ ...permissions, bootstrapped: ref(true) }) },
   '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
   '@/components/layout/FeatureHidden.vue': moduleDefault(EmptyStub),
   '@/composables/assistantState': {
@@ -98,6 +105,7 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
     }),
   },
   '@/lib/config': { featureEnabled: () => true, portalConfig },
+  '@/lib/desktop': { isDesktop: () => desktopMode },
   '@/lib/desktopBridge': { appQuit },
   '@/lib/desktopBoot': { probeRealm, realmReach },
   '@/lib/utils': Utils,
@@ -164,6 +172,13 @@ beforeEach(() => {
   nodeState.value = 'unknown'
   nodeLoaded.value = false
   appQuit.mockReset().mockResolvedValue(undefined)
+  desktopMode = false
+  pageLoader.mockClear()
+  resolveRoute.mockClear()
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 function destinations(html: string): string[] {
@@ -237,6 +252,27 @@ describe('desktop shell', () => {
 
     expect(desktop).toContain('Quit Aruna Desktop')
     expect(portal).not.toContain('Quit Aruna Desktop')
+  })
+
+  it('loads the main pages once at idle time on desktop and never in the browser', async () => {
+    const idle = vi.fn((run: () => void) => run())
+    vi.stubGlobal('window', { requestIdleCallback: idle })
+    desktopMode = true
+    const desktop = await mountApp(DesktopLayoutClient)
+
+    expect(idle).toHaveBeenCalledOnce()
+    expect(resolveRoute).toHaveBeenCalledWith('/app/device')
+    expect(pageLoader).toHaveBeenCalledTimes(11)
+    desktop.app.unmount()
+
+    desktopMode = false
+    idle.mockClear()
+    pageLoader.mockClear()
+    const browser = await mountApp(DesktopLayoutClient)
+
+    expect(idle).not.toHaveBeenCalled()
+    expect(pageLoader).not.toHaveBeenCalled()
+    browser.app.unmount()
   })
 
   it('asks the shell to quit and stays busy when it accepts', async () => {

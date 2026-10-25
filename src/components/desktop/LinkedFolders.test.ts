@@ -3,6 +3,7 @@ import { computed, defineComponent, h, reactive, ref } from 'vue'
 import * as RouterRuntime from 'vue-router'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import * as ActivityGroups from '@/lib/activityGroups'
 import * as DeviceApi from '@/lib/deviceApi'
 import * as FormatCount from '@/lib/formatCount'
 import * as StateBadge from '@/lib/stateBadge'
@@ -151,6 +152,7 @@ const SyncItemRow = compileClientComponent(new URL('./SyncItemRow.vue', import.m
   '@/components/ui/NodeLabel.vue': moduleDefault(NodeLabelStub),
   '@/components/ui/Progress.vue': moduleDefault(ProgressStub),
   '@/components/ui/Spinner.vue': moduleDefault(ProgressStub),
+  '@/lib/activityGroups': ActivityGroups,
   '@/lib/deviceApi': DeviceApi,
   '@/lib/formatCount': FormatCount,
   '@/lib/stateBadge': StateBadge,
@@ -337,6 +339,22 @@ describe('the linked folders card', () => {
     expect(content(row(mounted.root, 'other'))).not.toContain('raw/scan.tiff')
     const bar = nodes(row(mounted.root, 'data')).find((node) => node.props.role === 'progressbar')
     expect(bar?.props).toMatchObject({ warn: 101, critical: 101 })
+    mounted.app.unmount()
+  })
+
+  it('shows the file in flight among many waiting ones', async () => {
+    const waiting = ['raw/a.txt', 'raw/B.txt', 'raw/c.txt', 'raw/d.txt'].map((path) =>
+      transfer({ id: path, path, state: 'queued', bytes_done: 0 }),
+    )
+    transfers.value = [...waiting, transfer({ id: 'raw/z.txt', path: 'raw/z.txt' })]
+    const mounted = await mount()
+    const shown = content(row(mounted.root, 'data'))
+
+    expect(shown).toContain('raw/z.txt')
+    expect(shown.indexOf('raw/z.txt')).toBeLessThan(shown.indexOf('raw/B.txt'))
+    expect(shown.indexOf('raw/B.txt')).toBeLessThan(shown.indexOf('raw/a.txt'))
+    expect(shown).not.toContain('raw/c.txt')
+    expect(shown).toContain('Sending 5 files')
     mounted.app.unmount()
   })
 

@@ -114,7 +114,7 @@ describe('activity', () => {
     transfers.value = [transfer('a', 'transferring'), transfer('b', 'transferring')]
     expect(await render()).toContain('Total progress')
 
-    transfers.value = [transfer('a', 'running', { bytes_done: 0 })]
+    transfers.value = [transfer('a', 'running', { bytes_done: null })]
     expect(await render()).not.toContain('Total progress')
   })
 

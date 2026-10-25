@@ -20,6 +20,7 @@ import { assistantAvailable, assistantOpen } from '@/composables/assistantState'
 import { bindTourRouter, tourActive } from '@/composables/useTour'
 import { bindTutorialRouter, tutorialActive } from '@/lib/tutorial/session'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
+import { isDesktop } from '@/lib/desktop'
 import { appQuit } from '@/lib/desktopBridge'
 import { probeRealm, realmReach } from '@/lib/desktopBoot'
 import { asyncChunkError } from '@/lib/chunk-recovery'
@@ -93,9 +94,23 @@ const items = computed<NavEntry[]>(() =>
   }),
 )
 
+// The tauri:// protocol caches nothing, so the main pages load once while the app is idle.
+function prefetchPages(): void {
+  for (const item of items.value) {
+    if ('separator' in item) continue
+    for (const record of router.resolve(item.to).matched) {
+      const load = record.components?.default
+      if (typeof load === 'function') void (load as () => Promise<unknown>)().catch(() => undefined)
+    }
+  }
+}
+
 onMounted(() => {
   void probeRealm()
   watchNode()
+  if (!isDesktop()) return
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(prefetchPages, { timeout: 5_000 })
+  else window.setTimeout(prefetchPages, 2_000)
 })
 onUnmounted(unwatchNode)
 

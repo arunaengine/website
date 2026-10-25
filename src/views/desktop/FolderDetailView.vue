@@ -108,7 +108,7 @@ const filterStates = computed<Array<EntryState | ''>>(
 )
 const hasMore = computed(() => filterStates.value.some((state) => cursors.value[state]))
 
-const visible = computed(() => orderEntries(rows.value))
+const visible = computed(() => orderEntries(rows.value, movingByPath.value))
 
 // A file the node is moving right now shows its progress.
 const movingByPath = computed(
@@ -122,6 +122,8 @@ const movingByPath = computed(
 
 // Bumped on every fresh read, so an answer for another folder or filter is dropped.
 let generation = 0
+// True once the owner loaded more pages, which a quiet reload would drop again.
+let extended = false
 
 async function loadPage(reset = true): Promise<void> {
   const folder = folderId.value
@@ -144,6 +146,7 @@ async function loadPage(reset = true): Promise<void> {
     if (mine !== generation || folder !== folderId.value) return
     const found = pages.flatMap((page) => page.entries)
     rows.value = reset ? found : [...rows.value, ...found]
+    extended = !reset
     asked.forEach((state, index) => (cursors.value = { ...cursors.value, [state]: pages[index]?.next_cursor ?? null }))
     listState.value = 'ready'
   } catch (err) {
@@ -184,6 +187,13 @@ onMounted(async () => {
   await loadPage()
 })
 watch(filter, () => void loadPage())
+// A sent file changes its row, so the rows follow the file in flight without a skeleton.
+watch(
+  () => [...movingByPath.value.keys()].join('\n'),
+  () => {
+    if (!extended) void loadPage()
+  },
+)
 // Another folder starts from nothing: no row of the last one stays under its actions.
 watch(folderId, () => {
   rows.value = []
@@ -393,7 +403,7 @@ const filesText = computed(() => {
         <div class="min-w-0 space-y-3">
           <FilterChips v-model="filter" :options="chips" aria-label="Filter files" />
 
-          <div v-if="listState === 'loading'" class="space-y-2">
+          <div v-if="listState === 'loading' && !rows.length" class="space-y-2">
             <Skeleton v-for="n in 4" :key="n" class="h-12" />
           </div>
 

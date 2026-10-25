@@ -32,7 +32,7 @@ import { ArrowRight, Check, FolderPlus, Laptop, ListChecks, Play, Plus } from '@
 const { myGroups, searchBuckets, sessionEpoch } = useAruna()
 const deviceKeys = useDeviceKeys()
 const { shown } = usePortalFeatures()
-const { status, state: nodeState, refresh } = useDeviceStatus()
+const { status, state: nodeState, refresh, deviceClient } = useDeviceStatus()
 const { folders, listState: foldersState, ensureLoaded: ensureFolders, load: loadFolders } = useSyncedFolders()
 const { all: transfers, load: loadTransfers, state: transfersState } = useDeviceTransfers()
 const { compute, state: computeState, load: loadCompute } = useDeviceCompute()
@@ -151,7 +151,9 @@ const runsText = computed(() => {
 
 onMounted(async () => {
   void loadBuckets()
-  await refresh()
+  const reading = refresh()
+  // Only a first visit waits for the node's address; later visits read at once.
+  if (!deviceClient.value) await reading
   // Running counts change all the time, so they are read again on every visit.
   await Promise.all([ensureFolders(), loadTransfers(), loadCompute()])
 })
