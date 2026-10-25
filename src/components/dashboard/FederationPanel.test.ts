@@ -1,9 +1,15 @@
 import { createSSRApp, defineComponent, h, ref, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
-import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const BadgeStub = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
 const RouterLinkStub = defineComponent((_, { slots }) => () => h('a', slots.default?.()))
+const names: Record<string, string> = { 'aaaa-mgmt-1111': 'node-1' }
+const realmNodes = {
+  nodeById: (nodeId: string) => (names[nodeId] ? { nodeId, label: names[nodeId] } : null),
+  displayName: (nodeId: string) => names[nodeId] ?? nodeId,
+}
+let desktop = false
 let FederationPanel: Component
 
 beforeAll(async () => {
@@ -13,6 +19,11 @@ beforeAll(async () => {
   }))
   vi.doMock('@vueuse/core', () => ({ useNow: () => ref(new Date(0)) }))
   vi.doMock('@/components/ui/Badge.vue', () => ({ default: BadgeStub }))
+  vi.doMock('@/composables/useRealmNodes', () => ({ useRealmNodes: () => realmNodes }))
+  vi.doMock('@/lib/desktop', async () => ({
+    ...(await vi.importActual<typeof import('@/lib/desktop')>('@/lib/desktop')),
+    isDesktop: () => desktop,
+  }))
   FederationPanel = (await import('./FederationPanel.vue')).default
 })
 
@@ -74,10 +85,36 @@ describe('replication policy rendering', () => {
 })
 
 describe('topology', () => {
-  it('draws a connected edge from the hub to every other node', async () => {
-    const nodes = [realmNode('aaaa-mgmt-1111', 'management'), realmNode('bbbb-server-2222', 'server'), realmNode('cccc-server-3333', 'server')]
-    const app = createSSRApp({ render: () => h(FederationPanel, { nodes, localPeerId: 'aaaa-mgmt-1111' }) })
+  const nodes = [realmNode('aaaa-mgmt-1111', 'management'), realmNode('bbbb-server-2222', 'server'), realmNode('cccc-server-3333', 'server')]
+  const render = () => renderToString(createSSRApp({ render: () => h(FederationPanel, { nodes, localPeerId: 'aaaa-mgmt-1111' }) }))
 
-    expect((await renderToString(app)).match(/class="fed-flow"/g)).toHaveLength(2)
+  beforeEach(() => {
+    desktop = false
+  })
+
+  it('draws a connected edge from the hub to every other node', async () => {
+    expect((await render()).match(/class="fed-flow"/g)).toHaveLength(2)
+  })
+
+  it('names the realm node at the center in the desktop', async () => {
+    desktop = true
+
+    const html = await render()
+
+    expect(html).toContain('· node-1</title>')
+    expect(html).toMatch(/>\s*node-1\s*<\/text>/)
+    expect(html).toContain('Connections as seen by node-1.')
+    expect(html).not.toMatch(/>\s*this node\s*</)
+    expect(html).not.toContain('· this node')
+    expect(html).not.toContain('Edges show connections')
+  })
+
+  it('keeps this node and the portal footnote in the browser', async () => {
+    const html = await render()
+
+    expect(html).toContain('· this node</title>')
+    expect(html).toMatch(/>\s*this node\s*<\/text>/)
+    expect(html).toContain('Edges show connections as seen by the node serving this portal, not full mesh topology.')
+    expect(html).not.toContain('Connections as seen by')
   })
 })

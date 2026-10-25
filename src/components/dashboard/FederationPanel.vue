@@ -8,6 +8,8 @@ import LabelChip from '@/components/ui/LabelChip.vue'
 import NodesHealth from '@/components/dashboard/NodesHealth.vue'
 import type { RealmNodeInfo } from '@/lib/api'
 import { connectionLabel, connectionVariant, kindLabel, kindVariant } from '@/components/nodes/node-display'
+import { useRealmNodes } from '@/composables/useRealmNodes'
+import { isDesktop } from '@/lib/desktop'
 import { relativeTime, truncateMiddle } from '@/lib/utils'
 import { Laptop } from '@lucide/vue'
 
@@ -74,6 +76,11 @@ const LABEL_CAP = 10
 const hub = computed<RealmNodeInfo | undefined>(() => {
   return props.localPeerId ? props.nodes.find((node) => node.node_id === props.localPeerId) : undefined
 })
+
+// On the desktop the hub is a realm node, not the device serving this portal, so it goes by name.
+const { displayName } = useRealmNodes()
+const desktop = isDesktop()
+const hubName = computed(() => (desktop && hub.value ? displayName(hub.value.node_id) : null))
 
 const spokes = computed(() =>
   props.nodes
@@ -341,7 +348,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
               @click="openNode(hub.node_id)"
               @keydown.enter="openNode(hub.node_id)"
             >
-              <title>{{ nodeTitle(hub) }} · this node</title>
+              <title>{{ nodeTitle(hub) }} · {{ hubName ?? 'this node' }}</title>
               <circle :cx="CX" :cy="CY" :r="RING + 10" fill="url(#fed-glow-hub)" />
               <circle :cx="CX" :cy="CY" :r="RING + 2" fill="hsl(var(--card))" stroke="#55C4DE" stroke-width="1.5" />
               <path
@@ -365,12 +372,13 @@ function loadArc(cx: number, cy: number, permille: number): string {
                 {{ truncateMiddle(hub.node_id, 6, 4) }}
               </text>
               <text :x="CX" :y="CY + RING + 27" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="hsl(var(--muted-foreground))">
-                this node
+                {{ hubName ?? 'this node' }}
               </text>
             </g>
           </svg>
           <p v-if="edges.length" class="border-t border-border/60 px-5 py-2 text-[11px] text-muted-foreground">
-            Edges show connections as seen by the node serving this portal, not full mesh topology.
+            <template v-if="hubName">Connections as seen by {{ hubName }}.</template>
+            <template v-else>Edges show connections as seen by the node serving this portal, not full mesh topology.</template>
           </p>
         </div>
 
@@ -390,7 +398,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
         </div>
 
         <!-- Node health grid: only data the realm actually reports -->
-        <NodesHealth :nodes="nodes" :local-peer-id="localPeerId" @select="openNode" />
+        <NodesHealth :nodes="nodes" :local-peer-id="desktop ? undefined : localPeerId" @select="openNode" />
       </template>
 
       <div v-if="devices?.length" class="flex items-center gap-3 border-t border-border px-5 py-3 text-sm">
