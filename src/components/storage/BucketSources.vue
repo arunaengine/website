@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// How files got into this bucket. Only incoming paths are listed: external sources that are read
-// without copying, buckets that a sync copies from, and storage folders registered in place.
-// Files that no list covers are not claimed to come from anywhere.
+// How files got into this bucket, from the node's bounded list of incoming paths: buckets that a
+// sync copies from and storage folders registered in place. Files from an external source or a
+// database name it in their own origin, so this list never claims to cover every file.
 import { computed, ref, watch } from 'vue'
 import RowList from '@/components/distributed/RowList.vue'
 import StorageFeatureLink from '@/components/distributed/StorageFeatureLink.vue'
@@ -9,7 +9,6 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useBucketSources } from '@/composables/useBucketSources'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { useStagingReferences } from '@/composables/useStagingReferences'
 import { sourceRows } from '@/lib/bucketSources'
 import { truncateMiddle } from '@/lib/utils'
 import { Waypoints } from '@lucide/vue'
@@ -20,7 +19,6 @@ const { listGroupBackends } = useAruna()
 const bucket = computed(() => props.bucket)
 const nodeId = computed(() => props.nodeId)
 const { displayName } = useRealmNodes()
-const references = useStagingReferences(bucket, computed(() => !props.nodeId))
 const listed = useBucketSources(bucket, nodeId)
 
 // Names of the storage backends of the group, for the folders registered in place.
@@ -39,12 +37,15 @@ watch(
   { immediate: true },
 )
 
-const rows = computed(() =>
-  sourceRows(references.stats.value.groups, listed.sources.value, displayName, (id) => backends.value[id] ?? truncateMiddle(id, 8, 4)),
-)
-const loading = computed(() => references.loading.value || listed.state.value === 'loading')
-// A failed read says so; it never reads as "no sources".
-const unknown = computed(() => Boolean(props.nodeId) || references.status.value === 'error' || listed.state.value === 'failed')
+const rows = computed(() => sourceRows(listed.sources.value, displayName, (id) => backends.value[id] ?? truncateMiddle(id, 8, 4)))
+const loading = computed(() => listed.state.value === 'loading')
+// A failed read or a node without the list says so; it never reads as "no sources".
+const unknown = computed(() => {
+  if (props.nodeId) return 'This bucket is on another node, so its sources are not listed here.'
+  if (listed.state.value === 'missing') return 'This node does not list the sources of a bucket.'
+  if (listed.state.value === 'failed') return `The sources could not be read: ${listed.error.value}`
+  return null
+})
 </script>
 
 <template>
@@ -64,11 +65,12 @@ const unknown = computed(() => Boolean(props.nodeId) || references.status.value 
           <StorageFeatureLink icon :question="row.question" class="ml-1" />
         </template>
       </RowList>
-      <p v-else-if="!unknown" class="text-xs text-muted-foreground">No external source, sync or storage folder feeds this bucket.</p>
-      <p v-if="!listed.complete.value" class="text-xs text-muted-foreground">More sources exist than are listed.</p>
-      <p v-if="unknown" class="text-xs text-muted-foreground">
-        {{ nodeId ? 'This bucket is hosted on another node, so its sources are not listed here.' : 'The sources could not be read from this node.' }}
-      </p>
+      <p v-else-if="!unknown && listed.complete.value" class="text-xs text-muted-foreground">No sync or storage folder feeds this bucket.</p>
+      <p v-if="unknown" class="text-xs text-muted-foreground">{{ unknown }}</p>
+      <template v-else-if="!loading">
+        <p v-if="!listed.complete.value" class="text-xs text-muted-foreground">More sources exist than are listed.</p>
+        <p class="text-xs text-muted-foreground">Files from an external source or a database show it in their origin.</p>
+      </template>
     </div>
   </section>
 </template>
