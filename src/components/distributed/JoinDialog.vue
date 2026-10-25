@@ -13,8 +13,8 @@ import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSetChanges } from '@/composables/useSetChanges'
-import { COVERAGES, MOCK_NODES, SHARD_HOST_LABEL, STRATEGIES, type Coverage, type DataStrategy } from '@/lib/distributedMock'
-import type { DistributedBucket } from '@/lib/distribution'
+import { COVERAGES, MOCK_NODES, RANGE_MODES, SHARD_HOST_LABEL, STRATEGIES, type Coverage, type DataStrategy } from '@/lib/distributedMock'
+import { BEHAVIOURS, type DistributedBucket } from '@/lib/distribution'
 
 const props = defineProps<{ open: boolean; bucket: DistributedBucket }>()
 const emit = defineEmits<{
@@ -29,6 +29,8 @@ const strategy = ref<DataStrategy>('copy')
 const coverage = ref<Coverage>('all')
 const nodeId = ref('')
 const ranges = ref<string[]>([])
+// `bucket` keeps the bucket's setting; only a chosen mode is sent.
+const behaviour = ref<'bucket' | keyof typeof BEHAVIOURS>('bucket')
 const changes = useSetChanges(computed(() => props.bucket.live))
 const { nodes } = useRealmNodes()
 
@@ -36,6 +38,7 @@ watch(() => props.open, (open) => {
   if (open) {
     nodeId.value = ''
     ranges.value = []
+    behaviour.value = 'bucket'
   }
 })
 // Members that keep only their own ranges need to be told which ones.
@@ -55,6 +58,8 @@ const others = computed(() =>
         note: node.shardHost ? '' : `${SHARD_HOST_LABEL} is not set`,
       })),
 )
+const behaviours = [{ value: 'bucket', label: 'Use the bucket setting' }, ...RANGE_MODES.map(({ value, label }) => ({ value, label }))]
+const behaviourHint = computed(() => RANGE_MODES.find((mode) => mode.value === behaviour.value)?.hint)
 const strategies = STRATEGIES.map(({ value, label }) => ({ value, label }))
 const coverages = COVERAGES.map(({ value, label }) => ({ value, label }))
 const ready = computed(() => Boolean(nodeId.value) && (coverage.value === 'all' || !props.bucket.live || ranges.value.length > 0))
@@ -70,6 +75,7 @@ async function join() {
     coverage: coverage.value,
     strategy: STRATEGY_NAMES[strategy.value],
     ...(coverage.value === 'assigned' ? { ranges: ranges.value } : {}),
+    ...(behaviour.value === 'bucket' ? {} : { range_behaviour: BEHAVIOURS[behaviour.value] }),
   })
   if (!done) return
   emit('changed')
@@ -114,6 +120,13 @@ async function join() {
           </label>
         </div>
       </fieldset>
+      <details v-if="bucket.live" class="rounded-md border border-border px-4 py-3">
+        <summary class="cursor-pointer text-sm font-medium text-foreground">Advanced options</summary>
+        <div class="mt-3 space-y-1">
+          <Select v-model="behaviour" :options="behaviours" aria-label="Range request behaviour of this node" label="Range requests" />
+          <p v-if="behaviourHint" class="text-xs text-muted-foreground">{{ behaviourHint }}</p>
+        </div>
+      </details>
       <Notice v-if="changes.failure.value" tone="error">{{ changes.failure.value }}</Notice>
       <DialogFooter>
         <Button variant="outline" @click="emit('update:open', false)">Cancel</Button>
