@@ -16,10 +16,12 @@ import {
   type GroupDeletionBlockers,
   setGroupLocation as putGroupLocation,
   getGroupDeletionBlockers as fetchDeletionBlockers,
+  apiRequest,
 } from '@/lib/api'
+import { isDesktop } from '@/lib/desktop'
 import { roleSummary, slugify } from './format'
 import { loadAuthenticated } from './identity'
-import { realm } from './realm'
+import { realm, realmNodeBase } from './realm'
 import { apiGroups, assertCurrentSession, refreshContext, request, saving, userInfo } from './state'
 
 // Throws ApiError with status 409 and the server's verbatim message when the
@@ -73,7 +75,14 @@ export async function setGroupLocation(
 }
 
 export async function getGroupUsage(groupId: string): Promise<UsageResponse> {
-  return request<UsageResponse>(`/access/groups/${groupId}/usage`)
+  const path = `/access/groups/${groupId}/usage`
+  // A device syncs no usage from realm nodes, so its realm total holds only its own folders.
+  const context = refreshContext()
+  const baseUrl = isDesktop() ? await realmNodeBase(context) : null
+  if (!baseUrl) return request<UsageResponse>(path)
+  const usage = await apiRequest<UsageResponse>(path, {}, { ...context.client, baseUrl })
+  assertCurrentSession(context.epoch)
+  return usage
 }
 
 // STUB against the assumed #250 history endpoint (see api.ts). On today's

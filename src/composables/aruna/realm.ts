@@ -119,6 +119,13 @@ export function loadRealmView(context = refreshContext()): Promise<RealmView | n
   return view
 }
 
+/** API base of a realm node of this session and realm, or null when none answers. */
+export async function realmNodeBase(context = refreshContext()): Promise<string | null> {
+  const key = `${context.epoch}:${realmInfo.value?.realm_id}`
+  if (lastAnswered?.key !== key) await loadRealmView(context)
+  return lastAnswered?.key === key ? lastAnswered.base : null
+}
+
 export async function setRealmQuota(config: RealmQuotaConfig): Promise<RealmQuotaConfig> {
   saving.value = true
   try {
