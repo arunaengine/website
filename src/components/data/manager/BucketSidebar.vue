@@ -142,12 +142,18 @@ function listPlace(nodeId: string | null): { place: string | null; placeTitle: s
 }
 // Arrow keys move through the shown rows of this group, then of other groups.
 const listId = `bucket-results-${useId()}`
+const databaseRows = ref<{ openers: (() => void)[] } | null>(null)
 const groupOpeners = computed<(() => void)[]>(() => {
+  if (databaseMode.value) return databaseRows.value?.openers ?? []
   if (searchList.value) return all.error.value ? [] : all.hits.value.map((hit) => () => openHit(hit))
   if (bucketsLoading.value || (bucketsError.value && (bucketsAuthError.value || !bucketsLoaded.value))) return []
   return nodeBuckets.value.map((entry) => () => openBucketOn(entry.bucket, entry.nodeId))
 })
-const openers = computed(() => [...groupOpeners.value, ...otherHits.value.map((hit) => () => openSearchHit(hit))])
+// The database view lists no other groups, so its keys reach only its own rows.
+const openers = computed(() => [
+  ...groupOpeners.value,
+  ...(databaseMode.value ? [] : otherHits.value.map((hit) => () => openSearchHit(hit))),
+])
 const activeIndex = ref(-1)
 watch(openers, () => (activeIndex.value = -1))
 
@@ -225,8 +231,8 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           @keydown="onKeydown"
         />
       </div>
-      <ul v-if="databaseMode" class="max-h-[420px] overflow-y-auto py-1">
-        <DatabaseRows :filter="bucketNameFilter" :active="bucket" @open="openBucketOn" />
+      <ul v-if="databaseMode" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
+        <DatabaseRows ref="databaseRows" :filter="bucketNameFilter" :active="bucket" :highlighted="activeIndex" @open="openBucketOn" />
         <MockBucketRows database-only :filter="bucketNameFilter" :active="bucket" @open="openBucket" />
       </ul>
       <template v-else-if="searchList">

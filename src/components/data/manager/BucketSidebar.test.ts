@@ -172,6 +172,20 @@ const RealSearchSidebar = compileClientComponent(new URL('./BucketSidebar.vue', 
   '@/composables/useBucketSearch': RealSearch,
 })
 
+// The database view: the toggle can be switched and the database rows offer their own openers.
+const openDatabase = vi.fn()
+const DatabaseSidebar = compileClientComponent(new URL('./BucketSidebar.vue', import.meta.url), {
+  ...sidebarModules,
+  '@/components/ui/OptionToggle.vue': moduleDefault(defineComponent({ inheritAttrs: false, setup: (_, { attrs }) => () => h('div', { ...attrs, role: 'radiogroup' }) })),
+  '@/components/data/manager/DatabaseRows.vue': moduleDefault(defineComponent({
+    props: { highlighted: Number },
+    setup: (props, { expose }) => {
+      expose({ openers: [() => openDatabase('spire')] })
+      return () => h('li', { 'aria-selected': props.highlighted === 0 }, 'spire database')
+    },
+  })),
+})
+
 /** The slice of the data manager the sidebar reads, with the real name rule. */
 function manager() {
   const newBucketName = ref('')
@@ -763,6 +777,21 @@ describe('Bucket sidebar search keys', () => {
     await typeValue(field, 'r')
     expect(content(root)).not.toContain('reef-shared')
     nodeChoice.value = null
+  })
+
+  it('moves through the database rows, not the buckets, in the database view', async () => {
+    openDatabase.mockReset()
+    const state = withBucket()
+    const { root } = await mountApp(DatabaseSidebar, { props: { manager: state } })
+    ;(element(root, (node) => node.props.role === 'radiogroup').props['onUpdate:modelValue'] as (value: string) => void)('database')
+    await flush()
+    const field = element(root, (node) => node.props['aria-label'] === 'Find a bucket')
+
+    await key(field, 'ArrowDown')
+    expect(selected(root)).toEqual(['spire database'])
+    await key(field, 'Enter')
+    expect(openDatabase).toHaveBeenCalledWith('spire')
+    expect(state.openBucketOn).not.toHaveBeenCalled()
   })
 
   it('starts ArrowUp at the last row and drops the highlight when the list changes', async () => {

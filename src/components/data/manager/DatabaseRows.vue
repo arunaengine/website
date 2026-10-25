@@ -8,7 +8,7 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { NOT_HELD_HERE, STATE_NOTES, type DatabaseRow } from '@/lib/databases'
 import { errorMessage } from '@/lib/utils'
 
-const props = defineProps<{ filter: string; active: string }>()
+const props = defineProps<{ filter: string; active: string; highlighted?: number }>()
 const emit = defineEmits<{ (e: 'open', bucket: string, nodeId: string | null, groupId: string): void }>()
 
 const databases = useDatabases()
@@ -35,6 +35,9 @@ async function open(row: DatabaseRow) {
     if (run === opening) problem.value = errorMessage(cause)
   }
 }
+
+// The sidebar's arrow keys move through these rows.
+defineExpose({ openers: computed(() => rows.value.map((row) => () => void open(row))) })
 </script>
 
 <template>
@@ -45,10 +48,11 @@ async function open(row: DatabaseRow) {
     {{ databases.error.value }}
   </li>
   <template v-else>
-    <li v-for="row in rows" :key="row.entryId">
+    <li v-for="(row, index) in rows" :key="row.entryId">
       <BucketRow
         :bucket="row.bucket"
         option
+        :highlighted="index === highlighted"
         :pinnable="false"
         :active="row.bucket === active"
         :subtitle="STATE_NOTES[row.state] || row.title"
