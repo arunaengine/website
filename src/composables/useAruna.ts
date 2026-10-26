@@ -67,7 +67,7 @@ import {
   loadAuthenticated,
 } from './aruna/identity'
 import { mapMetadataDoc, metadata, profiles } from './aruna/mapping'
-import { isManagementNode, loadInfo, loadRealmView, nodes, realm, setRealmQuota } from './aruna/realm'
+import { getNodeInfo, isManagementNode, loadInfo, loadRealmView, nodes, realm, setRealmQuota } from './aruna/realm'
 import {
   searchBuckets,
   searchMetadata,
@@ -228,6 +228,7 @@ export function useAruna() {
     refresh,
     loadAuthenticated,
     loadInfo,
+    getNodeInfo,
     loadRealmView,
     loadMetadata,
     refreshProfiles,

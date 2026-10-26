@@ -23,14 +23,18 @@ import {
   type StorageRoutingRule,
 } from '@/lib/api'
 
-const props = defineProps<{ open: boolean; bucket: string; groupId: string | null }>()
+// `nodeId`: the node whose copy the rules steer; null for this node. Each node has its own rules.
+const props = defineProps<{ open: boolean; bucket: string; groupId: string | null; nodeId?: string | null }>()
 
-const { getBucketRouting, putBucketRouting, listGroupBackends, nodeInfo, saving } = useAruna()
+const { getBucketRouting, putBucketRouting, listGroupBackends, getNodeInfo, nodeInfo, saving } = useAruna()
 const { writesDisabled } = useConnectivity()
 
 const rules = ref<StorageRoutingRule[]>([])
 const backends = ref<GroupBackendResponse[]>([])
 const backendsKnown = ref(false)
+// The storage classes the rule's node offers; null while another node has not answered.
+const remoteClasses = ref<string[] | null>(null)
+const classes = computed(() => (props.nodeId ? (remoteClasses.value ?? []) : tenantClasses(nodeInfo.value?.services.blob?.backends)))
 const warnings = ref<string[]>([])
 const loading = ref(false)
 const loadError = ref<string | null>(null)
@@ -51,7 +55,7 @@ const noTarget = computed(
   () =>
     backendsKnown.value
     && !backends.value.some((backend) => !backend.disabled)
-    && tenantClasses(nodeInfo.value?.services.blob?.backends).length === 0,
+    && classes.value.length === 0,
 )
 
 let loadSeq = 0
@@ -61,12 +65,16 @@ async function load() {
   loadError.value = null
   saveError.value = null
   hidden.value = false
+  remoteClasses.value = null
+  const node = props.nodeId ?? null
   try {
-    const [routing, listed] = await Promise.all([
-      getBucketRouting(props.bucket),
-      props.groupId ? listGroupBackends(props.groupId).catch(() => null) : Promise.resolve(null),
+    const [routing, listed, info] = await Promise.all([
+      getBucketRouting(props.bucket, node),
+      props.groupId ? listGroupBackends(props.groupId, node).catch(() => null) : Promise.resolve(null),
+      node ? getNodeInfo(node).catch(() => null) : Promise.resolve(null),
     ])
     if (seq !== loadSeq) return
+    remoteClasses.value = info ? tenantClasses(info.services.blob?.backends) : null
     rules.value = routing.rules
     warnings.value = routing.warnings
     backends.value = listed?.backends ?? []
@@ -81,7 +89,7 @@ async function load() {
 }
 
 watch(
-  () => [props.open, props.bucket],
+  () => [props.open, props.bucket, props.nodeId],
   () => {
     if (props.open) void load()
   },
@@ -112,7 +120,7 @@ function patchRule(index: number, patch: Partial<StorageRoutingRule>) {
 async function save() {
   saveError.value = null
   try {
-    const stored = await putBucketRouting(props.bucket, rules.value)
+    const stored = await putBucketRouting(props.bucket, rules.value, props.nodeId ?? null)
     rules.value = stored.rules
     warnings.value = stored.warnings
   } catch (err) {
@@ -156,6 +164,7 @@ async function save() {
             <RoutingTargetPicker
               :model-value="rule.target.backend_id || rule.target.class ? rule.target : null"
               :backends="backends"
+              :classes="classes"
               :aria-label="`Target of rule ${index + 1}`"
               @update:model-value="(v: RoutingTarget | null) => setTarget(index, v)"
             />

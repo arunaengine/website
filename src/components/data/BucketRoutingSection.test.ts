@@ -25,12 +25,14 @@ const Titled = defineComponent({
   setup: (props, { slots }) => () => h('div', [props.title ?? props.message ?? '', slots.default?.()]),
 })
 const PickerStub = defineComponent({
-  props: { modelValue: Object, backends: Array, ariaLabel: String },
-  setup: (props) => () => h('select', { 'aria-label': props.ariaLabel }),
+  props: { modelValue: Object, backends: Array, classes: Array, ariaLabel: String },
+  setup: (props) => () => h('select', { 'aria-label': props.ariaLabel, classes: props.classes }),
 })
 
 const getBucketRouting = vi.fn()
+const putBucketRouting = vi.fn()
 const listGroupBackends = vi.fn()
+const getNodeInfo = vi.fn()
 const nodeInfo = ref<InfoResponse | null>(null)
 
 const section = compileClientComponent(new URL('./BucketRoutingSection.vue', import.meta.url), {
@@ -50,8 +52,9 @@ const section = compileClientComponent(new URL('./BucketRoutingSection.vue', imp
   '@/composables/useAruna': {
     useAruna: () => ({
       getBucketRouting,
-      putBucketRouting: vi.fn(),
+      putBucketRouting,
       listGroupBackends,
+      getNodeInfo,
       nodeInfo,
       saving: ref(false),
     }),
@@ -82,11 +85,11 @@ function withClasses(classes: string[]): InfoResponse {
   return { services: { blob: { backends } } } as unknown as InfoResponse
 }
 
-async function render(options: { rules?: StorageRoutingRule[]; backends?: GroupBackendResponse[]; classes?: string[] } = {}) {
+async function render(options: { rules?: StorageRoutingRule[]; backends?: GroupBackendResponse[]; classes?: string[]; nodeId?: string } = {}) {
   getBucketRouting.mockResolvedValue({ bucket: 'reef-survey', rules: options.rules ?? [], warnings: [] })
   listGroupBackends.mockResolvedValue({ backends: options.backends ?? [] })
   nodeInfo.value = withClasses(options.classes ?? [])
-  const { root } = await mountApp(section, { props: { open: true, bucket: 'reef-survey', groupId: 'g-1' } })
+  const { root } = await mountApp(section, { props: { open: true, bucket: 'reef-survey', groupId: 'g-1', nodeId: options.nodeId ?? null } })
   await flush()
   return root
 }
@@ -129,5 +132,20 @@ describe('bucket routing rules', () => {
   it('ignores a disabled backend but counts a tenant storage class', async () => {
     expect(button(await render({ backends: [backend('b-1', true)] }), 'Add rule').props.disabled).toBe(true)
     expect(button(await render({ classes: ['cold'] }), 'Add rule').props.disabled).toBe(false)
+  })
+
+  it('reads and saves the rules of a bucket on another node there, with that node\'s storage classes', async () => {
+    getNodeInfo.mockReset().mockResolvedValue(withClasses(['archive']))
+    putBucketRouting.mockReset().mockResolvedValue({ bucket: 'reef-survey', rules: [], warnings: [] })
+    const root = await render({ classes: ['fast'], nodeId: 'node-far', rules: [{ key_prefix: 'raw/', exact: false, target: { class: 'archive' } }] })
+
+    expect(getBucketRouting).toHaveBeenLastCalledWith('reef-survey', 'node-far')
+    expect(listGroupBackends).toHaveBeenLastCalledWith('g-1', 'node-far')
+    expect(getNodeInfo).toHaveBeenCalledWith('node-far')
+    expect(element(root, (node) => node.props['aria-label'] === 'Target of rule 1').props.classes).toEqual(['archive'])
+
+    await click(element(root, (node) => node.props['aria-label'] === 'Remove rule 1'))
+    await click(button(root, 'Save rules'))
+    expect(putBucketRouting).toHaveBeenCalledWith('reef-survey', [], 'node-far')
   })
 })

@@ -178,12 +178,14 @@ export async function retryDistributedAdmission(groupId: string, setId: string):
 export async function putBucketRouting(
   bucket: string,
   rules: StorageRoutingRule[],
+  nodeId?: string | null,
 ): Promise<BucketRoutingResponse> {
   saving.value = true
   try {
     return await request<BucketRoutingResponse>(
       `/data/buckets/${encodeURIComponent(bucket)}/storage/routing`,
       { method: 'PUT', body: JSON.stringify({ rules }) },
+      nodeId,
     )
   } finally {
     saving.value = false

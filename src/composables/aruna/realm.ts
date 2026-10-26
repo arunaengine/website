@@ -160,6 +160,11 @@ export async function realmNodeBase(context = refreshContext()): Promise<string 
   return lastAnswered?.key === key ? lastAnswered.base : null
 }
 
+/** What another node reports about itself, such as its storage classes. */
+export function getNodeInfo(nodeId: string): Promise<InfoResponse> {
+  return request<InfoResponse>('/system/info', {}, nodeId)
+}
+
 export async function setRealmQuota(config: RealmQuotaConfig): Promise<RealmQuotaConfig> {
   saving.value = true
   try {

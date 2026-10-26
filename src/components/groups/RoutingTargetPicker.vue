@@ -11,6 +11,8 @@ const props = withDefaults(
     backends: GroupBackendResponse[]
     /** Offer the empty target, i.e. leave the choice to this node. */
     allowDefault?: boolean
+    /** Storage classes of the node the rule is for; the connected node's when absent. */
+    classes?: string[]
     ariaLabel?: string
   }>(),
   { allowDefault: false, ariaLabel: 'Storage backend' },
@@ -38,7 +40,7 @@ const options = computed(() => {
     if (backend.disabled && current.value !== value) continue
     list.push({ value, label: backend.disabled ? `${backend.name} (disabled)` : backend.name })
   }
-  for (const name of tenantClasses(nodeInfo?.value?.services.blob?.backends)) {
+  for (const name of props.classes ?? tenantClasses(nodeInfo?.value?.services.blob?.backends)) {
     list.push({ value: `class:${name}`, label: `Class ${name}` })
   }
   // A stored target naming a backend this group no longer lists must stay
