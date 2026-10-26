@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { nodeApiBase } from '@/components/nodes/node-probe'
 import {
   ApiError,
   apiOrigin,
@@ -127,18 +128,11 @@ function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
 
-/** The REST base of a realm node; the connected node uses this session's, null when it names none. */
-export function nodeApiBase(nodeId: string): string | null {
-  if (nodeId === nodeInfo.value?.node.peer_id) return apiBaseUrl.value
-  const node = (realmInfo.value?.nodes ?? []).find((entry) => entry.node_id === nodeId)
-  const url = (node?.info?.urls?.api ?? node?.rest_url ?? '').replace(/\/+$/, '')
-  if (!url) return null
-  return url.endsWith('/api/v1') ? url : `${url}/api/v1`
-}
-
 /** This session's client for one node, which checks the token itself; no node is the connected one. */
 export function nodeClient(nodeId?: string | null) {
-  const baseUrl = nodeId ? nodeApiBase(nodeId) : apiBaseUrl.value
+  const local = !nodeId || nodeId === nodeInfo.value?.node.peer_id
+  const node = local ? null : (realmInfo.value?.nodes ?? []).find((entry) => entry.node_id === nodeId)
+  const baseUrl = local ? apiBaseUrl.value : node ? nodeApiBase(node) : null
   if (!baseUrl) throw new Error('The node publishes no API address.')
   return { baseUrl, token: authToken.value }
 }
