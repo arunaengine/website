@@ -122,6 +122,15 @@ export function mergeSets(hits: readonly BucketSearchHit[], isLocal: (nodeId: st
   return rows
 }
 
+/**
+ * A bucket count with each distributed bucket once. `total` counts a member bucket on every node
+ * that holds one; `copies` and `buckets` are the listed hits and rows. Exact only when all were listed.
+ */
+export function distinctCount(total: number, copies: number, buckets: number, listedAll: boolean): { count: number; exact: boolean } {
+  if (listedAll && copies >= total) return { count: buckets, exact: true }
+  return { count: Math.max(buckets, total - (copies - buckets)), exact: false }
+}
+
 // An ordinary bucket lives on one node. Only a bucket on more nodes has the Nodes tab.
 export function isMulti(bucket: DistributedBucket): boolean {
   return bucket.members.length > 1

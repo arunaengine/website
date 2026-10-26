@@ -28,12 +28,14 @@ import { useRefresh } from '@/composables/useRefresh'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { featureEnabled } from '@/lib/config'
 import { errorMessage, formatBytes, formatNumber, shortUserId } from '@/lib/utils'
+import { countText, useRealmBucketCount } from '@/composables/useBucketCount'
 import { apiErrorMessage, type RealmQuotaConfig, type UserSearchHit } from '@/lib/api'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { Database, HardDrive, Layers, Link2, Boxes, Save, Plus, Trash2, ShieldCheck, Users, UserCog } from '@lucide/vue'
 
 const { realmInfo, usageInfo, isRealmAdmin, canInspectUsers, canManageOnboarding, canManageQuarantine, setRealmQuota, saving, myGroups, discoverableGroups, searchUsers, refresh } = useAruna()
+const realmBuckets = useRealmBucketCount(computed(() => usageInfo.value?.realm?.buckets))
 const { isAuthenticated, authPending } = useAuth()
 // Shared realm directory: resolves saved user-cap ids to display names so rows
 // show a handle instead of the raw {ulid}@{realm} identity.
@@ -427,7 +429,12 @@ async function save() {
             <StatCard label="Stored data" :value="formatBytes(usageInfo.realm.stored_bytes ?? 0)" :icon="HardDrive" hint="Physical blob storage" />
             <StatCard label="Logical data" :value="formatBytes(usageInfo.realm.logical_bytes)" :icon="Layers" hint="Counts against quotas" />
             <StatCard label="Referenced data" :value="formatBytes(usageInfo.realm.referenced_bytes)" :icon="Link2" hint="Does not count against quotas" />
-            <StatCard label="Buckets" :value="formatNumber(usageInfo.realm.buckets)" :icon="Boxes" />
+            <StatCard
+              label="Buckets"
+              :value="realmBuckets ? countText(realmBuckets, formatNumber) : formatNumber(usageInfo.realm.buckets)"
+              :icon="Boxes"
+              hint="A bucket stored on several nodes counts once"
+            />
           </div>
           <p v-else class="px-5 py-4 text-sm text-muted-foreground">Realm-wide totals need an authenticated session on a quota-aware backend.</p>
         </section>

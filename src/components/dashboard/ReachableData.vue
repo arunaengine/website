@@ -13,9 +13,10 @@ const props = defineProps<{ refreshRevision: number }>()
 const { myGroups } = useAruna()
 const reach = useReachableUsage()
 
+// A dashboard refresh reads every bucket again; other parts reuse what was read.
 watch(
-  () => [myGroups.value.map((group) => group.id).join(','), props.refreshRevision],
-  () => void reach.load(),
+  () => [myGroups.value.map((group) => group.id).join(','), props.refreshRevision] as const,
+  (next, previous) => void reach.load(Boolean(previous && next[1] !== previous[1])),
   { immediate: true },
 )
 

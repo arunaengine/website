@@ -32,6 +32,7 @@ import { isDesktop } from '@/lib/desktop'
 import { POLL_SLOW_MS, follow, onWake } from '@/lib/poll'
 import { formatCount } from '@/lib/formatCount'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
+import { countText, useRealmBucketCount } from '@/composables/useBucketCount'
 
 // The desktop adds its own cards; the web build never loads them.
 const HomeCards = defineAsyncComponent({
@@ -180,6 +181,7 @@ const publicOverview = computed(() => realmInfo.value?.public_overview)
 // Realm-wide totals the same /system/usage response carries; the top-level
 // counters next to them belong to this node and live on the Status page.
 const realmTotals = computed(() => usageInfo.value?.realm ?? null)
+const realmBuckets = useRealmBucketCount(computed(() => realmTotals.value?.buckets))
 
 function publicCount(value: number | null | undefined): string {
   return value == null ? 'Unknown' : formatCount(value)
@@ -391,9 +393,9 @@ const pageDescription = computed(() =>
             />
             <StatCard
               label="Buckets"
-              :value="formatNumber(realmTotals.buckets)"
+              :value="realmBuckets ? countText(realmBuckets, formatNumber) : formatNumber(realmTotals.buckets)"
               :icon="FolderOpen"
-              hint="Realm-wide; includes every bucket the realm's nodes serve"
+              hint="Realm-wide; a bucket stored on several nodes counts once"
             />
           </template>
           <template v-else>

@@ -8,12 +8,23 @@ import Notice from '@/components/ui/Notice.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useMyGroupsUsage } from '@/composables/useMyGroupsUsage'
 import { useNotifications } from '@/composables/useNotifications'
+import { countText } from '@/composables/useBucketCount'
+import { useReachableUsage } from '@/composables/useReachableUsage'
+import { distinctCount } from '@/lib/distribution'
 import { QUOTA_STATE_BADGES } from '@/lib/quota'
 import { formatCount } from '@/lib/formatCount'
 import { formatBytes } from '@/lib/utils'
 
 const { aggregate, membershipKey, load } = useMyGroupsUsage()
 const { available: notificationsAvailable, unreadCount } = useNotifications()
+const reach = useReachableUsage()
+
+// Group totals count a bucket stored on several nodes once per node; the listed buckets correct that.
+const buckets = computed(() => {
+  const total = aggregate.value.buckets
+  if (total == null) return 'Unknown'
+  return countText(distinctCount(total, reach.copies.value, reach.total.value.buckets, reach.listedAll.value), formatCount)
+})
 
 function count(value: number | null): string {
   return value == null ? 'Unknown' : formatCount(value)
@@ -44,7 +55,7 @@ const tiles = computed<Tile[]>(() => {
       icon: Database,
       badge: quotaBadge.value,
     },
-    { key: 'buckets', label: 'Buckets', value: count(totals.buckets), icon: FolderOpen },
+    { key: 'buckets', label: 'Buckets', value: buckets.value, hint: 'A bucket stored on several nodes counts once', icon: FolderOpen },
     { key: 'objects', label: 'Objects', value: count(totals.objects), icon: Files },
     { key: 'groups', label: 'Groups', value: formatCount(totals.groups), icon: Users },
   ]
@@ -54,7 +65,10 @@ const tiles = computed<Tile[]>(() => {
   return rows
 })
 
-watch(membershipKey, () => void load(), { immediate: true })
+watch(membershipKey, () => {
+  void load()
+  void reach.load()
+}, { immediate: true })
 </script>
 
 <template>

@@ -59,6 +59,11 @@ const SkeletonStub = defineComponent(() => () => h('span', 'loading'))
 const GroupQuotaCardsStub = defineComponent(() => () => h('div', 'group quota cards'))
 const MyStatsCardsStub = defineComponent(() => () => h('div', 'my stats cards'))
 const ReachableStub = defineComponent(() => () => h('div', 'reachable data'))
+// The node total stands as the exact count; the correction itself is tested with the count rule.
+const bucketCountStub = {
+  countText: (counted: { count: number }, format: (value: number) => string) => format(counted.count),
+  useRealmBucketCount: (total: { value: number | undefined }) => VueRuntime.computed(() => (total.value == null ? null : { count: total.value, exact: true })),
+}
 // Names the current scope and offers the other one, so the view's wiring of
 // setScope is testable without the real segmented control.
 const ScopeToggleStub = defineComponent({
@@ -145,6 +150,7 @@ beforeAll(async () => {
   vi.doMock('@/components/dashboard/GroupQuotaCards.vue', () => ({ default: GroupQuotaCardsStub }))
   vi.doMock('@/components/dashboard/MyStatsCards.vue', () => ({ default: MyStatsCardsStub }))
   vi.doMock('@/components/dashboard/ReachableData.vue', () => ({ default: ReachableStub }))
+  vi.doMock('@/composables/useBucketCount', () => bucketCountStub)
   vi.doMock('@/components/dashboard/DashboardScopeToggle.vue', () => ({ default: ScopeToggleStub }))
   vi.doMock('@/components/metadata/ProfileChip.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/ui/StatCard.vue', () => ({ default: StatCardStub }))
@@ -208,6 +214,7 @@ beforeAll(async () => {
     '@/components/dashboard/GroupQuotaCards.vue': moduleDefault(GroupQuotaCardsStub),
     '@/components/dashboard/MyStatsCards.vue': moduleDefault(MyStatsCardsStub),
     '@/components/dashboard/ReachableData.vue': moduleDefault(ReachableStub),
+    '@/composables/useBucketCount': bucketCountStub,
     '@/components/dashboard/DashboardScopeToggle.vue': moduleDefault(ScopeToggleStub),
     '@/components/metadata/ProfileChip.vue': moduleDefault(EmptyStub),
     '@/components/auth/SignInPanel.vue': moduleDefault(EmptyStub),

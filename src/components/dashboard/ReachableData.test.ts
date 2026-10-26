@@ -22,7 +22,7 @@ const ReachableData = (await import('./ReachableData.vue')).default
 
 const group = (extra: Partial<GroupReach> = {}): GroupReach => ({
   groupId: 'g1', name: 'Genome Lab', stored: 2048, referenced: 10_294_602, objects: 18, buckets: 3,
-  unread: 0, referencedUnknown: 0, partial: false, error: null, missing: false, ...extra,
+  unread: 0, referencedUnknown: 0, partial: false, error: null, missing: false, copies: 3, ...extra,
 })
 
 async function html() {

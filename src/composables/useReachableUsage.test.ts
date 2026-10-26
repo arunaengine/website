@@ -43,11 +43,12 @@ describe('reachable usage', () => {
     const reach = scope.run(() => useReachableUsage())!
     await reach.load()
 
-    expect(aruna.getBucketUsage.mock.calls).toEqual([['bakrep', null], ['raw', 'n2']])
+    expect(aruna.getBucketUsage.mock.calls).toEqual([['bakrep', null], ['ws-run', null], ['raw', 'n2']])
     const lab = reach.groups.value.find((group) => group.groupId === 'g1')!
-    expect(lab).toMatchObject({ stored: 100, referenced: 10_294_602, objects: 28, buckets: 2, missing: true, error: null })
+    expect(lab).toMatchObject({ stored: 200, referenced: 10_294_602, objects: 38, buckets: 3, copies: 5, missing: true, error: null })
     expect(reach.groups.value.find((group) => group.groupId === 'g2')).toMatchObject({ error: 'no node answered', buckets: 0 })
-    expect(reach.total.value).toMatchObject({ stored: 100, referenced: 10_294_602, buckets: 2 })
+    expect(reach.total.value).toMatchObject({ stored: 200, referenced: 10_294_602, buckets: 3 })
+    expect(reach.listedAll.value).toBe(false)
     scope.stop()
   })
 
@@ -61,7 +62,8 @@ describe('reachable usage', () => {
     const first = reach.load()
     await vi.waitFor(() => expect(aruna.getBucketUsage).toHaveBeenCalledTimes(1))
     void reach.load()
-    void reach.load()
+    void reach.load(true)
+    void reach.load(true)
     release()
     await first
     await vi.waitFor(() => expect(aruna.getBucketUsage).toHaveBeenCalledTimes(2))

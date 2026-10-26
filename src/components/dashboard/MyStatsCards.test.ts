@@ -7,6 +7,9 @@ import type { UsageResponse } from '@/lib/api'
 const aruna = vi.hoisted(() => ({
   myGroups: { value: [] as Array<{ id: string; name: string }> },
   getGroupUsage: vi.fn<(groupId: string) => Promise<UsageResponse>>(),
+  sessionEpoch: { value: 1 },
+  searchBuckets: vi.fn(),
+  getBucketUsage: vi.fn(),
 }))
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
 
@@ -17,6 +20,7 @@ const notifications = vi.hoisted(() => ({
 vi.mock('@/composables/useNotifications', () => ({ useNotifications: () => notifications }))
 
 const { loadMyGroupsUsage } = await import('@/composables/useMyGroupsUsage')
+const { useReachableUsage } = await import('@/composables/useReachableUsage')
 const MyStatsCards = (await import('./MyStatsCards.vue')).default
 
 function usage(overrides: Partial<UsageResponse> = {}): UsageResponse {
@@ -66,13 +70,21 @@ describe('personal statistics tiles', () => {
       { id: 'sum-2', name: 'Beta' },
     ]
     aruna.getGroupUsage.mockResolvedValue(usage())
+    // Each group total counts 2 buckets; Alpha's two are the copies of one distributed bucket.
+    const hit = (bucket: string, node: string, group: string, set?: string) => ({ arn: '', bucket, node_id: node, group_id: group, created_at: '', set_id: set })
+    aruna.searchBuckets.mockImplementation(async (_q: string, options: { groupId: string }) => ({
+      hits: options.groupId === 'sum-1' ? [hit('shared', 'n1', 'sum-1', 's1'), hit('shared', 'n2', 'sum-1', 's1')] : [hit('a', 'n1', 'sum-2'), hit('b', 'n1', 'sum-2')],
+      nodes_queried: 2, nodes_failed: 0, failed_nodes: [],
+    }))
+    aruna.getBucketUsage.mockRejectedValue(new Error('not needed here'))
     await loadMyGroupsUsage()
+    await useReachableUsage().load()
 
     const text = await renderedText()
 
     expect(text).toMatch(/Datasets 6/)
     expect(text).toMatch(/Storage used 2 KB/)
-    expect(text).toMatch(/Buckets 4/)
+    expect(text).toMatch(/Buckets 3/)
     expect(text).toMatch(/Objects 10/)
     expect(text).toMatch(/Groups 2/)
     expect(text).toMatch(/Unread notifications 3/)

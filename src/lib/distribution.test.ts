@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { BucketSearchHit, DistributedResponse } from '@/lib/api'
 import { defaultSettings, type Placement, type PresetId } from '@/lib/distributedMock'
-import { createRequest, defaultDraft, degradedRanges, draftProblem, fromStatus, isDeleting, leaveBlock, mergeSets, openTransfers, placementProblem, settingsBody, transferChoice } from './distribution'
+import { createRequest, defaultDraft, degradedRanges, distinctCount, draftProblem, fromStatus, isDeleting, leaveBlock, mergeSets, openTransfers, placementProblem, settingsBody, transferChoice } from './distribution'
 
 const NODE_A = 'a'.repeat(64)
 const NODE_B = 'b'.repeat(64)
@@ -251,5 +251,18 @@ describe('mergeSets', () => {
     const rows = mergeSets([...first, hit('bakrep', NODE_B, 's1')], () => false)
     expect(rows).toHaveLength(1)
     expect(rows[0].nodes).toEqual([NODE_A, NODE_B])
+  })
+})
+
+describe('distinctCount', () => {
+  it('counts a distributed bucket once when every counted bucket was listed', () => {
+    // bakrep on three nodes and two plain buckets: the node totals say 5.
+    expect(distinctCount(5, 5, 3, true)).toEqual({ count: 3, exact: true })
+  })
+
+  it('says "at most" when buckets the totals count were not listed', () => {
+    expect(distinctCount(7, 5, 3, true)).toEqual({ count: 5, exact: false })
+    expect(distinctCount(5, 5, 3, false)).toEqual({ count: 3, exact: false })
+    expect(distinctCount(4, 0, 0, false)).toEqual({ count: 4, exact: false })
   })
 })

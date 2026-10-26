@@ -1,18 +1,15 @@
 // The data the caller can reach in their groups: each bucket's usage, asked of the node that holds
 // it and summed into stored bytes, referenced bytes and objects. A distributed bucket counts once.
 // A bucket whose usage cannot be read, or whose node reports no referenced bytes, stays unknown.
+// The state is shared, so every dashboard part reads one listing.
 import { computed, ref } from 'vue'
 import { nodeInfo } from '@/composables/aruna/state'
 import { useAruna } from '@/composables/useAruna'
+import { listBuckets } from '@/composables/useBucketCount'
 import { mapLimit } from '@/composables/useMyGroupsUsage'
-import type { BucketSearchHit, BucketUsageResponse } from '@/lib/api'
+import type { BucketUsageResponse } from '@/lib/api'
 import { mergeSets } from '@/lib/distribution'
 import { errorMessage } from '@/lib/utils'
-import { isHiddenBucket } from '@/lib/workspaces'
-
-const PAGE = 50
-// At most 1000 buckets per group are counted; a longer list says it was cut.
-const MAX_PAGES = 20
 
 export interface UsageSum {
   stored: number
@@ -34,6 +31,8 @@ export interface GroupReach extends UsageSum {
   error: string | null
   /** A node did not answer the bucket list, or it was cut: buckets may be missing. */
   missing: boolean
+  /** Listed hits, one per node that holds a bucket; above `buckets` for distributed buckets. */
+  copies: number
 }
 
 export function emptySum(): UsageSum {
@@ -67,35 +66,26 @@ export function addSums(left: UsageSum, right: UsageSum): UsageSum {
   }
 }
 
+const groups = ref<GroupReach[]>([])
+const loading = ref(false)
+let runs = 0
+// A reload asked for while one runs waits for it, so frequent refreshes ask each bucket once.
+let again = false
+let account = ''
+
 export function useReachableUsage() {
   const { myGroups, searchBuckets, getBucketUsage, sessionEpoch } = useAruna()
-  const groups = ref<GroupReach[]>([])
-  const loading = ref(false)
-  let runs = 0
 
   const isLocal = (nodeId: string) => nodeId === nodeInfo.value?.node.peer_id
 
   async function readGroup(groupId: string, name: string, current: () => boolean): Promise<GroupReach> {
-    const hits: BucketSearchHit[] = []
-    let cursor: string | undefined
-    let silent = 0
-    let cut = false
+    let listing
     try {
-      for (let page = 0; ; page++) {
-        if (page === MAX_PAGES) {
-          cut = true
-          break
-        }
-        const answer = await searchBuckets('', { limit: PAGE, groupId, cursor })
-        if (!current()) break
-        hits.push(...answer.hits.filter((hit) => hit.group_id === groupId && !isHiddenBucket(hit.bucket)))
-        silent = Math.max(silent, answer.nodes_failed)
-        cursor = answer.next_cursor ?? undefined
-        if (!cursor) break
-      }
+      listing = await listBuckets(searchBuckets, groupId, current)
     } catch (cause) {
-      return { groupId, name, ...emptySum(), error: errorMessage(cause), missing: true }
+      return { groupId, name, ...emptySum(), error: errorMessage(cause), missing: true, copies: 0 }
     }
+    const { hits } = listing
     const buckets = mergeSets(hits, isLocal)
     const usages: (BucketUsageResponse | null)[] = new Array(buckets.length).fill(null)
     await mapLimit([...buckets.keys()], 4, async (index) => {
@@ -104,16 +94,14 @@ export function useReachableUsage() {
       usages[index] = await getBucketUsage(bucket.bucket, isLocal(bucket.node_id) ? null : bucket.node_id).catch(() => null)
     })
     const sum = usages.reduce(addUsage, emptySum())
-    return { groupId, name, ...sum, error: null, missing: silent > 0 || cut }
+    return { groupId, name, ...sum, error: null, missing: !listing.complete, copies: hits.length }
   }
 
-  // A reload asked for while one runs waits for it, so frequent refreshes ask each bucket once.
-  let again = false
-  let account = ''
-  async function load() {
+  /** Reads the groups again; without `fresh`, groups already read or being read are kept. */
+  async function load(fresh = false) {
     const asked = `${sessionEpoch.value}|${myGroups.value.map((group) => group.id).join(',')}`
-    if (loading.value && asked === account) {
-      again = true
+    if (asked === account && (loading.value || !fresh)) {
+      again ||= fresh && loading.value
       return
     }
     account = asked
@@ -129,12 +117,15 @@ export function useReachableUsage() {
         loading.value = false
         if (again) {
           again = false
-          void load()
+          void load(true)
         }
       }
     }
   }
 
   const total = computed(() => groups.value.reduce<UsageSum>(addSums, emptySum()))
-  return { groups, total, loading, load }
+  // Every group listed whole: then the listed buckets are all the group totals count.
+  const listedAll = computed(() => groups.value.length > 0 && groups.value.every((group) => !group.error && !group.missing))
+  const copies = computed(() => groups.value.reduce((sum, group) => sum + group.copies, 0))
+  return { groups, total, listedAll, copies, loading, load }
 }
