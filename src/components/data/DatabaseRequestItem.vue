@@ -2,6 +2,7 @@
 // One database mark that waits for the group that owns the bucket. The admins of that group agree
 // or decline; the user who asked can withdraw it.
 import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDatabaseRequests } from '@/composables/useDatabaseRequests'
@@ -31,8 +32,9 @@ const bucket = computed(() => {
         <span class="font-mono text-xs font-normal text-muted-foreground">{{ bucket }}</span>
       </p>
       <p class="text-xs text-muted-foreground">
-        Asked by {{ mine ? 'you' : shortUserId(request.curator) }}. Waiting for the group admins of
+        Asked by {{ mine ? 'you' : shortUserId(request.curator) }}. Pending consent of the group admins of
         {{ group ?? 'the owning group' }}.
+        <RouterLink :to="{ name: 'dataset', params: { id: request.entry.dataset_id } }" class="text-primary hover:underline">Open the dataset</RouterLink>
       </p>
     </div>
     <template v-if="mine">

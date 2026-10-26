@@ -17,6 +17,7 @@ const Slotted = (tag: string) =>
 
 const component = compileClientComponent(new URL('./DatabaseSettings.vue', import.meta.url), {
   vue: VueRuntime,
+  'vue-router': { RouterLink: defineComponent({ props: { to: Object }, setup: (_, { slots }) => () => h('a', slots.default?.()) }) },
   '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => h('i')) }),
   '@/components/data/DatabaseHeader.vue': moduleDefault(Marker('dataset header')),
   '@/components/data/DatabaseMarkForm.vue': moduleDefault(Marker('mark form')),
@@ -84,6 +85,14 @@ describe('database settings', () => {
 
   it('waits to offer the mark until the set of the bucket is known', async () => {
     expect(content(await render({ setId: undefined }))).not.toContain('Mark as database')
+    expect(content(await render({ nodeId: 'n2', setId: undefined }))).not.toContain('Mark as database')
+  })
+
+  it('offers the mark for a bucket on another node like any other bucket', async () => {
+    const root = await render({ nodeId: 'n2', setId: null })
+
+    expect(content(root)).toContain('Not a database.')
+    expect(content(root)).toContain('Mark as database')
   })
 
   it('shows the dataset of a database and removes the mark', async () => {

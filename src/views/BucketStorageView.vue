@@ -172,6 +172,7 @@ const browserLink = computed(() => ({
           :bucket="bucket"
           :node-id="nodeId"
           :set-id="setId"
+          :group-id="groupId"
           :group-name="group?.display_name ?? null"
           :can-admin="canAdminGroup"
         />

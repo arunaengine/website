@@ -1,6 +1,7 @@
 // What the portal shows of the realm's databases. The node answers with ids, the bucket name and a
 // state; the dataset's own texts are read from the dataset, with the dataset's access rules.
 import type { DatabaseRequestView, DatabaseStateName, DatabaseTarget, DatabaseView, PartTargetResponse } from '@/lib/api'
+import { contextIri, DEFAULT_CRATE_VERSION, specIri } from '@/lib/crate/version'
 import { crateGraph, crateRootId, stringProp } from '@/lib/dataEntities'
 
 export interface DatabaseRow {
@@ -101,4 +102,67 @@ export function briefOf(crate: unknown): DatasetBrief {
     description: stringProp(root?.description) ?? '',
     license: stringProp(root?.license) ?? '',
   }
+}
+
+/** What a new dataset that describes a database says; empty fields are left out. */
+export interface DatasetFields {
+  name: string
+  description: string
+  version: string
+  license: string
+  /** A landing page URL or a DOI. */
+  page: string
+}
+
+const DOI = /^(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:)?(10\.\d{4,9}\/\S+)$/i
+
+// A link-like value is kept as a reference, anything else as text.
+const reference = (value: string) => (/^https?:\/\//i.test(value) ? { '@id': value } : value)
+
+/** The root fields of a new dataset: a DOI becomes its identifier, any other page its url. */
+function rootFields(fields: DatasetFields): Record<string, unknown> {
+  const page = fields.page.trim()
+  const doi = DOI.exec(page)?.[1]
+  return Object.fromEntries(
+    Object.entries({
+      name: fields.name.trim(),
+      description: fields.description.trim(),
+      version: fields.version.trim(),
+      license: fields.license.trim() ? reference(fields.license.trim()) : '',
+      identifier: doi ? `https://doi.org/${doi}` : '',
+      url: page && !doi ? page : '',
+    }).filter(([, value]) => value !== ''),
+  )
+}
+
+/** A new crate whose root names the bucket root as its Dataset-typed part, as a mark needs. */
+export function databaseCrate(fields: DatasetFields, part: string, bucket: string): unknown {
+  return {
+    '@context': contextIri(DEFAULT_CRATE_VERSION),
+    '@graph': [
+      { '@id': 'ro-crate-metadata.json', '@type': 'CreativeWork', about: { '@id': './' }, conformsTo: { '@id': specIri(DEFAULT_CRATE_VERSION) } },
+      { '@id': './', '@type': 'Dataset', ...rootFields(fields), datePublished: new Date().toISOString().slice(0, 10), hasPart: [{ '@id': part }] },
+      { '@id': part, '@type': 'Dataset', name: bucket },
+    ],
+  }
+}
+
+/** The crate with the bucket root added as a Dataset-typed part of its root; null when it is one. */
+export function withBucketPart(crate: unknown, part: string, bucket: string): unknown | null {
+  const graph = crateGraph(crate)
+  const rootId = crateRootId(crate)
+  const root = graph.find((entity) => entity['@id'] === rootId)
+  if (!root) return null
+  const parts = root.hasPart === undefined ? [] : Array.isArray(root.hasPart) ? root.hasPart : [root.hasPart]
+  const named = parts.some((entry) => stringProp(entry) === part)
+  const entity = graph.find((item) => item['@id'] === part)
+  const types = entity ? [entity['@type']].flat() : []
+  if (named && types.includes('Dataset')) return null
+  const next = graph.map((item) => {
+    if (item === root && !named) return { ...item, hasPart: [...parts, { '@id': part }] }
+    if (item === entity && !types.includes('Dataset')) return { ...item, '@type': [...types.filter(Boolean), 'Dataset'] }
+    return item
+  })
+  if (!entity) next.push({ '@id': part, '@type': 'Dataset', name: bucket })
+  return { ...(crate as Record<string, unknown>), '@graph': next }
 }

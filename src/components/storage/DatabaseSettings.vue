@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // Whether this bucket is a database: the dataset that describes it, the mark, and the agreement
-// of the group that owns the bucket. Marking needs the databases right; removing needs it too,
-// or admin rights on the owning group.
+// of the group that owns the bucket. Any bucket on any node can be one. Marking needs the
+// databases right; removing needs it too, or admin rights on the owning group.
 import { computed, onMounted, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import DatabaseHeader from '@/components/data/DatabaseHeader.vue'
 import DatabaseMarkForm from '@/components/data/DatabaseMarkForm.vue'
 import DatabaseRequestItem from '@/components/data/DatabaseRequestItem.vue'
@@ -21,6 +22,7 @@ const props = defineProps<{
   nodeId: string | null
   /** The set of the bucket; null for an ordinary bucket, undefined while it is not known. */
   setId?: string | null
+  groupId?: string | null
   groupName?: string | null
   canAdmin: boolean
 }>()
@@ -67,7 +69,8 @@ onMounted(() => {
 })
 watch(() => sessionEpoch.value, () => void readCurated())
 
-const known = computed(() => props.setId !== undefined || Boolean(props.nodeId))
+// The node that holds the bucket says whether it is distributed; until then the target is not known.
+const known = computed(() => props.setId !== undefined)
 const target = computed(() => {
   const node = props.nodeId ?? localNodeId.value
   return known.value && node ? targetOf(props.bucket, node, props.setId ?? null) : null
@@ -93,8 +96,8 @@ async function remove() {
   await Promise.all([databases.reload(), readCurated()])
 }
 
+// The form keeps its outcome on screen until the lists show the mark.
 function marked() {
-  asking.value = false
   void readCurated()
 }
 </script>
@@ -108,7 +111,10 @@ function marked() {
     <div class="space-y-3 px-5 py-4 text-sm">
       <template v-if="entry">
         <DatabaseHeader v-if="listed" bare :bucket="bucket" :node-id="nodeId" :set-id="setId" />
-        <p v-else class="text-muted-foreground">Marked as a database.</p>
+        <p v-else class="text-muted-foreground">
+          Marked as a database.
+          <RouterLink :to="{ name: 'dataset', params: { id: entry.datasetId } }" class="text-primary hover:underline">Open the dataset</RouterLink>
+        </p>
         <Notice v-if="entry.state !== 'active'" tone="warning">{{ STATE_NOTES[entry.state] }}</Notice>
         <Button v-if="curate === 'yes' || canAdmin" size="sm" variant="outline" @click="remove">Remove the database mark</Button>
       </template>
@@ -133,6 +139,7 @@ function marked() {
             :bucket="bucket"
             :node-id="nodeId"
             :set-id="setId ?? null"
+            :group-id="groupId"
             :group-name="groupName"
             @done="marked"
           />

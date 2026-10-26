@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DatabaseRequestView, DatabaseView } from '@/lib/api'
-import { briefOf, databaseOf, placeOf, requestOf, rowOf, sameTarget, searchRows, targetOf } from './databases'
+import { briefOf, databaseCrate, databaseOf, placeOf, requestOf, rowOf, sameTarget, searchRows, targetOf, withBucketPart } from './databases'
 
 function view(bucket: string, target: DatabaseView['target'], extra: Partial<DatabaseView> = {}): DatabaseView {
   return { entry_id: `e-${bucket}`, dataset_id: `d-${bucket}`, owner_group: 'g1', target, bucket, state: 'active', public: false, title: `${bucket} database`, ...extra }
@@ -73,5 +73,41 @@ describe('database rows', () => {
 
     expect(briefOf(crate)).toEqual({ name: 'SPIRE', description: 'Microbiome reference', license: 'https://spdx.org/licenses/CC-BY-4.0' })
     expect(briefOf(null)).toEqual({ name: '', description: '', license: '' })
+  })
+})
+
+describe('database datasets', () => {
+  const PART = 'https://w3id.org/aruna/data/r1/s1/'
+  const rootOf = (crate: unknown) => (crate as { '@graph': Record<string, unknown>[] })['@graph'].find((entity) => entity['@id'] === './')
+
+  it('makes a new dataset whose root names the bucket root as a Dataset part', () => {
+    const crate = databaseCrate({ name: ' SPIRE ', description: '', version: '2026-10', license: 'https://creativecommons.org/licenses/by/4.0/', page: 'https://spire.embl.de' }, PART, 'spire-db')
+    expect(rootOf(crate)).toMatchObject({
+      name: 'SPIRE',
+      version: '2026-10',
+      license: { '@id': 'https://creativecommons.org/licenses/by/4.0/' },
+      url: 'https://spire.embl.de',
+      hasPart: [{ '@id': PART }],
+    })
+    expect(rootOf(crate)).not.toHaveProperty('description')
+    expect((crate as { '@graph': unknown[] })['@graph']).toContainEqual({ '@id': PART, '@type': 'Dataset', name: 'spire-db' })
+  })
+
+  it('keeps a DOI as the identifier and plain text as text', () => {
+    const crate = databaseCrate({ name: 'Bakta', description: '', version: '', license: 'CC BY 4.0', page: 'https://doi.org/10.5281/zenodo.10522951' }, PART, 'bakta-db')
+    expect(rootOf(crate)).toMatchObject({ identifier: 'https://doi.org/10.5281/zenodo.10522951', license: 'CC BY 4.0' })
+    expect(rootOf(crate)).not.toHaveProperty('url')
+  })
+
+  it('adds the part once, types a named but untyped part, and leaves a linked dataset alone', () => {
+    const base = { '@graph': [{ '@id': 'ro-crate-metadata.json', about: { '@id': './' } }, { '@id': './', '@type': 'Dataset', hasPart: { '@id': 'x' } }] }
+    const added = withBucketPart(base, PART, 'bakrep')
+    expect(rootOf(added)?.hasPart).toEqual([{ '@id': 'x' }, { '@id': PART }])
+    expect(withBucketPart(added, PART, 'bakrep')).toBeNull()
+
+    const untyped = { '@graph': [...base['@graph'].slice(0, 1), { '@id': './', hasPart: [{ '@id': PART }] }, { '@id': PART, '@type': 'File' }] }
+    const typed = withBucketPart(untyped, PART, 'bakrep') as { '@graph': Record<string, unknown>[] }
+    expect(rootOf(typed)?.hasPart).toEqual([{ '@id': PART }])
+    expect(typed['@graph'].find((entity) => entity['@id'] === PART)?.['@type']).toEqual(['File', 'Dataset'])
   })
 })
