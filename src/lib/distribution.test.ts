@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { DistributedResponse } from '@/lib/api'
+import type { BucketSearchHit, DistributedResponse } from '@/lib/api'
 import { defaultSettings, type Placement, type PresetId } from '@/lib/distributedMock'
-import { createRequest, defaultDraft, degradedRanges, draftProblem, fromStatus, isDeleting, leaveBlock, openTransfers, placementProblem, settingsBody, transferChoice } from './distribution'
+import { createRequest, defaultDraft, degradedRanges, draftProblem, fromStatus, isDeleting, leaveBlock, mergeSets, openTransfers, placementProblem, settingsBody, transferChoice } from './distribution'
 
 const NODE_A = 'a'.repeat(64)
 const NODE_B = 'b'.repeat(64)
@@ -222,5 +222,34 @@ describe('settings of a set', () => {
     expect(draftProblem({ ...defaultDraft(), splitObjects: '12x' })).toContain('objects')
     expect(draftProblem({ ...defaultDraft(), splitBytes: '0' })).toContain('bytes')
     expect(draftProblem({ ...defaultDraft(), splitObjects: '5', splitBytes: '' })).toBeNull()
+  })
+})
+
+describe('mergeSets', () => {
+  const hit = (bucket: string, node: string, set?: string): BucketSearchHit => ({
+    arn: `${node}/${bucket}`, bucket, node_id: node, group_id: 'g1', created_at: '', set_id: set ?? null,
+  })
+
+  it('lists a distributed bucket once, answered by this node when it is a member', () => {
+    const rows = mergeSets(
+      [hit('bakrep', NODE_A, 's1'), hit('bakrep', NODE_B, 's1'), hit('bakrep', NODE_C, 's1'), hit('notes', NODE_A)],
+      (id) => id === NODE_B,
+    )
+    expect(rows.map((row) => [row.bucket, row.node_id, row.nodes])).toEqual([
+      ['bakrep', NODE_B, [NODE_A, NODE_B, NODE_C]],
+      ['notes', NODE_A, [NODE_A]],
+    ])
+  })
+
+  it('keeps ordinary buckets of one name on two nodes apart', () => {
+    const rows = mergeSets([hit('raw', NODE_A), hit('raw', NODE_B)], () => false)
+    expect(rows.map((row) => row.node_id)).toEqual([NODE_A, NODE_B])
+  })
+
+  it('merges a set again when its hits came on two pages', () => {
+    const first = mergeSets([hit('bakrep', NODE_A, 's1')], () => false)
+    const rows = mergeSets([...first, hit('bakrep', NODE_B, 's1')], () => false)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].nodes).toEqual([NODE_A, NODE_B])
   })
 })

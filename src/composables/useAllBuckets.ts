@@ -1,8 +1,10 @@
 // The buckets of every node, from the federated bucket search: one request per
 // page, so a realm of many nodes opens no S3 session per node.
 import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
+import { nodeInfo } from '@/composables/aruna/state'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError, type BucketSearchHit } from '@/lib/api'
+import { mergeSets } from '@/lib/distribution'
 import { isHiddenBucket } from '@/lib/workspaces'
 import { errorMessage } from '@/lib/utils'
 
@@ -12,7 +14,9 @@ const TYPING_MS = 250
 
 export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled: Ref<boolean>) {
   const { apiBaseUrl, currentUser, searchBuckets, sessionEpoch } = useAruna()
-  const hits = ref<BucketSearchHit[]>([])
+  const found = ref<BucketSearchHit[]>([])
+  // A distributed bucket is one row however many of its nodes answered.
+  const hits = computed(() => mergeSets(found.value, (id) => id === nodeInfo.value?.node.peer_id))
   const failedNodes = ref(0)
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -32,7 +36,7 @@ export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled:
   // Drops the list and every answer still on its way.
   function reset() {
     ++seq
-    hits.value = []
+    found.value = []
     cursor = null
     more.value = false
     failedNodes.value = 0
@@ -62,7 +66,7 @@ export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled:
       const page = response.hits.filter(
         (hit) => hit.group_id === groupId.value && !isHiddenBucket(hit.bucket),
       )
-      hits.value = after ? [...hits.value, ...page] : page
+      found.value = after ? [...found.value, ...page] : page
       cursor = response.next_cursor ?? null
       more.value = Boolean(cursor)
       failedNodes.value = response.nodes_failed

@@ -31,7 +31,7 @@ const rows = computed(() =>
       return {
         hit,
         device,
-        place: here ? 'This computer' : node ? placeName(node) : realmNodes.displayName(hit.node_id),
+        place: hit.nodes.length > 1 ? `${hit.nodes.length} nodes` : here ? 'This computer' : node ? placeName(node) : realmNodes.displayName(hit.node_id),
         title: node ? placeTitle(node) : hit.node_id,
         reason: here ? 'Already here, nothing to link' : device ? 'On another device, cannot be linked' : null,
       }

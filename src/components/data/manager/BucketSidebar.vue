@@ -17,6 +17,7 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import type { DataManager } from '@/composables/useDataManager'
 import type { AdmissionResponse, BucketSearchHit } from '@/lib/api'
+import type { ListedBucket } from '@/lib/distribution'
 import { isDesktop } from '@/lib/desktop'
 import type { BindSource } from '@/lib/bindSource'
 import { defaultPlacement, mockEnabled, placementLabel } from '@/lib/distributedMock'
@@ -125,6 +126,16 @@ const otherHits = computed(() =>
 function rowNode(nodeId: string | null): string {
   return `On ${realmNodes.displayName(nodeId ?? realmNodes.localNodeId.value)}`
 }
+// A distributed bucket names every node that holds part of it.
+function hitNodes(hit: ListedBucket): string {
+  return hit.set_id ? `On ${hit.nodes.map((id) => realmNodes.displayName(id)).join(', ')}` : rowNode(hit.node_id)
+}
+// The open bucket is this row when it was opened on the row's node, or on any node of its set.
+function hitActive(hit: ListedBucket): boolean {
+  const opened = (id: string) => (realmNodes.isLocalNode(id) ? null : id) === remoteNodeId.value
+  return hit.bucket === bucket.value && (hit.set_id ? hit.nodes.some(opened) : opened(hit.node_id))
+}
+const spread = (hit: ListedBucket) => (hit.set_id ? hit.nodes.length : 0)
 // The desktop names every row's place, short; the tooltip adds location, kind and id.
 function rowPlace(nodeId: string | null): { place: string | null; placeTitle: string | null } {
   if (!desktop) return { place: null, placeTitle: null }
@@ -246,12 +257,13 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               option
               :highlighted="index === activeIndex"
               :job="realmNodes.isLocalNode(hit.node_id) ? jobs.get(hit.bucket) : null"
-              :active="hit.bucket === bucket && (realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id) === remoteNodeId"
+              :active="hitActive(hit)"
+              :node-count="spread(hit)"
               v-bind="rowPlace(hit.node_id)"
               :linked-to="linkedTo(hit.node_id, hit.bucket)"
               @open="openHit(hit)"
             >
-              <template #tooltip>{{ rowNode(hit.node_id) }}</template>
+              <template #tooltip>{{ hitNodes(hit) }}</template>
               <template #link>
                 <IconButton v-if="hitSource(hit)" :label="`Link a local folder to ${hit.bucket}…`" side="right" @click="emitSync(hitSource(hit))">
                   <FolderSync class="h-3 w-3" />
@@ -387,14 +399,15 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               :bucket="hit.bucket"
               option
               :highlighted="groupOpeners.length + index === activeIndex"
-              :node-id="realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id"
+              :node-id="realmNodes.isLocalNode(hit.node_id) || hit.set_id ? null : hit.node_id"
+              :node-count="spread(hit)"
               :subtitle="hit.group_name || null"
               :pinnable="false"
               v-bind="rowPlace(hit.node_id)"
               :linked-to="linkedTo(hit.node_id, hit.bucket)"
               @open="openSearchHit(hit)"
             >
-              <template #tooltip>{{ rowNode(hit.node_id) }}</template>
+              <template #tooltip>{{ hitNodes(hit) }}</template>
               <template #link>
                 <IconButton v-if="hitSource(hit)" :label="`Link a local folder to ${hit.bucket}…`" side="right" @click="emitSync(hitSource(hit))">
                   <FolderSync class="h-3 w-3" />

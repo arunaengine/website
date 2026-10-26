@@ -1,6 +1,6 @@
 // What the portal shows of a bucket stored on more nodes. The node answers with
 // ids and states only, so a figure the node does not report stays absent here.
-import type { BehaviourName, CreateDistributedRequest, DistributedResponse, MemberStateName, StrategyName } from '@/lib/api'
+import type { BehaviourName, BucketSearchHit, CreateDistributedRequest, DistributedResponse, MemberStateName, StrategyName } from '@/lib/api'
 import {
   MAX_RANGES,
   MIN_MEMBERS,
@@ -98,6 +98,28 @@ export interface LiveDeletion {
   committed: boolean
   /** The nodes of the coordinators that still have to fence their ranges. */
   waiting: string[]
+}
+
+/** A listed bucket with the nodes that answered for it: one for an ordinary bucket. */
+export type ListedBucket = BucketSearchHit & { nodes: string[] }
+
+/** One row per distributed bucket, answered by this node when it is a member; order is kept. */
+export function mergeSets(hits: readonly BucketSearchHit[], isLocal: (nodeId: string) => boolean): ListedBucket[] {
+  const rows: ListedBucket[] = []
+  const bySet = new Map<string, number>()
+  for (const hit of hits) {
+    const nodes = 'nodes' in hit ? (hit as ListedBucket).nodes : [hit.node_id]
+    const index = hit.set_id ? bySet.get(hit.set_id) : undefined
+    if (index === undefined) {
+      if (hit.set_id) bySet.set(hit.set_id, rows.length)
+      rows.push({ ...hit, nodes: [...nodes] })
+      continue
+    }
+    const row = rows[index]
+    const merged = [...row.nodes, ...nodes.filter((node) => !row.nodes.includes(node))]
+    rows[index] = { ...(isLocal(hit.node_id) ? hit : row), nodes: merged }
+  }
+  return rows
 }
 
 // An ordinary bucket lives on one node. Only a bucket on more nodes has the Nodes tab.

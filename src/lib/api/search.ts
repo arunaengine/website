@@ -61,6 +61,8 @@ export interface BucketSearchHit {
   group_id: string
   group_name?: string | null
   created_at: string
+  /** The distributed bucket the hit is a member of; every member node answers its own hit. */
+  set_id?: string | null
 }
 
 export interface BucketSearchResponse {

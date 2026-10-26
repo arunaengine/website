@@ -10,6 +10,7 @@ import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { syncBucketKey } from '@/lib/sync'
 import { isHiddenBucket } from '@/lib/workspaces'
 import type { BucketSearchHit } from '@/lib/api'
+import type { ListedBucket } from '@/lib/distribution'
 import { computed, ref, useId, watch } from 'vue'
 import { AlertTriangle, ArrowLeftRight, Search, X } from '@lucide/vue'
 
@@ -73,13 +74,14 @@ watch(
   },
 )
 
-const { hits, nodesQueried, nodesFailed, searching, searched, error } = useBucketSearch(query)
+const { hits, raw, nodesQueried, nodesFailed, searching, searched, error } = useBucketSearch(query)
 
 const active = computed(() => query.value.trim().length >= MIN_CHARS)
 const partial = computed(() => nodesFailed.value > 0)
 
-const visibleHits = computed(() =>
-  hits.value.filter((hit) => {
+// One node's buckets are its own hits; otherwise a distributed bucket is one row.
+const visibleHits = computed<ListedBucket[]>(() =>
+  (props.filterNodeId ? raw.value.map((hit) => ({ ...hit, nodes: [hit.node_id] })) : hits.value).filter((hit) => {
     if (isHiddenBucket(hit.bucket)) return false
     if (props.filterNodeId && hit.node_id !== props.filterNodeId) return false
     if (props.excludeLocalBucket === hit.bucket && isLocalNode(hit.node_id)) return false
@@ -132,7 +134,7 @@ watch(
 
 function clear() {
   query.value = ''
-  hits.value = []
+  raw.value = []
   searched.value = false
   error.value = null
 }
@@ -205,7 +207,8 @@ function pinNodeId(hit: BucketSearchHit): string | null {
         <li v-for="(hit, index) in visibleHits" :key="hit.arn">
           <BucketRow
             :bucket="hit.bucket"
-            :node-id="pinNodeId(hit)"
+            :node-id="hit.nodes.length > 1 ? null : pinNodeId(hit)"
+            :node-count="hit.nodes.length > 1 ? hit.nodes.length : 0"
             :pinned="shortcuts.isPinned(hit.bucket, pinNodeId(hit))"
             :synced="hitSynced(hit)"
             :subtitle="hit.group_name || null"

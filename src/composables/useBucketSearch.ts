@@ -1,9 +1,11 @@
 // Federated bucket search over GET /search/buckets for one typed query.
 // Debounced with request-id staleness; fewer than two letters ask nothing.
 import { useDebounceFn } from '@vueuse/core'
-import { ref, watch, type Ref } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
+import { nodeInfo } from '@/composables/aruna/state'
 import { useAruna } from '@/composables/useAruna'
 import type { BucketSearchHit } from '@/lib/api'
+import { mergeSets } from '@/lib/distribution'
 import { errorMessage } from '@/lib/utils'
 
 export const MIN_CHARS = 2
@@ -13,7 +15,9 @@ export function useBucketSearch(query: Ref<string>, options: { listAll?: boolean
   const { authToken, searchBuckets } = useAruna()
   const minChars = options.listAll ? 0 : MIN_CHARS
   const page = options.listAll ? { limit: 50 } : {}
-  const hits = ref<BucketSearchHit[]>([])
+  const found = ref<BucketSearchHit[]>([])
+  // A distributed bucket is one row however many of its nodes answered.
+  const hits = computed(() => mergeSets(found.value, (id) => id === nodeInfo.value?.node.peer_id))
   const nodesQueried = ref(0)
   const nodesFailed = ref(0)
   const searching = ref(false)
@@ -28,7 +32,7 @@ export function useBucketSearch(query: Ref<string>, options: { listAll?: boolean
   const runSearch = useDebounceFn(async (term: string) => {
     const mySeq = ++seq
     if (term.length < minChars || !authToken.value) {
-      hits.value = []
+      found.value = []
       searching.value = false
       searched.value = false
       return
@@ -38,7 +42,7 @@ export function useBucketSearch(query: Ref<string>, options: { listAll?: boolean
     try {
       const response = await searchBuckets(term, page)
       if (mySeq !== seq) return
-      hits.value = response.hits
+      found.value = response.hits
       shownTerm = term
       cursor = response.next_cursor ?? null
       more.value = Boolean(cursor)
@@ -47,7 +51,7 @@ export function useBucketSearch(query: Ref<string>, options: { listAll?: boolean
       searched.value = true
     } catch (err) {
       if (mySeq !== seq) return
-      hits.value = []
+      found.value = []
       error.value = errorMessage(err)
     } finally {
       if (mySeq === seq) searching.value = false
@@ -64,7 +68,7 @@ export function useBucketSearch(query: Ref<string>, options: { listAll?: boolean
     try {
       const response = await searchBuckets(shownTerm, { ...page, cursor: after })
       if (mySeq !== seq) return
-      hits.value = [...hits.value, ...response.hits]
+      found.value = [...found.value, ...response.hits]
       nodesFailed.value = response.nodes_failed
       cursor = response.next_cursor ?? null
       more.value = Boolean(cursor)
@@ -85,7 +89,7 @@ export function useBucketSearch(query: Ref<string>, options: { listAll?: boolean
       cursor = null
       more.value = false
       if (term.length < minChars) {
-        hits.value = []
+        found.value = []
         searching.value = false
         searched.value = false
         error.value = null
@@ -95,5 +99,5 @@ export function useBucketSearch(query: Ref<string>, options: { listAll?: boolean
     { immediate: true },
   )
 
-  return { hits, nodesQueried, nodesFailed, searching, searched, error, more, loadMore }
+  return { hits, raw: found, nodesQueried, nodesFailed, searching, searched, error, more, loadMore }
 }

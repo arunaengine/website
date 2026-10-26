@@ -3,7 +3,7 @@ import BucketJobLabel from '@/components/storage/BucketJobLabel.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import type { BucketJob } from '@/lib/api'
-import { ArrowLeftRight, Boxes, FolderSync, Pin, Server, TriangleAlert } from '@lucide/vue'
+import { ArrowLeftRight, Boxes, FolderSync, Network, Pin, Server, TriangleAlert } from '@lucide/vue'
 import { RouterLink } from 'vue-router'
 
 // One shared row for every bucket list surface (sidebar pins/locals, recently
@@ -14,6 +14,8 @@ const props = withDefaults(
     bucket: string
     /** Hosting node; null = the connected node (no badge). */
     nodeId?: string | null
+    /** Nodes a distributed bucket is stored on; 0 for an ordinary bucket. */
+    nodeCount?: number
     pinned?: boolean
     /** Shows the ArrowLeftRight glyph for buckets with sync relationships. */
     synced?: boolean
@@ -42,6 +44,7 @@ const props = withDefaults(
   }>(),
   {
     nodeId: null,
+    nodeCount: 0,
     pinned: false,
     synced: false,
     job: null,
@@ -103,6 +106,7 @@ function onClick() {
             class="h-3 w-3 shrink-0 text-amber-500"
             aria-label="Degraded: writes to part of this bucket are refused"
           />
+          <Network v-if="nodeCount" class="h-3 w-3 shrink-0 text-primary/60" :aria-label="`Stored on ${nodeCount} nodes`" />
           <span v-if="place" class="w-20 truncate text-[11px] text-muted-foreground" :title="placeTitle ?? undefined">{{ place }}</span>
         </span>
       </button>
@@ -135,6 +139,7 @@ function onClick() {
           class="h-3 w-3 shrink-0 text-amber-500"
           aria-label="Degraded: writes to part of this bucket are refused"
         />
+        <Network v-if="nodeCount" class="h-3 w-3 shrink-0 text-primary/60" :aria-label="`Stored on ${nodeCount} nodes`" />
         <span v-if="place" class="w-20 truncate text-[11px] text-muted-foreground" :title="placeTitle ?? undefined">{{ place }}</span>
       </span>
     </button>

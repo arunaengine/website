@@ -12,6 +12,7 @@ const hit = (bucket: string, node_id: string) => ({
   group_id: 'g1',
   group_name: 'Lab group',
   created_at: '',
+  nodes: [node_id],
 })
 const listed = [hit('test', 'node-1'), hit('test', 'device'), hit('notes', 'laptop'), hit('ws-run', 'node-2')]
 const hits = ref(listed)

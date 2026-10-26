@@ -75,6 +75,21 @@ describe('all-nodes bucket list', () => {
     expect(list.failedNodes.value).toBe(2)
   })
 
+  it('lists a distributed bucket once, even when its nodes answer on two pages', async () => {
+    const member = (node: string) => ({ ...hit('bakrep', 'g1', node), set_id: 'set-1' })
+    searchBuckets
+      .mockResolvedValueOnce(answer([member('n1'), member('n2')], { next_cursor: 'c1' }))
+      .mockResolvedValueOnce(answer([member('n3'), hit('bakrep', 'g1', 'n4')]))
+    const { list } = start()
+    await settle()
+    await list.loadMore()
+
+    expect(list.hits.value.map((entry) => [entry.node_id, entry.nodes])).toEqual([
+      ['n1', ['n1', 'n2', 'n3']],
+      ['n4', ['n4']],
+    ])
+  })
+
   it('ends the list when a full page comes without a cursor', async () => {
     const full = Array.from({ length: BUCKET_PAGE }, (_, index) => hit(`b${index}`))
     searchBuckets.mockResolvedValueOnce(answer(full))
