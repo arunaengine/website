@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// What this node found when it walked the objects it holds for this bucket.
-// Observed only: it counts objects that CARRY the rules, which is not proof
-// that every copy of them sits somewhere the rules allow.
+// What the bucket's node found when it walked the objects it holds; for a bucket on several
+// nodes, what every node that writes part of it found. Observed only: it counts objects that
+// CARRY the rules, which is not proof that every copy of them sits somewhere the rules allow.
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -38,6 +38,9 @@ const staleRun = Symbol('stale placement run')
 let runGeneration = 0
 let disposed = false
 
+// A distributed bucket is reported whole: every node that writes part of it adds its share.
+const whole = computed(() => Boolean(coverage.value && !coverage.value.limits.includes('responder_local')))
+const unreached = computed(() => coverage.value?.unreached ?? [])
 const covered = computed(() =>
   coverage.value ? Math.max(0, coverage.value.observed - coverage.value.gaps.length) : null,
 )
@@ -122,13 +125,13 @@ async function applyToExisting() {
   <section class="surface">
     <header class="flex items-center gap-2 border-b border-border px-5 py-4">
       <ClipboardCheck class="size-4 text-primary" />
-      <h2 class="font-display text-sm font-semibold text-aruna-navy">Coverage on this node</h2>
+      <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ whole ? 'Coverage of the bucket' : 'Coverage on this node' }}</h2>
     </header>
 
     <div class="space-y-4 px-5 py-4">
       <p class="text-xs text-muted-foreground">
-        Counted on this node only. Covered means an object carries the rules, not that every copy
-        of it sits in an allowed place.
+        {{ whole ? 'Counted by every node that writes part of this bucket.' : 'Counted on this node only.' }}
+        Covered means an object carries the rules, not that every copy of it sits in an allowed place.
         <DocsLink icon topic="where-data-lives" section="Placement policies" class="ml-0.5" />
       </p>
 
@@ -142,8 +145,12 @@ async function applyToExisting() {
       <template v-else-if="coverage">
         <div class="grid gap-3 sm:grid-cols-2">
           <StatCard label="Objects carrying the rules" :value="formatNumber(covered ?? 0)" />
-          <StatCard label="Objects this node listed" :value="formatNumber(coverage.observed)" />
+          <StatCard :label="whole ? 'Objects listed' : 'Objects this node listed'" :value="formatNumber(coverage.observed)" />
         </div>
+        <Notice v-if="unreached.length" tone="warning">
+          {{ unreached.length === 1 ? 'A node that writes' : `${unreached.length} nodes that write` }} part of this bucket did not
+          report, so its objects are missing from these numbers. The next page asks again.
+        </Notice>
 
         <div class="flex items-center gap-1" role="group" aria-label="Which versions are counted">
           <Button

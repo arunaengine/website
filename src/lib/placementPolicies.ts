@@ -173,6 +173,8 @@ export interface CoverageResponse {
   cursor?: string
   complete: boolean
   limits: string[]
+  /** Nodes that write part of a distributed bucket and did not report; asked again next page. */
+  unreached?: string[]
 }
 
 export interface DiagnosticsQuery {
@@ -449,6 +451,7 @@ export function coverageLimitLabel(limit: string): string {
   if (normalized === 'bounded_page') return 'One page of a longer listing'
   if (normalized === 'historical_excluded') return 'Older versions not counted'
   if (normalized === 'concurrent_writes') return 'Writes during the count may be missing'
+  if (normalized === 'coordinated_ranges') return 'Only the parts of the bucket this node writes'
   return limit.replaceAll('_', ' ')
 }
 
