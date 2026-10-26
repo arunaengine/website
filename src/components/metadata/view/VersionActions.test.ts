@@ -1,11 +1,12 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h } from 'vue'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h, reactive, ref } from 'vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Resolve from '@/lib/api/resolve'
 import * as Utils from '@/lib/utils'
 import { bubbleClick, compileClientComponent, content, element, flush, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 
 const resolveVersion = vi.fn()
+const sessionEpoch = ref(0)
 const Slot = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 const ButtonStub = defineComponent({
   inheritAttrs: false,
@@ -22,7 +23,7 @@ const component = compileClientComponent(new URL('./VersionActions.vue', import.
   '@/components/ui/IconButton.vue': moduleDefault(ButtonStub),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
   '@/components/ui/Spinner.vue': moduleDefault(Slot),
-  '@/composables/useAruna': { useAruna: () => ({ resolveVersion }) },
+  '@/composables/useAruna': { useAruna: () => ({ resolveVersion, sessionEpoch }) },
   '@/composables/useObjectPreview': { classifyObject },
   '@/lib/api/resolve': Resolve,
   '@/lib/utils': Utils,
@@ -39,6 +40,7 @@ const labels = (root: Parameters<typeof nodes>[0]) => nodes(root).filter((node) 
 afterEach(() => {
   vi.unstubAllGlobals()
   resolveVersion.mockReset()
+  sessionEpoch.value = 0
 })
 
 describe('version actions', () => {
@@ -60,7 +62,7 @@ describe('version actions', () => {
 
     await bubbleClick(element(mounted.root, (node) => node.props['data-label'] === 'Preview'))
 
-    expect(resolveVersion).toHaveBeenCalledWith(ids.realmId, ids.versionId)
+    expect(resolveVersion).toHaveBeenCalledWith(ids.realmId, ids.versionId, expect.any(AbortSignal))
     expect(element(mounted.root, (node) => node.tag === 'img').props.src).toBe('blob:image')
   })
 
@@ -135,5 +137,90 @@ describe('version actions', () => {
     await flush()
 
     expect([anchor.click.mock.calls.length, anchor.href, anchor.download]).toEqual([1, 'blob:file', 'a.txt'])
+  })
+
+  describe('after the version or the session changes', () => {
+    // A parent that can hand the component new props, the way a refreshed dataset does.
+    async function mountChanging() {
+      const props = reactive({ ...ids, name: 'a.png', size: 3 })
+      const mounted = await mountApp(defineComponent(() => () => h(component, { ...props })))
+      return { mounted, props }
+    }
+    const createObjectURL = vi.fn(() => 'blob:old')
+    beforeEach(() => {
+      createObjectURL.mockClear()
+      vi.stubGlobal('URL', { createObjectURL, revokeObjectURL: vi.fn() })
+    })
+    const preview = (root: Parameters<typeof nodes>[0]) =>
+      bubbleClick(element(root, (node) => node.props['data-label'] === 'Preview'))
+
+    // A stream that stays open until the test hands it the bytes.
+    function pending() {
+      let controller!: ReadableStreamDefaultController<Uint8Array>
+      const body = new ReadableStream<Uint8Array>({ start: (c) => void (controller = c) })
+      return {
+        version: { body, size: null, type: '' },
+        finish(data: string) {
+          controller.enqueue(new TextEncoder().encode(data))
+          controller.close()
+        },
+      }
+    }
+
+    it.each([
+      ['version', (change: { props: { versionId: string } }) => void (change.props.versionId = '01K8Y2B6D8F0H2K4M6P8R0T2V5')],
+      ['session', () => void (sessionEpoch.value += 1)],
+    ])('drops a preview read that a %s change overtakes', async (_name, change) => {
+      const old = pending()
+      resolveVersion.mockResolvedValueOnce(old.version)
+      const view = await mountChanging()
+
+      const clicked = preview(view.mounted.root)
+      await flush()
+      change(view)
+      await flush()
+      old.finish('old bytes')
+      await clicked
+
+      expect(createObjectURL).not.toHaveBeenCalled()
+      expect(nodes(view.mounted.root).some((node) => node.tag === 'img')).toBe(false)
+      expect(resolveVersion.mock.calls[0][2].aborted).toBe(true)
+    })
+
+    it('does not show an answer that arrives after the change', async () => {
+      let answerLate!: (value: unknown) => void
+      resolveVersion.mockReturnValueOnce(new Promise((resolve) => void (answerLate = resolve)))
+      const view = await mountChanging()
+
+      const clicked = preview(view.mounted.root)
+      await flush()
+      view.props.versionId = '01K8Y2B6D8F0H2K4M6P8R0T2V5'
+      await flush()
+      const late = pending()
+      late.finish('old bytes')
+      answerLate(late.version)
+      await clicked
+
+      expect(createObjectURL).not.toHaveBeenCalled()
+      expect(nodes(view.mounted.root).some((node) => node.tag === 'img')).toBe(false)
+    })
+
+    it('clears a shown preview and previews the new version afresh', async () => {
+      const revoke = vi.fn()
+      vi.stubGlobal('URL', { createObjectURL, revokeObjectURL: revoke })
+      resolveVersion.mockResolvedValueOnce(answer('png', 3, 'image/png'))
+      const view = await mountChanging()
+      await preview(view.mounted.root)
+      expect(element(view.mounted.root, (node) => node.tag === 'img').props.src).toBe('blob:old')
+
+      view.props.versionId = '01K8Y2B6D8F0H2K4M6P8R0T2V5'
+      await flush()
+
+      expect(revoke).toHaveBeenCalledWith('blob:old')
+      expect(nodes(view.mounted.root).some((node) => node.tag === 'img')).toBe(false)
+      resolveVersion.mockResolvedValueOnce(answer('new', 3))
+      await preview(view.mounted.root)
+      expect(resolveVersion.mock.calls[1].slice(0, 2)).toEqual([ids.realmId, '01K8Y2B6D8F0H2K4M6P8R0T2V5'])
+    })
   })
 })
