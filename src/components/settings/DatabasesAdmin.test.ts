@@ -26,7 +26,6 @@ const component = compileClientComponent(new URL('./DatabasesAdmin.vue', import.
   '@/components/data/BucketSearchBox.vue': moduleDefault(Marker('bucket picker')),
   '@/components/data/DatabaseMarkForm.vue': moduleDefault(Marker('mark form')),
   '@/components/data/DatabaseRequestItem.vue': moduleDefault(Marker('pending request')),
-  '@/components/settings/MockCurators.vue': moduleDefault(Marker('example roles')),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
   '@/components/ui/CopyButton.vue': moduleDefault(Marker('copy')),

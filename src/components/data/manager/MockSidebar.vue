@@ -32,7 +32,7 @@ const KINDS = [
         <Input v-model="filter" placeholder="Find a bucket" aria-label="Find a bucket" class="h-8 text-xs" />
       </div>
       <ul class="max-h-[420px] overflow-y-auto py-1">
-        <MockBucketRows :database-only="kind === 'database'" :filter="filter" :active="active" @open="emit('open', $event)" />
+        <MockBucketRows v-if="kind !== 'database'" :filter="filter" :active="active" @open="emit('open', $event)" />
       </ul>
     </div>
   </aside>

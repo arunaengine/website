@@ -119,7 +119,6 @@ const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.me
   },
   '@/lib/dataEntities': { isLeafFile },
   '@/lib/databases': Databases,
-  '@/composables/useMockDatabases': { useMockDatabases: () => ({ search: () => [] }) },
   '@/composables/useDatabases': {
     useDatabases: () => ({
       search: (query: string) => databaseHits(query),

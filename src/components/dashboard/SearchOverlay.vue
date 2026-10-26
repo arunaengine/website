@@ -17,7 +17,6 @@ import CoverageIcon from '@/components/search/CoverageIcon.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealm } from '@/composables/useRealm'
 import { useDatabases } from '@/composables/useDatabases'
-import { useMockDatabases } from '@/composables/useMockDatabases'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSearchSettings } from '@/composables/useSearchSettings'
 import { OBJECT_SEARCH_MODE_LABELS, useUnifiedSearch } from '@/composables/useUnifiedSearch'
@@ -74,7 +73,6 @@ const { authToken } = useAruna()
 const { displayName: nodeDisplayName, isLocalNode } = useRealmNodes()
 const router = useRouter()
 const { objectSearchMode } = useSearchSettings()
-const { search: searchDatabases } = useMockDatabases()
 const databases = useDatabases()
 const objectModeOptions = Object.entries(OBJECT_SEARCH_MODE_LABELS).map(([value, label]) => ({ value, label }))
 
@@ -144,15 +142,7 @@ const items = computed<QuickItem[]>(() => [
     routeQuery: { group: row.ownerGroup },
     database: row,
   })),
-  // Databases and files of the example buckets (node mock).
-  ...(mockEnabled() ? searchDatabases(q.value) : []).map((entry): QuickItem => ({
-    key: `db:${entry.id}`,
-    section: 'databases',
-    title: entry.dataset.name,
-    subtitle: `${entry.dataset.description} ${entry.dataset.source}`,
-    routeName: 'bucket',
-    routeParams: { bucketId: entry.bucket },
-  })),
+  // Files of the example buckets (node mock).
   ...(mockEnabled() ? searchFiles(q.value) : []).map((file): QuickItem => ({
     key: `m:${file.key}`,
     section: 'files',

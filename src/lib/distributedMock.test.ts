@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { docsTopicBySlug } from '@/docs/v1'
 import { applyPortalConfig } from '@/lib/config'
 import { defaultSettings, mockEnabled, grantGap, membersFor, nodeGlob, planRanges, rangeTotal, splitKeys, STORAGE_QUESTIONS } from './distributedMock'
-import { BAKREP_COUNT, exampleListing, exampleMark, grantWarnings, mockFile, sourceLines, bucketCopies, basedOn, originOf, DATABASES_START, mockBucket, searchFiles, sourceObjects } from './distributedMockData'
+import { BAKREP_COUNT, exampleListing, exampleMark, grantWarnings, mockFile, sourceLines, bucketCopies, basedOn, originOf, mockBucket, searchFiles, sourceObjects } from './distributedMockData'
 
 describe('distributed mock helpers', () => {
   it('reports the members a node-specific grant does not reach', () => {
@@ -97,7 +97,7 @@ describe('distributed mock helpers', () => {
   it('keeps a mix of origins and turns them into isBasedOn entries', () => {
     const origin = (bucket: string, key: string) => originOf(mockFile(bucket, key)!)
     const registered = origin('bakrep', 'bakrep-v2-data-007/GCF_000005845.2/genome.fna.gz')
-    expect(registered).toMatchObject({ kind: 'source', source: 'https://s3.gi.denbi.de', database: 'bakrep' })
+    expect(registered).toMatchObject({ kind: 'source', source: 'https://s3.gi.denbi.de' })
     expect(basedOn(registered)[0].value).toBe('https://s3.gi.denbi.de/bakrep-v2-data-007/GCF_000005845.2/genome.fna.gz')
     expect(origin('lab-raw-data', 'raw/2026/reef-07/reads_R1.fastq.gz')).toMatchObject({ kind: 'upload', device: 'sequencer-laptop-3' })
     expect(basedOn(origin('lab-raw-data', 'raw/2026/reef-07/reads_R1.fastq.gz'))).toEqual([])
@@ -109,16 +109,6 @@ describe('distributed mock helpers', () => {
     ])
     expect(origin('reads-edge', 'qc/summary.tsv').kind).toBe('storage')
     expect(basedOn(origin('reads-edge', 'qc/summary.tsv'))).toEqual([])
-    expect(DATABASES_START.map((entry) => entry.bucket).every((name) => mockBucket(name))).toBe(true)
-  })
-
-  it('keeps being a database apart from where a bucket is stored', () => {
-    const marked = (name: string) => DATABASES_START.some((entry) => entry.bucket === name)
-    expect([marked('bakta-db'), mockBucket('bakta-db')?.members.length]).toEqual([true, 1])
-    expect([marked('refseq'), mockBucket('refseq')?.members.length]).toEqual([true, 2])
-    expect([marked('reads-edge'), mockBucket('reads-edge')?.members.length]).toEqual([false, 2])
-    expect(marked('lab-raw-data')).toBe(false)
-    expect(marked('bakrep') && marked('spire-db')).toBe(true)
   })
 
   it('finds example files when every word of the query is in the key', () => {

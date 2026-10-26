@@ -250,7 +250,6 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
       </div>
       <ul v-if="databaseMode" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
         <DatabaseRows ref="databaseRows" :filter="bucketNameFilter" :active="bucket" :highlighted="activeIndex" @open="openBucketOn" />
-        <MockBucketRows database-only :filter="bucketNameFilter" :active="bucket" @open="openBucket" />
       </ul>
       <template v-else-if="searchList">
         <Spinner v-if="all.loading.value && !all.hits.value.length" show-label label="Loading buckets…" class="px-3 py-4" />

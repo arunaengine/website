@@ -9,7 +9,6 @@ import AddDataShell from '@/components/data/add/AddDataShell.vue'
 import UploadTab from '@/components/data/add/UploadTab.vue'
 import ConnectorTab from '@/components/data/add/ConnectorTab.vue'
 import DatabasesTab from '@/components/data/add/DatabasesTab.vue'
-import MockDatabasesTab from '@/components/data/add/MockDatabasesTab.vue'
 import CollectionTab from '@/components/data/add/CollectionTab.vue'
 import OtherBucketsTab from '@/components/data/add/OtherBucketsTab.vue'
 import { useConnectorSource, type ConnectorStagingRow } from '@/components/data/add/useConnectorSource'
@@ -131,7 +130,6 @@ function onImportsCreated() {
       </TabsContent>
       <TabsContent value="databases" class="space-y-3">
         <DatabasesTab :bucket="bucket" @choose="chooseDatabase" />
-        <MockDatabasesTab v-if="mockEnabled()" :bucket="bucket" :prefix="prefix" />
       </TabsContent>
 
       <TabsContent v-if="collection" value="collection" class="space-y-3">

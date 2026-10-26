@@ -7,7 +7,6 @@ import { RouterLink } from 'vue-router'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import DatabaseMarkForm from '@/components/data/DatabaseMarkForm.vue'
 import DatabaseRequestItem from '@/components/data/DatabaseRequestItem.vue'
-import MockCurators from '@/components/settings/MockCurators.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
@@ -18,7 +17,6 @@ import { useDatabases } from '@/composables/useDatabases'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { ApiError, apiErrorMessage, type BucketSearchHit } from '@/lib/api'
 import { rowOf, STATE_NOTES, type DatabaseRow } from '@/lib/databases'
-import { mockEnabled } from '@/lib/distributedMock'
 import { Trash2 } from '@lucide/vue'
 
 const { realmInfo, listDatabases, removeDatabase, getBucketDistribution, sessionEpoch } = useAruna()
@@ -115,7 +113,6 @@ const search = ref('')
         {{ path }} <span class="uppercase">write</span>
         <CopyButton :value="path" label="Copy the access rule" class="ml-1 align-middle" />
       </p>
-      <MockCurators v-if="mockEnabled()" />
     </section>
 
     <section class="space-y-3">

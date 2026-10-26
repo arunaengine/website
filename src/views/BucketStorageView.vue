@@ -27,8 +27,6 @@ import DistributionOverview from '@/components/storage/DistributionOverview.vue'
 import SetDeleteSection from '@/components/storage/SetDeleteSection.vue'
 import BucketSources from '@/components/storage/BucketSources.vue'
 import LinkedDatasets from '@/components/data/LinkedDatasets.vue'
-import LinkedBy from '@/components/storage/LinkedBy.vue'
-import DatabaseMark from '@/components/storage/DatabaseMark.vue'
 import DatabaseSettings from '@/components/storage/DatabaseSettings.vue'
 import CopiesOfBucket from '@/components/storage/CopiesOfBucket.vue'
 import FileSources from '@/components/storage/FileSources.vue'
@@ -168,11 +166,9 @@ const browserLink = computed(() => ({
         <DistributionOverview v-if="live" :bucket="live" />
         <FileSources v-if="example" :bucket="bucket" />
         <BucketSources v-else :bucket="bucket" :nodes="ownerNodes" :group-id="groupId" />
-        <LinkedBy v-if="example" :bucket="bucket" />
-        <LinkedDatasets v-else heading="Linked by datasets" card :target="{ bucket, key: '', folder: true, node: nodeId }" />
-        <DatabaseMark v-if="example" :bucket="bucket" />
+        <LinkedDatasets v-if="!example" heading="Linked by datasets" card :target="{ bucket, key: '', folder: true, node: nodeId }" />
         <DatabaseSettings
-          v-else
+          v-if="!example"
           :bucket="bucket"
           :node-id="nodeId"
           :set-id="setId"

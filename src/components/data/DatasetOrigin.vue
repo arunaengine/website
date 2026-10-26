@@ -1,24 +1,16 @@
 <script setup lang="ts">
 // What the dataset editor adds on its own when this file joins a dataset: where it came from
-// (isBasedOn, or a run link) and the linked datasets it is part of (isPartOf).
+// (isBasedOn, or a run link).
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
-import type { PartOf } from '@/composables/useMockDatabases'
 import { basedOn, type BasedOn } from '@/lib/distributedMockData'
 import type { Origin } from '@/lib/fileOrigin'
 
-const props = defineProps<{ origin: Origin; partOf: PartOf[] }>()
+const props = defineProps<{ origin: Origin }>()
 
 const removed = ref<string[]>([])
-const all = computed<BasedOn[]>(() => [
-  ...basedOn(props.origin),
-  ...props.partOf.map((item) => ({
-    label: item.dataset.name,
-    value: `https://w3id.org/aruna/${item.dataset.id}`,
-    property: 'isPartOf' as const,
-  })),
-])
+const all = computed<BasedOn[]>(() => basedOn(props.origin))
 const entries = computed(() => all.value.filter((entry) => !removed.value.includes(entry.value)))
 </script>
 

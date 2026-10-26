@@ -701,144 +701,6 @@ export function grantWarnings(suffixes: readonly string[]): GrantWarning[] {
   })
 }
 
-export type DatabaseReaders = 'Everyone in the realm' | 'Public'
-
-// A dataset can link a bucket or a folder in a bucket as one folder-like part, always with the
-// current files. Linking a database is ordinary dataset-to-dataset metadata: it does not make the
-// files of the database part of the dataset.
-export interface LinkedPart {
-  kind: 'bucket' | 'folder' | 'database'
-  bucket: string
-  prefix?: string
-}
-
-export interface ExampleDataset {
-  id: string
-  name: string
-  description: string
-  license: string
-  creator: string
-  source: string
-  group: string
-  parts: LinkedPart[]
-}
-
-export const OWNING_GROUP: Record<string, string> = {
-  bakrep: 'Genome Lab',
-  'spire-db': 'Genome Lab',
-  refseq: 'Genome Lab',
-  'bakta-db': 'Genome Lab',
-  'reads-edge': 'Sequencing Core',
-  [ORDINARY_BUCKET]: 'Genome Lab',
-}
-
-function describing(
-  id: string,
-  name: string,
-  description: string,
-  license: string,
-  creator: string,
-  source: string,
-  bucket: string,
-): ExampleDataset {
-  return { id, name, description, license, creator, source, group: OWNING_GROUP[bucket], parts: [{ kind: 'bucket', bucket }] }
-}
-
-export const DATASETS_START: readonly ExampleDataset[] = [
-  describing('01K8Z0DB0BAKREP00000000001', 'bakrep', 'About 50 million annotated bacterial genomes.', 'CC BY 4.0', 'de.NBI cloud team', 'de.NBI cloud, s3.gi.denbi.de', 'bakrep'),
-  describing('01K8Z0DB0REFSEQ00000000002', 'RefSeq', 'NCBI reference sequences of genomes, transcripts and proteins.', 'Public domain', 'NCBI', 'NCBI, ftp.ncbi.nlm.nih.gov/refseq', 'refseq'),
-  describing('01K8Z0DB0SPIRE000000000003', 'SPIRE database', 'Metagenome-assembled genomes of microbial communities.', 'CC BY 4.0', 'SPIRE team, EMBL', 'SPIRE, EMBL', 'spire-db'),
-  describing('01K8Z0DB0BAKTA000000000004', 'Bakta database', 'Reference data for the Bakta annotation tool.', 'CC BY 4.0', 'Oliver Schwengers', 'Zenodo, record 10522951', 'bakta-db'),
-  {
-    id: '01K8Z0DS0REEF0000000000005',
-    name: 'Reef survey 2026',
-    description: 'Reads and notes of the 2026 reef survey.',
-    license: 'CC BY 4.0',
-    creator: 'Mira Okafor',
-    source: 'Own sequencing',
-    group: 'Genome Lab',
-    parts: [{ kind: 'folder', bucket: ORDINARY_BUCKET, prefix: 'raw/2026' }],
-  },
-  {
-    id: '01K8Z0DS0ECOLI000000000006',
-    name: 'E. coli genomes, 2025 release',
-    description: 'The E. coli genomes of one source bucket of bakrep.',
-    license: 'CC BY 4.0',
-    creator: 'Hendrik Voss',
-    source: 'bakrep',
-    group: 'Genome Lab',
-    parts: [
-      { kind: 'folder', bucket: 'bakrep', prefix: 'bakrep-v2-data-007' },
-      { kind: 'database', bucket: 'refseq' },
-    ],
-  },
-  {
-    id: '01K8Z0DS0RUNS0000000000007',
-    name: 'Sequencing runs 2026',
-    description: 'Runs of the sequencer in 2026.',
-    license: 'CC BY 4.0',
-    creator: 'Sequencing Core',
-    source: 'Own sequencing',
-    group: 'Sequencing Core',
-    parts: [{ kind: 'folder', bucket: 'reads-edge', prefix: 'runs' }],
-  },
-]
-
-export interface RealmRole {
-  name: string
-  users: string[]
-}
-
-// Realm roles of the example realm. Database curators hold WRITE on the databases path.
-export const REALM_ROLES: readonly RealmRole[] = [
-  { name: 'Database curators', users: ['Mira Okafor', 'Hendrik Voss'] },
-  { name: 'Data stewards', users: ['Ana Lopez', 'Kofi Mensah', 'Yuki Tanaka'] },
-  { name: 'Group leads', users: ['Sofia Richter'] },
-]
-
-// A database is a bucket plus a linked dataset that describes it. Any bucket can be one.
-export interface DatabaseEntry {
-  id: string
-  bucket: string
-  datasetId: string
-  readers: DatabaseReaders
-  /** Pending until the group admins of the owning group agree. */
-  status: 'agreed' | 'pending'
-}
-
-export const DATABASES_START: readonly DatabaseEntry[] = [
-  { id: 'bakrep', bucket: 'bakrep', datasetId: '01K8Z0DB0BAKREP00000000001', readers: 'Public', status: 'agreed' },
-  { id: 'refseq', bucket: 'refseq', datasetId: '01K8Z0DB0REFSEQ00000000002', readers: 'Everyone in the realm', status: 'agreed' },
-  { id: 'spire', bucket: 'spire-db', datasetId: '01K8Z0DB0SPIRE000000000003', readers: 'Public', status: 'agreed' },
-  { id: 'bakta', bucket: 'bakta-db', datasetId: '01K8Z0DB0BAKTA000000000004', readers: 'Everyone in the realm', status: 'agreed' },
-]
-
-// The RO-Crate of a database dataset: the bucket is one folder part, files stay unnamed under it.
-export function crateOf(dataset: ExampleDataset): Record<string, unknown> {
-  return {
-    '@id': './',
-    '@type': 'Dataset',
-    name: dataset.name,
-    description: dataset.description,
-    license: dataset.license,
-    creator: dataset.creator,
-    hasPart: dataset.parts.map((part) => ({ '@id': partId(part) })),
-  }
-}
-
-export function partId(part: LinkedPart): string {
-  if (part.kind === 'database') {
-    return `https://w3id.org/aruna/${DATABASES_START.find((entry) => entry.bucket === part.bucket)?.datasetId ?? part.bucket}`
-  }
-  return `s3://${part.bucket}/${part.prefix ? `${part.prefix}/` : ''}`
-}
-
-export function partLabel(part: LinkedPart): string {
-  const name = part.prefix ? `${part.bucket}/${part.prefix}` : part.bucket
-  const what = part.kind === 'folder' ? 'linked folder' : part.kind === 'database' ? 'linked database' : 'linked bucket'
-  return `${name}, ${what}`
-}
-
 const idOf = (version: string) => `/${REALM_ID}/${version}`
 
 const ORIGINS: Record<string, Origin> = {
@@ -862,7 +724,6 @@ const ORIGINS: Record<string, Origin> = {
 export function originOf(object: MockObject): Origin {
   const known = ORIGINS[`${object.bucket}:${object.key}`]
   if (known) return known
-  const database = DATASETS_START.find((dataset) => dataset.id === DATABASES_START.find((entry) => entry.bucket === object.bucket)?.datasetId)?.name
   if (object.external) {
     const url = new URL(object.external.source)
     const digest = object.external.digests[0]
@@ -872,14 +733,13 @@ export function originOf(object: MockObject): Origin {
       path: url.pathname.slice(1),
       etag: object.external.etag,
       digest: digest ? `${digest.algorithm}:${digest.digest}` : undefined,
-      database,
     }
   }
   if (object.bucket === 'refseq') {
-    return { kind: 'source', source: 'https://ftp.ncbi.nlm.nih.gov', path: `refseq/${object.key}`, database }
+    return { kind: 'source', source: 'https://ftp.ncbi.nlm.nih.gov', path: `refseq/${object.key}` }
   }
   if (object.bucket === 'bakta-db') {
-    return { kind: 'source', source: 'https://zenodo.org', path: `records/10522951/files/${object.key.split('/').pop()}`, database }
+    return { kind: 'source', source: 'https://zenodo.org', path: `records/10522951/files/${object.key.split('/').pop()}` }
   }
   if (object.bucket === 'reads-edge') return { kind: 'storage', folder: 'sequencer-share', key: object.key }
   return { kind: 'upload', user: 'Mira Okafor', node: object.holders[0]?.nodeId ?? 'node-1', time: object.modified }
