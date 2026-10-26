@@ -4,6 +4,7 @@
 // (route, open draft, realm profiles) is gathered here.
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { useRealmBucketCount } from '@/composables/useBucketCount'
 import Button from '@/components/ui/Button.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -39,6 +40,7 @@ const props = withDefaults(
 
 const route = useRoute()
 const { currentUser, profiles, myGroups, discoverableGroups, realmInfo, usageInfo } = useAruna()
+const realmBuckets = useRealmBucketCount(computed(() => usageInfo.value?.realm))
 const { realmId } = useRealm()
 const { bridge } = useAssistantEditor()
 const { bridge: runForm } = useAssistantRunForm()
@@ -93,7 +95,8 @@ function realmSummary() {
     groups: myGroups.value.length + discoverableGroups.value.length,
     nodesOnline: infra.length ? `${online} / ${infra.length}` : undefined,
     objects: usage?.objects,
-    buckets: usage?.buckets,
+    buckets: realmBuckets.value?.count,
+    bucketsExact: realmBuckets.value?.exact,
     storedBytes: usage?.stored_bytes ?? undefined,
   }
 }

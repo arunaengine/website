@@ -43,7 +43,9 @@ export interface RealmContext {
   groups?: number
   nodesOnline?: string
   objects?: number
+  /** Realm buckets with each distributed bucket once; an upper bound unless `bucketsExact`. */
   buckets?: number
+  bucketsExact?: boolean
   storedBytes?: number
 }
 
@@ -195,7 +197,7 @@ function realmLine(realm: RealmContext): string | null {
   if (realm.profiles !== undefined) details.push(`${realm.profiles} profiles`)
   if (realm.groups !== undefined) details.push(`${realm.groups} groups`)
   if (realm.objects !== undefined) details.push(`${realm.objects} objects`)
-  if (realm.buckets !== undefined) details.push(`${realm.buckets} buckets`)
+  if (realm.buckets !== undefined) details.push(`${realm.bucketsExact === false ? 'at most ' : ''}${realm.buckets} buckets`)
   if (realm.storedBytes !== undefined) details.push(`${formatBytes(realm.storedBytes)} stored`)
   const nodes = realm.nodesOnline ? `, with ${realm.nodesOnline} nodes online` : ''
   if (!details.length) return realm.nodesOnline ? `This realm currently has ${realm.nodesOnline} nodes online.` : null

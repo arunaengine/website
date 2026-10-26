@@ -239,6 +239,12 @@ describe('systemPrompt', () => {
     expect(prompt).toContain('answer count questions from them directly')
   })
 
+  it('says when the bucket total is only an upper bound', () => {
+    const prompt = systemPrompt({ route: '/app', realm: { buckets: 6, bucketsExact: false } })
+
+    expect(prompt).toContain('at most 6 buckets')
+  })
+
   it('leaves the realm line out when no totals are given', () => {
     const prompt = systemPrompt({ route: '/app' })
 

@@ -35,7 +35,7 @@ const aruna = {
   myGroups: ref<unknown[]>([]),
   discoverableGroups: ref<unknown[]>([]),
   realmInfo: ref<{ nodes: Array<{ kind: string; present: boolean }> } | null>(null),
-  usageInfo: ref<{ metadata_documents?: number; objects?: number; buckets?: number; stored_bytes?: number } | null>(null),
+  usageInfo: ref<{ metadata_documents?: number; objects?: number; buckets?: number; stored_bytes?: number; realm?: { buckets: number; distinct_buckets?: number } } | null>(null),
 }
 
 const vaultState = ref<'absent' | 'locked' | 'unlocked' | 'unsupported'>('absent')
@@ -103,6 +103,10 @@ const ChatComposer = compileClientComponent(new URL('./ChatComposer.vue', import
   '@/components/settings/VaultUnlockForm.vue': moduleDefault(UnlockStub),
   '@/composables/useUserVault': { useUserVault: () => ({ state: vaultState }) },
   '@/composables/useAruna': { useAruna: () => aruna },
+  '@/composables/useBucketCount': {
+    useRealmBucketCount: (totals: { value?: { distinct_buckets?: number } | null }) =>
+      VueRuntime.computed(() => (totals.value?.distinct_buckets == null ? null : { count: totals.value.distinct_buckets, exact: true })),
+  },
   '@/composables/useRealm': { useRealm: () => ({ realmId: ref('r-1') }) },
   '@/composables/useGroupSelection': { activeGroupId: ref('') },
   '@/composables/useAssistantChat': { useAssistantChat: () => chat },
@@ -177,7 +181,8 @@ describe('ChatComposer', () => {
 
   it('attaches the realm totals once the user is signed in', async () => {
     aruna.currentUser.value = { name: 'Ada Lovelace' }
-    aruna.usageInfo.value = { metadata_documents: 12, objects: 40, buckets: 6 }
+    // This node holds 2 buckets; the realm has 9 member buckets, 6 buckets counted once.
+    aruna.usageInfo.value = { metadata_documents: 12, objects: 40, buckets: 2, realm: { buckets: 9, distinct_buckets: 6 } }
     aruna.myGroups.value = [{}, {}]
     aruna.realmInfo.value = { nodes: [{ kind: 'server', present: true }, { kind: 'user', present: false }] }
     const { root } = await mountApp(ChatComposer, { props: { size: 'full' } })
@@ -192,6 +197,7 @@ describe('ChatComposer', () => {
       nodesOnline: '1 / 1',
       objects: 40,
       buckets: 6,
+      bucketsExact: true,
     })
   })
 
