@@ -181,7 +181,7 @@ const publicOverview = computed(() => realmInfo.value?.public_overview)
 // Realm-wide totals the same /system/usage response carries; the top-level
 // counters next to them belong to this node and live on the Status page.
 const realmTotals = computed(() => usageInfo.value?.realm ?? null)
-const realmBuckets = useRealmBucketCount(computed(() => realmTotals.value?.buckets))
+const realmBuckets = useRealmBucketCount(realmTotals)
 
 function publicCount(value: number | null | undefined): string {
   return value == null ? 'Unknown' : formatCount(value)

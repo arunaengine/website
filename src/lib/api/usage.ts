@@ -30,7 +30,10 @@ export interface GroupQuotaStatus {
 }
 
 export interface UsageTotals {
+  /** Summed over the nodes: a distributed bucket counts once per member node. */
   buckets: number
+  /** `buckets` with each distributed bucket once; absent when the node cannot count it. */
+  distinct_buckets?: number
   objects: number
   stored_blobs?: number
   stored_bytes?: number

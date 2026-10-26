@@ -62,7 +62,8 @@ const ReachableStub = defineComponent(() => () => h('div', 'reachable data'))
 // The node total stands as the exact count; the correction itself is tested with the count rule.
 const bucketCountStub = {
   countText: (counted: { count: number }, format: (value: number) => string) => format(counted.count),
-  useRealmBucketCount: (total: { value: number | undefined }) => VueRuntime.computed(() => (total.value == null ? null : { count: total.value, exact: true })),
+  useRealmBucketCount: (totals: { value: { buckets: number; distinct_buckets?: number } | null | undefined }) =>
+    VueRuntime.computed(() => (totals.value == null ? null : { count: totals.value.distinct_buckets ?? totals.value.buckets, exact: true })),
 }
 // Names the current scope and offers the other one, so the view's wiring of
 // setScope is testable without the real segmented control.

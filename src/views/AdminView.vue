@@ -35,7 +35,7 @@ import { computed, ref, watch } from 'vue'
 import { Database, HardDrive, Layers, Link2, Boxes, Save, Plus, Trash2, ShieldCheck, Users, UserCog } from '@lucide/vue'
 
 const { realmInfo, usageInfo, isRealmAdmin, canInspectUsers, canManageOnboarding, canManageQuarantine, setRealmQuota, saving, myGroups, discoverableGroups, searchUsers, refresh } = useAruna()
-const realmBuckets = useRealmBucketCount(computed(() => usageInfo.value?.realm?.buckets))
+const realmBuckets = useRealmBucketCount(computed(() => usageInfo.value?.realm))
 const { isAuthenticated, authPending } = useAuth()
 // Shared realm directory: resolves saved user-cap ids to display names so rows
 // show a handle instead of the raw {ulid}@{realm} identity.

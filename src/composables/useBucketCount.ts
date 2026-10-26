@@ -3,7 +3,7 @@
 // can list correct them. A count stays "at most" unless every counted bucket was listed.
 import { computed, ref, watch, type Ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
-import type { BucketSearchHit, BucketSearchResponse } from '@/lib/api'
+import type { BucketSearchHit, BucketSearchResponse, UsageTotals } from '@/lib/api'
 import { distinctCount, mergeSets } from '@/lib/distribution'
 
 const PAGE = 50
@@ -43,13 +43,18 @@ export function countText(counted: { count: number; exact: boolean }, format: (v
 const realmListing = ref<{ epoch: number; listing: Listing } | null>(null)
 let realmRun = 0
 
-/** The realm's bucket count from its node totals, corrected by the buckets the caller can list. */
-export function useRealmBucketCount(total: Ref<number | null | undefined>) {
+/**
+ * The realm's bucket count: exact when the node counts each distributed bucket once, otherwise
+ * the node total corrected by the buckets the caller can list.
+ */
+export function useRealmBucketCount(totals: Ref<UsageTotals | null | undefined>) {
   const { searchBuckets, sessionEpoch } = useAruna()
+  const total = computed(() => totals.value?.buckets)
+  const distinct = computed(() => totals.value?.distinct_buckets)
   watch(
-    () => sessionEpoch.value,
-    async (epoch) => {
-      if (realmListing.value?.epoch === epoch) return
+    () => [sessionEpoch.value, distinct.value == null] as const,
+    async ([epoch, needed]) => {
+      if (!needed || realmListing.value?.epoch === epoch) return
       const run = ++realmRun
       const current = () => run === realmRun && epoch === sessionEpoch.value
       const listing = await listBuckets(searchBuckets, undefined, current).catch(() => null)
@@ -58,6 +63,7 @@ export function useRealmBucketCount(total: Ref<number | null | undefined>) {
     { immediate: true },
   )
   return computed(() => {
+    if (distinct.value != null) return { count: distinct.value, exact: true }
     const listed = realmListing.value
     if (total.value == null) return null
     if (!listed || listed.epoch !== sessionEpoch.value) return { count: total.value, exact: false }

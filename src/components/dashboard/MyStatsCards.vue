@@ -23,6 +23,7 @@ const reach = useReachableUsage()
 const buckets = computed(() => {
   const total = aggregate.value.buckets
   if (total == null) return 'Unknown'
+  if (aggregate.value.bucketsDistinct) return formatCount(total)
   return countText(distinctCount(total, reach.copies.value, reach.total.value.buckets, reach.listedAll.value), formatCount)
 })
 

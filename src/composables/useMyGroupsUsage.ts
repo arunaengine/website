@@ -22,6 +22,8 @@ export interface GroupUsageEntry {
   profileCount?: number | null
   processRunCount?: number | null
   buckets?: number
+  /** `buckets` counts each distributed bucket once. */
+  bucketsDistinct?: boolean
   objects?: number
 }
 
@@ -30,6 +32,8 @@ export interface MyGroupsAggregate {
   /** Null means "Unknown": a group's usage failed or its count is unreported. */
   datasets: number | null
   buckets: number | null
+  /** Every group's bucket count counts each distributed bucket once. */
+  bucketsDistinct: boolean
   objects: number | null
   usedBytes: number | null
   worstState: QuotaState | null
@@ -87,7 +91,8 @@ async function fetchEntry(entry: GroupUsageEntry, seq: number): Promise<void> {
     entry.datasetCount = usage.dataset_count ?? null
     entry.profileCount = usage.profile_count ?? null
     entry.processRunCount = usage.process_run_count ?? null
-    entry.buckets = realmScoped(usage, 'buckets')
+    entry.buckets = usage.realm?.distinct_buckets ?? realmScoped(usage, 'buckets')
+    entry.bucketsDistinct = usage.realm?.distinct_buckets != null
     entry.objects = realmScoped(usage, 'objects')
     entry.quota = usage.quota ?? null
     entry.error = undefined
@@ -166,6 +171,7 @@ export function aggregateGroupUsage(list: readonly GroupUsageEntry[]): MyGroupsA
     groups: list.length,
     datasets: sum((entry) => entry.datasetCount),
     buckets: sum((entry) => entry.buckets),
+    bucketsDistinct: ready.length > 0 && ready.every((entry) => entry.bucketsDistinct),
     objects: sum((entry) => entry.objects),
     usedBytes: sum((entry) => entry.usedBytes),
     worstState: failed.length || !worst ? null : worst,

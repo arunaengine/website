@@ -90,6 +90,14 @@ describe('personal statistics tiles', () => {
     expect(text).toMatch(/Unread notifications 3/)
   })
 
+  it('shows the node\'s count with each distributed bucket once as exact', async () => {
+    aruna.myGroups.value = [{ id: 'distinct-1', name: 'Alpha' }]
+    aruna.getGroupUsage.mockResolvedValue(usage({ realm: { buckets: 5, distinct_buckets: 3, objects: 5, logical_bytes: 1_000, referenced_bytes: 1 } }))
+    await loadMyGroupsUsage()
+
+    expect(await renderedText()).toMatch(/Buckets 3 /)
+  })
+
   it('never reports physical storage, which has no group dimension', async () => {
     aruna.myGroups.value = [{ id: 'physical-1', name: 'Alpha' }]
     aruna.getGroupUsage.mockResolvedValue(usage())
