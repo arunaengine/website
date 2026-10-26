@@ -12,17 +12,15 @@ import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
 import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import Notice from '@/components/ui/Notice.vue'
 import OptionToggle from '@/components/ui/OptionToggle.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
-import { useRealmNodes } from '@/composables/useRealmNodes'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { featureEnabled } from '@/lib/config'
 import { ArrowLeftRight, ChevronDown, CloudDownload, Plus } from '@lucide/vue'
 
-const props = defineProps<{ bucket: string; nodeId: string | null; groupId: string | null }>()
+// `ownerNodes`: the nodes that run the bucket's staging jobs, null for this node; null while unknown.
+const props = defineProps<{ bucket: string; nodeId: string | null; ownerNodes?: (string | null)[] | null; groupId: string | null }>()
 
-const realmNodes = useRealmNodes()
 const stagingEnabled = featureEnabled('stagingJobs')
 const { shown } = usePortalFeatures()
 
@@ -32,15 +30,14 @@ const KINDS = [
   { value: 'syncs', label: 'Syncs' },
   { value: 'staging', label: 'Staging' },
 ]
-// Syncs of a bucket on another node are the only kind this node can show; with one kind there is nothing to filter.
-const filterable = computed(() => !props.nodeId && stagingEnabled)
+const filterable = computed(() => stagingEnabled)
 const shows = (value: string) => kind.value === 'all' || kind.value === value
 
 // Remounting the lists reloads them all at once.
 const reloadKey = ref(0)
 const counts = ref<Record<string, number | null>>({})
 const allEmpty = computed(() => {
-  const known = ['syncs', ...(props.nodeId || !stagingEnabled ? [] : ['staging'])]
+  const known = ['syncs', ...(stagingEnabled ? ['staging'] : [])]
   return known.every((key) => counts.value[key] === 0)
 })
 
@@ -108,11 +105,6 @@ const stagingOpen = ref(false)
       </div>
     </div>
 
-    <Notice v-if="nodeId" tone="info">
-      This bucket is hosted on {{ realmNodes.displayName(nodeId) }}, so this node can only show
-      the syncs you created for it.
-    </Notice>
-
     <EmptyState
       v-if="kind === 'all' && allEmpty"
       title="Nothing is copied into or out of this bucket."
@@ -130,9 +122,10 @@ const stagingOpen = ref(false)
       @count="(count: number | null) => setCount('syncs', count)"
     />
     <StagingJobRows
-      v-if="!nodeId && stagingEnabled && shows('staging')"
+      v-if="stagingEnabled && shows('staging') && ownerNodes !== null"
       :key="`staging-${reloadKey}`"
       :bucket="bucket"
+      :nodes="ownerNodes ?? [nodeId]"
       :quiet="kind === 'all'"
       @count="(count: number | null) => setCount('staging', count)"
     />

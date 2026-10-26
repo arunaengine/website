@@ -23,8 +23,8 @@ const component = compileClientComponent(new URL('./BucketSources.vue', import.m
   '@/lib/utils': { truncateMiddle: (id: string) => id },
 })
 
-async function text(nodeId: string | null = null) {
-  return content((await mountApp(component, { props: { bucket: 'lab', nodeId } })).root)
+async function text(nodes: (string | null)[] = [null]) {
+  return content((await mountApp(component, { props: { bucket: 'lab', nodes } })).root)
 }
 
 describe('bucket sources', () => {
@@ -41,14 +41,14 @@ describe('bucket sources', () => {
     complete.value = true
   })
 
-  it('keeps a node without the list, a failure and another node apart from no sources', async () => {
+  it('keeps a node without the list and a failure apart from no sources', async () => {
     sources.value = []
     state.value = 'missing'
-    expect(await text()).toContain('This node does not list the sources')
+    expect(await text()).toContain('The node does not list the sources')
     state.value = 'failed'
     expect(await text()).toContain('The sources could not be read: node busy')
     state.value = 'ready'
-    expect(await text('n2')).toContain('on another node')
+    expect(await text(['n2'])).not.toContain('on another node')
     for (const value of ['missing', 'failed']) {
       state.value = value
       expect(await text()).not.toContain('No sync or storage folder')

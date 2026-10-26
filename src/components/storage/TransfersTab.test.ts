@@ -57,8 +57,8 @@ describe('transfers tab', () => {
     expect(element(root, (node) => node.props['aria-label'] === 'Which transfers to show').props.class).toContain('h-7')
   })
 
-  it('drops the filter when only syncs can be shown', async () => {
-    const { root } = await mountApp(defineComponent({ setup: () => () => h(tab, { bucket: 'reef', nodeId: 'n-2', groupId: 'g-1' }) }))
-    expect(() => element(root, (node) => node.props['aria-label'] === 'Which transfers to show')).toThrow()
+  it('keeps the filter for a bucket on another node, whose node lists its staging jobs', async () => {
+    const { root } = await mountApp(defineComponent({ setup: () => () => h(tab, { bucket: 'reef', nodeId: 'n-2', ownerNodes: ['n-2'], groupId: 'g-1' }) }))
+    expect(element(root, (node) => node.props['aria-label'] === 'Which transfers to show')).toBeTruthy()
   })
 })

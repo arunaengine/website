@@ -15,6 +15,9 @@ vi.mock('@/composables/useAruna', () => ({
   isUnsupportedEndpoint: (err: { status?: number }) => err?.status === 404,
   useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('t'), sessionEpoch: epoch }),
 }))
+vi.mock('@/composables/aruna/state', () => ({
+  nodeClient: (node: string) => ({ baseUrl: `https://${node}`, token: 't' }),
+}))
 vi.mock('@/lib/api', () => ({
   listStorageBuckets: (...args: unknown[]) => listStorageBuckets(...args),
   ApiError: MockApiError,
@@ -29,11 +32,12 @@ const settle = async () => {
   await nextTick()
 }
 
-function setup(group = 'g1') {
+function setup(group = 'g1', nodes: string[] = []) {
   const groupId = ref(group)
   const bucketList = ref<unknown>([])
+  const others = ref(nodes)
   const scope = effectScope()
-  const jobs = scope.run(() => useBucketJobs(groupId, bucketList))!
+  const jobs = scope.run(() => useBucketJobs(groupId, bucketList, others))!
   return { scope, jobs, groupId, bucketList }
 }
 
@@ -52,6 +56,21 @@ describe('useBucketJobs', () => {
     expect(listStorageBuckets).toHaveBeenCalledWith('g1', expect.objectContaining({ after: null }), expect.anything())
     expect([...jobs.value.keys()]).toEqual(['genes'])
     expect(jobs.value.get('genes')).toEqual(RENAMING)
+    scope.stop()
+  })
+
+  it('reads the steps of other nodes from those nodes, by node and bucket', async () => {
+    listStorageBuckets.mockImplementation(async (_group: string, _page: unknown, client: { baseUrl: string }) =>
+      client.baseUrl === 'https://node-2'
+        ? { buckets: [listed('genes', RENAMING)], next: null }
+        : client.baseUrl === 'https://node-3'
+          ? Promise.reject(new MockApiError(503))
+          : { buckets: [listed('reads')], next: null },
+    )
+    const { scope, jobs } = setup('g1', ['node-2', 'node-3'])
+    await settle()
+    await settle()
+    expect([...jobs.value.entries()]).toEqual([['node-2/genes', RENAMING]])
     scope.stop()
   })
 

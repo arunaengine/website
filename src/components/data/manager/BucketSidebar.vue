@@ -75,11 +75,10 @@ const {
   linkedFolderFor,
 } = props.manager
 
-// Steps running on this node's buckets of the group; rows of other nodes show none.
-// They are read again whenever a list was read, in either mode (not on each typed letter).
+// Steps running on the group's buckets, from the node of each shown row. They are read
+// again whenever a list was read, in either mode (not on each typed letter).
 const listings = ref(0)
 watch(() => all.loading.value, (busy) => busy || listings.value++)
-const jobs = useBucketJobs(selectedGroupId, computed(() => [buckets.value, listings.value]))
 
 // Where the next bucket is stored: this node unless changed.
 const storageOpen = ref(false)
@@ -113,6 +112,13 @@ async function created(outcome: AdmissionResponse) {
 const allNodes = computed(() => bucketNodeChoice.value === null)
 // An older node cannot list without a name; the open node's list stands in.
 const searchList = computed(() => allNodes.value && !all.needsName.value)
+// The other nodes of the shown rows, so their steps are read from them.
+const otherNodes = computed(() => {
+  const ids = searchList.value ? all.hits.value.map((hit) => hit.node_id) : [remoteNodeId.value]
+  return [...new Set(ids.filter((id): id is string => Boolean(id) && !realmNodes.isLocalNode(id)))]
+})
+const jobs = useBucketJobs(selectedGroupId, computed(() => [buckets.value, listings.value]), otherNodes)
+const jobOf = (name: string, nodeId: string | null) => jobs.value.get(nodeId && !realmNodes.isLocalNode(nodeId) ? `${nodeId}/${name}` : name)
 const nodeBuckets = computed(() => {
   const term = bucketNameFilter.value.trim().toLowerCase()
   return term ? sidebarBuckets.value.filter((entry) => entry.bucket.toLowerCase().includes(term)) : sidebarBuckets.value
@@ -256,7 +262,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               :pinnable="false"
               option
               :highlighted="index === activeIndex"
-              :job="realmNodes.isLocalNode(hit.node_id) ? jobs.get(hit.bucket) : null"
+              :job="jobOf(hit.bucket, hit.node_id)"
               :active="hitActive(hit)"
               :node-count="spread(hit)"
               v-bind="rowPlace(hit.node_id)"
@@ -305,7 +311,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                 :node-id="entry.nodeId"
                 :pinned="entry.pinned"
                 :synced="syncByBucket.has(syncKeyFor(entry.nodeId, entry.bucket))"
-                :job="entry.nodeId ? null : jobs.get(entry.bucket)"
+                :job="jobOf(entry.bucket, entry.nodeId)"
                 :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
                 v-bind="listPlace(entry.nodeId ?? null)"
                 :linked-to="linkedTo(entry.nodeId ?? null, entry.bucket)"

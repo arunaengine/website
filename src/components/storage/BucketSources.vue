@@ -13,13 +13,14 @@ import { sourceRows } from '@/lib/bucketSources'
 import { truncateMiddle } from '@/lib/utils'
 import { Waypoints } from '@lucide/vue'
 
-const props = defineProps<{ bucket: string; nodeId: string | null; groupId?: string | null }>()
+// `nodes`: the nodes that own the bucket, null for this node; null while they are not known.
+const props = defineProps<{ bucket: string; nodes: (string | null)[] | null; groupId?: string | null }>()
 
 const { listGroupBackends } = useAruna()
 const bucket = computed(() => props.bucket)
-const nodeId = computed(() => props.nodeId)
+const nodes = computed(() => props.nodes)
 const { displayName } = useRealmNodes()
-const listed = useBucketSources(bucket, nodeId)
+const listed = useBucketSources(bucket, nodes)
 
 // Names of the storage backends of the group, for the folders registered in place.
 const backends = ref<Record<string, string>>({})
@@ -41,8 +42,7 @@ const rows = computed(() => sourceRows(listed.sources.value, displayName, (id) =
 const loading = computed(() => listed.state.value === 'loading')
 // A failed read or a node without the list says so; it never reads as "no sources".
 const unknown = computed(() => {
-  if (props.nodeId) return 'This bucket is on another node, so its sources are not listed here.'
-  if (listed.state.value === 'missing') return 'This node does not list the sources of a bucket.'
+  if (listed.state.value === 'missing') return 'The node does not list the sources of a bucket.'
   if (listed.state.value === 'failed') return `The sources could not be read: ${listed.error.value}`
   return null
 })

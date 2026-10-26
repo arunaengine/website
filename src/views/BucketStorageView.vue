@@ -86,6 +86,12 @@ const setId = computed(() =>
   live.value?.live?.setId ?? (distribution.state.value === 'ordinary' ? null : undefined),
 )
 const nodesTab = computed(() => Boolean(nodes.value && isMulti(nodes.value)))
+// Who keeps the bucket's sources and imports: every member of a distributed bucket, else its node.
+const ownerNodes = computed<(string | null)[] | null>(() => {
+  const members = live.value?.members.map((member) => member.nodeId) ?? []
+  if (members.length) return [...new Set(members)].map((id) => (realmNodes.isLocalNode(id) ? null : id))
+  return distribution.state.value === 'loading' ? null : [nodeId.value]
+})
 const canAdminGroup = computed(() => isGroupAdmin(group.value, currentUser.value?.id ?? ''))
 const local = computed(() => !nodeId.value)
 const backendVisible = computed(() => local.value && canAdminGroup.value)
@@ -161,7 +167,7 @@ const browserLink = computed(() => ({
         <StorageOverviewTab v-else :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
         <DistributionOverview v-if="live" :bucket="live" />
         <FileSources v-if="example" :bucket="bucket" />
-        <BucketSources v-else :bucket="bucket" :node-id="nodeId" :group-id="groupId" />
+        <BucketSources v-else :bucket="bucket" :nodes="ownerNodes" :group-id="groupId" />
         <LinkedBy v-if="example" :bucket="bucket" />
         <LinkedDatasets v-else heading="Linked by datasets" card :target="{ bucket, key: '', folder: true, node: nodeId }" />
         <DatabaseMark v-if="example" :bucket="bucket" />
@@ -216,7 +222,7 @@ const browserLink = computed(() => ({
 
       <TabsContent value="transfers" class="mt-0">
         <CopiesOfBucket v-if="example" :bucket="bucket" />
-        <TransfersTab v-else :bucket="bucket" :node-id="nodeId" :group-id="groupId" />
+        <TransfersTab v-else :bucket="bucket" :node-id="nodeId" :owner-nodes="ownerNodes" :group-id="groupId" />
       </TabsContent>
     </Tabs>
   </div>

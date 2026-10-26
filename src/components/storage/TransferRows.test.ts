@@ -51,6 +51,7 @@ const stagingRows = compileClientComponent(new URL('./StagingJobRows.vue', impor
     }),
   },
   '@/composables/useStaging': await import('@/composables/useStaging'),
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string | null) => id ?? 'this node' }) },
   '@/lib/api': Api,
   '@/lib/config': { featureEnabled: () => true },
 })
@@ -84,6 +85,26 @@ describe('staging job rows', () => {
     await flush()
 
     expect(listStagingJobs.mock.calls.length).toBeGreaterThan(calls)
+  })
+
+  it('lists the jobs of every node of a distributed bucket, each with its node', async () => {
+    const job = (state: string) => ({
+      job_id: 'j1', strategy: 'reference', group_id: 'g', connector_id: 'c', bucket: 'reef', state, phase: 'listing',
+      submitted_at: '2026-10-26T12:00:00Z', progress: { items_current: 0, bytes_current: 0 }, errors: [],
+    })
+    listStagingJobs.mockReset().mockImplementation(async (_cursor: unknown, _limit: unknown, node: string | null) =>
+      node === 'node-3' ? Promise.reject(new Api.ApiError(503, 'busy')) : { jobs: [job(node ? 'failed' : 'done')] },
+    )
+    const counts: Array<number | null> = []
+    const { root } = await mountApp(stagingRows, {
+      props: { bucket: 'reef', nodes: [null, 'node-2', 'node-3'], onCount: (count: number | null) => counts.push(count) },
+    })
+    await flush()
+
+    expect(content(root)).toContain('on this node')
+    expect(content(root)).toContain('on node-2')
+    expect(content(root)).toContain('Not answered by node-3')
+    expect(counts.at(-1)).toBeNull()
   })
 
   it('says the scan stopped early instead of claiming none', async () => {

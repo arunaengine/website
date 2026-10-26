@@ -15,11 +15,11 @@ const answer = (complete = true): FileSourcesResponse => ({
   complete,
 })
 
-function start(name = 'lab', node: string | null = null) {
+function start(name = 'lab', asked: (string | null)[] | null = [null]) {
   const bucket = ref(name)
-  const nodeId = ref(node)
+  const nodes = ref(asked)
   const scope = effectScope()
-  return { bucket, sources: scope.run(() => useBucketSources(bucket, nodeId))!, scope }
+  return { bucket, nodes, sources: scope.run(() => useBucketSources(bucket, nodes))!, scope }
 }
 
 describe('bucket sources', () => {
@@ -30,7 +30,7 @@ describe('bucket sources', () => {
     const { sources, scope } = start()
     await vi.waitFor(() => expect(sources.state.value).toBe('ready'))
 
-    expect(aruna.getBucketSources).toHaveBeenCalledWith('lab')
+    expect(aruna.getBucketSources).toHaveBeenCalledWith('lab', undefined, null)
     expect(sources.sources.value).toHaveLength(1)
     expect(sources.complete.value).toBe(false)
     scope.stop()
@@ -49,12 +49,36 @@ describe('bucket sources', () => {
     second.scope.stop()
   })
 
-  it('asks nothing for a bucket on another node', async () => {
-    const { sources, scope } = start('lab', 'node-2')
+  it('asks nothing while the owning nodes are not known', async () => {
+    const { sources, scope } = start('lab', null)
     await nextTick()
 
-    expect(sources.state.value).toBe('missing')
+    expect(sources.state.value).toBe('loading')
     expect(aruna.getBucketSources).not.toHaveBeenCalled()
+    scope.stop()
+  })
+
+  it('combines the sources of every node of a distributed bucket and lists a shared one once', async () => {
+    aruna.getBucketSources
+      .mockResolvedValueOnce(answer())
+      .mockResolvedValueOnce({ sources: [...answer().sources, { kind: 'storage', import_id: 'i1', backend_id: 'b1', backend_prefix: 'p/', key_prefix: '' }], complete: true })
+    const { sources, scope } = start('bakrep', [null, 'node-2'])
+    await vi.waitFor(() => expect(sources.state.value).toBe('ready'))
+
+    expect(aruna.getBucketSources).toHaveBeenCalledWith('bakrep', undefined, 'node-2')
+    expect(sources.sources.value.map((source) => source.kind)).toEqual(['sync', 'storage'])
+    expect(sources.complete.value).toBe(true)
+    scope.stop()
+  })
+
+  it('keeps the answered sources but says a node failed, and never claims the list is whole', async () => {
+    aruna.getBucketSources.mockResolvedValueOnce(answer()).mockRejectedValueOnce(new ApiError(503, 'node busy'))
+    const { sources, scope } = start('bakrep', [null, 'node-3'])
+    await vi.waitFor(() => expect(sources.state.value).toBe('failed'))
+
+    expect(sources.sources.value).toHaveLength(1)
+    expect(sources.complete.value).toBe(false)
+    expect(sources.error.value).toBe('node busy')
     scope.stop()
   })
 
