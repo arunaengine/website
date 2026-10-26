@@ -19,8 +19,8 @@ import { ApiError, apiErrorMessage, type BucketSearchHit } from '@/lib/api'
 import { rowOf, STATE_NOTES, type DatabaseRow } from '@/lib/databases'
 import { Trash2 } from '@lucide/vue'
 
-const { realmInfo, listDatabases, removeDatabase, getBucketDistribution, sessionEpoch } = useAruna()
-const { isLocalNode, localNodeId } = useRealmNodes()
+const { realmInfo, listDatabases, removeDatabase, sessionEpoch } = useAruna()
+const { isLocalNode } = useRealmNodes()
 const databases = useDatabases()
 const requests = useDatabaseRequests()
 
@@ -78,22 +78,8 @@ async function remove(row: DatabaseRow) {
 const label = (row: DatabaseRow) => row.title || 'A dataset you cannot read'
 const where = (row: DatabaseRow) => row.bucket || 'A bucket you cannot read'
 
-// The bucket to mark: one of this node, with the set it belongs to.
+// The bucket to mark, of any node; its hit names the set a distributed bucket belongs to.
 const chosen = ref<BucketSearchHit | null>(null)
-const setId = ref<string | null | undefined>(undefined)
-let lookups = 0
-
-watch(chosen, async (hit) => {
-  const lookup = ++lookups
-  setId.value = undefined
-  if (!hit || !isLocalNode(hit.node_id)) return
-  try {
-    const status = await getBucketDistribution(hit.bucket)
-    if (lookup === lookups) setId.value = status.set_id
-  } catch (cause) {
-    if (lookup === lookups && cause instanceof ApiError && cause.status === 404) setId.value = null
-  }
-})
 
 const nodeId = computed(() => (chosen.value && !isLocalNode(chosen.value.node_id) ? chosen.value.node_id : null))
 const search = ref('')
@@ -170,14 +156,15 @@ const search = ref('')
         @select="(hit: BucketSearchHit) => (chosen = hit)"
       />
       <DatabaseMarkForm
-        v-if="chosen && (nodeId || setId !== undefined)"
+        v-if="chosen"
         :key="`${chosen.node_id}/${chosen.bucket}`"
         :bucket="chosen.bucket"
         :node-id="nodeId"
-        :set-id="setId ?? null"
+        :set-id="chosen.set_id ?? null"
+        :group-id="chosen.group_id"
+        :group-name="chosen.group_name ?? null"
         @done="load()"
       />
-      <p v-else-if="chosen && localNodeId" class="text-xs text-muted-foreground">Reading the bucket…</p>
     </section>
   </div>
 </template>

@@ -3,7 +3,7 @@ import * as VueRuntime from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, type DatabaseRequestView, type DatabaseView } from '@/lib/api'
 import * as Databases from '@/lib/databases'
-import { button, compileClientComponent, content, flush, mountApp, moduleDefault } from '@/test/clientRender'
+import { button, compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
 
 const aruna = vi.hoisted(() => ({
   realmInfo: { value: { realm_id: 'realm1' } },
@@ -23,8 +23,10 @@ const component = compileClientComponent(new URL('./DatabasesAdmin.vue', import.
   vue: VueRuntime,
   'vue-router': { RouterLink: Slotted('a') },
   '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => h('i')) }),
-  '@/components/data/BucketSearchBox.vue': moduleDefault(Marker('bucket picker')),
-  '@/components/data/DatabaseMarkForm.vue': moduleDefault(Marker('mark form')),
+  '@/components/data/BucketSearchBox.vue': moduleDefault(defineComponent({ inheritAttrs: false, setup: (_, { attrs }) => () => h('section', { ...attrs, picker: true }, 'bucket picker') })),
+  '@/components/data/DatabaseMarkForm.vue': moduleDefault(
+    defineComponent({ props: { nodeId: String, setId: String, groupId: String }, setup: (props) => () => h('section', `mark form ${props.nodeId} ${props.setId} ${props.groupId}`) }),
+  ),
   '@/components/data/DatabaseRequestItem.vue': moduleDefault(Marker('pending request')),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
@@ -35,7 +37,7 @@ const component = compileClientComponent(new URL('./DatabasesAdmin.vue', import.
     useDatabaseRequests: () => ({ requests: pending, loading: ref(false), failure: ref(null), reload: vi.fn() }),
   },
   '@/composables/useDatabases': { useDatabases: () => ({ reload: reloadList }) },
-  '@/composables/useRealmNodes': { useRealmNodes: () => ({ isLocalNode: () => true, localNodeId: ref('n1') }) },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'n1', localNodeId: ref('n1') }) },
   '@/lib/api': { ApiError, apiErrorMessage: (cause: unknown) => (cause as Error).message },
   '@/lib/databases': Databases,
   '@/lib/distributedMock': { mockEnabled: () => false },
@@ -103,5 +105,14 @@ describe('databases admin', () => {
     pending.value = [{ request_id: 'r1', entry: { entry_id: 'e', dataset_id: 'd', owner_group: 'g', target: { kind: 'distributed', set_id: 's' } }, curator: 'u', created_at_ms: 1 }]
 
     expect(content(await render())).toContain('pending request')
+  })
+
+  it('marks a distributed bucket of another node by the set its hit names', async () => {
+    const root = await render()
+    const picker = element(root, (node) => Boolean(node.props.picker))
+    ;(picker.props.onSelect as (hit: unknown) => void)({ arn: 'a', bucket: 'bakrep', node_id: 'n3', group_id: 'g7', created_at: '', set_id: 's1' })
+    await flush()
+
+    expect(content(root)).toContain('mark form n3 s1 g7')
   })
 })
