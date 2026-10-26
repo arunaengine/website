@@ -9,6 +9,7 @@ import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useAruna } from '@/composables/useAruna'
 import { classifyObject } from '@/composables/useObjectPreview'
+import { readCapped, type VersionStream } from '@/lib/api/resolve'
 import { errorMessage, formatBytes } from '@/lib/utils'
 import { Download, Eye } from '@lucide/vue'
 
@@ -18,6 +19,9 @@ const TextPreview = defineAsyncComponent(() => import('@/components/preview/Text
 const MarkdownPreview = defineAsyncComponent(() => import('@/components/preview/MarkdownPreview.vue'))
 
 const PREVIEW_CAP = 2 * 1024 * 1024
+
+type SaveHandle = { createWritable(): Promise<WritableStream<Uint8Array>> }
+type SavePicker = (options: { suggestedName: string }) => Promise<SaveHandle>
 
 const { resolveVersion } = useAruna()
 const busy = ref(false)
@@ -39,12 +43,33 @@ function release() {
 }
 onBeforeUnmount(release)
 
+// A browser that can write a chosen file takes the stream straight to disk. Others have no way to
+// save a bearer-token request without holding it, so the caller collects it in a Blob instead.
+async function saveToFile(version: VersionStream): Promise<boolean> {
+  const pick = (globalThis as { showSaveFilePicker?: SavePicker }).showSaveFilePicker
+  if (!pick) return false
+  let handle: SaveHandle
+  try {
+    handle = await pick({ suggestedName: props.name })
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === 'AbortError') {
+      await version.body.cancel()
+      return true
+    }
+    return false
+  }
+  await version.body.pipeTo(await handle.createWritable())
+  return true
+}
+
 async function download() {
   if (busy.value) return
   busy.value = true
   failure.value = null
   try {
-    const url = URL.createObjectURL(await resolveVersion(props.realmId, props.versionId))
+    const version = await resolveVersion(props.realmId, props.versionId)
+    if (await saveToFile(version)) return
+    const url = URL.createObjectURL(await new Response(version.body).blob())
     const anchor = document.createElement('a')
     anchor.href = url
     anchor.download = props.name
@@ -67,9 +92,9 @@ async function preview() {
   release()
   open.value = true
   try {
-    const blob = await resolveVersion(props.realmId, props.versionId)
-    if (blob.size > PREVIEW_CAP) {
-      failure.value = `This file is ${formatBytes(blob.size)}, above the ${formatBytes(PREVIEW_CAP)} preview limit. Download it instead.`
+    const blob = await readCapped(await resolveVersion(props.realmId, props.versionId), PREVIEW_CAP)
+    if (!blob) {
+      failure.value = `This file is above the ${formatBytes(PREVIEW_CAP)} preview limit. Download it instead.`
     } else if (kind.value.kind === 'image') {
       imageUrl.value = URL.createObjectURL(blob)
     } else {

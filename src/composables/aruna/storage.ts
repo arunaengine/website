@@ -20,6 +20,7 @@ import {
   type JoinMemberRequest,
   type SettingsBody,
   type TransferRangeRequest,
+  type VersionStream,
   type BlobLocationsResponse,
   type BucketRoutingResponse,
   type BucketLinksQuery,
@@ -93,7 +94,7 @@ export function getFileOrigin(bucket: string, query: { key: string; version_id?:
 }
 
 /** The bytes of a global version id, which the node serves or fetches from a holder. */
-export function resolveVersion(realmId: string, versionId: string, signal?: AbortSignal): Promise<Blob> {
+export function resolveVersion(realmId: string, versionId: string, signal?: AbortSignal): Promise<VersionStream> {
   return requestResolve(realmId, versionId, refreshContext().client, signal)
 }
 

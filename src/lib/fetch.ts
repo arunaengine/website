@@ -50,10 +50,15 @@ function delay(ms: number, signal?: AbortSignal | null): Promise<void> {
   })
 }
 
+/**
+ * With `stream`, the timeout covers only the wait for the response head. The body is handed back
+ * unread, and the caller's signal alone stops it.
+ */
 export async function fetchWithTimeout(
   input: RequestInfo | URL,
   init: RequestInit = {},
   timeoutMs: number,
+  stream = false,
 ): Promise<Response> {
   const controller = new AbortController()
   const callerSignal = init.signal
@@ -66,6 +71,7 @@ export async function fetchWithTimeout(
   const timeout = globalThis.setTimeout(() => controller.abort(timedOut), timeoutMs)
   try {
     const response = await fetch(input, { ...init, signal: controller.signal })
+    if (stream) return response
     // Buffer the body inside the timeout window. Some servers expose a body
     // stream even on empty responses (e.g. a DELETE answered with 204 plus
     // Content-Length: 0); reconstructing such a Response with a non-null body
@@ -82,7 +88,7 @@ export async function fetchWithTimeout(
     throw controller.signal.reason === timedOut ? timedOut : err
   } finally {
     globalThis.clearTimeout(timeout)
-    callerSignal?.removeEventListener('abort', forwardAbort)
+    if (!stream) callerSignal?.removeEventListener('abort', forwardAbort)
   }
 }
 
@@ -99,8 +105,9 @@ export async function fetchWithRetry(
   input: RequestInfo | URL,
   init: RequestInit = {},
   timeoutMs: number,
+  stream = false,
 ): Promise<Response> {
-  const response = await fetchWithTimeout(input, init, timeoutMs)
+  const response = await fetchWithTimeout(input, init, timeoutMs, stream)
   if (response.status !== RATE_LIMITED_STATUS) return response
 
   const method = (init.method ?? 'GET').toUpperCase()
@@ -109,6 +116,7 @@ export async function fetchWithRetry(
   const wait = retryAfterMs(response)
   if (wait === null) return response
 
+  await response.body?.cancel()
   await delay(wait, init.signal)
-  return fetchWithTimeout(input, init, timeoutMs)
+  return fetchWithTimeout(input, init, timeoutMs, stream)
 }
