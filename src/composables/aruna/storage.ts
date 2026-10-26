@@ -39,12 +39,12 @@ import {
   type StorageRoutingRule,
 } from '@/lib/api'
 import { getStorageDeletionPreflight, type StorageDeletionPreflight } from '@/lib/storageDeletion'
-import { refreshContext, request, saving } from './state'
+import { nodeClient, refreshContext, request, saving } from './state'
 
 // ── Storage routing (group default and per-bucket rules) ────────────────────
 
-export async function getGroupRouting(groupId: string): Promise<GroupRoutingResponse> {
-  return request<GroupRoutingResponse>(`/data/groups/${groupId}/storage/routing`)
+export async function getGroupRouting(groupId: string, nodeId?: string | null): Promise<GroupRoutingResponse> {
+  return request<GroupRoutingResponse>(`/data/groups/${groupId}/storage/routing`, {}, nodeId)
 }
 
 // An omitted target clears the group default, falling back to node routing. `bucket` names
@@ -69,13 +69,13 @@ export async function putGroupRouting(
   }
 }
 
-export async function getBucketRouting(bucket: string): Promise<BucketRoutingResponse> {
-  return request<BucketRoutingResponse>(`/data/buckets/${encodeURIComponent(bucket)}/storage/routing`)
+export async function getBucketRouting(bucket: string, nodeId?: string | null): Promise<BucketRoutingResponse> {
+  return request<BucketRoutingResponse>(`/data/buckets/${encodeURIComponent(bucket)}/storage/routing`, {}, nodeId)
 }
 
 /** What the serving node counts in one bucket; 404 means the node lacks the route. */
-export function getBucketUsage(bucket: string): Promise<BucketUsageResponse> {
-  return requestBucketUsage(bucket, refreshContext().client)
+export function getBucketUsage(bucket: string, nodeId?: string | null): Promise<BucketUsageResponse> {
+  return requestBucketUsage(bucket, nodeClient(nodeId))
 }
 
 /** What deleting a whole bucket removes; a bucket stored on more nodes also lists the datasets that link it. */
@@ -83,9 +83,9 @@ export function getSetDeletion(bucket: string): Promise<StorageDeletionPreflight
   return getStorageDeletionPreflight({ kind: 'bucket', bucket }, refreshContext().client)
 }
 
-/** Datasets that link a file, a folder or the root of a bucket on this node. */
-export function getBucketLinks(bucket: string, query: BucketLinksQuery, signal?: AbortSignal): Promise<DataLinksResponse> {
-  return requestLinks(bucket, query, refreshContext().client, signal)
+/** Datasets that link a file, a folder or the root of a bucket on one node, this one unless named. */
+export function getBucketLinks(bucket: string, query: BucketLinksQuery, signal?: AbortSignal, nodeId?: string | null): Promise<DataLinksResponse> {
+  return requestLinks(bucket, query, nodeClient(nodeId), signal)
 }
 
 /** Where one file version of a bucket on this node came from. */
@@ -103,9 +103,9 @@ export function getFilePartOf(bucket: string, key: string, signal?: AbortSignal)
   return requestPartOf(bucket, key, refreshContext().client, signal)
 }
 
-/** The incoming syncs and storage folders of a bucket on this node. */
-export function getBucketSources(bucket: string, signal?: AbortSignal): Promise<FileSourcesResponse> {
-  return requestSources(bucket, refreshContext().client, signal)
+/** The incoming syncs and storage folders of a bucket on one node, this one unless named. */
+export function getBucketSources(bucket: string, signal?: AbortSignal, nodeId?: string | null): Promise<FileSourcesResponse> {
+  return requestSources(bucket, nodeClient(nodeId), signal)
 }
 
 /** The bucket and folder a linked part covers. */
@@ -119,8 +119,8 @@ export function getDataLinks(id: string, query: { parts_only?: boolean; after?: 
 }
 
 /** The set a bucket on this node belongs to; 404 means an ordinary bucket. */
-export function getBucketDistribution(bucket: string, signal?: AbortSignal): Promise<DistributedResponse> {
-  return requestDistribution(bucket, refreshContext().client, signal)
+export function getBucketDistribution(bucket: string, signal?: AbortSignal, nodeId?: string | null): Promise<DistributedResponse> {
+  return requestDistribution(bucket, nodeClient(nodeId), signal)
 }
 
 /** Group ADMIN: creates one bucket on several nodes with this node as publisher. */

@@ -38,7 +38,7 @@ const waiting = ref(false)
 let runs = 0
 
 // The datasets whose linked part is exactly this bucket's root, paged and with their coverage.
-const links = useDatasetLinks(computed(() => ({ bucket: props.bucket, key: '', folder: true, remote: Boolean(props.nodeId) })))
+const links = useDatasetLinks(computed(() => ({ bucket: props.bucket, key: '', folder: true, node: props.nodeId })))
 const options = computed(() =>
   links.documents.value.map((document) => ({ value: document.document_id, label: document.title || document.document_path })),
 )

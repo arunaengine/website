@@ -12,8 +12,8 @@ export interface LinkTarget {
   /** A file key, or a folder prefix when `folder` is set. The root is the empty prefix. */
   key: string
   folder: boolean
-  /** A bucket on another node is asked of that node, which this portal does not do. */
-  remote: boolean
+  /** The node that holds the bucket and is asked; null for this node. */
+  node: string | null
   /** An identifier to ask for instead of a file or folder of the bucket. */
   id?: string
 }
@@ -45,7 +45,7 @@ export function useDatasetLinks(target: Ref<LinkTarget | null>) {
     const asked = target.value
     const run = ++runs
     const epoch = sessionEpoch.value
-    if (!asked || asked.remote) {
+    if (!asked) {
       state.value = 'missing'
       return
     }
@@ -56,7 +56,7 @@ export function useDatasetLinks(target: Ref<LinkTarget | null>) {
       const after = append && next.value ? { after: next.value } : {}
       const page = asked.id
         ? await getDataLinks(asked.id, { parts_only: true, ...after })
-        : await getBucketLinks(asked.bucket, { ...queryOf(asked), ...after })
+        : await getBucketLinks(asked.bucket, { ...queryOf(asked), ...after }, undefined, asked.node)
       if (!current()) return
       take(page, append)
       state.value = 'ready'
@@ -74,7 +74,7 @@ export function useDatasetLinks(target: Ref<LinkTarget | null>) {
   }
 
   watch(
-    () => [target.value?.bucket, target.value?.key, target.value?.folder, target.value?.remote, target.value?.id, sessionEpoch.value],
+    () => [target.value?.bucket, target.value?.key, target.value?.folder, target.value?.node, target.value?.id, sessionEpoch.value],
     () => {
       documents.value = []
       next.value = null

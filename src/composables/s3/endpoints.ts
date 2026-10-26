@@ -2,7 +2,9 @@ import { computed } from 'vue'
 import { parseS3Url } from '@/lib/tes'
 import { useAruna } from '../useAruna'
 
-const { nodeInfo, realmInfo, apiBaseUrl } = useAruna()
+export { nodeApiBase } from '../aruna/state'
+
+const { nodeInfo, realmInfo } = useAruna()
 
 export const connectedEndpoint = computed(
   () =>
@@ -13,14 +15,6 @@ export const connectedEndpoint = computed(
 
 export function localNodeId(): string | null {
   return nodeInfo.value?.node.peer_id ?? null
-}
-
-export function nodeApiBase(nodeId: string): string | null {
-  if (nodeId === localNodeId()) return apiBaseUrl.value
-  const node = (realmInfo.value?.nodes ?? []).find((entry) => entry.node_id === nodeId)
-  const url = (node?.info?.urls?.api ?? node?.rest_url ?? '').replace(/\/+$/, '')
-  if (!url) return null
-  return url.endsWith('/api/v1') ? url : `${url}/api/v1`
 }
 
 // Resolves the S3 endpoint serving `nodeId`; null/the local peer id map to the

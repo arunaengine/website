@@ -242,16 +242,16 @@ describe('bucket storage overview', () => {
     expect(text).toContain('This node did not answer, so the numbers are unknown right now.')
   })
 
-  it('does not answer for a bucket hosted on another node', async () => {
+  it('asks the node that holds a bucket on another node', async () => {
     getBucketRouting.mockClear()
     getBucketPlacement.mockClear()
     syncRows.value = []
 
     const text = await render({ nodeId: 'node-far' })
 
-    expect(text).toContain('Unknown here')
-    expect(text).toContain('This bucket is hosted on another node.')
-    expect(getBucketRouting).not.toHaveBeenCalled()
-    expect(getBucketPlacement).not.toHaveBeenCalled()
+    expect(text).not.toContain('Unknown here')
+    expect(getBucketUsage).toHaveBeenCalledWith('reef-survey', 'node-far')
+    expect(getBucketRouting).toHaveBeenCalledWith('reef-survey', 'node-far')
+    expect(getBucketPlacement).toHaveBeenCalledWith('reef-survey', 'node-far')
   })
 })

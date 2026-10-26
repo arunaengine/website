@@ -443,7 +443,7 @@ const details = computed(() => props.folder ? [
           class="mt-4"
           quiet-empty
           heading="Linked by datasets"
-          :target="{ bucket: props.bucket, key: props.objectKey, folder: true, remote: false }"
+          :target="{ bucket: props.bucket, key: props.objectKey, folder: true, node: null }"
         />
         <p v-if="props.referencedFrom" class="mt-3 text-xs text-muted-foreground">
           Referenced from {{ props.referencedFrom.label }}.

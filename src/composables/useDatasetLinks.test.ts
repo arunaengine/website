@@ -12,7 +12,7 @@ vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
 const { useDatasetLinks } = await import('@/composables/useDatasetLinks')
 type Target = import('@/composables/useDatasetLinks').LinkTarget
 
-const file: Target = { bucket: 'lab', key: 'raw/a.fq', folder: false, remote: false }
+const file: Target = { bucket: 'lab', key: 'raw/a.fq', folder: false, node: null }
 
 function page(ids: string[], extra: Partial<DataLinksResponse> = {}): DataLinksResponse {
   return {
@@ -44,24 +44,24 @@ describe('dataset links', () => {
     const { links, scope } = start()
     await vi.waitFor(() => expect(links.state.value).toBe('ready'))
 
-    expect(aruna.getBucketLinks).toHaveBeenCalledWith('lab', { key: 'raw/a.fq', parts_only: true })
+    expect(aruna.getBucketLinks).toHaveBeenCalledWith('lab', { key: 'raw/a.fq', parts_only: true }, undefined, null)
     expect(links.documents.value.map((document) => document.document_id)).toEqual(['d1'])
     scope.stop()
   })
 
   it('asks for the datasets that link exactly a folder or the bucket root', async () => {
     aruna.getBucketLinks.mockResolvedValue(page([]))
-    const { links, scope } = start({ bucket: 'lab', key: '', folder: true, remote: false })
+    const { links, scope } = start({ bucket: 'lab', key: '', folder: true, node: null })
     await vi.waitFor(() => expect(links.state.value).toBe('ready'))
 
-    expect(aruna.getBucketLinks).toHaveBeenCalledWith('lab', { prefix: '', parts_only: true })
+    expect(aruna.getBucketLinks).toHaveBeenCalledWith('lab', { prefix: '', parts_only: true }, undefined, null)
     scope.stop()
   })
 
   it('asks for the datasets that name an identifier, with the bucket route left alone', async () => {
     aruna.getDataLinks.mockResolvedValue(page(['d1']))
     const part = 'https://w3id.org/aruna/data/r/s/'
-    const { links, scope } = start({ bucket: '', key: '', folder: false, remote: false, id: part })
+    const { links, scope } = start({ bucket: '', key: '', folder: false, node: null, id: part })
     await vi.waitFor(() => expect(links.state.value).toBe('ready'))
 
     expect(aruna.getDataLinks).toHaveBeenCalledWith(part, { parts_only: true })
@@ -87,12 +87,12 @@ describe('dataset links', () => {
     scope.stop()
   })
 
-  it('asks nothing for a bucket on another node', async () => {
-    const { links, scope } = start({ ...file, remote: true })
-    await nextTick()
+  it('asks the node that holds a bucket on another node', async () => {
+    aruna.getBucketLinks.mockResolvedValueOnce(page(['d1']))
+    const { links, scope } = start({ ...file, node: 'node-2' })
+    await vi.waitFor(() => expect(links.state.value).toBe('ready'))
 
-    expect(links.state.value).toBe('missing')
-    expect(aruna.getBucketLinks).not.toHaveBeenCalled()
+    expect(aruna.getBucketLinks).toHaveBeenCalledWith('lab', { key: 'raw/a.fq', parts_only: true }, undefined, 'node-2')
     scope.stop()
   })
 
@@ -104,7 +104,7 @@ describe('dataset links', () => {
     expect([links.more.value, links.complete.value, links.hidden.value]).toEqual([true, false, true])
     await links.loadMore()
 
-    expect(aruna.getBucketLinks).toHaveBeenLastCalledWith('lab', { key: 'raw/a.fq', parts_only: true, after: 'd1' })
+    expect(aruna.getBucketLinks).toHaveBeenLastCalledWith('lab', { key: 'raw/a.fq', parts_only: true, after: 'd1' }, undefined, null)
     expect(links.documents.value.map((document) => document.document_id)).toEqual(['d1', 'd2'])
     expect(links.more.value).toBe(false)
     // A complete later page does not make the first one complete or unhide what it hid.

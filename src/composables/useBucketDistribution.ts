@@ -1,6 +1,6 @@
-// The set of one bucket on the connected node: its nodes, ranges and state.
-// An ordinary bucket answers 404, which is not an error. A bucket on another
-// node, an unreadable one and a failed read all stay "unavailable", never empty.
+// The set of one bucket, as the node that holds it reports it: its nodes, ranges and state.
+// An ordinary bucket answers 404, which is not an error. An unreadable bucket and a failed
+// read stay "unavailable", never empty.
 import { ref, watch, type Ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError } from '@/lib/api'
@@ -20,7 +20,7 @@ export function useBucketDistribution(bucket: Ref<string>, nodeId: Ref<string | 
     const run = ++runs
     const name = bucket.value
     const epoch = sessionEpoch.value
-    if (!name || nodeId.value) {
+    if (!name) {
       view.value = null
       state.value = 'unavailable'
       error.value = null
@@ -28,7 +28,7 @@ export function useBucketDistribution(bucket: Ref<string>, nodeId: Ref<string | 
     }
     const current = () => run === runs && epoch === sessionEpoch.value && name === bucket.value
     try {
-      const status = await getBucketDistribution(name)
+      const status = await getBucketDistribution(name, undefined, nodeId.value)
       if (!current()) return
       view.value = fromStatus(status)
       state.value = 'ready'

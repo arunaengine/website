@@ -47,28 +47,20 @@ const usage = ref<BucketUsageResponse | null>(null)
 // 'missing': this node does not serve the route, so the card stays away.
 const usageState = ref<'loading' | 'ready' | 'missing' | 'failed'>('loading')
 
-// A bucket hosted on another node is a different bucket here, so this node's
-// answer for the same name would describe the wrong thing.
-const remote = computed(() => Boolean(props.nodeId))
-
 function refused(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 401 || error.status === 403)
 }
 
 async function load() {
   void loadSyncs()
-  if (remote.value) {
-    routingState.value = 'unknown'
-    policyState.value = 'unknown'
-    usageState.value = 'missing'
-    return
-  }
+  // The node that holds the bucket answers for it; a distributed bucket sums its ranges there.
+  const node = props.nodeId
   routingState.value = 'loading'
   policyState.value = 'loading'
   usageState.value = 'loading'
   usage.value = null
   const pending: Promise<unknown>[] = [
-    getBucketUsage(props.bucket)
+    getBucketUsage(props.bucket, node)
       .then((counted) => {
         usage.value = counted
         usageState.value = 'ready'
@@ -77,7 +69,7 @@ async function load() {
         const older = error instanceof ApiError && error.status === 404
         usageState.value = older ? 'missing' : 'failed'
       }),
-    getBucketRouting(props.bucket)
+    getBucketRouting(props.bucket, node)
       .then((routing) => {
         rules.value = routing.rules
         routingState.value = 'ready'
@@ -85,7 +77,7 @@ async function load() {
       .catch((error) => {
         routingState.value = refused(error) ? 'refused' : 'unknown'
       }),
-    getBucketPlacement(props.bucket)
+    getBucketPlacement(props.bucket, node)
       .then((placement) => {
         policies.value = placement.policies
         policyState.value = 'ready'
@@ -96,12 +88,12 @@ async function load() {
   ]
   if (props.groupId) {
     pending.push(
-      getGroupRouting(props.groupId)
+      getGroupRouting(props.groupId, node)
         .then((response) => {
           groupTarget.value = response.default_target ?? null
         })
         .catch(() => undefined),
-      listGroupBackends(props.groupId)
+      listGroupBackends(props.groupId, node)
         .then((response) => {
           backends.value = response.backends
         })
@@ -117,7 +109,6 @@ const bucketDefaultRule = computed(
   () => rules.value?.find((rule) => !rule.exact && !rule.key_prefix) ?? null,
 )
 
-const REMOTE = { value: 'Unknown here', note: 'This bucket is hosted on another node.' }
 const NO_ANSWER = { value: 'Unknown', note: 'This node did not answer.' }
 
 // A node that refuses the routing read says nothing about the bucket, so the
@@ -125,7 +116,6 @@ const NO_ANSWER = { value: 'Unknown', note: 'This node did not answer.' }
 const backendKnown = computed(() => routingState.value !== 'refused')
 
 const backend = computed(() => {
-  if (remote.value) return REMOTE
   if (routingState.value === 'loading' || routingState.value === 'refused') return null
   if (routingState.value === 'unknown') return NO_ANSWER
   const count = rules.value?.length ?? 0
@@ -145,7 +135,6 @@ const backend = computed(() => {
 })
 
 const policySummary = computed(() => {
-  if (remote.value) return REMOTE
   if (policyState.value === 'loading') return null
   if (policyState.value === 'refused') {
     return { value: 'Not shown', note: 'Only group admins and realm admins may read it.' }
@@ -175,6 +164,9 @@ const usageDetails = computed(() => {
   const size = formatBytes(held.logical_bytes)
   return [
     { key: 'size', label: 'Size', value: held.complete ? size : `at least ${size}` },
+    ...(held.referenced_bytes == null
+      ? []
+      : [{ key: 'referenced', label: 'Referenced external data', value: `${held.complete ? '' : 'at least '}${formatBytes(held.referenced_bytes)}` }]),
     { key: 'objects', label: 'Objects', value: counted(held.objects) },
     { key: 'versions', label: 'Versions', value: counted(held.versions) },
     { key: 'markers', label: 'Delete markers', value: counted(held.delete_markers) },

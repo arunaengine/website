@@ -24,8 +24,9 @@ export async function stageBatch(input: StagingBatchRequest): Promise<StagingBat
   return request<StagingBatchResponse>('/data/staging/batch', { method: 'POST', body: JSON.stringify(input) })
 }
 
-export async function listStagingJobs(cursor?: string, limit = 50): Promise<ListStagingJobsResponse> {
-  return request<ListStagingJobsResponse>('/data/staging/jobs', { query: { limit, cursor } })
+/** The staging jobs of one node, this one unless named. */
+export async function listStagingJobs(cursor?: string, limit = 50, nodeId?: string | null): Promise<ListStagingJobsResponse> {
+  return request<ListStagingJobsResponse>('/data/staging/jobs', { query: { limit, cursor } }, nodeId)
 }
 
 export async function createStagingJob(input: StagingBatchRequest): Promise<CreateStagingJobResponse> {
@@ -35,8 +36,8 @@ export async function createStagingJob(input: StagingBatchRequest): Promise<Crea
   })
 }
 
-export async function getStagingJob(jobId: string): Promise<StagingJob> {
-  return request<StagingJob>(`/data/staging/jobs/${encodeURIComponent(jobId)}`)
+export async function getStagingJob(jobId: string, nodeId?: string | null): Promise<StagingJob> {
+  return request<StagingJob>(`/data/staging/jobs/${encodeURIComponent(jobId)}`, {}, nodeId)
 }
 
 // Reference-backed keys of a bucket (agreed contract, see api.ts). Follows

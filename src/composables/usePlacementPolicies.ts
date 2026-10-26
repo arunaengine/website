@@ -1,5 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import { apiRequest, type ApiRequestOptions } from '@/lib/api'
+import { nodeClient } from '@/composables/aruna/state'
 import { useAruna } from '@/composables/useAruna'
 import { featureEnabled } from '@/lib/config'
 import {
@@ -32,10 +33,11 @@ const sessionPolicies = ref<PolicyResponse[]>([])
 const sessionPolicyRefs = ref<PolicyRefBody[]>([])
 let sessionWatcherInstalled = false
 
-function request<T>(path: string, options: ApiRequestOptions = {}) {
+function request<T>(path: string, options: ApiRequestOptions = {}, nodeId?: string | null) {
   const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
   const epoch = sessionEpoch.value
-  return apiRequest<T>(path, options, { baseUrl: apiBaseUrl.value, token: authToken.value })
+  const client = nodeId ? nodeClient(nodeId) : { baseUrl: apiBaseUrl.value, token: authToken.value }
+  return apiRequest<T>(path, options, client)
     .then((response) => {
       if (epoch !== sessionEpoch.value) throw new DOMException('The API session changed.', 'AbortError')
       return response
@@ -157,9 +159,11 @@ async function getPlacementPolicy(policy: PolicyRefBody): Promise<PolicyResponse
   return stored
 }
 
-async function getBucketPlacement(bucket: string): Promise<BucketPlacementResponse> {
+async function getBucketPlacement(bucket: string, nodeId?: string | null): Promise<BucketPlacementResponse> {
   const stored = await request<BucketPlacementResponse>(
     `/data/buckets/${encodeURIComponent(bucket)}/placement`,
+    {},
+    nodeId,
   )
   rememberRefs(stored.policies)
   return stored

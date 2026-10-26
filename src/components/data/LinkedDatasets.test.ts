@@ -25,7 +25,7 @@ const component = compileClientComponent(new URL('./LinkedDatasets.vue', import.
 })
 
 async function text() {
-  const target = { bucket: 'lab', key: 'raw/', folder: true, remote: false }
+  const target = { bucket: 'lab', key: 'raw/', folder: true, node: null }
   return content((await mountApp(component, { props: { heading: 'Linked by datasets', target, quietEmpty: true } })).root)
 }
 

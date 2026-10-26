@@ -127,9 +127,26 @@ function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
 
-export async function request<T>(path: string, options = {}) {
+/** The REST base of a realm node; the connected node uses this session's, null when it names none. */
+export function nodeApiBase(nodeId: string): string | null {
+  if (nodeId === nodeInfo.value?.node.peer_id) return apiBaseUrl.value
+  const node = (realmInfo.value?.nodes ?? []).find((entry) => entry.node_id === nodeId)
+  const url = (node?.info?.urls?.api ?? node?.rest_url ?? '').replace(/\/+$/, '')
+  if (!url) return null
+  return url.endsWith('/api/v1') ? url : `${url}/api/v1`
+}
+
+/** This session's client for one node, which checks the token itself; no node is the connected one. */
+export function nodeClient(nodeId?: string | null) {
+  const baseUrl = nodeId ? nodeApiBase(nodeId) : apiBaseUrl.value
+  if (!baseUrl) throw new Error('The node publishes no API address.')
+  return { baseUrl, token: authToken.value }
+}
+
+/** One request of this session, to the connected node unless another is named. */
+export async function request<T>(path: string, options = {}, nodeId?: string | null) {
   const context = refreshContext()
-  const response = await apiRequest<T>(path, options, context.client)
+  const response = await apiRequest<T>(path, options, nodeId ? nodeClient(nodeId) : context.client)
   assertCurrentSession(context.epoch)
   return response
 }

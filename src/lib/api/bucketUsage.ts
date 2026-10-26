@@ -1,8 +1,8 @@
 // ── Bucket usage ────────────────────────────────────────────────────────────
 // GET /data/buckets/{bucket}/usage: what one bucket holds, counted by the node
-// that serves it. Node-local like the other bucket routes, so it is asked of
-// the bucket's own node and carries no node parameter. A node that does not
-// serve the route yet answers 404, which means "not available here", not "empty".
+// that serves it. It is asked of the bucket's own node and carries no node
+// parameter; any member of a distributed bucket sums every range. A node that
+// does not serve the route yet answers 404: "not available here", not "empty".
 import { apiRequest, type ApiClientOptions } from './client'
 
 export interface BucketUsageResponse {
@@ -15,8 +15,13 @@ export interface BucketUsageResponse {
   open_multipart_uploads: number
   /** Bytes over all stored versions. */
   logical_bytes: number
-  /** False when the scan hit its cap: every number is a lower bound. */
+  /** Bytes reachable only through external references; absent on older nodes. */
+  referenced_bytes?: number
+  /** False while a count is not whole: every number is a lower bound. */
   complete: boolean
+  /** Ranges of a distributed bucket and how many of them were counted. */
+  ranges?: number
+  ranges_counted?: number
 }
 
 export function getBucketUsage(

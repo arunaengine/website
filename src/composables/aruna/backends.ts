@@ -9,8 +9,8 @@ import { request, saving } from './state'
 // Every route takes group ADMIN. Secrets are write-only: no response echoes
 // them back, so a caller can only replace them, never read them.
 
-export async function listGroupBackends(groupId: string): Promise<ListGroupBackendsResponse> {
-  return request<ListGroupBackendsResponse>(`/data/groups/${groupId}/storage/backends`)
+export async function listGroupBackends(groupId: string, nodeId?: string | null): Promise<ListGroupBackendsResponse> {
+  return request<ListGroupBackendsResponse>(`/data/groups/${groupId}/storage/backends`, {}, nodeId)
 }
 
 export async function createGroupBackend(

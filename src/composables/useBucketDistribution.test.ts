@@ -71,12 +71,12 @@ describe('bucket distribution', () => {
     scope.stop()
   })
 
-  it('asks nothing for a bucket on another node', async () => {
+  it('asks the node that holds a bucket on another node', async () => {
+    aruna.getBucketDistribution.mockResolvedValueOnce(status('spire'))
     const { distribution, scope } = start('spire', 'node-2')
-    await nextTick()
+    await vi.waitFor(() => expect(distribution.state.value).toBe('ready'))
 
-    expect(distribution.state.value).toBe('unavailable')
-    expect(aruna.getBucketDistribution).not.toHaveBeenCalled()
+    expect(aruna.getBucketDistribution).toHaveBeenCalledWith('spire', undefined, 'node-2')
     scope.stop()
   })
 

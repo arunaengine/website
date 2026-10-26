@@ -57,7 +57,7 @@ async function browse() {
     </div>
     <p v-if="problem" class="text-[11px] font-normal text-muted-foreground">{{ problem }}</p>
     <div v-if="others" class="text-[11px] font-normal" @click.stop>
-      <LinkedDatasets heading="Also linked by" :target="{ bucket: '', key: '', folder: false, remote: false, id }" :exclude="datasetId" />
+      <LinkedDatasets heading="Also linked by" :target="{ bucket: '', key: '', folder: false, node: null, id }" :exclude="datasetId" />
     </div>
   </div>
 </template>
