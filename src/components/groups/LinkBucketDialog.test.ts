@@ -35,6 +35,7 @@ const Dialog = compileClientComponent(new URL('./LinkBucketDialog.vue', import.m
   '@/components/ui/DialogClose.vue': moduleDefault(Slot),
   '@/components/ui/DialogContent.vue': moduleDefault(Slot),
   '@/components/ui/DialogDescription.vue': moduleDefault(Slot),
+  '@/components/distributed/StorageFeatureLink.vue': moduleDefault(defineComponent(() => () => null)),
   '@/components/ui/DialogFooter.vue': moduleDefault(Slot),
   '@/components/ui/DialogHeader.vue': moduleDefault(Slot),
   '@/components/ui/DialogTitle.vue': moduleDefault(Slot),

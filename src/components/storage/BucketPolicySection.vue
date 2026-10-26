@@ -10,6 +10,7 @@ import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DocsLink from '@/components/ui/DocsLink.vue'
+import StorageFeatureLink from '@/components/distributed/StorageFeatureLink.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Input from '@/components/ui/Input.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
@@ -209,6 +210,7 @@ function onPublished(policy: PolicyResponse) {
         <p class="text-xs text-muted-foreground">
           A policy allows a copy; it never creates, moves or removes one.
           <DocsLink icon topic="where-data-lives" section="Placement policies" class="ml-0.5" />
+          <StorageFeatureLink icon question="sites" class="ml-0.5" />
         </p>
 
         <ul v-if="draft.length" class="divide-y divide-border rounded-md border border-border">

@@ -16,17 +16,22 @@ import Spinner from '@/components/ui/Spinner.vue'
 import CoverageIcon from '@/components/search/CoverageIcon.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealm } from '@/composables/useRealm'
+import { useDatabases } from '@/composables/useDatabases'
+import { useMockDatabases } from '@/composables/useMockDatabases'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSearchSettings } from '@/composables/useSearchSettings'
 import { OBJECT_SEARCH_MODE_LABELS, useUnifiedSearch } from '@/composables/useUnifiedSearch'
 import { isLeafFile } from '@/lib/dataEntities'
-import { truncateMiddle } from '@/lib/utils'
+import { NOT_HELD_HERE, type DatabaseRow } from '@/lib/databases'
+import { mockEnabled } from '@/lib/distributedMock'
+import { searchFiles } from '@/lib/distributedMockData'
+import { errorMessage, truncateMiddle } from '@/lib/utils'
 import { Search, Settings2, X } from '@lucide/vue'
 import { useMediaQuery } from '@vueuse/core'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-type QuickSection = 'datasets' | 'files' | 'buckets' | 'objects' | 'groups' | 'people'
+type QuickSection = 'datasets' | 'files' | 'buckets' | 'objects' | 'databases' | 'groups' | 'people'
 
 interface QuickItem {
   key: string
@@ -36,6 +41,8 @@ interface QuickItem {
   routeName: string
   routeParams: Record<string, string>
   routeQuery?: Record<string, string>
+  /** A database opens where it is held, which is resolved on open. */
+  database?: DatabaseRow
 }
 
 // Declaration order is the order the summary line lists the kinds in.
@@ -44,6 +51,7 @@ const QUICK_KIND_LABELS: Record<QuickSection, string> = {
   files: 'File',
   buckets: 'Bucket',
   objects: 'Object',
+  databases: 'Database',
   groups: 'Group',
   people: 'User',
 }
@@ -66,6 +74,8 @@ const { authToken } = useAruna()
 const { displayName: nodeDisplayName, isLocalNode } = useRealmNodes()
 const router = useRouter()
 const { objectSearchMode } = useSearchSettings()
+const { search: searchDatabases } = useMockDatabases()
+const databases = useDatabases()
 const objectModeOptions = Object.entries(OBJECT_SEARCH_MODE_LABELS).map(([value, label]) => ({ value, label }))
 
 // Quick search is server-backed only: the catalog is paged, so a client-side
@@ -123,6 +133,35 @@ const items = computed<QuickItem[]>(() => [
       ...(objectParentPrefix(hit.key) ? { prefix: objectParentPrefix(hit.key) as string } : {}),
     },
   })),
+  // The databases the user may use, by the dataset's title and the bucket name.
+  ...databases.search(q.value).map((row): QuickItem => ({
+    key: `db:${row.entryId}`,
+    section: 'databases',
+    title: row.title || row.bucket,
+    subtitle: `Bucket: ${row.bucket}`,
+    routeName: 'bucket',
+    routeParams: { bucketId: row.bucket },
+    routeQuery: { group: row.ownerGroup },
+    database: row,
+  })),
+  // Databases and files of the example buckets (node mock).
+  ...(mockEnabled() ? searchDatabases(q.value) : []).map((entry): QuickItem => ({
+    key: `db:${entry.id}`,
+    section: 'databases',
+    title: entry.dataset.name,
+    subtitle: `${entry.dataset.description} ${entry.dataset.source}`,
+    routeName: 'bucket',
+    routeParams: { bucketId: entry.bucket },
+  })),
+  ...(mockEnabled() ? searchFiles(q.value) : []).map((file): QuickItem => ({
+    key: `m:${file.key}`,
+    section: 'files',
+    title: file.title,
+    subtitle: file.subtitle,
+    routeName: 'bucket',
+    routeParams: { bucketId: file.bucket },
+    routeQuery: { object: file.title },
+  })),
   ...quickGroups.value.map((group): QuickItem => ({
     key: `g:${group.group_id}`,
     section: 'groups',
@@ -143,9 +182,20 @@ const items = computed<QuickItem[]>(() => [
 // rather than read as the answer to what was just typed.
 const quickStale = computed(() => quickPending.value && items.value.length > 0)
 // One icon carries the whole answer; the numbers live on the search page.
-const quickCoverageShown = computed(() =>
-  quickSearched.value || quickObjectSearched.value || Boolean(quickError.value),
+// The databases are matched from the list read for the session, so it counts towards coverage.
+const databasesSearched = computed(() => Boolean(authToken.value) && q.value.trim().length >= 2)
+const databasesCovered = computed(
+  () => !databasesSearched.value || (databases.state.value === 'ready' && databases.complete.value),
 )
+const coverageComplete = computed(() => quickComplete.value && databasesCovered.value)
+const quickCoverageShown = computed(() =>
+  quickSearched.value || quickObjectSearched.value || Boolean(quickError.value) || !databasesCovered.value,
+)
+
+function retryAll() {
+  if (!databasesCovered.value) void databases.reload()
+  if (!quickComplete.value) retrySearch()
+}
 const quickObjectErrorDetail = computed(() => {
   if (!quickObjectError.value) return ''
   const strict = objectSearchMode.value === 'distributed_strict'
@@ -167,7 +217,13 @@ const quickSummary = computed(() => {
 const activeKey = computed(() => items.value[activeIndex.value]?.key ?? null)
 
 watch(items, () => (activeIndex.value = -1))
-watch(q, () => (activeIndex.value = -1))
+watch(q, (value) => {
+  activeIndex.value = -1
+  databaseProblem.value = null
+  opening++
+  // The list of databases is read once, when the first search needs it.
+  if (value.trim().length >= 2) databases.ensure()
+})
 watch(isNarrowSearch, (narrow) => {
   if (!narrow && panelOpen.value) requestPanelClose(false)
 })
@@ -230,7 +286,27 @@ function navigateAfterPanel(callback: () => void) {
   else callback()
 }
 
-function openItem(item: QuickItem) {
+// Why a chosen database cannot open from here; a later choice drops an earlier answer.
+const databaseProblem = ref<string | null>(null)
+let opening = 0
+
+async function openItem(chosen: QuickItem) {
+  const run = ++opening
+  let item = chosen
+  databaseProblem.value = null
+  if (chosen.database) {
+    try {
+      const place = await databases.locate(chosen.database)
+      if (run !== opening) return
+      if (!place) return void (databaseProblem.value = NOT_HELD_HERE)
+      const routeQuery: Record<string, string> = { group: chosen.database.ownerGroup }
+      if (!isLocalNode(place.nodeId)) routeQuery.node = place.nodeId
+      item = { ...chosen, routeParams: { bucketId: place.bucket }, routeQuery }
+    } catch (cause) {
+      if (run === opening) databaseProblem.value = errorMessage(cause)
+      return
+    }
+  }
   showResults.value = false
   q.value = ''
   navigateAfterPanel(() => void router.push({
@@ -258,7 +334,7 @@ function onInputKeydown(event: KeyboardEvent) {
     activeIndex.value = list.length ? (activeIndex.value - 1 + list.length) % list.length : -1
   } else if (event.key === 'Enter') {
     const item = list[activeIndex.value]
-    if (item) openItem(item)
+    if (item) void openItem(item)
     else if (q.value.trim()) openSearchPage()
   } else if (event.key === 'Escape') {
     showResults.value = false
@@ -501,20 +577,23 @@ onBeforeUnmount(() => {
                   role="status"
                   class="ml-auto flex shrink-0 items-center gap-1"
                 >
-                  <CoverageIcon compact :complete="quickComplete" @mousedown.prevent @click="openSearchPage" />
+                  <CoverageIcon compact :complete="coverageComplete" @mousedown.prevent @click="openSearchPage" />
                   <Button
-                    v-if="!quickComplete"
+                    v-if="!coverageComplete"
                     variant="ghost"
                     size="sm"
                     class="h-8 shrink-0 px-2 text-[10px]"
                     :disabled="quickPending"
                     @mousedown.prevent
-                    @click="retrySearch"
+                    @click="retryAll"
                   >
                     Retry
                   </Button>
                 </div>
               </div>
+              <p v-if="databaseProblem" role="status" class="border-t border-border/70 px-3 py-1.5 text-[10px] text-muted-foreground">
+                {{ databaseProblem }}
+              </p>
               <p
                 v-if="quickObjectError"
                 role="status"

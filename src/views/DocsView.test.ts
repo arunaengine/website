@@ -54,6 +54,10 @@ async function renderTopic(slug: string): Promise<string> {
 }
 
 describe('versioned in-portal Docs', () => {
+  it('opens the storage feature guide', async () => {
+    expect(await renderTopic('storage-features')).toContain('Which storage feature do I need?')
+  })
+
   it('renders every declared concept and how-to topic', async () => {
     // Guides lead; the concept wiki follows, glossary last as the long tail.
     expect(docsTopics.map((topic) => topic.slug)).toEqual([
@@ -79,6 +83,7 @@ describe('versioned in-portal Docs', () => {
       'storage-access',
       'states-and-retry',
       'data-to-compute',
+      'storage-features',
       'glossary',
     ])
 

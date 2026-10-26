@@ -39,6 +39,7 @@ const section = compileClientComponent(new URL('./BucketRoutingSection.vue', imp
   '@lucide/vue': new Proxy({}, { get: () => IconStub }),
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
   '@/components/ui/DocsLink.vue': moduleDefault(Slotted('a')),
+  '@/components/distributed/StorageFeatureLink.vue': moduleDefault({ render: () => null }),
   '@/components/ui/Input.vue': moduleDefault(Slotted('input')),
   '@/components/ui/Switch.vue': moduleDefault(Slotted('button')),
   '@/components/ui/Skeleton.vue': moduleDefault(Slotted('div')),

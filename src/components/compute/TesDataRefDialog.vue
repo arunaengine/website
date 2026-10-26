@@ -12,11 +12,14 @@ import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import OptionToggle from '@/components/ui/OptionToggle.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
+import DatabasesTab from '@/components/data/add/DatabasesTab.vue'
 import { useS3, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { useAruna } from '@/composables/useAruna'
 import { activeGroupId } from '@/composables/useGroupSelection'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { errorMessage } from '@/lib/utils'
 import {
   normalizeContainerDir,
@@ -46,7 +49,34 @@ const emit = defineEmits<{
 
 const s3 = useS3()
 const { currentUser, myGroups } = useAruna()
+const { isLocalNode } = useRealmNodes()
 const credentialDialogOpen = ref(false)
+
+// Inputs come from a bucket of this node or from a database this node holds, in its own group.
+const SOURCES = [
+  { value: 'buckets', label: 'Buckets' },
+  { value: 'databases', label: 'Databases' },
+]
+const source = ref<'buckets' | 'databases'>('buckets')
+const database = ref<{ bucket: string; groupId: string } | null>(null)
+const databaseProblem = ref<string | null>(null)
+
+function chooseDatabase(bucket: string, nodeId: string, groupId: string) {
+  if (!isLocalNode(nodeId)) {
+    databaseProblem.value = 'This database is on another node. Task inputs come from this node.'
+    return
+  }
+  databaseProblem.value = null
+  pendingSelection.value = null
+  database.value = { bucket, groupId }
+}
+
+function showSource(next: 'buckets' | 'databases') {
+  source.value = next
+  database.value = null
+  databaseProblem.value = null
+  pendingSelection.value = null
+}
 
 // Folder handling: the TES facade stages FILE inputs only, so a folder pick is
 // expanded here (for validation and the file cap) but emitted as ONE folder
@@ -151,6 +181,7 @@ watch(
     folderError.value = null
     mountDir.value = props.mountDefault
     pendingSelection.value = null
+    showSource('buckets')
     // The browser needs a session; without one the picker only offers credentials.
     if (!currentUser.value) return
     const gid = activeGroupId.value || myGroups.value[0]?.id
@@ -200,7 +231,26 @@ watch(
             Selected files are staged below this container directory; folders keep their name as a subdirectory.
           </p>
         </div>
-        <ObjectBrowserPanel selectable @add="addSelection" @selection-change="pendingSelection = $event" />
+        <OptionToggle :model-value="source" :options="SOURCES" aria-label="Inputs from" @update:model-value="(value: string) => showSource(value as 'buckets' | 'databases')" />
+        <ObjectBrowserPanel v-if="source === 'buckets'" selectable @add="addSelection" @selection-change="pendingSelection = $event" />
+        <template v-else-if="database">
+          <div class="flex items-center gap-2 text-xs">
+            <span class="min-w-0 flex-1 truncate font-mono text-foreground">{{ database.bucket }}</span>
+            <Button variant="ghost" size="sm" @click="showSource('databases')">Choose another database</Button>
+          </div>
+          <ObjectBrowserPanel
+            :key="`${database.groupId}/${database.bucket}`"
+            selectable
+            :bucket="database.bucket"
+            :group-id="database.groupId"
+            @add="addSelection"
+            @selection-change="pendingSelection = $event"
+          />
+        </template>
+        <template v-else>
+          <DatabasesTab bucket="" @choose="chooseDatabase" />
+          <p v-if="databaseProblem" class="text-[11px] text-destructive">{{ databaseProblem }}</p>
+        </template>
         <div v-if="previewPaths.length" class="rounded-md border border-border bg-muted/20 px-3 py-2">
           <p class="text-[11px] font-medium text-foreground">Will be staged as</p>
           <ul class="mt-1 space-y-0.5 font-mono text-[11px] text-muted-foreground">

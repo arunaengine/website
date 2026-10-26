@@ -6,6 +6,7 @@ import * as VueRuntime from 'vue'
 import { createRenderer, defineComponent, h, nextTick, ref, type App, type Component, type Ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { isLeafFile } from '@/lib/dataEntities'
+import * as Databases from '@/lib/databases'
 
 const ButtonStub = defineComponent({
   inheritAttrs: false,
@@ -30,6 +31,10 @@ const icons = new Proxy({}, { get: () => IconStub })
 const moduleDefault = (component: Component) => ({ __esModule: true, default: component })
 
 const narrow = ref(true)
+let databaseRows: Databases.DatabaseRow[] = []
+const databaseHits = (query: string) => Databases.searchRows(databaseRows, query)
+const databaseState = ref('ready')
+const databaseReload = vi.fn()
 const authToken = ref<string | null>('token-a')
 const objectSearchMode = ref('distributed_best_effort')
 const mediaQuery = vi.fn(() => narrow)
@@ -109,9 +114,24 @@ const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.me
     useRealmNodes: () => ({
       displayName: (nodeId: string) => nodeId === 'node-b' ? 'Storage node B' : nodeId,
       isLocalNode: (nodeId: string) => nodeId === 'node-a',
+      localNodeId: ref('node-a'),
     }),
   },
   '@/lib/dataEntities': { isLeafFile },
+  '@/lib/databases': Databases,
+  '@/composables/useMockDatabases': { useMockDatabases: () => ({ search: () => [] }) },
+  '@/composables/useDatabases': {
+    useDatabases: () => ({
+      search: (query: string) => databaseHits(query),
+      ensure: () => undefined,
+      reload: databaseReload,
+      state: databaseState,
+      complete: ref(true),
+      locate: async (row: Databases.DatabaseRow) => Databases.placeOf(row, null, 'node-a'),
+    }),
+  },
+  '@/lib/distributedMock': { mockEnabled: () => false },
+  '@/lib/distributedMockData': { searchFiles: () => [] },
   '@/lib/utils': {
     relativeTime: (value: string) => `relative ${value}`,
     truncateMiddle: (value: string) => value,
@@ -631,6 +651,22 @@ describe('narrow TopBar search panel', () => {
     mounted.app.unmount()
   })
 
+  it('lists the databases a person may use under their own tag', async () => {
+    databaseRows = [{
+      entryId: 'e1', datasetId: 'd1', bucket: 'spire-db', ownerGroup: 'group-a', title: 'SPIRE microbiome', documentPath: null, state: 'active', public: false,
+      target: { kind: 'ordinary', node_id: 'node-b', bucket: 'spire-db' },
+    }]
+    const mounted = await mount()
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
+    await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'microbiome')
+
+    const option = allNodes(mounted.root).find((node) => node.props.id === 'qs-db:e1')
+    expect(option && content(option)).toContain('Database')
+    expect(option && content(option)).toContain('SPIRE microbiome')
+    databaseRows = []
+    mounted.app.unmount()
+  })
+
   it('summarizes the answer and drops empty kinds', async () => {
     // No subject_types: an older node's hits keep the dataset label.
     search.documents.value = [
@@ -800,6 +836,19 @@ describe('narrow TopBar search panel', () => {
     expect(text).toContain('Strict mode did not fall back to best-effort')
     expect(text).not.toContain('reads/sample.fastq')
     expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('reports partial coverage when the databases could not be read, and reads them again on retry', async () => {
+    databaseState.value = 'failed'
+    const mounted = await mount()
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
+    await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'sample')
+
+    expect(allNodes(mounted.root).some((node) => node.props['aria-label'] === 'Search coverage: partial')).toBe(true)
+    await click(element(mounted.root, (node) => node.tag === 'button' && content(node).trim() === 'Retry'))
+    expect(databaseReload).toHaveBeenCalled()
+    databaseState.value = 'ready'
     mounted.app.unmount()
   })
 })

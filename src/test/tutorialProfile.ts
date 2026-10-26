@@ -27,6 +27,8 @@ import * as ArunaState from '@/composables/aruna/state'
 import * as CrateEditor from '@/lib/crate/editor'
 import * as CrateIssues from '@/lib/crate/issues'
 import * as CratePaths from '@/lib/crate/paths'
+import * as CrateReferences from '@/lib/crate/references'
+import * as LinkedPart from '@/lib/linkedPart'
 import * as DataIdentity from '@/lib/crate/dataIdentity'
 import * as CratePickers from '@/lib/crate/pickers'
 import * as CrateProfileSeed from '@/lib/crate/profileSeed'
@@ -326,6 +328,8 @@ const DatasetEditorView = compileClientComponent(url('views/DatasetEditorView.vu
   '@/lib/crate/paths': CratePaths,
   '@/lib/crate/dataIdentity': DataIdentity,
   '@/lib/crate/profileSeed': CrateProfileSeed,
+  '@/lib/crate/references': CrateReferences,
+  '@/lib/linkedPart': LinkedPart,
 })
 
 const TutorialProfileView = compileClientComponent(url('views/TutorialProfileView.vue'), {

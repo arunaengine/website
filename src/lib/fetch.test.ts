@@ -47,6 +47,26 @@ describe('fetchWithTimeout', () => {
   })
 })
 
+describe('fetchWithTimeout stream', () => {
+  it('times only the head and leaves the body to the caller signal', async () => {
+    vi.useFakeTimers()
+    let seen: AbortSignal | undefined
+    const response = new Response('body', { status: 200 })
+    vi.stubGlobal('fetch', vi.fn(async (_input: unknown, init: RequestInit) => {
+      seen = init.signal ?? undefined
+      return response
+    }))
+    const caller = new AbortController()
+
+    const result = await fetchWithTimeout('https://example.test/x', { signal: caller.signal }, 1000, true)
+    await vi.advanceTimersByTimeAsync(5000)
+
+    expect([result.bodyUsed, seen?.aborted]).toEqual([false, false])
+    caller.abort()
+    expect(seen?.aborted).toBe(true)
+  })
+})
+
 describe('retryAfterMs', () => {
   it('reads delay seconds', () => {
     expect(retryAfterMs(rateLimited('2'))).toBe(2000)

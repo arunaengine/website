@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addFilePart,
+  entityIdFor,
   addSubcratePart,
   linkReference,
   orphanAfterUnlink,
@@ -129,6 +130,78 @@ describe('orphanedDataEntities', () => {
     expect(orphanedDataEntities(unlinked).map((entity) => entity.id)).toEqual([
       's3://bucket/stray.csv',
       'https://example.test/child',
+    ])
+  })
+})
+
+describe('addFilePart origin', () => {
+  const file = {
+    id: 'https://w3id.org/aruna/data/' + 'a'.repeat(64),
+    name: 'one.csv',
+    contentUrl: 's3://reads/one.csv',
+  }
+
+  it('writes the origin and the datasets as references the editor can remove', () => {
+    const draft = addFilePart(newDraft(), {
+      ...file,
+      basedOn: ['https://example.org/src/one.csv'],
+      partOf: ['https://w3id.org/aruna/01K8Z0DS0REEF0000000000005'],
+    })
+
+    expect(findEntity(draft, file.id)?.properties.isBasedOn).toEqual([{ kind: 'reference', value: 'https://example.org/src/one.csv' }])
+    expect(findEntity(draft, file.id)?.properties.isPartOf).toEqual([
+      { kind: 'reference', value: 'https://w3id.org/aruna/01K8Z0DS0REEF0000000000005' },
+    ])
+  })
+
+  it('records a job result as the result of a CreateAction that the dataset mentions', () => {
+    const first = addFilePart(newDraft(), { ...file, createdBy: ['01RUN'] })
+    const second = addFilePart(first, { id: 's3://reads/two.csv', name: 'two.csv', createdBy: ['01RUN'] })
+
+    expect(findEntity(second, '#run-01RUN')).toMatchObject({ types: ['CreateAction'], properties: { identifier: [{ value: '01RUN' }] } })
+    expect(findEntity(second, '#run-01RUN')?.properties.result).toEqual([
+      { kind: 'reference', value: file.id },
+      { kind: 'reference', value: 's3://reads/two.csv' },
+    ])
+    expect(findEntity(second, './')?.properties.mentions).toEqual([{ kind: 'reference', value: '#run-01RUN' }])
+    expect(orphanedDataEntities(second)).toEqual([])
+  })
+
+  it('adds nothing for a file without origin, as before', () => {
+    const properties = findEntity(addFilePart(newDraft(), file), file.id)?.properties ?? {}
+
+    expect('isBasedOn' in properties || 'isPartOf' in properties).toBe(false)
+  })
+
+  it('keeps identical bytes with another origin as a separate entity under their location', () => {
+    const first = addFilePart(newDraft(), { ...file, basedOn: ['https://a.example/x'] })
+    const second = addFilePart(first, { ...file, contentUrl: 's3://reads/copy/one.csv', basedOn: ['https://b.example/x'] })
+
+    expect(findEntity(second, file.id)?.properties.isBasedOn).toEqual([{ kind: 'reference', value: 'https://a.example/x' }])
+    expect(findEntity(second, 's3://reads/copy/one.csv')?.properties.isBasedOn).toEqual([{ kind: 'reference', value: 'https://b.example/x' }])
+    expect(findEntity(second, './')?.properties.hasPart).toEqual([
+      { kind: 'reference', value: file.id },
+      { kind: 'reference', value: 's3://reads/copy/one.csv' },
+    ])
+  })
+
+  it('reuses the entity only for the same origin, memberships and runs', () => {
+    const first = addFilePart(newDraft(), { ...file, basedOn: ['https://a.example/x'] })
+
+    expect(addFilePart(first, { ...file, basedOn: ['https://a.example/x'] }).entities).toHaveLength(2)
+    expect(addFilePart(first, { ...file, contentUrl: 's3://reads/copy/one.csv', basedOn: ['https://a.example/x'] }).entities).toHaveLength(2)
+  })
+
+  it('keeps the same location with another origin, membership or run as a separate entity', () => {
+    const first = addFilePart(newDraft(), { ...file, basedOn: ['https://a.example/x'], createdBy: ['01RUN'] })
+    const same = { ...file, basedOn: ['https://a.example/x'], createdBy: ['01RUN'] }
+
+    expect(entityIdFor(first, same)).toBe(file.id)
+    expect(entityIdFor(first, { ...same, basedOn: ['https://other.example/x'] })).toBe(file.contentUrl)
+    expect(entityIdFor(first, { ...same, partOf: ['https://w3id.org/aruna/01DS'] })).toBe(file.contentUrl)
+    expect(entityIdFor(first, { ...same, createdBy: ['01OTHER'] })).toBe(file.contentUrl)
+    expect(findEntity(addFilePart(first, { ...same, basedOn: ['https://other.example/x'] }), file.id)?.properties.isBasedOn).toEqual([
+      { kind: 'reference', value: 'https://a.example/x' },
     ])
   })
 })

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { compileClientComponent, content, element, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 import * as DataIdentity from '@/lib/crate/dataIdentity'
 import * as DataEntities from '@/lib/dataEntities'
+import * as LinkedPart from '@/lib/linkedPart'
 import * as Uri from '@/lib/profiles/uri'
 import * as Utils from '@/lib/utils'
 
@@ -18,6 +19,9 @@ const DatasetFiles = compileClientComponent(new URL('./DatasetFiles.vue', import
   vue: VueRuntime,
   'vue-router': { RouterLink: LinkStub },
   '@/components/data/ReferencedBy.vue': moduleDefault(Slot),
+  '@/components/metadata/view/LinkedPartActions.vue': moduleDefault(defineComponent({ props: { id: String }, setup: (props) => () => h('em', `linked part ${props.id}`) })),
+  '@/components/metadata/view/VersionActions.vue': moduleDefault(defineComponent({ props: { realmId: String, versionId: String }, setup: (props) => () => h('em', `version actions ${props.realmId}/${props.versionId}`) })),
+  '@/lib/linkedPart': LinkedPart,
   '@/components/ui/Badge.vue': moduleDefault(Slot),
   '@/components/ui/Button.vue': moduleDefault(Slot),
   '@/components/ui/IconButton.vue': moduleDefault(Slot),
@@ -115,6 +119,28 @@ describe('DatasetFiles', () => {
     mounted.app.unmount()
   })
 
+  it('shows the global id of a version as a version, not as an external link', async () => {
+    const id = 'https://w3id.org/aruna/data/k3V9xQ2m/01K8Y2B6D8F0H2K4M6P8R0T2V4'
+    const mounted = await render({ '@id': id, contentUrl: id })
+    const text = content(mounted.root)
+
+    expect(text).toContain('Version: 01K8Y2B6D8F0H2K4M6P8R0T2V4')
+    expect(text).not.toContain('External')
+    expect(text).not.toContain('Location:')
+    expect(nodes(mounted.root).some((node) => node.tag === 'a' && node.props.href)).toBe(false)
+    mounted.app.unmount()
+  })
+
+  it('offers download and preview for a file named only by its global version id', async () => {
+    const id = 'https://w3id.org/aruna/data/k3V9xQ2m/01K8Y2B6D8F0H2K4M6P8R0T2V4'
+    const global = await render({ '@id': id, contentUrl: id })
+    expect(content(global.root)).toContain('version actions k3V9xQ2m/01K8Y2B6D8F0H2K4M6P8R0T2V4')
+    global.app.unmount()
+    const local = await render({ '@id': 's3://reads/raw/one.csv' })
+    expect(content(local.root)).not.toContain('version actions')
+    local.app.unmount()
+  })
+
   it('marks a file kept at another realm as external', async () => {
     const mounted = await render({ '@id': 'https://data.giessen.example/api/v1/objects/one.csv' })
     expect(content(mounted.root)).toContain('External')
@@ -129,5 +155,22 @@ describe('DatasetFiles', () => {
 
     expect(content(mounted.root)).not.toContain('Location')
     mounted.app.unmount()
+  })
+
+  it('offers the live files and the other datasets for a Dataset-typed part that names a bucket', async () => {
+    const part = 'https://w3id.org/aruna/data/k3V9xQ2m/01K8Y2B6D8/cmF3LzIwMjYv'
+    const mounted = await render({ '@id': part, '@type': 'Dataset', name: 'Raw 2026' })
+
+    expect(content(mounted.root)).toContain(`linked part ${part}`)
+    mounted.app.unmount()
+  })
+
+  it('offers nothing of the kind for a file, or a Dataset that is not a bucket', async () => {
+    const file = await render({ '@id': 's3://reads/raw/one.csv' })
+    expect(content(file.root)).not.toContain('linked part')
+    file.app.unmount()
+    const dataset = await render({ '@id': '#sub', '@type': 'Dataset', name: 'Sub' })
+    expect(content(dataset.root)).not.toContain('linked part')
+    dataset.app.unmount()
   })
 })

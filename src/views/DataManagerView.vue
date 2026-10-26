@@ -13,7 +13,6 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import Notice from '@/components/ui/Notice.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import DataViewSkeleton from '@/components/data/DataViewSkeleton.vue'
-import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
 import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
 import NewBucketDialog from '@/components/desktop/NewBucketDialog.vue'
 import BucketSidebar from '@/components/data/manager/BucketSidebar.vue'
@@ -21,18 +20,24 @@ import NodePicker from '@/components/data/NodePicker.vue'
 import DeleteDialog from '@/components/data/DeleteDialog.vue'
 import FileDetailsDialog from '@/components/data/FileDetailsDialog.vue'
 import PublicAccessDialog from '@/components/data/PublicAccessDialog.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import MockSidebar from '@/components/data/manager/MockSidebar.vue'
+import DatabaseHeader from '@/components/data/DatabaseHeader.vue'
+import DistributionBanner from '@/components/data/manager/DistributionBanner.vue'
 import ObjectBrowser from '@/components/data/manager/ObjectBrowser.vue'
 import UploadPanel from '@/components/data/manager/UploadPanel.vue'
 import NewNotebookDialog from '@/components/notebook/NewNotebookDialog.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDataManager } from '@/composables/useDataManager'
+import { useBucketDistribution } from '@/composables/useBucketDistribution'
 import { providePageContext } from '@/composables/usePageContext'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { folderNameProblem } from '@/lib/bucketName'
 import { isDesktop } from '@/lib/desktop'
+import { mockEnabled } from '@/lib/distributedMock'
+import { mockBucket } from '@/lib/distributedMockData'
 import type { BindSource } from '@/lib/bindSource'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
-import type { BucketSearchHit } from '@/lib/api'
 import type { PublicTarget } from '@/lib/publicAccess'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -121,28 +126,6 @@ function openPublicAccess(targets: PublicTarget[]) {
 }
 
 // ── Bucket sync ─────────────────────────────────────────────────────────────
-const syncDialogOpen = ref(false)
-const syncSource = ref<{ bucket: string; prefix: string; nodeId: string | null }>({
-  bucket: '',
-  prefix: '',
-  nodeId: null,
-})
-
-function openSyncDialog() {
-  syncSource.value = { bucket: bucket.value, prefix: s3Prefix.value, nodeId: remoteNodeId.value }
-  syncDialogOpen.value = true
-}
-
-// "Sync to this node…" on a remote search hit: remote source → local target.
-function openSyncFromHit(hit: BucketSearchHit) {
-  syncSource.value = {
-    bucket: hit.bucket,
-    prefix: '',
-    nodeId: realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id,
-  }
-  syncDialogOpen.value = true
-}
-
 // "Link a local folder": the desktop binds a bucket to a folder. The source
 // always comes with explicit node and group ids; newBucket is made by the link.
 const bindOpen = ref(false)
@@ -192,6 +175,22 @@ function onSyncChanged() {
 }
 
 const addDataOpen = ref(false)
+// An example bucket of the node mock replaces the object browser.
+const exampleBucket = computed(() => (mockEnabled() ? mockBucket(bucket.value) : undefined))
+// A bucket of this node that is stored on more nodes shows its state above the files.
+const distribution = useBucketDistribution(bucket, remoteNodeId)
+const storedBucket = computed(() => exampleBucket.value ?? distribution.view.value ?? undefined)
+const bucketSetId = computed(() => distribution.view.value?.live?.setId ?? (distribution.state.value === 'ordinary' ? null : undefined))
+// Without a session the example buckets still show, from static data.
+const mockOnly = computed(
+  () =>
+    mockEnabled() &&
+    bootstrapped.value &&
+    (!currentUser.value ||
+      !s3.connectedEndpoint.value ||
+      Boolean(contextError.value && !contextReady.value) ||
+      (!groupsLoading.value && !hasGroups.value)),
+)
 const newNotebookOpen = ref(false)
 // The notebooks entry is this same view with notebooks highlighted.
 const notebooksView = computed(() => route.name === 'notebooks' || route.query.notebooks === '1')
@@ -237,6 +236,10 @@ function openNewFolder() {
 
 async function createFolder() {
   if (newFolderInvalid.value || newFolderBusy.value) return
+  if (exampleBucket.value) {
+    newFolderOpen.value = false
+    return
+  }
   newFolderBusy.value = true
   newFolderError.value = null
   const targetBucket = bucket.value
@@ -313,6 +316,23 @@ async function createFolder() {
     <div class="container space-y-6 py-8">
       <DataViewSkeleton v-if="!bootstrapped" />
 
+      <section v-else-if="mockOnly" class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <MockSidebar :active="bucket" @open="(name: string) => manager.openBucket(name)" />
+        <div v-if="exampleBucket" class="min-w-0 space-y-4">
+          <DistributionBanner :bucket="exampleBucket" />
+          <ObjectBrowser
+            :manager="manager"
+            :notebooks="notebooksView"
+            @add-data="addDataOpen = true"
+            @new-folder="openNewFolder"
+            @new-notebook="newNotebookOpen = true"
+            @sync-to-computer="openBindDialog"
+            @public-access="openPublicAccess"
+          />
+        </div>
+        <EmptyState v-else title="Pick an example bucket" description="The buckets on the left show example data. Nothing here talks to a node." />
+      </section>
+
       <Notice v-else-if="!s3.connectedEndpoint.value" tone="warning" class="flex items-start gap-3 p-5 text-sm">
         <ShieldAlert class="mt-0.5 h-4 w-4 shrink-0" />
         <p>
@@ -379,24 +399,26 @@ async function createFolder() {
 
         <BucketSidebar
           :manager="manager"
-          @sync="openSyncFromHit"
           @sync-computer="openBindDialog"
           @new-bucket="newBucketOpen = true"
         />
 
-        <ObjectBrowser
-          :manager="manager"
-          :notebooks="notebooksView"
-          @add-data="addDataOpen = true"
-          @new-folder="openNewFolder"
-          @new-notebook="newNotebookOpen = true"
-          @sync-to-node="openSyncDialog"
-          @sync-to-computer="openBindDialog"
-          @public-access="openPublicAccess"
-          @new-bucket="newBucketOpen = true"
-        >
-          <UploadPanel :manager="manager" />
-        </ObjectBrowser>
+        <div class="min-w-0 space-y-4">
+          <DistributionBanner v-if="storedBucket" :bucket="storedBucket" />
+          <DatabaseHeader v-if="bucket && !exampleBucket" :bucket="bucket" :node-id="remoteNodeId" :set-id="bucketSetId" />
+          <ObjectBrowser
+            :manager="manager"
+            :notebooks="notebooksView"
+            @add-data="addDataOpen = true"
+            @new-folder="openNewFolder"
+            @new-notebook="newNotebookOpen = true"
+            @sync-to-computer="openBindDialog"
+            @public-access="openPublicAccess"
+            @new-bucket="newBucketOpen = true"
+          >
+            <UploadPanel :manager="manager" />
+          </ObjectBrowser>
+        </div>
       </section>
     </div>
 
@@ -416,14 +438,6 @@ async function createFolder() {
       :bucket="bucket"
       :prefix="s3Prefix"
       :group-id="activeGroupId ?? ''"
-    />
-
-    <SyncBucketDialog
-      v-model:open="syncDialogOpen"
-      :source-bucket="syncSource.bucket"
-      :source-prefix="syncSource.prefix"
-      :source-node-id="syncSource.nodeId"
-      @created="onSyncChanged"
     />
 
     <BindFolderDialog

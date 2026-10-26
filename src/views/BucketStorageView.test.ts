@@ -1,9 +1,10 @@
 import { computed, defineComponent, h, inject, provide, reactive, ref, type ComputedRef } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import * as Distribution from '@/lib/distribution'
 import * as GroupAdmin from '@/lib/groupAdmin'
 import type { GroupDetailResponse } from '@/lib/api'
-import { compileClientComponent, content, mountApp, moduleDefault, nodes } from '@/test/clientRender'
+import { compileClientComponent, content, flush, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 
 const route = reactive<{ params: Record<string, string>; query: Record<string, string> }>({
   params: { bucketId: 'reef-survey' },
@@ -29,6 +30,10 @@ function groupDetail(admin: boolean): GroupDetailResponse {
 }
 
 const isRealmAdmin = ref(false)
+// The set the node reports for the open bucket; null for an ordinary bucket.
+const setView = ref<unknown>(null)
+const setState = ref('ordinary')
+const setError = ref<string | null>(null)
 const group = ref<GroupDetailResponse>(groupDetail(false))
 
 const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
@@ -73,6 +78,23 @@ const view = compileClientComponent(new URL('./BucketStorageView.vue', import.me
   '@/components/ui/TabsList.vue': moduleDefault(Slotted('div')),
   '@/components/ui/TabsTrigger.vue': moduleDefault(TabsTriggerStub),
   '@/components/storage/BucketAccessTab.vue': moduleDefault(Marker('public rules')),
+  '@/components/distributed/AccessTab.vue': moduleDefault(Marker('grants on nodes')),
+  '@/components/storage/DistributionOverview.vue': moduleDefault(Marker('stored on')),
+  '@/components/storage/BucketSources.vue': moduleDefault(Marker('sources of files')),
+  '@/components/storage/SetDeleteSection.vue': moduleDefault(Marker('deleting a bucket on more nodes')),
+  '@/components/storage/DatabaseSettings.vue': moduleDefault(Marker('database settings')),
+  '@/components/data/LinkedDatasets.vue': moduleDefault(Marker('datasets that link this bucket')),
+  '@/components/distributed/GrantGuide.vue': moduleDefault(Marker('grant on every node')),
+  '@/components/storage/BucketNodesTab.vue': moduleDefault(Marker('nodes of the bucket')),
+  '@/components/storage/FileSources.vue': moduleDefault(Marker('file sources')),
+  '@/components/storage/DatabaseMark.vue': moduleDefault(Marker('database mark')),
+  '@/components/storage/LinkedBy.vue': moduleDefault(Marker('linked by datasets')),
+  '@/components/storage/CopiesOfBucket.vue': moduleDefault(Marker('copies of this bucket')),
+  '@/lib/distributedMock': { mockEnabled: () => false },
+  '@/lib/distributedMockData': { mockBucket: () => undefined },
+  '@/composables/useBucketDistribution': {
+    useBucketDistribution: () => ({ view: setView, state: setState, error: setError, reload: () => undefined }),
+  },
   '@/components/storage/BucketBackendTab.vue': moduleDefault(Marker('backend rules')),
   '@/components/storage/BucketDeleteSection.vue': moduleDefault(Marker('bucket deletion')),
   '@/components/storage/BucketComplianceSection.vue': moduleDefault(Marker('compliance on this node')),
@@ -101,12 +123,16 @@ const view = compileClientComponent(new URL('./BucketStorageView.vue', import.me
       }),
   },
   '@/composables/useS3': { useS3: () => ({ activeContext: ref({ groupId: 'g-1' }) }) },
+  '@/lib/distribution': Distribution,
   '@/lib/groupAdmin': GroupAdmin,
 })
 
 const hiddenFeatures = new Set<string>()
 
-async function render(options: { admin?: boolean; realmAdmin?: boolean; query?: Record<string, string> } = {}) {
+async function render(options: { admin?: boolean; realmAdmin?: boolean; stored?: unknown; query?: Record<string, string> } = {}) {
+  setView.value = options.stored ?? null
+  setState.value = options.stored ? 'ready' : 'ordinary'
+  setError.value = null
   group.value = groupDetail(options.admin ?? false)
   isRealmAdmin.value = options.realmAdmin ?? false
   route.query = options.query ?? {}
@@ -192,5 +218,38 @@ describe('bucket storage page', () => {
 
     expect(tabs(root)).toEqual(['overview', 'access', 'encryption', 'transfers'])
     expect(content(root)).toContain('transfer rows')
+  })
+
+  it('adds the nodes tab and the grant guide for a bucket the node reports on several nodes', async () => {
+    const stored = { name: 'reef-survey', members: [{ nodeId: 'a' }, { nodeId: 'b' }], ranges: [], live: { recommendedGrant: '/r/g/g-1/data/*/reef-survey/**' } }
+
+    const root = await render({ stored })
+    expect(tabs(root)).toEqual(['overview', 'nodes', 'access', 'encryption', 'transfers'])
+    expect(content(root)).toContain('stored on')
+    expect(content(root)).toContain('deleting a bucket on more nodes')
+    expect(content(root)).not.toContain('bucket deletion')
+    expect(content(await render({ stored, query: { tab: 'nodes' } }))).toContain('nodes of the bucket')
+    expect(content(await render({ stored, query: { tab: 'access' } }))).toContain('grant on every node')
+  })
+
+  it('offers no ordinary deletion while the storage is loading or unreadable, and says why', async () => {
+    const root = await render({ admin: true })
+    setState.value = 'loading'
+    await flush()
+    expect(content(root)).not.toContain('bucket deletion')
+
+    setState.value = 'unavailable'
+    setError.value = 'node busy'
+    await flush()
+    expect(content(root)).toContain('How this bucket is stored could not be read: node busy')
+    expect(content(root)).not.toContain('bucket deletion')
+  })
+
+  it('shows the database section on the overview', async () => {
+    expect(content(await render())).toContain('database settings')
+  })
+
+  it('keeps an ordinary bucket without the nodes tab', async () => {
+    expect(tabs(await render())).not.toContain('nodes')
   })
 })

@@ -1,4 +1,4 @@
-import { ApiError, apiRequest, type ApiClientOptions } from './api'
+import { ApiError, apiRequest, type ApiClientOptions, type DataLinkDocument } from './api'
 import { errorMessage } from './utils'
 
 export type StorageDeletionScope =
@@ -63,6 +63,8 @@ export interface StorageDeletionPreflight {
   permissions: StorageDeletionPermissions
   truncation: StorageDeletionTruncation
   reference_coverage: StorageDeletionReferenceCoverage
+  /** A whole bucket stored on more nodes: the readable datasets that link it, at most 25. */
+  linked_datasets?: DataLinkDocument[]
 }
 
 export interface StoragePurgeOperation {

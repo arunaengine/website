@@ -22,12 +22,14 @@ export function objectLocation(bucket: string, key: string): string {
   return `s3://${bucket}/${key}`
 }
 
+/** A picked version is pinned, so the location never resolves to a newer one. */
 export async function dataEntityIdentity(
   bucket: string,
   key: string,
   options: ContentIdentityOptions = {},
+  versionId?: string | null,
 ): Promise<DataEntityIdentity> {
-  const contentUrl = objectLocation(bucket, key)
+  const contentUrl = `${objectLocation(bucket, key)}${versionId ? `?versionId=${versionId}` : ''}`
   const resolved = arunaContentReference(contentUrl, await resolveContentIdentity(bucket, key, options))
   return { id: resolved.id, contentUrl }
 }
@@ -39,11 +41,14 @@ export interface ParsedDataIdentity {
   s3: { bucket: string; key: string } | null
   /** Node and version of an older versioned ARN `@id`. */
   arn: { realmId: string; nodeId: string; version: string } | null
+  /** A version of a bucket stored on more nodes, named by its realm and version id alone. */
+  global: { realmId: string; versionId: string } | null
   /** Path inside the crate, from `localPath` or a relative `@id`. */
   localPath: string | null
 }
 
 const CONTENT_ID = /^https:\/\/w3id\.org\/aruna\/data\/[0-9a-f]{64}$/
+const GLOBAL_VERSION = /^https:\/\/w3id\.org\/aruna\/data\/([A-Za-z0-9_-]+)\/([0-9A-HJKMNP-TV-Z]{26})$/
 const ARN_ID = /^arn:aruna:([^:]+):([^:]+):s3\/([^/]+)\/(.+)@([0-9A-HJKMNP-TV-Z]{26})$/
 const HASH_ARN = /^arn:aruna:([^:]+):[^:]+:ch\/(?:blake3\/)?[0-9a-f]{64}$/
 
@@ -74,6 +79,11 @@ export function parseObjectUrl(url: string, endpoint?: string | null): { bucket:
   return slash > 0 && key ? { bucket, key } : null
 }
 
+function parseGlobal(value: string) {
+  const match = GLOBAL_VERSION.exec(value)
+  return match ? { realmId: match[1], versionId: match[2] } : null
+}
+
 function parseArnId(id: string) {
   return id.startsWith(ARUNA_CONTENT_W3ID_PREFIX) ? parseArn(id.slice(ARUNA_CONTENT_W3ID_PREFIX.length)) : null
 }
@@ -99,6 +109,7 @@ export function parseDataIdentity(
     contentId: isContentId(id) ? id : isContentId(contentUrl) ? contentUrl : null,
     s3: parseObjectUrl(contentUrl, endpoint) ?? parseObjectUrl(id, endpoint) ?? versioned?.s3 ?? null,
     arn: versioned?.arn ?? null,
+    global: parseGlobal(id) ?? parseGlobal(contentUrl),
     localPath: entity.localPath || (relative ? id : null),
   }
 }

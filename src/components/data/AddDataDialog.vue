@@ -4,17 +4,23 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import ConnectorDialog from '@/components/groups/ConnectorDialog.vue'
+import StorageFeatureLink from '@/components/distributed/StorageFeatureLink.vue'
 import AddDataShell from '@/components/data/add/AddDataShell.vue'
 import UploadTab from '@/components/data/add/UploadTab.vue'
 import ConnectorTab from '@/components/data/add/ConnectorTab.vue'
+import DatabasesTab from '@/components/data/add/DatabasesTab.vue'
+import MockDatabasesTab from '@/components/data/add/MockDatabasesTab.vue'
+import CollectionTab from '@/components/data/add/CollectionTab.vue'
 import OtherBucketsTab from '@/components/data/add/OtherBucketsTab.vue'
 import { useConnectorSource, type ConnectorStagingRow } from '@/components/data/add/useConnectorSource'
 import { useOtherBuckets } from '@/components/data/add/useOtherBuckets'
 import { useBuilderBasket } from '@/composables/useBuilderBasket'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
-import type { StagingReferenceEntry } from '@/lib/api'
+import type { BucketSearchHit, StagingReferenceEntry } from '@/lib/api'
+import { mockEnabled } from '@/lib/distributedMock'
+import { mockBucket } from '@/lib/distributedMockData'
 import { computed, ref, toRef } from 'vue'
-import { Boxes, CloudDownload, Upload } from '@lucide/vue'
+import { Boxes, CloudDownload, Database, Library, Upload } from '@lucide/vue'
 
 // The ONE "Add data" entry point: a basket dialog for local files/folders
 // (persistent upload queue) and connector entries (batch staging), plus an
@@ -63,7 +69,15 @@ const otherBuckets = useOtherBuckets({
 const { groupSel, registerOpen, onConnectorSaved } = connectorSource
 
 const { shown } = usePortalFeatures()
+// Whole collections register into a bucket stored on several nodes (node mock).
+const collection = computed(() => mockEnabled() && Boolean(mockBucket(props.bucket)))
 const tab = ref(props.tab === 'connector' && !shown('connectors') ? 'local' : props.tab ?? 'local')
+
+// A chosen database is the source of the Other buckets tab.
+function chooseDatabase(name: string, nodeId: string, groupId: string) {
+  otherBuckets.pickSearchHit({ bucket: name, node_id: nodeId, arn: '', group_id: groupId, created_at: '' } satisfies BucketSearchHit)
+  tab.value = 'other'
+}
 
 function addConnectorRows(rows: ConnectorStagingRow[]) {
   basket.addStaging('connector', rows)
@@ -91,6 +105,8 @@ function onImportsCreated() {
         <TabsTrigger value="local"><Upload class="mr-1 h-3.5 w-3.5" /> Local files</TabsTrigger>
         <TabsTrigger v-if="shown('connectors')" value="connector"><CloudDownload class="mr-1 h-3.5 w-3.5" /> From connector</TabsTrigger>
         <TabsTrigger value="other"><Boxes class="mr-1 h-3.5 w-3.5" /> Other buckets</TabsTrigger>
+        <TabsTrigger value="databases"><Library class="mr-1 h-3.5 w-3.5" /> Databases</TabsTrigger>
+        <TabsTrigger v-if="collection" value="collection"><Database class="mr-1 h-3.5 w-3.5" /> Whole collection</TabsTrigger>
       </TabsList>
 
       <TabsContent value="local" class="space-y-3">
@@ -113,7 +129,16 @@ function onImportsCreated() {
           @created="onImportsCreated"
         />
       </TabsContent>
+      <TabsContent value="databases" class="space-y-3">
+        <DatabasesTab :bucket="bucket" @choose="chooseDatabase" />
+        <MockDatabasesTab v-if="mockEnabled()" :bucket="bucket" :prefix="prefix" />
+      </TabsContent>
+
+      <TabsContent v-if="collection" value="collection" class="space-y-3">
+        <CollectionTab :bucket="bucket" />
+      </TabsContent>
     </Tabs>
+    <StorageFeatureLink question="elsewhere" />
 
     <template #dialogs>
       <ConnectorDialog v-model:open="registerOpen" :group-id="groupSel" @saved="onConnectorSaved" />

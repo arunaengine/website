@@ -19,6 +19,8 @@ import KeyedReadNotice from '@/components/storage/KeyedReadNotice.vue'
 import { useAruna } from '@/composables/useAruna'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { isDesktop } from '@/lib/desktop'
+import { mockEnabled } from '@/lib/distributedMock'
+import { exampleMark } from '@/lib/distributedMockData'
 import type { BindSource } from '@/lib/bindSource'
 import { folderName } from '@/lib/deviceApi'
 import { useBrokenFiles } from '@/composables/useBrokenFiles'
@@ -70,7 +72,6 @@ const emit = defineEmits<{
   (e: 'add-data'): void
   (e: 'new-folder'): void
   (e: 'new-notebook'): void
-  (e: 'sync-to-node'): void
   (e: 'sync-to-computer', source: BindSource): void
   (e: 'public-access', targets: PublicTarget[]): void
   (e: 'new-bucket'): void
@@ -538,13 +539,8 @@ async function onDrop(event: DragEvent) {
         </p>
         <div class="mt-4 flex justify-center gap-2">
           <RefreshButton v-if="!remoteEndpointMissing" :busy="retrySpinning" label="Try again" @click="onRetryObjects" />
-          <Button
-            v-if="showSyncButton && (!desktop || (currentBindSource && !currentLinkedFolder))"
-            size="sm"
-            @click="currentBindSource && desktop ? emit('sync-to-computer', currentBindSource) : emit('sync-to-node')"
-          >
-            <FolderSync v-if="desktop" class="h-3.5 w-3.5" /><ArrowLeftRight v-else class="h-3.5 w-3.5" />
-            {{ desktop ? 'Link a local folder' : 'Sync to this node…' }}
+          <Button v-if="showSyncButton && desktop && currentBindSource && !currentLinkedFolder" size="sm" @click="emit('sync-to-computer', currentBindSource)">
+            <FolderSync class="h-3.5 w-3.5" /> Link a local folder
           </Button>
         </div>
       </div>
@@ -605,7 +601,7 @@ async function onDrop(event: DragEvent) {
               </td>
               <td class="px-4 py-2.5">
                 <span class="flex items-center gap-2">
-                  <ObjectIcon :name="folder.name" folder class="h-4 w-4" /> {{ folder.name }}/
+                  <ObjectIcon :name="folder.name" folder class="h-4 w-4" /> {{ folder.name }}
                   <Badge v-if="folderPublic(folder.prefix)" variant="success" size="sm" class="shrink-0 uppercase" title="Everyone can read this folder">
                     <Globe class="mr-0.5 h-3 w-3" aria-hidden="true" /> public
                   </Badge>
@@ -680,6 +676,9 @@ async function onDrop(event: DragEvent) {
                     class="h-3 w-3 shrink-0 text-primary/40"
                     aria-label="Covered by a sync relationship"
                   />
+                  <Badge v-if="mockEnabled() && exampleMark(bucket, object.key)" :variant="exampleMark(bucket, object.key) === 'Can change at the source' ? 'warn' : 'outline'" size="sm" class="shrink-0">
+                    {{ exampleMark(bucket, object.key) }}
+                  </Badge>
                   <Tooltip v-if="references.keyIsReferenced(object.key)">
                     <span class="shrink-0" tabindex="0">
                       <Link2 class="h-3 w-3 text-primary/40" :aria-label="referencedFrom(object.key)" />

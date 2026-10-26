@@ -4,6 +4,8 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import ReferencedBy from '@/components/data/ReferencedBy.vue'
+import LinkedPartActions from '@/components/metadata/view/LinkedPartActions.vue'
+import VersionActions from '@/components/metadata/view/VersionActions.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import IconButton from '@/components/ui/IconButton.vue'
@@ -18,6 +20,7 @@ import type { DatasetViewState } from '@/composables/useDatasetView'
 import type { CrateObjectReference } from '@/lib/crateReferences'
 import { objectLocation, objectRoute, parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { dataEntityTreeOf, formatContentSize, type DataEntity, type DataEntityNode } from '@/lib/dataEntities'
+import { looksLikePart } from '@/lib/linkedPart'
 import { termNameFromUri } from '@/lib/profiles/uri'
 import { isHttpUrl } from '@/lib/utils'
 import { Eye, ExternalLink as ExternalLinkIcon, FileJson2, Folder, Info, Link2 } from '@lucide/vue'
@@ -48,6 +51,11 @@ const { hasActiveKey: hasS3Access, endpoint: s3Endpoint } = s3
 const dataEntities = computed<DataEntityNode[]>(() =>
   dataEntityTreeOf(currentCrate.value).filter((row) => !subcrateIris.value.has(row.id)),
 )
+
+// A Dataset-typed part that names a bucket or a folder: its files are always the current ones.
+function linkedPart(row: DataEntity): boolean {
+  return row.types.some((type) => termNameFromUri(type) === 'Dataset') && looksLikePart(row.id)
+}
 
 function rowTypes(row: DataEntity): string {
   return row.types.map(termNameFromUri).join(', ') || '-'
@@ -111,20 +119,27 @@ watch(detailId, () => {
   resetBacklinks()
 })
 
+// A version of a bucket stored on more nodes: its id is no web page, so it is never opened as a link.
+function globalVersion(row: DataEntity): string | null {
+  return identityOf(row).global?.versionId ?? null
+}
+
 function entityLink(row: DataEntity): string | undefined {
+  if (globalVersion(row)) return undefined
   const target = row.contentUrl ?? (contentW3id(row) ? '' : row.id)
   return target.startsWith('http') ? target : undefined
 }
 
 // A file kept at its source, such as another realm: its identity is a web address there.
 function externalHost(row: DataEntityNode): string | null {
-  if (row.directory || !isHttpUrl(row.id) || identityOf(row).s3 || contentW3id(row)) return null
+  if (row.directory || !isHttpUrl(row.id) || identityOf(row).s3 || contentW3id(row) || globalVersion(row)) return null
   return new URL(row.id).host
 }
 
 // Where the bytes are: the S3 path when any form names one, else the written contentUrl.
 function locationText(row: DataEntity): string {
   const s3 = identityOf(row).s3
+  if (!s3 && globalVersion(row)) return ''
   return s3 ? objectLocation(s3.bucket, s3.key) : row.contentUrl ?? ''
 }
 
@@ -208,6 +223,10 @@ function openPreview(row: DataEntity) {
                   <a v-else-if="entityLink(row)" :href="entityLink(row)" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline" @click.stop>{{ row.contentUrl }}</a>
                   <span v-else class="font-mono">{{ locationText(row) }}</span>
                 </span>
+                <span v-if="globalVersion(row)" class="mt-0.5 block break-all font-mono text-[10px] font-normal text-muted-foreground">
+                  Version: {{ globalVersion(row) }}
+                </span>
+                <LinkedPartActions v-if="linkedPart(row)" :id="row.id" :dataset-id="detailId" />
                 <span v-if="referencedBy.get(row.id)?.length" class="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11px] font-normal text-muted-foreground">
                   <Link2 class="h-3 w-3 shrink-0" /> Loaded datasets only:
                   <template v-for="(ref, i) in referencedBy.get(row.id) ?? []" :key="ref.documentId">
@@ -219,7 +238,7 @@ function openPreview(row: DataEntity) {
               <td class="px-5 py-2.5 text-muted-foreground">{{ row.encodingFormat || '-' }}</td>
               <td class="px-5 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ formatContentSize(row.contentSize) }}</td>
               <td class="px-5 py-2.5 text-right">
-                <div class="flex items-center justify-end gap-1">
+                <div class="flex flex-wrap items-center justify-end gap-1">
                   <Button
                     v-if="contentW3id(row) && !row.directory"
                     variant="ghost"
@@ -236,6 +255,14 @@ function openPreview(row: DataEntity) {
                   <IconButton v-if="canPreview(row)" label="Preview" @click.stop="openPreview(row)">
                     <Eye class="size-3.5" />
                   </IconButton>
+                  <VersionActions
+                    v-if="identityOf(row).global && !row.directory && !linkedPart(row)"
+                    :realm-id="identityOf(row).global!.realmId"
+                    :version-id="identityOf(row).global!.versionId"
+                    :name="row.name"
+                    :size="row.contentSize && Number.isFinite(Number(row.contentSize)) ? Number(row.contentSize) : undefined"
+                    :content-type="row.encodingFormat"
+                  />
                   <a v-if="entityLink(row)" :href="entityLink(row)" target="_blank" rel="noopener noreferrer" class="inline-flex text-primary hover:opacity-80" :aria-label="`Open the location of ${row.name} in a new tab`" @click.stop>
                     <ExternalLinkIcon class="h-3.5 w-3.5" />
                   </a>

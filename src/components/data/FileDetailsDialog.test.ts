@@ -1,6 +1,7 @@
 import { computed, defineComponent, h, inject, provide, ref, type ComputedRef } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/lib/api'
 import * as assistantObject from '@/composables/useAssistantObject'
 import * as StateBadge from '@/lib/stateBadge'
 import * as NotebookDocument from '@/lib/notebook/document'
@@ -52,6 +53,8 @@ const ButtonStub = defineComponent({
 
 const headObject = vi.fn()
 const apiRequest = vi.fn()
+const getFileOrigin = vi.fn()
+let afterReset: (() => void) | null = null
 const hasActiveKey = ref(true)
 const currentUser = ref<{ id: string } | null>({ id: 'u-1' })
 const loadReferences = vi.fn()
@@ -72,6 +75,13 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   '@/components/ui/TabsContent.vue': moduleDefault(TabsContentStub),
   '@/components/ui/TabsList.vue': moduleDefault(Slotted('div')),
   '@/components/ui/TabsTrigger.vue': moduleDefault(Slotted('button')),
+  '@/components/data/MockFileGeneral.vue': moduleDefault(Marker('mock file ids')),
+  '@/components/data/MockFileStorage.vue': moduleDefault(Marker('mock file storage')),
+  '@/components/data/LinkedDatasets.vue': moduleDefault(Marker('datasets that link this')),
+  '@/components/data/FilePartOf.vue': moduleDefault(Marker('datasets this file is part of')),
+  '@/components/data/FileOrigin.vue': moduleDefault(Marker('origin of this version')),
+  '@/lib/distributedMock': { mockEnabled: () => false },
+  '@/lib/distributedMockData': { mockFile: () => undefined },
   '@/components/data/ObjectLocationsPanel.vue': moduleDefault(Marker('copies of this version')),
   '@/components/data/ObjectVersionsPanel.vue': moduleDefault(Marker('version rows')),
   '@/components/data/ReferencedBy.vue': moduleDefault(Marker('referencing datasets')),
@@ -90,7 +100,7 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   },
   '@/lib/publicAccess': PublicAccessLib,
   '@/lib/sync': SyncLib,
-  '@/lib/api': { apiRequest },
+  '@/lib/api': { ApiError, apiRequest },
   '@/lib/checksums': ChecksumsLib,
   '@/lib/contentIdentity': ContentIdentity,
   '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
@@ -100,6 +110,7 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
       apiBaseUrl: ref('https://local/api/v1'),
       authToken: ref('token-1'),
       nodeInfo: ref({ node: { realm_id: 'realm-1', peer_id: 'node-1' } }),
+      getFileOrigin,
     }),
   },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: () => 'this node' }) },
@@ -131,6 +142,7 @@ async function mount(
   headObject.mockResolvedValue({ contentType: 'text/plain', versionId: '01J000000000000000000HEAD' })
   apiRequest.mockReset()
   apiRequest.mockResolvedValue({ checksums })
+  afterReset?.()
   loadReferences.mockClear()
   resetReferences.mockClear()
   const tabs: string[] = []
@@ -207,6 +219,25 @@ describe('file details checksums', () => {
     expect(text).toContain('Checksums')
     expect(text.indexOf('SHA-256')).toBeLessThan(text.indexOf('MD5'))
     expect(element(root, (node) => node.props['data-copy'] === 'bb'.repeat(32))).toBeTruthy()
+  })
+
+  it('asks by the global id when the node ARN of a bucket on more nodes answers 409', async () => {
+    const globalId = 'https://w3id.org/aruna/data/realm-1/01J000000000000000000HEAD'
+    afterReset = () => {
+      apiRequest.mockRejectedValueOnce(new ApiError(409, 'use the global id'))
+      apiRequest.mockResolvedValueOnce({ checksums: [{ type: 'sha256', checksum: 'cc'.repeat(32) }] })
+    }
+    getFileOrigin.mockResolvedValue({ global_id: globalId })
+    const { root } = await mount('general')
+    afterReset = null
+
+    expect(getFileOrigin).toHaveBeenCalledWith('reef-survey', { key: 'raw/reads.fastq', version_id: '01J000000000000000000HEAD' })
+    expect(apiRequest).toHaveBeenLastCalledWith(
+      `/ga4gh/drs/v1/objects/${encodeURIComponent(globalId)}`,
+      {},
+      { baseUrl: 'https://node-1/api/v1', token: 'token-1' },
+    )
+    expect(content(root)).toContain('Checksums')
   })
 
   it('hides the section when the node has no checksums', async () => {

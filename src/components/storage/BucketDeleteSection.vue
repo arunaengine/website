@@ -3,10 +3,14 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import DeleteDialog from '@/components/data/DeleteDialog.vue'
+import SetDeleteDialog from '@/components/distributed/SetDeleteDialog.vue'
 import Button from '@/components/ui/Button.vue'
 import { useBuckets } from '@/composables/useBuckets'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { useS3 } from '@/composables/useS3'
+import { mockEnabled } from '@/lib/distributedMock'
+import { mockBucket } from '@/lib/distributedMockData'
+import { isMulti } from '@/lib/distribution'
 import type { DeleteRequest, DeletionResult } from '@/lib/deletion/request'
 import { Trash2 } from '@lucide/vue'
 
@@ -17,8 +21,13 @@ const s3 = useS3()
 const bucketList = useBuckets()
 const shortcuts = useBucketShortcuts()
 const request = ref<DeleteRequest | null>(null)
+// An example bucket of the node mock deletes through its preview.
+const example = computed(() => (mockEnabled() ? mockBucket(props.bucket) : undefined))
+const previewOpen = ref(false)
+const previewResult = ref('')
 
 const refusal = computed(() => {
+  if (example.value) return null
   if (props.nodeId) return 'Only the node that serves this bucket can delete it.'
   if (!s3.canDeletePrefix(props.bucket, '', null)) {
     return 'This session cannot delete this bucket: it needs write on the whole bucket.'
@@ -45,7 +54,7 @@ async function onCompleted(result: DeletionResult) {
         class="ml-auto text-destructive hover:text-destructive"
         :disabled="Boolean(refusal)"
         :title="refusal ?? undefined"
-        @click="request = { kind: 'bucket', bucket, nodeId, option: 'delete-permanently' }"
+        @click="example ? (previewOpen = true) : (request = { kind: 'bucket', bucket, nodeId, option: 'delete-permanently' })"
       >
         Delete permanently…
       </Button>
@@ -54,14 +63,15 @@ async function onCompleted(result: DeletionResult) {
         size="sm"
         :disabled="Boolean(refusal)"
         :title="refusal ?? undefined"
-        @click="request = { kind: 'bucket', bucket, nodeId }"
+        @click="example ? (previewOpen = true) : (request = { kind: 'bucket', bucket, nodeId })"
       >
         <Trash2 class="h-3.5 w-3.5" /> Delete bucket
       </Button>
     </header>
     <p class="px-5 py-4 text-sm text-muted-foreground">
-      {{ refusal ?? 'Removes the bucket and all its files.' }}
+      {{ previewResult || (refusal ?? (example && isMulti(example) ? 'Removes the bucket and all its files on every node.' : 'Removes the bucket and all its files.')) }}
     </p>
     <DeleteDialog :request="request" @close="request = null" @completed="onCompleted" />
+    <SetDeleteDialog v-if="example" v-model:open="previewOpen" :bucket="example" @done="previewResult = `Mock, nothing changed: ${$event}`" />
   </section>
 </template>

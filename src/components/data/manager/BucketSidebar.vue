@@ -4,27 +4,33 @@ import Button from '@/components/ui/Button.vue'
 import IconButton from '@/components/ui/IconButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
+import OptionToggle from '@/components/ui/OptionToggle.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
 import { useBucketJobs } from '@/composables/useBucketJobs'
+import BucketCreateResults from '@/components/data/BucketCreateResults.vue'
+import BucketStorageDialog from '@/components/data/BucketStorageDialog.vue'
+import DatabaseRows from '@/components/data/manager/DatabaseRows.vue'
+import MockBucketRows from '@/components/data/manager/MockBucketRows.vue'
 import { useBucketSearch } from '@/composables/useBucketSearch'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import type { DataManager } from '@/composables/useDataManager'
-import type { BucketSearchHit } from '@/lib/api'
+import type { AdmissionResponse, BucketSearchHit } from '@/lib/api'
 import { isDesktop } from '@/lib/desktop'
 import type { BindSource } from '@/lib/bindSource'
+import { defaultPlacement, mockEnabled, placementLabel } from '@/lib/distributedMock'
+import { exampleBuckets } from '@/lib/distributedMockData'
 import { folderName } from '@/lib/deviceApi'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
 import { isHiddenBucket } from '@/lib/workspaces'
-import { ArrowLeftRight, Boxes, ChevronRight, FolderPlus, FolderSync, History, KeyRound, Plus, Trash2 } from '@lucide/vue'
+import { Boxes, ChevronRight, FolderPlus, FolderSync, History, KeyRound, Plus, Trash2 } from '@lucide/vue'
 import { computed, ref, useId, watch } from 'vue'
 
 const props = defineProps<{ manager: DataManager }>()
 // Aruna Desktop offers one action: link a bucket to a folder on this computer.
 const desktop = isDesktop()
 const emit = defineEmits<{
-  (e: 'sync', hit: BucketSearchHit): void
   (e: 'sync-computer', source: BindSource): void
   (e: 'new-bucket'): void
 }>()
@@ -62,6 +68,7 @@ const {
   creatingBucket,
   createBucket,
   createBucketError,
+  bucketList,
   requestDelete,
   bindSourceFor,
   linkedFolderFor,
@@ -72,6 +79,36 @@ const {
 const listings = ref(0)
 watch(() => all.loading.value, (busy) => busy || listings.value++)
 const jobs = useBucketJobs(selectedGroupId, computed(() => [buckets.value, listings.value]))
+
+// Where the next bucket is stored: this node unless changed.
+const storageOpen = ref(false)
+const resultsOpen = ref(false)
+// A database is a bucket with a linked dataset, so this is only a filter.
+const bucketKind = ref('buckets')
+const KINDS = [
+  { value: 'buckets', label: 'Buckets' },
+  { value: 'database', label: 'Databases' },
+]
+const databaseMode = computed(() => bucketKind.value === 'database')
+// The example rows show even when the group has no bucket of its own.
+const examples = computed(() => (mockEnabled() ? exampleBuckets(bucketNameFilter.value) : []))
+const placement = ref(defaultPlacement())
+
+// Several nodes show the result of each node; one node creates as before.
+function create() {
+  if (!placement.value.several) return void createBucket()
+  if (newBucketName.value.trim() && !createBucketBlocker.value && selectedGroupId.value) resultsOpen.value = true
+}
+
+// The bucket opens here only when this node is one of its nodes.
+async function created(outcome: AdmissionResponse) {
+  const name = newBucketName.value.trim()
+  newBucketName.value = ''
+  placement.value = defaultPlacement()
+  await bucketList.refresh()
+  if (outcome.members.some((member) => realmNodes.isLocalNode(member.node_id)) && name) openBucket(name)
+}
+
 const allNodes = computed(() => bucketNodeChoice.value === null)
 // An older node cannot list without a name; the open node's list stands in.
 const searchList = computed(() => allNodes.value && !all.needsName.value)
@@ -105,12 +142,18 @@ function listPlace(nodeId: string | null): { place: string | null; placeTitle: s
 }
 // Arrow keys move through the shown rows of this group, then of other groups.
 const listId = `bucket-results-${useId()}`
+const databaseRows = ref<{ openers: (() => void)[] } | null>(null)
 const groupOpeners = computed<(() => void)[]>(() => {
+  if (databaseMode.value) return databaseRows.value?.openers ?? []
   if (searchList.value) return all.error.value ? [] : all.hits.value.map((hit) => () => openHit(hit))
   if (bucketsLoading.value || (bucketsError.value && (bucketsAuthError.value || !bucketsLoaded.value))) return []
   return nodeBuckets.value.map((entry) => () => openBucketOn(entry.bucket, entry.nodeId))
 })
-const openers = computed(() => [...groupOpeners.value, ...otherHits.value.map((hit) => () => openSearchHit(hit))])
+// The database view lists no other groups, so its keys reach only its own rows.
+const openers = computed(() => [
+  ...groupOpeners.value,
+  ...(databaseMode.value ? [] : otherHits.value.map((hit) => () => openSearchHit(hit))),
+])
 const activeIndex = ref(-1)
 watch(openers, () => (activeIndex.value = -1))
 
@@ -173,6 +216,9 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         </div>
       </header>
       <div class="border-b border-border px-3 py-2">
+        <OptionToggle v-model="bucketKind" :options="KINDS" aria-label="Kind of bucket" />
+      </div>
+      <div class="border-b border-border px-3 py-2">
         <Input
           v-model="bucketNameFilter"
           placeholder="Find a bucket"
@@ -185,10 +231,14 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           @keydown="onKeydown"
         />
       </div>
-      <template v-if="searchList">
+      <ul v-if="databaseMode" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
+        <DatabaseRows ref="databaseRows" :filter="bucketNameFilter" :active="bucket" :highlighted="activeIndex" @open="openBucketOn" />
+        <MockBucketRows database-only :filter="bucketNameFilter" :active="bucket" @open="openBucket" />
+      </ul>
+      <template v-else-if="searchList">
         <Spinner v-if="all.loading.value && !all.hits.value.length" show-label label="Loading buckets…" class="px-3 py-4" />
         <p v-else-if="all.error.value" class="px-3 py-3 text-xs text-destructive">{{ all.error.value }}</p>
-        <ul v-else-if="all.hits.value.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
+        <ul v-else-if="all.hits.value.length || examples.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
           <li v-for="(hit, index) in all.hits.value" :key="`${hit.node_id}/${hit.bucket}`">
             <BucketRow
               :bucket="hit.bucket"
@@ -209,6 +259,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               </template>
             </BucketRow>
           </li>
+          <MockBucketRows :filter="bucketNameFilter" :active="bucket" @open="openBucket" />
         </ul>
         <p v-else-if="!all.loading.value" class="px-3 py-4 text-xs text-muted-foreground">No buckets found.</p>
         <p v-if="all.failedNodes.value" class="border-t border-border/70 px-3 py-2 text-xs text-muted-foreground">
@@ -230,7 +281,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         <template v-else>
           <!-- A failed revalidation keeps the last good list and reports itself above it. -->
           <p v-if="bucketsError" class="border-b border-border/70 px-3 py-2 text-xs text-destructive">{{ bucketsError }}</p>
-          <ul v-if="nodeBuckets.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
+          <ul v-if="nodeBuckets.length || examples.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
             <li
               v-for="(entry, index) in nodeBuckets"
               :key="`${entry.nodeId ?? 'local'}/${entry.bucket}`"
@@ -273,6 +324,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                 </template>
               </BucketRow>
             </li>
+            <MockBucketRows :filter="bucketNameFilter" :active="bucket" @open="openBucket" />
           </ul>
           <p v-else class="px-3 py-4 text-xs text-muted-foreground">No buckets in this group yet.</p>
           <div v-if="recentBuckets.length" class="border-t border-border/70 py-1">
@@ -325,7 +377,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           </div>
         </template>
       </template>
-      <div v-if="otherHits.length || search.error.value || otherPartial" class="border-t border-border/70 py-1">
+      <div v-if="!databaseMode && (otherHits.length || search.error.value || otherPartial)" class="border-t border-border/70 py-1">
         <p class="px-3 pb-1 pt-2 text-xs font-medium text-muted-foreground">Other groups</p>
         <p v-if="search.error.value" class="px-3 pb-1 text-xs text-destructive">Other groups could not be searched.</p>
         <p v-else-if="otherPartial" class="px-3 pb-1 text-xs text-muted-foreground">Some nodes did not answer.</p>
@@ -348,11 +400,6 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                   <FolderSync class="h-3 w-3" />
                 </IconButton>
               </template>
-              <template v-if="!desktop && !realmNodes.isLocalNode(hit.node_id)" #actions>
-                <IconButton :label="`Sync ${hit.bucket} to this node…`" side="right" @click="emit('sync', hit)">
-                  <ArrowLeftRight class="h-3 w-3" />
-                </IconButton>
-              </template>
             </BucketRow>
           </li>
         </ul>
@@ -371,16 +418,28 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
             class="h-8 font-mono text-xs"
             :invalid="newBucketProblem ? 'error' : undefined"
             aria-label="New bucket name"
-            @keyup.enter="createBucket"
+            @keyup.enter="create"
           />
-          <Button variant="outline" size="sm" aria-label="Create bucket" :title="`Creates the bucket on ${createNode}`" :disabled="creatingBucket || !newBucketName.trim() || Boolean(createBucketBlocker)" @click="createBucket">
+          <Button variant="outline" size="sm" aria-label="Create bucket" :title="`Creates the bucket on ${placement.several ? `${placement.members.length} nodes` : createNode}`" :disabled="creatingBucket || !newBucketName.trim() || Boolean(createBucketBlocker)" @click="create">
             <FolderPlus class="h-4 w-4" />
           </Button>
         </div>
+        <button type="button" class="block text-left text-xs text-muted-foreground hover:text-foreground" @click="storageOpen = true">
+          Stored on: {{ placementLabel(placement) }} <span class="underline">Change</span>
+        </button>
         <p v-if="createBucketError" class="text-xs text-destructive">{{ createBucketError }}</p>
         <p v-else-if="newBucketProblem" class="text-xs text-destructive">{{ newBucketProblem }}</p>
         <p v-else-if="newBucketRefusal" class="text-xs text-muted-foreground">{{ newBucketRefusal }}</p>
       </footer>
     </div>
+    <BucketStorageDialog v-model:open="storageOpen" v-model="placement" />
+    <BucketCreateResults
+      v-if="selectedGroupId"
+      v-model:open="resultsOpen"
+      :name="newBucketName.trim()"
+      :group-id="selectedGroupId"
+      :placement="placement"
+      @created="created"
+    />
   </aside>
 </template>

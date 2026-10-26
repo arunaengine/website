@@ -48,6 +48,7 @@ const builder = compileClientComponent(new URL('./RoleBuilder.vue', import.meta.
   '@/components/ui/OptionToggle.vue': moduleDefault(ChoiceStub),
   '@/components/ui/Select.vue': moduleDefault(ChoiceStub),
   './PermissionPathPicker.vue': moduleDefault(PickerStub),
+  './GrantNodeWarning.vue': moduleDefault({ render: () => null }),
   './permission-paths': PermissionPaths,
   '@/composables/useAruna': { useAruna: () => ({ createGroupRole, deleteGroupRole, saving: ref(false) }) },
   '@/lib/utils': Utils,

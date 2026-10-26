@@ -14,6 +14,11 @@ import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
+import MockFileGeneral from '@/components/data/MockFileGeneral.vue'
+import MockFileStorage from '@/components/data/MockFileStorage.vue'
+import FileOrigin from '@/components/data/FileOrigin.vue'
+import FilePartOf from '@/components/data/FilePartOf.vue'
+import LinkedDatasets from '@/components/data/LinkedDatasets.vue'
 import ObjectLocationsPanel from '@/components/data/ObjectLocationsPanel.vue'
 import ReferencedBy from '@/components/data/ReferencedBy.vue'
 import ObjectVersionsPanel from '@/components/data/ObjectVersionsPanel.vue'
@@ -30,7 +35,7 @@ import type { SyncRow } from '@/composables/useBucketSyncs'
 import { usePublicAccess, type PublicAccess } from '@/composables/usePublicAccess'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { useAssistantObject } from '@/composables/useAssistantObject'
-import { apiRequest } from '@/lib/api'
+import { ApiError, apiRequest } from '@/lib/api'
 import { exactFileBacklinkPreflight } from '@/lib/backlinks'
 import { fileChecksums, type FileChecksum } from '@/lib/checksums'
 import { versionObjectId, type DrsObjectResponse } from '@/lib/contentIdentity'
@@ -38,6 +43,8 @@ import { publicUrl, type PublicTarget } from '@/lib/publicAccess'
 import { arnLocationLabel, parseArunaArn } from '@/lib/sync'
 import type { DeleteRequest } from '@/lib/deletion/request'
 import { featureEnabled } from '@/lib/config'
+import { mockEnabled } from '@/lib/distributedMock'
+import { mockFile } from '@/lib/distributedMockData'
 import { isNotebookKey } from '@/lib/notebook/document'
 import { stateVariant } from '@/lib/stateBadge'
 import { formatBytes, relativeTime } from '@/lib/utils'
@@ -85,7 +92,7 @@ const emit = defineEmits<{
 }>()
 
 const s3 = useS3()
-const { currentUser, apiBaseUrl, authToken, nodeInfo } = useAruna()
+const { currentUser, apiBaseUrl, authToken, nodeInfo, getFileOrigin } = useAruna()
 const { shown } = usePortalFeatures()
 const { displayName: nodeName } = useRealmNodes()
 const { leave } = useAssistantObject()
@@ -97,10 +104,14 @@ const pinnedVersion = ref<string | null>(null)
 let headSeq = 0
 
 const remote = computed(() => Boolean(props.nodeId))
-const currentVersion = computed(() => pinnedVersion.value ?? head.value?.versionId ?? null)
+// A file of an example bucket stored on several nodes (node mock).
+const mock = computed(() => (mockEnabled() ? mockFile(props.bucket, props.objectKey) : undefined))
+const shownSize = computed(() => props.size ?? mock.value?.size)
+const shownModified = computed(() => props.lastModified ?? (mock.value ? new Date(mock.value.modified) : undefined))
+const currentVersion = computed(() => pinnedVersion.value ?? head.value?.versionId ?? mock.value?.versionId ?? null)
 // Preview is a mode of this dialog, not a tab: it fills the frame under the
 // same header, and the tabs are one click away.
-const previewMode = computed(() => props.tab === 'preview' && !props.folder)
+const previewMode = computed(() => props.tab === 'preview' && !props.folder && !mock.value)
 const detailsTab = computed(() => (previewMode.value ? 'general' : props.tab))
 const notebookLink = computed(() => !remote.value && !pinnedVersion.value && props.groupId &&
   isNotebookKey(props.objectKey) && featureEnabled('tes') && shown('notebooks')
@@ -108,7 +119,7 @@ const notebookLink = computed(() => !remote.value && !pinnedVersion.value && pro
   : null)
 
 async function loadHead() {
-  if (!props.objectKey || remote.value || props.folder) return
+  if (!props.objectKey || remote.value || props.folder || mock.value) return
   const seq = ++headSeq
   headBusy.value = true
   headError.value = null
@@ -135,14 +146,21 @@ async function loadChecksums() {
   const realmId = nodeInfo.value?.node.realm_id
   const nodeId = props.nodeId ?? localNodeId()
   const baseUrl = nodeId ? nodeApiBase(nodeId) : null
-  if (!props.open || props.folder || !version || !realmId || !nodeId || !baseUrl) return
-  const id = versionObjectId(realmId, nodeId, props.bucket, props.objectKey, version)
+  if (!props.open || props.folder || mock.value || !version || !realmId || !nodeId || !baseUrl) return
+  const lookup = (id: string) =>
+    apiRequest<DrsObjectResponse>(`/ga4gh/drs/v1/objects/${encodeURIComponent(id)}`, {}, { baseUrl, token: authToken.value ?? undefined })
   try {
-    const object = await apiRequest<DrsObjectResponse>(
-      `/ga4gh/drs/v1/objects/${encodeURIComponent(id)}`,
-      {},
-      { baseUrl, token: authToken.value ?? undefined },
-    )
+    let object: DrsObjectResponse
+    try {
+      object = await lookup(versionObjectId(realmId, nodeId, props.bucket, props.objectKey, version))
+    } catch (error) {
+      // A node ARN of a bucket stored on more nodes answers 409 where this member holds no bytes:
+      // the version is then asked for by its global id, which any node resolves.
+      if (!(error instanceof ApiError) || error.status !== 409 || props.nodeId) throw error
+      const globalId = (await getFileOrigin(props.bucket, { key: props.objectKey, version_id: version })).global_id
+      if (!globalId) throw error
+      object = await lookup(globalId)
+    }
     if (seq === checksumSeq) checksums.value = fileChecksums(object)
   } catch {
     // Checksums are extra details; the dialog stays useful without them.
@@ -202,7 +220,7 @@ const fileReferences = computed(() =>
 
 function loadReferences() {
   const apiBase = props.nodeId ? nodeApiBase(props.nodeId) : apiBaseUrl.value
-  if (!currentUser.value || !apiBase || props.folder) {
+  if (!currentUser.value || !apiBase || props.folder || mock.value) {
     resetReferences()
     return
   }
@@ -254,10 +272,10 @@ const details = computed(() => props.folder ? [
   { label: 'Node', value: nodeName(props.nodeId) },
 ] : [
   { label: 'Key', value: props.objectKey },
-  { label: 'Size', value: props.size === undefined ? 'unknown' : formatBytes(props.size) },
+  { label: 'Size', value: shownSize.value === undefined ? 'unknown' : formatBytes(shownSize.value) },
   {
     label: 'Last modified',
-    value: props.lastModified ? relativeTime(props.lastModified.toISOString()) : 'unknown',
+    value: shownModified.value ? relativeTime(shownModified.value.toISOString()) : 'unknown',
   },
   { label: 'Content type', value: head.value?.contentType || 'unknown' },
 ])
@@ -277,7 +295,7 @@ const details = computed(() => props.folder ? [
           </DialogTitle>
           <p class="mt-0.5 font-mono text-[11px] text-muted-foreground">
             <span class="break-all">{{ props.bucket }}/{{ props.objectKey }}</span>
-            <span v-if="props.size !== undefined"> · {{ formatBytes(props.size) }}</span>
+            <span v-if="shownSize !== undefined"> · {{ formatBytes(shownSize) }}</span>
           </p>
         </div>
         <div class="flex flex-wrap items-center justify-end gap-2">
@@ -291,7 +309,7 @@ const details = computed(() => props.folder ? [
             <RouterLink :to="notebookLink" @click="leave"><NotebookPen class="h-4 w-4" /> Open notebook</RouterLink>
           </Button>
           <Button
-            v-if="!props.folder"
+            v-if="!props.folder && !mock"
             variant="outline"
             size="sm"
             @click="emit('update:tab', previewMode ? 'general' : 'preview')"
@@ -341,7 +359,8 @@ const details = computed(() => props.folder ? [
       </TabsList>
 
       <TabsContent value="general" class="surface p-4">
-        <dl class="space-y-2 text-xs">
+        <MockFileGeneral v-if="mock" :object="mock" />
+        <dl v-else class="space-y-2 text-xs">
           <div v-for="detail in details" :key="detail.label" class="flex items-baseline justify-between gap-4">
             <dt class="shrink-0 text-muted-foreground">{{ detail.label }}</dt>
             <dd class="min-w-0 break-all text-right font-mono text-foreground">{{ detail.value }}</dd>
@@ -376,7 +395,7 @@ const details = computed(() => props.folder ? [
               </div>
             </dd>
           </div>
-          <div v-if="props.groupId" class="flex items-center justify-between gap-4">
+          <div v-if="props.groupId && !mock" class="flex items-center justify-between gap-4">
             <dt class="shrink-0 text-muted-foreground">Public access</dt>
             <dd class="flex min-w-0 items-center justify-end gap-2">
               <Badge :variant="filePublic ? 'success' : 'secondary'" size="sm" class="uppercase">
@@ -409,6 +428,23 @@ const details = computed(() => props.folder ? [
             </li>
           </ul>
         </div>
+        <FileOrigin
+          v-if="props.open && !mock && !remote && !props.folder"
+          class="mt-4"
+          :target="{ bucket: props.bucket, key: props.objectKey, versionId: pinnedVersion }"
+        />
+        <FilePartOf
+          v-if="props.open && !mock && !remote && !props.folder"
+          class="mt-4"
+          :target="{ bucket: props.bucket, key: props.objectKey }"
+        />
+        <LinkedDatasets
+          v-if="props.open && !mock && !remote && props.folder"
+          class="mt-4"
+          quiet-empty
+          heading="Linked by datasets"
+          :target="{ bucket: props.bucket, key: props.objectKey, folder: true, remote: false }"
+        />
         <p v-if="props.referencedFrom" class="mt-3 text-xs text-muted-foreground">
           Referenced from {{ props.referencedFrom.label }}.
         </p>
@@ -417,7 +453,7 @@ const details = computed(() => props.folder ? [
           A public folder rule covers every file below it, including files added later.
         </p>
         <ReferencedBy
-          v-if="currentUser && !props.folder"
+          v-if="currentUser && !props.folder && !mock"
           class="mt-4 border-t border-border pt-3"
           :preflight="fileReferences"
           :busy="referencesBusy"
@@ -427,7 +463,9 @@ const details = computed(() => props.folder ? [
       </TabsContent>
 
       <TabsContent value="versions" class="surface p-4">
+        <p v-if="mock" class="text-xs text-muted-foreground">The mock has no version history.</p>
         <ObjectVersionsPanel
+          v-else
           :active="props.open && props.tab === 'versions'"
           :bucket="props.bucket"
           :object-key="props.objectKey"
@@ -440,7 +478,8 @@ const details = computed(() => props.folder ? [
       </TabsContent>
 
       <TabsContent value="storage">
-        <div class="grid gap-4 lg:grid-cols-2">
+        <MockFileStorage v-if="mock" :object="mock" />
+        <div v-else class="grid gap-4 lg:grid-cols-2">
           <div class="surface space-y-3 p-4">
             <PolicyColumn
               :key="props.revision"
