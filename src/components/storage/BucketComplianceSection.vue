@@ -20,7 +20,8 @@ import type { BulkRunProgress, CoverageResponse, CoverageScope } from '@/lib/pla
 import { formatNumber } from '@/lib/utils'
 import { Activity, ClipboardCheck } from '@lucide/vue'
 
-const props = defineProps<{ bucket: string; canApply: boolean; blockedReason: string | null }>()
+// `nodeId`: the node whose copies are checked and changed; null for this node.
+const props = defineProps<{ bucket: string; canApply: boolean; blockedReason: string | null; nodeId?: string | null }>()
 
 const { getPlacementCoverage, runBucketPlacement } = usePlacementPolicies()
 
@@ -48,7 +49,7 @@ async function load(cursor?: string) {
   refusal.value = null
   loadError.value = null
   try {
-    const report = await getPlacementCoverage(props.bucket, { scope: scope.value, cursor, limit: 128 })
+    const report = await getPlacementCoverage(props.bucket, { scope: scope.value, cursor, limit: 128 }, props.nodeId ?? null)
     if (request === sequence) coverage.value = report
   } catch (error) {
     if (request !== sequence) return
@@ -69,7 +70,7 @@ function setScope(next: CoverageScope) {
 }
 
 watch(
-  () => props.bucket,
+  () => [props.bucket, props.nodeId],
   () => {
     runGeneration += 1
     bulkBusy.value = false
@@ -89,8 +90,9 @@ onBeforeUnmount(() => {
 async function applyToExisting() {
   if (bulkBusy.value || !props.canApply) return
   const bucket = props.bucket
+  const node = props.nodeId ?? null
   const generation = ++runGeneration
-  const current = () => generation === runGeneration && !disposed && props.bucket === bucket
+  const current = () => generation === runGeneration && !disposed && props.bucket === bucket && (props.nodeId ?? null) === node
   bulkBusy.value = true
   bulkError.value = null
   bulkProgress.value = null
@@ -98,7 +100,7 @@ async function applyToExisting() {
     const progress = await runBulkToCompletion(
       (request) => {
         if (!current()) throw staleRun
-        return runBucketPlacement(bucket, request)
+        return runBucketPlacement(bucket, request, node)
       },
       (progress) => {
         if (current()) bulkProgress.value = { ...progress }

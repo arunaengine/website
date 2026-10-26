@@ -181,10 +181,12 @@ async function getObjectPlacement(bucket: string, key: string): Promise<ObjectPl
 async function putBucketPlacement(
   bucket: string,
   body: BucketPlacementRequest,
+  nodeId?: string | null,
 ): Promise<BucketPlacementResponse> {
   const stored = await request<BucketPlacementResponse>(
     `/data/buckets/${encodeURIComponent(bucket)}/placement`,
     { method: 'PUT', body: JSON.stringify(body) },
+    nodeId,
   )
   rememberRefs(stored.policies)
   return stored
@@ -202,10 +204,11 @@ async function mintObjectPlacement(
   return stored
 }
 
-async function runBucketPlacement(bucket: string, body: BulkRunRequest): Promise<BulkRunResponse> {
+async function runBucketPlacement(bucket: string, body: BulkRunRequest, nodeId?: string | null): Promise<BulkRunResponse> {
   const response = await request<BulkRunResponse>(
     `/data/buckets/${encodeURIComponent(bucket)}/placement/runs`,
     { method: 'POST', body: JSON.stringify(body) },
+    nodeId,
   )
   rememberRefs(response.target_policies)
   return response
@@ -214,10 +217,12 @@ async function runBucketPlacement(bucket: string, body: BulkRunRequest): Promise
 async function getPlacementCoverage(
   bucket: string,
   query: CoverageQuery = {},
+  nodeId?: string | null,
 ): Promise<CoverageResponse> {
   const response = await request<CoverageResponse>(
     `/data/buckets/${encodeURIComponent(bucket)}/placement/coverage`,
     { query: { scope: query.scope, cursor: query.cursor, limit: query.limit } },
+    nodeId,
   )
   rememberRefs(response.target_policies)
   return response

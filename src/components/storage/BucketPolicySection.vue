@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The rules this bucket puts on new objects. Policy only: what this node
-// observed about existing objects lives in the compliance surface below.
+// observed about existing objects lives in the compliance surface below. Each node
+// keeps the default of its own copy; a distributed bucket gets it on every member.
 import { computed, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -19,6 +20,7 @@ import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import PlacementRuleEditor from '@/components/storage/PlacementRuleEditor.vue'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useRefresh } from '@/composables/useRefresh'
 import { ApiError } from '@/lib/api'
 import {
@@ -37,11 +39,22 @@ const props = defineProps<{
   /** A group admin publishes for the group; a realm admin publishes realm wide. */
   canPublishForGroup: boolean
   canPublishForRealm: boolean
+  /** The nodes that keep the default, null for this node; coordinators first. */
+  nodes?: (string | null)[]
 }>()
 const emit = defineEmits<{ (event: 'saved'): void }>()
 
 const { getBucketPlacement, putBucketPlacement, listPoliciesForGroup, policyName } =
   usePlacementPolicies()
+const { displayName } = useRealmNodes()
+
+const asked = computed(() => (props.nodes?.length ? props.nodes : [null]))
+// The generation each node reported, for its own compare-and-set; a node that did not answer has none.
+const generations = ref(new Map<string | null, number>())
+const differing = ref<string[]>([])
+const unread = ref<string[]>([])
+const sameRefs = (a: PolicyRefBody[], b: PolicyRefBody[]) =>
+  JSON.stringify(a.map(policyRefKey).sort()) === JSON.stringify(b.map(policyRefKey).sort())
 
 const placement = ref<BucketPlacementResponse | null>(null)
 const draft = ref<PolicyRefBody[]>([])
@@ -90,9 +103,22 @@ async function load() {
   loadError.value = null
   saveError.value = null
   saveMessage.value = null
+  differing.value = []
+  unread.value = []
   try {
-    const stored = await getBucketPlacement(props.bucket)
+    const nodes = asked.value
+    const answers = await Promise.allSettled(nodes.map((node) => getBucketPlacement(props.bucket, node)))
     if (request !== sequence) return
+    const first = answers[0]
+    if (first.status === 'rejected') throw first.reason
+    const stored = first.value
+    generations.value = new Map(
+      answers.flatMap((answer, index) => (answer.status === 'fulfilled' ? [[nodes[index], answer.value.generation] as const] : [])),
+    )
+    differing.value = answers.flatMap((answer, index) =>
+      answer.status === 'fulfilled' && !sameRefs(answer.value.policies, stored.policies) ? [displayName(nodes[index])] : [],
+    )
+    unread.value = answers.flatMap((answer, index) => (answer.status === 'rejected' ? [displayName(nodes[index])] : []))
     placement.value = stored
     draft.value = stored.policies.map((policy) => ({ ...policy }))
   } catch (error) {
@@ -121,7 +147,7 @@ async function load() {
 const { busy: reloadBusy, refresh: onReload } = useRefresh(load)
 const spinning = computed(() => reloadBusy.value || loading.value)
 
-watch(() => [props.bucket, props.groupId], () => void load(), { immediate: true })
+watch(() => [props.bucket, props.groupId, asked.value.join(',')], () => void load(), { immediate: true })
 
 function attach(key: string) {
   attachChoice.value = ''
@@ -152,19 +178,28 @@ async function save() {
   saving.value = true
   saveError.value = null
   saveMessage.value = null
+  const policies = draft.value.map((policy) => ({ policy_id: policy.policy_id.trim(), digest: policy.digest.trim() }))
+  // Only nodes read just before are written, each against the generation it reported.
+  const nodes = asked.value.filter((node) => generations.value.has(node))
   try {
-    const stored = await putBucketPlacement(props.bucket, {
-      policies: draft.value.map((policy) => ({
-        policy_id: policy.policy_id.trim(),
-        digest: policy.digest.trim(),
-      })),
-      expected_generation: placement.value.generation,
-    })
-    placement.value = stored
+    const answers = await Promise.allSettled(
+      nodes.map((node) => putBucketPlacement(props.bucket, { policies, expected_generation: generations.value.get(node) }, node)),
+    )
+    const written = answers.flatMap((answer, index) => (answer.status === 'fulfilled' ? [{ node: nodes[index], stored: answer.value }] : []))
+    const failed = answers.flatMap((answer, index) => (answer.status === 'rejected' ? [{ node: nodes[index], cause: answer.reason }] : []))
+    if (!written.length) throw failed[0]?.cause
+    for (const { node, stored } of written) generations.value.set(node, stored.generation)
+    const stored = written[0].stored
+    placement.value = { ...stored, generation: generations.value.get(asked.value[0]) ?? stored.generation }
     draft.value = stored.policies.map((policy) => ({ ...policy }))
+    differing.value = failed.map((failure) => displayName(failure.node))
     saveMessage.value = stored.policies.length
       ? 'Saved. New objects in this bucket carry these rules.'
       : 'Saved. New objects in this bucket carry no rules.'
+    if (failed.length) {
+      const reason = placementPoliciesErrorMessage(failed[0].cause, 'bucket-cas')
+      saveError.value = `Not saved on ${failed.map((failure) => displayName(failure.node)).join(', ')}: ${reason}`
+    }
     emit('saved')
   } catch (error) {
     saveError.value = placementPoliciesErrorMessage(error, 'bucket-cas')
@@ -207,6 +242,16 @@ function onPublished(policy: PolicyResponse) {
       </div>
 
       <template v-else-if="placement">
+        <p v-if="asked.length > 1" class="text-xs text-muted-foreground">
+          The default is kept on each of the {{ asked.length }} nodes of this bucket, because the node that writes a range
+          applies it. Saving sets it on every node.
+        </p>
+        <p v-if="differing.length" class="text-xs text-amber-700">
+          {{ differing.join(', ') }} {{ differing.length === 1 ? 'has' : 'have' }} other rules. Saving sets these rules there too.
+        </p>
+        <p v-if="unread.length" class="text-xs text-muted-foreground">
+          {{ unread.join(', ') }} did not answer, so {{ unread.length === 1 ? 'its' : 'their' }} rules are not shown and not changed.
+        </p>
         <p class="text-xs text-muted-foreground">
           A policy allows a copy; it never creates, moves or removes one.
           <DocsLink icon topic="where-data-lives" section="Placement policies" class="ml-0.5" />

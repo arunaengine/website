@@ -6,6 +6,7 @@ import * as Api from '@/lib/api'
 import * as PlacementPolicies from '@/lib/placementPolicies'
 import type { PolicyResponse } from '@/lib/placementPolicies'
 import {
+  button,
   compileClientComponent,
   content,
   element,
@@ -41,6 +42,7 @@ const SelectStub = defineComponent({
 const MessageStub = defineComponent({ props: { message: String }, setup: (props) => () => h('p', props.message) })
 
 const getBucketPlacement = vi.fn()
+const putBucketPlacement = vi.fn()
 const listPoliciesForGroup = vi.fn()
 
 const section = compileClientComponent(new URL('./BucketPolicySection.vue', import.meta.url), {
@@ -65,12 +67,13 @@ const section = compileClientComponent(new URL('./BucketPolicySection.vue', impo
   '@/composables/usePlacementPolicies': {
     usePlacementPolicies: () => ({
       getBucketPlacement,
-      putBucketPlacement: vi.fn(),
+      putBucketPlacement,
       listPoliciesForGroup,
       policyName: (entry: { name?: string | null; policy_id: string }) => entry.name ?? entry.policy_id,
     }),
   },
   '@/composables/useRefresh': { useRefresh },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string | null) => id ?? 'this node' }) },
   '@/lib/api': Api,
   '@/lib/placementPolicies': PlacementPolicies,
 })
@@ -142,5 +145,40 @@ describe('bucket policy section', () => {
     listPoliciesForGroup.mockResolvedValue([])
 
     expect(content(await render())).toContain('None: copies of this bucket are not governed')
+  })
+
+  it('reads the default of every node of a distributed bucket and saves it on each with its own generation', async () => {
+    const eu = { policy_id: 'p-eu', digest: digestOne, name: 'Copies inside the EU', owner_group_id: null }
+    getBucketPlacement.mockReset().mockImplementation(async (_bucket: string, node: string | null) => {
+      if (node === 'node-3') throw new Api.ApiError(503, 'busy')
+      return { bucket: 'reef-survey', generation: node ? 7 : 3, policies: node ? [] : [eu] }
+    })
+    putBucketPlacement.mockReset().mockImplementation(async (_bucket: string, body: { expected_generation: number }, node: string | null) => {
+      if (node === 'node-2') throw new Api.ApiError(409, 'generation moved')
+      return { bucket: 'reef-survey', generation: body.expected_generation + 1, policies: [] }
+    })
+    listPoliciesForGroup.mockResolvedValue([])
+    const root = await render({ nodes: [null, 'node-2', 'node-3'] })
+
+    expect(content(root)).toContain('node-2 has other rules')
+    expect(content(root)).toContain('node-3 did not answer')
+    await (element(root, (node) => node.props['aria-label'] === 'Remove policy 1').props.onClick as () => void)()
+    await flush()
+    await (button(root, 'Save').props.onClick as () => Promise<void>)()
+    await flush()
+
+    expect(putBucketPlacement.mock.calls.map(([, body, node]) => [node, body.expected_generation])).toEqual([
+      [null, 3],
+      ['node-2', 7],
+    ])
+    expect(content(root)).toContain('Not saved on node-2')
+  })
+
+  it('asks the node that holds a bucket on another node', async () => {
+    getBucketPlacement.mockReset().mockResolvedValue({ bucket: 'reef-survey', generation: 1, policies: [] })
+    listPoliciesForGroup.mockResolvedValue([])
+    await render({ nodes: ['node-far'] })
+
+    expect(getBucketPlacement).toHaveBeenCalledWith('reef-survey', 'node-far')
   })
 })

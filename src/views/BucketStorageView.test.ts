@@ -211,10 +211,10 @@ describe('bucket storage page', () => {
     expect(content(await render({ query: { tab: 'access' } }))).toContain('public rules')
   })
 
-  it('hides the node-local tabs for a bucket hosted elsewhere', async () => {
+  it('keeps the settings tabs for a bucket hosted elsewhere, since its node answers for them', async () => {
     const root = await render({ admin: true, realmAdmin: true, query: { node: 'node-far', tab: 'transfers' } })
 
-    expect(tabs(root)).toEqual(['overview', 'access', 'encryption', 'transfers'])
+    expect(tabs(root)).toEqual(['overview', 'backend', 'placement', 'access', 'encryption', 'transfers'])
     expect(content(root)).toContain('transfer rows')
   })
 

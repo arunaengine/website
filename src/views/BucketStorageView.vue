@@ -91,11 +91,23 @@ const ownerNodes = computed<(string | null)[] | null>(() => {
   return distribution.state.value === 'loading' ? null : [nodeId.value]
 })
 const canAdminGroup = computed(() => isGroupAdmin(group.value, currentUser.value?.id ?? ''))
-const local = computed(() => !nodeId.value)
-const backendVisible = computed(() => local.value && canAdminGroup.value)
-const placementVisible = computed(() => local.value && (canAdminGroup.value || isRealmAdmin.value))
+// The node of the bucket answers for its settings, so they show for a bucket of any node.
+const backendVisible = computed(() => canAdminGroup.value)
+const placementVisible = computed(() => canAdminGroup.value || isRealmAdmin.value)
+// The member nodes of a distributed bucket; each keeps its own storage rules and placement default.
+const memberNodes = computed(() => [...new Set(live.value?.members.map((member) => member.nodeId) ?? [])])
+// The default is applied where a range is written, so coordinators come first and are read from.
+const placementNodes = computed<(string | null)[]>(() => {
+  if (!memberNodes.value.length) return [nodeId.value]
+  const coordinators = live.value?.ranges.map((range) => range.coordinator) ?? []
+  const ordered = [...new Set([...coordinators, ...memberNodes.value])]
+  return ordered.map((id) => (realmNodes.isLocalNode(id) ? null : id))
+})
 // A hidden feature loses its tab trigger only; a deep link still opens the tab.
 const placementTrigger = computed(() => placementVisible.value && shown('placement'))
+
+const APPLY_DISTRIBUTED =
+  'Existing files of a bucket stored on several nodes cannot be changed from here yet: only the node that writes each range may change its files.'
 
 const TAB_IDS = ['overview', 'nodes', 'backend', 'placement', 'access', 'encryption', 'transfers']
 const routeTab = useRouteTab(TAB_IDS, 'overview')
@@ -189,7 +201,7 @@ const browserLink = computed(() => ({
       </TabsContent>
 
       <TabsContent v-if="backendVisible" value="backend" class="mt-0">
-        <BucketBackendTab :bucket="bucket" :group-id="groupId" />
+        <BucketBackendTab :bucket="bucket" :group-id="groupId" :node-id="nodeId" :members="memberNodes" />
       </TabsContent>
 
       <TabsContent v-if="placementVisible" value="placement" class="mt-0 space-y-5">
@@ -199,11 +211,13 @@ const browserLink = computed(() => ({
           :group-name="group?.display_name ?? null"
           :can-publish-for-group="canAdminGroup"
           :can-publish-for-realm="isRealmAdmin && !canAdminGroup"
+          :nodes="placementNodes"
         />
         <BucketComplianceSection
           :bucket="bucket"
-          :can-apply="canAdminGroup || isRealmAdmin"
-          blocked-reason="Only group admins of this bucket and realm admins may apply the rules."
+          :node-id="nodeId"
+          :can-apply="(canAdminGroup || isRealmAdmin) && !memberNodes.length"
+          :blocked-reason="memberNodes.length ? APPLY_DISTRIBUTED : 'Only group admins of this bucket and realm admins may apply the rules.'"
         />
       </TabsContent>
 
