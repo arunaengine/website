@@ -9,6 +9,7 @@ import {
   getBucketSources as requestSources,
   getFilePartOf as requestPartOf,
   getFileOrigin as requestOrigin,
+  resolveVersion as requestResolve,
   getPartTarget as requestTarget,
   getDataLinks as requestDataLinks,
   getBucketDistribution as requestDistribution,
@@ -89,6 +90,11 @@ export function getBucketLinks(bucket: string, query: BucketLinksQuery, signal?:
 /** Where one file version of a bucket on this node came from. */
 export function getFileOrigin(bucket: string, query: { key: string; version_id?: string }, signal?: AbortSignal): Promise<OriginResponse> {
   return requestOrigin(bucket, query, refreshContext().client, signal)
+}
+
+/** The bytes of a global version id, which the node serves or fetches from a holder. */
+export function resolveVersion(realmId: string, versionId: string, signal?: AbortSignal): Promise<Blob> {
+  return requestResolve(realmId, versionId, refreshContext().client, signal)
 }
 
 /** The datasets whose linked parts contain a file of a bucket on this node. */

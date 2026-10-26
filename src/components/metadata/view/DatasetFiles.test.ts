@@ -20,6 +20,7 @@ const DatasetFiles = compileClientComponent(new URL('./DatasetFiles.vue', import
   'vue-router': { RouterLink: LinkStub },
   '@/components/data/ReferencedBy.vue': moduleDefault(Slot),
   '@/components/metadata/view/LinkedPartActions.vue': moduleDefault(defineComponent({ props: { id: String }, setup: (props) => () => h('em', `linked part ${props.id}`) })),
+  '@/components/metadata/view/VersionActions.vue': moduleDefault(defineComponent({ props: { realmId: String, versionId: String }, setup: (props) => () => h('em', `version actions ${props.realmId}/${props.versionId}`) })),
   '@/lib/linkedPart': LinkedPart,
   '@/components/ui/Badge.vue': moduleDefault(Slot),
   '@/components/ui/Button.vue': moduleDefault(Slot),
@@ -128,6 +129,16 @@ describe('DatasetFiles', () => {
     expect(text).not.toContain('Location:')
     expect(nodes(mounted.root).some((node) => node.tag === 'a' && node.props.href)).toBe(false)
     mounted.app.unmount()
+  })
+
+  it('offers download and preview for a file named only by its global version id', async () => {
+    const id = 'https://w3id.org/aruna/data/k3V9xQ2m/01K8Y2B6D8F0H2K4M6P8R0T2V4'
+    const global = await render({ '@id': id, contentUrl: id })
+    expect(content(global.root)).toContain('version actions k3V9xQ2m/01K8Y2B6D8F0H2K4M6P8R0T2V4')
+    global.app.unmount()
+    const local = await render({ '@id': 's3://reads/raw/one.csv' })
+    expect(content(local.root)).not.toContain('version actions')
+    local.app.unmount()
   })
 
   it('marks a file kept at another realm as external', async () => {

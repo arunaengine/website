@@ -5,6 +5,7 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import ReferencedBy from '@/components/data/ReferencedBy.vue'
 import LinkedPartActions from '@/components/metadata/view/LinkedPartActions.vue'
+import VersionActions from '@/components/metadata/view/VersionActions.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import IconButton from '@/components/ui/IconButton.vue'
@@ -237,7 +238,7 @@ function openPreview(row: DataEntity) {
               <td class="px-5 py-2.5 text-muted-foreground">{{ row.encodingFormat || '-' }}</td>
               <td class="px-5 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ formatContentSize(row.contentSize) }}</td>
               <td class="px-5 py-2.5 text-right">
-                <div class="flex items-center justify-end gap-1">
+                <div class="flex flex-wrap items-center justify-end gap-1">
                   <Button
                     v-if="contentW3id(row) && !row.directory"
                     variant="ghost"
@@ -254,6 +255,14 @@ function openPreview(row: DataEntity) {
                   <IconButton v-if="canPreview(row)" label="Preview" @click.stop="openPreview(row)">
                     <Eye class="size-3.5" />
                   </IconButton>
+                  <VersionActions
+                    v-if="identityOf(row).global && !row.directory && !linkedPart(row)"
+                    :realm-id="identityOf(row).global!.realmId"
+                    :version-id="identityOf(row).global!.versionId"
+                    :name="row.name"
+                    :size="row.contentSize && Number.isFinite(Number(row.contentSize)) ? Number(row.contentSize) : undefined"
+                    :content-type="row.encodingFormat"
+                  />
                   <a v-if="entityLink(row)" :href="entityLink(row)" target="_blank" rel="noopener noreferrer" class="inline-flex text-primary hover:opacity-80" :aria-label="`Open the location of ${row.name} in a new tab`" @click.stop>
                     <ExternalLinkIcon class="h-3.5 w-3.5" />
                   </a>
