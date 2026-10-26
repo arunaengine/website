@@ -139,6 +139,8 @@ export interface BulkRunResponse {
   blocked: BlockedGapBody[]
   cursor?: string
   complete: boolean
+  /** Nodes that write part of a distributed bucket and did not run this pass; asked again next. */
+  unreached?: string[]
 }
 
 export type CoverageScope = 'current' | 'historical'
@@ -400,6 +402,7 @@ function mergeBulkProgress(previous: BulkRunProgress | null, response: BulkRunRe
   for (const gap of previous?.blocked ?? []) blocked.set(`${gap.key}\u0000${gap.reason}`, gap)
   for (const gap of response.blocked) blocked.set(`${gap.key}\u0000${gap.reason}`, gap)
   const superseded = response.status === 'superseded'
+  const unreached = response.unreached ?? []
   return {
     operation_id: response.operation_id,
     status: response.status,
@@ -413,7 +416,9 @@ function mergeBulkProgress(previous: BulkRunProgress | null, response: BulkRunRe
     complete: response.complete || response.status === 'completed',
     message: superseded
       ? 'Run stopped because the bucket default changed underneath it. Start a new run to apply the new default.'
-      : undefined,
+      : unreached.length
+        ? `${unreached.length === 1 ? 'A node that writes' : `${unreached.length} nodes that write`} part of this bucket did not answer yet; the run asks again.`
+        : undefined,
   }
 }
 

@@ -106,9 +106,6 @@ const placementNodes = computed<(string | null)[]>(() => {
 // A hidden feature loses its tab trigger only; a deep link still opens the tab.
 const placementTrigger = computed(() => placementVisible.value && shown('placement'))
 
-const APPLY_DISTRIBUTED =
-  'Existing files of a bucket stored on several nodes cannot be changed from here yet: only the node that writes each range may change its files.'
-
 const TAB_IDS = ['overview', 'nodes', 'backend', 'placement', 'access', 'encryption', 'transfers']
 const routeTab = useRouteTab(TAB_IDS, 'overview')
 const tab = computed({
@@ -216,8 +213,8 @@ const browserLink = computed(() => ({
         <BucketComplianceSection
           :bucket="bucket"
           :node-id="nodeId"
-          :can-apply="(canAdminGroup || isRealmAdmin) && !memberNodes.length"
-          :blocked-reason="memberNodes.length ? APPLY_DISTRIBUTED : 'Only group admins of this bucket and realm admins may apply the rules.'"
+          :can-apply="canAdminGroup || isRealmAdmin"
+          blocked-reason="Only group admins of this bucket and realm admins may apply the rules."
         />
       </TabsContent>
 

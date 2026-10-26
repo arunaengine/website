@@ -47,6 +47,20 @@ describe('placement policy admin helpers', () => {
     expect(progress.blocked).toEqual([{ key: 'raw/a.fastq', reason: 'policy_unresolved' }])
   })
 
+  it('keeps going while a node of a distributed bucket did not answer, and says so', async () => {
+    const post = vi.fn()
+      .mockResolvedValueOnce(response({ status: 'active', minted: 2, cursor: 'c1', complete: false, unreached: ['node-3'] }))
+      .mockResolvedValueOnce(response({ status: 'completed', minted: 1, complete: true }))
+
+    const steps: (string | undefined)[] = []
+    const progress = await runBulkToCompletion(post, (step) => steps.push(step.message), '01J00000000000000000000000')
+
+    expect(post).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: 'c1' }))
+    expect(steps[0]).toContain('did not answer yet')
+    expect(progress.minted).toBe(3)
+    expect(progress.message).toBeUndefined()
+  })
+
   it('renders the dedicated bucket CAS conflict explanation', () => {
     const message = placementPoliciesErrorMessage(
       new ApiError(409, 'stored generation differs from expected generation', 'Conflict'),
