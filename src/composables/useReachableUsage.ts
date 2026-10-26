@@ -107,7 +107,16 @@ export function useReachableUsage() {
     return { groupId, name, ...sum, error: null, missing: silent > 0 || cut }
   }
 
+  // A reload asked for while one runs waits for it, so frequent refreshes ask each bucket once.
+  let again = false
+  let account = ''
   async function load() {
+    const asked = `${sessionEpoch.value}|${myGroups.value.map((group) => group.id).join(',')}`
+    if (loading.value && asked === account) {
+      again = true
+      return
+    }
+    account = asked
     const run = ++runs
     const epoch = sessionEpoch.value
     const current = () => run === runs && epoch === sessionEpoch.value
@@ -116,7 +125,13 @@ export function useReachableUsage() {
       const found = await Promise.all(myGroups.value.map((group) => readGroup(group.id, group.name, current)))
       if (current()) groups.value = found.sort((a, b) => a.name.localeCompare(b.name))
     } finally {
-      if (run === runs) loading.value = false
+      if (run === runs) {
+        loading.value = false
+        if (again) {
+          again = false
+          void load()
+        }
+      }
     }
   }
 

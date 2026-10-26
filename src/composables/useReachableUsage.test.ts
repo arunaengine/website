@@ -50,4 +50,25 @@ describe('reachable usage', () => {
     expect(reach.total.value).toMatchObject({ stored: 100, referenced: 10_294_602, buckets: 2 })
     scope.stop()
   })
+
+  it('asks each bucket once more, not once per refresh, when refreshes come while it counts', async () => {
+    let release: () => void = () => {}
+    aruna.myGroups.value = [{ id: 'g1', name: 'Genome Lab' }]
+    aruna.searchBuckets.mockReset().mockResolvedValue(page([hit('raw', 'n1')]))
+    aruna.getBucketUsage.mockReset().mockImplementation(() => new Promise((resolve) => (release = () => resolve(usage()))))
+    const scope = effectScope()
+    const reach = scope.run(() => useReachableUsage())!
+    const first = reach.load()
+    await vi.waitFor(() => expect(aruna.getBucketUsage).toHaveBeenCalledTimes(1))
+    void reach.load()
+    void reach.load()
+    release()
+    await first
+    await vi.waitFor(() => expect(aruna.getBucketUsage).toHaveBeenCalledTimes(2))
+    release()
+    await vi.waitFor(() => expect(reach.loading.value).toBe(false))
+
+    expect(aruna.getBucketUsage).toHaveBeenCalledTimes(2)
+    scope.stop()
+  })
 })
