@@ -58,6 +58,7 @@ const StatCardStub = defineComponent({
 const SkeletonStub = defineComponent(() => () => h('span', 'loading'))
 const GroupQuotaCardsStub = defineComponent(() => () => h('div', 'group quota cards'))
 const MyStatsCardsStub = defineComponent(() => () => h('div', 'my stats cards'))
+const ReachableStub = defineComponent(() => () => h('div', 'reachable data'))
 // Names the current scope and offers the other one, so the view's wiring of
 // setScope is testable without the real segmented control.
 const ScopeToggleStub = defineComponent({
@@ -143,6 +144,7 @@ beforeAll(async () => {
   vi.doMock('@/components/dashboard/FederationPanel.vue', () => ({ default: FederationPanelStub }))
   vi.doMock('@/components/dashboard/GroupQuotaCards.vue', () => ({ default: GroupQuotaCardsStub }))
   vi.doMock('@/components/dashboard/MyStatsCards.vue', () => ({ default: MyStatsCardsStub }))
+  vi.doMock('@/components/dashboard/ReachableData.vue', () => ({ default: ReachableStub }))
   vi.doMock('@/components/dashboard/DashboardScopeToggle.vue', () => ({ default: ScopeToggleStub }))
   vi.doMock('@/components/metadata/ProfileChip.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/ui/StatCard.vue', () => ({ default: StatCardStub }))
@@ -205,6 +207,7 @@ beforeAll(async () => {
     '@/components/dashboard/FederationPanel.vue': moduleDefault(FederationPanelStub),
     '@/components/dashboard/GroupQuotaCards.vue': moduleDefault(GroupQuotaCardsStub),
     '@/components/dashboard/MyStatsCards.vue': moduleDefault(MyStatsCardsStub),
+    '@/components/dashboard/ReachableData.vue': moduleDefault(ReachableStub),
     '@/components/dashboard/DashboardScopeToggle.vue': moduleDefault(ScopeToggleStub),
     '@/components/metadata/ProfileChip.vue': moduleDefault(EmptyStub),
     '@/components/auth/SignInPanel.vue': moduleDefault(EmptyStub),

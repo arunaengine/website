@@ -6,6 +6,7 @@ import DashboardScopeToggle from '@/components/dashboard/DashboardScopeToggle.vu
 import FederationPanel from '@/components/dashboard/FederationPanel.vue'
 import GroupQuotaCards from '@/components/dashboard/GroupQuotaCards.vue'
 import MyStatsCards from '@/components/dashboard/MyStatsCards.vue'
+import ReachableData from '@/components/dashboard/ReachableData.vue'
 import ProfileChip from '@/components/metadata/ProfileChip.vue'
 import SignInPanel from '@/components/auth/SignInPanel.vue'
 import StatCard from '@/components/ui/StatCard.vue'
@@ -343,6 +344,7 @@ const pageDescription = computed(() =>
         </header>
 
         <MyStatsCards />
+        <ReachableData v-if="myGroups.length" :refresh-revision="quotaRevision" />
         <GroupQuotaCards v-if="myGroups.length" :refresh-revision="quotaRevision" />
         <EmptyState v-else compact title="You do not belong to any groups yet." />
       </section>

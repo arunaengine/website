@@ -70,7 +70,7 @@ function membershipKey(): string {
   return myGroups.value.map((group) => group.id).join(',')
 }
 
-async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+export async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   const queue = [...items]
   const workers = Array.from({ length: Math.min(limit, queue.length) }, async () => {
     for (let next = queue.shift(); next !== undefined; next = queue.shift()) await fn(next)
