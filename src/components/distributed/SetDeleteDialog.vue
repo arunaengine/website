@@ -15,7 +15,7 @@ import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSetChanges } from '@/composables/useSetChanges'
-import { coverageNotes, useSetPreflight } from '@/composables/useSetPreflight'
+import { coverageNotes, excludedNotes, useSetPreflight } from '@/composables/useSetPreflight'
 import { DELETE_PREVIEWS } from '@/lib/distributedMockData'
 import { degradedRanges, type DistributedBucket } from '@/lib/distribution'
 
@@ -40,6 +40,10 @@ const notes = computed(() => {
   if (lookup.error.value) return [`The datasets could not be read: ${lookup.error.value}`]
   const coverage = lookup.preflight.value?.reference_coverage
   return coverage ? coverageNotes(coverage) : []
+})
+const left = computed(() => {
+  const coverage = lookup.preflight.value?.reference_coverage
+  return coverage ? excludedNotes(coverage) : []
 })
 const complete = computed(() => (props.bucket.live ? !lookup.loading.value && Boolean(lookup.preflight.value) && !notes.value.length : preview.value.reasons.length === 0))
 const unreachable = computed(() => [...new Set(degradedRanges(props.bucket).map((range) => displayName(range.coordinator)))])
@@ -84,6 +88,7 @@ async function remove() {
           </ul>
           <p v-else-if="lookup.preflight.value" class="text-xs text-muted-foreground">None you can read.</p>
           <Notice v-if="notes.length" tone="warning" title="The list may miss datasets" :lines="notes" />
+          <Notice v-if="left.length" tone="info" title="Not in this list" :lines="left" />
           <button v-if="lookup.error.value" type="button" class="text-xs text-primary hover:underline" @click="lookup.reload()">Try again</button>
         </template>
         <p class="text-xs text-muted-foreground">Datasets keep their entries. The files they point to are gone.</p>

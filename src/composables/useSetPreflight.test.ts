@@ -6,7 +6,7 @@ import type { StorageDeletionPreflight } from '@/lib/storageDeletion'
 const aruna = vi.hoisted(() => ({ sessionEpoch: { value: 1 }, getSetDeletion: vi.fn() }))
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
 
-const { coverageNotes, useSetPreflight } = await import('@/composables/useSetPreflight')
+const { coverageNotes, excludedNotes, useSetPreflight } = await import('@/composables/useSetPreflight')
 
 function answer(coverage: Partial<StorageDeletionPreflight['reference_coverage']> = {}): StorageDeletionPreflight {
   return {
@@ -81,5 +81,13 @@ describe('set deletion preflight', () => {
     expect(coverageNotes(answer({ complete: false, failed_nodes: 2, index_freshness: 'pending', hidden_references_exist: true }).reference_coverage))
       .toEqual(['2 node(s) did not answer.', 'A node is still indexing.', 'Some datasets are not visible to you.'])
     expect(coverageNotes(answer({ complete: false }).reference_coverage)).toEqual(['The node cannot say that the list is complete.'])
+  })
+
+  it('names what the list leaves out, and an unknown reason by its code', () => {
+    expect(excludedNotes(answer().reference_coverage)).toEqual([])
+    expect(excludedNotes(answer({ excluded: ['hash_only_references', 'later_kind'] }).reference_coverage)).toEqual([
+      'Datasets that name a file only by its content hash are not listed.',
+      'Not listed: later kind.',
+    ])
   })
 })

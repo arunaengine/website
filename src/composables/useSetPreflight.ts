@@ -15,6 +15,15 @@ export function coverageNotes(coverage: StorageDeletionReferenceCoverage): strin
   return notes.length ? notes : ['The node cannot say that the list is complete.']
 }
 
+const EXCLUDED_TEXT: Record<string, string> = {
+  hash_only_references: 'Datasets that name a file only by its content hash are not listed.',
+}
+
+/** What the list leaves out by design, shown whether or not the list is complete. */
+export function excludedNotes(coverage: StorageDeletionReferenceCoverage): string[] {
+  return coverage.excluded.map((code) => EXCLUDED_TEXT[code] ?? `Not listed: ${code.replaceAll('_', ' ')}.`)
+}
+
 export function useSetPreflight(bucket: Ref<string | null>) {
   const { getSetDeletion, sessionEpoch } = useAruna()
   const preflight = ref<StorageDeletionPreflight | null>(null)

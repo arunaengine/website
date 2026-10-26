@@ -39,7 +39,7 @@ const component = compileClientComponent(new URL('./SetDeleteDialog.vue', import
   '@/components/ui/Spinner.vue': moduleDefault(Slotted('i')),
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id }) },
   '@/composables/useSetChanges': { useSetChanges: () => ({ busy: ref(false), failure: ref(null), remove }) },
-  '@/composables/useSetPreflight': { coverageNotes: Preflight.coverageNotes, useSetPreflight: () => lookup },
+  '@/composables/useSetPreflight': { coverageNotes: Preflight.coverageNotes, excludedNotes: Preflight.excludedNotes, useSetPreflight: () => lookup },
   '@/lib/distributedMockData': MockData,
   '@/lib/distribution': Distribution,
 })
@@ -75,6 +75,15 @@ describe('set delete dialog', () => {
 
     expect(content(root)).toContain('One dataset')
     expect(content(root)).toContain('Complete')
+    expect(button(root, 'Delete bucket').props.disabled).toBe(false)
+  })
+
+  it('says what the list leaves out even when it is complete', async () => {
+    lookup.preflight.value = answer({ excluded: ['hash_only_references'] })
+    const root = await render()
+
+    expect(content(root)).toContain('Complete')
+    expect(content(root)).toContain('Datasets that name a file only by its content hash are not listed.')
     expect(button(root, 'Delete bucket').props.disabled).toBe(false)
   })
 
