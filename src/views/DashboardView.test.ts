@@ -63,7 +63,10 @@ const GroupQuotaCardsStub = defineComponent({
 })
 let pollInfo: () => unknown = () => undefined
 const MyStatsCardsStub = defineComponent(() => () => h('div', 'my stats cards'))
-const ReachableStub = defineComponent(() => () => h('div', 'reachable data'))
+const ReachableStub = defineComponent({
+  props: { refreshRevision: Number },
+  setup: (props) => () => h('div', `reachable data ${props.refreshRevision}`),
+})
 // The node total stands as the exact count; the correction itself is tested with the count rule.
 const bucketCountStub = {
   countText: (counted: { count: number }, format: (value: number) => string) => format(counted.count),
@@ -700,17 +703,19 @@ describe('dashboard refresh', () => {
     mounted.app.unmount()
   })
 
-  it('reads the group figures again on the info poll', async () => {
+  it('reads the group quota figures again on the info poll, never every bucket', async () => {
     const mounted = await mountApp(DashboardClient)
     await flush()
-    const revision = () => Number(content(mounted.root).match(/group quota cards (\d+)/)?.[1])
-    const before = revision()
+    const revision = (name: string) => Number(content(mounted.root).match(new RegExp(`${name} (\\d+)`))?.[1])
+    const [cards, reachable] = [revision('group quota cards'), revision('reachable data')]
+    expect([cards, reachable].every(Number.isInteger)).toBe(true)
 
     await pollInfo()
     await flush()
 
     expect(loadInfo).toHaveBeenCalled()
-    expect(revision()).toBe(before + 1)
+    expect(revision('group quota cards')).toBe(cards + 1)
+    expect(revision('reachable data')).toBe(reachable)
     mounted.app.unmount()
   })
 })

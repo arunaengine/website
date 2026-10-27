@@ -53,6 +53,8 @@ const computeTutorialOffered = computed(() => featureEnabled('tes'))
 const portalTour = docsTopicBySlug('portal-tour')?.tour ?? []
 const refreshing = ref(false)
 const quotaRevision = ref(0)
+// The info poll reads the cheap group figures again, never every bucket.
+const cardsRevision = ref(0)
 const recentDocs = ref<MetadataDoc[] | null>(null)
 const recentSettled = ref(false)
 let recentGeneration = 0
@@ -95,6 +97,7 @@ async function refreshDashboard() {
   } finally {
     refreshing.value = false
     quotaRevision.value++
+    cardsRevision.value++
   }
 }
 
@@ -122,12 +125,12 @@ watch([dashboardRevision, sessionEpoch], watchDashboard, { immediate: true })
 
 // Node heartbeats and usage republish without bumping the SSE revision; poll
 // the light info endpoints so the realm nodes panel stays current, and read the
-// group figures again. A failed read must not end the poll, so it is swallowed.
+// group quota figures again. A failed read must not end the poll, so it is swallowed.
 const pollInfo = () =>
   loadInfo()
     .catch(() => undefined)
     .then(() => {
-      quotaRevision.value++
+      cardsRevision.value++
     })
 const stopFollow = follow(pollInfo, () => POLL_SLOW_MS, () => refreshing.value)
 const stopWake = onWake(() => void pollInfo())
@@ -358,7 +361,7 @@ const pageDescription = computed(() =>
 
         <MyStatsCards />
         <ReachableData v-if="myGroups.length" :refresh-revision="quotaRevision" />
-        <GroupQuotaCards v-if="myGroups.length" :refresh-revision="quotaRevision" />
+        <GroupQuotaCards v-if="myGroups.length" :refresh-revision="cardsRevision" />
         <EmptyState v-else compact title="You do not belong to any groups yet." />
       </section>
 
