@@ -29,7 +29,11 @@ import { useUserDirectory } from '@/composables/useUserDirectory'
 import { featureEnabled } from '@/lib/config'
 import { errorMessage, formatBytes, formatNumber, shortUserId } from '@/lib/utils'
 import { countText, useRealmBucketCount } from '@/composables/useBucketCount'
-import { apiErrorMessage, type RealmQuotaConfig, type UserSearchHit } from '@/lib/api'
+import { apiErrorMessage, type UserSearchHit } from '@/lib/api'
+import {
+  UNITS, amountToBytes, buildConfig, fieldBytes, seedDraft, text,
+  type Draft, type OverrideRow, type QuotaField, type UserCapRow,
+} from '@/views/adminQuota'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { Database, HardDrive, Layers, Link2, Boxes, Save, Plus, Trash2, ShieldCheck, Users, UserCog } from '@lucide/vue'
@@ -54,100 +58,8 @@ const tab = useRouteTab(
   'realm',
 )
 
-// Mirrors aruna's `impl Default for QuotaConfig`: the effective policy when a
-// backend serves no quota block. null = unlimited.
-const DEFAULT_QUOTA: RealmQuotaConfig = {
-  default_group_quota_bytes: null,
-  grace_factor_percent: 110,
-  warn_threshold_percent: 85,
-  group_overrides: [],
-  max_groups_per_user: 3,
-  user_group_cap_overrides: [],
-  max_devices_per_user: null,
-}
-
-const UNITS = [
-  { value: 'TiB', factor: 1024 ** 4 },
-  { value: 'GiB', factor: 1024 ** 3 },
-  { value: 'MiB', factor: 1024 ** 2 },
-  { value: 'KiB', factor: 1024 },
-  { value: 'B', factor: 1 },
-]
 const unitOptions = UNITS.map((u) => ({ value: u.value, label: u.value }))
 const U32_MAX = 4294967295
-
-// type="number" inputs emit numbers; normalize before any string handling.
-function text(v: unknown): string {
-  return v == null ? '' : String(v)
-}
-
-interface QuotaField {
-  unlimited: boolean
-  value: string | number
-  unit: string
-}
-interface OverrideRow {
-  group_id: string
-  quota: QuotaField
-  grace: string | number
-}
-interface UserCapRow {
-  user_id: string
-  name: string
-  max_groups: string | number
-}
-interface Draft {
-  defaultQuota: QuotaField
-  grace: string | number
-  warn: string | number
-  maxGroups: string | number
-  maxDevices: string | number
-  overrides: OverrideRow[]
-  userCaps: UserCapRow[]
-}
-
-// B always divides cleanly, so the seed is exact and round-trips byte-identical.
-function bytesToAmount(bytes: number): { value: string; unit: string } {
-  const unit = UNITS.find((u) => bytes % u.factor === 0) ?? { value: 'B', factor: 1 }
-  return { value: String(bytes / unit.factor), unit: unit.value }
-}
-function amountToBytes(value: string | number, unit: string): number | null {
-  const s = text(value).trim()
-  const n = Number(s)
-  if (s === '' || !Number.isFinite(n) || n < 0) return null
-  const factor = UNITS.find((u) => u.value === unit)?.factor ?? 1024 ** 3
-  const bytes = Math.round(n * factor)
-  return Number.isSafeInteger(bytes) ? bytes : null
-}
-function fieldBytes(f: QuotaField): number | null {
-  return f.unlimited ? null : amountToBytes(f.value, f.unit)
-}
-function seedField(bytes: number | null): QuotaField {
-  if (bytes == null) return { unlimited: true, value: '', unit: 'GiB' }
-  const { value, unit } = bytesToAmount(bytes)
-  return { unlimited: false, value, unit }
-}
-
-function seedDraft(quota: RealmQuotaConfig | undefined, names: Map<string, string> = new Map()): Draft {
-  const q = quota ?? DEFAULT_QUOTA
-  return {
-    defaultQuota: seedField(q.default_group_quota_bytes),
-    grace: String(q.grace_factor_percent),
-    warn: String(q.warn_threshold_percent),
-    maxGroups: q.max_groups_per_user == null ? '' : String(q.max_groups_per_user),
-    maxDevices: q.max_devices_per_user == null ? '' : String(q.max_devices_per_user),
-    overrides: q.group_overrides.map((o) => ({
-      group_id: o.group_id,
-      quota: seedField(o.quota_bytes),
-      grace: o.grace_factor_percent == null ? '' : String(o.grace_factor_percent),
-    })),
-    userCaps: q.user_group_cap_overrides.map((u) => ({
-      user_id: u.user_id,
-      name: names.get(u.user_id) ?? '',
-      max_groups: u.max_groups == null ? '' : String(u.max_groups),
-    })),
-  }
-}
 
 const draft = ref<Draft>(seedDraft(realmInfo.value?.quota))
 const baseline = ref(JSON.stringify(draft.value))
@@ -242,7 +154,7 @@ const clientErrors = computed(() => {
 const invalid = computed(() => clientErrors.value.length > 0)
 
 function addOverride() {
-  draft.value.overrides.push({ group_id: '', quota: { unlimited: false, value: '', unit: 'GiB' }, grace: '' })
+  draft.value.overrides.push({ group_id: '', quota: { unlimited: false, value: '', unit: 'GiB' }, grace: '', count_replicas: null })
 }
 // Unlimited now exempts a group entirely; grace on an unlimited row is incoherent
 // and rejected by the backend, so drop any stale grace when the toggle turns on.
@@ -299,25 +211,6 @@ function addUserCap(hit: UserSearchHit) {
   userResults.value = []
 }
 
-function buildConfig(): RealmQuotaConfig {
-  return {
-    default_group_quota_bytes: fieldBytes(draft.value.defaultQuota),
-    grace_factor_percent: Number(draft.value.grace),
-    warn_threshold_percent: Number(draft.value.warn),
-    group_overrides: draft.value.overrides.map((o) => ({
-      group_id: o.group_id,
-      quota_bytes: fieldBytes(o.quota),
-      grace_factor_percent: o.quota.unlimited || text(o.grace).trim() === '' ? null : Number(o.grace),
-    })),
-    max_groups_per_user: text(draft.value.maxGroups).trim() === '' ? null : Number(draft.value.maxGroups),
-    user_group_cap_overrides: draft.value.userCaps.map((u) => ({
-      user_id: u.user_id,
-      max_groups: text(u.max_groups).trim() === '' ? null : Number(u.max_groups),
-    })),
-    max_devices_per_user: text(draft.value.maxDevices).trim() === '' ? null : Number(draft.value.maxDevices),
-  }
-}
-
 function reset() {
   reseed()
   saveError.value = null
@@ -328,7 +221,7 @@ async function save() {
   saveError.value = null
   saveMessage.value = null
   try {
-    await setRealmQuota(buildConfig())
+    await setRealmQuota(buildConfig(draft.value))
     reseed()
     saveMessage.value = 'Quota policy saved.'
   } catch (err) {

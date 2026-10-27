@@ -108,12 +108,16 @@ export interface RealmQuotaConfig {
   max_groups_per_user: number | null
   user_group_cap_overrides: RealmUserGroupCapOverride[]
   max_devices_per_user: number | null
+  // Whether copies of a distributed bucket count toward group quotas.
+  count_replicas?: boolean
 }
 
 export interface RealmGroupQuotaOverride {
   group_id: string
   quota_bytes: number | null
   grace_factor_percent: number | null
+  // Overrides the realm's count_replicas for this group; null keeps it.
+  count_replicas?: boolean | null
 }
 
 export interface RealmUserGroupCapOverride {
