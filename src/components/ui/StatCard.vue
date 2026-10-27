@@ -29,5 +29,6 @@ defineProps<{
       {{ value }}
     </div>
     <div v-if="hint" class="text-xs text-muted-foreground">{{ hint }}</div>
+    <slot />
   </div>
 </template>

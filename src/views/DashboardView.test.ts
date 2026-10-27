@@ -51,8 +51,9 @@ const PageHeaderStub = defineComponent({
 const RouterLinkStub = defineComponent((_, { attrs, slots }) => () => h('a', attrs, slots.default?.()))
 const StatCardStub = defineComponent({
   props: { label: String, value: [String, Number], hint: String },
-  setup(props) {
-    return () => h('div', [h('strong', String(props.value)), h('span', props.label), props.hint ? h('small', props.hint) : null])
+  setup(props, { slots }) {
+    return () =>
+      h('div', [h('strong', String(props.value)), h('span', props.label), props.hint ? h('small', props.hint) : null, slots.default?.()])
   },
 })
 const SkeletonStub = defineComponent(() => () => h('span', 'loading'))
@@ -439,9 +440,10 @@ describe('authenticated dashboard scope', () => {
     expect(text).toMatch(/9 Realm datasets/)
     expect(text).toMatch(/8 Realm groups/)
     expect(text).toMatch(/11 Objects/)
-    expect(text).toMatch(/2 KB Stored data/)
+    expect(text).toMatch(/2.1 KB Total data/)
+    expect(text).toMatch(/2 KB stored\s*· 64 B referenced/)
+    expect(text).toContain("Referenced files stay at their source and don't count toward quotas.")
     expect(text).toMatch(/3 Buckets/)
-    expect(text).toContain('Logical size across the realm')
     // Node-local counters and the client-window tile moved out of the section.
     expect(text).not.toContain('Loaded profiles')
     expect(text).not.toContain('physical blob locations')

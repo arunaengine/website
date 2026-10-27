@@ -182,6 +182,12 @@ const publicOverview = computed(() => realmInfo.value?.public_overview)
 // counters next to them belong to this node and live on the Status page.
 const realmTotals = computed(() => usageInfo.value?.realm ?? null)
 const realmBuckets = useRealmBucketCount(realmTotals)
+const realmData = computed(() => {
+  const stored = realmTotals.value?.logical_bytes ?? 0
+  const referenced = realmTotals.value?.referenced_bytes ?? 0
+  const total = stored + referenced
+  return { stored, referenced, total, storedPercent: total > 0 ? (stored / total) * 100 : 0 }
+})
 
 function publicCount(value: number | null | undefined): string {
   return value == null ? 'Unknown' : formatCount(value)
@@ -385,12 +391,19 @@ const pageDescription = computed(() =>
               :icon="Files"
               hint="Data objects across the realm"
             />
-            <StatCard
-              label="Stored data"
-              :value="formatBytes(realmTotals.logical_bytes)"
-              :icon="Database"
-              hint="Logical size across the realm; physical copies are not counted"
-            />
+            <StatCard label="Total data" :value="formatBytes(realmData.total)" :icon="Database">
+              <div v-if="realmData.total > 0" class="flex h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <div class="bg-primary" :style="{ width: `${realmData.storedPercent}%` }" />
+                <div class="bg-primary/30" :style="{ width: `${100 - realmData.storedPercent}%` }" />
+              </div>
+              <div class="text-xs text-muted-foreground">
+                <span class="font-medium text-foreground">{{ formatBytes(realmData.stored) }} stored</span>
+                · {{ formatBytes(realmData.referenced) }} referenced
+              </div>
+              <div v-if="realmData.referenced > 0" class="text-xs text-muted-foreground">
+                Referenced files stay at their source and don't count toward quotas.
+              </div>
+            </StatCard>
             <StatCard
               label="Buckets"
               :value="realmBuckets ? countText(realmBuckets, formatNumber) : formatNumber(realmTotals.buckets)"
