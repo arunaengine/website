@@ -49,7 +49,12 @@ export interface ObjectPage {
   objects: ObjectEntry[]
   folders: FolderEntry[]
   nextToken?: string
+  /** Key ranges a copy listed while their coordinator could not answer; they may be behind. */
+  staleRanges?: string[]
 }
+
+/** The header a node marks an answer with when copies answered for some key ranges. */
+const STALE_HEADER = 'x-aruna-stale'
 
 export interface ObjectHead {
   size?: number
@@ -108,15 +113,24 @@ export async function listObjects(
   nodeId?: string | null,
   options: { nameStart?: string; maxKeys?: number } = {},
 ): Promise<ObjectPage> {
-  const response = await client(nodeId).send(
-    new ListObjectsV2Command({
-      Bucket: bucket,
-      Prefix: `${prefix}${options.nameStart ?? ''}` || undefined,
-      Delimiter: '/',
-      ContinuationToken: token,
-      MaxKeys: options.maxKeys ?? 200,
-    }),
+  const command = new ListObjectsV2Command({
+    Bucket: bucket,
+    Prefix: `${prefix}${options.nameStart ?? ''}` || undefined,
+    Delimiter: '/',
+    ContinuationToken: token,
+    MaxKeys: options.maxKeys ?? 200,
+  })
+  // The SDK drops headers it does not know, so the stale mark is read from the raw answer.
+  let stale = ''
+  command.middlewareStack.add(
+    (next) => async (args) => {
+      const result = await next(args)
+      stale = (result.response as { headers?: Record<string, string> }).headers?.[STALE_HEADER] ?? ''
+      return result
+    },
+    { step: 'deserialize' },
   )
+  const response = await client(nodeId).send(command)
   const folders = (response.CommonPrefixes ?? [])
     .filter((entry) => entry.Prefix)
     .map((entry) => {
@@ -136,6 +150,7 @@ export async function listObjects(
     objects,
     folders,
     nextToken: response.IsTruncated ? response.NextContinuationToken : undefined,
+    staleRanges: stale ? stale.split(',').map((part) => part.trim().replace(/^range=/, '')) : undefined,
   }
 }
 

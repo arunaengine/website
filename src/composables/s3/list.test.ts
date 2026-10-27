@@ -18,6 +18,23 @@ describe('object listing', () => {
     expect(send.mock.calls[0][0].input).toMatchObject({ Bucket: 'reef', Prefix: 'raw/sample_', Delimiter: '/' })
     expect(page.folders).toEqual([{ prefix: 'raw/sample_1/', name: 'sample_1' }])
     expect(page.objects.map((object) => object.name)).toEqual(['sample_2.fastq'])
+    expect(page.staleRanges).toBeUndefined()
+  })
+
+  it('keeps the ranges a copy listed while their coordinator could not answer', async () => {
+    send.mockImplementationOnce(async (command) => {
+      const answer = async () => ({
+        output: { Contents: [{ Key: 'raw/a.txt' }], IsTruncated: false },
+        response: { headers: { 'x-aruna-stale': 'range=01A, range=01B' } },
+      })
+      const handler = command.middlewareStack.resolve(answer, {})
+      return (await handler({ input: command.input })).output
+    })
+
+    const page = await listObjects('reef', 'raw/', undefined, null)
+
+    expect(page.staleRanges).toEqual(['01A', '01B'])
+    expect(page.objects.map((object) => object.name)).toEqual(['a.txt'])
   })
 })
 

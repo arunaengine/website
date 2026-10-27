@@ -587,6 +587,8 @@ export function useDataManager() {
   const listLoading = ref(false)
   const listError = ref<string | null>(null)
   const listAuthError = ref(false)
+  // A copy listed part of the page while its coordinator could not answer.
+  const listStale = ref(false)
   // The name filter is an S3 prefix inside the open folder; the kind filter
   // only hides rows of the page already listed.
   const nameFilter = ref('')
@@ -749,6 +751,7 @@ export function useDataManager() {
     listLoading.value = false
     listError.value = null
     listAuthError.value = false
+    listStale.value = false
     remoteBrowseBlocked.value = false
     selection.clearSelection()
     for (const listener of listingResetListeners) listener()
@@ -787,6 +790,7 @@ export function useDataManager() {
     listLoading.value = true
     listError.value = null
     listAuthError.value = false
+    listStale.value = false
     remoteBrowseBlocked.value = false
     try {
       const page = await s3.listObjects(targetBucket, targetPrefix, continuation, targetNode, { nameStart, maxKeys })
@@ -794,6 +798,7 @@ export function useDataManager() {
       folders.value = page.folders
       objects.value = page.objects
       nextToken.value = page.nextToken
+      listStale.value = Boolean(page.staleRanges?.length)
       selection.keepListed()
     } catch (err) {
       // A node that no longer knows the session (evicted or removed) gets a new one, then one retry.
@@ -1522,6 +1527,7 @@ export function useDataManager() {
     listLoading,
     listError,
     listAuthError,
+    listStale,
     listedKeys,
     isEmpty,
     loadObjects,

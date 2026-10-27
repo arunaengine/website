@@ -116,6 +116,7 @@ const {
   listLoading,
   listError,
   listAuthError,
+  listStale,
   isEmpty,
   loadObjects,
   navigateTo,
@@ -561,6 +562,9 @@ async function onDrop(event: DragEvent) {
           <Button variant="outline" size="sm" class="mt-2" @click="s3.clearSessions()"><KeyRound class="h-3.5 w-3.5" /> Close temporary sessions</Button>
         </Notice>
         <p v-else-if="listError" class="border-b border-border px-4 py-3 text-xs text-destructive">{{ listError }}</p>
+        <Notice v-else-if="listStale" tone="warning" class="rounded-none border-x-0 border-t-0">
+          Some folders are shown from a copy and may be out of date.
+        </Notice>
         <table class="w-full text-sm">
           <thead class="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
             <tr>
