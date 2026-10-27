@@ -2,9 +2,10 @@ import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { OriginResponse } from '@/lib/api'
+import * as ContentIdentity from '@/lib/contentIdentity'
 import * as FileOriginLib from '@/lib/fileOrigin'
 import * as Utils from '@/lib/utils'
-import { button, compileClientComponent, content, mountApp, moduleDefault } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, mountApp, moduleDefault } from '@/test/clientRender'
 
 const origin = ref<OriginResponse | null>(null)
 const state = ref('ready')
@@ -17,11 +18,20 @@ const component = compileClientComponent(new URL('./FileOrigin.vue', import.meta
   'vue-router': { RouterLink: defineComponent((_, { slots }) => () => h('a', slots.default?.())) },
   '@/components/data/OriginLine.vue': moduleDefault(Marker('origin line')),
   '@/components/distributed/GlobalId.vue': moduleDefault(Marker('global id')),
+  '@/components/data/ProvenanceView.vue': moduleDefault(
+    defineComponent({ props: { start: Object }, setup: (props) => () => h('section', `provenance ${(props.start as { id: string }).id}`) }),
+  ),
+  '@/components/ui/Button.vue': moduleDefault(defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()) })),
+  '@/components/ui/DetailDialog.vue': moduleDefault(
+    defineComponent({ props: { open: Boolean }, setup: (props, { slots }) => () => (props.open ? h('dialog', [slots.header?.(), slots.default?.()]) : null) }),
+  ),
+  '@/composables/useAruna': { useAruna: () => ({ realmInfo: ref({ realm_id: 'realm1' }) }) },
+  '@/lib/contentIdentity': ContentIdentity,
   '@/components/ui/Spinner.vue': moduleDefault(defineComponent(() => () => h('i'))),
   '@/composables/useS3': { useS3: () => ({ downloadUrl }), s3ErrorMessage: (cause: unknown) => String(cause) },
   '@/composables/useDatabases': { useDatabases: () => ({ rows: ref([]) }) },
   '@/composables/useFileOrigin': { useFileOrigin: () => ({ origin, state, error: ref(null) }) },
-  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id }) },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id, localNodeId: ref('node1') }) },
   '@/lib/fileOrigin': FileOriginLib,
   '@/lib/utils': Utils,
 })
@@ -83,5 +93,26 @@ describe('file origin identifiers', () => {
     expect(content(root)).toContain('Identifier: BioSample SAMN15803895 ↗')
     expect(content(root)).toContain('Found by the current rules of the database.')
     expect(content(root)).toContain('identifierBioSample SAMN15803895')
+  })
+})
+
+describe('file origin provenance', () => {
+  it('opens where the file came from at its exact version id', async () => {
+    state.value = 'ready'
+    origin.value = response({ origin: { kind: 'job', run_id: 'r1' } })
+    const root = await render()
+    expect(content(root)).not.toContain('provenance')
+
+    await click(button(root, 'Where it came from'))
+    expect(content(root)).toContain('provenance https://w3id.org/aruna/data/arn:aruna:realm1:node1:s3/spire/a.tsv@v1')
+  })
+
+  it('starts a distributed file at its global id', async () => {
+    state.value = 'ready'
+    origin.value = response({ global_id: 'https://w3id.org/aruna/data/realm1/01K8Y2' })
+    const root = await render()
+    await click(button(root, 'Where it came from'))
+
+    expect(content(root)).toContain('provenance https://w3id.org/aruna/data/realm1/01K8Y2')
   })
 })
