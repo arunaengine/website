@@ -23,6 +23,7 @@ import {
   useS3,
   s3ErrorMessage,
   isS3AuthError,
+  isS3SessionRejected,
   isS3BucketMissingError,
   isS3NetworkError,
   type FolderEntry,
@@ -769,7 +770,7 @@ export function useDataManager() {
     listedOnce.value = true
   }
 
-  async function loadObjects() {
+  async function loadObjects(renewed = false) {
     if (exampleOpen.value) return listExample()
     if (!contextReady.value || !effectiveEndpoint.value || !bucket.value) return
     if (!s3.canRead(bucket.value, s3Prefix.value, remoteNodeId.value)) {
@@ -795,6 +796,14 @@ export function useDataManager() {
       nextToken.value = page.nextToken
       selection.keepListed()
     } catch (err) {
+      // A node that no longer knows the session (evicted or removed) gets a new one, then one retry.
+      const context = s3.activeContext.value
+      const refused = !renewed && requestId === listRequestId && isS3SessionRejected(err) && context
+      const reference = refused ? s3.referenceForContext(context.nodeId, context.groupId) : null
+      if (reference && (await s3.replaceSession(reference).then(() => true, () => false))) {
+        if (requestId === listRequestId) await loadObjects(true)
+        return
+      }
       if (requestId === listRequestId) {
         // A remote endpoint the browser cannot reach (CORS rejection or the node
         // being down) degrades to the hosted-elsewhere panel, never a raw error.

@@ -27,6 +27,8 @@ const s3 = {
   listObjects: vi.fn(async () => ({ folders: [], objects: [] })),
   listDeletedObjects: vi.fn(async () => ({ deleted: [], truncated: false })),
   headBucket: vi.fn(async () => undefined),
+  referenceForContext: (nodeId: string, groupId: string) => ({ nodeId, groupId, accessKeyId: 'k' }),
+  replaceSession: vi.fn(async () => undefined),
 }
 
 vi.mock('./useS3', () => ({
@@ -35,6 +37,7 @@ vi.mock('./useS3', () => ({
   isS3AuthError: () => false,
   isS3BucketMissingError: (err: unknown) => bucketMissing(err),
   isS3NetworkError: () => false,
+  isS3SessionRejected: (err: Error) => err.name === 'InvalidAccessKeyId',
 }))
 vi.mock('./useAruna', () => ({
   useAruna: () => ({
@@ -166,6 +169,36 @@ describe('bucket list node choice', () => {
     expect(s3.listObjects).toHaveBeenCalledExactlyOnceWith('reef', '', undefined, null, expect.anything())
     expect(referencesReload).not.toHaveBeenCalled()
     expect(searchBuckets.mock.calls.length).toBe(searches)
+  })
+
+  it('replaces a refused session and lists again', async () => {
+    const { router, manager } = await start()
+    await router.push({ name: 'bucket', params: { bucketId: 'reef' }, query: { group: 'g-a' } })
+    await settle()
+    const refused = Object.assign(new Error('The Access Key Id you provided does not exist'), { name: 'InvalidAccessKeyId' })
+    s3.listObjects.mockClear().mockRejectedValueOnce(refused)
+    s3.replaceSession.mockClear()
+
+    await manager.onRefresh()
+
+    expect(s3.replaceSession).toHaveBeenCalledOnce()
+    expect(s3.listObjects).toHaveBeenCalledTimes(2)
+    expect(manager.listError.value).toBeNull()
+  })
+
+  it('shows the refusal when the new session is refused too', async () => {
+    const { router, manager } = await start()
+    await router.push({ name: 'bucket', params: { bucketId: 'reef' }, query: { group: 'g-a' } })
+    await settle()
+    const refused = Object.assign(new Error('The Access Key Id you provided does not exist'), { name: 'InvalidAccessKeyId' })
+    s3.listObjects.mockClear().mockRejectedValueOnce(refused).mockRejectedValueOnce(refused)
+    s3.replaceSession.mockClear()
+
+    await manager.onRefresh()
+
+    expect(s3.replaceSession).toHaveBeenCalledOnce()
+    expect(s3.listObjects).toHaveBeenCalledTimes(2)
+    expect(manager.listError.value).toContain('Access Key Id')
   })
 
   it('skips the list when Refresh finds the bucket gone', async () => {
