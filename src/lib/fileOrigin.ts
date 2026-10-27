@@ -70,14 +70,20 @@ export function hopFrom(response: OriginResponse): Origin | null {
 /** One statement a dataset may add, in words. */
 export interface ProjectionRow {
   key: string
-  property: 'isBasedOn' | 'CreateAction'
+  property: 'isBasedOn' | 'CreateAction' | 'identifier'
   value: string
+  url?: string
 }
 
 export function projectionRows(projection: readonly OriginProjection[]): ProjectionRow[] {
-  return projection.map((item) =>
-    item.property === 'isBasedOn'
-      ? { key: `based:${item.id}`, property: 'isBasedOn', value: item.id }
-      : { key: `run:${item.run_id}`, property: 'CreateAction', value: item.run_id },
-  )
+  return projection.map((item): ProjectionRow => {
+    switch (item.property) {
+      case 'isBasedOn':
+        return { key: `based:${item.id}`, property: 'isBasedOn', value: item.id }
+      case 'CreateAction':
+        return { key: `run:${item.run_id}`, property: 'CreateAction', value: item.run_id }
+      case 'identifier':
+        return { key: `id:${item.name}:${item.value}`, property: 'identifier', value: `${item.name} ${item.value}`, url: item.url }
+    }
+  })
 }

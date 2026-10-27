@@ -35,6 +35,8 @@ const origin = computed(() =>
 )
 const hop = computed(() => (found.origin.value ? hopFrom(found.origin.value) : null))
 const rows = computed(() => projectionRows(found.origin.value?.projection ?? []))
+// Links to public records; they come from the database's rules as they are now.
+const identifiers = computed(() => found.origin.value?.identifiers ?? [])
 // The version downloads through this session's short-lived signed URL, never with the token in a URL.
 const downloadError = ref<string | null>(null)
 async function download() {
@@ -69,6 +71,13 @@ const recorded = computed(() => Boolean(origin.value || hop.value))
         <OriginLine v-if="hop" short :origin="hop" />
         <p v-if="!recorded" class="text-muted-foreground">Not recorded for this version.</p>
       </div>
+      <div v-if="identifiers.length" class="space-y-0.5 text-xs">
+        <p v-for="item in identifiers" :key="`${item.name}:${item.value}`">
+          <span class="text-muted-foreground">Identifier:</span> {{ item.name }}
+          <a :href="item.url" target="_blank" rel="noopener noreferrer" class="font-mono text-primary hover:underline">{{ item.value }} ↗</a>
+        </p>
+        <p class="text-muted-foreground">Found by the current rules of the database.</p>
+      </div>
       <div v-if="found.origin.value?.global_id" class="space-y-1.5 text-xs">
         <p class="text-muted-foreground">
           Id of this version. It names no node: the URL downloads the file from a holder that the node chooses.
@@ -95,6 +104,10 @@ const recorded = computed(() => Boolean(origin.value || hop.value))
                     Produced by the run
                     <RouterLink :to="{ name: 'compute', query: { tab: 'jobs' } }" class="font-mono text-primary hover:underline">{{ row.value }}</RouterLink>
                   </span>
+                </template>
+                <template v-else-if="row.property === 'identifier'">
+                  <span class="shrink-0 text-muted-foreground">identifier</span>
+                  <a :href="row.url" target="_blank" rel="noopener noreferrer" class="min-w-0 flex-1 break-all font-mono text-primary hover:underline">{{ row.value }}</a>
                 </template>
                 <template v-else>
                   <span class="shrink-0 text-muted-foreground">isBasedOn</span>

@@ -42,6 +42,16 @@ export type OriginProjection =
   | { property: 'isBasedOn'; id: string }
   /** The run crate convention: a `CreateAction` of the run with this file as `result`. */
   | { property: 'CreateAction'; run_id: string }
+  /** A link the database's identifier rules found. */
+  | { property: 'identifier'; name: string; value: string; url: string }
+
+/** A link to a public record, found by the current rules of the file's database. */
+export interface OriginIdentifier {
+  name: string
+  value: string
+  url: string
+  target: 'key' | 'source_url'
+}
 
 export interface OriginResponse {
   version_id: string
@@ -55,6 +65,11 @@ export interface OriginResponse {
   source?: OriginSource | null
   /** Uploads and imports in place give none. */
   projection: OriginProjection[]
+  /** The database entry that lists the bucket now; it may differ from when the file was made. */
+  database_entry?: string | null
+  identifiers?: OriginIdentifier[]
+  /** The content id of the stored bytes; absent for references. */
+  content_id?: string | null
 }
 
 export function getFileOrigin(

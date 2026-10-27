@@ -68,3 +68,20 @@ describe('file origin', () => {
     expect(content(await render())).not.toContain('Origin')
   })
 })
+
+describe('file origin identifiers', () => {
+  it('shows each identifier of the database as a link, and adds it to datasets', async () => {
+    const url = 'https://www.ebi.ac.uk/biosamples/samples/SAMN15803895'
+    state.value = 'ready'
+    origin.value = response({
+      origin: { kind: 'source', database_entry: 'e1' },
+      identifiers: [{ name: 'BioSample', value: 'SAMN15803895', url, target: 'key' }],
+      projection: [{ property: 'identifier', name: 'BioSample', value: 'SAMN15803895', url }],
+    })
+    const root = await render()
+
+    expect(content(root)).toContain('Identifier: BioSample SAMN15803895 ↗')
+    expect(content(root)).toContain('Found by the current rules of the database.')
+    expect(content(root)).toContain('identifierBioSample SAMN15803895')
+  })
+})
