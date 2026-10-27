@@ -9,6 +9,10 @@ import {
   getBucketSources as requestSources,
   getFilePartOf as requestPartOf,
   getFileOrigin as requestOrigin,
+  getVersionOrigin as requestVersionOrigin,
+  getRun as requestRun,
+  downloadProvenanceCrate as requestProvenanceCrate,
+  type RunResponse,
   resolveVersion as requestResolve,
   getPartTarget as requestTarget,
   getDataLinks as requestDataLinks,
@@ -91,6 +95,19 @@ export function getBucketLinks(bucket: string, query: BucketLinksQuery, signal?:
 /** Where one file version of a bucket on this node came from. */
 export function getFileOrigin(bucket: string, query: { key: string; version_id?: string }, signal?: AbortSignal): Promise<OriginResponse> {
   return requestOrigin(bucket, query, refreshContext().client, signal)
+}
+
+/** The origin of an exact version id, read on the node that holds it. */
+export function getVersionOrigin(version: string, signal?: AbortSignal): Promise<OriginResponse> {
+  return requestVersionOrigin(version, refreshContext().client, signal)
+}
+
+export function getRun(runId: string, signal?: AbortSignal): Promise<RunResponse> {
+  return requestRun(runId, refreshContext().client, signal)
+}
+
+export function downloadProvenanceCrate(start: { version: string } | { dataset: string }, signal?: AbortSignal): Promise<Blob> {
+  return requestProvenanceCrate(start, refreshContext().client, signal)
 }
 
 /** The bytes of a global version id, which the node serves or fetches from a holder. */
