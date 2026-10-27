@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError, type OriginResponse } from '@/lib/api'
-import { emptyGraph, expand, expandAll, hasPending, runInputs, startDataset, startFile, type Readers } from './provenance'
+import { dataParts, emptyGraph, expand, expandAll, hasPending, runInputs, startDataset, startFile, type Readers } from './provenance'
 
 const arn = (key: string, version: string) => `https://w3id.org/aruna/data/arn:aruna:realm:node:s3/lab/${key}@${version}`
 const V1 = '01K8W1B3D5F7H9KMQ1S3V5X7Z1'
@@ -102,6 +102,11 @@ describe('provenance graph', () => {
 
     await expandAll(graph, read, () => graph.steps >= 1)
     expect(graph.steps).toBe(2)
+  })
+
+  it('reads stored file parts, whose links come in any order', () => {
+    const stored = { '@graph': [{ '@id': '#a', '@type': 'MediaObject', name: 'a', contentUrl: [arn('a', V1), 's3://lab/a'] }] }
+    expect(dataParts(stored)).toEqual([{ id: '#a', name: 'a', exact: arn('a', V1) }])
   })
 
   it('reads the inputs a run crate names', () => {

@@ -151,8 +151,9 @@ function part(node: Record<string, unknown> | undefined, id: string): Part {
 
 /** The files a dataset names, with the exact version each one records, if any. */
 export function dataParts(crate: unknown): Part[] {
+  // A stored crate names files `MediaObject`, the term `File` stands for.
   return graphNodes(crate)
-    .filter((node) => isType(node, 'File'))
+    .filter((node) => isType(node, 'File') || isType(node, 'MediaObject'))
     .map((node) => part(node, String(node['@id'])))
 }
 
