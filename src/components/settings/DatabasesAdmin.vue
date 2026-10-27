@@ -7,6 +7,7 @@ import { RouterLink } from 'vue-router'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import DatabaseMarkForm from '@/components/data/DatabaseMarkForm.vue'
 import DatabaseRequestItem from '@/components/data/DatabaseRequestItem.vue'
+import IdentifierLinksEditor from '@/components/settings/IdentifierLinksEditor.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
@@ -58,6 +59,7 @@ onMounted(() => {
 // Another account or realm: nothing of the session before stays listed.
 watch(sessionEpoch, () => {
   listed.value = []
+  editing.value = null
   next.value = null
   failure.value = null
   chosen.value = null
@@ -72,6 +74,17 @@ async function remove(row: DatabaseRow) {
   } catch (cause) {
     failure.value = apiErrorMessage(cause)
   }
+  await Promise.all([load(), databases.reload()])
+}
+
+// The entry whose identifier links are open; saving reloads the list with the new rules.
+const editing = ref<string | null>(null)
+const linkCount = (row: DatabaseRow) => {
+  const count = row.parser?.rules.length ?? 0
+  return count === 1 ? '1 identifier link' : `${count} identifier links`
+}
+async function saved() {
+  editing.value = null
   await Promise.all([load(), databases.reload()])
 }
 
@@ -125,20 +138,39 @@ const search = ref('')
       <Notice v-if="state === 'refused'" tone="info">This account cannot curate databases.</Notice>
       <Notice v-else-if="state === 'failed'" tone="error">{{ failure }}</Notice>
       <ul v-else class="divide-y divide-border rounded-md border border-border">
-        <li v-for="row in listed" :key="row.entryId" class="flex flex-wrap items-center gap-3 px-4 py-3">
-          <div class="min-w-0 flex-1">
-            <p class="text-sm font-medium text-foreground">
-              {{ label(row) }} <span class="font-mono text-xs font-normal text-muted-foreground">{{ where(row) }}</span>
-              <Badge v-if="row.state !== 'active'" variant="warn" size="sm" class="ml-1">{{ STATE_NOTES[row.state] }}</Badge>
-            </p>
-            <p class="text-xs text-muted-foreground">Dataset <span class="font-mono">{{ row.datasetId }}</span></p>
+        <li v-for="row in listed" :key="row.entryId" class="px-4 py-3">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium text-foreground">
+                {{ label(row) }} <span class="font-mono text-xs font-normal text-muted-foreground">{{ where(row) }}</span>
+                <Badge v-if="row.state !== 'active'" variant="warn" size="sm" class="ml-1">{{ STATE_NOTES[row.state] }}</Badge>
+                <Badge v-if="row.parser?.rules.length" size="sm" class="ml-1">{{ linkCount(row) }}</Badge>
+              </p>
+              <p class="text-xs text-muted-foreground">Dataset <span class="font-mono">{{ row.datasetId }}</span></p>
+            </div>
+            <Button v-if="row.title" size="sm" variant="outline" as-child>
+              <RouterLink :to="{ name: 'dataset', params: { id: row.datasetId } }">Open the dataset</RouterLink>
+            </Button>
+            <Button
+              size="sm"
+              :variant="editing === row.entryId ? 'secondary' : 'ghost'"
+              :aria-expanded="editing === row.entryId"
+              @click="editing = editing === row.entryId ? null : row.entryId"
+            >
+              Identifier links {{ editing === row.entryId ? '▴' : '▾' }}
+            </Button>
+            <Button size="sm" variant="ghost" class="text-destructive hover:text-destructive" :aria-label="`Remove ${label(row)}`" @click="remove(row)">
+              <Trash2 class="size-3.5" /> Remove
+            </Button>
           </div>
-          <Button v-if="row.title" size="sm" variant="outline" as-child>
-            <RouterLink :to="{ name: 'dataset', params: { id: row.datasetId } }">Open the dataset</RouterLink>
-          </Button>
-          <Button size="sm" variant="ghost" class="text-destructive hover:text-destructive" :aria-label="`Remove ${label(row)}`" @click="remove(row)">
-            <Trash2 class="size-3.5" /> Remove
-          </Button>
+          <IdentifierLinksEditor
+            v-if="editing === row.entryId"
+            class="mt-4"
+            :entry-id="row.entryId"
+            :parser="row.parser ?? null"
+            @saved="saved"
+            @close="editing = null"
+          />
         </li>
         <li v-if="state === 'loading'" class="px-4 py-6 text-center text-sm text-muted-foreground">Loading…</li>
         <li v-else-if="!listed.length" class="px-4 py-6 text-center text-sm text-muted-foreground">No bucket is marked as a database yet.</li>

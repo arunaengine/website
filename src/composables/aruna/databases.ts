@@ -5,6 +5,10 @@ import {
   listDatabases as requestList,
   markDatabase as requestMark,
   removeDatabase as requestRemove,
+  setDatabaseParser as requestParser,
+  testDatabaseParser as requestParserTest,
+  type FoundIdentifier,
+  type IdentifierParser,
   type DatabaseEntryView,
   type DatabaseListQuery,
   type DatabaseListResponse,
@@ -43,3 +47,10 @@ export const approveDatabaseRequest = (requestId: string): Promise<DatabaseEntry
 
 export const dropDatabaseRequest = (requestId: string): Promise<void> =>
   change((client) => requestDrop(requestId, client))
+
+export const setDatabaseParser = (entryId: string, parser: IdentifierParser | null): Promise<void> =>
+  change((client) => requestParser(entryId, parser, client))
+
+export function testDatabaseParser(body: { parser: IdentifierParser; key: string; source_url?: string | null }): Promise<FoundIdentifier[]> {
+  return requestParserTest(body, refreshContext().client)
+}

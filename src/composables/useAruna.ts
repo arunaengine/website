@@ -115,6 +115,8 @@ import {
   listDatabases,
   markDatabase,
   removeDatabase,
+  setDatabaseParser,
+  testDatabaseParser,
 } from './aruna/databases'
 import {
   changeDistributedSettings,
@@ -289,6 +291,8 @@ export function useAruna() {
     listDatabases,
     markDatabase,
     removeDatabase,
+    setDatabaseParser,
+    testDatabaseParser,
     listDatabaseRequests,
     approveDatabaseRequest,
     dropDatabaseRequest,

@@ -1,6 +1,13 @@
 // What the portal shows of the realm's databases. The node answers with ids, the bucket name and a
 // state; the dataset's own texts are read from the dataset, with the dataset's access rules.
-import type { DatabaseRequestView, DatabaseStateName, DatabaseTarget, DatabaseView, PartTargetResponse } from '@/lib/api'
+import type {
+  DatabaseRequestView,
+  DatabaseStateName,
+  DatabaseTarget,
+  DatabaseView,
+  IdentifierParser,
+  PartTargetResponse,
+} from '@/lib/api'
 import { contextIri, DEFAULT_CRATE_VERSION, specIri } from '@/lib/crate/version'
 import { crateGraph, crateRootId, stringProp } from '@/lib/dataEntities'
 
@@ -17,6 +24,7 @@ export interface DatabaseRow {
   documentPath: string | null
   /** Anyone may read the bucket, also without a login. */
   public: boolean
+  parser?: IdentifierParser | null
 }
 
 export function rowOf(view: DatabaseView): DatabaseRow {
@@ -30,6 +38,7 @@ export function rowOf(view: DatabaseView): DatabaseRow {
     title: view.title ?? null,
     documentPath: view.document_path ?? null,
     public: view.public,
+    parser: view.parser ?? null,
   }
 }
 

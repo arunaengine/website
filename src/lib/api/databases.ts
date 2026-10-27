@@ -29,6 +29,27 @@ export interface DatabaseView extends DatabaseEntryView {
   document_path?: string | null
   /** Anyone, also without a login, may read the bucket; otherwise realm users with access. */
   public: boolean
+  /** The rules that turn keys and source URLs into links to public records. */
+  parser?: IdentifierParser | null
+}
+
+/** One identifier rule: a Rust regex with a group named `id`, and a link with `{id}`. */
+export interface IdentifierRule {
+  name: string
+  pattern: string
+  target: 'key' | 'source_url'
+  url_template: string
+}
+
+export interface IdentifierParser {
+  rules: IdentifierRule[]
+}
+
+export interface FoundIdentifier {
+  name: string
+  value: string
+  url: string
+  target: 'key' | 'source_url'
 }
 
 export interface DatabaseListResponse {
@@ -97,4 +118,20 @@ export function approveDatabaseRequest(requestId: string, client: ApiClientOptio
 /** The curator withdraws the request, or an admin of the owning group declines it. */
 export function dropDatabaseRequest(requestId: string, client: ApiClientOptions = {}): Promise<void> {
   return apiRequest(`/system/realm/databases/requests/${encodeURIComponent(requestId)}`, { method: 'DELETE' }, client)
+}
+
+/** Sets or clears (`null`) the identifier parser of a database entry. */
+export function setDatabaseParser(entryId: string, parser: IdentifierParser | null, client: ApiClientOptions = {}): Promise<void> {
+  const path = `/system/realm/databases/${encodeURIComponent(entryId)}/parser`
+  return apiRequest(path, { method: 'PUT', body: JSON.stringify({ parser }) }, client)
+}
+
+/** Tries a parser on a sample key or source URL with the server's regex engine; stores nothing. */
+export async function testDatabaseParser(
+  body: { parser: IdentifierParser; key: string; source_url?: string | null },
+  client: ApiClientOptions = {},
+): Promise<FoundIdentifier[]> {
+  const path = '/system/realm/databases/parser/test'
+  const answer = await apiRequest<{ identifiers: FoundIdentifier[] }>(path, { method: 'POST', body: JSON.stringify(body) }, client)
+  return answer.identifiers
 }

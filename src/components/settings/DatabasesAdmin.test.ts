@@ -28,6 +28,9 @@ const component = compileClientComponent(new URL('./DatabasesAdmin.vue', import.
     defineComponent({ props: { nodeId: String, setId: String, groupId: String }, setup: (props) => () => h('section', `mark form ${props.nodeId} ${props.setId} ${props.groupId}`) }),
   ),
   '@/components/data/DatabaseRequestItem.vue': moduleDefault(Marker('pending request')),
+  '@/components/settings/IdentifierLinksEditor.vue': moduleDefault(
+    defineComponent({ props: { entryId: String }, setup: (props) => () => h('section', `links editor ${props.entryId}`) }),
+  ),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
   '@/components/ui/CopyButton.vue': moduleDefault(Marker('copy')),
@@ -91,6 +94,18 @@ describe('databases admin', () => {
     expect(aruna.removeDatabase).toHaveBeenCalledWith('e-spire')
     expect(reloadList).toHaveBeenCalled()
     expect(aruna.listDatabases).toHaveBeenCalledTimes(2)
+  })
+
+  it('opens the identifier links of one entry and counts its rules', async () => {
+    const parser = { rules: [{ name: 'BioSample', pattern: '(?P<id>S)', target: 'key' as const, url_template: 'https://x.org/{id}' }] }
+    aruna.listDatabases.mockResolvedValue({ databases: [view('spire', { parser })] })
+    const root = await render()
+    expect(content(root)).toContain('1 identifier link')
+    expect(content(root)).not.toContain('links editor')
+
+    await (button(root, 'Identifier links').props.onClick as () => void)()
+    await flush()
+    expect(content(root)).toContain('links editor e-spire')
   })
 
   it('tells an account without the right, and offers no mark form', async () => {

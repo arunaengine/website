@@ -6,6 +6,8 @@ import {
   listDatabases,
   markDatabase,
   removeDatabase,
+  setDatabaseParser,
+  testDatabaseParser,
 } from './databases'
 
 const client = { baseUrl: 'https://api.test/api/v1', token: 'tok' }
@@ -64,5 +66,27 @@ describe('database requests', () => {
     const dropped = stubFetch(204, null)
     await dropDatabaseRequest('r1', client)
     expect(dropped[0]).toMatchObject({ url: 'https://api.test/api/v1/system/realm/databases/requests/r1', method: 'DELETE' })
+  })
+})
+
+describe('identifier parsers', () => {
+  const parser = { rules: [{ name: 'BioSample', pattern: '(?P<id>SAMN\\d+)', target: 'key' as const, url_template: 'https://x.org/{id}' }] }
+
+  it('sets and clears the parser of one entry', async () => {
+    const calls = stubFetch(204, null)
+
+    await setDatabaseParser('e/1', parser, client)
+    await setDatabaseParser('e/1', null, client)
+
+    expect(calls[0]).toMatchObject({ url: 'https://api.test/api/v1/system/realm/databases/e%2F1/parser', method: 'PUT', body: { parser } })
+    expect(calls[1].body).toEqual({ parser: null })
+  })
+
+  it('tries a parser and returns what it found', async () => {
+    const found = [{ name: 'BioSample', value: 'SAMN1', url: 'https://x.org/SAMN1', target: 'key' }]
+    const calls = stubFetch(200, { identifiers: found })
+
+    expect(await testDatabaseParser({ parser, key: 'SAMN1/a.fna' }, client)).toEqual(found)
+    expect(calls[0]).toMatchObject({ url: 'https://api.test/api/v1/system/realm/databases/parser/test', method: 'POST' })
   })
 })
