@@ -16,6 +16,7 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { s3ErrorMessage, useS3 } from '@/composables/useS3'
 import { ARUNA_CONTENT_W3ID_PREFIX, versionObjectId } from '@/lib/contentIdentity'
 import { hopFrom, originFrom, projectionRows } from '@/lib/fileOrigin'
+import type { ProvenanceStart } from '@/lib/provenance'
 import { shortUserId, truncateMiddle } from '@/lib/utils'
 
 const props = defineProps<{ target: OriginTarget }>()
@@ -51,6 +52,11 @@ const startId = computed(() => {
   if (answer.global_id) return answer.global_id
   if (!realm || !localNodeId.value) return null
   return `${ARUNA_CONTENT_W3ID_PREFIX}${versionObjectId(realm, localNodeId.value, props.target.bucket, props.target.key, answer.version_id)}`
+})
+// One start object per answer, so a re-render keeps what the view has read.
+const start = computed<ProvenanceStart | null>(() => {
+  const origin = found.origin.value
+  return origin && startId.value ? { kind: 'file', id: startId.value, name: fileName.value, origin } : null
 })
 // Links to public records; they come from the database's rules as they are now.
 const identifiers = computed(() => found.origin.value?.identifiers ?? [])
@@ -98,12 +104,12 @@ const recorded = computed(() => Boolean(origin.value || hop.value))
       <div v-if="startId">
         <Button size="sm" variant="outline" @click="showing = true">Where it came from</Button>
       </div>
-      <DetailDialog v-if="startId && found.origin.value" :open="showing" @update:open="(open) => (showing = open)">
+      <DetailDialog v-if="start" :open="showing" @update:open="(open) => (showing = open)">
         <template #header>
           <h2 class="font-display text-lg font-semibold text-aruna-navy">Where it came from</h2>
           <p class="text-xs text-muted-foreground">{{ fileName }}</p>
         </template>
-        <ProvenanceView v-if="showing" :start="{ kind: 'file', id: startId, name: fileName, origin: found.origin.value }" />
+        <ProvenanceView v-if="showing" :start="start" />
       </DetailDialog>
       <div v-if="found.origin.value?.global_id" class="space-y-1.5 text-xs">
         <p class="text-muted-foreground">
