@@ -70,14 +70,14 @@ watch(sessionEpoch, () => {
 }, { flush: 'sync' })
 
 // Null keeps the tile on the window-derived list, so a node that cannot order
-// by recency degrades to the old behaviour instead of an empty panel.
+// by recency degrades to the old behaviour instead of an empty panel. A refresh
+// replaces the shown list in place; a failed one keeps it.
 async function loadRecent() {
   const epoch = sessionEpoch.value
   const generation = ++recentGeneration
-  recentSettled.value = false
   const recent = await listRecentMetadata().catch(() => null)
   if (epoch !== sessionEpoch.value || generation !== recentGeneration) return
-  recentDocs.value = recent
+  if (recent || !recentSettled.value) recentDocs.value = recent
   recentSettled.value = true
 }
 
@@ -120,10 +120,15 @@ function watchDashboard() {
 
 watch([dashboardRevision, sessionEpoch], watchDashboard, { immediate: true })
 
-// Node heartbeats republish every 60s but never bump the SSE revision; poll
-// the light info endpoints so the realm nodes panel stays current. A failed
-// read must not end the poll, so it is swallowed here.
-const pollInfo = () => loadInfo().catch(() => undefined)
+// Node heartbeats and usage republish without bumping the SSE revision; poll
+// the light info endpoints so the realm nodes panel stays current, and read the
+// group figures again. A failed read must not end the poll, so it is swallowed.
+const pollInfo = () =>
+  loadInfo()
+    .catch(() => undefined)
+    .then(() => {
+      quotaRevision.value++
+    })
 const stopFollow = follow(pollInfo, () => POLL_SLOW_MS, () => refreshing.value)
 const stopWake = onWake(() => void pollInfo())
 onUnmounted(() => {

@@ -1,7 +1,7 @@
 import * as VueRuntime from 'vue'
 import { createSSRApp, defineComponent, h, ref, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, content, compileClientComponent, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
 import { docsTopicBySlug } from '@/docs/v1'
 
@@ -57,7 +57,11 @@ const StatCardStub = defineComponent({
   },
 })
 const SkeletonStub = defineComponent(() => () => h('span', 'loading'))
-const GroupQuotaCardsStub = defineComponent(() => () => h('div', 'group quota cards'))
+const GroupQuotaCardsStub = defineComponent({
+  props: { refreshRevision: Number },
+  setup: (props) => () => h('div', `group quota cards ${props.refreshRevision}`),
+})
+let pollInfo: () => unknown = () => undefined
 const MyStatsCardsStub = defineComponent(() => () => h('div', 'my stats cards'))
 const ReachableStub = defineComponent(() => () => h('div', 'reachable data'))
 // The node total stands as the exact count; the correction itself is tested with the count rule.
@@ -192,7 +196,14 @@ beforeAll(async () => {
       useDocumentVisibility: () => ref('hidden'),
       useIntervalFn: () => ({ pause: vi.fn(), resume: vi.fn() }),
     },
-    '@/lib/poll': { POLL_SLOW_MS: 15_000, follow: () => () => {}, onWake: () => () => {} },
+    '@/lib/poll': {
+      POLL_SLOW_MS: 15_000,
+      follow: (run: () => unknown) => {
+        pollInfo = run
+        return () => {}
+      },
+      onWake: () => () => {},
+    },
     '@/composables/useNotifications': { useNotifications: () => ({ dashboardRevision }) },
     '@/composables/useDashboardScope': { useDashboardScope: () => ({ scope, setScope }) },
     '@/composables/useOnboarding': { useOnboarding: () => ({ isNewUser, dismissOnboarding }) },
@@ -652,6 +663,54 @@ describe('desktop realm nodes panel', () => {
 
     expect(loadRealmView).not.toHaveBeenCalled()
     expect(content(mounted.root)).toContain('hub own-device')
+    mounted.app.unmount()
+  })
+})
+
+describe('dashboard refresh', () => {
+  const doc = (ulid: string, title: string) => ({ ulid, title, description: '', updatedAt: '2026-10-27' }) as never
+
+  beforeEach(() => {
+    vi.stubGlobal('window', {})
+    currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
+    myGroups.value = [{ id: 'g1', name: 'Genome Lab' }]
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('keeps the recent datasets in place while a revision bump reads them again', async () => {
+    listRecentMetadata.mockResolvedValueOnce([doc('d1', 'Coral survey')])
+    const mounted = await mountApp(DashboardClient)
+    await flush()
+    const shown = content(mounted.root)
+    expect(shown).toContain('Coral survey')
+
+    let answer!: (docs: never[]) => void
+    listRecentMetadata.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
+    dashboardRevision.value++
+    await flush()
+    const during = content(mounted.root)
+    expect(during).toContain('Coral survey')
+    expect(during.split('loading').length).toBe(shown.split('loading').length)
+
+    answer([doc('d2', 'Reef census')])
+    await flush()
+    expect(content(mounted.root)).toContain('Reef census')
+    expect(content(mounted.root)).not.toContain('Coral survey')
+    mounted.app.unmount()
+  })
+
+  it('reads the group figures again on the info poll', async () => {
+    const mounted = await mountApp(DashboardClient)
+    await flush()
+    const revision = () => Number(content(mounted.root).match(/group quota cards (\d+)/)?.[1])
+    const before = revision()
+
+    await pollInfo()
+    await flush()
+
+    expect(loadInfo).toHaveBeenCalled()
+    expect(revision()).toBe(before + 1)
     mounted.app.unmount()
   })
 })
