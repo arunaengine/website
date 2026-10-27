@@ -20,6 +20,7 @@ import DatasetActions from '@/components/metadata/view/DatasetActions.vue'
 import DatasetDetailSkeleton from '@/components/metadata/view/DatasetDetailSkeleton.vue'
 import DatasetFiles from '@/components/metadata/view/DatasetFiles.vue'
 import DatasetGraph from '@/components/metadata/view/DatasetGraph.vue'
+import DatasetProvenance from '@/components/metadata/view/DatasetProvenance.vue'
 import DatasetHeader from '@/components/metadata/view/DatasetHeader.vue'
 import DatasetGitRow from '@/components/metadata/view/DatasetGitRow.vue'
 import DatasetStorageRow from '@/components/metadata/view/DatasetStorageRow.vue'
@@ -108,7 +109,7 @@ providePageContext(() => {
   }
 })
 
-const routeTab = useRouteTab(['overview', 'graph', 'history'], 'overview')
+const routeTab = useRouteTab(['overview', 'graph', 'provenance', 'history'], 'overview')
 const history = useDatasetHistory(
   detailId,
   () => docState.value === 'found' && Boolean(currentUser.value),
@@ -229,11 +230,19 @@ function jumpTo(entityId: string) {
           <TabsList aria-label="Dataset views">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="graph">Graph</TabsTrigger>
+            <TabsTrigger value="provenance">Provenance</TabsTrigger>
             <TabsTrigger v-if="historyShown" value="history">History</TabsTrigger>
           </TabsList>
         </Tabs>
 
         <DatasetGraph v-if="tab === 'graph'" :state="state" @open="openInfo" />
+
+        <DatasetProvenance
+          v-if="tab === 'provenance'"
+          :state="state"
+          :document-id="detailId"
+          :title="current?.title || fetchedSummary?.document_path || 'Dataset'"
+        />
 
         <DatasetHistory v-if="tab === 'history'" :history="history" :state="state" />
 
