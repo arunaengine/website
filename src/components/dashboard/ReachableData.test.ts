@@ -57,4 +57,12 @@ describe('reachable data', () => {
     expect(text).toContain('Unknown: no node answered')
     expect(text).toContain('The buckets of Broken could not be listed')
   })
+
+  it('shows totals as a lower bound while a group may miss buckets', async () => {
+    groups.value = [group(), group({ groupId: 'g2', name: 'Partial', missing: true })]
+    const text = await html()
+
+    expect(text).toContain('Buckets of Partial may be missing')
+    expect(text).toContain('Stored</span><span class="font-display text-2xl font-semibold text-aruna-navy">at least')
+  })
 })

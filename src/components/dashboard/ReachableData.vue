@@ -20,9 +20,10 @@ watch(
   { immediate: true },
 )
 
-// A figure is a lower bound when a bucket was not counted whole or a group was not read.
+// A figure is a lower bound when a bucket was not counted whole or a group was not read whole.
 const failed = computed(() => reach.groups.value.filter((group) => group.error).map((group) => group.name))
-const lower = (sum: UsageSum, missing = failed.value.length > 0) => missing || sum.partial || sum.unread > 0
+const unlisted = computed(() => reach.groups.value.some((group) => group.error || group.missing))
+const lower = (sum: UsageSum, missing = unlisted.value) => missing || sum.partial || sum.unread > 0
 const bytes = (value: number, atLeast: boolean) => `${atLeast ? 'at least ' : ''}${formatBytes(value)}`
 
 function figures(sum: UsageSum, missing?: boolean) {
