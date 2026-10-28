@@ -41,14 +41,28 @@ const withoutSecrets = (run: SavedRun): SavedRun => ({ ...run, task: savedTask(r
 /** The secret-looking variables of a saved run, whose values are asked at each start. */
 export const secretNames = (run: SavedRun) => Object.keys(run.task.executors[0]?.env ?? {}).filter(isSecretName)
 
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+const listOf = (value: unknown, item: (entry: unknown) => boolean) => Array.isArray(value) && value.every(item)
+const optionalList = (value: unknown, item: (entry: unknown) => boolean) => value === undefined || listOf(value, item)
+const isText = (value: unknown) => typeof value === 'string'
+
+// The fields the New run menu and the start form read, checked before a stored or imported run is used.
+function isTask(value: unknown): boolean {
+  if (!isObject(value)) return false
+  const executor = (entry: unknown) => isObject(entry) && isText(entry.image) && listOf(entry.command, isText)
+    && (entry.env === undefined || (isObject(entry.env) && Object.values(entry.env).every(isText)))
+  const file = (entry: unknown) => isObject(entry) && isText(entry.path) && (entry.name === undefined || isText(entry.name))
+    && (entry.url === undefined || isText(entry.url))
+  const output = (entry: unknown) => isObject(entry) && isText(entry.path) && isText(entry.url)
+  return listOf(value.executors, executor) && (value.executors as unknown[]).length > 0
+    && optionalList(value.inputs, file) && optionalList(value.outputs, output)
+    && (value.tags === undefined || (isObject(value.tags) && Object.values(value.tags).every(isText)))
+}
+
 function isSavedRun(value: unknown): value is SavedRun {
-  const run = value as Partial<SavedRun> | null
-  return Boolean(
-    run && typeof run.id === 'string' && typeof run.name === 'string' && typeof run.savedAt === 'string'
-      && run.task && typeof run.task === 'object' && Array.isArray(run.task.executors)
-      && run.ask && Array.isArray(run.ask.inputs) && run.ask.inputs.every((path) => typeof path === 'string')
-      && typeof run.ask.results === 'boolean',
-  )
+  if (!isObject(value) || !isText(value.id) || !isText(value.name) || !isText(value.savedAt) || !isTask(value.task)) return false
+  const ask = value.ask
+  return isObject(ask) && listOf(ask.inputs, isText) && typeof ask.results === 'boolean'
 }
 
 /** The saved runs of this browser; an unreadable store reads as none. */

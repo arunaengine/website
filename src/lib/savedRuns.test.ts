@@ -70,4 +70,19 @@ describe('saved runs', () => {
     expect(secretNames(imported)).toEqual(['AWS_SECRET_ACCESS_KEY', 'api_token', 'DB_PASSWORD'])
     expect(askedFor(imported)).toContain('AWS_SECRET_ACCESS_KEY')
   })
+
+  it('refuses runs whose nested fields the menu and start form could not read', () => {
+    const broken = [
+      { ...run('a'), task: { ...run('a').task, inputs: {} } },
+      { ...run('b'), task: { ...run('b').task, executors: [{ image: 'x', command: 'not a list' }] } },
+      { ...run('c'), task: { ...run('c').task, executors: [] } },
+      { ...run('d'), task: { ...run('d').task, executors: [{ image: 'x', command: [], env: { A: 1 } }] } },
+      { ...run('e'), task: { ...run('e').task, outputs: [{ path: '/out' }] } },
+    ]
+    const storage = memory()
+    storage.setItem('aruna.myRuns', JSON.stringify([...broken, run('ok')]))
+    expect(readSavedRuns(storage).map((item) => item.id)).toEqual(['ok'])
+    expect(() => importRuns(exportRuns(broken as SavedRun[]), [])).toThrow('not readable')
+    expect(askedFor(readSavedRuns(storage)[0])).toEqual(['genome.fna', 'results folder'])
+  })
 })
