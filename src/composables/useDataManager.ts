@@ -91,11 +91,13 @@ export function dataViewReady(state: {
   listLoading: boolean
   /** A listing of this bucket has finished, even an empty one. */
   listedOnce: boolean
+  /** The view was already on screen for this session, so a new bucket or folder lists in place. */
+  shown?: boolean
 }): boolean {
   if (!state.contextReady) return false
   if (state.remoteBlocked) return true
   // Only the first page blocks: paging must not take the listing off screen.
-  const listingPending = Boolean(state.bucket) && state.listLoading && !state.listedOnce
+  const listingPending = Boolean(state.bucket) && state.listLoading && !state.listedOnce && !state.shown
   return (state.bucketsLoaded || state.bucketsFailed) && !listingPending
 }
 
@@ -734,6 +736,7 @@ export function useDataManager() {
 
   let listRequestId = 0
   const listedOnce = ref(false)
+  const viewShown = ref(false)
 
   // Deletion dialogs drop their target and pending preflight when the listing
   // they were opened from is replaced.
@@ -888,6 +891,7 @@ export function useDataManager() {
     [contextFingerprint, effectiveEndpoint],
     ([context, endpoint]) => {
       clearObjectListing()
+      viewShown.value = false
       if (!context) return
       if (!endpoint) return
       // Cached buckets show at once; useBuckets scopes them by session and
@@ -1439,8 +1443,10 @@ export function useDataManager() {
       bucket: bucket.value,
       listLoading: listLoading.value,
       listedOnce: listedOnce.value,
+      shown: viewShown.value,
     }),
   )
+  watch(viewReady, (ready) => ready && (viewShown.value = true), { immediate: true })
 
   return {
     route,

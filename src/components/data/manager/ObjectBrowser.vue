@@ -740,7 +740,12 @@ async function onDrop(event: DragEvent) {
               </td>
             </tr>
             </template>
-            <tr v-if="isEmpty">
+            <tr v-if="listLoading && !visibleFolders.length && !visibleObjects.length && !deletedRows.length">
+              <td colspan="5" class="px-4 py-10">
+                <Spinner show-label label="Loading objects…" class="justify-center" />
+              </td>
+            </tr>
+            <tr v-else-if="isEmpty">
               <td colspan="5" class="px-4 py-10 text-center text-xs text-muted-foreground">
                 <template v-if="nameFilter">No names here start with "{{ nameFilter }}".</template>
                 <template v-else-if="nextToken || folders.length || objects.length">No matches on this page.</template>

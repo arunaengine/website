@@ -37,6 +37,10 @@ describe('Data view readiness', () => {
     expect(dataViewReady(state({ bucket: 'data', listLoading: true, listedOnce: true }))).toBe(true)
   })
 
+  it('lists another bucket or folder in place once the view was shown', () => {
+    expect(dataViewReady(state({ bucket: 'data', listLoading: true, shown: true }))).toBe(true)
+  })
+
   it('opens when a remote node cannot be browsed', () => {
     expect(dataViewReady(state({ remoteBlocked: true, bucketsLoaded: false }))).toBe(true)
   })
