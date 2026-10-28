@@ -1,5 +1,5 @@
 // ── Datasets that link data ─────────────────────────────────────────────────
-// Verified against aruna api/src/routes/metadata/links.rs (feat/distributed-buckets-metadata).
+// Verified against aruna api/src/routes/metadata/links.rs (feat/mounted-run-inputs).
 // A linked part is a Dataset-typed hasPart that names a bucket or a folder; every file under it is
 // part of the dataset. A node without the routes answers 404, which means "not available here".
 import { apiRequest, type ApiClientOptions } from './client'
@@ -54,7 +54,7 @@ export function getBucketLinks(
   const { prefix, ...rest } = query
   // The request client leaves out empty values, but an empty prefix names the bucket root.
   const root = prefix === '' ? '?prefix=' : ''
-  const path = `/data/buckets/${encodeURIComponent(bucket)}/links${root}`
+  const path = `/data/buckets/${encodeURIComponent(bucket)}/datasets${root}`
   return apiRequest(path, { query: { ...rest, prefix: prefix || undefined }, signal }, client)
 }
 

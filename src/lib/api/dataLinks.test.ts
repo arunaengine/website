@@ -27,7 +27,7 @@ describe('data link requests', () => {
     await getBucketLinks('lab data', { key: 'raw/a b.fq', parts_only: true }, client)
 
     const url = new URL(urls[0])
-    expect(url.pathname).toBe('/api/v1/data/buckets/lab%20data/links')
+    expect(url.pathname).toBe('/api/v1/data/buckets/lab%20data/datasets')
     expect(url.searchParams.get('key')).toBe('raw/a b.fq')
     expect(url.searchParams.get('parts_only')).toBe('true')
     expect(url.searchParams.has('prefix')).toBe(false)
