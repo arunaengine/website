@@ -121,15 +121,20 @@ async function poll() {
 }
 
 async function initialLoad() {
+  const requestId = nativeRequestId
   loadState.value = 'loading'
   loadError.value = null
   lastPollError.value = null
   try {
-    task.value = await getTask(props.taskId, 'FULL')
+    const next = await getTask(props.taskId, 'FULL')
+    // A task opened meanwhile owns the panel; this answer belongs to the previous one.
+    if (requestId !== nativeRequestId) return
+    task.value = next
     now.value = Date.now()
     loadState.value = 'ready'
-    if (!isTerminalTesState(task.value.state)) startPolling()
+    if (!isTerminalTesState(next.state)) startPolling()
   } catch (err) {
+    if (requestId !== nativeRequestId) return
     if (isTesUnsupported(err)) loadState.value = 'unsupported'
     else {
       loadState.value = 'error'
@@ -492,17 +497,21 @@ const outputRange = computed(() => {
 })
 
 // ── Run dataset (targeted lookup at runs/{taskId}) ───────────────────────────
+let crateTask: string | null = null
 async function findRunCrate() {
-  if (runCrateLoading.value) return
+  const id = props.taskId
+  if (runCrateLoading.value && crateTask === id) return
+  crateTask = id
   runCrateLoading.value = true
   try {
-    runCrate.value = await metadataAtPath(`runs/${props.taskId}`)
+    const crate = await metadataAtPath(`runs/${id}`)
+    if (crateTask === id) runCrate.value = crate
   } catch {
     // The crate is written when the run completes; a failed lookup just keeps
     // the section in its "not found yet" state.
-    runCrate.value = null
+    if (crateTask === id) runCrate.value = null
   } finally {
-    runCrateLoading.value = false
+    if (crateTask === id) runCrateLoading.value = false
   }
 }
 
