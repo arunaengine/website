@@ -18,11 +18,28 @@ export interface SavedRun {
 const STORE = 'aruna.myRuns'
 const FORMAT = 'aruna-my-runs'
 
-/** The run request without what only a finished run has. */
+// The name parts the server's run records hide (core/src/structs/execution/job/launch.rs).
+const SECRET_MARKERS = ['TOKEN', 'SECRET', 'KEY', 'PASS', 'CREDENTIAL', 'AUTH', 'PRIVATE']
+
+/** A variable whose value is never saved and is asked again at each start. */
+export const isSecretName = (name: string) => SECRET_MARKERS.some((marker) => name.toUpperCase().includes(marker))
+
+/** The run request without what only a finished run has and without secret-looking values. */
 export function savedTask(task: TesTask): TesTask {
   const { id: _id, state: _state, logs: _logs, creation_time: _created, ...rest } = task
-  return rest
+  const executors = rest.executors.map((executor) => ({
+    ...executor,
+    ...(executor.env
+      ? { env: Object.fromEntries(Object.entries(executor.env).map(([name, value]) => [name, isSecretName(name) ? '' : value])) }
+      : {}),
+  }))
+  return { ...rest, executors }
 }
+
+const withoutSecrets = (run: SavedRun): SavedRun => ({ ...run, task: savedTask(run.task) })
+
+/** The secret-looking variables of a saved run, whose values are asked at each start. */
+export const secretNames = (run: SavedRun) => Object.keys(run.task.executors[0]?.env ?? {}).filter(isSecretName)
 
 function isSavedRun(value: unknown): value is SavedRun {
   const run = value as Partial<SavedRun> | null
@@ -38,7 +55,7 @@ function isSavedRun(value: unknown): value is SavedRun {
 export function readSavedRuns(storage: Storage | undefined = globalThis.localStorage): SavedRun[] {
   try {
     const parsed = JSON.parse(storage?.getItem(STORE) ?? '[]') as unknown
-    return Array.isArray(parsed) ? parsed.filter(isSavedRun) : []
+    return Array.isArray(parsed) ? parsed.filter(isSavedRun).map(withoutSecrets) : []
   } catch {
     return []
   }
@@ -68,7 +85,7 @@ export function importRuns(text: string, runs: readonly SavedRun[]): SavedRun[] 
   if (parsed?.format !== FORMAT || !Array.isArray(parsed.runs)) throw new Error('This file is not a saved runs file.')
   const found = parsed.runs.filter(isSavedRun)
   if (found.length !== parsed.runs.length) throw new Error('Some runs in this file are not readable.')
-  return found.reduce<SavedRun[]>((all, run) => withRun(all, run), [...runs])
+  return found.map(withoutSecrets).reduce<SavedRun[]>((all, run) => withRun(all, run), [...runs])
 }
 
 /** What a saved run asks for at each start, in words: input names and the results folder. */
@@ -77,5 +94,6 @@ export function askedFor(run: SavedRun): string[] {
     const input = run.task.inputs?.find((item) => item.path === path)
     return input?.name || path.split('/').filter(Boolean).pop() || path
   })
-  return run.ask.results ? [...names, 'results folder'] : names
+  const asked = [...names, ...secretNames(run)]
+  return run.ask.results ? [...asked, 'results folder'] : asked
 }

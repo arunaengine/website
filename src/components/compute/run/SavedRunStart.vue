@@ -8,14 +8,17 @@ import ResultsHome from '@/components/compute/run/ResultsHome.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
 import { injectCustomRun, outputDestination } from '@/composables/useCustomRun'
 import type { TesDataRefEntry } from '@/lib/tes'
+import { isSecretName } from '@/lib/savedRuns'
 import { Star } from '@lucide/vue'
 
-const { savedStart, inputs, outputRows, openInputs, resultsChosen, bucketOptions, answerInput, chooseResults, editSaved } = injectCustomRun()
+const { savedStart, inputs, outputRows, openInputs, resultsChosen, bucketOptions, envRows, answerInput, chooseResults, editSaved } = injectCustomRun()
 
 const run = computed(() => savedStart.value?.run ?? null)
 const entryPath = (entry: TesDataRefEntry) => (entry.kind === 'file' ? entry.path : entry.basePath).replace(/\/$/, '')
 const nameOf = (path: string) => run.value?.task.inputs?.find((input) => input.path === path)?.name || path
 const asked = computed(() => run.value?.ask.inputs ?? [])
+// Secret values are never saved, so each start asks for them.
+const secrets = computed(() => envRows.value.filter((row) => isSecretName(row.key)))
 const fixed = computed(() => inputs.value.filter((entry) => !asked.value.includes(entryPath(entry))))
 const pickOf = (path: string) => inputs.value.find((entry) => entryPath(entry) === path)
 const pickText = (entry: TesDataRefEntry) => (entry.kind === 'file' ? entry.url : `${entry.bucket}/${entry.prefix}`)
@@ -63,6 +66,14 @@ const resultsFolder = ref('')
         </div>
         <span class="text-xs text-muted-foreground">Fixed in this run</span>
       </div>
+    </div>
+
+    <div v-if="secrets.length" id="saved-secrets" class="surface-inline space-y-2 p-3 text-sm">
+      <p class="text-xs text-muted-foreground">Secret values are not saved. Enter them for this run.</p>
+      <label v-for="row in secrets" :key="row.key" class="flex items-center gap-3">
+        <span class="w-48 truncate font-mono text-xs">{{ row.key }}</span>
+        <Input v-model="row.value" type="password" class="flex-1" :aria-label="`Value of ${row.key}`" />
+      </label>
     </div>
 
     <div v-if="outputRows.length" id="saved-results" class="surface-inline space-y-2 p-3 text-sm">

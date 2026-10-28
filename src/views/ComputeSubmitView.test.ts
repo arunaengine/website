@@ -509,6 +509,22 @@ describe('run page', () => {
     mounted.app.unmount()
   })
 
+  it('asks again for the secret values of a saved run', async () => {
+    useSavedRuns().save({
+      id: 'r2', name: 'Upload', savedAt: '2026-10-28T10:00:00Z',
+      task: { name: 'Upload', executors: [{ image: 'alpine:3.20', command: ['echo', 'hi'], env: { AWS_SECRET_ACCESS_KEY: 'leaked', THREADS: '4' } }] },
+      ask: { inputs: [], results: false },
+    })
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?saved=r2')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    expect(content(mounted.root)).toContain('Enter the value of AWS_SECRET_ACCESS_KEY')
+    expect(content(mounted.root)).not.toContain('leaked')
+    useSavedRuns().remove('r2')
+    mounted.app.unmount()
+  })
+
   it('prefills the executor from the template in the query', async () => {
     const mounted = await mount(ComputeSubmitView, '/app/compute/new?template=python')
 

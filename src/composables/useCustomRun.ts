@@ -61,7 +61,7 @@ import { bucketNameProblem, objectKeyProblem } from '@/lib/bucketName'
 import { isHiddenBucket } from '@/lib/workspaces'
 import { quoteCommand, tokenizeCommand } from '@/lib/shellwords'
 import { errorMessage } from '@/lib/utils'
-import type { SavedRun } from '@/lib/savedRuns'
+import { isSecretName, type SavedRun } from '@/lib/savedRuns'
 import { useSavedRuns } from '@/composables/useSavedRuns'
 import { targetProblems as collectTargetProblems } from '@/lib/runTarget'
 import type { useAruna } from '@/composables/useAruna'
@@ -977,6 +977,9 @@ function createStore(deps: CustomRunDeps) {
     for (const path of openInputs.value) {
       list.push({ section: 'section-saved', field: 'saved-inputs', text: `Choose the input for ${path}` })
     }
+    for (const name of openSecrets.value) {
+      list.push({ section: 'section-saved', field: 'saved-secrets', text: `Enter the value of ${name}` })
+    }
     if (savedStart.value && !resultsChosen.value) {
       list.push({ section: 'section-saved', field: 'saved-results', text: 'Choose the results folder' })
     }
@@ -1056,6 +1059,11 @@ function createStore(deps: CustomRunDeps) {
     const asked = savedStart.value?.run.ask.inputs ?? []
     return asked.filter((path) => !inputs.value.some((entry) => entryPath(entry) === path))
   })
+
+  /** Secret-looking variables of the saved run that still have no value. */
+  const openSecrets = computed(() =>
+    savedStart.value ? envRows.value.filter((row) => isSecretName(row.key) && !row.value).map((row) => row.key) : [],
+  )
 
   async function applySaved(id: string) {
     savedError.value = null
@@ -1369,6 +1377,7 @@ function createStore(deps: CustomRunDeps) {
     savedStart,
     savedError,
     openInputs,
+    openSecrets,
     resultsChosen,
     answerInput,
     chooseResults,

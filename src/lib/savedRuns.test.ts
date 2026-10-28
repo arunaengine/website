@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { askedFor, exportRuns, importRuns, readSavedRuns, savedTask, withRun, writeSavedRuns, type SavedRun } from './savedRuns'
+import { askedFor, exportRuns, importRuns, readSavedRuns, savedTask, secretNames, withRun, writeSavedRuns, type SavedRun } from './savedRuns'
 
 function memory(): Storage {
   const items = new Map<string, string>()
@@ -58,5 +58,16 @@ describe('saved runs', () => {
     expect(askedFor(run('a'))).toEqual(['genome.fna', 'results folder'])
     const finished = { ...run('a').task, id: 't1', state: 'COMPLETE' as const, logs: [], creation_time: 'x' }
     expect(Object.keys(savedTask(finished)).sort()).toEqual(['executors', 'inputs', 'name'])
+  })
+
+  it('never keeps secret-looking values, also from an imported file', () => {
+    const env = { AWS_SECRET_ACCESS_KEY: 'abc', api_token: 'xyz', DB_PASSWORD: 'p', THREADS: '8' }
+    const secret = { ...run('s'), task: { ...run('s').task, executors: [{ image: 'x', command: ['y'], env }] } }
+
+    expect(savedTask(secret.task).executors[0].env).toEqual({ AWS_SECRET_ACCESS_KEY: '', api_token: '', DB_PASSWORD: '', THREADS: '8' })
+    const [imported] = importRuns(exportRuns([secret]), [])
+    expect(imported.task.executors[0].env?.AWS_SECRET_ACCESS_KEY).toBe('')
+    expect(secretNames(imported)).toEqual(['AWS_SECRET_ACCESS_KEY', 'api_token', 'DB_PASSWORD'])
+    expect(askedFor(imported)).toContain('AWS_SECRET_ACCESS_KEY')
   })
 })
