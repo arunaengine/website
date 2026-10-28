@@ -49,16 +49,19 @@ async function load(more = false) {
   }
 }
 
+// The rows and cursor of the folder before never show under the new one, also after a failure.
 function open(next: string) {
   prefix.value = next
+  objects.value = []
+  prefixes.value = []
+  cursor.value = null
   void load()
 }
 
 watch(() => [props.bucket, props.nodeId], () => {
   chosenFiles.value = new Map()
   chosenFolders.value = new Set()
-  prefix.value = ''
-  void load()
+  open('')
 }, { immediate: true })
 
 const crumbs = computed(() => {
