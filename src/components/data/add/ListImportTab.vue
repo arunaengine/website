@@ -117,7 +117,14 @@ function applyUses() {
 }
 
 watch([from, link, listBucket, listKey, file], () => void read())
-watch(presetName, () => (text.value ? read() : undefined))
+// Without a preview (typed column names) a preset applies at once and the shown columns stay current.
+watch(presetName, () => {
+  if (text.value) return void read()
+  const preset = PRESETS.find((item) => item.name === presetName.value)
+  if (preset) format.value = { ...format.value, ...preset.format, header: format.value.header }
+  applyUses()
+  if (!reading.value) readFor.value = sourceKey()
+})
 
 // The format and the column names change the preview; the uses follow the new columns.
 watch(() => preview.value.columns.join('\u0000'), (now, before) => {

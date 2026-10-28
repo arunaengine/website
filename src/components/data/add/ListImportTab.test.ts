@@ -97,4 +97,24 @@ describe('import from a list', () => {
     expect(sent.table.rows.keep).toBeNull()
     expect(sent.table.source).toEqual({ object: { bucket: 'samples', key: 'lists/run1.csv' } })
   })
+
+  it('keeps Start usable when the preset changes after a failed preview', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
+    createStagingJob.mockClear()
+    const { root } = await mountApp(component, { props: { bucket: 'samples', source } })
+    await change(labelled(root, 'Link to the list'), 'https://data.example.org/summary.txt')
+    await flush()
+    await click(button(root, 'More options'))
+    ;(element(root, (node) => node.tag === 'select' && content(node).includes('Typed in')).props['onUpdate:modelValue'] as (value: string) => void)('columns')
+    await flush()
+    await change(labelled(root, 'Typed column names'), 'ftp_path, taxid')
+
+    ;(labelled(root, 'Preset').props['onUpdate:modelValue'] as (value: string) => void)('NCBI assembly summary')
+    await flush()
+    expect(button(root, 'Start import').props.disabled).toBe(false)
+    await click(button(root, 'Start import'))
+    const sent = (createStagingJob.mock.calls.at(-1) as unknown as [{ table: { format: { delimiter: string; header: unknown }; rows: { kind: string; exact: string[] } } }])[0]
+    expect(sent.table.format).toMatchObject({ delimiter: '\t', header: { columns: ['ftp_path', 'taxid'] } })
+    expect(sent.table.rows).toMatchObject({ kind: 'folder', exact: ['taxid'] })
+  })
 })
