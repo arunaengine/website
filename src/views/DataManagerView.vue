@@ -23,6 +23,7 @@ import PublicAccessDialog from '@/components/data/PublicAccessDialog.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import MockSidebar from '@/components/data/manager/MockSidebar.vue'
 import DatabaseHeader from '@/components/data/DatabaseHeader.vue'
+import MetadataSearch from '@/components/data/MetadataSearch.vue'
 import DistributionBanner from '@/components/data/manager/DistributionBanner.vue'
 import ObjectBrowser from '@/components/data/manager/ObjectBrowser.vue'
 import UploadPanel from '@/components/data/manager/UploadPanel.vue'
@@ -141,6 +142,12 @@ const newBucketOpen = ref(false)
 watch(newBucketOpen, (open) => {
   contextHold.value = open
 })
+
+// A found folder opens itself; a found file opens the folder that holds it.
+function openFound(key: string) {
+  const folder = key.endsWith('/') ? key.slice(0, -1) : key.split('/').slice(0, -1).join('/')
+  manager.navigateTo(folder)
+}
 
 function onBucketCreated(created: BindSource) {
   manager.openSearchHit({
@@ -406,6 +413,7 @@ async function createFolder() {
         <div class="min-w-0 space-y-4">
           <DistributionBanner v-if="storedBucket" :bucket="storedBucket" />
           <DatabaseHeader v-if="bucket && !exampleBucket" :bucket="bucket" :node-id="remoteNodeId" :set-id="bucketSetId" />
+          <MetadataSearch v-if="bucket && !exampleBucket" :bucket="bucket" @open="openFound" />
           <ObjectBrowser
             :manager="manager"
             :notebooks="notebooksView"

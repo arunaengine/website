@@ -85,7 +85,7 @@ export interface BucketSearchResponse {
 // exposes no total. Distributed strict fails instead of returning a partial
 // page; best-effort and local answers carry their exact coverage.
 export type ObjectSearchMode = 'local' | 'distributed_best_effort' | 'distributed_strict'
-export type ObjectSearchMatchMode = 'substring' | 'prefix'
+export type ObjectSearchMatchMode = 'substring' | 'prefix' | 'metadata'
 export type ObjectSearchScope = 'this_node' | 'realm'
 
 export interface ObjectSearchChecksum {

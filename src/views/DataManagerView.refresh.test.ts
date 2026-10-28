@@ -34,6 +34,7 @@ const children = [
   'ui/EmptyState',
   'data/manager/MockSidebar',
   'data/DatabaseHeader',
+  'data/MetadataSearch',
   'data/manager/DistributionBanner',
   'data/manager/ObjectBrowser',
   'data/manager/UploadPanel',
