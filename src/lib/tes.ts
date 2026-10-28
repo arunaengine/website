@@ -1,6 +1,7 @@
 import type { BadgeVariant } from '@/components/nodes/node-display'
 import { stateVariant } from './stateBadge'
 import type { PlacementLike } from '@/lib/jobs'
+import { versionObjectId } from './contentIdentity'
 
 // ── GA4GH TES v1.1 ───────────────────────────────────────────────────────────
 // Verified against the Aruna TES facade (api/src/routes/tes.rs, aruna #425).
@@ -36,7 +37,7 @@ export interface TesInput {
   content?: string
   // Absolute path inside the container the input is materialized at.
   path: string
-  type?: TesFileType // default FILE; only FILE is accepted
+  type?: TesFileType // default FILE; DIRECTORY names an s3:// prefix on the submitting node
 }
 
 export interface TesOutput {
@@ -395,14 +396,51 @@ export type TesDataRefEntry =
       /** Container directory the folder's files mount under; absolute, trailing slash. */
       basePath: string
       files: Array<{ key: string; /** Path relative to the folder prefix (may contain '/'). */ name: string }>
+      /** One DIRECTORY input: the node pins every file below the prefix when it accepts the run. */
+      directory?: boolean
     }
 
-// Expands one picker entry into its TES FILE inputs (folders: one per file).
+/** Where picks come from: the realm, the node that listed them, the bucket and whether it is this node. */
+export interface PickPlace {
+  realmId: string
+  nodeId: string
+  bucket: string
+  local: boolean
+}
+
+/**
+ * Picker entries for files and folders listed with their versions. Files are pinned to the exact
+ * version on their node. A folder of this node is one DIRECTORY input; a folder of another node
+ * becomes its listed files, each pinned, since a DIRECTORY input names this node's bucket.
+ */
+export function pickedEntries(
+  place: PickPlace,
+  files: ReadonlyArray<{ key: string; versionId: string; name: string }>,
+  folders: ReadonlyArray<{ prefix: string; name: string; files?: ReadonlyArray<{ key: string; versionId: string }> }>,
+  mount: string,
+): TesDataRefEntry[] {
+  const pinned = (key: string, versionId: string) => versionObjectId(place.realmId, place.nodeId, place.bucket, key, versionId)
+  const entries: TesDataRefEntry[] = files.map((file) => ({ kind: 'file', url: pinned(file.key, file.versionId), path: `${mount}${file.name}`, name: file.name }))
+  for (const folder of folders) {
+    if (place.local) {
+      entries.push({ kind: 'folder', bucket: place.bucket, prefix: folder.prefix, name: folder.name, basePath: `${mount}${folder.name}/`, files: [], directory: true })
+      continue
+    }
+    for (const file of folder.files ?? []) {
+      const relative = file.key.slice(folder.prefix.length)
+      entries.push({ kind: 'file', url: pinned(file.key, file.versionId), path: `${mount}${folder.name}/${relative}`, name: `${folder.name}/${relative}` })
+    }
+  }
+  return entries
+}
+
+// Expands one picker entry into its TES inputs: a file, a DIRECTORY, or one FILE per listed file.
 export function expandDataRefEntry(entry: TesDataRefEntry): TesInput[] {
   if (entry.kind === 'file') {
     return [{ name: entry.name, url: entry.url, path: entry.path.trim(), type: 'FILE' }]
   }
   const base = normalizeContainerDir(entry.basePath)
+  if (entry.directory) return [{ name: entry.name, url: `s3://${entry.bucket}/${entry.prefix}`, path: base.replace(/\/$/, ''), type: 'DIRECTORY' }]
   return entry.files.map((file) => ({
     name: `${entry.name}/${file.name}`,
     url: `s3://${entry.bucket}/${file.key}`,

@@ -18,6 +18,8 @@ import {
   getDataLinks as requestDataLinks,
   getBucketDistribution as requestDistribution,
   getBucketUsage as requestBucketUsage,
+  listBucketObjects as requestObjects,
+  type ObjectListResponse,
   retryAdmission as requestRetry,
   type AdmissionResponse,
   type ChangeResponse,
@@ -80,6 +82,16 @@ export async function getBucketRouting(bucket: string, nodeId?: string | null): 
 /** What the serving node counts in one bucket; 404 means the node lacks the route. */
 export function getBucketUsage(bucket: string, nodeId?: string | null): Promise<BucketUsageResponse> {
   return requestBucketUsage(bucket, nodeClient(nodeId))
+}
+
+/** One page of a bucket's current objects with their versions, listed by the bucket's node. */
+export function listBucketObjects(
+  bucket: string,
+  query: { prefix?: string; delimiter?: string; cursor?: string; limit?: number },
+  nodeId?: string | null,
+  signal?: AbortSignal,
+): Promise<ObjectListResponse> {
+  return requestObjects(bucket, query, nodeClient(nodeId), signal)
 }
 
 /** What deleting a whole bucket removes; a bucket stored on more nodes also lists the datasets that link it. */

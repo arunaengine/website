@@ -1053,12 +1053,12 @@ function createStore(deps: CustomRunDeps) {
       const dataRefs = (source.inputs ?? []).filter(
         (input) => input !== match?.scriptInput && input.path !== dependencyConfigPath.value,
       )
-      inputs.value = dataRefs.map((input) => ({
-        kind: 'file',
-        url: input.url ?? '',
-        path: input.path,
-        name: input.name || input.path.split('/').filter(Boolean).pop() || 'input',
-      }))
+      inputs.value = dataRefs.map((input): TesDataRefEntry => {
+        const name = input.name || input.path.split('/').filter(Boolean).pop() || 'input'
+        const folder = input.type === 'DIRECTORY' ? parseS3Url(input.url ?? '') : null
+        if (folder) return { kind: 'folder', bucket: folder.bucket, prefix: folder.key, name, basePath: `${input.path.replace(/\/$/, '')}/`, files: [], directory: true }
+        return { kind: 'file', url: input.url ?? '', path: input.path, name }
+      })
       if (dataRefs.some((input) => input.name?.includes('/'))) {
         notes.push('Folder selections were restored as individual file inputs.')
       }
