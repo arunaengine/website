@@ -63,3 +63,18 @@ describe('answers to an asked input', () => {
     expect(entry).toMatchObject({ basePath: '/db/' })
   })
 })
+
+describe('answers with several folders', () => {
+  it('keeps the folder names so equal file names stay apart', () => {
+    const files = pickedEntries({ realmId: 'realm', nodeId: 'node-b', bucket: 'db', local: false }, [], [
+      { prefix: 'a/first/', name: 'first', files: [{ key: 'a/first/x.tsv', versionId: V1 }] },
+      { prefix: 'a/second/', name: 'second', files: [{ key: 'a/second/x.tsv', versionId: V2 }] },
+    ], '/data/')
+    expect(answerEntries('/db', files).map((entry) => (entry.kind === 'file' ? entry.path : ''))).toEqual(['/db/first/x.tsv', '/db/second/x.tsv'])
+    const folders = answerEntries('/db', [
+      { kind: 'folder', bucket: 'db', prefix: 'first/', name: 'first', basePath: '/data/first/', files: [], directory: true },
+      { kind: 'folder', bucket: 'db', prefix: 'second/', name: 'second', basePath: '/data/second/', files: [], directory: true },
+    ])
+    expect(folders.map((entry) => (entry.kind === 'folder' ? entry.basePath : ''))).toEqual(['/db/first/', '/db/second/'])
+  })
+})

@@ -452,10 +452,13 @@ export const atOrBelow = (entry: TesDataRefEntry, path: string) => entryPath(ent
  */
 export function answerEntries(path: string, entries: readonly TesDataRefEntry[]): TesDataRefEntry[] {
   if (entries.length === 1 && entries[0].kind === 'file' && !entries[0].name.includes('/')) return [{ ...entries[0], path }]
+  // Files of a folder are named `<folder>/<relative>`. One folder becomes the asked path; several
+  // keep their names below it, so their files stay apart.
+  const roots = new Set(entries.map((entry) => (entry.kind === 'folder' ? entry.name : entry.name.split('/')[0])))
+  const one = roots.size === 1
   return entries.map((entry) => {
-    if (entry.kind === 'folder') return { ...entry, basePath: `${path}/` }
-    // Files of a folder are named `<folder>/<relative>`; the folder itself is the asked path.
-    const relative = entry.name.includes('/') ? entry.name.slice(entry.name.indexOf('/') + 1) : entry.name
+    if (entry.kind === 'folder') return { ...entry, basePath: one ? `${path}/` : `${path}/${entry.name}/` }
+    const relative = one && entry.name.includes('/') ? entry.name.slice(entry.name.indexOf('/') + 1) : entry.name
     return { ...entry, path: `${path}/${relative}` }
   })
 }
