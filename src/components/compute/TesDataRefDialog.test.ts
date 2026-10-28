@@ -6,6 +6,7 @@ import { button, click, compileClientComponent, content, element, flush, mountAp
 
 const Passthrough = defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h('div', attrs, slots.default?.()) })
 const Empty = defineComponent(() => () => null)
+const s3State = { endpoint: ref<string | null>('https://s3.test'), hasActiveKey: ref(true), ensureSession: async () => {} }
 const V1 = '01K8W1B3D5F7H9KMQ1S3V5X7Z1'
 const V2 = '01K8W1B3D5F7H9KMQ1S3V5X7Z2'
 const listBucketObjects = vi.fn(async () => ({ bucket: 'far-db', objects: [{ key: 'db/6.0/y.tsv', version_id: V2 }], prefixes: [] }))
@@ -46,7 +47,7 @@ const component = compileClientComponent(new URL('./TesDataRefDialog.vue', impor
       h('button', { onClick: () => emit('choose', 'spire', 'n1', 'g3') }, 'Local database'),
     ]),
   })),
-  '@/composables/useS3': { useS3: () => ({ endpoint: ref('https://s3.test'), hasActiveKey: ref(true), ensureSession: async () => {} }) },
+  '@/composables/useS3': { useS3: () => s3State },
   '@/composables/useAruna': { useAruna: () => ({ currentUser: ref(null), myGroups: ref([]), nodeInfo: ref({ node: { realm_id: 'realm' } }), listBucketObjects }) },
   '@/composables/useGroupSelection': { activeGroupId: ref('') },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'n1' }) },
@@ -81,5 +82,20 @@ describe('TES input picker databases', () => {
     await click(button(root, 'pick spire n1'))
     await flush()
     expect(added[1]).toEqual({ kind: 'folder', bucket: 'spire', prefix: 'db/6.0/', name: '6.0', basePath: '/inputs/6.0/', files: [], directory: true })
+  })
+
+  it('offers databases without an S3 session, which only my buckets need', async () => {
+    s3State.endpoint.value = null
+    s3State.hasActiveKey.value = false
+    const { root } = await mountApp(component, { props: { open: true, mode: 'input' } })
+    expect(content(root)).toContain('does not advertise an S3 endpoint')
+    ;(element(root, (node) => node.props.role === 'radiogroup').props['onUpdate:modelValue'] as (value: string) => void)('databases')
+    await flush()
+
+    expect(content(root)).not.toContain('does not advertise an S3 endpoint')
+    await click(button(root, 'Far database'))
+    expect(content(root)).toContain('pick far-db n2')
+    s3State.endpoint.value = 'https://s3.test'
+    s3State.hasActiveKey.value = true
   })
 })

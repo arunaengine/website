@@ -220,55 +220,56 @@ watch(
         </DialogDescription>
       </DialogHeader>
 
-      <Notice v-if="!s3.endpoint.value" tone="warning" class="flex items-start gap-2">
-        <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        <span>This node does not advertise an S3 endpoint, so its data cannot be browsed or referenced here.</span>
-      </Notice>
-      <div v-else-if="!s3.hasActiveKey.value" class="space-y-2 rounded-md border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
-        <p class="flex items-center gap-2 font-medium text-foreground"><KeyRound class="h-3.5 w-3.5" /> S3 credentials are required to browse node data.</p>
-        <Button v-if="currentUser" variant="outline" size="sm" @click="credentialDialogOpen = true">
-          <Plus class="size-3.5" /> Create credentials
-        </Button>
-        <p v-else class="flex items-center gap-2"><LogIn class="h-3.5 w-3.5" /> Sign in first to create credentials.</p>
+      <div v-if="!destination" data-tutorial="input-mount" class="max-w-sm">
+        <label class="text-xs font-medium text-foreground">Mount under</label>
+        <Input
+          v-model="mountDir"
+          class="mt-1 h-8 font-mono text-xs"
+          placeholder="/work/in/"
+          aria-label="Container mount directory"
+          :invalid="!mountDirValid ? 'error' : undefined"
+        />
+        <p v-if="!mountDirValid" class="mt-1 text-[11px] text-destructive">
+          Use an absolute directory path such as /work/in/.
+        </p>
+        <p v-else class="mt-1 text-[11px] text-muted-foreground">
+          Selected files are staged below this container directory; folders keep their name as a subdirectory.
+        </p>
       </div>
-      <template v-else>
-        <div v-if="!destination" data-tutorial="input-mount" class="max-w-sm">
-          <label class="text-xs font-medium text-foreground">Mount under</label>
-          <Input
-            v-model="mountDir"
-            class="mt-1 h-8 font-mono text-xs"
-            placeholder="/work/in/"
-            aria-label="Container mount directory"
-            :invalid="!mountDirValid ? 'error' : undefined"
-          />
-          <p v-if="!mountDirValid" class="mt-1 text-[11px] text-destructive">
-            Use an absolute directory path such as /work/in/.
-          </p>
-          <p v-else class="mt-1 text-[11px] text-muted-foreground">
-            Selected files are staged below this container directory; folders keep their name as a subdirectory.
-          </p>
+      <OptionToggle :model-value="source" :options="SOURCES" aria-label="Inputs from" @update:model-value="(value: string) => showSource(value as Source)" />
+      <!-- Only the own buckets are browsed through an S3 session; the others use the REST listing. -->
+      <template v-if="source === 'buckets'">
+        <Notice v-if="!s3.endpoint.value" tone="warning" class="flex items-start gap-2">
+          <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>This node does not advertise an S3 endpoint, so its data cannot be browsed or referenced here.</span>
+        </Notice>
+        <div v-else-if="!s3.hasActiveKey.value" class="space-y-2 rounded-md border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
+          <p class="flex items-center gap-2 font-medium text-foreground"><KeyRound class="h-3.5 w-3.5" /> S3 credentials are required to browse node data.</p>
+          <Button v-if="currentUser" variant="outline" size="sm" @click="credentialDialogOpen = true">
+            <Plus class="size-3.5" /> Create credentials
+          </Button>
+          <p v-else class="flex items-center gap-2"><LogIn class="h-3.5 w-3.5" /> Sign in first to create credentials.</p>
         </div>
-        <OptionToggle :model-value="source" :options="SOURCES" aria-label="Inputs from" @update:model-value="(value: string) => showSource(value as Source)" />
-        <ObjectBrowserPanel v-if="source === 'buckets'" selectable @add="addSelection" @selection-change="pendingSelection = $event" />
-        <template v-else-if="database">
-          <div class="flex items-center gap-2 text-xs">
-            <span class="min-w-0 flex-1 truncate font-mono text-foreground">{{ database.bucket }}</span>
-            <Button variant="ghost" size="sm" @click="showSource(source)">Choose another bucket</Button>
-          </div>
-          <RemoteObjectPicker :bucket="database.bucket" :node-id="database.nodeId" :busy="folderBusy" @add="addRemote" />
-        </template>
-        <DatabasesTab v-else-if="source === 'databases'" bucket="" @choose="chooseDatabase" />
-        <BucketSearchBox v-else mode="picker" placeholder="Find a bucket you may read…" @select="chooseBucket" />
-        <div v-if="previewPaths.length" class="rounded-md border border-border bg-muted/20 px-3 py-2">
-          <p class="text-[11px] font-medium text-foreground">Will be staged as</p>
-          <ul class="mt-1 space-y-0.5 font-mono text-[11px] text-muted-foreground">
-            <li v-for="line in previewPaths.slice(0, PREVIEW_LIMIT)" :key="line" class="truncate" :title="line">{{ line }}</li>
-            <li v-if="previewPaths.length > PREVIEW_LIMIT" class="font-sans">and {{ previewPaths.length - PREVIEW_LIMIT }} more</li>
-          </ul>
-        </div>
-        <p v-if="folderBusy" class="mt-2 text-[11px] text-muted-foreground">Expanding selected folders…</p>
-        <p v-if="folderError" class="mt-2 text-[11px] text-destructive">{{ folderError }}</p>
+        <ObjectBrowserPanel v-else selectable @add="addSelection" @selection-change="pendingSelection = $event" />
       </template>
+      <template v-else-if="database">
+        <div class="flex items-center gap-2 text-xs">
+          <span class="min-w-0 flex-1 truncate font-mono text-foreground">{{ database.bucket }}</span>
+          <Button variant="ghost" size="sm" @click="showSource(source)">Choose another bucket</Button>
+        </div>
+        <RemoteObjectPicker :bucket="database.bucket" :node-id="database.nodeId" :busy="folderBusy" @add="addRemote" />
+      </template>
+      <DatabasesTab v-else-if="source === 'databases'" bucket="" @choose="chooseDatabase" />
+      <BucketSearchBox v-else mode="picker" placeholder="Find a bucket you may read…" @select="chooseBucket" />
+      <div v-if="previewPaths.length" class="rounded-md border border-border bg-muted/20 px-3 py-2">
+        <p class="text-[11px] font-medium text-foreground">Will be staged as</p>
+        <ul class="mt-1 space-y-0.5 font-mono text-[11px] text-muted-foreground">
+          <li v-for="line in previewPaths.slice(0, PREVIEW_LIMIT)" :key="line" class="truncate" :title="line">{{ line }}</li>
+          <li v-if="previewPaths.length > PREVIEW_LIMIT" class="font-sans">and {{ previewPaths.length - PREVIEW_LIMIT }} more</li>
+        </ul>
+      </div>
+      <p v-if="folderBusy" class="mt-2 text-[11px] text-muted-foreground">Expanding selected folders…</p>
+      <p v-if="folderError" class="mt-2 text-[11px] text-destructive">{{ folderError }}</p>
 
       <p class="text-[11px] text-muted-foreground">
         External sources (S3, HTTP, WebDAV, FTP) are referenced into a bucket first: in the
