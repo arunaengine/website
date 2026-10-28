@@ -154,6 +154,13 @@ export interface SyncedFolder {
   last_error_at_ms?: number | null
 }
 
+/** Linked folders that can take a run's results: they bring files down, and their bucket is on
+ * the node the run writes to and in the run's group. */
+export function resultFolders(folders: readonly SyncedFolder[], groupId: string, isRunNode: (nodeId: string) => boolean): SyncedFolder[] {
+  return folders.filter((folder) =>
+    folder.mode !== 'upload_only' && folder.state === 'active' && isRunNode(folder.remote.node_id) && folder.group_id === groupId)
+}
+
 /** How a bound folder is named to its owner: the last segment of its root. */
 export function folderName(root: string): string {
   const parts = root.split(/[\\/]/).filter(Boolean)

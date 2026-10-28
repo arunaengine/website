@@ -14,6 +14,7 @@ import {
   readDraft,
   readEntry,
   readFolder,
+  resultFolders,
   readTransfer,
   previewDeviceDraft,
   requireDevice,
@@ -337,5 +338,15 @@ describe('sync dataset mapping', () => {
     expect(status.datasets[0]?.lastError).toBe('retrying')
     expect(status.datasets[1]?.state).toBe('deleting')
     request.mockRestore()
+  })
+})
+
+describe('folders that can take run results', () => {
+  const folder = (id: string, node: string, group: string, mode = 'two_way') =>
+    readFolder({ folder_id: id, root: `/home/u/${id}`, local_bucket: 'l', group_id: group, remote: { node_id: node, bucket: 'genomes', prefix: '' }, mode, state: 'active' })
+
+  it('offers only folders on the run node and in the run group that bring files down', () => {
+    const folders = [folder('a', 'n1', 'g1'), folder('b', 'n2', 'g1'), folder('c', 'n1', 'g2'), folder('d', 'n1', 'g1', 'upload_only')]
+    expect(resultFolders(folders, 'g1', (node) => node === 'n1').map((item) => item.folder_id)).toEqual(['a'])
   })
 })

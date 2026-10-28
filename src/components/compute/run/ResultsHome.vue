@@ -1,10 +1,13 @@
 <script setup lang="ts">
 // On the desktop, a linked folder that brings files down can take the run's results: they are
-// written to the folder's bucket and come back to this computer with the next sync.
+// written to the folder's bucket and come back to this computer with the next sync. Outputs go
+// to the node that accepts the run, so only folders of that node and the run's group qualify.
 import { computed, onMounted } from 'vue'
 import Button from '@/components/ui/Button.vue'
+import { injectCustomRun } from '@/composables/useCustomRun'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
-import { folderName, type SyncedFolder } from '@/lib/deviceApi'
+import { folderName, resultFolders, type SyncedFolder } from '@/lib/deviceApi'
 import { isDesktop } from '@/lib/desktop'
 import { Laptop } from '@lucide/vue'
 
@@ -13,12 +16,16 @@ const emit = defineEmits<{ choose: [bucket: string, prefix: string] }>()
 
 const desktop = isDesktop()
 const synced = useSyncedFolders()
+const { groupId, runTarget } = injectCustomRun()
+const { isLocalNode } = useRealmNodes()
 onMounted(() => {
   if (desktop) void synced.ensureLoaded()
 })
 
 const homes = computed<SyncedFolder[]>(() =>
-  desktop ? synced.folders.value.filter((folder) => folder.mode !== 'upload_only' && folder.state === 'active') : [],
+  desktop && !runTarget.local.value
+    ? resultFolders(synced.folders.value, groupId.value, isLocalNode)
+    : [],
 )
 </script>
 
