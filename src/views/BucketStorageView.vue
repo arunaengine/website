@@ -27,7 +27,7 @@ import DistributionOverview from '@/components/storage/DistributionOverview.vue'
 import SetDeleteSection from '@/components/storage/SetDeleteSection.vue'
 import BucketSources from '@/components/storage/BucketSources.vue'
 import LinkedDatasets from '@/components/data/LinkedDatasets.vue'
-import DatabaseSettings from '@/components/storage/DatabaseSettings.vue'
+import BucketMetadataSection from '@/components/storage/BucketMetadataSection.vue'
 import CopiesOfBucket from '@/components/storage/CopiesOfBucket.vue'
 import FileSources from '@/components/storage/FileSources.vue'
 import StorageOverviewTab from '@/components/storage/StorageOverviewTab.vue'
@@ -79,10 +79,6 @@ const example = computed(() => (mockEnabled() ? mockBucket(bucket.value) : undef
 const distribution = useBucketDistribution(bucket, nodeId)
 const live = computed(() => (example.value ? null : distribution.view.value))
 const nodes = computed(() => example.value ?? live.value ?? undefined)
-// The set of the bucket for a mark: null for an ordinary bucket, undefined while it is not known.
-const setId = computed(() =>
-  live.value?.live?.setId ?? (distribution.state.value === 'ordinary' ? null : undefined),
-)
 const nodesTab = computed(() => Boolean(nodes.value && isMulti(nodes.value)))
 // Who keeps the bucket's sources and imports: every member of a distributed bucket, else its node.
 const ownerNodes = computed<(string | null)[] | null>(() => {
@@ -176,15 +172,7 @@ const browserLink = computed(() => ({
         <FileSources v-if="example" :bucket="bucket" />
         <BucketSources v-else :bucket="bucket" :nodes="ownerNodes" :group-id="groupId" />
         <LinkedDatasets v-if="!example" heading="Linked by datasets" card :target="{ bucket, key: '', folder: true, node: nodeId }" />
-        <DatabaseSettings
-          v-if="!example"
-          :bucket="bucket"
-          :node-id="nodeId"
-          :set-id="setId"
-          :group-id="groupId"
-          :group-name="group?.display_name ?? null"
-          :can-admin="canAdminGroup"
-        />
+        <BucketMetadataSection v-if="!example" :bucket="bucket" :node-id="nodeId" :can-admin="canAdminGroup" />
         <Notice v-if="!example && distribution.error.value" tone="error">
           How this bucket is stored could not be read: {{ distribution.error.value }}
         </Notice>

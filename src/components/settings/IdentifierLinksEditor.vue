@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// The identifier links of one database. Try and Save use the server's regex engine, so what the
-// editor shows is what file details will show.
+// The identifier rules of one bucket. Try uses the server's regex engine, so what the editor shows
+// is what file details will show. Save hands the rules to the bucket metadata, which stores them.
 import { computed, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
@@ -9,15 +9,14 @@ import { useAruna } from '@/composables/useAruna'
 import { apiErrorMessage, type FoundIdentifier, type IdentifierParser, type IdentifierRule } from '@/lib/api'
 import { emptyRule, parserOf, PRESETS, ruleProblem, withPreset } from '@/lib/identifierLinks'
 
-const props = defineProps<{ entryId: string; parser: IdentifierParser | null }>()
-const emit = defineEmits<{ saved: []; close: [] }>()
+const props = defineProps<{ parser: IdentifierParser | null; busy?: boolean }>()
+const emit = defineEmits<{ save: [parser: IdentifierParser | null]; close: [] }>()
 
-const { setDatabaseParser, testDatabaseParser } = useAruna()
+const { testIdentifierRules } = useAruna()
 const rules = ref<IdentifierRule[]>((props.parser?.rules ?? []).map((rule) => ({ ...rule })))
 const sample = ref('')
 const found = ref<FoundIdentifier[] | null>(null)
 const failure = ref<string | null>(null)
-const busy = ref(false)
 
 const problems = computed(() =>
   rules.value.flatMap((rule, index) => {
@@ -39,25 +38,16 @@ async function tryIt() {
   failure.value = null
   const url = /^https?:\/\//.test(sample.value)
   try {
-    found.value = await testDatabaseParser({ parser, key: url ? '' : sample.value, source_url: url ? sample.value : null })
+    found.value = await testIdentifierRules({ parser, key: url ? '' : sample.value, source_url: url ? sample.value : null })
   } catch (cause) {
     found.value = null
     failure.value = apiErrorMessage(cause)
   }
 }
 
-async function save(clear = false) {
+function save(clear = false) {
   if (!clear && problems.value.length) return
-  busy.value = true
-  failure.value = null
-  try {
-    await setDatabaseParser(props.entryId, clear ? null : parserOf(rules.value))
-    emit('saved')
-  } catch (cause) {
-    failure.value = apiErrorMessage(cause)
-  } finally {
-    busy.value = false
-  }
+  emit('save', clear ? null : parserOf(rules.value))
 }
 </script>
 
@@ -66,7 +56,7 @@ async function save(clear = false) {
     <div>
       <h3 class="text-sm font-medium text-foreground">Identifier links</h3>
       <p class="text-xs text-muted-foreground">
-        Turn file names into links to public records, for example BioSample pages. Files of this database show the link,
+        Turn file names into links to public records, for example BioSample pages. Files of this bucket show the link,
         and datasets get it as an identifier.
       </p>
     </div>

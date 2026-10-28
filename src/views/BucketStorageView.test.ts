@@ -82,7 +82,7 @@ const view = compileClientComponent(new URL('./BucketStorageView.vue', import.me
   '@/components/storage/DistributionOverview.vue': moduleDefault(Marker('stored on')),
   '@/components/storage/BucketSources.vue': moduleDefault(Marker('sources of files')),
   '@/components/storage/SetDeleteSection.vue': moduleDefault(Marker('deleting a bucket on more nodes')),
-  '@/components/storage/DatabaseSettings.vue': moduleDefault(Marker('database settings')),
+  '@/components/storage/BucketMetadataSection.vue': moduleDefault(Marker('bucket metadata')),
   '@/components/data/LinkedDatasets.vue': moduleDefault(Marker('datasets that link this bucket')),
   '@/components/distributed/GrantGuide.vue': moduleDefault(Marker('grant on every node')),
   '@/components/storage/BucketNodesTab.vue': moduleDefault(Marker('nodes of the bucket')),
@@ -244,7 +244,7 @@ describe('bucket storage page', () => {
   })
 
   it('shows the database section on the overview', async () => {
-    expect(content(await render())).toContain('database settings')
+    expect(content(await render())).toContain('bucket metadata')
   })
 
   it('keeps an ordinary bucket without the nodes tab', async () => {
