@@ -42,8 +42,11 @@ watch(() => [props.bucket, props.nodeId, sessionEpoch.value], () => {
 
 const query = computed(() => searchQuery(searchTerms(typed.value).words, chips.value))
 
-// Each `column=value` typed so far becomes a chip; the words stay in the box.
+// Each `column=value` typed so far becomes a chip; the words stay in the box. A value whose quote
+// is still open waits, so a space inside it does not cut it.
+const quoteOpen = () => (typed.value.match(/"/g)?.length ?? 0) % 2 === 1
 function takeChips() {
+  if (quoteOpen()) return
   const terms = searchTerms(typed.value)
   if (!terms.exact.length) return
   chips.value = [...chips.value, ...terms.exact]
@@ -51,6 +54,7 @@ function takeChips() {
 }
 
 async function search(more = false) {
+  if (quoteOpen()) typed.value += '"'
   takeChips()
   if (query.value.trim().length < 2) return
   const run = ++runs

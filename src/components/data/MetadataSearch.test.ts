@@ -51,4 +51,22 @@ describe('bucket metadata search', () => {
     expect(content(root)).not.toContain('GCF_')
     expect(content(root)).not.toContain('Show more')
   })
+
+  it('keeps a quoted value with a space whole', async () => {
+    searchObjects.mockClear()
+    const { root } = await mountApp(component, { props: { bucket: 'ncbi', nodeId: null } })
+    const input = () => element(root, (node) => node.tag === 'input')
+    ;(input().props['onUpdate:modelValue'] as (value: string) => void)('assembly_level="Complete')
+    await flush()
+    ;(input().props.onKeydown as (event: KeyboardEvent) => void)({ key: ' ' } as KeyboardEvent)
+    await flush()
+    expect(content(root)).not.toContain('assembly_level =')
+
+    ;(input().props['onUpdate:modelValue'] as (value: string) => void)('assembly_level="Complete Genome"')
+    await flush()
+    ;(element(root, (node) => node.tag === 'form').props.onSubmit as (event: Event) => void)({ preventDefault: () => {} } as Event)
+    await flush()
+    expect(content(root)).toContain('assembly_level = Complete Genome')
+    expect(searchObjects).toHaveBeenLastCalledWith('assembly_level="Complete Genome"', expect.objectContaining({ match: 'metadata' }))
+  })
 })
