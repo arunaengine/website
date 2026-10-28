@@ -80,6 +80,7 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   '@/components/data/LinkedDatasets.vue': moduleDefault(Marker('datasets that link this')),
   '@/components/data/FilePartOf.vue': moduleDefault(Marker('datasets this file is part of')),
   '@/components/data/FileOrigin.vue': moduleDefault(Marker('origin of this version')),
+  '@/components/data/ObjectMetadata.vue': moduleDefault(compileClientComponent(new URL('./ObjectMetadata.vue', import.meta.url), { vue: VueRuntime })),
   '@/lib/distributedMock': { mockEnabled: () => false },
   '@/lib/distributedMockData': { mockFile: () => undefined },
   '@/components/data/ObjectLocationsPanel.vue': moduleDefault(Marker('copies of this version')),
@@ -358,10 +359,12 @@ describe('file details public access', () => {
 })
 
 describe('folder details', () => {
-  it('shows only the general details of a folder', async () => {
+  it('shows only the general details of a folder and the metadata of its marker', async () => {
     headObject.mockClear()
     loadReferences.mockClear()
+    headObject.mockResolvedValueOnce({ metadata: { taxid: '511145', 'aruna-search-text': 'organism_name' } })
     const { root } = await mount('general', { objectKey: 'raw/', name: 'raw/', folder: true })
+    await flush()
 
     expect(content(root)).toContain('Folder')
     expect(content(root)).toContain('raw/')
@@ -370,7 +373,10 @@ describe('folder details', () => {
     expect(content(root)).not.toContain('Current version')
     expect(content(root)).not.toContain('referencing datasets')
     expect(content(root)).toContain('Access…')
-    expect(headObject).not.toHaveBeenCalled()
+    expect(headObject).toHaveBeenCalledWith(expect.any(String), 'raw/', null)
+    expect(content(root)).toContain('taxid')
+    expect(content(root)).toContain('511145')
+    expect(content(root)).not.toContain('aruna-search-text')
     expect(loadReferences).not.toHaveBeenCalled()
   })
 })

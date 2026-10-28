@@ -17,6 +17,7 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import MockFileGeneral from '@/components/data/MockFileGeneral.vue'
 import MockFileStorage from '@/components/data/MockFileStorage.vue'
 import FileOrigin from '@/components/data/FileOrigin.vue'
+import ObjectMetadata from '@/components/data/ObjectMetadata.vue'
 import FilePartOf from '@/components/data/FilePartOf.vue'
 import LinkedDatasets from '@/components/data/LinkedDatasets.vue'
 import ObjectLocationsPanel from '@/components/data/ObjectLocationsPanel.vue'
@@ -96,7 +97,7 @@ const { currentUser, apiBaseUrl, authToken, nodeInfo, getFileOrigin } = useAruna
 const { shown } = usePortalFeatures()
 const { displayName: nodeName } = useRealmNodes()
 const { leave } = useAssistantObject()
-const head = ref<{ contentType?: string; versionId?: string } | null>(null)
+const head = ref<{ contentType?: string; versionId?: string; metadata?: Record<string, string> } | null>(null)
 const headError = ref<string | null>(null)
 const headBusy = ref(false)
 // A version chosen in the Versions tab; the Preview and Storage tabs follow it.
@@ -119,14 +120,22 @@ const notebookLink = computed(() => !remote.value && !pinnedVersion.value && pro
   : null)
 
 async function loadHead() {
-  if (!props.objectKey || remote.value || props.folder || mock.value) return
+  if (!props.objectKey || remote.value || mock.value) return
+  // A folder may have a marker object that carries metadata, such as a folder row of a list import.
+  if (props.folder) {
+    const seq = ++headSeq
+    const marker = props.objectKey.endsWith('/') ? props.objectKey : `${props.objectKey}/`
+    const response = await s3.headObject(props.bucket, marker, props.nodeId ?? null).catch(() => null)
+    if (seq === headSeq) head.value = response ? { metadata: response.metadata } : null
+    return
+  }
   const seq = ++headSeq
   headBusy.value = true
   headError.value = null
   try {
     const response = await s3.headObject(props.bucket, props.objectKey, props.nodeId ?? null)
     if (seq !== headSeq) return
-    head.value = { contentType: response.contentType, versionId: response.versionId }
+    head.value = { contentType: response.contentType, versionId: response.versionId, metadata: response.metadata }
   } catch (err) {
     if (seq !== headSeq) return
     head.value = null
@@ -428,6 +437,7 @@ const details = computed(() => props.folder ? [
             </li>
           </ul>
         </div>
+        <ObjectMetadata v-if="head?.metadata" class="mt-4" :metadata="head.metadata" />
         <FileOrigin
           v-if="props.open && !mock && !remote && !props.folder"
           class="mt-4"
