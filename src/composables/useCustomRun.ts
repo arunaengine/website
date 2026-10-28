@@ -23,6 +23,7 @@ import {
   parseS3Url,
   answerEntries,
   nativeInput,
+  badReference,
   atOrBelow,
   resultsKey,
   tesPlacementTags,
@@ -966,6 +967,9 @@ function createStore(deps: CustomRunDeps) {
     }
     if (!inputsValid.value) {
       list.push({ section: 'section-data', field: 'run-tree', text: 'An input path is not valid' })
+    }
+    for (const input of dataInputs.value.filter(badReference)) {
+      list.push({ section: 'section-data', field: 'run-tree', text: `The input ${input.path} names a version that cannot be read` })
     }
     if (!cpuCoresValid.value) {
       list.push({ section: 'section-resources', field: 'run-cpu', text: 'CPU cores: a whole number of 1 or more' })

@@ -467,9 +467,18 @@ export function answerEntries(path: string, entries: readonly TesDataRefEntry[])
 export function nativeInput(input: TesInput): TesInput {
   const arn = /^arn:aruna:[^:]+:([^:]+):s3\/([^/]+)\/(.+)@([0-9A-HJKMNP-TV-Z]{26})$/.exec(input.url ?? '')
   if (!arn) return input
-  const key = arn[3].split('/').map(decodeURIComponent).join('/')
+  let key: string
+  try {
+    key = arn[3].split('/').map(decodeURIComponent).join('/')
+  } catch {
+    // A key with broken escaping stays as given; `badReference` names it for the form.
+    return input
+  }
   return { ...input, url: `s3://${arn[2]}/${key}`, source_node_id: arn[1], version_id: arn[4] }
 }
+
+/** An Aruna ARN input whose node, bucket, key or version cannot be read. */
+export const badReference = (input: TesInput) => Boolean(input.url?.startsWith('arn:aruna:')) && nativeInput(input) === input
 
 // Expands one picker entry into its TES inputs: a file, a DIRECTORY, or one FILE per listed file.
 export function expandDataRefEntry(entry: TesDataRefEntry): TesInput[] {

@@ -617,6 +617,26 @@ describe('run page', () => {
     mounted.app.unmount()
   })
 
+  it('names a version reference with broken escaping instead of failing to render', async () => {
+    createTask.mockClear()
+    useSavedRuns().save({
+      id: 'r5', name: 'Broken', savedAt: '2026-10-28T10:00:00Z',
+      task: { name: 'Broken', executors: [{ image: 'alpine:3.20', command: ['cat', '/in/a'] }], inputs: [{ name: 'a', path: '/in/a', url: 'arn:aruna:realm:node-b:s3/db/%ZZ@01K8W1B3D5F7H9KMQ1S3V5X7Z1', type: 'FILE' }] },
+      ask: { inputs: [], results: false },
+    })
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?saved=r5')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    expect(content(mounted.root)).toContain('The input /in/a names a version that cannot be read')
+    await click(runButton(mounted.root))
+    await flush()
+    expect(createTask).not.toHaveBeenCalled()
+    expect(mounted.errors).toEqual([])
+    useSavedRuns().remove('r5')
+    mounted.app.unmount()
+  })
+
   it('carries a placement constraint into the task tags', async () => {
     const mounted = await mount(ComputeSubmitView, '/app/compute/new')
     await fillValidRun(mounted.root)

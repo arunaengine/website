@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { answerEntries, expandDataRefEntry, nativeInput, pickedEntries, resultsKey } from './tes'
+import { answerEntries, badReference, expandDataRefEntry, nativeInput, pickedEntries, resultsKey } from './tes'
 
 const V1 = '01K8W1B3D5F7H9KMQ1S3V5X7Z1'
 const V2 = '01K8W1B3D5F7H9KMQ1S3V5X7Z2'
@@ -76,5 +76,15 @@ describe('answers with several folders', () => {
       { kind: 'folder', bucket: 'db', prefix: 'second/', name: 'second', basePath: '/data/second/', files: [], directory: true },
     ])
     expect(folders.map((entry) => (entry.kind === 'folder' ? entry.basePath : ''))).toEqual(['/db/first/', '/db/second/'])
+  })
+})
+
+describe('broken version references', () => {
+  it('reads a key with broken escaping as an invalid reference instead of throwing', () => {
+    const input = { path: '/in/a', url: `arn:aruna:realm:node-b:s3/db/x/%ZZ.fna@${V1}` }
+    expect(nativeInput(input)).toBe(input)
+    expect(badReference(input)).toBe(true)
+    expect(badReference({ path: '/in/b', url: `arn:aruna:realm:node-b:s3/db/x/ok.fna@${V1}` })).toBe(false)
+    expect(badReference({ path: '/in/c', url: 's3://lab/c' })).toBe(false)
   })
 })
