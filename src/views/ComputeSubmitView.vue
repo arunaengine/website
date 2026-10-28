@@ -20,6 +20,7 @@ import PlacementCard from '@/components/compute/run/PlacementCard.vue'
 import RunFooter from '@/components/compute/run/RunFooter.vue'
 import RequestDialog from '@/components/compute/run/RequestDialog.vue'
 import ScriptPickerDialog from '@/components/compute/run/ScriptPickerDialog.vue'
+import SaveRunDialog from '@/components/compute/SaveRunDialog.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useComputeDataView } from '@/composables/useComputeDataView'
@@ -85,6 +86,11 @@ provideRunFormBridge(createRunFormBridge(store))
 const resourcesCard = ref<InstanceType<typeof ResourcesCard> | null>(null)
 const placementCard = ref<InstanceType<typeof PlacementCard> | null>(null)
 const requestOpen = ref(false)
+const saveOpen = ref(false)
+// A new script is stored only when the run starts, so a saved run could not find it yet.
+const saveBlocked = computed(() =>
+  hasScript.value && !reuseSelectedScript.value ? 'The script is stored when the run starts. Start the run once, then save it from its details.' : null,
+)
 const submitting = ref(false)
 const submitError = ref<string | null>(null)
 
@@ -193,6 +199,7 @@ async function run() {
     <PageHeader eyebrow="Compute" title="New run" :docs="{ topic: 'compute-run', section: 'One page, six sections' }">
       <template #actions>
         <AskAiButton size="default" prompt="Help me set up this run." subject="the run form" />
+        <Button variant="outline" size="default" @click="saveOpen = true">Save as my run</Button>
         <Button variant="outline" size="default" as-child>
           <RouterLink :to="{ name: 'compute' }"><ArrowLeft class="h-4 w-4" /> Back to Compute</RouterLink>
         </Button>
@@ -238,5 +245,6 @@ async function run() {
     <TesDataRefDialog v-model:open="inputDialogOpen" mode="input" :mount-default="inputMountDefault" @add="addInputEntry" />
     <CreateCredentialDialog v-model:open="credentialDialogOpen" />
     <ScriptPickerDialog />
+    <SaveRunDialog v-model:open="saveOpen" :task="task" :blocked="saveBlocked" />
   </div>
 </template>

@@ -306,6 +306,7 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
   '@/components/compute/run/RunFooter.vue': part('../components/compute/run/RunFooter.vue'),
   '@/components/compute/run/RequestDialog.vue': moduleDefault(GenericStub),
   '@/components/compute/run/ScriptPickerDialog.vue': moduleDefault(GenericStub),
+  '@/components/compute/SaveRunDialog.vue': moduleDefault(GenericStub),
   '@/components/compute/TesDataRefDialog.vue': moduleDefault(GenericStub),
   '@/components/compute/RerunPrefillNote.vue': moduleDefault(GenericStub),
   '@/components/compute/ComputeGates.vue': moduleDefault(ComputeGates),

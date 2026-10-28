@@ -21,6 +21,7 @@ import JobKeyWait from '@/components/jobs/JobKeyWait.vue'
 import JobPlacementFigure from '@/components/jobs/JobPlacementFigure.vue'
 import RunLogDialog, { type LogStream } from '@/components/compute/RunLogDialog.vue'
 import TaskHeader from '@/components/compute/TaskHeader.vue'
+import SaveRunDialog from '@/components/compute/SaveRunDialog.vue'
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import ClaimWatchStep, { type WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
@@ -618,6 +619,7 @@ function rerun() {
   if (!task.value) return
   void router.push({ name: 'compute-new', query: { rerun: props.taskId } })
 }
+const saveOpen = ref(false)
 
 // ── Delete (finished runs; the node removes it for every client) ─────────────
 const confirmingDelete = ref(false)
@@ -875,6 +877,8 @@ async function confirmDelete() {
       <div class="space-y-2">
         <div class="flex flex-wrap items-center gap-2">
           <Button v-if="!active" variant="outline" size="sm" title="Starts a new run prefilled from this one" @click="rerun"><RotateCcw class="h-3.5 w-3.5" /> Run again</Button>
+          <Button v-if="!active" variant="outline" size="sm" @click="saveOpen = true">Save as my run</Button>
+          <SaveRunDialog v-model:open="saveOpen" :task="task" />
           <template v-if="canCancel">
             <template v-if="!confirmingCancel">
               <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="busy" @click="requestCancel"><Ban class="h-3.5 w-3.5" /> Cancel run</Button>
