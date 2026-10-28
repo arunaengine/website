@@ -87,11 +87,27 @@ function fileBox(graph: Graph, parent: string | null, id: string, asked: string,
   const metadata = origin.bucket_metadata
   if (metadata?.database) {
     const title = metadata.title || 'A database'
+    const unchecked = origin.releases_complete === false ? 'Release membership could not be checked everywhere.' : undefined
+    const releases = origin.releases ?? []
+    // A release that pins this exact version names it; one box per release file version.
+    for (const release of releases) {
+      const upstream = release.upstream[0]
+      const named = box(`release:${release.crate_version}`, 'database', 'Database release', `${title} ${release.label}`, {
+        detail: unchecked,
+        ...(upstream ? { link: { label: upstream.name === 'DOI' ? `doi:${upstream.value}` : upstream.value, url: upstream.url } } : {}),
+      })
+      add(graph, id, named)
+    }
+    if (releases.length) return addSource(graph, id, kind, origin)
     // One box per bucket; a file known only by a global id gets its own, never one by title.
-    const database = box(`database:${bucketOf(asked) ?? id}`, 'database', 'Bucket with database metadata', title)
+    const database = box(`database:${bucketOf(asked) ?? id}`, 'database', 'Bucket with database metadata', title, { detail: unchecked })
     if (metadata.dataset) database.link = { label: 'Open the dataset', document: metadata.dataset }
     add(graph, id, database)
   }
+  addSource(graph, id, kind, origin)
+}
+
+function addSource(graph: Graph, id: string, kind: string | undefined, origin: OriginResponse) {
   const url = kind === 'source' ? origin.source?.url : null
   if (url) {
     const title = (() => {

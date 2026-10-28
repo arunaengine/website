@@ -156,6 +156,23 @@ describe('provenance graph', () => {
     expect(bucketOf(DIGEST)).toBeNull()
   })
 
+  it('names the release that pins a version, or says membership could not be checked', () => {
+    const doi = { name: 'DOI', value: '10.5281/zenodo.4247252', url: 'https://doi.org/10.5281/zenodo.4247252' }
+    const pinned = emptyGraph()
+    startFile(pinned, arn('a', V1), 'a', origin({
+      bucket_metadata: { ...bakrep, title: 'Bakta database' },
+      releases: [{ crate_version: 'rv1', label: '6.0', upstream: [doi] }],
+      releases_complete: true,
+    }))
+    const release = pinned.boxes['release:rv1']
+    expect([release.role, release.title, release.link?.label, release.detail]).toEqual(['Database release', 'Bakta database 6.0', 'doi:10.5281/zenodo.4247252', undefined])
+    expect(pinned.boxes['database:node/lab']).toBeUndefined()
+
+    const unchecked = emptyGraph()
+    startFile(unchecked, arn('a', V1), 'a', origin({ bucket_metadata: bakrep, releases: [], releases_complete: false }))
+    expect(unchecked.boxes['database:node/lab'].detail).toBe('Release membership could not be checked everywhere.')
+  })
+
   it('drops an answer that comes back after the view moved on', async () => {
     let answer: (value: OriginResponse) => void = () => {}
     const read = readers({})
