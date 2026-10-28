@@ -1,6 +1,7 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import * as SavedRuns from '@/lib/savedRuns'
 import {
   button,
   click,
@@ -12,6 +13,7 @@ import {
 } from '@/test/clientRender'
 
 const push = vi.fn()
+const savedRuns = ref<SavedRuns.SavedRun[]>([])
 const Passthrough = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 const ButtonStub = defineComponent({
   inheritAttrs: false,
@@ -30,6 +32,11 @@ const NewRunMenu = compileClientComponent(new URL('./NewRunMenu.vue', import.met
   '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuContent.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuItem.vue': moduleDefault(ButtonStub),
+  '@/components/ui/DropdownMenuLabel.vue': moduleDefault(Passthrough),
+  '@/components/ui/DropdownMenuSeparator.vue': moduleDefault(Passthrough),
+  '@/components/compute/MyRunsDialog.vue': moduleDefault(Passthrough),
+  '@/composables/useSavedRuns': { useSavedRuns: () => ({ runs: savedRuns }) },
+  '@/lib/savedRuns': SavedRuns,
 })
 
 describe('new run menu', () => {
@@ -57,6 +64,21 @@ describe('new run menu', () => {
     await click(button(mounted.root, 'Blank run'))
     expect(push).toHaveBeenLastCalledWith({ name: 'compute-new' })
     expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('lists my runs first and starts one by its id', async () => {
+    savedRuns.value = [{
+      id: 'r1', name: 'Annotate a genome', savedAt: '2026-10-28T10:00:00Z',
+      task: { executors: [{ image: 'bakta', command: ['bakta'] }], inputs: [{ name: 'genome', path: '/data/genome.fna' }] },
+      ask: { inputs: ['/data/genome.fna'], results: true },
+    }]
+    const mounted = await mountApp(NewRunMenu)
+
+    expect(content(mounted.root)).toContain('Asks for: genome, results folder')
+    await click(button(mounted.root, 'Annotate a genome'))
+    expect(push).toHaveBeenLastCalledWith({ name: 'compute-new', query: { saved: 'r1' } })
+    savedRuns.value = []
     mounted.app.unmount()
   })
 })
