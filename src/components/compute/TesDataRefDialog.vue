@@ -16,13 +16,17 @@ import OptionToggle from '@/components/ui/OptionToggle.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import DatabasesTab from '@/components/data/add/DatabasesTab.vue'
+import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
+import RemoteObjectPicker, { type RemotePick } from '@/components/compute/RemoteObjectPicker.vue'
 import { useS3, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { useAruna } from '@/composables/useAruna'
 import { activeGroupId } from '@/composables/useGroupSelection'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { errorMessage } from '@/lib/utils'
+import type { BucketSearchHit } from '@/lib/api'
 import {
   normalizeContainerDir,
+  pickedEntries,
   validContainerDir,
   type TesDataRefEntry,
 } from '@/lib/tes'
@@ -48,40 +52,34 @@ const emit = defineEmits<{
 }>()
 
 const s3 = useS3()
-const { currentUser, myGroups } = useAruna()
+const { currentUser, myGroups, listBucketObjects, nodeInfo } = useAruna()
 const { isLocalNode } = useRealmNodes()
 const credentialDialogOpen = ref(false)
 
-// Inputs come from a bucket of this node or from a database this node holds, in its own group.
+// Inputs come from a bucket of this group on this node, a database, or any other bucket the user
+// may read, also of other groups and nodes. Those are listed by their own node and pinned.
+type Source = 'buckets' | 'databases' | 'other'
 const SOURCES = [
-  { value: 'buckets', label: 'Buckets' },
+  { value: 'buckets', label: 'My buckets' },
   { value: 'databases', label: 'Databases' },
+  { value: 'other', label: 'Other buckets' },
 ]
-const source = ref<'buckets' | 'databases'>('buckets')
-const database = ref<{ bucket: string; groupId: string } | null>(null)
-const databaseProblem = ref<string | null>(null)
+const source = ref<Source>('buckets')
+const database = ref<{ bucket: string; nodeId: string } | null>(null)
 
-function chooseDatabase(bucket: string, nodeId: string, groupId: string) {
-  if (!isLocalNode(nodeId)) {
-    databaseProblem.value = 'This database is on another node. Task inputs come from this node.'
-    return
-  }
-  databaseProblem.value = null
+function chooseDatabase(bucket: string, nodeId: string) {
   pendingSelection.value = null
-  database.value = { bucket, groupId }
+  database.value = { bucket, nodeId }
 }
 
-function showSource(next: 'buckets' | 'databases') {
+const chooseBucket = (hit: BucketSearchHit) => chooseDatabase(hit.bucket, hit.node_id)
+
+function showSource(next: Source) {
   source.value = next
   database.value = null
-  databaseProblem.value = null
   pendingSelection.value = null
 }
 
-// Folder handling: the TES facade stages FILE inputs only, so a folder pick is
-// expanded here (for validation and the file cap) but emitted as ONE folder
-// entry carrying its file list; consumers expand it again at task assembly.
-const MAX_FOLDER_FILES = 200
 const folderBusy = ref(false)
 const folderError = ref<string | null>(null)
 
@@ -125,7 +123,6 @@ async function addSelection(selection: Selection) {
   try {
     const mount = mountDirNormalized.value
     const entries: TesDataRefEntry[] = []
-    let total = 0
     for (const object of selection.objects) {
       if (coveredByFolder(object.key, selection.folders)) continue
       entries.push({
@@ -134,32 +131,52 @@ async function addSelection(selection: Selection) {
         path: `${mount}${object.name}`,
         name: object.name,
       })
-      total++
     }
+    // A folder is one DIRECTORY input; the node pins every file below it when it accepts the run.
     for (const folder of selection.folders) {
-      const result = await s3.listObjectsRecursive(selection.bucket, folder.prefix, MAX_FOLDER_FILES)
-      if (result.truncated) {
-        folderError.value = `A selected folder holds more than ${MAX_FOLDER_FILES} files. Select a smaller folder.`
-        return
-      }
-      if (!result.objects.length) {
-        folderError.value = `The folder ${folder.name}/ contains no files.`
-        return
-      }
-      total += result.objects.length
-      entries.push({
-        kind: 'folder',
-        bucket: selection.bucket,
-        prefix: folder.prefix,
-        name: folder.name,
-        basePath: `${mount}${folder.name}/`,
-        files: result.objects.map((object) => ({ key: object.key, name: object.name })),
-      })
+      entries.push({ kind: 'folder', bucket: selection.bucket, prefix: folder.prefix, name: folder.name, basePath: `${mount}${folder.name}/`, files: [], directory: true })
     }
-    if (total > MAX_FOLDER_FILES) {
-      folderError.value = `Select at most ${MAX_FOLDER_FILES} files in one batch.`
+    if (!entries.length) {
+      folderError.value = 'The selection contains no files.'
       return
     }
+    for (const entry of entries) emit('add', entry)
+    emit('update:open', false)
+  } catch (err) {
+    folderError.value = errorMessage(err)
+  } finally {
+    folderBusy.value = false
+  }
+}
+
+// Every file below a folder of another node, with its version, read page by page.
+async function folderFiles(bucket: string, nodeId: string, prefix: string) {
+  const files: { key: string; versionId: string }[] = []
+  let cursor: string | undefined
+  do {
+    const page = await listBucketObjects(bucket, { prefix, cursor, limit: 1000 }, nodeId)
+    files.push(...page.objects.map((item) => ({ key: item.key, versionId: item.version_id })))
+    cursor = page.next_cursor ?? undefined
+  } while (cursor)
+  return files
+}
+
+async function addRemote(pick: RemotePick) {
+  const place = database.value
+  const realmId = nodeInfo.value?.node.realm_id
+  if (!place || !realmId || folderBusy.value) return
+  if (!mountDirValid.value) {
+    folderError.value = 'Enter a valid absolute mount directory first, for example /work/in/.'
+    return
+  }
+  folderBusy.value = true
+  folderError.value = null
+  try {
+    const local = isLocalNode(place.nodeId)
+    const folders = local
+      ? pick.folders
+      : await Promise.all(pick.folders.map(async (folder) => ({ ...folder, files: await folderFiles(place.bucket, place.nodeId, folder.prefix) })))
+    const entries = pickedEntries({ realmId, nodeId: place.nodeId, bucket: place.bucket, local }, pick.files, folders, mountDirNormalized.value)
     if (!entries.length) {
       folderError.value = 'The selection contains no files.'
       return
@@ -199,7 +216,7 @@ watch(
           <Database class="h-4 w-4 text-primary" /> Add input reference
         </DialogTitle>
         <DialogDescription>
-          Select files and folders from this node's data. Selected folders include all files below them.
+          Select files and folders. A folder includes all files below it. Files from databases and other buckets keep their exact version.
         </DialogDescription>
       </DialogHeader>
 
@@ -231,26 +248,17 @@ watch(
             Selected files are staged below this container directory; folders keep their name as a subdirectory.
           </p>
         </div>
-        <OptionToggle :model-value="source" :options="SOURCES" aria-label="Inputs from" @update:model-value="(value: string) => showSource(value as 'buckets' | 'databases')" />
+        <OptionToggle :model-value="source" :options="SOURCES" aria-label="Inputs from" @update:model-value="(value: string) => showSource(value as Source)" />
         <ObjectBrowserPanel v-if="source === 'buckets'" selectable @add="addSelection" @selection-change="pendingSelection = $event" />
         <template v-else-if="database">
           <div class="flex items-center gap-2 text-xs">
             <span class="min-w-0 flex-1 truncate font-mono text-foreground">{{ database.bucket }}</span>
-            <Button variant="ghost" size="sm" @click="showSource('databases')">Choose another database</Button>
+            <Button variant="ghost" size="sm" @click="showSource(source)">Choose another bucket</Button>
           </div>
-          <ObjectBrowserPanel
-            :key="`${database.groupId}/${database.bucket}`"
-            selectable
-            :bucket="database.bucket"
-            :group-id="database.groupId"
-            @add="addSelection"
-            @selection-change="pendingSelection = $event"
-          />
+          <RemoteObjectPicker :bucket="database.bucket" :node-id="database.nodeId" :busy="folderBusy" @add="addRemote" />
         </template>
-        <template v-else>
-          <DatabasesTab bucket="" @choose="chooseDatabase" />
-          <p v-if="databaseProblem" class="text-[11px] text-destructive">{{ databaseProblem }}</p>
-        </template>
+        <DatabasesTab v-else-if="source === 'databases'" bucket="" @choose="chooseDatabase" />
+        <BucketSearchBox v-else mode="picker" placeholder="Find a bucket you may read…" @select="chooseBucket" />
         <div v-if="previewPaths.length" class="rounded-md border border-border bg-muted/20 px-3 py-2">
           <p class="text-[11px] font-medium text-foreground">Will be staged as</p>
           <ul class="mt-1 space-y-0.5 font-mono text-[11px] text-muted-foreground">

@@ -12,8 +12,8 @@ import { Folder, ListPlus, X } from '@lucide/vue'
 // Input row editor (aruna#290): never mutates the prop; every change emits a
 // fresh array. New rows come from the TesDataRefDialog picker. Files keep an
 // inline-editable container path; a folder is ONE summary row whose base path
-// is editable and which expands to per-file FILE inputs at run assembly
-// (lib/tes expandDataRefEntry) because the facade accepts FILE inputs only.
+// is editable. It becomes one DIRECTORY input, or one FILE input per listed
+// file, at run assembly (lib/tes expandDataRefEntry).
 const props = defineProps<{ modelValue: TesDataRefEntry[]; disabled?: boolean }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: TesDataRefEntry[]): void }>()
 
@@ -55,7 +55,8 @@ function remove(i: number) {
               <div class="flex items-center gap-1.5 truncate text-[11px] text-foreground" :title="`s3://${entry.bucket}/${entry.prefix}`">
                 <Folder class="h-3.5 w-3.5 shrink-0 text-primary" />
                 <span class="truncate font-mono">{{ entry.name }}/</span>
-                <span class="shrink-0 text-muted-foreground">{{ entry.files.length }} file{{ entry.files.length === 1 ? '' : 's' }}</span>
+                <span v-if="entry.directory" class="shrink-0 text-muted-foreground">all files</span>
+                <span v-else class="shrink-0 text-muted-foreground">{{ entry.files.length }} file{{ entry.files.length === 1 ? '' : 's' }}</span>
               </div>
             </div>
             <Badge variant="outline">FOLDER</Badge>
