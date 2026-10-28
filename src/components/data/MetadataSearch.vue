@@ -18,7 +18,7 @@ const { displayName, isLocalNode } = useRealmNodes()
 // The search spans nodes by bucket name; a hit of another node names that node.
 const elsewhere = (hit: ObjectSearchHit) => (props.nodeId ? hit.issuer_node_id !== props.nodeId : !isLocalNode(hit.issuer_node_id))
 
-const { searchObjects } = useAruna()
+const { searchObjects, sessionEpoch } = useAruna()
 const typed = ref('')
 const chips = ref<{ column: string; value: string }[]>([])
 const hits = ref<ObjectSearchHit[] | null>(null)
@@ -28,10 +28,16 @@ const failure = ref<string | null>(null)
 const busy = ref(false)
 let runs = 0
 
-watch(() => props.bucket, () => {
+// Another bucket, node or session drops every answer still on its way, and the paging.
+watch(() => [props.bucket, props.nodeId, sessionEpoch.value], () => {
+  runs++
   typed.value = ''
   chips.value = []
   hits.value = null
+  cursor.value = null
+  complete.value = true
+  failure.value = null
+  busy.value = false
 })
 
 const query = computed(() => searchQuery(searchTerms(typed.value).words, chips.value))
