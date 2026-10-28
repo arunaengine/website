@@ -92,6 +92,17 @@ describe('PersistentIdSection polling', () => {
     mounted.app.unmount()
   })
 
+  it('keeps status while polling', async () => {
+    const mounted = await mount()
+    expect(content(mounted.root)).toContain('Registration runs automatically')
+
+    listPersistentIds.mockReturnValue(new Promise(() => undefined))
+    await tick(3000)
+    expect(listPersistentIds).toHaveBeenCalledTimes(2)
+    expect(content(mounted.root)).toContain('Registration runs automatically')
+    mounted.app.unmount()
+  })
+
   it('doubles the delay between two pending answers', async () => {
     const mounted = await mount()
 

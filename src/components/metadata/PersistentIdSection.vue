@@ -29,6 +29,8 @@ function client() {
 const view = ref<PersistentIdView | null>(null)
 const rows = ref<PersistentIdView[]>([])
 const loading = ref(false)
+// Set once this document's first answer is shown, so polls and refreshes update in place.
+const shown = ref(false)
 const loadError = ref<string | null>(null)
 // A private document has no anonymous status: the route answers 404 rather
 // than acting as an existence oracle.
@@ -90,6 +92,7 @@ async function load() {
   } finally {
     if (token === loadToken) {
       loading.value = false
+      shown.value = true
       scheduleNext()
     }
   }
@@ -101,6 +104,7 @@ watch(
     resetPoll()
     view.value = null
     rows.value = []
+    shown.value = false
     void load()
   },
   { immediate: true },
@@ -138,11 +142,11 @@ const dois = computed(() => doiRows(secondaryIdentifiers(rows.value, 'doi'), pro
         <span class="w-10 shrink-0 text-xs text-muted-foreground">PID</span>
         <code class="min-w-0 break-all font-mono text-xs text-foreground">{{ pid }}</code>
         <CopyButton :value="pid" label="Copy PID" />
-        <Skeleton v-if="loading" class="h-5 w-24" />
+        <Skeleton v-if="!shown" class="h-5 w-24" />
         <Badge v-else :variant="meta.variant">{{ meta.label }}</Badge>
       </div>
 
-      <template v-if="!loading">
+      <template v-if="shown">
         <p v-if="needsSignIn" class="text-xs text-muted-foreground">
           Sign in to see the identifier status for this dataset.
         </p>
