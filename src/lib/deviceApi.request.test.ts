@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { applyEntryAction, applyFolderAction, listEntries, type DeviceClient } from './deviceApi'
+import { applyEntryAction, applyFolderAction, getLocalRunCrate, listEntries, type DeviceClient } from './deviceApi'
 
 // The device's own listener, never the realm's.
 const client: DeviceClient = { baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner-token' }
@@ -89,5 +89,17 @@ describe('entry listing', () => {
     await listEntries('f1', { state: '' }, client)
 
     expect(new URL(calls[0].url).searchParams.has('state')).toBe(false)
+  })
+})
+
+describe('local run record', () => {
+  it('reads the crate of a local run from the device itself', async () => {
+    stubFetch({ '@graph': [] })
+    expect(await getLocalRunCrate('01JZ7Q3V4K8M2N6P0R5S9T1W3X', client)).toEqual({ '@graph': [] })
+    expect(calls[0]).toMatchObject({
+      url: 'http://127.0.0.1:9000/api/v1/device/compute/runs/01JZ7Q3V4K8M2N6P0R5S9T1W3X/crate',
+      method: 'GET',
+      authorization: 'Bearer owner-token',
+    })
   })
 })

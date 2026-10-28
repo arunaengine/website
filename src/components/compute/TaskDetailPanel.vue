@@ -29,6 +29,9 @@ import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import { useRefresh } from '@/composables/useRefresh'
+import { useDeviceStatus } from '@/composables/useDeviceStatus'
+import { downloadCrateJson } from '@/lib/crateImport'
+import { getLocalRunCrate, requireDevice } from '@/lib/deviceApi'
 import type { MetadataDocumentListItem } from '@/lib/api'
 import { deleteErrorMessage, formatJobProgress, type JobStatusResponse } from '@/lib/jobs'
 import { POLL_IDLE_MS, follow, onWake } from '@/lib/poll'
@@ -41,6 +44,7 @@ import {
   isDrsReference,
   isTerminalTesState,
   parseS3Url,
+  isLocalRun,
   tesPlacementTags,
   type TesState,
   type TesTask,
@@ -282,6 +286,23 @@ const runDuration = computed(() => {
 })
 
 const failed = computed(() => task.value?.state === 'EXECUTOR_ERROR' || task.value?.state === 'SYSTEM_ERROR')
+
+// A finished run of this computer keeps its own run record here until it is published.
+const { deviceClient } = useDeviceStatus()
+const localRecordJob = computed(() =>
+  task.value?.state === 'COMPLETE' && isLocalRun(task.value.tags) ? tesPlacementTags(task.value.tags).jobId ?? null : null,
+)
+const recordError = ref<string | null>(null)
+async function downloadRunRecord() {
+  const jobId = localRecordJob.value
+  if (!jobId) return
+  recordError.value = null
+  try {
+    downloadCrateJson(await getLocalRunCrate(jobId, requireDevice(deviceClient.value, 'The run record')))
+  } catch (cause) {
+    recordError.value = errorMessage(cause)
+  }
+}
 
 // The one line that says what happened; the badge, the stages and this line
 // tell the same story.
@@ -829,6 +850,11 @@ async function confirmDelete() {
             <RouterLink v-if="runCrate" class="inline-flex items-center gap-1.5 text-primary hover:underline" :to="{ name: 'dataset', params: { id: runCrate.document_id } }">
               <FileText class="h-3.5 w-3.5" /> Open
             </RouterLink>
+            <template v-else-if="localRecordJob">
+              <Button variant="outline" size="sm" @click="downloadRunRecord"><Download class="h-3.5 w-3.5" /> Run record</Button>
+              <span class="text-muted-foreground">The run record stays on this computer until you publish the run.</span>
+              <span v-if="recordError" class="text-destructive">{{ recordError }}</span>
+            </template>
             <span v-else-if="sessionRuntime(task?.tags) !== null" class="text-muted-foreground">none, a notebook session keeps its report instead</span>
             <span v-else class="text-muted-foreground">written once the run completes</span>
           </div>

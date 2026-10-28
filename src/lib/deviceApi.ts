@@ -776,3 +776,8 @@ export function createDeviceCredential(
 export function revokeDeviceCredential(accessKeyId: string, client: DeviceClient): Promise<void> {
   return request<void>(`/access/credentials/${encodeURIComponent(accessKeyId)}`, client, { method: 'DELETE' })
 }
+
+/** The run record (an RO-Crate) this computer wrote for one of its finished local runs; 404 when none. */
+export function getLocalRunCrate(jobId: string, client: DeviceClient): Promise<unknown> {
+  return request<unknown>(`/device/compute/runs/${encodeURIComponent(jobId)}/crate`, client)
+}
