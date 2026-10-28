@@ -42,6 +42,7 @@ import { placeName, placeTitle } from '@/lib/bucketPlace'
 import type { PublicTarget } from '@/lib/publicAccess'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import type { ObjectSearchHit } from '@/lib/api'
 import { KeyRound, LogIn, ShieldAlert } from '@lucide/vue'
 
 const { bootstrapped, currentUser, myGroups } = useAruna()
@@ -143,10 +144,16 @@ watch(newBucketOpen, (open) => {
   contextHold.value = open
 })
 
-// A found folder opens itself; a found file opens the folder that holds it.
-function openFound(key: string) {
-  const folder = key.endsWith('/') ? key.slice(0, -1) : key.split('/').slice(0, -1).join('/')
-  manager.navigateTo(folder)
+// A found folder opens itself; a found file opens the folder that holds it, on the hit's node.
+function openFound(hit: ObjectSearchHit) {
+  const folder = hit.key.endsWith('/') ? hit.key.slice(0, -1) : hit.key.split('/').slice(0, -1).join('/')
+  const here = remoteNodeId.value ? hit.issuer_node_id === remoteNodeId.value : realmNodes.isLocalNode(hit.issuer_node_id)
+  if (here) return manager.navigateTo(folder)
+  void router.push({
+    name: 'bucket',
+    params: { bucketId: hit.bucket },
+    query: { ...(folder ? { prefix: folder } : {}), ...(realmNodes.isLocalNode(hit.issuer_node_id) ? {} : { node: hit.issuer_node_id }), group: hit.group_id },
+  })
 }
 
 function onBucketCreated(created: BindSource) {
@@ -413,7 +420,7 @@ async function createFolder() {
         <div class="min-w-0 space-y-4">
           <DistributionBanner v-if="storedBucket" :bucket="storedBucket" />
           <DatabaseHeader v-if="bucket && !exampleBucket" :bucket="bucket" :node-id="remoteNodeId" :set-id="bucketSetId" />
-          <MetadataSearch v-if="bucket && !exampleBucket" :bucket="bucket" @open="openFound" />
+          <MetadataSearch v-if="bucket && !exampleBucket" :bucket="bucket" :node-id="remoteNodeId" @open="openFound" />
           <ObjectBrowser
             :manager="manager"
             :notebooks="notebooksView"

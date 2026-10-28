@@ -4,21 +4,23 @@ import { describe, expect, it, vi } from 'vitest'
 import * as TableImport from '@/lib/tableImport'
 import { compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
 
-const searchObjects = vi.fn(async () => ({ hits: [{ key: 'GCF_000005845.2_ASM584v2/' }], next_cursor: null, coverage: { complete: true } }))
+const hit = { key: 'GCF_000005845.2_ASM584v2/', bucket: 'ncbi', issuer_node_id: 'n2', group_id: 'g1' }
+const searchObjects = vi.fn(async () => ({ hits: [hit], next_cursor: null, coverage: { complete: true } }))
 
 const component = compileClientComponent(new URL('./MetadataSearch.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => h('i')) }),
   '@/components/ui/Button.vue': moduleDefault(defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()) })),
   '@/composables/useAruna': { useAruna: () => ({ searchObjects }) },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => `node ${id}`, isLocalNode: (id: string) => id === 'n1' }) },
   '@/lib/tableImport': TableImport,
   '@/lib/utils': { errorMessage: (cause: unknown) => String(cause) },
 })
 
 describe('bucket metadata search', () => {
   it('turns column=value into a chip and searches the bucket metadata', async () => {
-    const opened: string[] = []
-    const { root } = await mountApp(component, { props: { bucket: 'ncbi', onOpen: (key: string) => opened.push(key) } })
+    const opened: unknown[] = []
+    const { root } = await mountApp(component, { props: { bucket: 'ncbi', nodeId: null, onOpen: (found: unknown) => opened.push(found) } })
     const box = element(root, (node) => node.tag === 'input')
     ;(box.props['onUpdate:modelValue'] as (value: string) => void)('coli species_taxid=562')
     await flush()
@@ -28,6 +30,7 @@ describe('bucket metadata search', () => {
     expect(searchObjects).toHaveBeenCalledWith('coli species_taxid=562', { bucket: 'ncbi', match: 'metadata', limit: 50, cursor: undefined })
     expect(content(root)).toContain('species_taxid = 562')
     ;(element(root, (node) => node.tag === 'button' && content(node).includes('GCF_')).props.onClick as () => void)()
-    expect(opened).toEqual(['GCF_000005845.2_ASM584v2/'])
+    expect(content(root)).toContain('on node n2')
+    expect(opened).toEqual([hit])
   })
 })

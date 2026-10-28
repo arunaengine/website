@@ -4,13 +4,19 @@
 import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import type { ObjectSearchHit } from '@/lib/api'
 import { searchQuery, searchTerms } from '@/lib/tableImport'
 import { errorMessage } from '@/lib/utils'
 import { Search, X } from '@lucide/vue'
 
-const props = defineProps<{ bucket: string }>()
-const emit = defineEmits<{ open: [key: string] }>()
+/** `nodeId` is the node of the open bucket; null for the connected node. */
+const props = defineProps<{ bucket: string; nodeId: string | null }>()
+const emit = defineEmits<{ open: [hit: ObjectSearchHit] }>()
+
+const { displayName, isLocalNode } = useRealmNodes()
+// The search spans nodes by bucket name; a hit of another node names that node.
+const elsewhere = (hit: ObjectSearchHit) => (props.nodeId ? hit.issuer_node_id !== props.nodeId : !isLocalNode(hit.issuer_node_id))
 
 const { searchObjects } = useAruna()
 const typed = ref('')
@@ -82,8 +88,10 @@ function drop(index: number) {
     <p class="text-[11px] text-muted-foreground">Type words, or column=value for an exact match.</p>
     <p v-if="failure" class="text-xs text-destructive">{{ failure }}</p>
     <ul v-if="hits?.length" class="divide-y divide-border rounded-md border border-border text-xs">
-      <li v-for="hit in hits" :key="hit.key">
-        <button type="button" class="w-full truncate px-3 py-1.5 text-left font-mono text-primary hover:bg-accent" @click="emit('open', hit.key)">{{ hit.key }}</button>
+      <li v-for="hit in hits" :key="`${hit.issuer_node_id}/${hit.key}`">
+        <button type="button" class="w-full truncate px-3 py-1.5 text-left font-mono text-primary hover:bg-accent" @click="emit('open', hit)">
+          {{ hit.key }}<span v-if="elsewhere(hit)" class="ml-2 font-sans text-muted-foreground">on {{ displayName(hit.issuer_node_id) }}</span>
+        </button>
       </li>
     </ul>
     <p v-else-if="hits" class="text-xs text-muted-foreground">Nothing matches.</p>
