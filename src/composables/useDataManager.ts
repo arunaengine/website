@@ -657,7 +657,7 @@ export function useDataManager() {
   }
 
   watch(
-    [bucket, s3Prefix, remoteNodeId, showDeleted, contextReady],
+    [bucket, s3Prefix, remoteNodeId, showDeleted, contextReady, effectiveEndpoint],
     () => {
       void loadDeleted()
     },

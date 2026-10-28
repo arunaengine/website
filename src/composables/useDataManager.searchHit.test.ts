@@ -5,6 +5,7 @@ import { flush, mountApp } from '@/test/clientRender'
 
 // A cached session: activating a group the browser already holds resolves at once.
 const activeContext = ref<Record<string, unknown> | null>(null)
+const endpointUrl = ref('https://s3.example')
 const s3 = {
   activeContext,
   activeKey: ref({ accessKeyId: 'k' }),
@@ -13,7 +14,7 @@ const s3 = {
   }),
   nodeIdFor: () => 'n-local',
   contextMismatch: () => null,
-  endpointForNode: () => 'https://s3.example',
+  endpointForNode: () => endpointUrl.value,
   endpoint: () => 'https://s3.example',
   canRead: () => true,
   canWrite: () => true,
@@ -191,5 +192,36 @@ describe('name filter refresh', () => {
     finish({ folders: [], objects: [] })
     await flush()
     expect(manager!.listLoading.value).toBe(false)
+  })
+  it('reloads deleted rows on endpoint change', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/buckets', name: 'buckets', component: View },
+        { path: '/buckets/:bucketId', name: 'bucket', component: View },
+      ],
+    })
+    await router.push({ name: 'bucket', params: { bucketId: 'reef' }, query: { group: 'g-b' } })
+    let manager: ReturnType<typeof useDataManager> | null = null
+    const host = defineComponent({
+      setup: () => {
+        manager = useDataManager()
+        return () => null
+      },
+    })
+    await mountApp(host, { router })
+    for (let round = 0; round < 6; round++) await new Promise((resolve) => setTimeout(resolve, 0))
+    const gone = { key: 'old.txt', name: 'old.txt', markerVersionId: 'm1' }
+    s3.listDeletedObjects.mockImplementation(async () => ({ deleted: [gone], truncated: false }) as never)
+    manager!.setShowDeleted(true)
+    await flush()
+    expect(manager!.deletedObjects.value).toEqual([gone])
+
+    endpointUrl.value = 'https://s3-other.example'
+    for (let round = 0; round < 6; round++) await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(manager!.deletedObjects.value).toEqual([gone])
+    manager!.setShowDeleted(false)
+    s3.listDeletedObjects.mockImplementation(async () => ({ deleted: [], truncated: false }))
+    endpointUrl.value = 'https://s3.example'
   })
 })
