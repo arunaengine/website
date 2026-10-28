@@ -21,6 +21,7 @@ import {
   captureOutput,
   expandDataRefEntry,
   parseS3Url,
+  resultsKey,
   tesPlacementTags,
   validContainerDir,
   validContainerFilePath,
@@ -408,12 +409,14 @@ function createStore(deps: CustomRunDeps) {
   const inputMountDefault = ref('/work/in/')
 
   const runKey = computed(() => `quickruns/${runSlug(name.value)}`)
-  function defaultOutputKey(containerPath: string): string {
+  function outputTail(containerPath: string): string {
     const relative = containerPath.startsWith(`${activeWorkdir.value}/`)
       ? containerPath.slice(activeWorkdir.value.length + 1)
       : normalizedOutputKey(containerPath)
-    const trimmed = relative.replace(/^out\//, '')
-    return `${runKey.value}/${trimmed || baseNameOf(containerPath)}`
+    return relative.replace(/^out\//, '') || baseNameOf(containerPath)
+  }
+  function defaultOutputKey(containerPath: string): string {
+    return `${runKey.value}/${outputTail(containerPath)}`
   }
   function lastBucket(): string {
     return outputRows.value.at(-1)?.bucket || stagingBucket.value.trim() || buckets.value[0] || ''
@@ -454,6 +457,13 @@ function createStore(deps: CustomRunDeps) {
     row.bucket = bucket
     setOutputKey(row, key)
     onOutputKeyBlur(row)
+  }
+
+  /** Sends every capture below a bucket folder, such as the realm side of a linked folder. */
+  function sendOutputsTo(bucket: string, prefix: string) {
+    outputRows.value.forEach((row, index) =>
+      setOutputDestination(index, bucket, resultsKey(prefix, runSlug(name.value), outputTail(row.path))),
+    )
   }
 
   const treeOutputs = computed(() =>
@@ -1232,6 +1242,7 @@ function createStore(deps: CustomRunDeps) {
     setOutputPath,
     setOutputKey,
     setOutputDestination,
+    sendOutputsTo,
     onOutputKeyBlur,
     addInputEntry,
     removeInputEntry,

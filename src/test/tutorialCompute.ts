@@ -204,6 +204,7 @@ const withParts = {
   '@/components/compute/run/AiMark.vue': runPart('components/compute/run/AiMark.vue'),
   '@/components/compute/run/PathChips.vue': runPart('components/compute/run/PathChips.vue'),
   '@/components/compute/run/DependenciesTab.vue': moduleDefault(GenericStub),
+  '@/components/compute/run/ResultsHome.vue': moduleDefault(GenericStub),
   '@/components/groups/GroupSelect.vue': moduleDefault(SelectStub),
 }
 const card = (path: string) => moduleDefault(compileClientComponent(url(path), withParts))

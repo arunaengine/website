@@ -12,6 +12,7 @@ import DocsLink from '@/components/ui/DocsLink.vue'
 import ContainerFsTree from '@/components/compute/ContainerFsTree.vue'
 import TesInputsEditor from '@/components/compute/TesInputsEditor.vue'
 import RunSection from '@/components/compute/run/RunSection.vue'
+import ResultsHome from '@/components/compute/run/ResultsHome.vue'
 import {
   DATA_VIEWS,
   injectCustomRun,
@@ -38,6 +39,7 @@ const {
   setOutputPath,
   setOutputKey,
   setOutputDestination,
+  sendOutputsTo,
   onOutputKeyBlur,
   onTreeInputPath,
   onTreeOutputPath,
@@ -86,6 +88,7 @@ const checkLabel = computed(() => {
       <OptionToggle v-model="dataView" :options="DATA_VIEWS" aria-label="Container data view" />
     </template>
 
+    <ResultsHome :disabled="noOutputs" class="mb-2" @choose="sendOutputsTo" />
     <section v-if="dataView === 'tree'" data-tutorial="run-filesystem" class="surface-inline space-y-2.5 p-3.5">
       <div class="flex items-center gap-2">
         <p class="flex-1 text-[11px] text-muted-foreground">

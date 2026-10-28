@@ -434,6 +434,12 @@ export function pickedEntries(
   return entries
 }
 
+/** Where a run's capture goes below a folder: `<prefix>results/<run>/<path>`. */
+export function resultsKey(prefix: string, slug: string, tail: string): string {
+  const folder = prefix && !prefix.endsWith('/') ? `${prefix}/` : prefix
+  return `${folder}results/${slug}/${tail}`
+}
+
 // Expands one picker entry into its TES inputs: a file, a DIRECTORY, or one FILE per listed file.
 export function expandDataRefEntry(entry: TesDataRefEntry): TesInput[] {
   if (entry.kind === 'file') {

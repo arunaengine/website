@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { expandDataRefEntry, pickedEntries } from './tes'
+import { expandDataRefEntry, pickedEntries, resultsKey } from './tes'
 
 const V1 = '01K8W1B3D5F7H9KMQ1S3V5X7Z1'
 const V2 = '01K8W1B3D5F7H9KMQ1S3V5X7Z2'
@@ -26,5 +26,13 @@ describe('picked run inputs', () => {
       ['/data/6.0/x.tsv', `arn:aruna:realm:node-b:s3/db/db/6.0/x.tsv@${V1}`],
       ['/data/6.0/sub/y.tsv', `arn:aruna:realm:node-b:s3/db/db/6.0/sub/y.tsv@${V2}`],
     ])
+  })
+})
+
+describe('results below a linked folder', () => {
+  it('puts each capture under results and the run name', () => {
+    expect(resultsKey('genomes/', 'bakta-sample7', 'sample7.gff3')).toBe('genomes/results/bakta-sample7/sample7.gff3')
+    expect(resultsKey('genomes', 'run', 'out/')).toBe('genomes/results/run/out/')
+    expect(resultsKey('', 'run', 'a.txt')).toBe('results/run/a.txt')
   })
 })

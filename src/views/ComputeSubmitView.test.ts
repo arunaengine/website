@@ -286,6 +286,7 @@ const withParts = {
   '@/components/compute/run/AiMark.vue': AiMark,
   '@/components/compute/run/PathChips.vue': PathChips,
   '@/components/compute/run/DependenciesTab.vue': moduleDefault(GenericStub),
+  '@/components/compute/run/ResultsHome.vue': moduleDefault(GenericStub),
   '@/components/compute/ScriptEditor.vue': moduleDefault(GenericStub),
   '@/lib/chunk-recovery': { asyncChunkError: () => {} },
 }
