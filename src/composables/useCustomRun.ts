@@ -21,6 +21,8 @@ import {
   captureOutput,
   expandDataRefEntry,
   parseS3Url,
+  answerEntries,
+  atOrBelow,
   resultsKey,
   tesPlacementTags,
   validContainerDir,
@@ -1053,11 +1055,10 @@ function createStore(deps: CustomRunDeps) {
   const savedStart = ref<{ run: SavedRun; notes: string[] } | null>(null)
   const savedError = ref<string | null>(null)
   const resultsChosen = ref(false)
-  const entryPath = (entry: TesDataRefEntry) => (entry.kind === 'file' ? entry.path : entry.basePath).replace(/\/$/, '')
   /** The asked inputs of the saved run that have no pick yet. */
   const openInputs = computed(() => {
     const asked = savedStart.value?.run.ask.inputs ?? []
-    return asked.filter((path) => !inputs.value.some((entry) => entryPath(entry) === path))
+    return asked.filter((path) => !inputs.value.some((entry) => atOrBelow(entry, path)))
   })
 
   /** Secret-looking variables of the saved run that still have no value. */
@@ -1075,7 +1076,7 @@ function createStore(deps: CustomRunDeps) {
     rerunLoading.value = true
     try {
       const notes = await fillFrom(run.task)
-      inputs.value = inputs.value.filter((entry) => !run.ask.inputs.includes(entryPath(entry)))
+      inputs.value = inputs.value.filter((entry) => !run.ask.inputs.some((path) => atOrBelow(entry, path)))
       resultsChosen.value = !run.ask.results
       savedStart.value = { run, notes }
     } catch (err) {
@@ -1085,10 +1086,9 @@ function createStore(deps: CustomRunDeps) {
     }
   }
 
-  /** Puts a pick at the path the saved run asks for. */
-  function answerInput(path: string, entry: TesDataRefEntry) {
-    const placed: TesDataRefEntry = entry.kind === 'file' ? { ...entry, path } : { ...entry, basePath: `${path}/` }
-    inputs.value = [...inputs.value.filter((item) => entryPath(item) !== path), placed]
+  /** Puts the picks of one choice at the path the saved run asks for, replacing an earlier answer. */
+  function answerInput(path: string, entries: TesDataRefEntry[]) {
+    inputs.value = [...inputs.value.filter((item) => !atOrBelow(item, path)), ...answerEntries(path, entries)]
   }
 
   function chooseResults(bucket: string, prefix: string) {

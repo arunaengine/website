@@ -440,6 +440,26 @@ export function resultsKey(prefix: string, slug: string, tail: string): string {
   return `${folder}results/${slug}/${tail}`
 }
 
+/** The container path of a picked input, without a trailing slash. */
+export const entryPath = (entry: TesDataRefEntry) => (entry.kind === 'file' ? entry.path : entry.basePath).replace(/\/$/, '')
+
+/** Whether a picked input sits at a path or below it. */
+export const atOrBelow = (entry: TesDataRefEntry, path: string) => entryPath(entry) === path || entryPath(entry).startsWith(`${path}/`)
+
+/**
+ * One answer to an asked input: a single file lands at the asked path, a folder becomes it, and
+ * several files (a folder of another node, or more picks) keep their relative paths below it.
+ */
+export function answerEntries(path: string, entries: readonly TesDataRefEntry[]): TesDataRefEntry[] {
+  if (entries.length === 1 && entries[0].kind === 'file' && !entries[0].name.includes('/')) return [{ ...entries[0], path }]
+  return entries.map((entry) => {
+    if (entry.kind === 'folder') return { ...entry, basePath: `${path}/` }
+    // Files of a folder are named `<folder>/<relative>`; the folder itself is the asked path.
+    const relative = entry.name.includes('/') ? entry.name.slice(entry.name.indexOf('/') + 1) : entry.name
+    return { ...entry, path: `${path}/${relative}` }
+  })
+}
+
 /** An input as a native job takes it: a versioned object ARN becomes its s3:// url, node and version. */
 export function nativeInput(input: TesInput): TesInput {
   const arn = /^arn:aruna:[^:]+:([^:]+):s3\/([^/]+)\/(.+)@([0-9A-HJKMNP-TV-Z]{26})$/.exec(input.url ?? '')

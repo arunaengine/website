@@ -7,32 +7,36 @@ import Select from '@/components/ui/Select.vue'
 import ResultsHome from '@/components/compute/run/ResultsHome.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
 import { injectCustomRun, outputDestination } from '@/composables/useCustomRun'
-import type { TesDataRefEntry } from '@/lib/tes'
+import { atOrBelow, entryPath, type TesDataRefEntry } from '@/lib/tes'
 import { isSecretName } from '@/lib/savedRuns'
 import { Star } from '@lucide/vue'
 
 const { savedStart, inputs, outputRows, openInputs, resultsChosen, bucketOptions, envRows, answerInput, chooseResults, editSaved } = injectCustomRun()
 
 const run = computed(() => savedStart.value?.run ?? null)
-const entryPath = (entry: TesDataRefEntry) => (entry.kind === 'file' ? entry.path : entry.basePath).replace(/\/$/, '')
 const nameOf = (path: string) => run.value?.task.inputs?.find((input) => input.path === path)?.name || path
 const asked = computed(() => run.value?.ask.inputs ?? [])
 // Secret values are never saved, so each start asks for them.
 const secrets = computed(() => envRows.value.filter((row) => isSecretName(row.key)))
-const fixed = computed(() => inputs.value.filter((entry) => !asked.value.includes(entryPath(entry))))
-const pickOf = (path: string) => inputs.value.find((entry) => entryPath(entry) === path)
+const fixed = computed(() => inputs.value.filter((entry) => !asked.value.some((path) => atOrBelow(entry, path))))
+const pickOf = (path: string) => inputs.value.find((entry) => atOrBelow(entry, path))
 const pickText = (entry: TesDataRefEntry) => (entry.kind === 'file' ? entry.url : `${entry.bucket}/${entry.prefix}`)
 
 const choosing = ref<string | null>(null)
+// The dialog adds each pick on its own and then closes; the picks of one choice are one answer.
+let batch: TesDataRefEntry[] = []
 const dialogOpen = computed({
   get: () => choosing.value !== null,
   set: (open: boolean) => {
-    if (!open) choosing.value = null
+    if (open) return
+    if (choosing.value && batch.length) answerInput(choosing.value, batch)
+    batch = []
+    choosing.value = null
   },
 })
 const destination = computed(() => (choosing.value ? `${choosing.value.slice(0, choosing.value.lastIndexOf('/') + 1)}` : '/'))
 function picked(entry: TesDataRefEntry) {
-  if (choosing.value) answerInput(choosing.value, entry)
+  batch.push(entry)
 }
 
 const resultsBucket = ref('')

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { expandDataRefEntry, nativeInput, pickedEntries, resultsKey } from './tes'
+import { answerEntries, expandDataRefEntry, nativeInput, pickedEntries, resultsKey } from './tes'
 
 const V1 = '01K8W1B3D5F7H9KMQ1S3V5X7Z1'
 const V2 = '01K8W1B3D5F7H9KMQ1S3V5X7Z2'
@@ -42,5 +42,24 @@ describe('pinned inputs on a local run', () => {
     const input = { name: 'a b.fna', path: '/in/a b.fna', url: `arn:aruna:realm:node-b:s3/db/x/a%20b.fna@${V1}` }
     expect(nativeInput(input)).toEqual({ ...input, url: 's3://db/x/a b.fna', source_node_id: 'node-b', version_id: V1 })
     expect(nativeInput({ path: '/in/c', url: 's3://lab/c' })).toEqual({ path: '/in/c', url: 's3://lab/c' })
+  })
+})
+
+describe('answers to an asked input', () => {
+  it('puts one file at the asked path', () => {
+    const [entry] = answerEntries('/data/genome.fna', [{ kind: 'file', url: 's3://lab/g7.fna', path: '/inputs/g7.fna', name: 'g7.fna' }])
+    expect(entry).toMatchObject({ path: '/data/genome.fna' })
+  })
+
+  it('keeps every file of a folder from another node below the asked directory', () => {
+    const files = pickedEntries({ realmId: 'realm', nodeId: 'node-b', bucket: 'db', local: false }, [], [
+      { prefix: 'db/6.0/', name: '6.0', files: [{ key: 'db/6.0/x.tsv', versionId: V1 }, { key: 'db/6.0/sub/y.tsv', versionId: V2 }] },
+    ], '/data/')
+    expect(answerEntries('/db', files).map((entry) => (entry.kind === 'file' ? entry.path : ''))).toEqual(['/db/x.tsv', '/db/sub/y.tsv'])
+  })
+
+  it('makes a folder of this node the asked directory', () => {
+    const [entry] = answerEntries('/db', [{ kind: 'folder', bucket: 'db', prefix: 'db/6.0/', name: '6.0', basePath: '/data/6.0/', files: [], directory: true }])
+    expect(entry).toMatchObject({ basePath: '/db/' })
   })
 })
