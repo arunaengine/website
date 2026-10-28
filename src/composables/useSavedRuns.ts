@@ -4,15 +4,25 @@ import { ref } from 'vue'
 import { exportRuns, importRuns, readSavedRuns, savedTask, withRun, writeSavedRuns, type SavedRun } from '@/lib/savedRuns'
 
 const runs = ref<SavedRun[]>(readSavedRuns())
+const failure = ref<string | null>(null)
 
-function store(next: SavedRun[]) {
+// Written to this computer first; the list changes only when that worked, else it says why.
+function store(next: SavedRun[]): boolean {
+  try {
+    writeSavedRuns(next)
+  } catch (cause) {
+    failure.value = `This computer could not keep the saved runs: ${cause instanceof Error ? cause.message : String(cause)}`
+    return false
+  }
+  failure.value = null
   runs.value = next
-  writeSavedRuns(next)
+  return true
 }
 
 export function useSavedRuns() {
   return {
     runs,
+    failure,
     find: (id: string) => runs.value.find((run) => run.id === id),
     save: (run: SavedRun) => store(withRun(runs.value, { ...run, task: savedTask(run.task) })),
     remove: (id: string) => store(runs.value.filter((run) => run.id !== id)),

@@ -38,13 +38,14 @@ function toggle(path: string) {
 
 function save() {
   if (!props.task || !name.value.trim()) return
-  saved.save({
+  const kept = saved.save({
     id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`,
     name: name.value.trim(),
     savedAt: new Date().toISOString(),
     task: savedTask(props.task),
     ask: { inputs: asked.value, results: results.value },
   })
+  if (!kept) return
   emit('saved')
   emit('update:open', false)
 }
@@ -77,6 +78,7 @@ function save() {
           </label>
         </fieldset>
       </template>
+      <p v-if="saved.failure.value" class="text-sm text-destructive">{{ saved.failure.value }}</p>
       <DialogFooter>
         <Button variant="outline" @click="emit('update:open', false)">Cancel</Button>
         <Button :disabled="Boolean(blocked) || !task || !name.trim()" @click="save">Save</Button>

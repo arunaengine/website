@@ -50,7 +50,7 @@ async function chosen(event: Event) {
         </li>
       </ul>
       <p v-else class="text-sm text-muted-foreground">No saved runs yet. Use "Save as my run" on a run.</p>
-      <Notice v-if="failure" tone="error">{{ failure }}</Notice>
+      <Notice v-if="failure || saved.failure.value" tone="error">{{ failure || saved.failure.value }}</Notice>
       <div class="flex gap-2">
         <Button variant="outline" size="sm" :disabled="!saved.runs.value.length" @click="saved.exportFile()">Export as file</Button>
         <Button variant="outline" size="sm" @click="picker?.click()">Import a file</Button>
