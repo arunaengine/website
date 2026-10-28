@@ -3,23 +3,7 @@
 // checksum and modified-time uses follow the planned `rows.size`, `rows.checksums` and
 // `rows.modified` fields (plans/ncbi-summary-import.md), which the server does not take yet.
 import Papa from 'papaparse'
-
-export type TableHeader = 'first_row' | 'last_comment' | { row: number } | { columns: string[] }
-
-export interface TableFormat {
-  delimiter: string
-  /** `null` reads quote characters as plain text. */
-  quote: string | null
-  header: TableHeader
-  comment: string | null
-  nulls: string[]
-  /** `null` decides by a `.gz` name or the gzip magic bytes. */
-  gzip: boolean | null
-}
-
-export type TableSource = { connector: string } | { object: { bucket: string; key: string } }
-
-export type ChecksumAlgorithm = 'md5' | 'sha256' | 'sha1'
+import type { ChecksumAlgorithm, TableFormat, TableRows } from '@/lib/api'
 
 export type ColumnUse =
   | 'path' | 'name' | 'size' | 'checksum' | 'modified'
@@ -32,26 +16,6 @@ export interface ColumnChoice {
   algorithm?: ChecksumAlgorithm
   /** "Only rows with": the row is imported when its value is one of these; empty means any. */
   only: string[]
-}
-
-export interface TableRows {
-  kind: 'file' | 'folder'
-  source: string
-  target: string
-  filter: { column: string; any_of: string[] }[]
-  keep: string[] | null
-  text: string[]
-  exact: string[]
-  size?: string
-  checksums?: { algorithm: ChecksumAlgorithm; column: string }[]
-  modified?: string
-}
-
-export interface TableImport {
-  source: TableSource
-  format: TableFormat
-  rows: TableRows
-  rate?: number
 }
 
 export const DEFAULT_FORMAT: TableFormat = { delimiter: ',', quote: '"', header: 'first_row', comment: null, nulls: [''], gzip: null }

@@ -20,6 +20,8 @@ export interface StagingBatchRequest {
   strategy: StagingStrategy
   items?: StagingBatchItem[]
   prefixes?: StagingBatchPrefix[]
+  /** Import the rows of a CSV or TSV list instead of items and prefixes; reference strategy only. */
+  table?: TableImport
 }
 
 export interface StagingBatchResult {
@@ -93,6 +95,8 @@ export interface StagingJob {
   submitted_at: string
   finished_at?: string | null
   error?: string | null
+  /** While set, the job waits until then because its source asked it to slow down. */
+  paused_until?: string | null
   progress: StagingJobProgress
   errors: Array<{ source_path: string; target_key: string; error: string }>
 }
@@ -141,4 +145,43 @@ export interface StagingReferencesResponse {
   entries: StagingReferenceEntry[]
   /** Opaque cursor; omitted on the last page. Pass back verbatim. */
   next_cursor?: string
+}
+
+// Import from a list (`table` of a staging job, core/src/structs/execution/table.rs). `size`,
+// `checksums` and `modified` are planned server fields (plans/ncbi-summary-import.md).
+export type TableHeader = 'first_row' | 'last_comment' | { row: number } | { columns: string[] }
+
+export interface TableFormat {
+  delimiter: string
+  /** `null` reads quote characters as plain text. */
+  quote: string | null
+  header: TableHeader
+  comment: string | null
+  nulls: string[]
+  /** `null` decides by a `.gz` name or the gzip magic bytes. */
+  gzip: boolean | null
+}
+
+export type TableSource = { connector: string } | { object: { bucket: string; key: string } }
+
+export type ChecksumAlgorithm = 'md5' | 'sha256' | 'sha1'
+
+export interface TableRows {
+  kind: 'file' | 'folder'
+  source: string
+  target: string
+  filter: { column: string; any_of: string[] }[]
+  keep: string[] | null
+  text: string[]
+  exact: string[]
+  size?: string
+  checksums?: { algorithm: ChecksumAlgorithm; column: string }[]
+  modified?: string
+}
+
+export interface TableImport {
+  source: TableSource
+  format: TableFormat
+  rows: TableRows
+  rate?: number
 }

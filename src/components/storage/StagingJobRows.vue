@@ -202,6 +202,9 @@ function percent(job: StagingJob): number {
           :critical="101"
           class="mt-2 h-1.5"
         />
+        <p v-if="job.paused_until" class="mt-1 text-[11px] text-muted-foreground">
+          Waiting until {{ new Date(job.paused_until).toLocaleTimeString() }}, the source asked to slow down.
+        </p>
         <p v-if="job.error" class="mt-1 break-all text-[11px] text-destructive">{{ job.error }}</p>
         <p v-else-if="job.errors.length" class="mt-1 break-all text-[11px] text-destructive">
           {{ job.errors.length }} {{ job.errors.length === 1 ? 'file' : 'files' }} failed, first:
