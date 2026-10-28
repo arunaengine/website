@@ -13,8 +13,6 @@ export type Origin =
 export interface OriginLabels {
   user: (userId: string) => string
   node: (nodeId: string) => string
-  /** The name of the database entry, or null when the entry is not listed for this user. */
-  database: (entryId: string) => string | null
   backend: (backendId: string) => string
 }
 
@@ -49,7 +47,7 @@ export function originFrom(response: OriginResponse, labels: OriginLabels): Orig
         ...(source?.url ? { url: source.url } : {}),
         ...(source?.etag ? { etag: source.etag } : {}),
         ...(digest ? { digest: `${digest.algorithm}:${digest.digest}` } : {}),
-        ...(origin.database_entry ? { database: labels.database(origin.database_entry) ?? 'a database' } : {}),
+        ...(response.bucket_metadata?.database ? { database: response.bucket_metadata.title || 'a database' } : {}),
       }
     }
     case 'copy':

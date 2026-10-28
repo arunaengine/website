@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError, type OriginResponse } from '@/lib/api'
-import { dataParts, emptyGraph, expand, expandAll, hasPending, runInputs, startDataset, startFile, type Readers } from './provenance'
+import { dataParts, emptyGraph, expand, expandAll, hasPending, runInputs, runRecordDetail, startDataset, startFile, type Readers } from './provenance'
+
+const bakrep = { database: true, title: 'BakRep', dataset: 'd1', identifiers: [] }
 
 const arn = (key: string, version: string) => `https://w3id.org/aruna/data/arn:aruna:realm:node:s3/lab/${key}@${version}`
 const V1 = '01K8W1B3D5F7H9KMQ1S3V5X7Z1'
@@ -25,7 +27,6 @@ function readers(answers: Record<string, OriginResponse | Error>, crate: unknown
     }),
     run: vi.fn(async (runId: string) => ({ run_id: runId, run_crate: 'doc1' })),
     crate: vi.fn(async () => crate),
-    database: (entry: string) => (entry === 'e1' ? { title: 'BakRep', datasetId: 'd1' } : null),
   }
 }
 
@@ -44,13 +45,13 @@ describe('provenance graph', () => {
     const found = [{ name: 'BioSample', value: 'SAMN1', url: 'https://x.org/SAMN1', target: 'key' as const }]
     const read = readers(
       {
-        [arn('a.faa', V1)]: origin({ origin: { kind: 'source', database_entry: 'e1' }, database_entry: 'e1', identifiers: found }),
+        [arn('a.faa', V1)]: origin({ origin: { kind: 'source' }, bucket_metadata: bakrep, identifiers: found }),
         [arn('b.faa', V2)]: origin({ origin: { kind: 'upload', node_id: 'n1' } }),
       },
       runCrate,
     )
     const graph = emptyGraph()
-    startFile(graph, arn('out.tsv', V1), 'out.tsv', origin({ origin: { kind: 'job', run_id: 'r1' } }), read)
+    startFile(graph, arn('out.tsv', V1), 'out.tsv', origin({ origin: { kind: 'job', run_id: 'r1' } }))
     await expandAll(graph, read, () => false)
 
     const run = graph.boxes['run:r1']
@@ -58,7 +59,7 @@ describe('provenance graph', () => {
     expect(run.link?.document).toBe('doc1')
     expect([...run.from].sort()).toEqual([arn('a.faa', V1), arn('b.faa', V2), 's3://lab/c.yaml'].sort())
     expect(graph.boxes['s3://lab/c.yaml'].detail).toBe('No exact version recorded')
-    const database = graph.boxes['database:e1']
+    const database = graph.boxes['database:d1']
     expect(database.title).toBe('BakRep')
     expect(graph.boxes[arn('a.faa', V1)].identifiers[0].value).toBe('SAMN1')
     expect(graph.steps).toBe(3)
@@ -69,7 +70,7 @@ describe('provenance graph', () => {
     const [a, b] = [arn('a', V1), arn('b', V2)]
     const read = readers({ [b]: origin({ origin: { kind: 'copy', from: a } }) })
     const graph = emptyGraph()
-    startFile(graph, a, 'a', origin({ origin: { kind: 'copy', from: b } }), read)
+    startFile(graph, a, 'a', origin({ origin: { kind: 'copy', from: b } }))
     await expandAll(graph, read, () => false)
 
     expect(read.origin).toHaveBeenCalledTimes(1)
@@ -79,7 +80,7 @@ describe('provenance graph', () => {
   it('names a hidden file by its content id only, and lets a silent node be asked again', async () => {
     const read = readers({ [arn('b.faa', V2)]: new ApiError(503, 'busy') }, runCrate)
     const graph = emptyGraph()
-    startFile(graph, arn('out.tsv', V1), 'out.tsv', origin({ origin: { kind: 'job', run_id: 'r1' } }), read)
+    startFile(graph, arn('out.tsv', V1), 'out.tsv', origin({ origin: { kind: 'job', run_id: 'r1' } }))
     await expandAll(graph, read, () => false)
 
     expect(graph.boxes[DIGEST]).toMatchObject({ kind: 'hidden', title: 'Not visible to you' })
@@ -112,15 +113,15 @@ describe('provenance graph', () => {
 
   it('keeps identifiers on each file, not on their shared database', async () => {
     const found = (value: string) => [{ name: 'BioSample', value, url: `https://x.org/${value}`, target: 'key' as const }]
-    const from = (value: string) => origin({ origin: { kind: 'source', database_entry: 'e1' }, database_entry: 'e1', identifiers: found(value) })
+    const from = (value: string) => origin({ origin: { kind: 'source' }, bucket_metadata: bakrep, identifiers: found(value) })
     const read = readers({ [arn('a.faa', V1)]: from('SAMN1'), [arn('b.faa', V2)]: from('SAMN2') }, runCrate)
     const graph = emptyGraph()
-    startFile(graph, arn('out.tsv', V1), 'out.tsv', origin({ origin: { kind: 'job', run_id: 'r1' } }), read)
+    startFile(graph, arn('out.tsv', V1), 'out.tsv', origin({ origin: { kind: 'job', run_id: 'r1' } }))
     await expandAll(graph, read, () => false)
 
     expect(graph.boxes[arn('a.faa', V1)].identifiers[0].value).toBe('SAMN1')
     expect(graph.boxes[arn('b.faa', V2)].identifiers[0].value).toBe('SAMN2')
-    expect(graph.boxes['database:e1'].identifiers).toEqual([])
+    expect(graph.boxes['database:d1'].identifiers).toEqual([])
   })
 
   it('drops an answer that comes back after the view moved on', async () => {
@@ -128,7 +129,7 @@ describe('provenance graph', () => {
     const read = readers({})
     vi.mocked(read.origin).mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
     const graph = emptyGraph()
-    startFile(graph, arn('a', V1), 'a', origin({ origin: { kind: 'copy', from: arn('b', V2) } }), read)
+    startFile(graph, arn('a', V1), 'a', origin({ origin: { kind: 'copy', from: arn('b', V2) } }))
     let current = true
     const pending = expand(graph, arn('a', V1), read, () => current)
     current = false
@@ -143,5 +144,16 @@ describe('provenance graph', () => {
   it('reads the inputs a run crate names', () => {
     expect(runInputs(runCrate).parts.map((part) => part.exact !== null)).toEqual([true, true, false])
     expect(runInputs(null)).toEqual({ name: null, parts: [] })
+  })
+})
+
+describe('runRecordDetail', () => {
+  it('says why a run shows no record', () => {
+    expect(runRecordDetail({ status: 'denied', message: 'metadata write access denied' })).toBe(
+      'Run record not written: metadata write access denied',
+    )
+    expect(runRecordDetail({ status: 'local' })).toBe('Run record kept on the device')
+    expect(runRecordDetail({ status: 'pending' })).toBe('No run record yet')
+    expect(runRecordDetail(null)).toBe('No run record yet')
   })
 })

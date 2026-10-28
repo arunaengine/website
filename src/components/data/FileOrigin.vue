@@ -10,7 +10,6 @@ import DetailDialog from '@/components/ui/DetailDialog.vue'
 import GlobalId from '@/components/distributed/GlobalId.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useDatabases } from '@/composables/useDatabases'
 import { useFileOrigin, type OriginTarget } from '@/composables/useFileOrigin'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { s3ErrorMessage, useS3 } from '@/composables/useS3'
@@ -23,7 +22,6 @@ const props = defineProps<{ target: OriginTarget }>()
 
 const { displayName, localNodeId } = useRealmNodes()
 const s3 = useS3()
-const databases = useDatabases()
 const found = useFileOrigin(computed(() => props.target))
 
 const origin = computed(() =>
@@ -31,10 +29,6 @@ const origin = computed(() =>
     ? originFrom(found.origin.value, {
         user: shortUserId,
         node: displayName,
-        database: (entryId) => {
-          const row = databases.rows.value.find((item) => item.entryId === entryId)
-          return row ? row.title || row.bucket : null
-        },
         backend: (id) => truncateMiddle(id, 8, 4),
       })
     : null,
@@ -58,7 +52,7 @@ const start = computed<ProvenanceStart | null>(() => {
   const origin = found.origin.value
   return origin && startId.value ? { kind: 'file', id: startId.value, name: fileName.value, origin } : null
 })
-// Links to public records; they come from the database's rules as they are now.
+// Links to public records; they come from the bucket's rules as they are now.
 const identifiers = computed(() => found.origin.value?.identifiers ?? [])
 // The version downloads through this session's short-lived signed URL, never with the token in a URL.
 const downloadError = ref<string | null>(null)
@@ -99,7 +93,7 @@ const recorded = computed(() => Boolean(origin.value || hop.value))
           <span class="text-muted-foreground">Identifier:</span> {{ item.name }}
           <a :href="item.url" target="_blank" rel="noopener noreferrer" class="font-mono text-primary hover:underline">{{ item.value }} ↗</a>
         </p>
-        <p class="text-muted-foreground">Found by the current rules of the database.</p>
+        <p class="text-muted-foreground">Found by the current rules of the bucket.</p>
       </div>
       <div v-if="startId">
         <Button size="sm" variant="outline" @click="showing = true">Where it came from</Button>

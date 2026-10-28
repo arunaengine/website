@@ -12,6 +12,8 @@ export interface RunResponse {
   /** The run crate document, once written. */
   run_crate?: string | null
   run_crate_iri?: string | null
+  /** The crate's state for the submitter, with a `message` when it was not written. */
+  run_crate_status?: { status: string; message?: string; resource?: string } | null
 }
 
 /** The origin of one exact version: a global id URL or a versioned object w3id. */

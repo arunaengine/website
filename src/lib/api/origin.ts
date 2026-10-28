@@ -1,5 +1,5 @@
 // ── Where a file version came from ──────────────────────────────────────────
-// Verified against aruna api/src/routes/storage/origin.rs (feat/distributed-buckets-metadata).
+// Verified against aruna api/src/routes/storage/origin.rs (feat/run-provenance-gaps).
 // The server sets the origin when it mints the version and never changes it. A sync adds a hop.
 // Readers of the file see the full record; `projection` is what a dataset may say about it.
 import { apiRequest, type ApiClientOptions } from './client'
@@ -7,8 +7,8 @@ import { apiRequest, type ApiClientOptions } from './client'
 export type OriginBody =
   /** Uploaded directly; the uploader is `created_by`. */
   | { kind: 'upload'; node_id: string; device?: string | null }
-  /** From an external source or a database; the details are under `source`. */
-  | { kind: 'source'; database_entry?: string | null }
+  /** From an external source; the details are under `source`. */
+  | { kind: 'source' }
   /** Copied from another exact version (global id URL or versioned node id). */
   | { kind: 'copy'; from: string }
   /** Registered in place from a storage backend folder. */
@@ -45,7 +45,7 @@ export type OriginProjection =
   /** A link the database's identifier rules found. */
   | { property: 'identifier'; name: string; value: string; url: string }
 
-/** A link to a public record, found by the current rules of the file's database. */
+/** A link to a public record, found by the current identifier rules of the file's bucket. */
 export interface OriginIdentifier {
   name: string
   value: string
@@ -65,11 +65,42 @@ export interface OriginResponse {
   source?: OriginSource | null
   /** Uploads and imports in place give none. */
   projection: OriginProjection[]
-  /** The database entry that lists the bucket now; it may differ from when the file was made. */
-  database_entry?: string | null
+  /** The bucket's metadata now; it may differ from when the file was made. */
+  bucket_metadata?: BucketMetadata | null
   identifiers?: OriginIdentifier[]
   /** The content id of the stored bytes; absent for references. */
   content_id?: string | null
+  /** Releases of the bucket that pin exactly this version and the user may read. */
+  releases?: OriginRelease[]
+  /** False when release membership could not be checked everywhere, so one may be missing. */
+  releases_complete?: boolean
+}
+
+/** One identifier of a bucket or release, such as its DOI. */
+export interface BucketIdentifier {
+  name: string
+  value: string
+  url: string
+}
+
+/** What describes a bucket; `database` lets the portal show it as a database. */
+export interface BucketMetadata {
+  database: boolean
+  title?: string | null
+  description?: string | null
+  version?: string | null
+  license?: string | null
+  identifiers: BucketIdentifier[]
+  parser?: unknown
+  /** The dataset document that describes the bucket. */
+  dataset?: string | null
+}
+
+/** A release that pins a version: its release crate's exact version, label and upstream ids. */
+export interface OriginRelease {
+  crate_version: string
+  label: string
+  upstream: BucketIdentifier[]
 }
 
 export function getFileOrigin(

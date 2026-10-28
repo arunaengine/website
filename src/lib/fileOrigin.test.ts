@@ -5,7 +5,6 @@ import { hopFrom, originFrom, projectionRows, type OriginLabels } from './fileOr
 const labels: OriginLabels = {
   user: (id) => `user ${id}`,
   node: (id) => `node ${id}`,
-  database: (id) => (id === 'e1' ? 'SPIRE' : null),
   backend: (id) => `folder ${id}`,
 }
 
@@ -23,7 +22,8 @@ describe('file origin', () => {
   it('names the source with its public url, its etag and the first digest, and the database', () => {
     const origin = originFrom(
       response({
-        origin: { kind: 'source', database_entry: 'e1' },
+        origin: { kind: 'source' },
+        bucket_metadata: { database: true, title: 'SPIRE', identifiers: [] },
         source: {
           url: 'https://s3.example.org/bakrep/a/genome.fna.gz',
           path: 'a/genome.fna.gz',
@@ -45,9 +45,13 @@ describe('file origin', () => {
     })
   })
 
-  it('keeps a source without a public url, and a database that is not listed for the user', () => {
+  it('keeps a source without a public url, and a database bucket without a title', () => {
     const origin = originFrom(
-      response({ origin: { kind: 'source', database_entry: 'e9' }, source: { path: 'drive/a.bin', digests: [] } }),
+      response({
+        origin: { kind: 'source' },
+        bucket_metadata: { database: true, identifiers: [] },
+        source: { path: 'drive/a.bin', digests: [] },
+      }),
       labels,
     )
 

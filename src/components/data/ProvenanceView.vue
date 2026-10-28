@@ -6,7 +6,6 @@ import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useDatabases } from '@/composables/useDatabases'
 import { apiErrorMessage } from '@/lib/api'
 import {
   emptyGraph,
@@ -24,16 +23,11 @@ import {
 const props = defineProps<{ start: ProvenanceStart }>()
 
 const { getVersionOrigin, getRun, fetchRoCrateRaw, downloadProvenanceCrate, runSparql, sessionEpoch } = useAruna()
-const databases = useDatabases()
 
 const readers: Readers = {
   origin: (version) => getVersionOrigin(version),
   run: (runId) => getRun(runId),
   crate: (documentId) => fetchRoCrateRaw(documentId),
-  database: (entryId) => {
-    const row = databases.rows.value.find((item) => item.entryId === entryId)
-    return row ? { title: row.title || row.bucket, datasetId: row.datasetId } : null
-  },
 }
 
 const graph = reactive<Graph>(emptyGraph())
@@ -60,7 +54,7 @@ watch(
     went.value = null
     wentState.value = 'idle'
     Object.assign(graph, emptyGraph())
-    if (props.start.kind === 'file') startFile(graph, props.start.id, props.start.name, props.start.origin, readers)
+    if (props.start.kind === 'file') startFile(graph, props.start.id, props.start.name, props.start.origin)
     else startDataset(graph, props.start.title, props.start.documentId, props.start.crate)
   },
   { immediate: true },

@@ -32,7 +32,6 @@ export interface Readers {
   origin: (version: string) => Promise<OriginResponse>
   run: (runId: string) => Promise<RunResponse>
   crate: (documentId: string) => Promise<unknown>
-  database: (entryId: string) => { title: string; datasetId: string } | null
 }
 
 export type ProvenanceStart =
@@ -70,7 +69,7 @@ function add(graph: Graph, parent: string | null, child: Box): string {
 }
 
 /** A file's box, with its database and source added at once and its other links waiting. */
-function fileBox(graph: Graph, parent: string | null, id: string, role: string, name: string, origin: OriginResponse, readers: Readers) {
+function fileBox(graph: Graph, parent: string | null, id: string, role: string, name: string, origin: OriginResponse) {
   const file = box(id, 'file', role, name, { detail: new Date(origin.created_at).toLocaleDateString() })
   const kind = origin.origin?.kind
   if (origin.origin?.kind === 'copy') file.pending.push({ kind: 'version', id: origin.origin.from, role: 'Copied from' })
@@ -79,11 +78,11 @@ function fileBox(graph: Graph, parent: string | null, id: string, role: string, 
   add(graph, parent, file)
   // Identifiers belong to this file; the database box is shared by every file it lists.
   file.identifiers = origin.identifiers ?? []
-  const entry = origin.database_entry ?? (origin.origin?.kind === 'source' ? origin.origin.database_entry : null)
-  if (entry) {
-    const listed = readers.database(entry)
-    const database = box(`database:${entry}`, 'database', 'Database (current)', listed?.title || 'A database')
-    if (listed) database.link = { label: 'Open the dataset', document: listed.datasetId }
+  const metadata = origin.bucket_metadata
+  if (metadata?.database) {
+    const title = metadata.title || 'A database'
+    const database = box(`database:${metadata.dataset || title}`, 'database', 'Bucket with database metadata', title)
+    if (metadata.dataset) database.link = { label: 'Open the dataset', document: metadata.dataset }
     add(graph, id, database)
   }
   const url = kind === 'source' ? origin.source?.url : null
@@ -104,10 +103,10 @@ export function emptyGraph(): Graph {
 }
 
 /** Starts at a file whose origin is already read; `id` is its exact version id. */
-export function startFile(graph: Graph, id: string, name: string, origin: OriginResponse, readers: Readers) {
+export function startFile(graph: Graph, id: string, name: string, origin: OriginResponse) {
   const canonical = origin.global_id || id
   graph.seen[id] = canonical
-  fileBox(graph, null, canonical, 'This file', name, origin, readers)
+  fileBox(graph, null, canonical, 'This file', name, origin)
 }
 
 /** Starts at a dataset: each file part with an exact version waits to be read. */
@@ -188,7 +187,7 @@ async function follow(graph: Graph, boxId: string, hop: Hop, readers: Readers, c
       const canonical = origin.global_id || hop.id
       graph.seen[asked] = canonical
       if (graph.boxes[canonical]) add(graph, boxId, graph.boxes[canonical])
-      else fileBox(graph, boxId, canonical, hop.role, hop.name ?? shortName(hop.id), origin, readers)
+      else fileBox(graph, boxId, canonical, hop.role, hop.name ?? shortName(hop.id), origin)
       return
     }
     const run = await readers.run(hop.runId)
@@ -199,7 +198,7 @@ async function follow(graph: Graph, boxId: string, hop: Hop, readers: Readers, c
     const { name, parts } = runInputs(crate)
     const created = box(id, 'run', 'Run', name ?? `Run ${shortName(hop.runId)}`)
     if (run.run_crate) created.link = { label: 'Open the run record', document: run.run_crate }
-    else created.detail = 'No run record yet'
+    else created.detail = runRecordDetail(run.run_crate_status)
     add(graph, boxId, created)
     for (const input of parts) {
       if (input.exact) created.pending.push({ kind: 'version', id: input.exact, name: input.name, digest: input.id, role: 'Input file' })
@@ -214,6 +213,15 @@ async function follow(graph: Graph, boxId: string, hop: Hop, readers: Readers, c
     const silent = box(`silent:${asked}`, 'silent', hop.kind === 'run' ? 'Run' : hop.role, 'Node did not answer', { pending: [hop] })
     add(graph, boxId, silent)
   }
+}
+
+/** Why a run shows no record: its crate state, as its node reported it to the submitter. */
+export function runRecordDetail(status: RunResponse['run_crate_status']): string {
+  if (status?.status === 'local') return 'Run record kept on the device'
+  if (status?.status === 'denied' || status?.status === 'failed') {
+    return `Run record not written: ${status.message || status.status}`
+  }
+  return 'No run record yet'
 }
 
 /** A link the user may not read: named by a global id or content id, never by bucket or key. */
