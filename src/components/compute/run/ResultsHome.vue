@@ -45,3 +45,4 @@ const homes = computed<SyncedFolder[]>(() =>
       {{ folderName(folder.root) }}
     </Button>
   </div>
+</template>
