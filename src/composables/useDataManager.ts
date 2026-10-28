@@ -750,6 +750,8 @@ export function useDataManager() {
     listedOnce.value = false
     folders.value = []
     objects.value = []
+    deletedObjects.value = []
+    deletedTruncated.value = false
     pages.reset()
     listLoading.value = false
     listError.value = null

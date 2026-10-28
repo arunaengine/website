@@ -172,13 +172,22 @@ describe('name filter refresh', () => {
     await mountApp(host, { router })
     for (let round = 0; round < 6; round++) await new Promise((resolve) => setTimeout(resolve, 0))
     expect(manager!.viewReady.value).toBe(true)
+    const gone = { key: 'old.txt', name: 'old.txt', markerVersionId: 'm1' }
+    s3.listDeletedObjects.mockImplementationOnce(async () => ({ deleted: [gone], truncated: false }) as never)
+    manager!.setShowDeleted(true)
+    await flush()
+    expect(manager!.deletedObjects.value).toEqual([gone])
 
     let finish: (page: { folders: never[]; objects: never[] }) => void = () => undefined
     s3.listObjects.mockImplementationOnce(() => new Promise((resolve) => (finish = resolve as never)) as never)
+    s3.listDeletedObjects.mockImplementationOnce(() => new Promise(() => undefined) as never)
     await router.push({ name: 'bucket', params: { bucketId: 'reef' }, query: { group: 'g-b', prefix: 'SAMN1/' } })
     for (let round = 0; round < 6; round++) await new Promise((resolve) => setTimeout(resolve, 0))
     expect(manager!.listLoading.value).toBe(true)
     expect(manager!.viewReady.value).toBe(true)
+    // Deleted rows of the previous folder must not stay actionable under the new one.
+    expect(manager!.deletedObjects.value).toEqual([])
+    manager!.setShowDeleted(false)
     finish({ folders: [], objects: [] })
     await flush()
     expect(manager!.listLoading.value).toBe(false)
