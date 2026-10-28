@@ -134,6 +134,21 @@ describe('portal S3 session migration and selection', () => {
     expect(sessionSet).not.toHaveBeenCalled()
   })
 
+  it('opens a session of another node for one read without changing the active one', async () => {
+    await s3.activateContext(null, 'group-a')
+    apiRequest.mockResolvedValueOnce(sessionResponse({
+      access_key_id: 'session-key-b',
+      issuer_node: { node_id: 'node-b', s3_endpoint: 'https://s3.node-b.test' },
+    }))
+
+    const reference = await s3.referenceForNode('node-b', 'group-a')
+    expect(reference).toEqual({ nodeId: 'node-b', groupId: 'group-a', accessKeyId: 'session-key-b' })
+    expect(apiRequest.mock.calls.at(-1)?.[2]).toMatchObject({ baseUrl: 'https://api.node-b.test/api/v1' })
+    expect(s3.activeContext.value?.nodeId).toBe('node-a')
+    expect(await s3.referenceForNode('node-b', 'group-a')).toEqual(reference)
+    expect(apiRequest).toHaveBeenCalledTimes(2)
+  })
+
   it('explains a refused mint', async () => {
     // The node answers a bare 403 when the caller's roles reach none of the group data.
     apiRequest.mockRejectedValueOnce(Object.assign(new Error('Forbidden'), { name: 'ApiError', status: 403 }))

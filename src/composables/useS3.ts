@@ -41,6 +41,7 @@ import {
   hasActiveKey,
   normalizeNodeId,
   referenceForContext,
+  referenceForNode,
   replaceSession,
   sessionRevision,
   sessions,
@@ -119,6 +120,7 @@ function nodeS3() {
     replaceSession,
     clearSessions,
     referenceForContext,
+    referenceForNode,
     sessionState,
     contextMismatch,
     canRead: (bucket: string, key?: string, nodeId?: string | null) =>

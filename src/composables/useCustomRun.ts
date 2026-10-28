@@ -1188,12 +1188,14 @@ function createStore(deps: CustomRunDeps) {
       notes.push('The original script is not an s3:// object, so its content could not be restored.')
       return
     }
-    if (!s3.hasActiveKey.value || !s3.endpoint.value) {
+    if (!pinned?.source_node_id && (!s3.hasActiveKey.value || !s3.endpoint.value)) {
       notes.push('S3 credentials are required to restore the script content; the editor shows the template.')
       return
     }
     try {
-      const content = await s3.getObjectText(scriptRef.bucket, scriptRef.key, pinned?.source_node_id, pinned?.version_id)
+      // A pinned script is read with a session of its own node, without changing the active one.
+      const reference = pinned?.source_node_id ? await s3.referenceForNode(pinned.source_node_id, groupId.value) : undefined
+      const content = await s3.getObjectText(scriptRef.bucket, scriptRef.key, pinned?.source_node_id, pinned?.version_id, reference)
       const extracted =
         id === 'python-uv' ? extractInlineDependencies(content) : { script: content, dependencies: [] }
       script.value = extracted.script
@@ -1212,7 +1214,8 @@ function createStore(deps: CustomRunDeps) {
     const configRef = config?.url ? parseS3Url(config.url) : null
     if (!configRef) return
     try {
-      const list = dependenciesFromDenoConfig(await s3.getObjectText(configRef.bucket, configRef.key, config?.source_node_id, config?.version_id))
+      const reference = config?.source_node_id ? await s3.referenceForNode(config.source_node_id, groupId.value) : undefined
+      const list = dependenciesFromDenoConfig(await s3.getObjectText(configRef.bucket, configRef.key, config?.source_node_id, config?.version_id, reference))
       dependencies.value = list
       for (const dependency of list) void verifyDependency(dependency)
     } catch {

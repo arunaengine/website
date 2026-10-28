@@ -237,6 +237,7 @@ const s3 = {
   listBuckets: vi.fn(async () => [{ name: 'results' }]),
   ensureSession: vi.fn(async () => undefined),
   getObjectText: vi.fn(async () => ''),
+  referenceForNode: vi.fn(async (nodeId: string, groupId: string) => ({ nodeId, groupId, accessKeyId: 'k-b' })),
   putTextObject: vi.fn(async () => ({ versionId: 'v1' })),
   createBucket: vi.fn(async () => undefined),
   canWrite: () => true,
@@ -542,7 +543,7 @@ describe('run page', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     await flush()
 
-    expect(s3.getObjectText).toHaveBeenCalledWith('scripts', 'run/script.py', 'node-b', '01K8W1B3D5F7H9KMQ1S3V5X7Z1')
+    expect(s3.getObjectText).toHaveBeenCalledWith('scripts', 'run/script.py', 'node-b', '01K8W1B3D5F7H9KMQ1S3V5X7Z1', expect.objectContaining({ nodeId: 'node-b', accessKeyId: 'k-b' }))
     expect(content(mounted.root)).not.toContain('could not be restored')
     await click(runButton(mounted.root))
     await new Promise((resolve) => setTimeout(resolve, 0))

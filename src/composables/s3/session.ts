@@ -439,6 +439,19 @@ export function referenceForContext(nodeId: string | null, groupId: string): S3S
     : null
 }
 
+/** A session of one node and group, minted when there is none; the active context stays as it is. */
+export async function referenceForNode(nodeId: string | null, groupId: string): Promise<S3SessionReference> {
+  const known = referenceForContext(nodeId, groupId)
+  if (known) return known
+  const user = currentUser.value
+  const issuerNodeId = normalizeNodeId(nodeId)
+  if (!user || !authToken.value || !issuerNodeId || !groupId.trim()) throw new Error('No S3 session can be opened for this node and group.')
+  await mintSession(issuerNodeId, groupId.trim(), user.id)
+  const minted = referenceForContext(nodeId, groupId.trim())
+  if (!minted) throw new Error('The S3 session for this node is not usable.')
+  return minted
+}
+
 export function sessionState(reference: S3SessionReference): 'usable' | 'expired' | 'missing' {
   const session = sessions.value.get(storeKey(reference.nodeId, reference.groupId))
   if (!session || session.accessKeyId !== reference.accessKeyId) return 'missing'
