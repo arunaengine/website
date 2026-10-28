@@ -21,6 +21,7 @@ import RunFooter from '@/components/compute/run/RunFooter.vue'
 import RequestDialog from '@/components/compute/run/RequestDialog.vue'
 import ScriptPickerDialog from '@/components/compute/run/ScriptPickerDialog.vue'
 import SaveRunDialog from '@/components/compute/SaveRunDialog.vue'
+import SavedRunStart from '@/components/compute/run/SavedRunStart.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useComputeDataView } from '@/composables/useComputeDataView'
@@ -78,6 +79,8 @@ const {
   rerunError,
   rerunLoading,
   dismissRerun,
+  savedStart,
+  savedError,
 } = store
 
 // The assistant may read and change this form while the page is open.
@@ -222,11 +225,15 @@ async function run() {
           @dismiss="dismissRerun"
         />
 
-        <RunBasics />
-        <ExecutorCard />
-        <ScriptCard v-if="hasScript" />
-        <FilesystemCard />
-        <ResourcesCard ref="resourcesCard" />
+        <Notice v-if="savedError" tone="error">{{ savedError }}</Notice>
+        <SavedRunStart v-if="savedStart" />
+        <template v-else>
+          <RunBasics />
+          <ExecutorCard />
+          <ScriptCard v-if="hasScript" />
+          <FilesystemCard />
+          <ResourcesCard ref="resourcesCard" />
+        </template>
         <PlacementCard ref="placementCard" />
 
         <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>

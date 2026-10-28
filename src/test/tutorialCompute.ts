@@ -268,6 +268,7 @@ const ComputeSubmitView = compileClientComponent(url('views/ComputeSubmitView.vu
   '@/components/compute/run/RequestDialog.vue': moduleDefault(RequestDialog),
   '@/components/compute/run/ScriptPickerDialog.vue': moduleDefault(GenericStub),
   '@/components/compute/SaveRunDialog.vue': moduleDefault(GenericStub),
+  '@/components/compute/run/SavedRunStart.vue': moduleDefault(GenericStub),
   '@/components/compute/TesDataRefDialog.vue': moduleDefault(TesDataRefDialog),
   '@/components/compute/ComputeGates.vue': moduleDefault(ComputeGates),
   '@/components/compute/RerunPrefillNote.vue': moduleDefault(RerunPrefillNote),

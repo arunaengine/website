@@ -17,6 +17,7 @@ import {
   typeValue,
   type HostNode,
 } from '@/test/clientRender'
+import { useSavedRuns } from '@/composables/useSavedRuns'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as VueUse from '@vueuse/core'
 import { useRefresh } from '@/composables/useRefresh'
@@ -307,6 +308,7 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
   '@/components/compute/run/RequestDialog.vue': moduleDefault(GenericStub),
   '@/components/compute/run/ScriptPickerDialog.vue': moduleDefault(GenericStub),
   '@/components/compute/SaveRunDialog.vue': moduleDefault(GenericStub),
+  '@/components/compute/run/SavedRunStart.vue': moduleDefault(GenericStub),
   '@/components/compute/TesDataRefDialog.vue': moduleDefault(GenericStub),
   '@/components/compute/RerunPrefillNote.vue': moduleDefault(GenericStub),
   '@/components/compute/ComputeGates.vue': moduleDefault(ComputeGates),
@@ -478,6 +480,32 @@ describe('run page', () => {
     expect(submitted.resources).toEqual({ cpu_cores: 1, ram_gb: 2, disk_gb: 10 })
     expect(mounted.router!.currentRoute.value.name).toBe('task')
     expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('starts a saved run with only its asked input open', async () => {
+    useSavedRuns().save({
+      id: 'r1', name: 'Align', savedAt: '2026-10-28T10:00:00Z',
+      task: {
+        name: 'Align',
+        executors: [{ image: 'alpine:3.20', command: ['echo', 'hi'] }],
+        inputs: [
+          { name: 'genome', path: '/data/genome.fna', url: 's3://lab/genome.fna', type: 'FILE' },
+          { name: 'ref', path: '/data/ref.fna', url: 's3://lab/ref.fna', type: 'FILE' },
+        ],
+      },
+      ask: { inputs: ['/data/genome.fna'], results: false },
+    })
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?saved=r1')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    expect(content(mounted.root)).toContain('Choose the input for /data/genome.fna')
+    expect(content(mounted.root)).not.toContain('Image is missing')
+    await click(runButton(mounted.root))
+    await flush()
+    expect(createTask).not.toHaveBeenCalled()
+    useSavedRuns().remove('r1')
     mounted.app.unmount()
   })
 

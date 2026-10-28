@@ -61,6 +61,8 @@ import { bucketNameProblem, objectKeyProblem } from '@/lib/bucketName'
 import { isHiddenBucket } from '@/lib/workspaces'
 import { quoteCommand, tokenizeCommand } from '@/lib/shellwords'
 import { errorMessage } from '@/lib/utils'
+import type { SavedRun } from '@/lib/savedRuns'
+import { useSavedRuns } from '@/composables/useSavedRuns'
 import { targetProblems as collectTargetProblems } from '@/lib/runTarget'
 import type { useAruna } from '@/composables/useAruna'
 import type { useComputeDataView } from '@/composables/useComputeDataView'
@@ -140,6 +142,7 @@ function baseNameOf(path: string): string {
 }
 function createStore(deps: CustomRunDeps) {
   const { runTarget, s3, myGroups, currentUser, nodes, getTask, dataView, realmName } = deps
+  const savedRuns = useSavedRuns()
   const router = useRouter()
   const route = useRoute()
 
@@ -971,6 +974,12 @@ function createStore(deps: CustomRunDeps) {
     if (!matchCount.value) {
       list.push({ section: 'section-placement', field: 'run-node', text: 'No node matches the placement' })
     }
+    for (const path of openInputs.value) {
+      list.push({ section: 'section-saved', field: 'saved-inputs', text: `Choose the input for ${path}` })
+    }
+    if (savedStart.value && !resultsChosen.value) {
+      list.push({ section: 'section-saved', field: 'saved-results', text: 'Choose the results folder' })
+    }
     for (const problem of targetProblems.value) {
       list.push({ section: 'section-placement', field: 'run-node', text: problem })
     }
@@ -1001,6 +1010,8 @@ function createStore(deps: CustomRunDeps) {
     for (const dependency of dependencies.value) void verifyDependency(dependency)
     const rerun = route.query.rerun
     if (typeof rerun === 'string' && rerun) void applyRerun(rerun)
+    const saved = route.query.saved
+    if (typeof saved === 'string' && saved) void applySaved(saved)
   })
   watch([currentUser, () => s3.hasActiveKey.value, myGroups], initDefaults)
   // Staging the script needs a session for the run's group.
@@ -1025,72 +1036,7 @@ function createStore(deps: CustomRunDeps) {
     rerunNotes.value = []
     try {
       const source = await getTask(id, 'FULL')
-      const notes: string[] = []
-      const match = detectQuickRun(source)
-      // The template the run came from: a script runtime, or a custom image.
-      if (match) chooseRuntime(match.runtime.id)
-      else useCustomImage()
-
-      const sourceWorkdir = source.executors?.[0]?.workdir?.trim() ?? ''
-      activeWorkdir.value =
-        sourceWorkdir && sourceWorkdir !== '/' && validContainerDir(sourceWorkdir)
-          ? normWorkdir(sourceWorkdir)
-          : '/work'
-      workdir.value = activeWorkdir.value
-      workdirNotice.value = null
-      await nextTick()
-
-      name.value = source.name ?? ''
-      description.value = source.description ?? ''
-      const group = source.tags?.[TES_GROUP_TAG]
-      if (group) groupId.value = group
-      executorConstraint.value = source.tags?.[TES_EXECUTOR_TAG] ?? ''
-      setConstraints(tesPlacementTags(source.tags).labelConstraints)
-
-      const executor = source.executors?.[0]
-      if (executor) {
-        image.value = executor.image
-        commandLine.value = quoteCommand(executor.command)
-        envRows.value = Object.entries(executor.env ?? {}).map(([key, value]) => ({ key, value }))
-        markTouched('image')
-        markTouched('command')
-        markTouched('env')
-        if ((source.executors?.length ?? 0) > 1) {
-          notes.push('Only the first executor was restored; a run carries one.')
-        }
-      }
-
-      const dataRefs = (source.inputs ?? []).filter(
-        (input) => input !== match?.scriptInput && input.path !== dependencyConfigPath.value,
-      )
-      inputs.value = dataRefs.map((input): TesDataRefEntry => {
-        const name = input.name || input.path.split('/').filter(Boolean).pop() || 'input'
-        const folder = input.type === 'DIRECTORY' ? parseS3Url(input.url ?? '') : null
-        if (folder) return { kind: 'folder', bucket: folder.bucket, prefix: folder.key, name, basePath: `${input.path.replace(/\/$/, '')}/`, files: [], directory: true }
-        return { kind: 'file', url: input.url ?? '', path: input.path, name }
-      })
-      if (dataRefs.some((input) => input.name?.includes('/'))) {
-        notes.push('Folder selections were restored as individual file inputs.')
-      }
-
-      outputRows.value = (source.outputs ?? []).flatMap((output) => {
-        const parsed = parseS3Url(output.url)
-        if (!parsed) {
-          notes.push(`The output destination ${output.url} is not an s3:// URL and was not restored.`)
-          return []
-        }
-        const path = captureContainerPath(output)
-        const key = isDirCapture(path) && !parsed.key.endsWith('/') ? `${parsed.key}/` : parsed.key
-        return [{ path, bucket: parsed.bucket, key, keyTouched: true }]
-      })
-
-      const r = source.resources
-      cpuCores.value = r?.cpu_cores != null ? String(r.cpu_cores) : ''
-      ramGb.value = r?.ram_gb != null ? String(r.ram_gb) : ''
-      diskGb.value = r?.disk_gb != null ? String(r.disk_gb) : ''
-
-      if (match) await restoreScript(match.scriptInput.url, match.runtime.id, source, notes)
-
+      const notes = await fillFrom(source)
       rerunSource.value = { id, name: source.name || id }
       rerunNotes.value = notes
     } catch (err) {
@@ -1098,6 +1044,123 @@ function createStore(deps: CustomRunDeps) {
     } finally {
       rerunLoading.value = false
     }
+  }
+
+  // ── Saved runs (?saved=<id>): the stored request, with the asked parts left open ──
+  const savedStart = ref<{ run: SavedRun; notes: string[] } | null>(null)
+  const savedError = ref<string | null>(null)
+  const resultsChosen = ref(false)
+  const entryPath = (entry: TesDataRefEntry) => (entry.kind === 'file' ? entry.path : entry.basePath).replace(/\/$/, '')
+  /** The asked inputs of the saved run that have no pick yet. */
+  const openInputs = computed(() => {
+    const asked = savedStart.value?.run.ask.inputs ?? []
+    return asked.filter((path) => !inputs.value.some((entry) => entryPath(entry) === path))
+  })
+
+  async function applySaved(id: string) {
+    savedError.value = null
+    const run = savedRuns.find(id)
+    if (!run) {
+      savedError.value = 'This saved run is not on this computer.'
+      return
+    }
+    rerunLoading.value = true
+    try {
+      const notes = await fillFrom(run.task)
+      inputs.value = inputs.value.filter((entry) => !run.ask.inputs.includes(entryPath(entry)))
+      resultsChosen.value = !run.ask.results
+      savedStart.value = { run, notes }
+    } catch (err) {
+      savedError.value = errorMessage(err)
+    } finally {
+      rerunLoading.value = false
+    }
+  }
+
+  /** Puts a pick at the path the saved run asks for. */
+  function answerInput(path: string, entry: TesDataRefEntry) {
+    const placed: TesDataRefEntry = entry.kind === 'file' ? { ...entry, path } : { ...entry, basePath: `${path}/` }
+    inputs.value = [...inputs.value.filter((item) => entryPath(item) !== path), placed]
+  }
+
+  function chooseResults(bucket: string, prefix: string) {
+    sendOutputsTo(bucket, prefix)
+    resultsChosen.value = true
+  }
+
+  /** Shows the whole form; the open questions stay as they are. */
+  function editSaved() {
+    savedStart.value = null
+  }
+
+  // Fills the form from a run request and answers notes on what could not be restored.
+  async function fillFrom(source: TesTask): Promise<string[]> {
+    const notes: string[] = []
+    const match = detectQuickRun(source)
+    // The template the run came from: a script runtime, or a custom image.
+    if (match) chooseRuntime(match.runtime.id)
+    else useCustomImage()
+
+    const sourceWorkdir = source.executors?.[0]?.workdir?.trim() ?? ''
+    activeWorkdir.value =
+      sourceWorkdir && sourceWorkdir !== '/' && validContainerDir(sourceWorkdir)
+        ? normWorkdir(sourceWorkdir)
+        : '/work'
+    workdir.value = activeWorkdir.value
+    workdirNotice.value = null
+    await nextTick()
+
+    name.value = source.name ?? ''
+    description.value = source.description ?? ''
+    const group = source.tags?.[TES_GROUP_TAG]
+    if (group) groupId.value = group
+    executorConstraint.value = source.tags?.[TES_EXECUTOR_TAG] ?? ''
+    setConstraints(tesPlacementTags(source.tags).labelConstraints)
+
+    const executor = source.executors?.[0]
+    if (executor) {
+      image.value = executor.image
+      commandLine.value = quoteCommand(executor.command)
+      envRows.value = Object.entries(executor.env ?? {}).map(([key, value]) => ({ key, value }))
+      markTouched('image')
+      markTouched('command')
+      markTouched('env')
+      if ((source.executors?.length ?? 0) > 1) {
+        notes.push('Only the first executor was restored; a run carries one.')
+      }
+    }
+
+    const dataRefs = (source.inputs ?? []).filter(
+      (input) => input !== match?.scriptInput && input.path !== dependencyConfigPath.value,
+    )
+    inputs.value = dataRefs.map((input): TesDataRefEntry => {
+      const name = input.name || input.path.split('/').filter(Boolean).pop() || 'input'
+      const folder = input.type === 'DIRECTORY' ? parseS3Url(input.url ?? '') : null
+      if (folder) return { kind: 'folder', bucket: folder.bucket, prefix: folder.key, name, basePath: `${input.path.replace(/\/$/, '')}/`, files: [], directory: true }
+      return { kind: 'file', url: input.url ?? '', path: input.path, name }
+    })
+    if (dataRefs.some((input) => input.name?.includes('/'))) {
+      notes.push('Folder selections were restored as individual file inputs.')
+    }
+
+    outputRows.value = (source.outputs ?? []).flatMap((output) => {
+      const parsed = parseS3Url(output.url)
+      if (!parsed) {
+        notes.push(`The output destination ${output.url} is not an s3:// URL and was not restored.`)
+        return []
+      }
+      const path = captureContainerPath(output)
+      const key = isDirCapture(path) && !parsed.key.endsWith('/') ? `${parsed.key}/` : parsed.key
+      return [{ path, bucket: parsed.bucket, key, keyTouched: true }]
+    })
+
+    const r = source.resources
+    cpuCores.value = r?.cpu_cores != null ? String(r.cpu_cores) : ''
+    ramGb.value = r?.ram_gb != null ? String(r.ram_gb) : ''
+    diskGb.value = r?.disk_gb != null ? String(r.disk_gb) : ''
+
+    if (match) await restoreScript(match.scriptInput.url, match.runtime.id, source, notes)
+    return notes
   }
 
   // Re-fetches the staged script; without S3 access the editor keeps the template.
@@ -1303,6 +1366,13 @@ function createStore(deps: CustomRunDeps) {
     canRun,
     applyTemplate,
     rerunSource,
+    savedStart,
+    savedError,
+    openInputs,
+    resultsChosen,
+    answerInput,
+    chooseResults,
+    editSaved,
     rerunNotes,
     rerunError,
     rerunLoading,
