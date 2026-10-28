@@ -224,3 +224,15 @@ describe('every contentUrl value', () => {
     expect(hasLocalIdentity({ id: '#a', contentUrls: [location, exact] }, 'realm-1', 'node-3')).toBe(false)
   })
 })
+
+describe('stored contentUrl precedence', () => {
+  const exact = (node: string) => `https://w3id.org/aruna/data/arn:aruna:realm-1:${node}:s3/reads/a.csv@01K8Y2B6D8F0H2K4M6P8R0T2V4`
+
+  it('follows the last exact id of the stored list, as the node does', () => {
+    const urls = [exact('node-a'), exact('node-b')]
+    const entity = { id: '#a', contentUrl: primaryContentUrl(urls), contentUrls: urls }
+    expect(parseDataIdentity(entity).arn?.nodeId).toBe('node-b')
+    expect(hasLocalIdentity(entity, 'realm-1', 'node-b')).toBe(true)
+    expect(hasLocalIdentity(entity, 'realm-1', 'node-a')).toBe(false)
+  })
+})

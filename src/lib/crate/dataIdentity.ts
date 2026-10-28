@@ -125,19 +125,28 @@ export function parseDataIdentity(
   endpoint?: string | null,
 ): ParsedDataIdentity {
   const { id } = entity
-  // Every stored value is read: the location and an exact version id may come in any order.
-  const urls = [...new Set([...(entity.contentUrls ?? []), entity.contentUrl ?? ''].filter(Boolean))]
+  const urls = storedUrls(entity)
+  // As the node reads them: `@id`, then each value in stored order; the last id of a kind wins.
+  const values = [id, ...urls]
   const first = <T>(read: (value: string) => T | null): T | null =>
     urls.reduce<T | null>((found, value) => found ?? read(value), null)
-  const versioned = parseArnId(id) ?? first(parseArnId)
+  const last = <T>(read: (value: string) => T | null): T | null =>
+    values.reduce<T | null>((found, value) => read(value) ?? found, null)
+  const versioned = last(parseArnId)
   const relative = Boolean(id) && !id.startsWith('#') && !isAbsoluteUri(id)
   return {
-    contentId: isContentId(id) ? id : urls.find(isContentId) ?? null,
+    contentId: values.filter(isContentId).at(-1) ?? null,
     s3: first((value) => parseObjectUrl(value, endpoint)) ?? parseObjectUrl(id, endpoint) ?? versioned?.s3 ?? null,
     arn: versioned?.arn ?? null,
-    global: parseGlobal(id) ?? first(parseGlobal),
+    global: last(parseGlobal),
     localPath: entity.localPath || (relative ? id : null),
   }
+}
+
+/** The stored `contentUrl` values: the full list when the reader kept it, else the one value. */
+function storedUrls(entity: { contentUrl?: string | null; contentUrls?: readonly string[] }): string[] {
+  if (entity.contentUrls?.length) return [...entity.contentUrls]
+  return entity.contentUrl ? [entity.contentUrl] : []
 }
 
 /** Whether node `nodeId` of `realmId`, the export's source, can copy the bytes by its rule: a
@@ -148,7 +157,7 @@ export function hasLocalIdentity(
   realmId: string,
   nodeId: string,
 ): boolean {
-  const values = [entity.id, ...(entity.contentUrls ?? []), entity.contentUrl ?? '']
+  const values = [entity.id, ...storedUrls(entity)]
   if (values.some((value) => isContentId(value) || HASH_ARN.exec(value)?.[1] === realmId)) return true
   // Like the node, the last versioned ARN read counts, before its realm and node are checked.
   const exact = values.flatMap((value) => (parseArnId(value) ?? parseArn(value))?.arn ?? []).at(-1)
