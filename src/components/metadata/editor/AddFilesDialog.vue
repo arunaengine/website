@@ -24,7 +24,12 @@ import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3, s3ErrorMessage, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { UPLOAD_FINISHING_MESSAGE, useUploadQueue } from '@/composables/useUploadQueue'
-import { externalContentReference, type ContentIdentityOptions } from '@/lib/contentIdentity'
+import {
+  ARUNA_CONTENT_W3ID_PREFIX,
+  externalContentReference,
+  versionObjectId,
+  type ContentIdentityOptions,
+} from '@/lib/contentIdentity'
 import { dataEntityIdentity, objectLocation } from '@/lib/crate/dataIdentity'
 import {
   addFilePart,
@@ -218,7 +223,22 @@ async function origins(bucketName: string, key: string, versionId: string | null
     note('Some files may be part of more datasets than listed. Open the file in Data to see them all.')
   }
   if (failed(origin) || failed(parts)) note('The origin or the datasets of some files could not be read. They were added without them.')
-  return { found: { ...(basedOn.length ? { basedOn } : {}), ...(createdBy.length ? { createdBy } : {}) }, partOf, sourceIds }
+  const answer = origin.status === 'fulfilled' ? origin.value : null
+  const identifiers = (answer?.identifiers ?? []).map(({ name, value, url }) => ({ name, value, url }))
+  const found = {
+    ...(basedOn.length ? { basedOn } : {}),
+    ...(createdBy.length ? { createdBy } : {}),
+    ...(identifiers.length ? { identifiers } : {}),
+  }
+  return { found, partOf, sourceIds, globalId: answer?.global_id ?? null }
+}
+
+// The exact version: the global id of a bucket on more nodes, else this node's versioned id.
+function exactVersion(bucketName: string, key: string, versionId: string | null, nodeId: string | null, globalId: string | null) {
+  if (globalId) return globalId
+  const realm = nodeInfo.value?.node.realm_id
+  const node = nodeId ?? nodeInfo.value?.node.peer_id
+  return versionId && realm && node ? `${ARUNA_CONTENT_W3ID_PREFIX}${versionObjectId(realm, node, bucketName, key, versionId)}` : null
 }
 
 // A file of a bucket on another node (`nodeId`) keeps that node in its identity. This node cannot
@@ -229,10 +249,12 @@ async function filePart(bucketName: string, key: string, name: string, size?: nu
   const identity = await dataEntityIdentity(bucketName, key, identityOptions(versionId, nodeId), versionId)
   if (lookup && nodeId) note('Files of a bucket on another node were added without their origin and datasets.')
   const looked = lookup && !nodeId ? await origins(bucketName, key, versionId) : null
+  const version = exactVersion(bucketName, key, versionId, nodeId, looked?.globalId ?? null)
   const part: FilePart = {
     id: identity.id,
     name,
     contentUrl: identity.contentUrl,
+    ...(version ? { version } : {}),
     ...looked?.found,
     ...(formatOf(name) ? { encodingFormat: formatOf(name) } : {}),
     ...(size === undefined ? {} : { contentSize: String(size) }),

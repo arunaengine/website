@@ -198,7 +198,10 @@ describe('AddFilesDialog', () => {
       types: ['File'],
       properties: {
         name: [{ value: 'one.csv' }],
-        contentUrl: [{ value: 's3://reads/raw/one.csv?versionId=01VERSION' }],
+        contentUrl: [
+          { value: 's3://reads/raw/one.csv?versionId=01VERSION' },
+          { value: 'https://w3id.org/aruna/data/arn:aruna:realm-1:node-1:s3/reads/raw/one.csv@01VERSION' },
+        ],
         encodingFormat: [{ value: 'text/csv' }],
         contentSize: [{ value: '2048' }],
       },
@@ -247,6 +250,26 @@ describe('AddFilesDialog', () => {
     const named = Editor.findEntity(confirmed.at(-1)!, `https://w3id.org/aruna/data/${BLAKE3}`)
     expect(named?.properties.isPartOf).toEqual([{ kind: 'reference', value: 'https://w3id.org/aruna/d9' }])
     again.app.unmount()
+  })
+
+  it('writes the global id and the database identifiers of the picked version', async () => {
+    const global = 'https://w3id.org/aruna/data/realm-1/01K8Y2B6D8F0H2K4M6P8R0T2V4'
+    const url = 'https://www.ebi.ac.uk/biosamples/samples/SAMN1'
+    getFileOrigin.mockResolvedValue({
+      projection: [],
+      global_id: global,
+      identifiers: [{ name: 'BioSample', value: 'SAMN1', url, target: 'key' }],
+    })
+    const updates: Editor.CrateDraft[] = []
+    const mounted = await mount(updates)
+    await click(button(mounted.root, 'Pick objects'))
+    await flush()
+
+    const file = Editor.findEntity(updates[0], `https://w3id.org/aruna/data/${BLAKE3}`)
+    expect(file?.properties.contentUrl?.map((value) => value.value)).toEqual(['s3://reads/raw/one.csv?versionId=01VERSION', global])
+    const link = file?.properties.identifier?.[0]?.value ?? ''
+    expect(Editor.findEntity(updates[0], link)?.properties.url?.[0].value).toBe(url)
+    mounted.app.unmount()
   })
 
   it('offers the node address of a copy source and names it only when the user confirms', async () => {
@@ -460,7 +483,10 @@ describe('AddFilesDialog', () => {
     expect(Editor.findEntity(updates[0], `https://w3id.org/aruna/data/${BLAKE3}`)).toMatchObject({
       types: ['File'],
       properties: {
-        contentUrl: [{ value: 's3://reads/two.json?versionId=01VERSION' }],
+        contentUrl: [
+          { value: 's3://reads/two.json?versionId=01VERSION' },
+          { value: 'https://w3id.org/aruna/data/arn:aruna:realm-1:node-1:s3/reads/two.json@01VERSION' },
+        ],
         encodingFormat: [{ value: 'application/json' }],
         contentSize: [{ value: '64' }],
       },
