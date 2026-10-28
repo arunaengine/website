@@ -205,3 +205,41 @@ describe('addFilePart origin', () => {
     ])
   })
 })
+
+describe('addFilePart exact versions', () => {
+  const version = (id: string) => `https://w3id.org/aruna/data/arn:aruna:realm:node:s3/reads/one.csv@${id}`
+  const V1 = '01K8W1B3D5F7H9KMQ1S3V5X7Z1'
+  const V2 = '01K8W1B3D5F7H9KMQ1S3V5X7Z2'
+  const file = (id: string) => ({
+    id: 'https://w3id.org/aruna/data/' + 'a'.repeat(64),
+    name: 'one.csv',
+    contentUrl: `s3://reads/one.csv?versionId=${id}`,
+    version: version(id),
+  })
+
+  it('writes the exact version as a second contentUrl', () => {
+    const draft = addFilePart(newDraft(), file(V1))
+
+    expect(findEntity(draft, file(V1).id)?.properties.contentUrl?.map((value) => value.value)).toEqual([file(V1).contentUrl, version(V1)])
+  })
+
+  it('keeps equal bytes of two versions as two entities, each with its own version', () => {
+    const second = addFilePart(addFilePart(newDraft(), file(V1)), file(V2))
+
+    expect(findEntity(second, file(V1).id)?.properties.contentUrl?.[1].value).toBe(version(V1))
+    expect(findEntity(second, file(V2).contentUrl)?.properties.contentUrl?.[1].value).toBe(version(V2))
+    expect(findEntity(second, './')?.properties.hasPart?.map((value) => value.value)).toEqual([file(V1).id, file(V2).contentUrl])
+    expect(addFilePart(second, file(V1)).entities).toHaveLength(second.entities.length)
+  })
+
+  it('names each identifier as a PropertyValue the file links', () => {
+    const found = { name: 'BioSample', value: 'SAMN1', url: 'https://www.ebi.ac.uk/biosamples/samples/SAMN1' }
+    const draft = addFilePart(newDraft(), { ...file(V1), identifiers: [found] })
+    const link = findEntity(draft, file(V1).id)?.properties.identifier?.[0]?.value ?? ''
+
+    expect(findEntity(draft, link)).toMatchObject({ types: ['PropertyValue'] })
+    expect(findEntity(draft, link)?.properties.value?.[0].value).toBe('SAMN1')
+    expect(findEntity(draft, link)?.properties.url?.[0].value).toBe(found.url)
+    expect(orphanedDataEntities(draft)).toEqual([])
+  })
+})

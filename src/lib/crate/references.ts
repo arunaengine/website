@@ -16,6 +16,7 @@ import {
   type DraftEntity,
   type DraftValue,
 } from './editor'
+import { isExactId } from './dataIdentity'
 import { orphanedDataEntities } from './orphans'
 import { RO_CRATE_PROFILE_IRI, type SubcrateLink } from '@/lib/subcrates'
 
@@ -116,6 +117,10 @@ export interface FilePart {
   partOf?: string[]
   /** The runs that wrote the file: each becomes a CreateAction with the file as its result. */
   createdBy?: string[]
+  /** The exact version id, written as a second `contentUrl` so provenance can follow it. */
+  version?: string
+  /** Links the database's rules found; each becomes a PropertyValue named by `identifier`. */
+  identifiers?: { name: string; value: string; url: string }[]
 }
 
 function reference(id: string): DraftValue[] {
@@ -130,25 +135,37 @@ function sorted(values: readonly string[]): string {
   return [...values].sort().join('\n')
 }
 
-/** The origin, the memberships and the runs a draft records for one entity. */
+/** The origin, the memberships, the runs and the exact versions a draft records for one entity. */
 function provenanceOf(draft: CrateDraft, id: string): string[] {
   const entity = findEntity(draft, id)
   const values = (property: string) => (entity?.properties[property] ?? []).map((value) => value.value)
   const runs = draft.entities
     .filter((item) => item.types.includes('CreateAction') && (item.properties.result ?? []).some((value) => value.value === id))
     .map((item) => item.properties.identifier?.[0]?.value ?? item.id)
-  return [sorted(values('isBasedOn')), sorted(values('isPartOf')), sorted(runs)]
+  const versions = values('contentUrl').filter(isExactId)
+  return [sorted(values('isBasedOn')), sorted(values('isPartOf')), sorted(runs), sorted(versions)]
 }
 
 /**
  * Identical bytes have one content id. A second file with the same id but another origin,
- * membership or run stays a separate entity under its location, so nothing of the first is lost.
+ * membership, run or exact version stays a separate entity under its location, so nothing of the
+ * first is lost.
  */
 export function entityIdFor(draft: CrateDraft, part: FilePart): string {
   if (!findEntity(draft, part.id) || !part.contentUrl) return part.id
-  const incoming = [sorted(part.basedOn ?? []), sorted(part.partOf ?? []), sorted(part.createdBy ?? [])]
+  const incoming = [
+    sorted(part.basedOn ?? []),
+    sorted(part.partOf ?? []),
+    sorted(part.createdBy ?? []),
+    sorted([part.version ?? ''].filter(isExactId)),
+  ]
   const known = provenanceOf(draft, part.id)
   return known.every((value, index) => value === incoming[index]) ? part.id : part.contentUrl
+}
+
+/** One PropertyValue per identifier, shared by every file that carries it. */
+function identifierId(found: { name: string; value: string }): string {
+  return `#identifier-${encodeURIComponent(found.name.replace(/\s+/g, '-'))}-${encodeURIComponent(found.value)}`
 }
 
 /**
@@ -172,16 +189,27 @@ export function addFilePart(
   part: FilePart,
   target: ReferenceTarget = rootParts(draft),
 ): CrateDraft {
+  const urls = [part.contentUrl, part.version].filter((url): url is string => Boolean(url))
   const properties: Record<string, DraftValue[]> = {
     name: textValue(part.name || part.id),
-    ...(part.contentUrl ? { contentUrl: textValue(part.contentUrl) } : {}),
+    ...(urls.length ? { contentUrl: urls.flatMap(textValue) } : {}),
     ...(part.encodingFormat ? { encodingFormat: textValue(part.encodingFormat) } : {}),
     ...(part.contentSize ? { contentSize: textValue(part.contentSize) } : {}),
     ...(part.basedOn?.length ? { isBasedOn: part.basedOn.map((id) => ({ kind: 'reference' as const, value: id })) } : {}),
     ...(part.partOf?.length ? { isPartOf: part.partOf.map((id) => ({ kind: 'reference' as const, value: id })) } : {}),
   }
   const id = entityIdFor(draft, part)
-  const added = addEntity(draft, { type: part.type ?? 'File', id, properties })
+  let next = draft
+  for (const found of part.identifiers ?? []) {
+    const key = identifierId(found)
+    next = addEntity(next, {
+      type: 'PropertyValue',
+      id: key,
+      properties: { name: textValue(found.name), value: textValue(found.value), url: textValue(found.url) },
+    }).draft
+    properties.identifier = [...(properties.identifier ?? []), { kind: 'reference', value: key }]
+  }
+  const added = addEntity(next, { type: part.type ?? 'File', id, properties })
   const linked = linkReference(added.draft, target.entityId, target.property, id)
   return (part.createdBy ?? []).reduce((next, runId) => addRunResult(next, runId, id), linked)
 }

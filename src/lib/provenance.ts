@@ -1,11 +1,10 @@
 // Where data came from, read one link at a time with the user's own access. Each box is a record
 // the node answered; a link the user may not read is named by its global id or content id only.
 import { ApiError, type OriginIdentifier, type OriginResponse, type RunResponse } from '@/lib/api'
-import { isContentId } from '@/lib/crate/dataIdentity'
+import { isContentId, isExactId } from '@/lib/crate/dataIdentity'
 
 const DATA_PREFIX = 'https://w3id.org/aruna/data/'
 const GLOBAL_VERSION = /^https:\/\/w3id\.org\/aruna\/data\/[A-Za-z0-9_-]+\/[0-9A-HJKMNP-TV-Z]{26}$/
-const ARN_VERSION = /^https:\/\/w3id\.org\/aruna\/data\/arn:aruna:[^:]+:[^:]+:s3\/[^/]+\/.+@[0-9A-HJKMNP-TV-Z]{26}$/
 
 export type BoxKind = 'file' | 'run' | 'database' | 'source' | 'hidden' | 'unversioned' | 'silent'
 
@@ -47,8 +46,6 @@ export interface Graph {
   roots: string[]
   steps: number
 }
-
-export const isExactId = (value: string) => GLOBAL_VERSION.test(value) || ARN_VERSION.test(value)
 
 function box(id: string, kind: BoxKind, role: string, title: string, extra: Partial<Box> = {}): Box {
   return { id, kind, role, title, identifiers: [], from: [], pending: [], ...extra }

@@ -52,6 +52,13 @@ const GLOBAL_VERSION = /^https:\/\/w3id\.org\/aruna\/data\/([A-Za-z0-9_-]+)\/([0
 const ARN_ID = /^arn:aruna:([^:]+):([^:]+):s3\/([^/]+)\/(.+)@([0-9A-HJKMNP-TV-Z]{26})$/
 const HASH_ARN = /^arn:aruna:([^:]+):[^:]+:ch\/(?:blake3\/)?[0-9a-f]{64}$/
 
+const EXACT_ARN = /^https:\/\/w3id\.org\/aruna\/data\/arn:aruna:[^:]+:[^:]+:s3\/[^/]+\/.+@[0-9A-HJKMNP-TV-Z]{26}$/
+
+/** An exact version id: a global id, or a versioned object as a web id. */
+export function isExactId(value: string): boolean {
+  return GLOBAL_VERSION.test(value) || EXACT_ARN.test(value)
+}
+
 export function isContentId(value: string | null | undefined): value is string {
   return Boolean(value && CONTENT_ID.test(value))
 }
