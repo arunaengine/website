@@ -109,6 +109,23 @@ describe('provenance graph', () => {
     expect(dataParts(stored)).toEqual([{ id: '#a', name: 'a', exact: arn('a', V1) }])
   })
 
+  it('drops an answer that comes back after the view moved on', async () => {
+    let answer: (value: OriginResponse) => void = () => {}
+    const read = readers({})
+    vi.mocked(read.origin).mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
+    const graph = emptyGraph()
+    startFile(graph, arn('a', V1), 'a', origin({ origin: { kind: 'copy', from: arn('b', V2) } }), read)
+    let current = true
+    const pending = expand(graph, arn('a', V1), read, () => current)
+    current = false
+    Object.assign(graph, emptyGraph())
+    answer(origin({ origin: { kind: 'upload', node_id: 'n1' } }))
+    await pending
+
+    expect(graph.boxes).toEqual({})
+    expect(graph.seen).toEqual({})
+  })
+
   it('reads the inputs a run crate names', () => {
     expect(runInputs(runCrate).parts.map((part) => part.exact !== null)).toEqual([true, true, false])
     expect(runInputs(null)).toEqual({ name: null, parts: [] })

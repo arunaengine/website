@@ -166,8 +166,13 @@ export function runInputs(crate: unknown): { name: string | null; parts: Part[] 
 
 const refused = (cause: unknown) => cause instanceof ApiError && [401, 403, 404].includes(cause.status)
 
+/** Whether the graph still belongs to the start that asked; a late answer for another is dropped. */
+export type Current = () => boolean
+
+const always: Current = () => true
+
 /** Reads one waiting link of `boxId`. */
-async function follow(graph: Graph, boxId: string, hop: Hop, readers: Readers) {
+async function follow(graph: Graph, boxId: string, hop: Hop, readers: Readers, current: Current) {
   const asked = hop.kind === 'version' ? hop.id : `run:${hop.runId}`
   const known = graph.seen[asked]
   if (known) {
@@ -178,6 +183,7 @@ async function follow(graph: Graph, boxId: string, hop: Hop, readers: Readers) {
   try {
     if (hop.kind === 'version') {
       const origin = await readers.origin(hop.id)
+      if (!current()) return
       const canonical = origin.global_id || hop.id
       graph.seen[asked] = canonical
       if (graph.boxes[canonical]) add(graph, boxId, graph.boxes[canonical])
@@ -185,9 +191,10 @@ async function follow(graph: Graph, boxId: string, hop: Hop, readers: Readers) {
       return
     }
     const run = await readers.run(hop.runId)
+    const crate = run.run_crate ? await readers.crate(run.run_crate) : null
+    if (!current()) return
     const id = `run:${hop.runId}`
     graph.seen[asked] = id
-    const crate = run.run_crate ? await readers.crate(run.run_crate) : null
     const { name, parts } = runInputs(crate)
     const created = box(id, 'run', 'Run', name ?? `Run ${shortName(hop.runId)}`)
     if (run.run_crate) created.link = { label: 'Open the run record', document: run.run_crate }
@@ -198,6 +205,7 @@ async function follow(graph: Graph, boxId: string, hop: Hop, readers: Readers) {
       else add(graph, id, box(input.id, 'unversioned', 'Input file', input.name, { detail: 'No exact version recorded' }))
     }
   } catch (cause) {
+    if (!current()) return
     if (refused(cause)) {
       graph.seen[asked] = hiddenBox(graph, boxId, hop)
       return
@@ -217,28 +225,28 @@ function hiddenBox(graph: Graph, parent: string, hop: Hop): string {
 }
 
 /** Reads every waiting link of one box. */
-export async function expand(graph: Graph, boxId: string, readers: Readers) {
-  const current = graph.boxes[boxId]
-  if (!current) return
-  const hops = current.pending.splice(0)
-  if (current.kind === 'silent') {
+export async function expand(graph: Graph, boxId: string, readers: Readers, current: Current = always) {
+  const opened = graph.boxes[boxId]
+  if (!opened) return
+  const hops = opened.pending.splice(0)
+  if (opened.kind === 'silent') {
     // A retry replaces the box that did not answer.
     const parent = Object.values(graph.boxes).find((item) => item.from.includes(boxId))
     if (!parent) return
     parent.from = parent.from.filter((id) => id !== boxId)
     delete graph.boxes[boxId]
-    for (const hop of hops) await follow(graph, parent.id, hop, readers)
+    for (const hop of hops) if (current()) await follow(graph, parent.id, hop, readers, current)
     return
   }
-  for (const hop of hops) await follow(graph, boxId, hop, readers)
+  for (const hop of hops) if (current()) await follow(graph, boxId, hop, readers, current)
 }
 
 /** Follows every link until none waits or `stopped` says so; boxes that did not answer stay. */
-export async function expandAll(graph: Graph, readers: Readers, stopped: () => boolean) {
+export async function expandAll(graph: Graph, readers: Readers, stopped: () => boolean, current: Current = always) {
   for (;;) {
     const next = Object.values(graph.boxes).find((item) => item.pending.length && item.kind !== 'silent')
-    if (!next || stopped()) return
-    await expand(graph, next.id, readers)
+    if (!next || stopped() || !current()) return
+    await expand(graph, next.id, readers, current)
   }
 }
 

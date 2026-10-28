@@ -100,6 +100,21 @@ describe('provenance view', () => {
     expect(content(root)).toContain('not this exact version')
   })
 
+  it('forgets where the previous file went when another file opens', async () => {
+    aruna.runSparql.mockResolvedValue({ rows: [{ s: 'https://w3id.org/aruna/01K8W1B3D5F7H9KMQ1S3V5X7Z9#run-1' }] })
+    const contentId = `https://w3id.org/aruna/data/${'a'.repeat(64)}`
+    const start = ref({ kind: 'file', id: START, name: 'out.tsv', origin: origin({ origin: { kind: 'job', run_id: 'r1' }, content_id: contentId }) })
+    const Host = defineComponent(() => () => h(component, { start: start.value }))
+    const { root } = await mountApp(Host)
+    await click(button(root, 'Find runs and datasets'))
+    await vi.waitFor(() => expect(content(root)).toContain('Used by 1 run'))
+
+    start.value = { ...start.value, id: INPUT, name: 'in.faa' }
+    await flush()
+    expect(content(root)).not.toContain('Used by 1 run')
+    expect(content(root)).toContain('Find runs and datasets')
+  })
+
   it('says when a file has no content id to search by', async () => {
     expect(content(await render())).toContain('Not available for this file.')
   })

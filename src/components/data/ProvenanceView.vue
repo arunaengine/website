@@ -40,6 +40,15 @@ const graph = reactive<Graph>(emptyGraph())
 const walking = ref(false)
 let stopped = false
 let generation = 0
+// Where it went: runs and datasets that name the same bytes. Only stored files have a content id.
+const went = ref<{ runs: string[]; datasets: string[] } | null>(null)
+const wentState = ref<'idle' | 'loading' | 'ready' | 'failed'>('idle')
+
+/** Holds while the graph still belongs to the start that is shown now. */
+function fenced() {
+  const run = generation
+  return () => run === generation
+}
 
 // A new start or session clears what was read before.
 watch(
@@ -48,6 +57,8 @@ watch(
     generation += 1
     stopped = true
     walking.value = false
+    went.value = null
+    wentState.value = 'idle'
     Object.assign(graph, emptyGraph())
     if (props.start.kind === 'file') startFile(graph, props.start.id, props.start.name, props.start.origin, readers)
     else startDataset(graph, props.start.title, props.start.documentId, props.start.crate)
@@ -56,11 +67,11 @@ watch(
 )
 
 async function showAll() {
-  const run = generation
+  const current = fenced()
   stopped = false
   walking.value = true
-  await expandAll(graph, readers, () => stopped || run !== generation)
-  if (run === generation) walking.value = false
+  await expandAll(graph, readers, () => stopped, current)
+  if (current()) walking.value = false
 }
 
 function stop() {
@@ -93,9 +104,6 @@ async function exportCrate() {
   }
 }
 
-// Where it went: runs and datasets that name the same bytes. Only stored files have a content id.
-const went = ref<{ runs: string[]; datasets: string[] } | null>(null)
-const wentState = ref<'idle' | 'loading' | 'ready' | 'failed'>('idle')
 const contentId = computed(() => (props.start.kind === 'file' ? props.start.origin.content_id ?? null : null))
 const documentOf = (iri: string) => /^https:\/\/w3id\.org\/aruna\/([0-9A-HJKMNP-TV-Z]{26})/.exec(iri)?.[1] ?? null
 
@@ -142,7 +150,7 @@ function boxView(item: Box): VNode {
   }
   if (item.pending.length) {
     const label = item.kind === 'silent' ? 'Try again' : 'Show where this came from'
-    lines.push(h('button', { type: 'button', class: 'mt-1 text-primary hover:underline', onClick: () => expand(graph, item.id, readers) }, label))
+    lines.push(h('button', { type: 'button', class: 'mt-1 text-primary hover:underline', onClick: () => expand(graph, item.id, readers, fenced()) }, label))
   }
   const ring = root ? 'shadow-[0_0_0_2px_hsl(var(--primary)/0.35)]' : ''
   return h('div', { class: [BOX, muted ? MUTED : 'bg-background', ring], 'data-box': item.id }, lines)
