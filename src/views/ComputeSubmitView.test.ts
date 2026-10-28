@@ -591,6 +591,31 @@ describe('run page', () => {
     mounted.app.unmount()
   })
 
+  it('lets a local run take a pinned input without another version check failing', async () => {
+    runTargetAvailable.value = true
+    runTargetChoice.value = 'local'
+    submitJob.mockClear()
+    const arn = 'arn:aruna:realm:node-b:s3/db/genome.fna@01K8W1B3D5F7H9KMQ1S3V5X7Z1'
+    useSavedRuns().save({
+      id: 'r4', name: 'Local', savedAt: '2026-10-28T10:00:00Z',
+      task: { name: 'Local', executors: [{ image: 'alpine:3.20', command: ['cat', '/in/genome.fna'] }], inputs: [{ name: 'genome.fna', path: '/in/genome.fna', url: arn, type: 'FILE' }] },
+      ask: { inputs: [], results: false },
+    })
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?saved=r4')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    expect(content(mounted.root)).not.toContain('need an exact version')
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    expect(submitJob).toHaveBeenCalledTimes(1)
+    const [request] = submitJob.mock.calls[0] as unknown as [{ inputs: Record<string, unknown>[] }]
+    expect(request.inputs[0]).toMatchObject({ source_node_id: 'node-b', version_id: '01K8W1B3D5F7H9KMQ1S3V5X7Z1' })
+    useSavedRuns().remove('r4')
+    mounted.app.unmount()
+  })
+
   it('carries a placement constraint into the task tags', async () => {
     const mounted = await mount(ComputeSubmitView, '/app/compute/new')
     await fillValidRun(mounted.root)

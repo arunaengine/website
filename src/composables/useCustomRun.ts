@@ -929,9 +929,10 @@ function createStore(deps: CustomRunDeps) {
       executorConstraint: executorConstraint.value,
       backend: runTarget.compute.value?.backend,
       dependencies: dependencies.value,
+      // A pinned ARN carries its node and version; it counts once read as the native job reads it.
       realmInputsMissingVersion:
-        reuseSelectedScript.value ||
-        dataInputs.value.some((input) => !input.source_node_id?.trim() || !input.version_id?.trim()),
+        (reuseSelectedScript.value && !selectedScript.value?.ref) ||
+        dataInputs.value.map(nativeInput).some((input) => !input.source_node_id?.trim() || !input.version_id?.trim()),
       cpuCores: resources.value.cpu_cores,
       ramBytes:
         resources.value.ram_gb === undefined
