@@ -77,14 +77,15 @@ function fileBox(graph: Graph, parent: string | null, id: string, role: string, 
   if (origin.origin?.kind === 'job') file.pending.push({ kind: 'run', runId: origin.origin.run_id })
   if (origin.hop) file.pending.push({ kind: 'version', id: origin.hop.from, role: 'Synced from' })
   add(graph, parent, file)
-  const identifiers = origin.identifiers ?? []
+  // Identifiers belong to this file; the database box is shared by every file it lists.
+  file.identifiers = origin.identifiers ?? []
   const entry = origin.database_entry ?? (origin.origin?.kind === 'source' ? origin.origin.database_entry : null)
   if (entry) {
     const listed = readers.database(entry)
-    const database = box(`database:${entry}`, 'database', 'Database (current)', listed?.title || 'A database', { identifiers })
+    const database = box(`database:${entry}`, 'database', 'Database (current)', listed?.title || 'A database')
     if (listed) database.link = { label: 'Open the dataset', document: listed.datasetId }
     add(graph, id, database)
-  } else file.identifiers = identifiers
+  }
   const url = kind === 'source' ? origin.source?.url : null
   if (url) {
     const title = (() => {

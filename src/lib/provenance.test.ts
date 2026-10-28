@@ -59,7 +59,8 @@ describe('provenance graph', () => {
     expect([...run.from].sort()).toEqual([arn('a.faa', V1), arn('b.faa', V2), 's3://lab/c.yaml'].sort())
     expect(graph.boxes['s3://lab/c.yaml'].detail).toBe('No exact version recorded')
     const database = graph.boxes['database:e1']
-    expect([database.title, database.identifiers[0].value]).toEqual(['BakRep', 'SAMN1'])
+    expect(database.title).toBe('BakRep')
+    expect(graph.boxes[arn('a.faa', V1)].identifiers[0].value).toBe('SAMN1')
     expect(graph.steps).toBe(3)
     expect(hasPending(graph)).toBe(false)
   })
@@ -107,6 +108,19 @@ describe('provenance graph', () => {
   it('reads stored file parts, whose links come in any order', () => {
     const stored = { '@graph': [{ '@id': '#a', '@type': 'MediaObject', name: 'a', contentUrl: [arn('a', V1), 's3://lab/a'] }] }
     expect(dataParts(stored)).toEqual([{ id: '#a', name: 'a', exact: arn('a', V1) }])
+  })
+
+  it('keeps identifiers on each file, not on their shared database', async () => {
+    const found = (value: string) => [{ name: 'BioSample', value, url: `https://x.org/${value}`, target: 'key' as const }]
+    const from = (value: string) => origin({ origin: { kind: 'source', database_entry: 'e1' }, database_entry: 'e1', identifiers: found(value) })
+    const read = readers({ [arn('a.faa', V1)]: from('SAMN1'), [arn('b.faa', V2)]: from('SAMN2') }, runCrate)
+    const graph = emptyGraph()
+    startFile(graph, arn('out.tsv', V1), 'out.tsv', origin({ origin: { kind: 'job', run_id: 'r1' } }), read)
+    await expandAll(graph, read, () => false)
+
+    expect(graph.boxes[arn('a.faa', V1)].identifiers[0].value).toBe('SAMN1')
+    expect(graph.boxes[arn('b.faa', V2)].identifiers[0].value).toBe('SAMN2')
+    expect(graph.boxes['database:e1'].identifiers).toEqual([])
   })
 
   it('drops an answer that comes back after the view moved on', async () => {
