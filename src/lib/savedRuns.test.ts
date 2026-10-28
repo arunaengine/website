@@ -85,4 +85,11 @@ describe('saved runs', () => {
     expect(() => importRuns(exportRuns(broken as SavedRun[]), [])).toThrow('not readable')
     expect(askedFor(readSavedRuns(storage)[0])).toEqual(['genome.fna', 'results folder'])
   })
+
+  it('keeps the exact version ARNs a past run names', () => {
+    const arn = 'arn:aruna:realm:node-b:s3/db/x/a%20b.fna@01K8W1B3D5F7H9KMQ1S3V5X7Z1'
+    const past = { ...run('a').task, id: 't1', state: 'COMPLETE' as const, inputs: [{ name: 'a', path: '/in/a', url: arn, type: 'FILE' as const }] }
+    expect(savedTask(past).inputs?.[0].url).toBe(arn)
+    expect(importRuns(exportRuns([{ ...run('a'), task: savedTask(past) }]), [])[0].task.inputs?.[0].url).toBe(arn)
+  })
 })
