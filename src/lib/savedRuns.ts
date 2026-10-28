@@ -45,17 +45,25 @@ const isObject = (value: unknown): value is Record<string, unknown> => typeof va
 const listOf = (value: unknown, item: (entry: unknown) => boolean) => Array.isArray(value) && value.every(item)
 const optionalList = (value: unknown, item: (entry: unknown) => boolean) => value === undefined || listOf(value, item)
 const isText = (value: unknown) => typeof value === 'string'
+const optional = (value: unknown, check: (entry: unknown) => boolean) => value === undefined || check(value)
+const isNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value)
+const isFileType = (value: unknown) => value === 'FILE' || value === 'DIRECTORY'
 
 // The fields the New run menu and the start form read, checked before a stored or imported run is used.
 function isTask(value: unknown): boolean {
   if (!isObject(value)) return false
   const executor = (entry: unknown) => isObject(entry) && isText(entry.image) && listOf(entry.command, isText)
+    && optional(entry.workdir, isText)
     && (entry.env === undefined || (isObject(entry.env) && Object.values(entry.env).every(isText)))
-  const file = (entry: unknown) => isObject(entry) && isText(entry.path) && (entry.name === undefined || isText(entry.name))
-    && (entry.url === undefined || isText(entry.url))
+  const file = (entry: unknown) => isObject(entry) && isText(entry.path) && optional(entry.name, isText)
+    && optional(entry.url, isText) && optional(entry.type, isFileType)
   const output = (entry: unknown) => isObject(entry) && isText(entry.path) && isText(entry.url)
+    && optional(entry.path_prefix, isText) && optional(entry.type, isFileType)
+  const resources = (entry: unknown) => isObject(entry)
+    && optional(entry.cpu_cores, isNumber) && optional(entry.ram_gb, isNumber) && optional(entry.disk_gb, isNumber)
   return listOf(value.executors, executor) && (value.executors as unknown[]).length > 0
     && optionalList(value.inputs, file) && optionalList(value.outputs, output)
+    && optional(value.name, isText) && optional(value.description, isText) && optional(value.resources, resources)
     && (value.tags === undefined || (isObject(value.tags) && Object.values(value.tags).every(isText)))
 }
 

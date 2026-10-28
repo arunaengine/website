@@ -78,6 +78,11 @@ describe('saved runs', () => {
       { ...run('c'), task: { ...run('c').task, executors: [] } },
       { ...run('d'), task: { ...run('d').task, executors: [{ image: 'x', command: [], env: { A: 1 } }] } },
       { ...run('e'), task: { ...run('e').task, outputs: [{ path: '/out' }] } },
+      { ...run('f'), task: { ...run('f').task, executors: [{ image: 'x', command: [], workdir: 42 }] } },
+      { ...run('g'), task: { ...run('g').task, name: 7 } },
+      { ...run('h'), task: { ...run('h').task, resources: { cpu_cores: '2' } } },
+      { ...run('i'), task: { ...run('i').task, inputs: [{ path: '/in', type: 'FOLDER' }] } },
+      { ...run('j'), task: { ...run('j').task, outputs: [{ path: '/out/*', url: 's3://b/k', path_prefix: 3 }] } },
     ]
     const storage = memory()
     storage.setItem('aruna.myRuns', JSON.stringify([...broken, run('ok')]))
