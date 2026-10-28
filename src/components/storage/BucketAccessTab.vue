@@ -50,7 +50,7 @@ async function removeRule(entry: PublicRule) {
       </Button>
     </header>
     <div class="px-5 py-4 text-sm">
-      <Skeleton v-if="access.loading.value" class="h-4 w-48" />
+      <Skeleton v-if="access.loading.value && !access.detail.value" class="h-4 w-48" />
       <p v-else-if="access.error.value" class="text-muted-foreground">
         The group's roles could not be loaded: {{ access.error.value }}
       </p>

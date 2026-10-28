@@ -28,7 +28,8 @@ export function usePublicAccess(groupId: Ref<string | null | undefined>) {
   async function load() {
     const id = groupId.value
     const current = ++generation
-    detail.value = null
+    // A reload of the same group keeps its roles on screen until the answer lands.
+    if (detail.value?.group_id !== id) detail.value = null
     error.value = null
     if (!id) {
       loading.value = false
@@ -41,6 +42,7 @@ export function usePublicAccess(groupId: Ref<string | null | undefined>) {
       detail.value = response
     } catch (err) {
       if (current !== generation) return
+      detail.value = null
       error.value = errorMessage(err)
     } finally {
       if (current === generation) loading.value = false

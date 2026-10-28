@@ -119,6 +119,21 @@ describe('usePublicAccess', () => {
     )
   })
 
+  it('keeps rules while reloading', async () => {
+    const existing: ApiRole = { role_id: 'r-public', name: 'public', permissions: { [`${ROOT}/reef/a`]: 'read' }, public: true }
+    getGroup.mockResolvedValue(detail([ADMIN, existing]))
+    const access = usePublicAccess(ref('g-1'))
+    await settle()
+
+    getGroup.mockReturnValue(new Promise(() => undefined))
+    void access.grant(null, [{ kind: 'file', bucket: 'reef', key: 'b' }])
+    await settle()
+
+    expect(access.loading.value).toBe(true)
+    expect(access.isPublic(null, { kind: 'file', bucket: 'reef', key: 'a' })).toBe(true)
+    expect(access.canManage.value).toBe(true)
+  })
+
   it('denies management to a plain member and reloads on a group change', async () => {
     currentUser.value = { id: 'user-2' }
     getGroup.mockResolvedValue(detail([ADMIN]))
