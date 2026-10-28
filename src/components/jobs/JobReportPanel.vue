@@ -6,6 +6,7 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useJobs } from '@/composables/useJobs'
+import { useRefresh } from '@/composables/useRefresh'
 import {
   isReportAbsent,
   isReportCursorConflict,
@@ -62,12 +63,15 @@ function codeVariant(code: string): 'success' | 'destructive' | 'warn' {
   return BAD_CODES.has(code) ? 'destructive' : 'warn'
 }
 
-async function load() {
+async function load(recheck = false) {
   const id = ++requestId
-  panelState.value = 'loading'
+  // Checking a pending report again keeps its notice on screen until the answer lands.
+  if (!recheck) {
+    panelState.value = 'loading'
+    pendingState.value = null
+  }
   loadError.value = null
   moreError.value = null
-  pendingState.value = null
   try {
     const page = await getJobReport(props.jobId, {})
     if (id !== requestId) return
@@ -116,6 +120,7 @@ async function loadMore() {
 }
 
 watch(() => props.jobId, () => void load(), { immediate: true })
+const { busy: checking, refresh: checkAgain } = useRefresh(() => load(true))
 
 const summary = computed(() => {
   const counts = new Map<string, number>()
@@ -143,7 +148,9 @@ const summary = computed(() => {
         The report is frozen only once the work finishes. This one is
         <span class="font-medium text-foreground">{{ pendingState }}</span>, so there is nothing to page yet.
       </p>
-      <Button variant="outline" size="sm" @click="load">Check again</Button>
+      <Button variant="outline" size="sm" :disabled="checking" :aria-busy="checking" @click="checkAgain">
+        <Spinner v-if="checking" label="Checking the report again" class="text-current" /> Check again
+      </Button>
     </div>
 
     <p v-else-if="panelState === 'absent'" class="text-xs text-muted-foreground">
