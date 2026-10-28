@@ -1,3 +1,4 @@
+import { contentUrlValues, primaryContentUrl } from './crate/dataIdentity'
 import { PROCESS_RUN_PROFILE_URI } from './profiles/builtinProfiles'
 
 // Parses the backend's Process Run Crate into the dedicated run UI model.
@@ -9,6 +10,7 @@ export interface RunCrateFileRef {
   name: string
   contentSize?: string
   contentUrl?: string
+  contentUrls?: string[]
 }
 
 export interface RunCrateAgent {
@@ -108,7 +110,8 @@ function fileRef(id: string, byId: Map<string, Record<string, unknown>>): RunCra
     id,
     name: stringOf(entity?.name) || fallbackName,
     contentSize: stringOf(entity?.contentSize),
-    contentUrl: stringOf(entity?.contentUrl),
+    contentUrl: primaryContentUrl(contentUrlValues(entity?.contentUrl)),
+    contentUrls: contentUrlValues(entity?.contentUrl),
   }
 }
 

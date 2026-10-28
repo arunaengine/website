@@ -4,6 +4,7 @@
 // context entity's remaining properties into labeled, profile-ordered fields.
 
 import { crateGraph, crateRootId, entityKind, isDataEntity, stringProp } from '@/lib/dataEntities'
+import { contentUrlValues, primaryContentUrl } from '@/lib/crate/dataIdentity'
 import { readableIri } from '@/lib/identifiers'
 import { isHttpUrl } from '@/lib/utils'
 import { contextTermsOf } from '@/lib/profiles/contextTerms'
@@ -516,6 +517,7 @@ export interface PresentedDataEntity extends PresentedEntity {
   /** Full @type values, for chips and external ontology links. */
   typeUris: string[]
   contentUrl?: string
+  contentUrls?: string[]
   encodingFormat?: string
   contentSize?: string
   /** Direct hasPart children (a sub-dataset's own listing). */
@@ -569,7 +571,8 @@ export function presentDataEntity(
     relations: [],
     fields: entityFields(entity, match?.fields, byId, homes, DATA_ENTITY_SKIP, 'pointer', new Set(), terms),
     unresolved: isStub(entity),
-    contentUrl: stringProp(entity.contentUrl),
+    contentUrl: primaryContentUrl(contentUrlValues(entity.contentUrl)),
+    contentUrls: contentUrlValues(entity.contentUrl),
     encodingFormat: stringProp(entity.encodingFormat),
     contentSize: stringProp(entity.contentSize),
     children,

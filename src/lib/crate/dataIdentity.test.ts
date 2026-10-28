@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
-import { dataEntityIdentity, folderRoute, hasLocalIdentity, objectLocation, objectRoute, parseDataIdentity } from './dataIdentity'
+import {
+  contentUrlValues,
+  dataEntityIdentity,
+  folderRoute,
+  hasLocalIdentity,
+  objectLocation,
+  objectRoute,
+  parseDataIdentity,
+  primaryContentUrl,
+} from './dataIdentity'
 
 const BLAKE3 = 'a'.repeat(64)
 
@@ -191,5 +200,27 @@ describe('hasLocalIdentity', () => {
     expect(hasLocalIdentity({ id: 'https://example.org/one.csv' }, 'own', 'n')).toBe(false)
     expect(hasLocalIdentity({ id: 'https://example.org/one.csv', contentUrl: 'https://example.org/one.csv' }, 'own', 'n')).toBe(false)
     expect(hasLocalIdentity({ id: 'data/one.csv' }, 'own', 'n')).toBe(false)
+  })
+})
+
+describe('every contentUrl value', () => {
+  const exact = 'https://w3id.org/aruna/data/arn:aruna:realm-1:node-2:s3/reads/a.csv@01K8Y2B6D8F0H2K4M6P8R0T2V4'
+  const location = 's3://reads/a.csv?versionId=01K8Y2B6D8F0H2K4M6P8R0T2V4'
+
+  it('reads the location and the exact version in any stored order', () => {
+    const urls = contentUrlValues([exact, { '@id': location }])
+    expect(urls).toEqual([exact, location])
+    expect(primaryContentUrl(urls)).toBe(location)
+
+    const parsed = parseDataIdentity({ id: `https://w3id.org/aruna/data/${'a'.repeat(64)}`, contentUrls: urls })
+    expect(parsed.s3).toEqual({ bucket: 'reads', key: 'a.csv' })
+    expect(parsed.arn).toEqual({ realmId: 'realm-1', nodeId: 'node-2', version: '01K8Y2B6D8F0H2K4M6P8R0T2V4' })
+  })
+
+  it('finds a global id among the values and checks local identity over all of them', () => {
+    const global = 'https://w3id.org/aruna/data/realm-1/01K8Y2B6D8F0H2K4M6P8R0T2V4'
+    expect(parseDataIdentity({ id: '#a', contentUrls: [location, global] }).global?.versionId).toBe('01K8Y2B6D8F0H2K4M6P8R0T2V4')
+    expect(hasLocalIdentity({ id: '#a', contentUrls: [location, exact] }, 'realm-1', 'node-2')).toBe(true)
+    expect(hasLocalIdentity({ id: '#a', contentUrls: [location, exact] }, 'realm-1', 'node-3')).toBe(false)
   })
 })

@@ -59,6 +59,22 @@ export function isExactId(value: string): boolean {
   return GLOBAL_VERSION.test(value) || EXACT_ARN.test(value)
 }
 
+/** Every value of a `contentUrl`: a text, a list, or `{ "@id": … }` entries, in stored order. */
+export function contentUrlValues(value: unknown): string[] {
+  const list = Array.isArray(value) ? value : value === undefined || value === null ? [] : [value]
+  return list.flatMap((item) => {
+    if (typeof item === 'string') return item ? [item] : []
+    const id = (item as { '@id'?: unknown } | null)?.['@id']
+    return typeof id === 'string' && id ? [id] : []
+  })
+}
+
+/** The value to show as a file's place: the first that is not an exact version id. Stored
+ * values have no order, so the location is found rather than taken first. */
+export function primaryContentUrl(values: readonly string[]): string | undefined {
+  return values.find((value) => !isExactId(value)) ?? values[0]
+}
+
 export function isContentId(value: string | null | undefined): value is string {
   return Boolean(value && CONTENT_ID.test(value))
 }
@@ -105,18 +121,21 @@ function parseArn(value: string) {
 // Reads every form: the current one (content w3id `@id`, s3 `contentUrl`), an
 // older versioned ARN `@id` with a content w3id `contentUrl`, an s3 `@id`, or a relative `@id`.
 export function parseDataIdentity(
-  entity: { id: string; contentUrl?: string | null; localPath?: string | null },
+  entity: { id: string; contentUrl?: string | null; contentUrls?: readonly string[]; localPath?: string | null },
   endpoint?: string | null,
 ): ParsedDataIdentity {
   const { id } = entity
-  const contentUrl = entity.contentUrl ?? ''
-  const versioned = parseArnId(id)
+  // Every stored value is read: the location and an exact version id may come in any order.
+  const urls = [...new Set([...(entity.contentUrls ?? []), entity.contentUrl ?? ''].filter(Boolean))]
+  const first = <T>(read: (value: string) => T | null): T | null =>
+    urls.reduce<T | null>((found, value) => found ?? read(value), null)
+  const versioned = parseArnId(id) ?? first(parseArnId)
   const relative = Boolean(id) && !id.startsWith('#') && !isAbsoluteUri(id)
   return {
-    contentId: isContentId(id) ? id : isContentId(contentUrl) ? contentUrl : null,
-    s3: parseObjectUrl(contentUrl, endpoint) ?? parseObjectUrl(id, endpoint) ?? versioned?.s3 ?? null,
+    contentId: isContentId(id) ? id : urls.find(isContentId) ?? null,
+    s3: first((value) => parseObjectUrl(value, endpoint)) ?? parseObjectUrl(id, endpoint) ?? versioned?.s3 ?? null,
     arn: versioned?.arn ?? null,
-    global: parseGlobal(id) ?? parseGlobal(contentUrl),
+    global: parseGlobal(id) ?? first(parseGlobal),
     localPath: entity.localPath || (relative ? id : null),
   }
 }
@@ -125,11 +144,11 @@ export function parseDataIdentity(
  * content id or bare content hash ARN of the realm, else a versioned ARN of the realm (bare or as
  * a web id) on that node, else an s3 location. */
 export function hasLocalIdentity(
-  entity: { id: string; contentUrl?: string | null },
+  entity: { id: string; contentUrl?: string | null; contentUrls?: readonly string[] },
   realmId: string,
   nodeId: string,
 ): boolean {
-  const values = [entity.id, entity.contentUrl ?? '']
+  const values = [entity.id, ...(entity.contentUrls ?? []), entity.contentUrl ?? '']
   if (values.some((value) => isContentId(value) || HASH_ARN.exec(value)?.[1] === realmId)) return true
   // Like the node, the last versioned ARN read counts, before its realm and node are checked.
   const exact = values.flatMap((value) => (parseArnId(value) ?? parseArn(value))?.arn ?? []).at(-1)

@@ -3,6 +3,7 @@
 // editor list, plus the write-back that keeps @ids verbatim and only drops a
 // removed entity when nothing else in the crate still references it.
 
+import { contentUrlValues, primaryContentUrl } from '@/lib/crate/dataIdentity'
 import { formatBytes } from '@/lib/utils'
 
 export interface DataEntity {
@@ -12,6 +13,8 @@ export interface DataEntity {
   encodingFormat?: string
   contentSize?: string
   contentUrl?: string
+  /** Every `contentUrl` value, such as the location and an exact version id. */
+  contentUrls?: string[]
   description?: string
 }
 
@@ -43,6 +46,12 @@ export function crateRootId(crate: unknown): string | undefined {
   const about = descriptor?.about
   if (isRecord(about) && typeof about['@id'] === 'string') return about['@id']
   return g.find((e) => e['@id'] !== 'ro-crate-metadata.json')?.['@id'] as string | undefined
+}
+
+/** The shown place and every value of an entity's `contentUrl`. */
+function contentUrlsOf(entity: Record<string, unknown> | undefined) {
+  const contentUrls = contentUrlValues(entity?.contentUrl)
+  return { contentUrl: primaryContentUrl(contentUrls), contentUrls }
 }
 
 export function stringProp(value: unknown): string | undefined {
@@ -81,7 +90,7 @@ export function dataEntitiesOf(crate: unknown): DataEntity[] {
       types: types.length ? types : ['File'],
       encodingFormat: stringProp(entity?.encodingFormat),
       contentSize: stringProp(entity?.contentSize),
-      contentUrl: stringProp(entity?.contentUrl),
+      ...contentUrlsOf(entity),
       description: stringProp(entity?.description),
     })
   }
@@ -213,7 +222,7 @@ export function dataEntityTreeOf(crate: unknown, maxDepth = 8): DataEntityNode[]
       types: types.length ? types : ['File'],
       encodingFormat: stringProp(entity?.encodingFormat),
       contentSize: stringProp(entity?.contentSize),
-      contentUrl: stringProp(entity?.contentUrl),
+      ...contentUrlsOf(entity),
       description: stringProp(entity?.description),
       depth,
       parentId,

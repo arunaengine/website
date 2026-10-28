@@ -265,3 +265,19 @@ describe('writing the editor file list back', () => {
     expect(graph.some((entity) => entity['@id'] === './listed')).toBe(true)
   })
 })
+
+describe('data entity locations', () => {
+  it('keeps every contentUrl value and shows the location, whatever the stored order', () => {
+    const exact = 'https://w3id.org/aruna/data/arn:aruna:realm-1:node-2:s3/reads/a.csv@01K8Y2B6D8F0H2K4M6P8R0T2V4'
+    const crate = {
+      '@graph': [
+        { '@id': 'ro-crate-metadata.json', '@type': 'CreativeWork', about: { '@id': './' } },
+        { '@id': './', '@type': 'Dataset', hasPart: [{ '@id': '#a' }] },
+        { '@id': '#a', '@type': 'MediaObject', name: 'a.csv', contentUrl: [exact, 's3://reads/a.csv'] },
+      ],
+    }
+    for (const rows of [dataEntitiesOf(crate), dataEntityTreeOf(crate)]) {
+      expect(rows[0]).toMatchObject({ contentUrl: 's3://reads/a.csv', contentUrls: [exact, 's3://reads/a.csv'] })
+    }
+  })
+})

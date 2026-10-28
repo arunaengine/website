@@ -64,6 +64,7 @@ describe('canonical content identity authoring', () => {
       encodingFormat: undefined,
       contentSize: undefined,
       contentUrl: location,
+      contentUrls: [location],
       description: undefined,
     }])
   })
