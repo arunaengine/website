@@ -22,6 +22,7 @@ import {
   expandDataRefEntry,
   parseS3Url,
   answerEntries,
+  nativeInput,
   atOrBelow,
   resultsKey,
   tesPlacementTags,
@@ -255,7 +256,8 @@ function createStore(deps: CustomRunDeps) {
   )
   const script = ref(RUNTIMES[0].template)
   const scriptPath = ref('/work/script.py')
-  const selectedScript = ref<{ bucket: string; key: string; content: string } | null>(null)
+/** `ref` keeps the exact versioned reference a stored run named, so a rerun reads the same bytes. */
+  const selectedScript = ref<{ bucket: string; key: string; content: string; ref?: string } | null>(null)
   const editorTab = ref('script')
   const dependencies = ref<string[]>([])
   const dependencyDraft = ref('')
@@ -321,7 +323,7 @@ function createStore(deps: CustomRunDeps) {
   const scriptUrl = computed(() => {
     const selected = selectedScript.value
     return reuseSelectedScript.value && selected
-      ? `s3://${selected.bucket}/${selected.key}`
+      ? selected.ref ?? `s3://${selected.bucket}/${selected.key}`
       : stagingScriptUrl.value
   })
   const needsStagingLocation = computed(
@@ -399,7 +401,7 @@ function createStore(deps: CustomRunDeps) {
     if (!stored) return
     addInputEntry({
       kind: 'file',
-      url: `s3://${stored.bucket}/${stored.key}`,
+      url: stored.ref ?? `s3://${stored.bucket}/${stored.key}`,
       path,
       name: baseNameOf(path) || 'script',
     })
@@ -1178,7 +1180,9 @@ function createStore(deps: CustomRunDeps) {
     source: TesTask,
     notes: string[],
   ) {
-    const scriptRef = url ? parseS3Url(url) : null
+    // A versioned object ARN names the node and exact version; it is read there and kept as is.
+    const pinned = url ? nativeInput({ path: '', url }) : null
+    const scriptRef = pinned?.url ? parseS3Url(pinned.url) : null
     if (!scriptRef) {
       notes.push('The original script is not an s3:// object, so its content could not be restored.')
       return
@@ -1188,12 +1192,12 @@ function createStore(deps: CustomRunDeps) {
       return
     }
     try {
-      const content = await s3.getObjectText(scriptRef.bucket, scriptRef.key)
+      const content = await s3.getObjectText(scriptRef.bucket, scriptRef.key, pinned?.source_node_id, pinned?.version_id)
       const extracted =
         id === 'python-uv' ? extractInlineDependencies(content) : { script: content, dependencies: [] }
       script.value = extracted.script
       dependencies.value = extracted.dependencies
-      selectedScript.value = { bucket: scriptRef.bucket, key: scriptRef.key, content }
+      selectedScript.value = { bucket: scriptRef.bucket, key: scriptRef.key, content, ...(pinned?.version_id ? { ref: url } : {}) }
       stagingBucket.value = scriptRef.bucket
       setScriptKey(scriptRef.key)
       for (const dependency of extracted.dependencies) void verifyDependency(dependency)
@@ -1203,10 +1207,11 @@ function createStore(deps: CustomRunDeps) {
     }
     if (id !== 'deno') return
     const configInput = (source.inputs ?? []).find((input) => input.path === dependencyConfigPath.value)
-    const configRef = configInput?.url ? parseS3Url(configInput.url) : null
+    const config = configInput?.url ? nativeInput(configInput) : null
+    const configRef = config?.url ? parseS3Url(config.url) : null
     if (!configRef) return
     try {
-      const list = dependenciesFromDenoConfig(await s3.getObjectText(configRef.bucket, configRef.key))
+      const list = dependenciesFromDenoConfig(await s3.getObjectText(configRef.bucket, configRef.key, config?.source_node_id, config?.version_id))
       dependencies.value = list
       for (const dependency of list) void verifyDependency(dependency)
     } catch {

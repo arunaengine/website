@@ -525,6 +525,34 @@ describe('run page', () => {
     mounted.app.unmount()
   })
 
+  it('restores a pinned script from its node and version and keeps its exact reference', async () => {
+    const arn = 'arn:aruna:realm:node-b:s3/scripts/run/script.py@01K8W1B3D5F7H9KMQ1S3V5X7Z1'
+    s3.getObjectText.mockResolvedValueOnce('print("pinned")\n')
+    createTask.mockClear()
+    useSavedRuns().save({
+      id: 'r3', name: 'Pinned', savedAt: '2026-10-28T10:00:00Z',
+      task: {
+        name: 'Pinned',
+        executors: [{ image: 'ghcr.io/astral-sh/uv:python3.13-bookworm-slim', command: ['uv', 'run', '--no-project', '/work/script.py'] }],
+        inputs: [{ name: 'script.py', path: '/work/script.py', url: arn, type: 'FILE' }],
+      },
+      ask: { inputs: [], results: false },
+    })
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?saved=r3')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    expect(s3.getObjectText).toHaveBeenCalledWith('scripts', 'run/script.py', 'node-b', '01K8W1B3D5F7H9KMQ1S3V5X7Z1')
+    expect(content(mounted.root)).not.toContain('could not be restored')
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    const submitted = (createTask.mock.calls.at(-1) as unknown[])[0] as Tes.TesTask
+    expect(submitted.inputs?.find((input) => input.path === '/work/script.py')?.url).toBe(arn)
+    useSavedRuns().remove('r3')
+    mounted.app.unmount()
+  })
+
   it('prefills the executor from the template in the query', async () => {
     const mounted = await mount(ComputeSubmitView, '/app/compute/new?template=python')
 
