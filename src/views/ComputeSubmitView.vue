@@ -34,7 +34,7 @@ import { provideRunFormBridge } from '@/composables/useAssistantRunForm'
 import { createRunFormBridge } from '@/lib/runFormBridge'
 import { defaultPlacement, isNativeBlocked, tesFormToExecutionRequest } from '@/lib/nativeSubmit'
 import { submitJob } from '@/lib/jobs'
-import type { TesTask } from '@/lib/tes'
+import { nativeInput, type TesTask } from '@/lib/tes'
 import { errorMessage } from '@/lib/utils'
 import { ArrowLeft } from '@lucide/vue'
 
@@ -172,7 +172,7 @@ async function run() {
     if (runTarget.local.value) {
       const sourceNodeId = s3.nodeIdFor()
       if (!sourceNodeId) throw new Error('The realm node for staged inputs is not available.')
-      const localInputs = [...(draft.inputs ?? [])]
+      const localInputs = (draft.inputs ?? []).map(nativeInput)
       if (scriptUpload?.versionId && localInputs[0]) {
         localInputs[0] = { ...localInputs[0], source_node_id: sourceNodeId, version_id: scriptUpload.versionId }
       }

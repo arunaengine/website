@@ -440,6 +440,14 @@ export function resultsKey(prefix: string, slug: string, tail: string): string {
   return `${folder}results/${slug}/${tail}`
 }
 
+/** An input as a native job takes it: a versioned object ARN becomes its s3:// url, node and version. */
+export function nativeInput(input: TesInput): TesInput {
+  const arn = /^arn:aruna:[^:]+:([^:]+):s3\/([^/]+)\/(.+)@([0-9A-HJKMNP-TV-Z]{26})$/.exec(input.url ?? '')
+  if (!arn) return input
+  const key = arn[3].split('/').map(decodeURIComponent).join('/')
+  return { ...input, url: `s3://${arn[2]}/${key}`, source_node_id: arn[1], version_id: arn[4] }
+}
+
 // Expands one picker entry into its TES inputs: a file, a DIRECTORY, or one FILE per listed file.
 export function expandDataRefEntry(entry: TesDataRefEntry): TesInput[] {
   if (entry.kind === 'file') {

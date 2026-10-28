@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { expandDataRefEntry, pickedEntries, resultsKey } from './tes'
+import { expandDataRefEntry, nativeInput, pickedEntries, resultsKey } from './tes'
 
 const V1 = '01K8W1B3D5F7H9KMQ1S3V5X7Z1'
 const V2 = '01K8W1B3D5F7H9KMQ1S3V5X7Z2'
@@ -34,5 +34,13 @@ describe('results below a linked folder', () => {
     expect(resultsKey('genomes/', 'bakta-sample7', 'sample7.gff3')).toBe('genomes/results/bakta-sample7/sample7.gff3')
     expect(resultsKey('genomes', 'run', 'out/')).toBe('genomes/results/run/out/')
     expect(resultsKey('', 'run', 'a.txt')).toBe('results/run/a.txt')
+  })
+})
+
+describe('pinned inputs on a local run', () => {
+  it('turns a version ARN into the url, node and version a native job takes', () => {
+    const input = { name: 'a b.fna', path: '/in/a b.fna', url: `arn:aruna:realm:node-b:s3/db/x/a%20b.fna@${V1}` }
+    expect(nativeInput(input)).toEqual({ ...input, url: 's3://db/x/a b.fna', source_node_id: 'node-b', version_id: V1 })
+    expect(nativeInput({ path: '/in/c', url: 's3://lab/c' })).toEqual({ path: '/in/c', url: 's3://lab/c' })
   })
 })
