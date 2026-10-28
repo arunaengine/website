@@ -3,6 +3,7 @@
 // with the databases. Read from the node that holds the bucket; group admins may change it.
 import { computed, ref, watch } from 'vue'
 import IdentifierLinksEditor from '@/components/settings/IdentifierLinksEditor.vue'
+import BucketReleases from '@/components/storage/BucketReleases.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
@@ -154,6 +155,13 @@ const saveRules = (parser: IdentifierParser | null) => void store({ ...current.v
           </div>
         </template>
         <Notice v-if="failure" tone="error">{{ failure }}</Notice>
+        <BucketReleases
+          v-if="current.database"
+          :bucket="bucket"
+          :node-id="nodeId"
+          :can-publish="canAdmin"
+          :page="pageText(current.identifiers)"
+        />
       </template>
     </div>
   </section>
