@@ -195,3 +195,28 @@ export const PRESETS: readonly ListPreset[] = [
 export function presetUses(preset: ListPreset, columns: readonly string[]): ColumnChoice[] {
   return columns.map((name) => ({ name, use: preset.uses[name] ?? 'keep', only: [] }))
 }
+
+/** The server reads the header from the first 256 KiB, so the preview reads as much. */
+export const PREVIEW_BYTES = 256 * 1024
+
+/** The start of a list as text, ending at a whole line; a gzip list is unpacked first. */
+export async function previewText(blob: Blob): Promise<{ text: string; gzip: boolean; partial: boolean }> {
+  const magic = new Uint8Array(await blob.slice(0, 2).arrayBuffer())
+  const gzip = magic[0] === 0x1f && magic[1] === 0x8b
+  if (!gzip) return wholeLines(await blob.slice(0, PREVIEW_BYTES).text(), gzip, blob.size > PREVIEW_BYTES)
+  const reader = blob.stream().pipeThrough(new DecompressionStream('gzip')).getReader() as ReadableStreamDefaultReader<Uint8Array<ArrayBuffer>>
+  const parts: Uint8Array<ArrayBuffer>[] = []
+  let size = 0
+  while (size < PREVIEW_BYTES) {
+    const { done, value } = await reader.read()
+    if (done) break
+    parts.push(value)
+    size += value.length
+  }
+  await reader.cancel().catch(() => {})
+  return wholeLines(await new Blob(parts).slice(0, PREVIEW_BYTES).text(), gzip, size >= PREVIEW_BYTES)
+}
+
+function wholeLines(text: string, gzip: boolean, partial: boolean) {
+  return { text: partial ? text.slice(0, text.lastIndexOf('\n') + 1) : text, gzip, partial }
+}

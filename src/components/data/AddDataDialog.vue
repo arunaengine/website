@@ -11,6 +11,7 @@ import ConnectorTab from '@/components/data/add/ConnectorTab.vue'
 import DatabasesTab from '@/components/data/add/DatabasesTab.vue'
 import CollectionTab from '@/components/data/add/CollectionTab.vue'
 import OtherBucketsTab from '@/components/data/add/OtherBucketsTab.vue'
+import ListImportTab from '@/components/data/add/ListImportTab.vue'
 import { useConnectorSource, type ConnectorStagingRow } from '@/components/data/add/useConnectorSource'
 import { useOtherBuckets } from '@/components/data/add/useOtherBuckets'
 import { useBuilderBasket } from '@/composables/useBuilderBasket'
@@ -19,7 +20,7 @@ import type { BucketSearchHit, StagingReferenceEntry } from '@/lib/api'
 import { mockEnabled } from '@/lib/distributedMock'
 import { mockBucket } from '@/lib/distributedMockData'
 import { computed, ref, toRef } from 'vue'
-import { Boxes, CloudDownload, Database, Library, Upload } from '@lucide/vue'
+import { Boxes, CloudDownload, Database, Library, ListChecks, Upload } from '@lucide/vue'
 
 // The ONE "Add data" entry point: a basket dialog for local files/folders
 // (persistent upload queue) and connector entries (batch staging), plus an
@@ -103,6 +104,7 @@ function onImportsCreated() {
       <TabsList>
         <TabsTrigger value="local"><Upload class="mr-1 h-3.5 w-3.5" /> Local files</TabsTrigger>
         <TabsTrigger v-if="shown('connectors')" value="connector"><CloudDownload class="mr-1 h-3.5 w-3.5" /> From connector</TabsTrigger>
+        <TabsTrigger v-if="shown('connectors')" value="list"><ListChecks class="mr-1 h-3.5 w-3.5" /> From a list</TabsTrigger>
         <TabsTrigger value="other"><Boxes class="mr-1 h-3.5 w-3.5" /> Other buckets</TabsTrigger>
         <TabsTrigger value="databases"><Library class="mr-1 h-3.5 w-3.5" /> Databases</TabsTrigger>
         <TabsTrigger v-if="collection" value="collection"><Database class="mr-1 h-3.5 w-3.5" /> Whole collection</TabsTrigger>
@@ -118,6 +120,10 @@ function onImportsCreated() {
           @add="addConnectorRows"
           @navigate="emit('update:open', false)"
         />
+      </TabsContent>
+
+      <TabsContent v-if="shown('connectors')" value="list" class="space-y-3">
+        <ListImportTab :bucket="bucket" :source="connectorSource" @started="emit('staged')" />
       </TabsContent>
 
       <TabsContent value="other" class="space-y-3">
