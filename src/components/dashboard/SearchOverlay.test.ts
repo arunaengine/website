@@ -126,7 +126,7 @@ const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.me
       reload: databaseReload,
       state: databaseState,
       complete: ref(true),
-      locate: async (row: Databases.DatabaseRow) => Databases.placeOf(row, null, 'node-a'),
+      locate: (row: Databases.DatabaseRow) => Databases.placeOf(row, 'node-a'),
     }),
   },
   '@/lib/distributedMock': { mockEnabled: () => false },
@@ -652,14 +652,15 @@ describe('narrow TopBar search panel', () => {
 
   it('lists the databases a person may use under their own tag', async () => {
     databaseRows = [{
-      entryId: 'e1', datasetId: 'd1', bucket: 'spire-db', ownerGroup: 'group-a', title: 'SPIRE microbiome', documentPath: null, state: 'active', public: false,
+      datasetId: 'd1', bucket: 'spire-db', ownerGroup: 'group-a', title: 'SPIRE microbiome', public: false,
       target: { kind: 'ordinary', node_id: 'node-b', bucket: 'spire-db' },
+      places: [{ bucket: 'spire-db', nodeId: 'node-b' }], metadata: { database: true, identifiers: [] },
     }]
     const mounted = await mount()
     await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
     await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'microbiome')
 
-    const option = allNodes(mounted.root).find((node) => node.props.id === 'qs-db:e1')
+    const option = allNodes(mounted.root).find((node) => node.props.id === 'qs-db:node-b/spire-db')
     expect(option && content(option)).toContain('Database')
     expect(option && content(option)).toContain('SPIRE microbiome')
     databaseRows = []

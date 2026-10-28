@@ -11,6 +11,8 @@
 // is always served (schema:name with subject/path fallback); `snippet` is optional.
 // Partiality is signalled by `nodes_failed` (not a `partial` flag); `truncated`
 // marks a page that stopped at the server depth cap before exhausting matches.
+import type { BucketMetadata } from './databases'
+
 export interface MetadataSearchHit {
   document_id: string
   group_id: string
@@ -63,6 +65,10 @@ export interface BucketSearchHit {
   created_at: string
   /** The distributed bucket the hit is a member of; every member node answers its own hit. */
   set_id?: string | null
+  /** The bucket's metadata, in a `database=true` search only. */
+  metadata?: BucketMetadata | null
+  /** Anyone, also without a login, may read the bucket; in a `database=true` search only. */
+  public?: boolean
 }
 
 export interface BucketSearchResponse {

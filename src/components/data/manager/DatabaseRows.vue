@@ -1,21 +1,17 @@
 <script setup lang="ts">
 // The databases the user may use, listed like buckets with the dataset's title under the name.
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import BucketRow from '@/components/data/BucketRow.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useDatabases } from '@/composables/useDatabases'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { NOT_HELD_HERE, STATE_NOTES, type DatabaseRow } from '@/lib/databases'
-import { errorMessage } from '@/lib/utils'
+import { targetKey, type DatabaseRow } from '@/lib/databases'
 
 const props = defineProps<{ filter: string; active: string; highlighted?: number }>()
 const emit = defineEmits<{ (e: 'open', bucket: string, nodeId: string | null, groupId: string): void }>()
 
 const databases = useDatabases()
 const { isLocalNode } = useRealmNodes()
-const problem = ref<string | null>(null)
-let opening = 0
-
 onMounted(() => databases.ensure())
 
 const rows = computed(() => {
@@ -23,21 +19,13 @@ const rows = computed(() => {
   return databases.rows.value.filter((row) => !term || `${row.bucket} ${row.title ?? ''}`.toLowerCase().includes(term))
 })
 
-async function open(row: DatabaseRow) {
-  const run = ++opening
-  problem.value = null
-  try {
-    const place = await databases.locate(row)
-    if (run !== opening) return
-    if (!place) problem.value = NOT_HELD_HERE
-    else emit('open', place.bucket, isLocalNode(place.nodeId) ? null : place.nodeId, row.ownerGroup)
-  } catch (cause) {
-    if (run === opening) problem.value = errorMessage(cause)
-  }
+function open(row: DatabaseRow) {
+  const place = databases.locate(row)
+  emit('open', place.bucket, isLocalNode(place.nodeId) ? null : place.nodeId, row.ownerGroup)
 }
 
 // The sidebar's arrow keys move through these rows.
-defineExpose({ openers: computed(() => rows.value.map((row) => () => void open(row))) })
+defineExpose({ openers: computed(() => rows.value.map((row) => () => open(row))) })
 </script>
 
 <template>
@@ -48,14 +36,14 @@ defineExpose({ openers: computed(() => rows.value.map((row) => () => void open(r
     {{ databases.error.value }}
   </li>
   <template v-else>
-    <li v-for="(row, index) in rows" :key="row.entryId">
+    <li v-for="(row, index) in rows" :key="targetKey(row.target)">
       <BucketRow
         :bucket="row.bucket"
         option
         :highlighted="index === highlighted"
         :pinnable="false"
         :active="row.bucket === active"
-        :subtitle="STATE_NOTES[row.state] || row.title"
+        :subtitle="row.title ?? undefined"
         @open="open(row)"
       />
     </li>
@@ -63,6 +51,5 @@ defineExpose({ openers: computed(() => rows.value.map((row) => () => void open(r
       No database {{ filter.trim() ? 'matches' : 'is listed for you yet' }}.
     </li>
     <li v-if="!databases.complete.value" class="px-3 py-2 text-xs text-muted-foreground">The list is partial. Narrow it with the search.</li>
-    <li v-if="problem" role="status" class="px-3 py-2 text-xs text-muted-foreground">{{ problem }}</li>
   </template>
 </template>

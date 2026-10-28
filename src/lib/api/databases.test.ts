@@ -1,92 +1,53 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-  approveDatabaseRequest,
-  dropDatabaseRequest,
-  listDatabaseRequests,
-  listDatabases,
-  markDatabase,
-  removeDatabase,
-  setDatabaseParser,
-  testDatabaseParser,
-} from './databases'
+import { getBucketMetadata, publishRelease, putBucketMetadata } from './databases'
 
 const client = { baseUrl: 'https://api.test/api/v1', token: 'tok' }
 
-function stubFetch(status: number, body: unknown) {
-  const calls: { url: string; method?: string; body?: unknown }[] = []
+function stubFetch(body: unknown) {
+  const calls: { url: string; method: string; body: unknown }[] = []
   vi.stubGlobal('window', { location: { origin: 'https://portal.test' } })
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (input: URL, init: RequestInit) => {
-      calls.push({ url: String(input), method: init.method, body: init.body ? JSON.parse(String(init.body)) : undefined })
-      return new Response(status === 204 ? null : JSON.stringify(body), { status })
+    vi.fn(async (input: URL, init?: RequestInit) => {
+      calls.push({ url: String(input), method: init?.method ?? 'GET', body: init?.body ? JSON.parse(String(init.body)) : null })
+      return new Response(JSON.stringify(body), { status: 200 })
     }),
   )
   return calls
 }
 
-afterEach(() => {
-  vi.unstubAllGlobals()
-})
+afterEach(() => vi.unstubAllGlobals())
 
-describe('database requests', () => {
-  it('lists a page and asks for the curator view on request', async () => {
-    const calls = stubFetch(200, { databases: [] })
+// Every source file of the portal, to check that no removed route is still called.
+const sources = import.meta.glob(['/src/**/*.ts', '/src/**/*.vue', '!/src/**/*.test.ts'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 
-    await listDatabases({ limit: 100, curation: true, after: 'e1' }, client)
+describe('bucket metadata requests', () => {
+  it('reads and writes the metadata of a bucket', async () => {
+    const calls = stubFetch({ bucket: 'bakta db', metadata: null })
 
-    const url = new URL(calls[0].url)
-    expect(url.pathname).toBe('/api/v1/data/databases')
-    expect([url.searchParams.get('limit'), url.searchParams.get('curation'), url.searchParams.get('after')]).toEqual(['100', 'true', 'e1'])
+    expect(await getBucketMetadata('bakta db', client)).toBeNull()
+    await putBucketMetadata('bakta db', { database: true, identifiers: [] }, client)
+
+    expect(calls.map((call) => [call.method, new URL(call.url).pathname])).toEqual([
+      ['GET', '/api/v1/data/buckets/bakta%20db/metadata'],
+      ['PUT', '/api/v1/data/buckets/bakta%20db/metadata'],
+    ])
+    expect(calls[1].body).toEqual({ metadata: { database: true, identifiers: [] } })
   })
 
-  it('marks a bucket with the dataset and the target', async () => {
-    const answer = { status: 'pending_consent', request_id: 'r1' }
-    const calls = stubFetch(200, answer)
-    const body = { dataset_id: 'd1', target: { kind: 'ordinary' as const, node_id: 'n1', bucket: 'lab' } }
+  it('publishes a release of a folder', async () => {
+    const calls = stubFetch({ bucket: 'db', key: 'r.json', version_id: 'v1', files: 3, replayed: false })
+    const body = { key: 'r.json', label: '6.0', prefix: 'db/', upstream: [], preparation: [] }
 
-    expect(await markDatabase(body, client)).toEqual(answer)
-    expect(calls[0]).toMatchObject({ url: 'https://api.test/api/v1/system/realm/databases', method: 'POST', body })
+    expect((await publishRelease('db', body, client)).files).toBe(3)
+    expect(calls[0]).toMatchObject({ method: 'POST', body })
   })
 
-  it('removes an entry and reads the pending requests as a list', async () => {
-    const calls = stubFetch(204, null)
-    await removeDatabase('e 1', client)
-    expect(calls[0]).toMatchObject({ url: 'https://api.test/api/v1/system/realm/databases/e%201', method: 'DELETE' })
+  it('leaves no call to a removed database route in the portal', () => {
+    const removed = [/\/data\/databases/, /\/system\/realm\/databases/, /\/data\/buckets\/\$\{[^}]+\}\/links/]
+    const files = Object.entries(sources).filter(([, text]) => removed.some((route) => route.test(text)))
 
-    stubFetch(200, { requests: [{ request_id: 'r1' }] })
-    expect(await listDatabaseRequests(client)).toEqual([{ request_id: 'r1' }])
-  })
-
-  it('approves and drops a request by its id', async () => {
-    const calls = stubFetch(200, { entry_id: 'e1' })
-    await approveDatabaseRequest('r1', client)
-    expect(calls[0]).toMatchObject({ url: 'https://api.test/api/v1/system/realm/databases/requests/r1/approve', method: 'POST' })
-
-    const dropped = stubFetch(204, null)
-    await dropDatabaseRequest('r1', client)
-    expect(dropped[0]).toMatchObject({ url: 'https://api.test/api/v1/system/realm/databases/requests/r1', method: 'DELETE' })
-  })
-})
-
-describe('identifier parsers', () => {
-  const parser = { rules: [{ name: 'BioSample', pattern: '(?P<id>SAMN\\d+)', target: 'key' as const, url_template: 'https://x.org/{id}' }] }
-
-  it('sets and clears the parser of one entry', async () => {
-    const calls = stubFetch(204, null)
-
-    await setDatabaseParser('e/1', parser, client)
-    await setDatabaseParser('e/1', null, client)
-
-    expect(calls[0]).toMatchObject({ url: 'https://api.test/api/v1/system/realm/databases/e%2F1/parser', method: 'PUT', body: { parser } })
-    expect(calls[1].body).toEqual({ parser: null })
-  })
-
-  it('tries a parser and returns what it found', async () => {
-    const found = [{ name: 'BioSample', value: 'SAMN1', url: 'https://x.org/SAMN1', target: 'key' }]
-    const calls = stubFetch(200, { identifiers: found })
-
-    expect(await testDatabaseParser({ parser, key: 'SAMN1/a.fna' }, client)).toEqual(found)
-    expect(calls[0]).toMatchObject({ url: 'https://api.test/api/v1/system/realm/databases/parser/test', method: 'POST' })
+    expect(Object.keys(sources).length).toBeGreaterThan(100)
+    expect(files.map(([path]) => path)).toEqual([])
   })
 })

@@ -3,15 +3,11 @@
 import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { databaseOf, placeOf, rowOf, searchRows, targetOf, type DatabasePlace, type DatabaseRow } from '@/lib/databases'
-import { partId } from '@/lib/linkedPart'
+import type { BucketSearchHit } from '@/lib/api'
+import { databaseOf, placeOf, rowsOf, searchRows, targetOf, type DatabasePlace, type DatabaseRow } from '@/lib/databases'
 import { errorMessage } from '@/lib/utils'
 
 export type DatabasesState = 'idle' | 'loading' | 'ready' | 'failed'
-
-const PAGE = 100
-// A realm holds at most 1024 databases, so this reads all of them.
-const PAGES = Math.ceil(1024 / PAGE)
 
 // One list for the whole portal; it belongs to the session that read it.
 const listed = ref<DatabaseRow[]>([])
@@ -24,7 +20,7 @@ let stateEpoch = -1
 let runs = 0
 
 export function useDatabases() {
-  const { listDatabases, getPartTarget, nodeInfo, sessionEpoch, authToken } = useAruna()
+  const { searchBuckets, sessionEpoch, authToken } = useAruna()
   const { localNodeId } = useRealmNodes()
 
   const rows = computed(() => (listedEpoch.value === sessionEpoch.value ? listed.value : []))
@@ -40,19 +36,20 @@ export function useDatabases() {
     }
     state.value = 'loading'
     error.value = null
-    const found: DatabaseRow[] = []
-    let after: string | undefined
+    const hits: BucketSearchHit[] = []
+    let cursor: string | undefined
+    let failedNodes = 0
     try {
-      for (let page = 0; page < PAGES; page++) {
-        const answer = await listDatabases({ limit: PAGE, ...(after ? { after } : {}) })
+      do {
+        const answer = await searchBuckets('', { database: true, limit: 50, cursor })
         if (run !== runs || epoch !== sessionEpoch.value) return
-        found.push(...answer.databases.map(rowOf))
-        after = answer.next_after ?? undefined
-        if (!after) break
-      }
-      listed.value = found
+        hits.push(...answer.hits)
+        failedNodes += answer.nodes_failed
+        cursor = answer.next_cursor ?? undefined
+      } while (cursor)
+      listed.value = rowsOf(hits)
       listedEpoch.value = epoch
-      complete.value = !after
+      complete.value = failedNodes === 0
       state.value = 'ready'
     } catch (cause) {
       if (run !== runs || epoch !== sessionEpoch.value) return
@@ -75,15 +72,8 @@ export function useDatabases() {
     },
   )
 
-  /** Where a database opens; a set asks this node whether it holds a copy. */
-  async function locate(row: DatabaseRow): Promise<DatabasePlace | null> {
-    const local = localNodeId.value ?? ''
-    if (row.target.kind === 'ordinary') return placeOf(row, null, local)
-    const realmId = nodeInfo.value?.node.realm_id
-    if (!realmId || !local) return null
-    const root = partId({ realmId, nodeId: local, bucket: row.bucket, prefix: '', setId: row.target.set_id })
-    return placeOf(row, await getPartTarget(root), local)
-  }
+  /** Where a database opens: on this node when it holds it, else on a node that does. */
+  const locate = (row: DatabaseRow): DatabasePlace => placeOf(row, localNodeId.value)
 
   return {
     rows,

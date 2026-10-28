@@ -7,7 +7,6 @@ import { compileClientComponent, content, element, click, mountApp, moduleDefaul
 const state = ref('ready')
 const rows = ref<Databases.DatabaseRow[]>([])
 const complete = ref(true)
-const held = ref<{ id: string; bucket: string; prefix: string; held_here: boolean } | null>(null)
 
 const RowStub = defineComponent({
   props: { bucket: String, subtitle: String },
@@ -22,20 +21,20 @@ const component = compileClientComponent(new URL('./DatabaseRows.vue', import.me
   '@/composables/useDatabases': {
     useDatabases: () => ({
       rows, state, error: ref('node busy'), complete, ensure: vi.fn(),
-      locate: async (item: Databases.DatabaseRow) => Databases.placeOf(item, held.value, 'n1'),
+      locate: (item: Databases.DatabaseRow) => Databases.placeOf(item, 'n1'),
     }),
   },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({ localNodeId: ref('n1'), isLocalNode: (id: string) => id === 'n1' }),
   },
   '@/lib/databases': Databases,
-  '@/lib/utils': { errorMessage: (cause: unknown) => String(cause) },
 })
 
 function row(bucket: string, extra: Partial<Databases.DatabaseRow> = {}): Databases.DatabaseRow {
   return {
-    entryId: `e-${bucket}`, datasetId: `d-${bucket}`, bucket, ownerGroup: 'g1', title: `${bucket} title`, documentPath: null, state: 'active', public: false,
-    target: { kind: 'ordinary', node_id: 'n1', bucket },
+    datasetId: `d-${bucket}`, bucket, ownerGroup: 'g1', title: `${bucket} title`, public: false,
+    target: { kind: 'ordinary', node_id: 'n1', bucket }, places: [{ bucket, nodeId: 'n1' }],
+    metadata: { database: true, identifiers: [] },
     ...extra,
   }
 }
@@ -47,7 +46,7 @@ async function render(filter = '') {
 describe('database rows', () => {
   it('lists each database with the dataset title and opens it on its own node', async () => {
     state.value = 'ready'
-    rows.value = [row('lab'), row('far', { target: { kind: 'ordinary', node_id: 'n2', bucket: 'far' } })]
+    rows.value = [row('lab'), row('far', { target: { kind: 'ordinary', node_id: 'n2', bucket: 'far' }, places: [{ bucket: 'far', nodeId: 'n2' }] })]
     const opened: unknown[][] = []
     const { root } = await mountApp(component, { props: { filter: '', active: '', onOpen: (...args: unknown[]) => opened.push(args) } })
 
@@ -58,14 +57,13 @@ describe('database rows', () => {
     expect(opened).toEqual([['far', 'n2', 'g1'], ['lab', null, 'g1']])
   })
 
-  it('says why an entry is not plain and filters by the typed text', async () => {
+  it('filters by the typed text', async () => {
     state.value = 'ready'
-    rows.value = [row('lab', { state: 'description_unavailable' }), row('spire')]
+    rows.value = [row('lab'), row('spire')]
     const { root } = await render('spi')
 
     expect(content(root)).toContain('spire spire title')
     expect(content(root)).not.toContain('lab')
-    expect(content((await render('lab')).root)).toContain('Description temporarily unavailable')
   })
 
   it('keeps a failed read apart from an empty list and notes a partial one', async () => {
@@ -80,20 +78,18 @@ describe('database rows', () => {
     complete.value = true
   })
 
-  it('opens a set here only when this node holds it, and says so otherwise', async () => {
+  it('opens a set on this node when it holds it, else on a member node', async () => {
     state.value = 'ready'
-    rows.value = [row('spire', { target: { kind: 'distributed', set_id: 's1' } })]
+    const target = { kind: 'distributed' as const, set_id: 's1' }
+    rows.value = [
+      row('spire', { target, places: [{ bucket: 'spire', nodeId: 'n2' }, { bucket: 'spire', nodeId: 'n1' }] }),
+      row('reef', { target: { kind: 'distributed', set_id: 's2' }, places: [{ bucket: 'reef', nodeId: 'n3' }] }),
+    ]
     const opened: unknown[][] = []
     const { root } = await mountApp(component, { props: { filter: '', active: '', onOpen: (...args: unknown[]) => opened.push(args) } })
 
-    held.value = { id: 'r', bucket: 'spire', prefix: '', held_here: false }
     await click(element(root, (node) => node.props['data-bucket'] === 'spire'))
-    expect(opened).toEqual([])
-    expect(content(root)).toContain('This node holds no copy of this database.')
-
-    held.value = { ...held.value, held_here: true }
-    await click(element(root, (node) => node.props['data-bucket'] === 'spire'))
-    expect(opened).toEqual([['spire', null, 'g1']])
-    held.value = null
+    await click(element(root, (node) => node.props['data-bucket'] === 'reef'))
+    expect(opened).toEqual([['spire', null, 'g1'], ['reef', 'n3', 'g1']])
   })
 })

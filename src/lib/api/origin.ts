@@ -3,6 +3,7 @@
 // The server sets the origin when it mints the version and never changes it. A sync adds a hop.
 // Readers of the file see the full record; `projection` is what a dataset may say about it.
 import { apiRequest, type ApiClientOptions } from './client'
+import type { BucketIdentifier, BucketMetadata } from './databases'
 
 export type OriginBody =
   /** Uploaded directly; the uploader is `created_by`. */
@@ -74,26 +75,6 @@ export interface OriginResponse {
   releases?: OriginRelease[]
   /** False when release membership could not be checked everywhere, so one may be missing. */
   releases_complete?: boolean
-}
-
-/** One identifier of a bucket or release, such as its DOI. */
-export interface BucketIdentifier {
-  name: string
-  value: string
-  url: string
-}
-
-/** What describes a bucket; `database` lets the portal show it as a database. */
-export interface BucketMetadata {
-  database: boolean
-  title?: string | null
-  description?: string | null
-  version?: string | null
-  license?: string | null
-  identifiers: BucketIdentifier[]
-  parser?: unknown
-  /** The dataset document that describes the bucket. */
-  dataset?: string | null
 }
 
 /** A release that pins a version: its release crate's exact version, label and upstream ids. */

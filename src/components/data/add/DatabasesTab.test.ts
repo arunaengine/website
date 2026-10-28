@@ -15,17 +15,17 @@ const component = compileClientComponent(new URL('./DatabasesTab.vue', import.me
   '@/composables/useDatabases': {
     useDatabases: () => ({
       rows, state, error: ref('node busy'), complete: ref(true), ensure: () => undefined,
-      locate: async (item: Databases.DatabaseRow) => Databases.placeOf(item, null, 'n1'),
+      locate: (item: Databases.DatabaseRow) => Databases.placeOf(item, 'n1'),
     }),
   },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ localNodeId: ref('n1') }) },
   '@/composables/useBucketDistribution': { useBucketDistribution: () => distribution },
   '@/lib/databases': Databases,
-  '@/lib/utils': { errorMessage: (cause: unknown) => String(cause) },
 })
 
 function row(bucket: string, target: Databases.DatabaseRow['target']): Databases.DatabaseRow {
-  return { entryId: `e-${bucket}`, datasetId: 'd', bucket, ownerGroup: 'g', title: `${bucket} title`, documentPath: null, state: 'active', public: false, target }
+  const nodeId = target.kind === 'ordinary' ? target.node_id : 'n3'
+  return { datasetId: 'd', bucket, ownerGroup: 'g', title: `${bucket} title`, public: false, target, places: [{ bucket, nodeId }], metadata: { database: true, identifiers: [] } }
 }
 
 describe('databases in Add data', () => {

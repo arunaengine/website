@@ -1,32 +1,26 @@
 import { effectScope, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, type DatabaseView } from '@/lib/api'
+import { ApiError, type BucketSearchHit } from '@/lib/api'
 
 const aruna = vi.hoisted(() => ({
   sessionEpoch: { value: 1 },
   authToken: { value: 'token' },
-  listDatabases: vi.fn(),
-  getPartTarget: vi.fn(),
-  nodeInfo: { value: { node: { realm_id: 'r1' } } },
+  searchBuckets: vi.fn(),
 }))
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
 vi.mock('@/composables/useRealmNodes', () => ({ useRealmNodes: () => ({ localNodeId: ref('n1') }) }))
 
 const { useDatabases } = await import('@/composables/useDatabases')
 
-function view(bucket: string, extra: Partial<DatabaseView> = {}): DatabaseView {
+function view(bucket: string, title = `${bucket} database`): BucketSearchHit {
   return {
-    entry_id: `e-${bucket}`,
-    dataset_id: `d-${bucket}`,
-    owner_group: 'g1',
-    target: { kind: 'ordinary', node_id: 'n1', bucket },
-    bucket,
-    state: 'active',
-    public: false,
-    title: `${bucket} database`,
-    ...extra,
+    arn: `arn:aruna:r1:n1:s3/${bucket}`, bucket, node_id: 'n1', group_id: 'g1', created_at: '2026-10-28T00:00:00Z',
+    metadata: { database: true, title, identifiers: [] }, public: false,
   }
 }
+
+const page = (hits: BucketSearchHit[], next_cursor?: string, nodes_failed = 0) =>
+  ({ hits, next_cursor, nodes_failed, nodes_queried: 2, failed_nodes: [] })
 
 function start() {
   const scope = effectScope()
@@ -37,17 +31,17 @@ describe('databases', () => {
   beforeEach(() => {
     aruna.sessionEpoch.value += 1
     aruna.authToken.value = 'token'
-    aruna.listDatabases.mockReset()
+    aruna.searchBuckets.mockReset()
   })
 
   it('reads every page up to the end and finds the database of a bucket', async () => {
-    aruna.listDatabases.mockResolvedValueOnce({ databases: [view('lab')], next_after: 'e-lab' })
-    aruna.listDatabases.mockResolvedValueOnce({ databases: [view('spire')] })
+    aruna.searchBuckets.mockResolvedValueOnce(page([view('lab')], 'c1'))
+    aruna.searchBuckets.mockResolvedValueOnce(page([view('spire')]))
     const { databases, scope } = start()
     databases.ensure()
     await vi.waitFor(() => expect(databases.state.value).toBe('ready'))
 
-    expect(aruna.listDatabases).toHaveBeenNthCalledWith(2, { limit: 100, after: 'e-lab' })
+    expect(aruna.searchBuckets).toHaveBeenNthCalledWith(2, '', { database: true, limit: 50, cursor: 'c1' })
     expect(databases.rows.value.map((row) => row.bucket)).toEqual(['lab', 'spire'])
     expect(databases.complete.value).toBe(true)
     expect(databases.find('lab', null, null)?.title).toBe('lab database')
@@ -58,7 +52,7 @@ describe('databases', () => {
   })
 
   it('says when the list is partial, and keeps a failure apart from an empty list', async () => {
-    aruna.listDatabases.mockResolvedValue({ databases: [view('lab')], next_after: 'more' })
+    aruna.searchBuckets.mockResolvedValue(page([view('lab')], undefined, 1))
     const first = start()
     first.databases.ensure()
     await vi.waitFor(() => expect(first.databases.state.value).toBe('ready'))
@@ -66,7 +60,7 @@ describe('databases', () => {
     first.scope.stop()
 
     aruna.sessionEpoch.value += 1
-    aruna.listDatabases.mockRejectedValue(new ApiError(503, 'configuration unreadable'))
+    aruna.searchBuckets.mockRejectedValue(new ApiError(503, 'configuration unreadable'))
     const second = start()
     second.databases.ensure()
     await vi.waitFor(() => expect(second.databases.state.value).toBe('failed'))
@@ -76,7 +70,7 @@ describe('databases', () => {
   })
 
   it('does not show the list of the session before', async () => {
-    aruna.listDatabases.mockResolvedValue({ databases: [view('lab')] })
+    aruna.searchBuckets.mockResolvedValue(page([view('lab')]))
     const { databases, scope } = start()
     databases.ensure()
     await vi.waitFor(() => expect(databases.state.value).toBe('ready'))
@@ -91,13 +85,13 @@ describe('databases', () => {
     const { databases, scope } = start()
     databases.ensure()
 
-    expect(aruna.listDatabases).not.toHaveBeenCalled()
+    expect(aruna.searchBuckets).not.toHaveBeenCalled()
     expect(databases.state.value).toBe('idle')
     scope.stop()
   })
 
   it('searches the loaded titles and buckets', async () => {
-    aruna.listDatabases.mockResolvedValue({ databases: [view('spire', { title: 'SPIRE microbiome' }), view('refseq')] })
+    aruna.searchBuckets.mockResolvedValue(page([view('spire', 'SPIRE microbiome'), view('refseq')]))
     const { databases, scope } = start()
     databases.ensure()
     await vi.waitFor(() => expect(databases.state.value).toBe('ready'))
@@ -107,8 +101,8 @@ describe('databases', () => {
   })
 
   it('starts a new read when the session changed during a read', async () => {
-    aruna.listDatabases.mockImplementationOnce(() => new Promise(() => {}))
-    aruna.listDatabases.mockResolvedValueOnce({ databases: [view('lab')] })
+    aruna.searchBuckets.mockImplementationOnce(() => new Promise(() => {}))
+    aruna.searchBuckets.mockResolvedValueOnce(page([view('lab')]))
     const { databases, scope } = start()
     databases.ensure()
     aruna.sessionEpoch.value += 1
@@ -119,32 +113,17 @@ describe('databases', () => {
     scope.stop()
   })
 
-  it('reads up to the 1024 databases a realm may hold', async () => {
-    aruna.listDatabases.mockImplementation(async ({ after }: { after?: string }) => {
-      const page = Number(after ?? 0)
-      return { databases: [view(`b${page}`)], next_after: page < 10 ? String(page + 1) : null }
+  it('reads every page however many databases there are', async () => {
+    aruna.searchBuckets.mockImplementation(async (_q: string, { cursor }: { cursor?: string }) => {
+      const at = Number(cursor ?? 0)
+      return page([view(`b${at}`)], at < 30 ? String(at + 1) : undefined)
     })
     const { databases, scope } = start()
     databases.ensure()
     await vi.waitFor(() => expect(databases.state.value).toBe('ready'))
 
-    expect(aruna.listDatabases).toHaveBeenCalledTimes(11)
-    expect(databases.complete.value).toBe(true)
-    scope.stop()
-  })
-
-  it('opens a set here only when the part target of its root says this node holds it', async () => {
-    const { databases, scope } = start()
-    const [set] = [view('spire', { target: { kind: 'distributed', set_id: 'S1' } })].map((item) => ({
-      entryId: item.entry_id, datasetId: item.dataset_id, bucket: item.bucket, ownerGroup: 'g1', target: item.target,
-      state: item.state, title: null, documentPath: null, public: false,
-    }))
-    aruna.getPartTarget.mockResolvedValueOnce({ id: 'x', bucket: 'spire', prefix: '', held_here: true })
-    expect(await databases.locate(set)).toEqual({ bucket: 'spire', nodeId: 'n1' })
-    expect(aruna.getPartTarget).toHaveBeenCalledWith('https://w3id.org/aruna/data/r1/S1/')
-
-    aruna.getPartTarget.mockResolvedValueOnce({ id: 'x', bucket: 'spire', prefix: '', held_here: false })
-    expect(await databases.locate(set)).toBeNull()
+    expect(aruna.searchBuckets).toHaveBeenCalledTimes(31)
+    expect(databases.rows.value).toHaveLength(31)
     scope.stop()
   })
 })

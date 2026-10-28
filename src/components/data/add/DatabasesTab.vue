@@ -7,16 +7,13 @@ import Spinner from '@/components/ui/Spinner.vue'
 import { useBucketDistribution } from '@/composables/useBucketDistribution'
 import { useDatabases } from '@/composables/useDatabases'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { NOT_HELD_HERE, sameTarget, STATE_NOTES, targetOf, type DatabaseRow } from '@/lib/databases'
-import { errorMessage } from '@/lib/utils'
+import { sameTarget, targetKey, targetOf, type DatabaseRow } from '@/lib/databases'
 
 const props = defineProps<{ bucket: string }>()
 const emit = defineEmits<{ (e: 'choose', bucket: string, nodeId: string, groupId: string): void }>()
 
 const databases = useDatabases()
 const { localNodeId } = useRealmNodes()
-const problem = ref<string | null>(null)
-let choosing = 0
 
 onMounted(() => databases.ensure())
 
@@ -34,17 +31,9 @@ const rows = computed(() =>
   }),
 )
 
-async function choose(row: DatabaseRow) {
-  const run = ++choosing
-  problem.value = null
-  try {
-    const place = await databases.locate(row)
-    if (run !== choosing) return
-    if (!place) problem.value = NOT_HELD_HERE
-    else emit('choose', place.bucket, place.nodeId, row.ownerGroup)
-  } catch (cause) {
-    if (run === choosing) problem.value = errorMessage(cause)
-  }
+function choose(row: DatabaseRow) {
+  const place = databases.locate(row)
+  emit('choose', place.bucket, place.nodeId, row.ownerGroup)
 }
 </script>
 
@@ -53,12 +42,12 @@ async function choose(row: DatabaseRow) {
     <Spinner v-if="databases.state.value === 'loading' && !rows.length" show-label label="Loading databases…" />
     <p v-else-if="databases.state.value === 'failed'" class="text-xs text-destructive">{{ databases.error.value }}</p>
     <ul v-else-if="rows.length" class="divide-y divide-border rounded-md border border-border">
-      <li v-for="row in rows" :key="row.entryId" class="flex flex-wrap items-center gap-3 px-3 py-2.5">
+      <li v-for="row in rows" :key="targetKey(row.target)" class="flex flex-wrap items-center gap-3 px-3 py-2.5">
         <div class="min-w-0 flex-1">
           <p class="text-sm font-medium text-foreground">{{ row.title || row.bucket }}</p>
           <p class="text-xs text-muted-foreground">
             <span class="font-mono">{{ row.bucket }}</span>
-            <template v-if="STATE_NOTES[row.state]"> · {{ STATE_NOTES[row.state] }}</template>
+            <template v-if="row.public"> · Public</template>
           </p>
         </div>
         <Button size="sm" variant="outline" @click="choose(row)">Add from this database</Button>
@@ -66,6 +55,5 @@ async function choose(row: DatabaseRow) {
     </ul>
     <p v-else class="text-xs text-muted-foreground">No database is listed for you yet.</p>
     <p v-if="!databases.complete.value" class="text-xs text-muted-foreground">The list is partial.</p>
-    <p v-if="problem" role="status" class="text-xs text-muted-foreground">{{ problem }}</p>
   </div>
 </template>

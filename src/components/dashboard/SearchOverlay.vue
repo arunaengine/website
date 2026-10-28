@@ -21,7 +21,7 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSearchSettings } from '@/composables/useSearchSettings'
 import { OBJECT_SEARCH_MODE_LABELS, useUnifiedSearch } from '@/composables/useUnifiedSearch'
 import { isLeafFile } from '@/lib/dataEntities'
-import { NOT_HELD_HERE, type DatabaseRow } from '@/lib/databases'
+import { targetKey, type DatabaseRow } from '@/lib/databases'
 import { mockEnabled } from '@/lib/distributedMock'
 import { searchFiles } from '@/lib/distributedMockData'
 import { errorMessage, truncateMiddle } from '@/lib/utils'
@@ -131,9 +131,9 @@ const items = computed<QuickItem[]>(() => [
       ...(objectParentPrefix(hit.key) ? { prefix: objectParentPrefix(hit.key) as string } : {}),
     },
   })),
-  // The databases the user may use, by the dataset's title and the bucket name.
+  // The databases the user may use, by their title and the bucket name.
   ...databases.search(q.value).map((row): QuickItem => ({
-    key: `db:${row.entryId}`,
+    key: `db:${targetKey(row.target)}`,
     section: 'databases',
     title: row.title || row.bucket,
     subtitle: `Bucket: ${row.bucket}`,
@@ -288,7 +288,6 @@ async function openItem(chosen: QuickItem) {
     try {
       const place = await databases.locate(chosen.database)
       if (run !== opening) return
-      if (!place) return void (databaseProblem.value = NOT_HELD_HERE)
       const routeQuery: Record<string, string> = { group: chosen.database.ownerGroup }
       if (!isLocalNode(place.nodeId)) routeQuery.node = place.nodeId
       item = { ...chosen, routeParams: { bucketId: place.bucket }, routeQuery }
