@@ -316,6 +316,34 @@ export async function appQuit(): Promise<void> {
   await call('app_quit')
 }
 
+/** Stops the node gracefully and starts Aruna Desktop again, which runs an installed update. */
+export async function appRestart(): Promise<void> {
+  await call('app_restart')
+}
+
+/** A signed build of the realm's Aruna version that the shell can install itself. */
+export interface UpdateOffer {
+  version: string
+}
+
+/** The in-app update to the realm's version, or null when only a download can update this app. */
+export async function updateCheck(): Promise<UpdateOffer | null> {
+  const command = 'update_check'
+  const answer = await call(command)
+  if (answer == null) return null
+  const version = asText(asRecord(command, answer).version)
+  if (!version) throw new BridgeFailure(command, `Aruna Desktop answered "${command}" without a version.`)
+  return { version }
+}
+
+/**
+ * Downloads, checks and installs that update; progress arrives as events. On
+ * Windows the installer closes the app and starts the new version, so no answer comes.
+ */
+export async function updateInstall(): Promise<void> {
+  await call('update_install')
+}
+
 /** Native folder dialog; null when the owner cancelled it. */
 export async function pickDirectory(options: { title?: string; startPath?: string } = {}): Promise<string | null> {
   return asText(await call('pick_directory', { ...options }))

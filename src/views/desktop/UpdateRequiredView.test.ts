@@ -3,11 +3,22 @@ import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Utils from '@/lib/utils'
 import * as UpdateRequired from '@/lib/updateRequired'
-import { button, click, compileClientComponent, content, moduleDefault, mountApp } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, flush, moduleDefault, mountApp } from '@/test/clientRender'
 
 const openExternal = vi.fn(async () => undefined)
 const wipeDevice = vi.fn(async () => undefined)
 const appQuit = vi.fn(async () => undefined)
+const appRestart = vi.fn(async () => undefined)
+const updateCheck = vi.fn(async (): Promise<{ version: string } | null> => null)
+const updateInstall = vi.fn(async (): Promise<void> => undefined)
+type Progress = { downloaded: number; total: number | null }
+const progress = { handler: null as ((next: Progress) => void) | null }
+const unlisten = vi.fn()
+const onUpdateProgress = vi.fn(async (handler: (next: Progress) => void) => {
+  progress.handler = handler
+  return unlisten
+})
+class BridgeUnavailable extends Error {}
 const refresh = vi.fn(async () => undefined)
 const startNode = vi.fn(async () => undefined)
 const status = ref<{ updateRequired: { local: string; realm: string } | null }>({ updateRequired: null })
@@ -36,12 +47,23 @@ const UpdateRequiredView = compileClientComponent(new URL('./UpdateRequiredView.
   '@/components/ui/DialogHeader.vue': moduleDefault(Plain),
   '@/components/ui/DialogTitle.vue': moduleDefault(Plain),
   '@/components/ui/Notice.vue': moduleDefault(Plain),
+  '@/components/ui/Progress.vue': moduleDefault(Empty),
   '@/components/ui/Spinner.vue': moduleDefault(Empty),
   '@/components/layout/AppLogo.vue': moduleDefault(Empty),
   '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ refresh, status }) },
   '@/composables/useNodeControl': { useNodeControl: () => ({ busy: ref(false), error: ref(null), start: startNode }) },
   '@/composables/useRealm': { useRealm: () => ({ realm: ref({ name: 'Aruna v3 Demo' }) }) },
-  '@/lib/desktopBridge': { appQuit, openExternal, wipeDevice, WIPE_PHRASE: 'wipe' },
+  '@/lib/desktopBridge': {
+    appQuit,
+    appRestart,
+    BridgeUnavailable,
+    openExternal,
+    updateCheck,
+    updateInstall,
+    wipeDevice,
+    WIPE_PHRASE: 'wipe',
+  },
+  '@/lib/desktopEvents': { onUpdateProgress },
   '@/lib/updateRequired': {
     ...UpdateRequired,
     get DESKTOP_DOWNLOAD_URL() {
@@ -59,6 +81,14 @@ beforeEach(() => {
   openExternal.mockClear()
   wipeDevice.mockClear()
   appQuit.mockClear()
+  appRestart.mockClear()
+  updateCheck.mockReset()
+  updateCheck.mockResolvedValue(null)
+  updateInstall.mockReset()
+  updateInstall.mockResolvedValue(undefined)
+  onUpdateProgress.mockClear()
+  unlisten.mockClear()
+  progress.handler = null
   refresh.mockClear()
   startNode.mockClear()
   download.url = null
@@ -66,7 +96,7 @@ beforeEach(() => {
 })
 
 describe('update required', () => {
-  it('names both versions and says where to get the update', async () => {
+  it('names both versions and says where to get the update without a signed build', async () => {
     const mounted = await mount('3.0.0-alpha.131', '3.0.0-alpha.133')
     const html = content(mounted.root)
 
@@ -76,7 +106,8 @@ describe('update required', () => {
     expect(html).toContain('3.0.0-alpha.131')
     expect(html).toContain('3.0.0-alpha.133')
     expect(html).toContain('Get the latest Aruna Desktop from your Aruna administrator.')
-    expect(() => button(mounted.root, 'Update now')).toThrow()
+    expect(() => button(mounted.root, 'Update to')).toThrow()
+    expect(() => button(mounted.root, 'Download the update')).toThrow()
     mounted.app.unmount()
   })
 
@@ -85,9 +116,75 @@ describe('update required', () => {
     const mounted = await mount('3.0.0-alpha.131', '3.0.0-alpha.133')
 
     expect(content(mounted.root)).toContain('What is new in alpha.133')
-    await click(button(mounted.root, 'Update now'))
+    await click(button(mounted.root, 'Download the update'))
 
     expect(openExternal).toHaveBeenCalledWith('https://download.example/aruna')
+    mounted.app.unmount()
+  })
+
+  it('installs the realm version with progress and then offers the restart', async () => {
+    updateCheck.mockResolvedValue({ version: '3.0.0-alpha.133' })
+    let finish: () => void = () => undefined
+    updateInstall.mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)))
+    const mounted = await mount('3.0.0-alpha.131', '3.0.0-alpha.133')
+
+    expect(content(mounted.root)).not.toContain('Get the latest')
+    const pending = click(button(mounted.root, 'Update to 3.0.0-alpha.133'))
+    await flush()
+    progress.handler?.({ downloaded: 45, total: 100 })
+    await flush()
+
+    expect(updateInstall).toHaveBeenCalledTimes(1)
+    expect(content(mounted.root)).toContain('Downloading the update, 45%')
+    expect(() => button(mounted.root, 'Update to')).toThrow()
+
+    finish()
+    await pending
+    expect(content(mounted.root)).toContain('The update is installed. Restart Aruna Desktop to use it.')
+    expect(unlisten).toHaveBeenCalled()
+
+    await click(button(mounted.root, 'Restart now'))
+    expect(appRestart).toHaveBeenCalledTimes(1)
+    mounted.app.unmount()
+  })
+
+  it('shows a failed update with a retry and the download fallback', async () => {
+    download.url = 'https://download.example/aruna'
+    updateCheck.mockResolvedValue({ version: '3.0.0-alpha.133' })
+    updateInstall.mockRejectedValueOnce(new Error('signature mismatch'))
+    const mounted = await mount('3.0.0-alpha.131', '3.0.0-alpha.133')
+
+    await click(button(mounted.root, 'Update to 3.0.0-alpha.133'))
+
+    expect(content(mounted.root)).toContain('The update failed: signature mismatch')
+    expect(() => button(mounted.root, 'Download the update')).not.toThrow()
+    await click(button(mounted.root, 'Try again'))
+    expect(updateInstall).toHaveBeenCalledTimes(2)
+    expect(content(mounted.root)).toContain('The update is installed.')
+    mounted.app.unmount()
+  })
+
+  it('reports a failed look for the update and looks again', async () => {
+    updateCheck.mockRejectedValueOnce(new Error('the release could not be reached'))
+    const mounted = await mount('3.0.0-alpha.131', '3.0.0-alpha.133')
+
+    expect(content(mounted.root)).toContain('Could not look for the update: the release could not be reached')
+    expect(content(mounted.root)).toContain('Get the latest Aruna Desktop')
+    updateCheck.mockResolvedValueOnce({ version: '3.0.0-alpha.133' })
+    await click(button(mounted.root, 'Look again'))
+
+    expect(updateCheck).toHaveBeenCalledTimes(2)
+    expect(() => button(mounted.root, 'Update to 3.0.0-alpha.133')).not.toThrow()
+    expect(content(mounted.root)).not.toContain('Could not look')
+    mounted.app.unmount()
+  })
+
+  it('keeps only the download on a shell without the updater', async () => {
+    updateCheck.mockRejectedValueOnce(new BridgeUnavailable('update_check'))
+    const mounted = await mount('3.0.0-alpha.131', '3.0.0-alpha.133')
+
+    expect(content(mounted.root)).toContain('Get the latest Aruna Desktop')
+    expect(content(mounted.root)).not.toContain('Could not look')
     mounted.app.unmount()
   })
 
@@ -117,7 +214,10 @@ describe('update required', () => {
 
     expect(html).toContain('runs an older version than this app')
     expect(html).toContain('Ask the person who runs')
-    expect(() => button(mounted.root, 'Update now')).toThrow()
+    expect(html).toContain('does not install an older version itself')
+    expect(updateCheck).not.toHaveBeenCalled()
+    expect(() => button(mounted.root, 'Update to')).toThrow()
+    expect(() => button(mounted.root, 'Download the update')).toThrow()
     expect(content(mounted.root)).not.toContain('Get the latest')
     mounted.app.unmount()
   })

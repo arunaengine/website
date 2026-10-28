@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { EnrollInvite } from './desktopBridge'
+import type { UpdateProgress } from './desktopEvents'
 
 type Emit = (payload: unknown) => void
 
@@ -74,5 +75,25 @@ describe('enroll invites', () => {
 
     const refused = await load(shell(), vi.fn(async () => Promise.reject(new Error('not allowed'))))
     await expect(refused.onEnrollInvite(() => {})).resolves.toBeNull()
+  })
+})
+
+describe('update progress', () => {
+  it('reads the downloaded bytes and an unknown total', async () => {
+    const listen = channel()
+    const events = await load(shell(), listen)
+    const seen: UpdateProgress[] = []
+
+    await events.onUpdateProgress((progress) => seen.push(progress))
+    expect(listen).toHaveBeenCalledWith('update-progress', expect.any(Function))
+    emit({ downloaded: 1024, total: 4096 })
+    emit({ downloaded: 2048, total: null })
+    emit({ downloaded: -1, total: 'many' })
+
+    expect(seen).toEqual([
+      { downloaded: 1024, total: 4096 },
+      { downloaded: 2048, total: null },
+      { downloaded: 0, total: null },
+    ])
   })
 })
