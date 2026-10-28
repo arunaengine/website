@@ -46,7 +46,12 @@ const started = ref<string | null>(null)
 const busy = ref(false)
 let reads = 0
 
-const preview = computed(() => (text.value ? previewOf(text.value, format.value) : { columns: [], rows: [] }))
+// Without a preview (a link the browser may not read) typed column names still give the columns.
+const preview = computed(() => {
+  if (text.value) return previewOf(text.value, format.value)
+  const header = format.value.header
+  return { columns: typeof header === 'object' && 'columns' in header ? header.columns : [], rows: [] as string[][] }
+})
 const first = computed(() => preview.value.rows[0] ?? [])
 
 // Reads the start of the list for the preview; the node reads the whole list itself.
@@ -229,6 +234,7 @@ const SELECT = 'h-9 w-full rounded-md border border-input bg-field px-2 text-sm'
     </div>
 
     <p v-if="reading" class="text-xs text-muted-foreground">Reading the list…</p>
+    <Button v-else-if="!columns.length" variant="ghost" size="sm" @click="options = !options">More options</Button>
     <p v-else-if="columns.length" class="text-xs text-muted-foreground">
       {{ formatLine }} <button type="button" class="text-primary hover:underline" @click="options = !options">Change</button>
     </p>
@@ -283,7 +289,7 @@ const SELECT = 'h-9 w-full rounded-md border border-input bg-field px-2 text-sm'
         </select>
       </label>
       <label v-if="headerMode === 'row'">Row<Input v-model.number="headerRow" type="number" min="1" class="mt-1" /></label>
-      <label v-if="headerMode === 'columns'" class="sm:col-span-2">Names, comma separated<Input :model-value="typedColumns" @change="typedColumns = ($event.target as HTMLInputElement).value" class="mt-1 font-mono" /></label>
+      <label v-if="headerMode === 'columns'" class="sm:col-span-2">Names, comma separated<Input :model-value="typedColumns" aria-label="Typed column names" @change="typedColumns = ($event.target as HTMLInputElement).value" class="mt-1 font-mono" /></label>
       <label>Comment lines<Input :model-value="format.comment ?? ''" maxlength="1" class="mt-1 font-mono" @update:model-value="format = { ...format, comment: String($event) || null }" /></label>
       <label>Empty values<Input :model-value="format.nulls.filter(Boolean).join(', ')" class="mt-1 font-mono" @change="format = { ...format, nulls: [...($event.target as HTMLInputElement).value.split(',').map((item) => item.trim()).filter(Boolean), ''] }" /></label>
       <label>Gzip
