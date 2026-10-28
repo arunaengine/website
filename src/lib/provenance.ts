@@ -61,6 +61,12 @@ export function shortName(id: string): string {
   return tail.length > 20 ? `${tail.slice(0, 8)}…${tail.slice(-6)}` : tail
 }
 
+/** The node and bucket a versioned object id names; null for a global or content id. */
+export function bucketOf(id: string): string | null {
+  const arn = /arn:aruna:[^:/]+:([^:/]+):s3\/([^/]+)\//.exec(id)
+  return arn ? `${arn[1]}/${arn[2]}` : null
+}
+
 function add(graph: Graph, parent: string | null, child: Box): string {
   graph.boxes[child.id] ??= child
   if (parent && !graph.boxes[parent].from.includes(child.id)) graph.boxes[parent].from.push(child.id)
@@ -69,7 +75,7 @@ function add(graph: Graph, parent: string | null, child: Box): string {
 }
 
 /** A file's box, with its database and source added at once and its other links waiting. */
-function fileBox(graph: Graph, parent: string | null, id: string, role: string, name: string, origin: OriginResponse) {
+function fileBox(graph: Graph, parent: string | null, id: string, asked: string, role: string, name: string, origin: OriginResponse) {
   const file = box(id, 'file', role, name, { detail: new Date(origin.created_at).toLocaleDateString() })
   const kind = origin.origin?.kind
   if (origin.origin?.kind === 'copy') file.pending.push({ kind: 'version', id: origin.origin.from, role: 'Copied from' })
@@ -81,7 +87,8 @@ function fileBox(graph: Graph, parent: string | null, id: string, role: string, 
   const metadata = origin.bucket_metadata
   if (metadata?.database) {
     const title = metadata.title || 'A database'
-    const database = box(`database:${metadata.dataset || title}`, 'database', 'Bucket with database metadata', title)
+    // One box per bucket; a file known only by a global id gets its own, never one by title.
+    const database = box(`database:${bucketOf(asked) ?? id}`, 'database', 'Bucket with database metadata', title)
     if (metadata.dataset) database.link = { label: 'Open the dataset', document: metadata.dataset }
     add(graph, id, database)
   }
@@ -106,7 +113,7 @@ export function emptyGraph(): Graph {
 export function startFile(graph: Graph, id: string, name: string, origin: OriginResponse) {
   const canonical = origin.global_id || id
   graph.seen[id] = canonical
-  fileBox(graph, null, canonical, 'This file', name, origin)
+  fileBox(graph, null, canonical, id, 'This file', name, origin)
 }
 
 /** Starts at a dataset: each file part with an exact version waits to be read. */
@@ -187,7 +194,7 @@ async function follow(graph: Graph, boxId: string, hop: Hop, readers: Readers, c
       const canonical = origin.global_id || hop.id
       graph.seen[asked] = canonical
       if (graph.boxes[canonical]) add(graph, boxId, graph.boxes[canonical])
-      else fileBox(graph, boxId, canonical, hop.role, hop.name ?? shortName(hop.id), origin)
+      else fileBox(graph, boxId, canonical, hop.id, hop.role, hop.name ?? shortName(hop.id), origin)
       return
     }
     const run = await readers.run(hop.runId)

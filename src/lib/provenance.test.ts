@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError, type OriginResponse } from '@/lib/api'
-import { dataParts, emptyGraph, expand, expandAll, hasPending, runInputs, runRecordDetail, startDataset, startFile, type Readers } from './provenance'
+import { bucketOf, dataParts, emptyGraph, expand, expandAll, hasPending, runInputs, runRecordDetail, startDataset, startFile, type Readers } from './provenance'
 
 const bakrep = { database: true, title: 'BakRep', dataset: 'd1', identifiers: [] }
 
@@ -59,7 +59,7 @@ describe('provenance graph', () => {
     expect(run.link?.document).toBe('doc1')
     expect([...run.from].sort()).toEqual([arn('a.faa', V1), arn('b.faa', V2), 's3://lab/c.yaml'].sort())
     expect(graph.boxes['s3://lab/c.yaml'].detail).toBe('No exact version recorded')
-    const database = graph.boxes['database:d1']
+    const database = graph.boxes['database:node/lab']
     expect(database.title).toBe('BakRep')
     expect(graph.boxes[arn('a.faa', V1)].identifiers[0].value).toBe('SAMN1')
     expect(graph.steps).toBe(3)
@@ -121,7 +121,39 @@ describe('provenance graph', () => {
 
     expect(graph.boxes[arn('a.faa', V1)].identifiers[0].value).toBe('SAMN1')
     expect(graph.boxes[arn('b.faa', V2)].identifiers[0].value).toBe('SAMN2')
-    expect(graph.boxes['database:d1'].identifiers).toEqual([])
+    expect(graph.boxes['database:node/lab'].identifiers).toEqual([])
+  })
+
+  it('keeps databases of different buckets apart, also with the same or no title', async () => {
+    const other = (key: string, version: string) => arn(key, version).replace('s3/lab/', 's3/other/')
+    const untitled = { database: true, identifiers: [] }
+    const stored = { '@graph': [
+      { '@id': '#a', '@type': 'File', name: 'a', contentUrl: arn('a', V1) },
+      { '@id': '#b', '@type': 'File', name: 'b', contentUrl: other('b', V2) },
+      { '@id': '#c', '@type': 'File', name: 'c', contentUrl: arn('c', V2) },
+      { '@id': '#d', '@type': 'File', name: 'd', contentUrl: `https://w3id.org/aruna/data/realm/${V1}` },
+      { '@id': '#e', '@type': 'File', name: 'e', contentUrl: `https://w3id.org/aruna/data/realm/${V2}` },
+    ] }
+    const read = readers({
+      [arn('a', V1)]: origin({ bucket_metadata: untitled }),
+      [other('b', V2)]: origin({ bucket_metadata: untitled }),
+      [arn('c', V2)]: origin({ bucket_metadata: untitled }),
+      [`https://w3id.org/aruna/data/realm/${V1}`]: origin({ bucket_metadata: bakrep }),
+      [`https://w3id.org/aruna/data/realm/${V2}`]: origin({ bucket_metadata: bakrep }),
+    })
+    const graph = emptyGraph()
+    startDataset(graph, 'Set', 'doc', stored)
+    await expandAll(graph, read, () => false)
+
+    const databases = Object.keys(graph.boxes).filter((id) => id.startsWith('database:')).sort()
+    expect(databases).toEqual([
+      `database:https://w3id.org/aruna/data/realm/${V1}`,
+      `database:https://w3id.org/aruna/data/realm/${V2}`,
+      'database:node/lab',
+      'database:node/other',
+    ])
+    expect(graph.boxes['database:node/lab'].title).toBe('A database')
+    expect(bucketOf(DIGEST)).toBeNull()
   })
 
   it('drops an answer that comes back after the view moved on', async () => {
