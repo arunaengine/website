@@ -55,10 +55,16 @@ const preview = computed(() => {
 const first = computed(() => preview.value.rows[0] ?? [])
 
 // Reads the start of the list for the preview; the node reads the whole list itself.
+// The source the shown columns belong to; Start waits until it is the current one.
+const readFor = ref<string | null>(null)
+const sourceKey = () => JSON.stringify([from.value, link.value, listBucket.value, listKey.value, file.value?.name, file.value?.size, presetName.value])
+
 async function read() {
   const run = ++reads
+  const key = sourceKey()
   failure.value = null
   started.value = null
+  readFor.value = null
   reading.value = true
   try {
     let blob: Blob
@@ -93,7 +99,10 @@ async function read() {
       ? `No preview from this link (${errorMessage(cause)}). Type the column names under More options.`
       : errorMessage(cause)
   } finally {
-    if (run === reads) reading.value = false
+    if (run === reads) {
+      reading.value = false
+      readFor.value = key
+    }
   }
 }
 
@@ -167,27 +176,31 @@ const tableSource = computed<TableSource | null>(() => {
   return file.value ? { object: { bucket: props.bucket, key: `lists/${file.value.name}` } } : null
 })
 const ready = computed(() =>
-  Boolean(tableSource.value && connectorSel.value && groupSel.value && sourceTemplate.value && targetTemplate.value && !unknown.value.length && !busy.value),
+  Boolean(tableSource.value && connectorSel.value && groupSel.value && sourceTemplate.value && targetTemplate.value && !unknown.value.length && !busy.value)
+    && !reading.value && readFor.value === sourceKey(),
 )
 
 async function start() {
   if (!ready.value || !tableSource.value) return
   busy.value = true
   failure.value = null
+  // What is sent is fixed now; a change while the list uploads does not mix into it.
+  const listFile = from.value === 'upload' ? file.value : null
+  const request = {
+    group_id: groupSel.value,
+    connector_id: connectorSel.value,
+    bucket: props.bucket,
+    strategy: 'reference' as const,
+    table: {
+      source: tableSource.value,
+      format: { ...format.value },
+      rows: rowsOf(choices.value, kind.value, sourceTemplate.value, targetTemplate.value),
+      rate: Number(rate.value) || undefined,
+    },
+  }
   try {
-    if (from.value === 'upload' && file.value) await s3.uploadObject(props.bucket, `lists/${file.value.name}`, file.value).promise
-    const answer = await createStagingJob({
-      group_id: groupSel.value,
-      connector_id: connectorSel.value,
-      bucket: props.bucket,
-      strategy: 'reference',
-      table: {
-        source: tableSource.value,
-        format: format.value,
-        rows: rowsOf(choices.value, kind.value, sourceTemplate.value, targetTemplate.value),
-        rate: Number(rate.value) || undefined,
-      },
-    })
+    if (listFile) await s3.uploadObject(props.bucket, `lists/${listFile.name}`, listFile).promise
+    const answer = await createStagingJob(request)
     started.value = answer.job_id
     emit('started', answer.job_id)
   } catch (cause) {

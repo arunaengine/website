@@ -58,4 +58,43 @@ describe('import from a list', () => {
     expect(body[0].table.format.header).toEqual({ columns: ['sample', 'url'] })
     expect(body[0].table.rows.source).toBe('{url}')
   })
+
+  it('waits for the preview of a new source and sends what was shown when Start was pressed', async () => {
+    const csv = 'sample,url\nS01,https://x.org/S01.fq\n'
+    let release: (value: Response) => void = () => {}
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(csv, { status: 200 }))
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (release = resolve))))
+    createStagingJob.mockClear()
+    const { root } = await mountApp(component, { props: { bucket: 'samples', source } })
+    await change(labelled(root, 'Link to the list'), 'https://x.org/a.csv')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    expect(button(root, 'Start import').props.disabled).toBe(false)
+
+    await change(labelled(root, 'Link to the list'), 'https://x.org/b.csv')
+    expect(button(root, 'Start import').props.disabled).toBe(true)
+    release(new Response('id,link\n1,https://x.org/1.fq\n', { status: 200 }))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    expect(button(root, 'Start import').props.disabled).toBe(false)
+
+    let uploaded: () => void = () => {}
+    upload.mockReturnValueOnce({ promise: new Promise<void>((resolve) => (uploaded = resolve)) })
+    const file = new File(['sample,url\nS01,https://x.org/S01.fq\n'], 'run1.csv')
+    vi.stubGlobal('fetch', vi.fn())
+    await click(button(root, 'Upload source'))
+    ;(element(root, (node) => node.props['aria-label'] === 'List file').props.onChange as (event: unknown) => void)({ target: { files: [file] } })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    const pressed = click(button(root, 'Start import'))
+    await flush()
+    await change(labelled(root, 'Use of url'), 'skip')
+    uploaded()
+    await pressed
+    await flush()
+    const sent = (createStagingJob.mock.calls.at(-1) as unknown as [{ table: { rows: { keep: unknown }; source: unknown } }])[0]
+    expect(sent.table.rows.keep).toBeNull()
+    expect(sent.table.source).toEqual({ object: { bucket: 'samples', key: 'lists/run1.csv' } })
+  })
 })
