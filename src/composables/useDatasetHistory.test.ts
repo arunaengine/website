@@ -97,6 +97,18 @@ describe('useDatasetHistory', () => {
     expect(history.versions.value?.map((entry) => entry.message)).toEqual(['b'])
   })
 
+  it('keeps versions while refreshing', async () => {
+    listVersions.mockResolvedValueOnce({ versions: [version('a')], next_cursor: null })
+    const { history } = start()
+    await settle()
+    listVersions.mockReturnValue(new Promise(() => undefined))
+    void history.refresh()
+    await settle()
+    expect(listVersions).toHaveBeenCalledTimes(2)
+    expect(history.state.value).toBe('ready')
+    expect(history.versions.value?.map((entry) => entry.message)).toEqual(['a'])
+  })
+
   it('resolves node-made authors once per page', async () => {
     listVersions.mockResolvedValue({ versions: [version('a', 'u1'), version('b', 'u1'), version('c')] })
     const { history } = start()

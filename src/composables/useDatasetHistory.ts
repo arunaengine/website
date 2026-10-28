@@ -114,11 +114,12 @@ export function useDatasetHistory(documentId: Ref<string>, enabled: () => boolea
   }
 
   let listToken = 0
-  async function loadList() {
+  async function loadList(keep = false) {
     const token = ++listToken
     const same = stamp()
     const live = () => token === listToken && same()
-    versions.value = null
+    // Another branch must not show the old list; a refresh of the same one keeps it.
+    if (!keep) versions.value = null
     nextCursor.value = null
     loadingMore.value = false
     moreError.value = ''
@@ -161,9 +162,8 @@ export function useDatasetHistory(documentId: Ref<string>, enabled: () => boolea
 
   // Also the step after every write: cursors pin the head they started from.
   async function refresh() {
-    versions.value = null
     listProblem.value = null
-    if ((await loadRefs()) && active()) await loadList()
+    if ((await loadRefs()) && active()) await loadList(true)
   }
 
   watch(
