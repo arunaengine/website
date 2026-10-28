@@ -250,7 +250,12 @@ const family: JobFamilyResponse = {
   },
 }
 
-function taskPanel(getTask: unknown, getJob: unknown, deleteJob: unknown = vi.fn()): Component {
+function taskPanel(
+  getTask: unknown,
+  getJob: unknown,
+  deleteJob: unknown = vi.fn(),
+  metadataAtPath: unknown = vi.fn(async () => null),
+): Component {
   return compileClientComponent(new URL('../compute/TaskDetailPanel.vue', import.meta.url), {
     vue: VueRuntime,
     'vue-router': { RouterLink: RouterLinkStub, useRouter: () => ({ push: vi.fn() }) },
@@ -295,7 +300,7 @@ function taskPanel(getTask: unknown, getJob: unknown, deleteJob: unknown = vi.fn
       useAruna: () => ({
         myGroups: ref([]),
         apiBaseUrl: ref('https://node.test/api/v1'),
-        metadataAtPath: vi.fn(async () => null),
+        metadataAtPath,
       }),
     },
     '@/composables/useS3': {
@@ -1030,6 +1035,20 @@ describe('distributed job detail components', () => {
       expect(text, `state ${task.state}`).toContain(expected)
       mounted.app.unmount()
     }
+    wake.mockRestore()
+    followSpy.mockRestore()
+  })
+
+  it('looks up the run dataset of a run opened at once', async () => {
+    const wake = vi.spyOn(Poll, 'onWake').mockImplementation(() => () => {})
+    const followSpy = vi.spyOn(Poll, 'follow').mockImplementation(() => () => {})
+    const base = { id: 'run', state: 'COMPLETE', executors: [{ image: 'alpine', command: ['sh'] }], inputs: [], outputs: [], logs: [], tags: {} }
+    const lookup = vi.fn(async () => null)
+    const getJob = vi.fn(async () => ({ family: null }))
+    const mounted = await mount(taskPanel(vi.fn(async () => base), getJob, vi.fn(), lookup), { taskId: 'run', open: true })
+
+    expect(lookup).toHaveBeenCalledWith('runs/run')
+    mounted.app.unmount()
     wake.mockRestore()
     followSpy.mockRestore()
   })

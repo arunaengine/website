@@ -69,6 +69,7 @@ const nativeJob = ref<JobStatusResponse | null>(null)
 const nativeDetailUnavailable = ref(false)
 const runCrate = ref<MetadataDocumentListItem | null>(null)
 const runCrateLoading = ref(false)
+let crateTask: string | null = null
 const loadState = ref<'idle' | 'loading' | 'ready' | 'error' | 'unsupported'>('idle')
 const loadError = ref<string | null>(null)
 const lastPollError = ref<string | null>(null)
@@ -497,7 +498,6 @@ const outputRange = computed(() => {
 })
 
 // ── Run dataset (targeted lookup at runs/{taskId}) ───────────────────────────
-let crateTask: string | null = null
 async function findRunCrate() {
   const id = props.taskId
   if (runCrateLoading.value && crateTask === id) return
