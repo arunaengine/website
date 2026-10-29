@@ -87,7 +87,10 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   '@/lib/distributedMockData': { mockFile: () => undefined },
   '@/components/data/ObjectLocationsPanel.vue': moduleDefault(Marker('copies of this version')),
   '@/components/data/ObjectVersionsPanel.vue': moduleDefault(Marker('version rows')),
-  '@/components/data/ReferencedBy.vue': moduleDefault(Marker('referencing datasets')),
+  '@/components/data/ReferencedBy.vue': moduleDefault(defineComponent({
+    props: { busy: Boolean },
+    setup: (props) => () => h('section', props.busy ? 'referencing datasets, loading' : 'referencing datasets'),
+  })),
   '@/components/data/PublicAccessDialog.vue': moduleDefault(defineComponent({ props: { open: Boolean }, setup: (props) => () => (props.open ? h('section', 'public access dialog') : null) })),
   '@/components/storage/ObjectRulesEditor.vue': moduleDefault(Marker('edit rules for this file')),
   '@/components/storage/PolicyColumn.vue': moduleDefault(Marker('rules this file carries')),
@@ -329,6 +332,34 @@ describe('file details references', () => {
     await flush()
     expect(loadReferences).toHaveBeenCalledWith(expect.anything(), 'https://node-2/api/v1')
     expect(apiRequest).toHaveBeenCalledWith(expect.stringContaining('/ga4gh/drs/v1/objects/'), {}, { baseUrl: 'https://node-2/api/v1', token: 'token-1' })
+    addressKnown = Promise.resolve()
+  })
+
+  it('drops the earlier file lookup and shows loading while the next node address resolves', async () => {
+    const shown = VueRuntime.reactive<Record<string, unknown>>({ nodeId: null, objectKey: 'raw/a.fastq' })
+    loadReferences.mockClear()
+    resetReferences.mockClear()
+    const host = defineComponent({
+      setup: () => () => h(dialog, { open: true, tab: 'general', bucket: 'reef-survey', name: 'file', groupId: 'g-1', ...shown }),
+    })
+    const { root } = await mountApp(host)
+    await flush()
+    expect(loadReferences).toHaveBeenCalledTimes(1)
+
+    let name!: () => void
+    addressKnown = new Promise((resolve) => (name = resolve))
+    const resets = resetReferences.mock.calls.length
+    Object.assign(shown, { nodeId: 'node-2', objectKey: 'raw/b.fastq' })
+    await flush()
+    expect(resetReferences.mock.calls.length).toBeGreaterThan(resets)
+    expect(content(root)).toContain('referencing datasets, loading')
+
+    name()
+    await flush()
+    expect(loadReferences).toHaveBeenLastCalledWith(
+      { target: { kind: 'bucket_prefix', bucket: 'reef-survey', prefix: 'raw/b.fastq' } },
+      'https://node-2/api/v1',
+    )
     addressKnown = Promise.resolve()
   })
 

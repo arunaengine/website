@@ -235,10 +235,15 @@ const fileReferences = computed(() =>
 )
 
 let referenceSeq = 0
+// The node's address is still being resolved; the earlier file's lookup is already dropped.
+const referencesResolving = ref(false)
 async function loadReferences() {
   const seq = ++referenceSeq
+  resetReferences()
+  referencesResolving.value = Boolean(props.nodeId)
   const apiBase = props.nodeId ? await nodeApiBaseReady(props.nodeId) : apiBaseUrl.value
   if (seq !== referenceSeq) return
+  referencesResolving.value = false
   if (!currentUser.value || !apiBase || props.folder || mock.value) {
     resetReferences()
     return
@@ -259,6 +264,7 @@ watch(
     } else {
       head.value = null
       referenceSeq++
+      referencesResolving.value = false
       resetReferences()
     }
   },
@@ -478,7 +484,7 @@ const details = computed(() => props.folder ? [
           v-if="currentUser && !props.folder && !mock"
           class="mt-4 border-t border-border pt-3"
           :preflight="fileReferences"
-          :busy="referencesBusy"
+          :busy="referencesBusy || referencesResolving"
           :error="referencesError"
           @retry="loadReferences"
         />
