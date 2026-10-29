@@ -4,7 +4,6 @@
 import { computed } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import { nodeName } from '@/components/nodes/node-display'
-import type { NodeImports } from '@/composables/useNodeImports'
 import type { RealmNodeInfo } from '@/lib/api'
 import { formatCount } from '@/lib/formatCount'
 import { LOCATION_AFFINITY_KEY } from '@/lib/placement'
@@ -14,7 +13,6 @@ import { Download } from '@lucide/vue'
 const props = defineProps<{
   nodes: RealmNodeInfo[]
   devices: RealmNodeInfo[]
-  imports: Map<string, NodeImports>
   /** The node serving this portal, named as such. */
   localNodeId?: string | null
   /** Offers a Details link per card; `openId` is the card whose details show. */
@@ -39,10 +37,13 @@ function facts(node: RealmNodeInfo): string {
   return parts.join(', ')
 }
 
-function importing(node: RealmNodeInfo): string | null {
-  const entry = props.imports.get(node.node_id)
-  if (!entry?.running) return null
-  return `Importing, ${entry.more ? 'at least ' : ''}${formatCount(entry.running)} ${entry.running === 1 ? 'job' : 'jobs'}`
+// What the node's last heartbeat says it runs: imports first, as they explain a busy node.
+function activity(node: RealmNodeInfo): string | null {
+  const utilization = node.info?.utilization
+  const jobs = (count: number) => `${formatCount(count)} ${count === 1 ? 'job' : 'jobs'}`
+  if (utilization?.imports_running) return `Importing, ${jobs(utilization.imports_running)}`
+  if (utilization?.jobs_running) return `Busy, ${jobs(utilization.jobs_running)}`
+  return null
 }
 
 const devicesLine = computed(() => {
@@ -67,8 +68,8 @@ const devicesLine = computed(() => {
           </span>
         </div>
         <p class="mt-1 truncate text-xs text-muted-foreground">{{ facts(node) }}</p>
-        <Badge v-if="importing(node)" variant="sky" size="sm" class="mt-1.5 gap-1">
-          <Download class="h-3 w-3" /> {{ importing(node) }}
+        <Badge v-if="activity(node)" variant="sky" size="sm" class="mt-1.5 gap-1">
+          <Download class="h-3 w-3" /> {{ activity(node) }}
         </Badge>
         <button
           v-if="details"

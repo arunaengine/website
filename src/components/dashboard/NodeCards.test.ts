@@ -2,10 +2,10 @@ import { createSSRApp, h } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { describe, expect, it } from 'vitest'
 import type { RealmNodeInfo } from '@/lib/api'
-import type { NodeImports } from '@/composables/useNodeImports'
 import NodeCards from './NodeCards.vue'
 
-const node = (overrides: Partial<RealmNodeInfo> & { labels?: Record<string, string>; api?: string; load?: number } = {}): RealmNodeInfo => ({
+type Overrides = Partial<RealmNodeInfo> & { labels?: Record<string, string>; api?: string; load?: number; jobs?: number; imports?: number }
+const node = (overrides: Overrides = {}): RealmNodeInfo => ({
   node_id: overrides.node_id ?? '12D3KooWHashHashHash',
   kind: overrides.kind ?? 'server',
   configured: true,
@@ -16,13 +16,19 @@ const node = (overrides: Partial<RealmNodeInfo> & { labels?: Record<string, stri
     executors: [],
     labels: overrides.labels ?? {},
     urls: { api: overrides.api ?? 'https://api.node-2.v3-debug.example.org' },
-    utilization: { storage_bytes_used: 2048, heartbeat_at_ms: 1, ...(overrides.load === undefined ? {} : { load_permille: overrides.load }) },
+    utilization: {
+      storage_bytes_used: 2048,
+      heartbeat_at_ms: 1,
+      ...(overrides.load === undefined ? {} : { load_permille: overrides.load }),
+      ...(overrides.jobs === undefined ? {} : { jobs_running: overrides.jobs }),
+      ...(overrides.imports === undefined ? {} : { imports_running: overrides.imports }),
+    },
     updated_at_ms: 1,
   },
 })
 
-async function text(nodes: RealmNodeInfo[], imports = new Map<string, NodeImports>(), devices: RealmNodeInfo[] = [], extra: Record<string, unknown> = {}) {
-  const html = await renderToString(createSSRApp({ render: () => h(NodeCards, { nodes, devices, imports, ...extra }) }))
+async function text(nodes: RealmNodeInfo[], devices: RealmNodeInfo[] = [], extra: Record<string, unknown> = {}) {
+  const html = await renderToString(createSSRApp({ render: () => h(NodeCards, { nodes, devices, ...extra }) }))
   return html.replace(/<!--[^>]*-->/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
@@ -54,12 +60,19 @@ describe('node cards', () => {
     expect(shown).not.toContain('server')
   })
 
-  it('marks a node that runs imports and sums devices in one line', async () => {
-    const imports = new Map<string, NodeImports>([['12D3KooWHashHashHash', { running: 8, more: false }], ['b', { running: 0, more: false }]])
+  it('marks what a node runs from its heartbeat, imports first, and sums devices in one line', async () => {
     const devices = [{ ...node({ kind: 'user' }), connection_status: 'seen' as const }, { ...node({ kind: 'user' }), connection_status: 'unknown' as const }]
-    const shown = await text([node(), node({ node_id: 'b', api: 'https://api.node-3.example.org' })], imports, devices)
-    expect(shown).toContain('Importing, 8 jobs')
-    expect(shown.match(/Importing/g)).toHaveLength(1)
+    const shown = await text([
+      node({ jobs: 10, imports: 8 }),
+      node({ node_id: 'b', api: 'https://api.node-3.example.org', jobs: 1, imports: 0 }),
+      node({ node_id: 'c', api: 'https://api.node-4.example.org', jobs: 0, imports: 0 }),
+      node({ node_id: 'd', api: 'https://api.node-5.example.org' }),
+    ], devices)
+    expect(shown).toContain('node-2 online 2 KB stored Importing, 8 jobs')
+    expect(shown).toContain('node-3 online 2 KB stored Busy, 1 job')
+    // No count, or a zero, shows nothing.
+    expect(shown).toContain('node-4 online 2 KB stored node-5')
+    expect(shown.match(/Importing|Busy/g)).toHaveLength(2)
     expect(shown).toContain('2 devices, 1 active')
   })
 
@@ -68,7 +81,7 @@ describe('node cards', () => {
     const other = node({ node_id: 'b', api: 'https://api.node-3.example.org' })
     expect(await text([full, other])).not.toContain('Details')
 
-    const shown = await text([full, other], new Map(), [], { details: true, localNodeId: '12D3KooWHashHashHash', openId: 'b' })
+    const shown = await text([full, other], [], { details: true, localNodeId: '12D3KooWHashHashHash', openId: 'b' })
     expect(shown).toContain('node-2 this node online 2 KB stored, full, draining Details')
     expect(shown).toContain('node-3 online 2 KB stored Hide details')
   })

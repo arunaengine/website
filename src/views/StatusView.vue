@@ -234,8 +234,6 @@ const cardNodes = computed(() =>
   [...panelInfra.value].sort((a, b) => kindOrder[a.kind] - kindOrder[b.kind] || a.node_id.localeCompare(b.node_id)),
 )
 const expandedNode = computed(() => cardNodes.value.find((node) => node.node_id === expandedId.value) ?? null)
-// The Status page reads no import jobs; the landing view shows them.
-const noImports = new Map()
 
 const targetNodeId = computed(() => (typeof route.query.node === 'string' ? route.query.node : ''))
 let highlightedTarget = ''
@@ -370,7 +368,6 @@ watch(
           <NodeCards
             :nodes="cardNodes"
             :devices="[]"
-            :imports="noImports"
             :local-node-id="localPeerId"
             :open-id="expandedId"
             details

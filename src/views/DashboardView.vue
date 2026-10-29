@@ -20,8 +20,7 @@ import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useDatabases } from '@/composables/useDatabases'
-import { useNodeImports } from '@/composables/useNodeImports'
-import { computerName, useRealmNodes } from '@/composables/useRealmNodes'
+import { computerName } from '@/composables/useRealmNodes'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useNotifications } from '@/composables/useNotifications'
 import { useRefresh } from '@/composables/useRefresh'
@@ -91,7 +90,6 @@ async function refreshDashboard() {
     } while (refreshQueued)
   } finally {
     refreshing.value = false
-    loadImports()
     if (cardsShown) {
       quotaRevision.value++
       cardsRevision.value++
@@ -168,17 +166,10 @@ const deviceName = computed(() => computerName(deviceRecord.value))
 
 const onlineNodes = computed(() => infraNodes.value.filter((node) => node.present).length)
 
-// Import jobs explain a busy node; they are read with the dashboard's own rounds, never faster.
-const nodeImports = useNodeImports()
-const { isLocalNode } = useRealmNodes()
-const infraIds = computed(() => infraNodes.value.map((node) => node.node_id))
-function loadImports() {
-  if (currentUser.value && infraIds.value.length) void nodeImports.load(infraIds.value, isLocalNode)
-}
-watch(() => infraIds.value.join(), loadImports)
+// Imports explain a busy node; each node's heartbeat counts them in the realm snapshot the cards show.
 const importsLine = computed(() => {
-  const { running, atLeast } = nodeImports.total.value
-  return running ? `Imports running: ${atLeast ? 'at least ' : ''}${formatCount(running)} ${running === 1 ? 'job' : 'jobs'}` : null
+  const running = infraNodes.value.reduce((sum, node) => sum + (node.info?.utilization.imports_running ?? 0), 0)
+  return running ? `Imports running: ${formatCount(running)} ${running === 1 ? 'job' : 'jobs'}` : null
 })
 const replication = computed(() => {
   const factor = realmInfo.value?.metadata_replication.default_replication_factor
@@ -308,7 +299,7 @@ const pageDescription = computed(() =>
           </OverviewCell>
         </div>
         <div v-if="currentUser && infraNodes.length" class="border-t border-border px-5 py-4">
-          <NodeCards :nodes="infraNodes" :devices="deviceNodes" :imports="nodeImports.imports.value" />
+          <NodeCards :nodes="infraNodes" :devices="deviceNodes" />
         </div>
         <DeviceRow v-if="desktop && currentUser" :name="deviceName" />
       </section>

@@ -67,10 +67,6 @@ const NodeCardsStub = defineComponent({
       h('em', `${props.devices.length} devices`),
     ]),
 })
-// Running imports by node, as the composable reads them.
-const importsTotal = ref({ running: 0, atLeast: false })
-const loadImports = vi.fn(async () => undefined)
-const importsStub = { useNodeImports: () => ({ imports: ref(new Map()), total: importsTotal, load: loadImports }) }
 const realmNodesStub = {
   useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'own-device' }),
   computerName: RealmNodes.computerName,
@@ -160,7 +156,6 @@ beforeAll(async () => {
   vi.doMock('@/composables/useDatabases', () => databasesStub)
   vi.doMock('@/components/dashboard/NodeCards.vue', () => ({ default: NodeCardsStub }))
   vi.doMock('@/components/dashboard/WebStart.vue', () => ({ default: WebStartStub }))
-  vi.doMock('@/composables/useNodeImports', () => importsStub)
   vi.doMock('@/composables/useRealmNodes', () => realmNodesStub)
   vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: SkeletonStub }))
   DashboardView = (await import('./DashboardView.vue')).default
@@ -230,7 +225,6 @@ beforeAll(async () => {
     '@/composables/useDatabases': databasesStub,
     '@/components/dashboard/NodeCards.vue': moduleDefault(NodeCardsStub),
     '@/components/dashboard/WebStart.vue': moduleDefault(WebStartStub),
-    '@/composables/useNodeImports': importsStub,
     '@/composables/useRealmNodes': realmNodesStub,
     '@/components/nodes/node-display': NodeDisplay,
     '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
@@ -271,8 +265,6 @@ beforeEach(() => {
   loadRealmView.mockResolvedValue(null)
   databaseRows.value = []
   databaseState.value = 'idle'
-  importsTotal.value = { running: 0, atLeast: false }
-  loadImports.mockClear()
   reloadDatabases.mockClear()
   signIn.mockClear()
 })
@@ -593,18 +585,28 @@ describe('realm nodes in the overview', () => {
     web.app.unmount()
   })
 
-  it('reads the imports of the realm nodes with each round and names them in the header', async () => {
-    vi.stubGlobal('window', {})
+  it('sums the imports the realm snapshot reports in the header, and drops them with a new snapshot', async () => {
+    desktopMode.value = true
+    // The device's own copy has no heartbeats; the realm node's snapshot counts the imports.
+    loadRealmView.mockResolvedValue({
+      info: { node: { peer_id: 'mgmt-node' } },
+      realm: { nodes: [
+        { ...beat('mgmt-node', 'management', 9000), info: { utilization: { heartbeat_at_ms: 9000, jobs_running: 12, imports_running: 9 } } },
+        { ...beat('server-node', 'server', 8000), info: { utilization: { heartbeat_at_ms: 8000, imports_running: 7 } } },
+      ] },
+    })
     const mounted = await mountApp(DashboardClient)
     await flush()
-    expect(loadImports).toHaveBeenCalledWith(['mgmt-node'], expect.any(Function))
-    expect(content(mounted.root)).not.toContain('Imports running')
-
-    importsTotal.value = { running: 16, atLeast: false }
-    await flush()
     expect(content(mounted.root)).toContain('OverviewImports running: 16 jobs')
+
+    // Another session reads its own snapshot; the old counts never linger.
+    loadRealmView.mockResolvedValue(null)
+    sessionEpoch.value++
+    realmInfo.value = { metadata_replication: { default_replication_factor: null }, nodes: [beat('mgmt-node', 'management', 1000)] }
+    await flush()
+    await flush()
+    expect(content(mounted.root)).not.toContain('Imports running')
     mounted.app.unmount()
-    vi.unstubAllGlobals()
   })
 })
 
