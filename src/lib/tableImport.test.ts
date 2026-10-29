@@ -48,7 +48,8 @@ describe('column uses', () => {
       ['sample', 'name', undefined], ['url', 'path', undefined], ['bytes', 'size', undefined],
       ['md5', 'checksum', 'md5'], ['collected', 'modified', undefined],
     ])
-    expect(defaultTemplates(uses)).toEqual({ source: '{url}', target: '{sample}/{url|basename}' })
+    expect(defaultTemplates(uses)).toEqual({ source: '{url}', target: '{sample}' })
+    expect(defaultTemplates(uses.filter((choice) => choice.use !== 'name'))).toEqual({ source: '{url}', target: '{url|basename}' })
   })
 
   it('builds the rows of the import from the uses', () => {

@@ -99,8 +99,8 @@ export function defaultTemplates(choices: readonly ColumnChoice[]): { source: st
   const path = choices.find((choice) => choice.use === 'path')
   if (!path) return null
   const name = choices.find((choice) => choice.use === 'name')
-  const file = `{${path.name}|basename}`
-  return { source: `{${path.name}}`, target: name ? `{${name.name}}/${file}` : file }
+  // The column chosen as the name in the bucket is the file name itself, not a folder.
+  return { source: `{${path.name}}`, target: name ? `{${name.name}}` : `{${path.name}|basename}` }
 }
 
 /** A template filled with one row: `{column}` and `{column|basename}`; null when a value is missing. */
