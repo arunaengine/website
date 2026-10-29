@@ -1033,6 +1033,11 @@ describe('distributed job detail components', () => {
       [{ state: 'INITIALIZING' }, { progress: { current: 2, total: 5, unit: 'inputs' } }, 'Copying inputs · 2 / 5 inputs'],
       [{ state: 'INITIALIZING' }, {}, 'Copying inputs'],
       [{ state: 'RUNNING', logs: [{ start_time: started, logs: [], outputs: [] }] }, {}, 'Running for'],
+      [
+        { state: 'RUNNING', logs: [{ start_time: new Date(Date.now() - 300000).toISOString(), logs: [], outputs: [] }, { start_time: new Date(Date.now() - 10000).toISOString(), logs: [], outputs: [] }] },
+        {},
+        'Running for 5m',
+      ],
       [{ state: 'COMPLETE' }, {}, 'Completed'],
       [{ state: 'CANCELED' }, {}, 'Cancelled'],
       [

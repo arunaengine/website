@@ -280,10 +280,15 @@ const executorKind = computed(
   () => tesPlacementTags(task.value?.tags).executorKind ?? nativeFamily.value?.placement?.executor_kind ?? null,
 )
 
+// Counted from the first start, so a run placed again keeps its real elapsed time.
 const runDuration = computed(() => {
   const log = latestLog.value
-  const start = log?.start_time ? Date.parse(log.start_time) : NaN
-  if (!Number.isFinite(start)) return null
+  const starts = [
+    nativeFamily.value?.started_at_ms ?? NaN,
+    ...(task.value?.logs ?? []).map((entry) => (entry.start_time ? Date.parse(entry.start_time) : NaN)),
+  ].filter(Number.isFinite)
+  if (!starts.length || !log?.start_time) return null
+  const start = Math.min(...starts)
   const end = log?.end_time ? Date.parse(log.end_time) : now.value
   return formatDuration(end - start) || null
 })
