@@ -19,6 +19,8 @@ function session(overrides: Partial<UserSession> = {}): UserSession {
 }
 
 const sessions = ref<UserSession[]>([])
+const listed = ref(true)
+const sessionEpoch = ref(1)
 const revoke = vi.fn(async () => false)
 const load = vi.fn(async () => undefined)
 const signOut = vi.fn(async () => undefined)
@@ -36,11 +38,12 @@ const SessionsPanel = compileClientComponent(new URL('./SessionsPanel.vue', impo
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/RefreshButton.vue': moduleDefault(ButtonStub),
   '@/components/ui/RefusalNote.vue': moduleDefault(EmptyStub),
-  '@/composables/useAruna': { useAruna: () => ({ currentUser: ref({ id: 'u1' }) }) },
+  '@/composables/useAruna': { useAruna: () => ({ currentUser: ref({ id: 'u1' }), sessionEpoch }) },
   '@/composables/useAuth': { useAuth: () => ({ signOut }) },
   '@/composables/useUserSessions': {
     useUserSessions: () => ({
       sessions,
+      listed,
       loading: ref(false),
       error: ref(null),
       busyIds: ref<string[]>([]),
@@ -54,6 +57,7 @@ const SessionsPanel = compileClientComponent(new URL('./SessionsPanel.vue', impo
 
 beforeEach(() => {
   sessions.value = []
+  listed.value = true
   revoke.mockClear()
   revoke.mockResolvedValue(false)
   signOut.mockClear()
@@ -132,5 +136,27 @@ describe('SessionsPanel', () => {
     await click(button(root, 'Revoke'))
 
     expect(signOut).toHaveBeenCalledOnce()
+  })
+
+  it('stops signing out the others once another token is applied', async () => {
+    sessions.value = [session({ session_id: 'here', current: true }), session({ session_id: 'a' }), session({ session_id: 'b' })]
+    revoke.mockImplementationOnce(async () => {
+      sessionEpoch.value++
+      listed.value = false
+      return false
+    })
+    const { root } = await mountApp(SessionsPanel)
+
+    await click(button(root, 'Sign out all others'))
+    await click(button(root, 'Sign out'))
+    expect(revoke.mock.calls).toEqual([['a']])
+  })
+
+  it('offers no sign out of the others until this session has listed them', async () => {
+    sessions.value = [session({ session_id: 'here', current: true }), session({ session_id: 'a' })]
+    listed.value = false
+    const { root } = await mountApp(SessionsPanel)
+
+    expect(button(root, 'Sign out all others').props.disabled).toBe(true)
   })
 })

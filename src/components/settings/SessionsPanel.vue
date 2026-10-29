@@ -12,17 +12,15 @@ import { useUserSessions } from '@/composables/useUserSessions'
 import { SESSION_KIND_LABELS, type UserSession } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
 
-const { currentUser } = useAruna()
+const { currentUser, sessionEpoch } = useAruna()
 const { signOut } = useAuth()
-const { sessions, loading, error, busyIds, load, revoke } = useUserSessions()
+const { sessions, listed, loading, error, busyIds, load, revoke } = useUserSessions()
 
 const confirming = ref('')
 
-let loadedOnce = false
-watch(currentUser, (user) => {
-  if (!user || loadedOnce) return
-  loadedOnce = true
-  void load()
+// Each session epoch lists again: the `current` flags of another token's list are not ours.
+watch([currentUser, sessionEpoch], ([user], before) => {
+  if (user && (!before || !listed.value)) void load()
 }, { immediate: true })
 
 // This browser first, then the newest; the list opens with the newest five.
@@ -42,7 +40,11 @@ const others = computed(() => sessions.value.filter((session) => !session.curren
 const confirmingOthers = ref(false)
 async function signOutOthers() {
   confirmingOthers.value = false
-  for (const session of others.value) await revoke(session.session_id)
+  const epoch = sessionEpoch.value
+  for (const session of others.value) {
+    if (epoch !== sessionEpoch.value || !listed.value) return
+    await revoke(session.session_id)
+  }
 }
 
 async function confirmRevoke(session: UserSession) {
@@ -63,10 +65,10 @@ async function confirmRevoke(session: UserSession) {
         <template v-if="others.length">
           <template v-if="confirmingOthers">
             <span class="text-[11px] text-muted-foreground">Sign out {{ others.length }} other {{ others.length === 1 ? 'sign-in' : 'sign-ins' }}?</span>
-            <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" @click="signOutOthers">Sign out</Button>
+            <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="!listed || loading" @click="signOutOthers">Sign out</Button>
             <Button variant="ghost" size="sm" @click="confirmingOthers = false">Cancel</Button>
           </template>
-          <Button v-else variant="outline" size="sm" @click="confirmingOthers = true">Sign out all others</Button>
+          <Button v-else variant="outline" size="sm" :disabled="!listed || loading" @click="confirmingOthers = true">Sign out all others</Button>
         </template>
         <RefreshButton :busy="loading" sr-label="Refresh sign-ins" @click="load" />
       </div>
