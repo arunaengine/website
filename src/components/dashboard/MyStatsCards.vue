@@ -3,6 +3,7 @@
 // buckets themselves, so a distributed bucket counts once; a part that was not read makes the
 // figure a lower bound instead of a smaller number.
 import { computed, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import Notice from '@/components/ui/Notice.vue'
 import OverviewCell from '@/components/dashboard/OverviewCell.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -112,13 +113,19 @@ const workLine = computed(() => {
         Stored counts against quotas. Referenced data stays at its source.
       </OverviewCell>
       <OverviewCell label="Data">
-        <template #value><b>{{ lowerBound(atLeast, formatCount(sum.objects)) }}</b> {{ plural(sum.objects, 'object', 'objects') }}</template>
+        <template #value>
+          <RouterLink :to="{ name: 'buckets' }" class="hover:underline"><b>{{ lowerBound(atLeast, formatCount(sum.objects)) }}</b></RouterLink>
+          {{ plural(sum.objects, 'object', 'objects') }}
+        </template>
         {{ [buckets, databaseText].filter(Boolean).join(', ') }}
       </OverviewCell>
     </template>
     <div v-if="aggregate.pending" class="bg-card px-5 py-4"><Skeleton class="h-16" /></div>
     <OverviewCell v-else label="Work">
-      <template #value><b>{{ runCount }}</b> {{ aggregate.processRuns === 1 ? 'run' : 'runs' }}</template>
+      <template #value>
+        <RouterLink :to="{ name: 'compute' }" class="hover:underline"><b>{{ runCount }}</b></RouterLink>
+        {{ aggregate.processRuns === 1 ? 'run' : 'runs' }}
+      </template>
       {{ workLine }}
     </OverviewCell>
 

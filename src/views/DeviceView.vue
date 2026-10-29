@@ -28,9 +28,9 @@ const showEnroll = computed(() => !enrolled.value || Boolean(invite.value))
 onMounted(async () => {
   void start()
   void refresh()
-  // The node-down page links here with ?section=wipe, Home with ?section=local-runs.
+  // The node-down page links here with ?section=wipe, Home with the folders, activity or local runs.
   const section = route.query.section
-  if (section !== 'wipe' && section !== 'local-runs') return
+  if (typeof section !== 'string' || !['wipe', 'local-runs', 'folders', 'activity'].includes(section)) return
   await nextTick()
   document.getElementById(section)?.scrollIntoView?.({ block: 'center' })
 })
@@ -53,8 +53,8 @@ function onEnrolled() {
     <div class="container space-y-5 py-5">
       <EnrollPanel v-if="showEnroll" :invite="invite" @enrolled="onEnrolled" />
       <NodePanel />
-      <LinkedFolders />
-      <ActivityCard />
+      <LinkedFolders id="folders" />
+      <ActivityCard id="activity" />
       <div class="space-y-3.5 pt-2">
         <h2 class="font-display text-[15px] font-semibold text-foreground/85">Settings for this computer</h2>
         <div class="grid items-start gap-5 lg:grid-cols-2">

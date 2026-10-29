@@ -59,14 +59,31 @@ const foldersText = computed(() => {
 const movingText = computed(() =>
   transfersState.value === 'ready' ? `${plural(transfers.value.filter(isMoving).length, 'file', 'files')} moving` : `Transfers ${waiting(transfersState.value)}`,
 )
-const runsText = computed(() => {
-  if (!shown('compute')) return null
-  if (computeState.value !== 'ready' || !compute.value) return `Local runs ${waiting(computeState.value)}`
-  if (!compute.value.enabled) return 'runs here: off'
+// How many runs run here now, then the runtime, which opens the local run settings.
+const runsFacts = computed<Fact[]>(() => {
+  if (!shown('compute')) return []
+  const settings = { name: 'device', query: { section: 'local-runs' } }
+  if (computeState.value !== 'ready' || !compute.value) return [{ text: `Local runs ${waiting(computeState.value)}` }]
+  if (!compute.value.enabled) return [{ text: 'Local runs off', to: settings }]
+  const running = compute.value.running
+  const kind = compute.value.backend ?? ''
+  const backend = kind.charAt(0).toUpperCase() + kind.slice(1)
   const limit = compute.value.limits.max_concurrent
-  return `runs here: ${[compute.value.backend, limit ? `${formatCount(limit)} at a time` : null].filter(Boolean).join(', ')}`
+  return [
+    { text: `${plural(running, 'run', 'runs')} running here` },
+    { text: [backend, limit ? `${formatCount(limit)} at a time` : null].filter(Boolean).join(', '), to: settings },
+  ]
 })
-const facts = computed(() => [foldersText.value, movingText.value, runsText.value].filter((fact): fact is string => Boolean(fact)))
+// Each fact with a place of its own on the device page links there.
+interface Fact {
+  text: string
+  to?: { name: string; query: Record<string, string> }
+}
+const facts = computed<Fact[]>(() => [
+  { text: foldersText.value, to: { name: 'device', query: { section: 'folders' } } },
+  { text: movingText.value, to: { name: 'device', query: { section: 'activity' } } },
+  ...runsFacts.value,
+])
 
 onMounted(async () => {
   const reading = refresh()
@@ -87,9 +104,10 @@ onMounted(async () => {
     <Badge v-if="name !== THIS_COMPUTER" variant="secondary" size="sm">this computer</Badge>
     <Badge :variant="pill.variant" size="sm">{{ pill.label }}</Badge>
     <p class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-      <template v-for="(fact, index) in facts" :key="fact">
+      <template v-for="(fact, index) in facts" :key="fact.text">
         <span v-if="index" aria-hidden="true" class="text-border">|</span>
-        <span>{{ fact }}</span>
+        <RouterLink v-if="fact.to" :to="fact.to" class="hover:text-foreground hover:underline">{{ fact.text }}</RouterLink>
+        <span v-else>{{ fact.text }}</span>
       </template>
     </p>
     <Button variant="outline" size="sm" @click="showBind = true"><FolderPlus class="h-3.5 w-3.5" /> Link a folder</Button>

@@ -717,7 +717,7 @@ describe('realm nodes in the overview', () => {
     })
     let mounted = await mountApp(DashboardClient)
     await flush()
-    expect(content(mounted.root)).toContain('Activity16 imports running on')
+    expect(content(mounted.root).replace(/\s+/g, ' ')).toContain('Activity16 imports running on Unnamed node and Unnamed node')
     mounted.app.unmount()
 
     // One node has no heartbeat count: the known imports are a lower bound.
@@ -730,7 +730,7 @@ describe('realm nodes in the overview', () => {
     })
     mounted = await mountApp(DashboardClient)
     await flush()
-    expect(content(mounted.root)).toContain('Activityat least 2 imports running on')
+    expect(content(mounted.root).replace(/\s+/g, ' ')).toContain('Activityat least 2 imports running on Unnamed node')
 
     // Another session reads its own snapshot; the old counts never linger.
     loadRealmView.mockResolvedValue(null)

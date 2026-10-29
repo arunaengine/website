@@ -192,7 +192,6 @@ const activity = computed(() => {
     nodes: infraNodes.value.filter((node) => (node.info?.utilization?.imports_running ?? 0) > 0),
   }
 })
-const listed = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`)
 
 // The visible runs, newest first: the Work cell counts the running ones.
 const recentRuns = useRecentRuns()
@@ -321,13 +320,19 @@ const pageDescription = computed(() =>
                 Stored counts against quotas. Referenced data stays at its source.
               </OverviewCell>
               <OverviewCell label="Data">
-                <template v-if="realmTotals" #value><b>{{ formatCount(realmTotals.objects) }}</b> {{ plural(realmTotals.objects, 'object', 'objects') }}</template>
+                <template v-if="realmTotals" #value>
+                  <RouterLink :to="{ name: 'buckets' }" class="hover:underline"><b>{{ formatCount(realmTotals.objects) }}</b></RouterLink>
+                  {{ plural(realmTotals.objects, 'object', 'objects') }}
+                </template>
                 <template v-else #value>Unknown</template>
                 {{ realmDataLine }}
               </OverviewCell>
             </template>
             <OverviewCell label="Work" :class="currentUser ? '' : 'sm:col-span-1 lg:col-span-3'">
-              <template v-if="realmDatasets !== null" #value><b>{{ formatCount(realmDatasets) }}</b> {{ plural(realmDatasets, 'dataset', 'datasets') }}</template>
+              <template v-if="realmDatasets !== null" #value>
+                <RouterLink :to="{ name: 'datasets' }" class="hover:underline"><b>{{ formatCount(realmDatasets) }}</b></RouterLink>
+                {{ plural(realmDatasets, 'dataset', 'datasets') }}
+              </template>
               <template v-else #value>Unknown</template>
               <template v-if="currentUser && recentRuns.state.value === 'ready'">
                 {{ recentRuns.running.value.atLeast ? 'at least ' : '' }}{{ formatCount(recentRuns.running.value.count) }} running
@@ -339,7 +344,14 @@ const pageDescription = computed(() =>
               <b>{{ activity.atLeast ? 'at least ' : '' }}{{ formatCount(activity.running) }}</b> {{ activity.running === 1 ? 'import' : 'imports' }} running
             </template>
             <template v-else #value>none</template>
-            <template v-if="activity.nodes.length">on {{ listed(activity.nodes.map(nodeName)) }}</template>
+            <!-- Each importing node by name, opening its page. -->
+            <template v-if="activity.nodes.length">
+              on
+              <template v-for="(busy, index) in activity.nodes" :key="busy.node_id">
+                <template v-if="index">{{ index === activity.nodes.length - 1 ? ' and ' : ', ' }}</template>
+                <RouterLink :to="{ name: 'node', params: { nodeId: busy.node_id } }" class="hover:underline">{{ nodeName(busy) }}</RouterLink>
+              </template>
+            </template>
             <template v-else-if="activity.atLeast">Not every node reports its imports.</template>
           </OverviewCell>
           <OverviewCell v-else label="Realm">

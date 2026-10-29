@@ -5,7 +5,7 @@ import * as DeviceApi from '@/lib/deviceApi'
 import * as FormatCount from '@/lib/formatCount'
 import * as NodePill from '@/lib/nodePill'
 import * as SyncStates from '@/lib/syncStates'
-import { button, click, compileClientComponent, content, flush, moduleDefault, mountApp } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 import type { DeviceCompute, DeviceTransfer, SyncedFolder } from '@/lib/deviceApi'
 import type { NodeStatus } from '@/lib/desktopBridge'
 
@@ -51,6 +51,7 @@ const docker = (): DeviceCompute => ({
   message: null,
 })
 
+const LinkStub = defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()) })
 const Plain = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
 const ButtonStub = defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()) })
 const renameDevice = vi.fn(async () => undefined)
@@ -63,7 +64,7 @@ const BindStub = defineComponent({ props: { open: Boolean }, setup: (props) => (
 
 const DeviceRow = compileClientComponent(new URL('./DeviceRow.vue', import.meta.url), {
   vue: VueRuntime,
-  'vue-router': { RouterLink: Plain },
+  'vue-router': { RouterLink: LinkStub },
   '@lucide/vue': new Proxy({}, { get: () => Plain }),
   '@/components/ui/Badge.vue': moduleDefault(Plain),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
@@ -106,7 +107,7 @@ describe('device row', () => {
     const text = content(mounted.root)
 
     expect(text).toContain('Microbiology laptopthis computeronline')
-    expect(text).toContain('1 linked folder, in sync|0 files moving|runs here: docker, 1 at a time')
+    expect(text).toContain('1 linked folder, in sync|0 files moving|0 runs running here|Docker, 1 at a time')
     expect(text).not.toContain('Running')
     await click(button(mounted.root, 'Link a folder'))
     expect(content(mounted.root)).toContain('bind-dialog-open')
@@ -124,7 +125,7 @@ describe('device row', () => {
     compute.value = { ...docker(), enabled: false }
     let mounted = await mountApp(DeviceRow, { props: { name: 'This computer' } })
     expect(content(mounted.root)).toContain('2 linked folders, 2 files need you')
-    expect(content(mounted.root)).toContain('runs here: off')
+    expect(content(mounted.root)).toContain('Local runs off')
     mounted.app.unmount()
 
     folders.value = [folder({ state: 'binding' })]
@@ -132,7 +133,7 @@ describe('device row', () => {
     computeShown.value = false
     mounted = await mountApp(DeviceRow, { props: { name: 'This computer' } })
     expect(content(mounted.root)).toContain('1 linked folder, syncing|1 file moving')
-    expect(content(mounted.root)).not.toContain('runs here')
+    expect(content(mounted.root)).not.toContain('running here')
     mounted.app.unmount()
   })
 
@@ -181,6 +182,21 @@ describe('device row', () => {
     const mounted = await mountApp(DeviceRow, { props: { name: 'Microbiology laptop', nodeId: 'dev-node-1', value: null } })
     await click(button(mounted.root, 'Rename'))
     expect(renameDevice).toHaveBeenCalledWith('dev-node-1', 'Lab laptop')
+    mounted.app.unmount()
+  })
+
+  it('links each count to its place on the device page and the runtime to the run settings', async () => {
+    folders.value = [folder()]
+    compute.value = { ...docker(), running: 2, limits: { ...docker().limits, max_concurrent: 4 } }
+    const mounted = await mountApp(DeviceRow, { props: { name: 'This computer' } })
+    const target = (text: string) => JSON.parse(String(element(mounted.root, (node) => node.tag === 'a' && content(node) === text).props['data-to']))
+
+    expect(target('1 linked folder, in sync')).toEqual({ name: 'device', query: { section: 'folders' } })
+    expect(target('0 files moving')).toEqual({ name: 'device', query: { section: 'activity' } })
+    expect(target('Docker, 4 at a time')).toEqual({ name: 'device', query: { section: 'local-runs' } })
+    // The count of running runs is a fact on its own, with no place to open.
+    expect(content(mounted.root)).toContain('2 runs running here')
+    expect(nodes(mounted.root).some((node) => node.tag === 'a' && content(node) === '2 runs running here')).toBe(false)
     mounted.app.unmount()
   })
 })

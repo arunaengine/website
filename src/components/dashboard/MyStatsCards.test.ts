@@ -12,6 +12,11 @@ const aruna = vi.hoisted(() => ({
   getBucketUsage: vi.fn(),
 }))
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
+// Links render as anchors naming where they go.
+vi.mock('vue-router', async () => {
+  const { defineComponent, h } = await import('vue')
+  return { RouterLink: defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()) }) }
+})
 // The realm's database list, by owning group.
 const databases = vi.hoisted(() => ({
   rows: { value: [] as Array<{ ownerGroup: string }> },
@@ -182,5 +187,18 @@ describe('personal statistics tiles', () => {
     expect(await renderedText()).toContain('10 B stored, no quota')
     expect(await renderedText({ running: { count: 2, atLeast: false } })).toContain('Work 2 runs 2 running, 3 datasets')
     expect(await renderedText({ running: { count: 0, atLeast: true } })).toContain('at least 0 running')
+  })
+
+  it('links the counts that have a page: the objects to Data, the runs to Compute', async () => {
+    aruna.myGroups.value = [{ id: 'link-1', name: 'Alpha' }]
+    aruna.getGroupUsage.mockResolvedValue(usage())
+    aruna.searchBuckets.mockResolvedValue(listing([hit('a', 'n1', 'link-1')]))
+    aruna.getBucketUsage.mockResolvedValue(bucketUsage(10, 0, 3))
+    await loadMyGroupsUsage()
+    await useReachableUsage().load()
+    const html = await renderToString(createSSRApp(MyStatsCards))
+
+    expect(html).toMatch(/data-to="\{&quot;name&quot;:&quot;buckets&quot;\}"[^>]*><b>3<\/b>/)
+    expect(html).toMatch(/data-to="\{&quot;name&quot;:&quot;compute&quot;\}"[^>]*><b>2<\/b>/)
   })
 })
