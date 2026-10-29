@@ -165,6 +165,11 @@ const deviceRecord = computed(() => {
   return local && givenName(local) ? local : (ownRecord(panelRealm.value?.nodes) ?? local)
 })
 const deviceName = computed(() => computerName(deviceRecord.value))
+// Only the owner names a device, so the row offers renaming only for the signed-in owner's own.
+const renameId = computed(() => {
+  const record = deviceRecord.value
+  return record?.kind === 'user' && record.owner && record.owner === currentUser.value?.id ? record.node_id : null
+})
 
 const onlineNodes = computed(() => infraNodes.value.filter((node) => node.present).length)
 
@@ -306,7 +311,7 @@ const pageDescription = computed(() =>
         <DeviceRow
           v-if="desktop && currentUser"
           :name="deviceName"
-          :node-id="deviceRecord ? deviceRecord.node_id : null"
+          :node-id="renameId"
           :value="deviceRecord?.display_name ?? null"
         />
       </section>

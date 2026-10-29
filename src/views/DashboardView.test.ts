@@ -499,7 +499,7 @@ describe('desktop home', () => {
     currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
     desktopMode.value = true
     nodeInfo.value = { node: { peer_id: 'own-device' } }
-    realmInfo.value = { metadata_replication: { default_replication_factor: 3 }, nodes: [{ node_id: 'own-device', kind: 'user', display_name: 'Lab laptop' }] }
+    realmInfo.value = { metadata_replication: { default_replication_factor: 3 }, nodes: [{ node_id: 'own-device', kind: 'user', owner: 'u1', display_name: 'Lab laptop' }] }
     loadRealmView.mockResolvedValue({ info: { node: { peer_id: 'mgmt' } }, realm: { nodes: [{ node_id: 'own-device', kind: 'user', display_name: 'Old name' }] } })
     let mounted = await mountApp(DashboardClient)
     await flush()
@@ -512,6 +512,19 @@ describe('desktop home', () => {
     mounted = await mountApp(DashboardClient)
     await flush()
     expect(content(mounted.root)).toContain('device row Old name')
+    mounted.app.unmount()
+  })
+
+  it('offers renaming this computer only to the user who owns it', async () => {
+    currentUser.value = { id: 'u2', name: 'Guest Researcher' }
+    desktopMode.value = true
+    nodeInfo.value = { node: { peer_id: 'own-device' } }
+    realmInfo.value = { metadata_replication: { default_replication_factor: 3 }, nodes: [{ node_id: 'own-device', kind: 'user', owner: 'u1', display_name: 'Lab laptop' }] }
+    const mounted = await mountApp(DashboardClient)
+    await flush()
+
+    expect(content(mounted.root)).toContain('device row Lab laptop')
+    expect(content(mounted.root)).not.toContain('own-device')
     mounted.app.unmount()
   })
 
