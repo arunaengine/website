@@ -1,0 +1,127 @@
+import { defineComponent, ref } from 'vue'
+import { createMemoryHistory, createRouter } from 'vue-router'
+import { describe, expect, it, vi } from 'vitest'
+import { flush, mountApp } from '@/test/clientRender'
+
+// A cached session: activating a group the browser already holds resolves at once.
+const activeContext = ref<Record<string, unknown> | null>(null)
+const endpointUrl = ref('https://s3.example')
+const searchBuckets = vi.fn(async (_q: string, _options?: unknown) => ({
+  hits: [
+    { bucket: 'laptop-old', node_id: 'n-local', group_id: 'g-a' },
+    { bucket: 'laptop', node_id: 'n-2', group_id: 'g-a' },
+  ],
+  nodes_queried: 2,
+  nodes_failed: 0,
+  failed_nodes: [],
+}))
+const s3 = {
+  activeContext,
+  activeKey: ref({ accessKeyId: 'k' }),
+  activateContext: vi.fn(async (_node: string | null, groupId: string) => {
+    activeContext.value = { userId: 'u-1', nodeId: 'n-local', groupId, session: { accessKeyId: `k-${groupId}` } }
+  }),
+  nodeIdFor: () => 'n-local',
+  contextMismatch: () => null,
+  endpointForNode: () => endpointUrl.value,
+  endpoint: () => 'https://s3.example',
+  canRead: () => true,
+  canWrite: () => true,
+  canWritePrefix: () => true,
+  canDeletePrefix: () => true,
+  // The serving node lacks the bucket; another node of the group holds it.
+  listObjects: vi.fn(async (_bucket: string, _prefix: string, _token: unknown, node: string | null) => {
+    if (!node) throw new Error('That bucket does not exist.')
+    return { folders: [], objects: [] }
+  }),
+  listDeletedObjects: vi.fn(async () => ({ deleted: [], truncated: false })),
+  headBucket: vi.fn(async () => undefined),
+}
+
+vi.mock('./useS3', () => ({
+  useS3: () => s3,
+  s3ErrorMessage: (err: Error) => err.message,
+  isS3AuthError: () => false,
+  isS3BucketMissingError: () => true,
+  isS3SessionRejected: () => false,
+  isS3NetworkError: () => false,
+}))
+vi.mock('./useAruna', () => ({
+  useAruna: () => ({
+    apiBaseUrl: ref('https://api.example'),
+    authToken: ref('t'),
+    currentUser: ref({ id: 'u-1' }),
+    myGroups: ref([{ id: 'g-a', name: 'A' }, { id: 'g-b', name: 'B' }]),
+    getGroupUsage: vi.fn(async () => null),
+    listGroupConnectors: vi.fn(async () => ({ connectors: [] })),
+    listSyncRelationships: vi.fn(async () => ({ outgoing: [], incoming: [] })),
+    nodeInfo: ref(null),
+    realmInfo: ref(null),
+    searchBuckets,
+    sessionEpoch: ref(1),
+  }),
+}))
+vi.mock('./useBuckets', () => ({
+  useBuckets: () => ({
+    buckets: ref([{ name: 'reef' }, { name: 'archive' }]),
+    loaded: ref(true),
+    loading: ref(false),
+    refreshing: ref(false),
+    error: ref(null),
+    authError: ref(false),
+    ensure: vi.fn(async () => undefined),
+    refresh: vi.fn(async () => undefined),
+  }),
+}))
+vi.mock('./useBucketShortcuts', () => ({
+  useBucketShortcuts: () => ({ pinned: ref([]), recent: ref([]), recordRecent: vi.fn(), remove: vi.fn() }),
+}))
+vi.mock('./useGroupSelection', () => ({
+  useGroupContext: () => ({ groupsLoading: ref(false), hasGroups: ref(true) }),
+}))
+vi.mock('./usePublicAccess', () => ({ usePublicAccess: () => ({ isPublic: () => false }) }))
+vi.mock('./useRealmNodes', () => ({
+  useRealmNodes: () => ({
+    isLocalNode: (id: string) => id === 'n-local',
+    displayName: (id: string) => id,
+    localNodeId: ref('n-local'),
+  }),
+}))
+vi.mock('./useStagingReferences', () => ({
+  useStagingReferences: () => ({
+    entries: ref([]),
+    referencedByKey: ref(new Map()),
+    stats: ref({ count: 0, bytes: 0, groups: [] }),
+    reload: vi.fn(async () => undefined),
+  }),
+}))
+vi.mock('./useUploadQueue', () => ({ useUploadQueue: () => ({ enqueue: vi.fn(), lastCompleted: ref(null) }) }))
+
+const { useDataManager } = await import('./useDataManager')
+
+const View = defineComponent({ render: () => null })
+
+describe('bucket address without a node', () => {
+  it('opens the bucket on the node of the group that holds it', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/buckets', name: 'buckets', component: View },
+        { path: '/buckets/:bucketId', name: 'bucket', component: View },
+      ],
+    })
+    await router.push({ name: 'bucket', params: { bucketId: 'laptop' }, query: { group: 'g-a', prefix: 'runs/' } })
+    const host = defineComponent({
+      setup: () => {
+        useDataManager()
+        return () => null
+      },
+    })
+    await mountApp(host, { router })
+    for (let round = 0; round < 8; round++) await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(searchBuckets).toHaveBeenCalledWith('laptop', { limit: 50, groupId: 'g-a' })
+    expect(router.currentRoute.value.query).toEqual({ group: 'g-a', prefix: 'runs/', node: 'n-2' })
+    await flush()
+  })
+})
