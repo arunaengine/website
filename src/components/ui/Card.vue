@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 const props = defineProps<{ class?: string }>()
 const classes = computed(() =>
   cn(
-    'rounded-xl border border-border/80 bg-card text-card-foreground shadow-sm',
+    'rounded-xl border border-border-subtle bg-card text-card-foreground shadow-sm dark:shadow-none',
     props.class,
   ),
 )

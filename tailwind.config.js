@@ -10,7 +10,16 @@ export default {
     },
     extend: {
       colors: {
-        border: 'hsl(var(--border))',
+        border: {
+          DEFAULT: 'hsl(var(--border))',
+          subtle: 'hsl(var(--border-subtle))',
+        },
+        status: {
+          ok: 'hsl(var(--status-ok))',
+          running: 'hsl(var(--status-running))',
+          warn: 'hsl(var(--status-warn))',
+          failed: 'hsl(var(--status-failed))',
+        },
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
@@ -79,8 +88,9 @@ export default {
           'monospace',
         ],
       },
+      // Containers 12 (xl), controls 8 (lg), smaller parts below them.
       borderRadius: {
-        xl: 'calc(var(--radius) + 2px)',
+        xl: 'var(--radius-container)',
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
