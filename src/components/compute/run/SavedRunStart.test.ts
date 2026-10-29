@@ -70,7 +70,7 @@ describe('saved run start', () => {
   it('names a fixed database input by its title and release with the bucket path in small print', async () => {
     databaseRows.value = [{
       bucket: 'bakta-database',
-      places: [{ bucket: 'bakta-database', nodeId: 'node-2' }],
+      places: [{ bucket: 'bakta-database', nodeId: 'node-1' }],
       title: 'Bakta database (light)',
       metadata: { database: true, version: '6.0 light', identifiers: [] },
     }]
@@ -79,6 +79,19 @@ describe('saved run start', () => {
 
     expect(text).toContain('Bakta database (light), release 6.0 light')
     expect(text).toContain('bakta-database/db/')
+    databaseRows.value = []
+  })
+
+  it('gives a local folder no title of a database with that name on another node', async () => {
+    databaseRows.value = [{
+      bucket: 'bakta-database',
+      places: [{ bucket: 'bakta-database', nodeId: 'node-2' }],
+      title: 'Bakta database (light)',
+      metadata: { database: true, version: '6.0 light', identifiers: [] },
+    }]
+    const { root } = await mountApp(component)
+
+    expect(content(root)).not.toContain('Bakta database (light)')
     databaseRows.value = []
   })
 })

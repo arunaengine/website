@@ -31,8 +31,8 @@ const fixed = computed(() => inputs.value.filter((entry) => !asked.value.some((p
 const pickOf = (path: string) => inputs.value.find((entry) => atOrBelow(entry, path))
 const pickText = (entry: TesDataRefEntry) => (entry.kind === 'file' ? entry.url : `${entry.bucket}/${entry.prefix}`)
 
-// A fixed input read from a database names it by title and release; a bucket matched by name
-// alone that several nodes hold as a database counts only on this node.
+// A fixed input read from a database names it by title and release. The database must be held
+// by the node the input names: its ARN's node, else this node for a local reference.
 const databases = useDatabases()
 databases.ensure()
 const { localNodeId } = useRealmNodes()
@@ -40,8 +40,8 @@ function databaseOf(entry: TesDataRefEntry): { title: string; release: string | 
   const arn = entry.kind === 'file' ? parseArunaArn(entry.url) : null
   const bucket = entry.kind === 'folder' ? entry.bucket : (arn?.bucket ?? parseS3Url(entry.url)?.bucket)
   if (!bucket) return null
-  const matches = databases.rows.value.filter((row) => row.bucket === bucket && (!arn || row.places.some((place) => place.nodeId === arn.nodeId)))
-  const row = matches.length > 1 ? matches.find((match) => match.places.some((place) => place.nodeId === localNodeId.value)) : matches[0]
+  const node = arn?.nodeId ?? localNodeId.value
+  const row = databases.rows.value.find((entry) => entry.bucket === bucket && entry.places.some((place) => place.nodeId === node))
   if (!row) return null
   return { title: row.title ?? row.metadata.title ?? bucket, release: row.metadata.version ?? null }
 }
