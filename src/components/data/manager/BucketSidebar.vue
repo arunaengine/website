@@ -26,7 +26,7 @@ import { folderName } from '@/lib/deviceApi'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
 import { isFolderBucket, isHiddenBucket } from '@/lib/workspaces'
 import type { BucketShortcut } from '@/composables/useBucketShortcuts'
-import { Boxes, ChevronRight, FolderPlus, FolderSync, History, KeyRound, Plus, Trash2 } from '@lucide/vue'
+import { Boxes, ChevronLeft, ChevronRight, FolderPlus, FolderSync, History, KeyRound, Plus, Trash2 } from '@lucide/vue'
 import { computed, ref, useId, watch } from 'vue'
 
 const props = defineProps<{ manager: DataManager }>()
@@ -164,6 +164,19 @@ const allRows = computed<AllRow[]>(() => {
   const rest = hits.filter((hit) => !used.has(hit)).map((hit) => ({ key: `${hit.node_id}/${hit.bucket}`, bucket: hit.bucket, nodeId: shortcutNode(hit), hit, pinned: false }))
   return [...pins, ...recents, ...rest]
 })
+// Pages of 25 rows, the pins on top of the first; the next page is read from the nodes when
+// needed. The nodes name no total, so no page count is shown.
+const BUCKETS_PER_PAGE = 25
+const page = ref(1)
+watch([selectedGroupId, bucketNameFilter, bucketNodeChoice], () => (page.value = 1))
+const pageRows = computed(() => allRows.value.slice((page.value - 1) * BUCKETS_PER_PAGE, page.value * BUCKETS_PER_PAGE))
+const pageFilled = () => allRows.value.length > page.value * BUCKETS_PER_PAGE
+const hasNextPage = computed(() => pageFilled() || all.more.value)
+async function nextPage() {
+  if (!pageFilled() && all.more.value) await all.loadMore()
+  if (pageFilled()) page.value++
+}
+
 function openRow(row: AllRow) {
   if (row.hit) openHit(row.hit)
   else openBucketOn(row.bucket, row.nodeId)
@@ -188,7 +201,7 @@ const listId = `bucket-results-${useId()}`
 const databaseRows = ref<{ openers: (() => void)[] } | null>(null)
 const groupOpeners = computed<(() => void)[]>(() => {
   if (databaseMode.value) return databaseRows.value?.openers ?? []
-  if (searchList.value) return all.error.value ? [] : allRows.value.map((row) => () => openRow(row))
+  if (searchList.value) return all.error.value ? [] : pageRows.value.map((row) => () => openRow(row))
   if (bucketsLoading.value || (bucketsError.value && (bucketsAuthError.value || !bucketsLoaded.value))) return []
   return nodeBuckets.value.map((entry) => () => openBucketOn(entry.bucket, entry.nodeId))
 })
@@ -281,7 +294,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         <Spinner v-if="all.loading.value && !all.hits.value.length" show-label label="Loading buckets…" class="px-3 py-4" />
         <p v-else-if="all.error.value" class="px-3 py-3 text-xs text-destructive">{{ all.error.value }}</p>
         <ul v-else-if="allRows.length || examples.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
-          <li v-for="(row, index) in allRows" :key="row.key">
+          <li v-for="(row, index) in pageRows" :key="row.key">
             <BucketRow
               v-if="row.hit"
               :bucket="row.bucket"
@@ -325,8 +338,14 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           {{ all.failedNodes.value }} {{ all.failedNodes.value === 1 ? 'node' : 'nodes' }} did not answer.
           <button type="button" class="text-primary hover:underline" @click="all.reload()">Retry</button>
         </p>
-        <div v-if="all.more.value" class="border-t border-border/70 p-2 text-center">
-          <Button variant="outline" size="sm" :disabled="all.loading.value" @click="all.loadMore()">Load more</Button>
+        <div v-if="page > 1 || hasNextPage" class="flex items-center justify-center gap-2 border-t border-border/70 p-2">
+          <Button variant="outline" size="sm" :disabled="page <= 1 || all.loading.value" @click="page--">
+            <ChevronLeft class="size-3.5" /> Prev
+          </Button>
+          <span class="px-1 text-center text-xs tabular-nums text-muted-foreground">Page {{ page }}</span>
+          <Button variant="outline" size="sm" :disabled="!hasNextPage || all.loading.value" @click="nextPage">
+            Next <ChevronRight class="size-3.5" />
+          </Button>
         </div>
       </template>
       <template v-else>

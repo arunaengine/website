@@ -656,14 +656,33 @@ describe('Bucket sidebar node choice', () => {
     expect(reload).toHaveBeenCalledOnce()
   })
 
-  it('pages with Load more', async () => {
-    const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
-    expect(content(root)).not.toContain('Load more')
-
+  it('shows 25 buckets a page and reads the next page from the nodes when needed', async () => {
+    const listed = (count: number, from = 0) =>
+      Array.from({ length: count }, (_, index) => ({ bucket: `b${String(from + index).padStart(2, '0')}`, node_id: 'home', group_id: 'g1' }))
+    const shown = (root: Parameters<typeof content>[0]) =>
+      nodes(root).filter((node) => String(node.props['aria-label']).startsWith('Open b')).map((node) => content(node))
+    allBuckets.hits.value = listed(25)
     allBuckets.more.value = true
+    loadMore.mockImplementationOnce(async () => {
+      allBuckets.hits.value = [...allBuckets.hits.value, ...listed(5, 25)]
+      allBuckets.more.value = false
+    })
+    const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
     await flush()
-    await click(button(root, 'Load more'))
+    expect(shown(root)).toHaveLength(25)
+    expect(content(root)).toContain('Page 1')
+    expect(button(root, 'Prev').props.disabled).toBe(true)
+
+    await click(button(root, 'Next'))
+    await flush()
     expect(loadMore).toHaveBeenCalledOnce()
+    expect(shown(root)).toEqual(['b25', 'b26', 'b27', 'b28', 'b29'])
+    expect(content(root)).toContain('Page 2')
+    expect(button(root, 'Next').props.disabled).toBe(true)
+
+    await click(button(root, 'Prev'))
+    expect(shown(root)[0]).toBe('b00')
+    allBuckets.hits.value = []
   })
 
   it('lists one node after picking it and names it in the create button title', async () => {
