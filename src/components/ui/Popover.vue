@@ -35,24 +35,27 @@ function keepOpen(event: Event) {
 
 <template>
   <PopoverRoot :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
-    <TooltipProvider v-if="tooltip" :delay-duration="120">
-      <TooltipRoot>
-        <TooltipTrigger as-child>
-          <PopoverTrigger as-child>
-            <slot />
-          </PopoverTrigger>
-        </TooltipTrigger>
-        <TooltipPortal>
-          <TooltipContent
-            side="top"
-            :side-offset="6"
-            class="z-50 rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=open]:fade-in-0"
-          >
-            {{ tooltip }}
-          </TooltipContent>
-        </TooltipPortal>
-      </TooltipRoot>
-    </TooltipProvider>
+    <!-- The wrapper anchors the popover: a tooltip trigger in between would hide the button from it. -->
+    <PopoverTrigger v-if="tooltip" as-child>
+      <span class="inline-flex">
+        <TooltipProvider :delay-duration="120">
+          <TooltipRoot>
+            <TooltipTrigger as-child>
+              <slot />
+            </TooltipTrigger>
+            <TooltipPortal>
+              <TooltipContent
+                side="top"
+                :side-offset="6"
+                class="z-50 rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=open]:fade-in-0"
+              >
+                {{ tooltip }}
+              </TooltipContent>
+            </TooltipPortal>
+          </TooltipRoot>
+        </TooltipProvider>
+      </span>
+    </PopoverTrigger>
     <PopoverTrigger v-else as-child>
       <slot />
     </PopoverTrigger>

@@ -58,5 +58,8 @@ describe('Popover', () => {
 
     const tipped = await mountApp(Popover, { props: { tooltip: 'Stored on Giessen storage 1' } })
     expect(content(element(tipped.root, (node) => node.props.role === 'tooltip')).trim()).toBe('Stored on Giessen storage 1')
+    // A real element anchors the popover, between its trigger and the tooltip's.
+    const tooltip = element(tipped.root, (node) => node.props.role === 'tooltip')
+    expect(nodes(tipped.root).some((node) => node.tag === 'span' && node.props.class === 'inline-flex' && nodes(node).includes(tooltip))).toBe(true)
   })
 })
