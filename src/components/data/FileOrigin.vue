@@ -4,6 +4,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import OriginLine from '@/components/data/OriginLine.vue'
+import ExternalLink from '@/components/ui/ExternalLink.vue'
 import ProvenanceView from '@/components/data/ProvenanceView.vue'
 import Button from '@/components/ui/Button.vue'
 import DetailDialog from '@/components/ui/DetailDialog.vue'
@@ -91,7 +92,7 @@ const recorded = computed(() => Boolean(origin.value || hop.value))
       <div v-if="identifiers.length" class="space-y-0.5 text-xs">
         <p v-for="item in identifiers" :key="`${item.name}:${item.value}`">
           <span class="text-muted-foreground">Identifier:</span> {{ item.name }}
-          <a :href="item.url" target="_blank" rel="noopener noreferrer" class="font-mono text-primary hover:underline">{{ item.value }} ↗</a>
+          <ExternalLink :href="item.url" :label="item.value" class="font-mono" />
         </p>
         <p class="text-muted-foreground">Found by the current rules of the bucket.</p>
       </div>

@@ -3,6 +3,8 @@
 // is what file details will show. The rules go into the bucket metadata form and are stored with its Save.
 import { computed, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
+import ExternalLink from '@/components/ui/ExternalLink.vue'
+import { Check } from '@lucide/vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -109,8 +111,8 @@ function save(clear = false) {
       <p class="text-xs text-muted-foreground">A file path or a source link.</p>
       <ul v-if="found" class="space-y-1 text-xs">
         <li v-for="item in found" :key="`${item.name}:${item.value}`">
-          ✓ {{ item.name }}
-          <a :href="item.url" target="_blank" rel="noopener noreferrer" class="font-mono text-primary hover:underline">{{ item.value }} ↗</a>
+          <Check class="inline h-3 w-3 text-primary" aria-hidden="true" /> {{ item.name }}
+          <ExternalLink :href="item.url" :label="item.value" class="font-mono" />
         </li>
         <li v-for="name in misses" :key="`miss:${name}`" class="text-muted-foreground">{{ name }}: no match</li>
       </ul>

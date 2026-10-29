@@ -5,6 +5,7 @@ import { computed, defineComponent, h, reactive, ref, watch, type PropType, type
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
+import ExternalLink from '@/components/ui/ExternalLink.vue'
 import { useAruna } from '@/composables/useAruna'
 import { apiErrorMessage } from '@/lib/api'
 import {
@@ -136,14 +137,14 @@ function boxView(item: Box): VNode {
     lines.push(
       h('p', [
         `${found.name} `,
-        h('a', { href: found.url, target: '_blank', rel: 'noopener noreferrer', class: 'font-mono text-primary hover:underline' }, `${found.value} ↗`),
+        h(ExternalLink, { href: found.url, label: found.value, class: 'font-mono' }),
       ]),
     )
   }
   if (item.link?.document) {
     lines.push(h(RouterLink, { to: { name: 'dataset', params: { id: item.link.document } }, class: 'text-primary hover:underline' }, () => item.link?.label))
   } else if (item.link?.url) {
-    lines.push(h('a', { href: item.link.url, target: '_blank', rel: 'noopener noreferrer', class: 'text-primary hover:underline' }, `${item.link.label} ↗`))
+    lines.push(h(ExternalLink, { href: item.link.url, label: item.link.label }))
   }
   if (item.pending.length) {
     const label = item.kind === 'silent' ? 'Try again' : 'Show where this came from'

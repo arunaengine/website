@@ -18,6 +18,8 @@ const Field = defineComponent({
 
 const component = compileClientComponent(new URL('./IdentifierLinksEditor.vue', import.meta.url), {
   vue: VueRuntime,
+  '@/components/ui/ExternalLink.vue': { __esModule: true, default: defineComponent({ props: { href: String, label: String }, setup: (props) => () => h('a', { href: props.href }, props.label) }) },
+  '@lucide/vue': { Check: defineComponent(() => () => h('i')) },
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
   '@/components/ui/Input.vue': moduleDefault(Field),
   '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
@@ -50,7 +52,7 @@ describe('identifier links editor', () => {
     const sent = aruna.testIdentifierRules.mock.calls[0][0]
     expect(sent.key).toBe('genes/SAMN1.faa.gz')
     expect(sent.parser.rules.map((rule: { name: string }) => rule.name)).toEqual(['BioSample', 'NCBI assembly'])
-    expect(content(root)).toContain('SAMN1 ↗')
+    expect(content(root)).toContain('SAMN1')
     expect(content(root)).toContain('NCBI assembly: no match')
   })
 

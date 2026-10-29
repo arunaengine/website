@@ -15,6 +15,7 @@ const Marker = (text: string) => defineComponent({ props: { globalUrl: String },
 
 const component = compileClientComponent(new URL('./FileOrigin.vue', import.meta.url), {
   vue: VueRuntime,
+  '@/components/ui/ExternalLink.vue': { __esModule: true, default: defineComponent({ props: { href: String, label: String }, setup: (props) => () => h('a', { href: props.href }, props.label) }) },
   'vue-router': { RouterLink: defineComponent((_, { slots }) => () => h('a', slots.default?.())) },
   '@/components/data/OriginLine.vue': moduleDefault(Marker('origin line')),
   '@/components/distributed/GlobalId.vue': moduleDefault(Marker('global id')),
@@ -91,7 +92,7 @@ describe('file origin identifiers', () => {
     })
     const root = await render()
 
-    expect(content(root)).toContain('Identifier: BioSample SAMN15803895 ↗')
+    expect(content(root)).toContain('Identifier: BioSample SAMN15803895')
     expect(content(root)).toContain('Found by the current rules of the bucket.')
     expect(content(root)).toContain('identifierBioSample SAMN15803895')
   })

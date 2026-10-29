@@ -34,7 +34,7 @@ const summary = computed(() =>
     what.value,
     `${inputs.value.length} input${inputs.value.length === 1 ? '' : 's'}`,
     `${outputRows.value.length} output${outputRows.value.length === 1 ? '' : 's'}`,
-    `${String(cpuCores.value).trim() || '?'} cores, ${String(ramGb.value).trim() || '?'} GB`,
+    `${String(cpuCores.value).trim() || '?'} ${String(cpuCores.value).trim() === '1' ? 'core' : 'cores'}, ${String(ramGb.value).trim() || '?'} GB`,
     placementSummary.value,
   ].join(', '),
 )
