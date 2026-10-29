@@ -151,4 +151,3 @@ describe('bucket metadata search', () => {
     expect(content(root)).not.toContain('Show more')
   })
 })
-

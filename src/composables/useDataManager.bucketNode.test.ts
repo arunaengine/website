@@ -160,4 +160,3 @@ describe('bucket address without a node', () => {
     searchBuckets.mockImplementation(answer)
   })
 })
-
