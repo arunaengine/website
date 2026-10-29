@@ -52,6 +52,8 @@ interface BucketSyncInfo {
   incoming: number
   /** Local-side key prefixes ('' = whole bucket) for row indicators. */
   prefixes: string[]
+  /** The nodes at the other end, each once; a sync within one node names none. */
+  partners: string[]
 }
 
 // ONE flat sidebar list: pinned buckets first (any node, remote entries carry
@@ -377,13 +379,16 @@ export function useDataManager() {
       const response = await listSyncRelationships({ direction: 'both' })
       if (requestId !== syncOverviewRequestId) return
       const map = new Map<string, BucketSyncInfo>()
-      const add = (arn: string, direction: 'outgoing' | 'incoming') => {
+      const add = (arn: string, direction: 'outgoing' | 'incoming', other: string) => {
         const parsed = parseArunaArn(arn)
         if (!parsed) return
         const key = syncKeyFor(parsed.nodeId, parsed.bucket)
-        const info = map.get(key) ?? { outgoing: 0, incoming: 0, prefixes: [] }
+        const info = map.get(key) ?? { outgoing: 0, incoming: 0, prefixes: [], partners: [] }
         info[direction]++
         info.prefixes.push(parsed.prefix)
+        const partner = parseArunaArn(other)?.nodeId
+        const node = (id: string | null | undefined) => (!id || realmNodes.isLocalNode(id) ? (realmNodes.localNodeId.value ?? '') : id)
+        if (partner && node(partner) !== node(parsed.nodeId) && !info.partners.includes(partner)) info.partners.push(partner)
         map.set(key, info)
       }
       // Each relationship touches two buckets: its source has an outgoing sync,
@@ -395,8 +400,8 @@ export function useDataManager() {
         if (seen.has(relationship.id)) continue
         seen.add(relationship.id)
         unique.push(relationship)
-        add(relationship.source, 'outgoing')
-        add(relationship.target, 'incoming')
+        add(relationship.source, 'outgoing', relationship.target)
+        add(relationship.target, 'incoming', relationship.source)
       }
       syncRelationships.value = unique
       syncByBucket.value = map

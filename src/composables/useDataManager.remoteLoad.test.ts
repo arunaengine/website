@@ -8,6 +8,7 @@ const activeContext = ref<Record<string, unknown> | null>(null)
 // Before the realm read with the token names node 2, neither its endpoint nor a session is known.
 const endpointUrl = ref<string | null>(null)
 const realmInfo = ref<{ nodes: Array<{ node_id: string }> } | null>({ nodes: [] })
+const syncList = vi.fn(async () => ({ outgoing: [] as unknown[], incoming: [] as unknown[] }))
 const s3 = {
   activeContext,
   activeKey: ref({ accessKeyId: 'k' }),
@@ -44,7 +45,7 @@ vi.mock('./useAruna', () => ({
     myGroups: ref([{ id: 'g-a', name: 'A' }, { id: 'g-b', name: 'B' }]),
     getGroupUsage: vi.fn(async () => null),
     listGroupConnectors: vi.fn(async () => ({ connectors: [] })),
-    listSyncRelationships: vi.fn(async () => ({ outgoing: [], incoming: [] })),
+    listSyncRelationships: (...args: unknown[]) => syncList(...(args as [])),
     nodeInfo: ref(null),
     realmInfo,
     searchBuckets: vi.fn(),
@@ -124,5 +125,31 @@ describe('a folder on another node opened by its address', () => {
     expect(s3.listObjects).toHaveBeenCalledWith('laptop', 'results/alignment/', undefined, 'n-2', expect.anything())
     expect(manager!.visibleObjects.value.map((object) => object.key)).toEqual(['results/alignment/genome-vs-k12.paf'])
     expect(manager!.isEmpty.value).toBe(false)
+  })
+})
+
+describe('the sync overview of the bucket list', () => {
+  it('names the other node of each sync once, and none for a sync within one node', async () => {
+    const relation = (id: string, source: string, target: string) => ({ id, source, target })
+    // The view may read the overview itself at mount, so every read gets the same answer.
+    syncList.mockResolvedValue({
+      outgoing: [
+        relation('s1', 'arn:aruna:realm:n-local:s3/reef', 'arn:aruna:realm:n-laptop:s3/reef'),
+        relation('s2', 'arn:aruna:realm:n-local:s3/reef', 'arn:aruna:realm:n-laptop:s3/reef/raw'),
+        relation('s3', 'arn:aruna:realm:n-local:s3/reef', 'arn:aruna:realm:n-local:s3/archive'),
+      ],
+      incoming: [],
+    })
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/buckets', name: 'buckets', component: View }] })
+    await router.push({ name: 'buckets', query: { group: 'g-a' } })
+    let manager: ReturnType<typeof useDataManager> | null = null
+    await mountApp(defineComponent({ setup: () => ((manager = useDataManager()), () => null) }), { router })
+    await manager!.loadSyncOverview()
+
+    const info = (node: string | null, bucket: string) => manager!.syncByBucket.value.get(manager!.syncKeyFor(node, bucket))
+    expect(info(null, 'reef')?.partners).toEqual(['n-laptop'])
+    expect(info('n-laptop', 'reef')?.partners).toEqual(['n-local'])
+    expect(info(null, 'archive')?.partners).toEqual([])
+    syncList.mockResolvedValue({ outgoing: [], incoming: [] })
   })
 })
