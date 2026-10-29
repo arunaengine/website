@@ -177,7 +177,10 @@ export function useKeyedRead() {
   async function readObject(object: KeyedObject): Promise<Blob> {
     const action = begin()
     const node = object.nodeId || localNodeId()
-    const baseUrl = node ? await nodeApiBaseReady(node) : null
+    // A cancel ends the wait for the node's address too.
+    const waiting = new AbortController()
+    abort = waiting
+    const baseUrl = node ? await nodeApiBaseReady(node, waiting.signal) : null
     if (action.ended()) throw new ReadEndedError()
     if (!baseUrl) throw new Error('The node publishes no API address.')
     const client = { baseUrl, token: authToken.value }

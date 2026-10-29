@@ -24,7 +24,18 @@ const closeKeyWorker = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/vault/keyedRead', async (original) => ({ ...(await original<object>()), ...read }))
 vi.mock('@/lib/vault/keyWorker', async (original) => ({ ...(await original<object>()), closeKeyWorker }))
 vi.mock('./useUserVault', () => ({ useUserVault: () => vault }))
-vi.mock('./s3/endpoints', () => ({ localNodeId: () => 'n', nodeApiBaseReady: async () => 'https://node.test/api/v1' }))
+// The node's address may wait for the realm; like the real helper, an abort answers null at once.
+const address = vi.hoisted(() => ({ known: Promise.resolve(), signals: [] as (AbortSignal | undefined)[] }))
+vi.mock('./s3/endpoints', () => ({
+  localNodeId: () => 'n',
+  nodeApiBaseReady: (_node: string, signal?: AbortSignal) => {
+    address.signals.push(signal)
+    return new Promise<string | null>((resolve) => {
+      signal?.addEventListener('abort', () => resolve(null), { once: true })
+      void address.known.then(() => resolve('https://node.test/api/v1'))
+    })
+  },
+}))
 const headObject = vi.hoisted(() => vi.fn())
 vi.mock('./useS3', () => ({ useS3: () => ({ headObject }) }))
 vi.mock('./aruna/state', async () => {
@@ -226,6 +237,22 @@ describe('version lookup', () => {
     await expect(first).rejects.toBeInstanceOf(ReadEndedError)
     expect(read.fetchEnvelope).toHaveBeenCalledTimes(1)
     expect(read.fetchEnvelope.mock.calls[0]![0]).toMatchObject({ key: 'b.csv', versionId: 'V2' })
+  })
+
+  it('ends a read at once when it is cancelled while the node address resolves', async () => {
+    let name!: () => void
+    address.known = new Promise((resolve) => (name = resolve))
+    const keyed = useKeyedRead()
+    const reading = keyed.readObject({ bucket: 'reef', key: 'a.csv' })
+    const outcome = reading.then(() => 'read', (error: Error) => error.constructor.name)
+    await lookup()
+    keyed.cancel()
+    await lookup()
+
+    expect(address.signals.at(-1)?.aborted).toBe(true)
+    expect(await Promise.race([outcome, lookup().then(() => 'pending')])).toBe('ReadEndedError')
+    name()
+    address.known = Promise.resolve()
   })
 
   it('ends a read whose lookup outlived a cancel or a session change', async () => {

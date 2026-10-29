@@ -1,3 +1,4 @@
+import { effectScope } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { apiRequest } from '@/lib/api'
 
@@ -50,4 +51,23 @@ describe('requests to another node on a fresh load', () => {
     await expect(waiting).rejects.toMatchObject({ name: 'AbortError' })
     expect(apiRequest).not.toHaveBeenCalled()
   })
+
+  it('settle a wait at once when its signal aborts or its scope ends', async () => {
+    state.authToken.value = 't'
+    state.sessionEpoch.value = 11
+    state.realmInfo.value = { realm_id: 'r', nodes: [] } as never
+    const outcome = (wait: Promise<unknown>) =>
+      Promise.race([wait.then(() => 'resolved', (error: Error) => error.name), settle().then(() => 'pending')])
+
+    const controller = new AbortController()
+    const signalled = state.nodeClientReady('node-2', undefined, controller.signal)
+    controller.abort()
+    expect(await outcome(signalled)).toBe('AbortError')
+
+    const scope = effectScope()
+    const scoped = scope.run(() => state.nodeClientReady('node-2'))!
+    scope.stop()
+    expect(await outcome(scoped)).toBe('AbortError')
+  })
 })
+

@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue'
+import { effectScope, getCurrentScope, onScopeDispose, ref, watch } from 'vue'
 import { nodeApiBase } from '@/components/nodes/node-probe'
 import {
   ApiError,
@@ -141,21 +141,38 @@ export function nodeClient(nodeId?: string | null) {
 
 /**
  * `nodeClient` once the realm can name the node; a fresh load reads it first without a token.
- * Fails with an AbortError when the session that asked ends while it waits.
+ * Fails with an AbortError when the session that asked ends, `signal` aborts or its scope ends.
  */
-export async function nodeClientReady(nodeId?: string | null, epoch = sessionEpoch.value) {
+export async function nodeClientReady(nodeId?: string | null, epoch = sessionEpoch.value, signal?: AbortSignal) {
   const ended = () => epoch !== sessionEpoch.value
   const settled = () =>
     !nodeId || nodeId === nodeInfo.value?.node.peer_id || !authToken.value
     || realmReadEpoch.value === sessionEpoch.value
     || (realmInfo.value?.nodes ?? []).some((node) => node.node_id === nodeId)
-  if (!settled() && !ended()) {
-    await new Promise<void>((resolve) => {
-      const stop = watch(() => settled() || ended(), (done) => done && (stop(), resolve()))
-    })
-  }
+  if (!settled() && !ended()) await settledWhen(() => settled() || ended(), signal)
+  signal?.throwIfAborted()
   assertCurrentSession(epoch)
   return nodeClient(nodeId)
+}
+
+// The watch runs in its own scope, so a disposed owner cannot freeze it; that disposal or an
+// abort settles the wait with an AbortError and stops the watch.
+function settledWhen(done: () => boolean, signal?: AbortSignal) {
+  const owner = getCurrentScope()
+  return new Promise<void>((resolve, reject) => {
+    const waiter = effectScope(true)
+    const finish = (error?: unknown) => {
+      waiter.stop()
+      signal?.removeEventListener('abort', aborted)
+      if (error) reject(error)
+      else resolve()
+    }
+    const aborted = () => finish(new DOMException('The wait was cancelled.', 'AbortError'))
+    if (signal?.aborted) return aborted()
+    signal?.addEventListener('abort', aborted, { once: true })
+    if (owner) onScopeDispose(aborted)
+    waiter.run(() => watch(done, (ready) => ready && finish()))
+  })
 }
 
 /** One request of this session, to the connected node unless another is named. */

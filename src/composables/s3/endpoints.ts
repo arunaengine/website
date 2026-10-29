@@ -24,8 +24,8 @@ export function nodeApiBase(nodeId: string): string | null {
 }
 
 /** `nodeApiBase` once the realm read with the token can name the node; null when it does not. */
-export function nodeApiBaseReady(nodeId: string): Promise<string | null> {
-  return useAruna().nodeClientReady(nodeId).then((client) => client.baseUrl, () => null)
+export function nodeApiBaseReady(nodeId: string, signal?: AbortSignal): Promise<string | null> {
+  return useAruna().nodeClientReady(nodeId, undefined, signal).then((client) => client.baseUrl, () => null)
 }
 
 // Resolves the S3 endpoint serving `nodeId`; null/the local peer id map to the
