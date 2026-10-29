@@ -204,6 +204,32 @@ describe('object browser row actions', () => {
     expect(String(end.props.class)).toContain('shrink-0')
   })
 
+  it('links the realm website from the desktop and names the node that serves the bucket', async () => {
+    const writeText = vi.fn(async () => undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    vi.stubGlobal('window', { location: { origin: 'tauri://localhost' } })
+    const resolve = vi.fn((to: { query: Record<string, string> }) => ({ href: `/app/buckets/reef?${new URLSearchParams(to.query)}` }))
+    const realmNodes = { displayName: (id: string) => id, nodeById: () => null, localNodeId: ref('laptop-1') }
+    desktopMode.on = true
+    try {
+      desktopMode.website = 'https://realm.example'
+      const root = await render({ router: { push, resolve }, activeGroupId: ref('g1'), realmNodes })
+      await click(menuItem(root, 'Share'))
+      expect(writeText).toHaveBeenCalledWith('https://realm.example/app/buckets/reef?prefix=raw&node=laptop-1&group=g1&object=raw%2Freads.fastq')
+
+      writeText.mockClear()
+      desktopMode.website = null
+      const unknown = await render({ router: { push, resolve }, activeGroupId: ref('g1'), realmNodes })
+      await click(menuItem(unknown, 'Share'))
+      expect(writeText).not.toHaveBeenCalled()
+      expect(content(unknown)).toContain('No link: the realm website is not known')
+    } finally {
+      desktopMode.on = false
+      desktopMode.website = null
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('copies a portal link to the file from Share', async () => {
     const writeText = vi.fn(async () => undefined)
     vi.stubGlobal('navigator', { clipboard: { writeText } })

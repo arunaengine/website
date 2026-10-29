@@ -25,7 +25,7 @@ import WatchButton from '@/components/watches/WatchButton.vue'
 import KeyedReadNotice from '@/components/storage/KeyedReadNotice.vue'
 import { useAruna } from '@/composables/useAruna'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
-import { isDesktop } from '@/lib/desktop'
+import { isDesktop, realmWebsite } from '@/lib/desktop'
 import { mockEnabled } from '@/lib/distributedMock'
 import { exampleMark } from '@/lib/distributedMockData'
 import type { BindSource } from '@/lib/bindSource'
@@ -462,18 +462,21 @@ const rangeText = computed(() => {
   return `${formatCount(shownCount)} of ${formatCount(listed)} in ${prefix.value.split('/').at(-1) || bucket.value}`
 })
 
-// Share copies the portal links that open the files or folders, one per line.
+// Share copies the portal links that open the files or folders, one per line. The desktop's own
+// origin opens nothing elsewhere, so it links the realm website, and every link names the node.
 const shareNote = ref('')
 let shareTimer: ReturnType<typeof setTimeout> | undefined
 async function share(keys: string[]) {
+  const site = desktop ? realmWebsite() : window.location.origin
+  const node = remoteNodeId.value ?? realmNodes.localNodeId.value
   const link = (key: string) => {
     const folder = key.endsWith('/')
     const at = folder ? key.slice(0, -1) : key.split('/').slice(0, -1).join('/')
-    const query = { ...(at ? { prefix: at } : {}), ...(remoteNodeId.value ? { node: remoteNodeId.value } : {}), ...(activeGroupId.value ? { group: activeGroupId.value } : {}), ...(folder ? {} : { object: key }) }
-    return new URL(router.resolve({ name: 'bucket', params: { bucketId: bucket.value }, query }).href, window.location.origin).href
+    const query = { ...(at ? { prefix: at } : {}), ...(node ? { node } : {}), ...(activeGroupId.value ? { group: activeGroupId.value } : {}), ...(folder ? {} : { object: key }) }
+    return new URL(router.resolve({ name: 'bucket', params: { bucketId: bucket.value }, query }).href, site!).href
   }
-  await copyToClipboard(keys.map(link).join('\n'))
-  shareNote.value = keys.length === 1 ? 'Link copied' : `${formatCount(keys.length)} links copied`
+  if (site) await copyToClipboard(keys.map(link).join('\n'))
+  shareNote.value = !site ? 'No link: the realm website is not known' : keys.length === 1 ? 'Link copied' : `${formatCount(keys.length)} links copied`
   clearTimeout(shareTimer)
   shareTimer = setTimeout(() => (shareNote.value = ''), 2500)
 }

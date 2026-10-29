@@ -74,7 +74,7 @@ export const folderOrigin = {
 export const bucketUsage = { value: ref<{ objects: number } | null>(null) }
 
 /** Whether the browser under test runs inside Aruna Desktop. */
-export const desktopMode = { on: false }
+export const desktopMode = { on: false, website: null as string | null }
 
 /** The write answers the compiled browser sees; a test may narrow them. */
 export const s3Access = {
@@ -251,7 +251,7 @@ export function objectBrowser(): Component {
       '@/components/watches/WatchButton.vue': moduleDefault(Slotted('button')),
       '@/components/storage/KeyedReadNotice.vue': moduleDefault(Slotted('aside')),
       '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
-      '@/lib/desktop': { isDesktop: () => desktopMode.on },
+      '@/lib/desktop': { isDesktop: () => desktopMode.on, realmWebsite: () => desktopMode.website },
       '@/lib/distributedMock': { mockEnabled: () => false },
       '@/lib/distributedMockData': { exampleMark: () => null },
       '@/composables/useAruna': { useAruna: () => ({ isRealmAdmin: ref(false) }) },
