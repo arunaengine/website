@@ -34,7 +34,6 @@ const children = [
   'ui/EmptyState',
   'data/manager/MockSidebar',
   'data/DatabaseHeader',
-  'data/MetadataSearch',
   'data/manager/DistributionBanner',
   'data/manager/ObjectBrowser',
   'data/manager/UploadPanel',
@@ -138,7 +137,8 @@ describe('Data view search hits', () => {
     booted.value = true
     endpoint.value = 'https://s3.test'
     const { root, app } = await mountApp(DataManagerView)
-    const open = element(root, (node: HostNode) => node.props['data-stub'] === 'MetadataSearch').props.onOpen as (hit: unknown) => void
+    // A hit of the whole-bucket search comes up from the file list, where the one box lives.
+    const open = element(root, (node: HostNode) => node.props['data-stub'] === 'ObjectBrowser').props.onOpenHit as (hit: unknown) => void
 
     open({ key: 'ui-list/check.txt', bucket: 'reads', issuer_node_id: 'n1', group_id: 'g1' })
     open({ key: 'ui-list/', bucket: 'reads', issuer_node_id: 'n1', group_id: 'g1' })
