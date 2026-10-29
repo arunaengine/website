@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
+import FederationPanel from '@/components/dashboard/FederationPanel.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -21,12 +22,14 @@ import { onWake, POLL_SLOW_MS } from '@/lib/poll'
 import { aggregateByLocation } from '@/lib/placement'
 import { errorMessage, formatBytes, formatNumber, relativeTime, truncateMiddle } from '@/lib/utils'
 import type { RealmNodeInfo } from '@/lib/api'
+import type { RealmView } from '@/composables/aruna/realm'
+import { isDesktop } from '@/lib/desktop'
 import { Boxes, ChevronRight, Globe2, HardDrive, Laptop, MapPin, MapPinned } from '@lucide/vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 
 const route = useRoute()
-const { realm, realmInfo, nodeInfo, usageInfo, apiBaseUrl, currentUser, loadInfo } = useAruna()
+const { realm, realmInfo, nodeInfo, usageInfo, apiBaseUrl, currentUser, loadInfo, sessionEpoch, loadRealmView } = useAruna()
 
 // The very first latency round waits out page-load network contention (asset
 // and bootstrap requests share the connection pool); the cells show a muted
@@ -183,6 +186,37 @@ const ownedDevices = computed(() => {
   return userId ? deviceNodes.value.filter((node) => node.owner === userId).length : 0
 })
 
+// On the desktop the API base is the device node, which sees no live heartbeats and no
+// connections between realm nodes, so the node map reads them from a realm node.
+const desktop = isDesktop()
+const realmView = ref<RealmView | null>(null)
+let realmViewGeneration = 0
+watch([sessionEpoch, () => realmInfo.value?.realm_id], () => {
+  realmViewGeneration++
+  realmView.value = null
+}, { flush: 'sync' })
+async function loadPanelRealm() {
+  if (!desktop) return
+  const generation = realmViewGeneration
+  const view = await loadRealmView()
+  if (generation === realmViewGeneration) realmView.value = view
+}
+watch(realmInfo, () => void loadPanelRealm(), { immediate: true })
+const panelNodes = computed(() => (realmView.value?.realm ?? realmInfo.value)?.nodes ?? [])
+const panelInfra = computed(() => panelNodes.value.filter((node) => node.kind !== 'user'))
+const panelDevices = computed(() => panelNodes.value.filter((node) => node.kind === 'user'))
+
+// This computer by its own /system/info, the device node: the realm nodes it is connected to now.
+const computer = computed(() => {
+  const info = nodeInfo.value
+  if (!desktop || !info?.connections) return null
+  const id = info.node.peer_id
+  const labels = panelDevices.value.find((node) => node.node_id === id)?.info?.labels ?? {}
+  const name = labels['name'] || labels['display_name'] || labels['device'] || 'This computer'
+  const peers = info.connections.filter((peer) => peer.status === 'connected').map((peer) => peer.peer_id)
+  return { id, name, peers }
+})
+
 const sortedNodes = computed(() =>
   [...infraNodes.value].sort(
     (a, b) => kindOrder[a.kind] - kindOrder[b.kind] || a.node_id.localeCompare(b.node_id),
@@ -316,6 +350,16 @@ watch(
             </Badge>
           </div>
         </div>
+      </section>
+
+      <section v-if="currentUser" aria-label="Realm nodes">
+        <FederationPanel
+          :nodes="panelInfra"
+          :devices="panelDevices"
+          :replication-factor="realmInfo?.metadata_replication.default_replication_factor"
+          :local-peer-id="(realmView?.info ?? nodeInfo)?.node.peer_id"
+          :computer="computer"
+        />
       </section>
 
       <section class="surface overflow-hidden">

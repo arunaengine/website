@@ -36,7 +36,7 @@ let StatusView: Component
 beforeAll(async () => {
   vi.doMock('vue-router', () => ({ useRoute: () => ({ query: {} }) }))
   vi.doMock('@/composables/useAruna', () => ({
-    useAruna: () => ({ realm, realmInfo, nodeInfo, usageInfo, currentUser, apiBaseUrl, loadInfo }),
+    useAruna: () => ({ realm, realmInfo, nodeInfo, usageInfo, currentUser, apiBaseUrl, loadInfo, sessionEpoch: ref(0), loadRealmView: vi.fn(async () => null) }),
   }))
   vi.doMock('@vueuse/core', () => ({
     useDocumentVisibility: () => ref('hidden'),
@@ -49,6 +49,9 @@ beforeAll(async () => {
   vi.doMock('@/components/nodes/LocalNodeDetails.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/nodes/NodeDetailPanel.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/placement/LocationAggregates.vue', () => ({ default: AggregatesStub }))
+  vi.doMock('@/components/dashboard/FederationPanel.vue', () => ({
+    default: defineComponent({ props: { nodes: Array, replicationFactor: Number }, setup: (props) => () => h('div', `node map ${props.nodes?.length} x${props.replicationFactor}`) }),
+  }))
   StatusView = (await import('./StatusView.vue')).default
 })
 
@@ -68,6 +71,19 @@ async function renderedText(): Promise<string> {
     .replace(/\s+/g, ' ')
     .trim()
 }
+
+describe('realm node map', () => {
+  it('shows the node map to a signed-in user, the one the dashboard no longer shows', async () => {
+    realmInfo.value = { metadata_replication: { default_replication_factor: 3 }, nodes: [
+      { node_id: 'server-node', kind: 'server', configured: true, present: true, connection_status: 'connected', placement: { location: 'eu-west', weight: 1, full: false, draining: false } },
+      { node_id: 'laptop-beta', kind: 'user', owner: 'user-2', configured: true, present: false, connection_status: 'unknown' },
+    ] }
+    expect(await renderedText()).not.toContain('node map')
+
+    currentUser.value = { id: 'u1' }
+    expect(await renderedText()).toContain('node map 1 x3')
+  })
+})
 
 describe('node outage presentation', () => {
   it('requires a failed browser probe instead of treating configured DHT state as an outage', () => {
