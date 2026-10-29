@@ -631,9 +631,22 @@ describe('realm nodes in the overview', () => {
         { ...beat('server-node', 'server', 8000), info: { utilization: { heartbeat_at_ms: 8000, imports_running: 7 } } },
       ] },
     })
-    const mounted = await mountApp(DashboardClient)
+    let mounted = await mountApp(DashboardClient)
     await flush()
     expect(content(mounted.root)).toContain('OverviewImports running: 16 jobs')
+    mounted.app.unmount()
+
+    // One node has no heartbeat count: the known imports are a lower bound.
+    loadRealmView.mockResolvedValue({
+      info: { node: { peer_id: 'mgmt-node' } },
+      realm: { nodes: [
+        { ...beat('mgmt-node', 'management', 9000), info: { utilization: { heartbeat_at_ms: 9000, imports_running: 2 } } },
+        beat('server-node', 'server', 8000),
+      ] },
+    })
+    mounted = await mountApp(DashboardClient)
+    await flush()
+    expect(content(mounted.root)).toContain('OverviewImports running: at least 2 jobs')
 
     // Another session reads its own snapshot; the old counts never linger.
     loadRealmView.mockResolvedValue(null)

@@ -174,9 +174,12 @@ const renameId = computed(() => {
 const onlineNodes = computed(() => infraNodes.value.filter((node) => node.present).length)
 
 // Imports explain a busy node; each node's heartbeat counts them in the realm snapshot the cards show.
+// A node without a heartbeat count adds nothing known, so the sum is then a lower bound.
 const importsLine = computed(() => {
-  const running = infraNodes.value.reduce((sum, node) => sum + (node.info?.utilization.imports_running ?? 0), 0)
-  return running ? `Imports running: ${formatCount(running)} ${running === 1 ? 'job' : 'jobs'}` : null
+  const counts = infraNodes.value.map((node) => node.info?.utilization?.imports_running)
+  const running = counts.reduce<number>((sum, count) => sum + (count ?? 0), 0)
+  const atLeast = counts.some((count) => count === undefined) ? 'at least ' : ''
+  return running ? `Imports running: ${atLeast}${formatCount(running)} ${running === 1 ? 'job' : 'jobs'}` : null
 })
 const replication = computed(() => {
   const factor = realmInfo.value?.metadata_replication.default_replication_factor
