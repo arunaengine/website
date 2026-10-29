@@ -114,7 +114,6 @@ async function onDrop(event: DragEvent) {
     </button>
   </div>
   <p class="text-[11px] text-muted-foreground">
-    Uploads are multipart (16 MiB parts), run up to three at a time, and keep going while you navigate.
-    A picked or dropped folder keeps its structure under the target prefix.
+    Folders keep their structure. Uploads go on while you browse.
   </p>
 </template>

@@ -121,8 +121,7 @@ function rowEditable(row: BuilderRow): boolean {
           <Upload class="h-4 w-4 text-primary" /> Add data
         </DialogTitle>
         <DialogDescription>
-          Collect local files, connector sources and objects from other buckets, then add them to
-          <span class="font-mono text-xs">{{ bucket }}/{{ prefix }}</span>.
+          Into <span class="font-mono text-xs">{{ bucket }}/{{ prefix }}</span>
         </DialogDescription>
       </DialogHeader>
     </template>

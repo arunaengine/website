@@ -41,9 +41,7 @@ async function createOtherRelationships() {
 
 <template>
   <p class="text-[11px] text-muted-foreground">
-    Import objects from another bucket, local or on another realm node. "Copy (once)" duplicates the
-    selection into <span class="font-mono">{{ bucket }}/{{ prefix }}</span> now; "Reference" exposes it
-    there without copying the data.
+    Copy (once) copies the files now. Reference shows them here without copying.
   </p>
 
   <div>
