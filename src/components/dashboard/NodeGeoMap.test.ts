@@ -65,7 +65,7 @@ const node = (id: string, lat: number, extra: Partial<RealmNodeInfo> = {}) =>
   ({ node_id: id, kind: 'server', configured: true, present: true, display_name: id, coordinates: { lat, lon: 8.7 }, ...extra }) as RealmNodeInfo
 
 const urls = { made: [] as string[], revoked: [] as string[] }
-const fetches: { signal: AbortSignal; answer: () => void }[] = []
+const fetches: { url: string; init: RequestInit; signal: AbortSignal; answer: () => void }[] = []
 beforeEach(() => {
   leaflet.markers = []
   leaflet.fits = 0
@@ -75,8 +75,8 @@ beforeEach(() => {
   fetches.length = 0
   vi.stubGlobal('document', { createElement: (tag: string) => ({ tag, textContent: '', className: '', append() {}, addEventListener() {} }) })
   vi.stubGlobal('URL', { createObjectURL: () => (urls.made.push(`blob:${urls.made.length}`), `blob:${urls.made.length - 1}`), revokeObjectURL: (url: string) => urls.revoked.push(url) })
-  vi.stubGlobal('fetch', (_url: string, init: { signal: AbortSignal }) =>
-    new Promise((resolve) => fetches.push({ signal: init.signal, answer: () => resolve({ ok: true, blob: async () => 'bytes' }) })))
+  vi.stubGlobal('fetch', (url: string, init: RequestInit & { signal: AbortSignal }) =>
+    new Promise((resolve) => fetches.push({ url, init, signal: init.signal, answer: () => resolve({ ok: true, blob: async () => 'bytes' }) })))
 })
 afterEach(() => vi.unstubAllGlobals())
 
@@ -141,5 +141,14 @@ describe('node map', () => {
     app.unmount()
     expect(fetches[3].signal.aborted).toBe(true)
     expect(open).toBeTruthy()
+  })
+
+  it('sends the portal origin as Referer and leaves caching to the browser, as the OSM tile policy asks', async () => {
+    await mount([node('a', 50.58)])
+    leaflet.layer!.createTile({}, vi.fn())
+    expect(fetches[0].init.referrerPolicy).toBe('strict-origin-when-cross-origin')
+    expect(fetches[0].init.cache).toBeUndefined()
+    expect(fetches[0].init.headers).toBeUndefined()
+    expect(fetches[0].url).toBe('https://tile.example/1/2/3.png')
   })
 })

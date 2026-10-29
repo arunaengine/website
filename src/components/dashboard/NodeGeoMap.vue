@@ -33,7 +33,9 @@ const BlobTiles = L.TileLayer.extend({
     tile.alt = ''
     const entry: { controller: AbortController; url?: string } = { controller: new AbortController() }
     tiles.set(tile, entry)
-    fetch(this.getTileUrl(coords), { signal: entry.controller.signal })
+    // OSM refuses tiles without a Referer; the portal's own policy sends none, so the tile asks
+    // for the origin. The browser cache keeps the tiles as the server's headers say.
+    fetch(this.getTileUrl(coords), { signal: entry.controller.signal, referrerPolicy: 'strict-origin-when-cross-origin' })
       .then((response) => (response.ok ? response.blob() : Promise.reject(new Error(`Tile answered ${response.status}`))))
       .then((blob) => {
         if (entry.controller.signal.aborted) return
