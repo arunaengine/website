@@ -2,7 +2,8 @@ import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ listTasks: vi.fn(), tesEnabled: { value: true }, desktop: { on: false } }))
-vi.mock('@/composables/useAruna', () => ({ useAruna: () => ({ sessionEpoch: { value: 1 } }) }))
+const sessionEpoch = ref(1)
+vi.mock('@/composables/useAruna', () => ({ useAruna: () => ({ sessionEpoch }) }))
 vi.mock('@/composables/useTes', () => ({ useTes: () => ({ tesEnabled: mocks.tesEnabled, listTasks: mocks.listTasks }) }))
 vi.mock('@/composables/useRealmNodes', () => ({
   useRealmNodes: () => ({ targets: ref([{ nodeId: 'home', isLocal: true, apiBase: '/api/v1' }, { nodeId: 'store-1', isLocal: false, apiBase: 'https://store-1/api/v1' }]) }),
@@ -47,5 +48,24 @@ describe('recent runs', () => {
     await runs.load()
     expect(runs.state.value).toBe('off')
     expect(mocks.listTasks).not.toHaveBeenCalled()
+  })
+
+  it('drops the runs of the last account at once on a session change, and its late answer', async () => {
+    mocks.listTasks.mockImplementation(async () => ({ tasks: [task('theirs', '2026-10-29T10:00:00Z', 'RUNNING')] }))
+    const runs = useRecentRuns()
+    await runs.load()
+    expect(runs.state.value).toBe('ready')
+
+    const answers: ((page: unknown) => void)[] = []
+    mocks.listTasks.mockImplementation(() => new Promise((resolve) => answers.push(resolve)))
+    const late = runs.load()
+    sessionEpoch.value++
+    expect(runs.runs.value).toEqual([])
+    expect(runs.running.value).toEqual({ count: 0, atLeast: false })
+    expect(runs.state.value).toBe('idle')
+
+    for (const answer of answers) answer({ tasks: [task('theirs-late', '2026-10-29T11:00:00Z', 'RUNNING')] })
+    await late
+    expect(runs.runs.value).toEqual([])
   })
 })

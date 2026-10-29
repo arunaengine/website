@@ -1,7 +1,7 @@
 // The latest runs the signed-in user can see, for the landing view: the serving node's own and, on
 // the web, a first page of each other realm node, as the run list reads them. A node that does not
 // answer or has more pages makes the running count a lower bound.
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useTes } from '@/composables/useTes'
@@ -52,6 +52,14 @@ export function useRecentRuns() {
     partial.value = pages.some((entry) => !entry || Boolean(entry.page.next_page_token))
     state.value = 'ready'
   }
+
+  // Another account or realm: the old runs go at once, and a load under way ends unseen.
+  watch(sessionEpoch, () => {
+    round++
+    runs.value = []
+    partial.value = false
+    state.value = 'idle'
+  }, { flush: 'sync' })
 
   const running = computed(() => ({
     count: runs.value.filter((run) => isActiveTesState(run.task.state)).length,
