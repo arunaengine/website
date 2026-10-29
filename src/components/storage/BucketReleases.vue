@@ -9,14 +9,16 @@ import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { nodeClientReady } from '@/composables/aruna/state'
 import { useAruna } from '@/composables/useAruna'
-import { apiErrorMessage, getFileOrigin, getRun, type ReleaseItem, type ReleaseListResponse } from '@/lib/api'
+import { apiErrorMessage, getRun, releasePreparation, type ReleaseItem, type ReleaseListResponse } from '@/lib/api'
+import { ARUNA_CONTENT_W3ID_PREFIX, versionObjectId } from '@/lib/contentIdentity'
 import { pageIdentifier } from '@/lib/databases'
 import { releaseKey, versionTime } from '@/lib/releases'
+import { crateGraph, crateRootId, stringProp } from '@/lib/dataEntities'
 import { Plus } from '@lucide/vue'
 
 const props = defineProps<{ bucket: string; nodeId: string | null; canPublish: boolean; page?: string }>()
 
-const { listReleases, publishRelease, sessionEpoch } = useAruna()
+const { listReleases, publishRelease, sessionEpoch, nodeInfo, fetchRoCrateRaw } = useAruna()
 
 const listed = ref<ReleaseListResponse | null>(null)
 const failure = ref<string | null>(null)
@@ -27,7 +29,8 @@ const busy = ref(false)
 const published = ref<string | null>(null)
 let runs = 0
 
-// Who made each release, from its file's origin: a run links to its record, an upload was by hand.
+// Who made each release: the preparation runs its crate names, linked to their run records. The
+// release route writes the crate file itself, so the file's own origin says nothing about this.
 type Maker = { text: string; record: string | null }
 const makers = ref<Record<string, Maker>>({})
 const UNKNOWN: Maker = { text: 'Unknown', record: null }
@@ -35,11 +38,20 @@ const UNKNOWN: Maker = { text: 'Unknown', record: null }
 async function makerOf(item: ReleaseItem): Promise<Maker> {
   try {
     const client = await nodeClientReady(props.nodeId)
-    const origin = await getFileOrigin(props.bucket, { key: item.key, version_id: item.version_id }, client)
-    if (origin.origin?.kind === 'upload') return { text: 'By hand', record: null }
-    if (origin.origin?.kind !== 'job') return UNKNOWN
-    const run = await getRun(origin.origin.run_id, client).catch(() => null)
-    return run?.run_crate ? { text: 'A run, open its record', record: run.run_crate } : { text: 'A run', record: null }
+    const realmId = nodeInfo.value?.node.realm_id
+    const node = props.nodeId ?? nodeInfo.value?.node.peer_id
+    if (!realmId || !node) return UNKNOWN
+    const objectId = `${ARUNA_CONTENT_W3ID_PREFIX}${versionObjectId(realmId, node, props.bucket, item.key, item.version_id)}`
+    const runIds = await releasePreparation(objectId, client)
+    if (!runIds.length) return { text: 'By hand', record: null }
+    const more = runIds.length > 1 ? ` and ${runIds.length - 1} more` : ''
+    const run = await getRun(runIds[0]!, client).catch(() => null)
+    if (!run?.run_crate) return { text: `A run${more}`, record: null }
+    const name = await fetchRoCrateRaw(run.run_crate).then((crate) => {
+      const root = crateRootId(crate)
+      return stringProp(crateGraph(crate).find((entity) => entity['@id'] === root)?.name)
+    }, () => undefined)
+    return { text: `${name ?? 'A run, open its record'}${more}`, record: run.run_crate }
   } catch {
     return UNKNOWN
   }

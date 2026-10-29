@@ -1,7 +1,9 @@
 import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import * as ContentIdentity from '@/lib/contentIdentity'
 import * as Releases from '@/lib/releases'
+import * as DataEntities from '@/lib/dataEntities'
 import { compileClientComponent, content, flush, mountApp, moduleDefault } from '@/test/clientRender'
 
 const Slotted = (tag: string) =>
@@ -12,9 +14,16 @@ const listReleases = vi.fn(async () => ({
   complete: true,
   releases: [release('6.0', '01M62DCH5J7HXR3V6784DBERPA', 'db/'), release('5.1', '01M62DCH5J7HXR3V6784DBERPB')],
 }))
-const getFileOrigin = vi.fn(async (_bucket: string, query: { version_id: string }) =>
-  query.version_id.endsWith('PA') ? { origin: { kind: 'job', run_id: 'run-1' } } : { origin: { kind: 'upload', node_id: 'n1' } })
+// The release crate of 6.0 names its preparation run; 5.1 names none. Its file was written by the
+// release route, so an origin read would wrongly answer an upload for both.
+const releasePreparation = vi.fn(async (objectId: string) => (objectId.endsWith('PA') ? ['run-1'] : []))
 const getRun = vi.fn(async () => ({ run_id: 'run-1', run_crate: 'record-1' }))
+const fetchRoCrateRaw = vi.fn(async () => ({
+  '@graph': [
+    { '@id': 'ro-crate-metadata.json', about: { '@id': './' } },
+    { '@id': './', '@type': 'Dataset', name: 'Prepare Bakta DB 6.0 light', conformsTo: { '@id': 'https://w3id.org/ro/wfrun/process/0.5' } },
+  ],
+}))
 
 const component = compileClientComponent(new URL('./BucketReleases.vue', import.meta.url), {
   vue: VueRuntime,
@@ -24,8 +33,12 @@ const component = compileClientComponent(new URL('./BucketReleases.vue', import.
   '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
   '@/components/ui/Spinner.vue': moduleDefault(Slotted('span')),
   '@/composables/aruna/state': { nodeClientReady: async () => ({ baseUrl: 'https://node.test', token: 't' }) },
-  '@/composables/useAruna': { useAruna: () => ({ listReleases, publishRelease: vi.fn(), sessionEpoch: ref(1) }) },
-  '@/lib/api': { apiErrorMessage: String, getFileOrigin, getRun },
+  '@/composables/useAruna': {
+    useAruna: () => ({ listReleases, publishRelease: vi.fn(), sessionEpoch: ref(1), nodeInfo: ref({ node: { realm_id: 'realm', peer_id: 'node-2' } }), fetchRoCrateRaw }),
+  },
+  '@/lib/api': { apiErrorMessage: String, getRun, releasePreparation },
+  '@/lib/contentIdentity': ContentIdentity,
+  '@/lib/dataEntities': DataEntities,
   '@/lib/databases': { pageIdentifier: () => null },
   '@/lib/releases': Releases,
   '@lucide/vue': { Plus: Slotted('i') },
@@ -38,9 +51,13 @@ describe('bucket releases', () => {
     const text = content(root).replace(/\s+/g, '')
 
     expect(text).toContain('VersionFilesMadebyPublished')
-    expect(text).toContain('6.0db/Arun,openitsrecord')
+    expect(text).toContain('6.0db/PrepareBaktaDB6.0light')
     expect(text).toContain('5.1WholebucketByhand')
     expect(text).toContain(new Date('2026-10-28T23:26:37.234Z').toLocaleDateString().replace(/\s+/g, ''))
     expect(getRun).toHaveBeenCalledWith('run-1', { baseUrl: 'https://node.test', token: 't' })
+    expect(releasePreparation).toHaveBeenCalledWith(
+      'https://w3id.org/aruna/data/arn:aruna:realm:node-2:s3/bakta-db/release-6.0.json@01M62DCH5J7HXR3V6784DBERPA',
+      { baseUrl: 'https://node.test', token: 't' },
+    )
   })
 })

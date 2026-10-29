@@ -96,6 +96,21 @@ export function listReleases(bucket: string, client: ApiClientOptions = {}, sign
   return apiRequest(bucketPath(bucket, 'releases'), { signal }, client)
 }
 
+/**
+ * The preparation runs a release names, read from its crate on the bucket's node: the run ids of
+ * the CreateActions the crate's root mentions. Empty when the release names none.
+ */
+export async function releasePreparation(objectId: string, client: ApiClientOptions, signal?: AbortSignal): Promise<string[]> {
+  const crate = await apiRequest<{ '@graph'?: unknown }>('/ga4gh/drs/v1/download', { query: { object_id: objectId, here: true }, signal }, client)
+  const graph = Array.isArray(crate?.['@graph']) ? (crate['@graph'] as Record<string, unknown>[]) : []
+  const idOf = (value: unknown) => (value && typeof value === 'object' ? (value as { '@id'?: unknown })['@id'] : value)
+  const root = graph.find((entity) => entity['@id'] === './')
+  const mentioned = new Set([root?.mentions ?? []].flat().map(idOf))
+  return graph
+    .filter((entity) => mentioned.has(entity['@id']) && entity['@type'] === 'CreateAction' && typeof entity.identifier === 'string')
+    .map((entity) => entity.identifier as string)
+}
+
 export function publishRelease(bucket: string, body: PublishReleaseRequest, client: ApiClientOptions = {}): Promise<PublishReleaseResponse> {
   return apiRequest(bucketPath(bucket, 'releases'), { method: 'POST', body: JSON.stringify(body) }, client)
 }

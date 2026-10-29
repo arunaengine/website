@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getBucketMetadata, publishRelease, putBucketMetadata } from './databases'
+import { getBucketMetadata, publishRelease, putBucketMetadata, releasePreparation } from './databases'
 
 const client = { baseUrl: 'https://api.test/api/v1', token: 'tok' }
 
@@ -51,3 +51,23 @@ describe('bucket metadata requests', () => {
     expect(files.map(([path]) => path)).toEqual([])
   })
 })
+
+describe('release preparation', () => {
+  it('reads the runs a release crate names from its exact version on the bucket node', async () => {
+    const calls = stubFetch({
+      '@graph': [
+        { '@id': 'ro-crate-metadata.json', about: { '@id': './' } },
+        { '@id': './', '@type': 'Dataset', name: 'Release 6.0 light', mentions: [{ '@id': '#run-01M62WBHNH01030EV17BJGWGCB' }] },
+        { '@id': '#run-01M62WBHNH01030EV17BJGWGCB', '@type': 'CreateAction', name: 'Preparation run 01M62WBHNH01030EV17BJGWGCB', identifier: '01M62WBHNH01030EV17BJGWGCB' },
+        { '@id': '#other', '@type': 'CreateAction', identifier: 'not-mentioned' },
+      ],
+    })
+    const objectId = 'https://w3id.org/aruna/data/arn:aruna:r:n2:s3/bakta-database/release-6.0-light.crate.json@01M62WYK3PB0QGWDD1B1W39MPE'
+
+    expect(await releasePreparation(objectId, client)).toEqual(['01M62WBHNH01030EV17BJGWGCB'])
+    const url = new URL(calls[0]!.url)
+    expect(url.pathname).toBe('/api/v1/ga4gh/drs/v1/download')
+    expect([url.searchParams.get('object_id'), url.searchParams.get('here')]).toEqual([objectId, 'true'])
+  })
+})
+
