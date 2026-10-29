@@ -16,7 +16,7 @@ vi.mock('@/composables/useAruna', () => ({
   useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('t'), sessionEpoch: epoch }),
 }))
 vi.mock('@/composables/aruna/state', () => ({
-  nodeClient: (node: string) => ({ baseUrl: `https://${node}`, token: 't' }),
+  nodeClientReady: async (node: string) => ({ baseUrl: `https://${node}`, token: 't' }),
 }))
 vi.mock('@/lib/api', () => ({
   listStorageBuckets: (...args: unknown[]) => listStorageBuckets(...args),

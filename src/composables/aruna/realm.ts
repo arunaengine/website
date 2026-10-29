@@ -17,6 +17,7 @@ import {
   metadataItems,
   nodeInfo,
   realmInfo,
+  realmReadEpoch,
   refreshContext,
   request,
   saving,
@@ -66,6 +67,7 @@ export async function loadInfo(context = refreshContext()) {
     apiRequest<Signed<RealmDescriptor>>('/system/realm/descriptor', {}, context.client),
   ])
   if (context.epoch !== sessionEpoch.value) return
+  if (context.client.token) realmReadEpoch.value = context.epoch
   const known = realmInfo.value?.realm_id
   if (info.status === 'fulfilled') nodeInfo.value = info.value
   if (realm.status === 'fulfilled') realmInfo.value = realm.value

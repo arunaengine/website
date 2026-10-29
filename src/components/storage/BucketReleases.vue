@@ -7,7 +7,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import { nodeClient } from '@/composables/aruna/state'
+import { nodeClientReady } from '@/composables/aruna/state'
 import { useAruna } from '@/composables/useAruna'
 import { apiErrorMessage, getFileOrigin, getRun, type ReleaseItem, type ReleaseListResponse } from '@/lib/api'
 import { pageIdentifier } from '@/lib/databases'
@@ -34,7 +34,7 @@ const UNKNOWN: Maker = { text: 'Unknown', record: null }
 
 async function makerOf(item: ReleaseItem): Promise<Maker> {
   try {
-    const client = nodeClient(props.nodeId)
+    const client = await nodeClientReady(props.nodeId)
     const origin = await getFileOrigin(props.bucket, { key: item.key, version_id: item.version_id }, client)
     if (origin.origin?.kind === 'upload') return { text: 'By hand', record: null }
     if (origin.origin?.kind !== 'job') return UNKNOWN

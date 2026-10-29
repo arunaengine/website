@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { nodeApiBase } from '@/components/nodes/node-probe'
 import {
   ApiError,
@@ -70,6 +70,8 @@ export const bootstrapped = ref(false)
 // Monotonic identity counter: bumped whenever the token or API base changes,
 // so in-flight work and module-singleton caches can tell sessions apart.
 export const sessionEpoch = ref(0)
+// The session whose realm document was read with its token; only that one names the nodes.
+export const realmReadEpoch = ref(-1)
 
 /** The saved API override of the portal whose served config names `servedBase`. */
 export function apiBaseKey(servedBase = defaultApiBaseUrl()): string {
@@ -137,10 +139,24 @@ export function nodeClient(nodeId?: string | null) {
   return { baseUrl, token: authToken.value }
 }
 
+/** `nodeClient` once the realm can name the node; a fresh load reads it first without a token. */
+export async function nodeClientReady(nodeId?: string | null) {
+  const settled = () =>
+    !nodeId || nodeId === nodeInfo.value?.node.peer_id || !authToken.value
+    || realmReadEpoch.value === sessionEpoch.value
+    || (realmInfo.value?.nodes ?? []).some((node) => node.node_id === nodeId)
+  if (!settled()) {
+    await new Promise<void>((resolve) => {
+      const stop = watch(settled, (done) => done && (stop(), resolve()))
+    })
+  }
+  return nodeClient(nodeId)
+}
+
 /** One request of this session, to the connected node unless another is named. */
 export async function request<T>(path: string, options = {}, nodeId?: string | null) {
   const context = refreshContext()
-  const response = await apiRequest<T>(path, options, nodeId ? nodeClient(nodeId) : context.client)
+  const response = await apiRequest<T>(path, options, nodeId ? await nodeClientReady(nodeId) : context.client)
   assertCurrentSession(context.epoch)
   return response
 }

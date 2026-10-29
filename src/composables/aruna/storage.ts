@@ -45,7 +45,7 @@ import {
   type StorageRoutingRule,
 } from '@/lib/api'
 import { getStorageDeletionPreflight, type StorageDeletionPreflight } from '@/lib/storageDeletion'
-import { nodeClient, refreshContext, request, saving } from './state'
+import { nodeClientReady, refreshContext, request, saving } from './state'
 
 // ── Storage routing (group default and per-bucket rules) ────────────────────
 
@@ -80,18 +80,18 @@ export async function getBucketRouting(bucket: string, nodeId?: string | null): 
 }
 
 /** What the serving node counts in one bucket; 404 means the node lacks the route. */
-export function getBucketUsage(bucket: string, nodeId?: string | null): Promise<BucketUsageResponse> {
-  return requestBucketUsage(bucket, nodeClient(nodeId))
+export async function getBucketUsage(bucket: string, nodeId?: string | null): Promise<BucketUsageResponse> {
+  return requestBucketUsage(bucket, await nodeClientReady(nodeId))
 }
 
 /** One page of a bucket's current objects with their versions, listed by the bucket's node. */
-export function listBucketObjects(
+export async function listBucketObjects(
   bucket: string,
   query: { prefix?: string; delimiter?: string; cursor?: string; limit?: number },
   nodeId?: string | null,
   signal?: AbortSignal,
 ): Promise<ObjectListResponse> {
-  return requestObjects(bucket, query, nodeClient(nodeId), signal)
+  return requestObjects(bucket, query, await nodeClientReady(nodeId), signal)
 }
 
 /** What deleting a whole bucket removes; a bucket stored on more nodes also lists the datasets that link it. */
@@ -100,13 +100,13 @@ export function getSetDeletion(bucket: string): Promise<StorageDeletionPreflight
 }
 
 /** Datasets that link a file, a folder or the root of a bucket on one node, this one unless named. */
-export function getBucketLinks(bucket: string, query: BucketLinksQuery, signal?: AbortSignal, nodeId?: string | null): Promise<DataLinksResponse> {
-  return requestLinks(bucket, query, nodeClient(nodeId), signal)
+export async function getBucketLinks(bucket: string, query: BucketLinksQuery, signal?: AbortSignal, nodeId?: string | null): Promise<DataLinksResponse> {
+  return requestLinks(bucket, query, await nodeClientReady(nodeId), signal)
 }
 
 /** Where one file version of a bucket on one node came from, this one unless named. */
-export function getFileOrigin(bucket: string, query: { key: string; version_id?: string }, signal?: AbortSignal, nodeId?: string | null): Promise<OriginResponse> {
-  return requestOrigin(bucket, query, nodeId ? nodeClient(nodeId) : refreshContext().client, signal)
+export async function getFileOrigin(bucket: string, query: { key: string; version_id?: string }, signal?: AbortSignal, nodeId?: string | null): Promise<OriginResponse> {
+  return requestOrigin(bucket, query, nodeId ? await nodeClientReady(nodeId) : refreshContext().client, signal)
 }
 
 /** The origin of an exact version id, read on the node that holds it. */
@@ -133,8 +133,8 @@ export function getFilePartOf(bucket: string, key: string, signal?: AbortSignal)
 }
 
 /** The incoming syncs and storage folders of a bucket on one node, this one unless named. */
-export function getBucketSources(bucket: string, signal?: AbortSignal, nodeId?: string | null): Promise<FileSourcesResponse> {
-  return requestSources(bucket, nodeClient(nodeId), signal)
+export async function getBucketSources(bucket: string, signal?: AbortSignal, nodeId?: string | null): Promise<FileSourcesResponse> {
+  return requestSources(bucket, await nodeClientReady(nodeId), signal)
 }
 
 /** The bucket and folder a linked part covers. */
@@ -148,8 +148,8 @@ export function getDataLinks(id: string, query: { parts_only?: boolean; after?: 
 }
 
 /** The set a bucket on this node belongs to; 404 means an ordinary bucket. */
-export function getBucketDistribution(bucket: string, signal?: AbortSignal, nodeId?: string | null): Promise<DistributedResponse> {
-  return requestDistribution(bucket, nodeClient(nodeId), signal)
+export async function getBucketDistribution(bucket: string, signal?: AbortSignal, nodeId?: string | null): Promise<DistributedResponse> {
+  return requestDistribution(bucket, await nodeClientReady(nodeId), signal)
 }
 
 /** Group ADMIN: creates one bucket on several nodes with this node as publisher. */

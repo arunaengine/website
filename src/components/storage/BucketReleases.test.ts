@@ -23,7 +23,7 @@ const component = compileClientComponent(new URL('./BucketReleases.vue', import.
   '@/components/ui/Input.vue': moduleDefault(Slotted('input')),
   '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
   '@/components/ui/Spinner.vue': moduleDefault(Slotted('span')),
-  '@/composables/aruna/state': { nodeClient: () => ({ baseUrl: 'https://node.test', token: 't' }) },
+  '@/composables/aruna/state': { nodeClientReady: async () => ({ baseUrl: 'https://node.test', token: 't' }) },
   '@/composables/useAruna': { useAruna: () => ({ listReleases, publishRelease: vi.fn(), sessionEpoch: ref(1) }) },
   '@/lib/api': { apiErrorMessage: String, getFileOrigin, getRun },
   '@/lib/databases': { pageIdentifier: () => null },

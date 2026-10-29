@@ -1,7 +1,7 @@
 // The steps running on the buckets of a group, for the labels in a bucket list: by bucket name on
 // this node, by `node/bucket` on the other nodes listed. A node that refuses simply shows none.
 import { onScopeDispose, ref, watch, type Ref } from 'vue'
-import { nodeClient } from '@/composables/aruna/state'
+import { nodeClientReady } from '@/composables/aruna/state'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { ApiError, listStorageBuckets, type BucketJob } from '@/lib/api'
 
@@ -56,7 +56,7 @@ export function useBucketJobs(groupId: Ref<string>, listed: Ref<unknown>, others
     try {
       let after: string | null = null
       for (;;) {
-        const page = await listStorageBuckets(groupId.value, { limit: PAGE, after }, nodeClient(node))
+        const page = await listStorageBuckets(groupId.value, { limit: PAGE, after }, await nodeClientReady(node))
         if (id !== generation) return
         for (const entry of page.buckets) if (entry.job) found.set(`${node}/${entry.bucket}`, entry.job)
         if (!page.next) break

@@ -85,6 +85,16 @@ describe('realm name', () => {
   })
 })
 
+describe('realm read with a token', () => {
+  it('marks the session whose realm names the nodes, and not a read without a token', async () => {
+    serve(new ApiError(404, 'No federation settings'))
+    await loadInfo({ epoch: state.sessionEpoch.value, client: { baseUrl: 'https://api.test', token: '' } })
+    expect(state.realmReadEpoch.value).not.toBe(state.sessionEpoch.value)
+    await loadInfo({ epoch: state.sessionEpoch.value, client: { baseUrl: 'https://api.test', token: 't' } })
+    expect(state.realmReadEpoch.value).toBe(state.sessionEpoch.value)
+  })
+})
+
 describe('realm view from a realm node', () => {
   const member = (node_id: string, kind: string, api?: string) => ({ node_id, kind, info: api ? { urls: { api } } : undefined })
 
