@@ -2,6 +2,7 @@
 // Every S3 access key of this account in one table: the long-lived keys and the temporary S3
 // sessions on the connected node. A node that does not list sessions yet (404/405) shows keys only.
 import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
@@ -27,7 +28,8 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const unsupported = ref(false)
 const busyIds = ref<string[]>([])
-const createOpen = ref(false)
+// The first steps link here with `create=key` to open the dialog at once.
+const createOpen = ref(props.keys && useRoute()?.query.create === 'key')
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }

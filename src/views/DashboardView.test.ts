@@ -3,7 +3,6 @@ import { createSSRApp, defineComponent, h, ref, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, content, compileClientComponent, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
-import { docsTopicBySlug } from '@/docs/v1'
 
 const firstPaintMock = vi.hoisted(() => ({
   useFirstPaint: () => ({ value: true }),
@@ -30,16 +29,13 @@ const dashboardRevision = ref(0)
 const scope = ref<'personal' | 'realm'>('personal')
 const desktopMode = ref(false)
 const HomeCardsStub = defineComponent(() => () => h('div', 'desktop-home-cards'))
+const WebStartStub = defineComponent(() => () => h('div', 'web-first-steps'))
 const setScope = vi.fn(async () => undefined)
 const refresh = vi.fn(async () => undefined)
 let servedEpoch = -1
 const loadInfo = vi.fn(async () => undefined)
 const loadRealmView = vi.fn(async (): Promise<unknown> => null)
 const signIn = vi.fn(async () => undefined)
-const isNewUser = ref(false)
-const dismissOnboarding = vi.fn(async () => undefined)
-const startTour = vi.fn()
-const tesEnabled = ref(true)
 
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const PageHeaderStub = defineComponent({
@@ -142,14 +138,6 @@ beforeAll(async () => {
   vi.doMock('@/composables/useDashboardScope', () => ({
     useDashboardScope: () => ({ scope, setScope }),
   }))
-  vi.doMock('@/composables/useOnboarding', () => ({
-    useOnboarding: () => ({ isNewUser, dismissOnboarding }),
-  }))
-  vi.doMock('@/composables/useTour', () => ({ startTour }))
-  vi.doMock('@/lib/config', async () => ({
-    ...(await vi.importActual<typeof import('@/lib/config')>('@/lib/config')),
-    featureEnabled: () => tesEnabled.value,
-  }))
   vi.doMock('@vueuse/core', () => ({
     useDocumentVisibility: () => ref('hidden'),
     useIntervalFn: () => ({ pause: vi.fn(), resume: vi.fn() }),
@@ -164,6 +152,7 @@ beforeAll(async () => {
   vi.doMock('@/components/dashboard/OverviewCell.vue', () => ({ default: OverviewCellStub }))
   vi.doMock('@/composables/useDatabases', () => databasesStub)
   vi.doMock('@/components/dashboard/NodeCards.vue', () => ({ default: NodeCardsStub }))
+  vi.doMock('@/components/dashboard/WebStart.vue', () => ({ default: WebStartStub }))
   vi.doMock('@/composables/useNodeImports', () => importsStub)
   vi.doMock('@/composables/useRealmNodes', () => realmNodesStub)
   vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: SkeletonStub }))
@@ -212,10 +201,6 @@ beforeAll(async () => {
     },
     '@/composables/useNotifications': { useNotifications: () => ({ dashboardRevision }) },
     '@/composables/useDashboardScope': { useDashboardScope: () => ({ scope, setScope }) },
-    '@/composables/useOnboarding': { useOnboarding: () => ({ isNewUser, dismissOnboarding }) },
-    '@/composables/useTour': { startTour },
-    '@/docs/v1': { docsTopicBySlug },
-    '@/lib/config': { featureEnabled: () => tesEnabled.value },
     '@/composables/useRefresh': {
       useRefresh: (run: () => unknown) => ({ busy: ref(false), refresh: run }),
     },
@@ -237,6 +222,7 @@ beforeAll(async () => {
     '@/components/dashboard/OverviewCell.vue': moduleDefault(OverviewCellStub),
     '@/composables/useDatabases': databasesStub,
     '@/components/dashboard/NodeCards.vue': moduleDefault(NodeCardsStub),
+    '@/components/dashboard/WebStart.vue': moduleDefault(WebStartStub),
     '@/composables/useNodeImports': importsStub,
     '@/composables/useRealmNodes': realmNodesStub,
     '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
@@ -270,10 +256,6 @@ beforeEach(() => {
   authPending.value = false
   authStage.value = 'idle'
   authStageError.value = null
-  isNewUser.value = false
-  dismissOnboarding.mockClear()
-  startTour.mockClear()
-  tesEnabled.value = true
   refresh.mockClear()
   loadInfo.mockClear()
   loadRealmView.mockReset()
@@ -448,78 +430,26 @@ describe('authenticated dashboard scope', () => {
   })
 })
 
-describe('welcome card', () => {
-  beforeEach(() => {
+describe('first steps', () => {
+  it('shows the one-line first steps on the web, without the welcome card and its tours', async () => {
     currentUser.value = { id: 'user-id', name: 'Ada Lovelace' }
-    isNewUser.value = true
-  })
-
-  it('leads with the docs and the tour, tutorials behind them', async () => {
-    const text = await renderedText()
-
-    expect(text).toContain('New here? Start with the basics.')
-    expect(text).toContain('Open the docs')
-    expect(text).toContain('Take the tour')
-    expect(text).toContain('Compute tutorial')
-    expect(text).toContain('Profile tutorial')
-    expect(text).toContain('Not now')
-  })
-
-  it('points the docs button at the portal tour topic', async () => {
-    const mounted = await mountApp(DashboardClient)
-
-    const link = element(mounted.root, (node) => node.tag === 'a' && content(node).trim() === 'Open the docs')
-
-    expect(link.props.to).toEqual({ name: 'docs', params: { topic: 'portal-tour' } })
-    expect(mounted.errors).toEqual([])
-    mounted.app.unmount()
-  })
-
-  it('starts the portal tour from the card', async () => {
-    const mounted = await mountApp(DashboardClient)
-
-    await click(button(mounted.root, 'Take the tour'))
-
-    expect(startTour).toHaveBeenCalledWith(docsTopicBySlug('portal-tour')?.tour)
-    expect(mounted.errors).toEqual([])
-    mounted.app.unmount()
-  })
-
-  it('leaves the compute tutorial out where the node runs nothing', async () => {
-    tesEnabled.value = false
 
     const text = await renderedText()
 
-    expect(text).toContain('Profile tutorial')
-    expect(text).not.toContain('Compute tutorial')
+    expect(text).toContain('web-first-steps')
+    for (const gone of ['New here?', 'Take the tour', 'Compute tutorial', 'Profile tutorial', 'Not now']) {
+      expect(text).not.toContain(gone)
+    }
   })
 
-  it('stays away from an account that already answered', async () => {
-    isNewUser.value = false
-
-    expect(await renderedText()).not.toContain('New here? Start with the basics.')
-  })
-
-  it('stays away while a stored session is still resolving', async () => {
+  it('leaves them out while a stored session resolves and for a visitor', async () => {
+    currentUser.value = { id: 'user-id', name: 'Ada Lovelace' }
     authPending.value = true
+    expect(await renderedText()).not.toContain('web-first-steps')
 
-    expect(await renderedText()).not.toContain('New here? Start with the basics.')
-  })
-
-  it('stays away from a visitor who is not signed in', async () => {
+    authPending.value = false
     currentUser.value = null
-
-    expect(await renderedText()).not.toContain('New here? Start with the basics.')
-  })
-
-  it('records the refusal when the card is dismissed', async () => {
-    const mounted = await mountApp(DashboardClient)
-
-    await click(button(mounted.root, 'Not now'))
-
-    expect(dismissOnboarding).toHaveBeenCalledTimes(1)
-    expect(mounted.errors).toEqual([])
-    mounted.app.unmount()
+    expect(await renderedText()).not.toContain('web-first-steps')
   })
 })
 
@@ -531,20 +461,8 @@ describe('desktop home', () => {
     await flush()
 
     expect(content(mounted.root)).toContain('desktop-home-cards')
+    expect(content(mounted.root)).not.toContain('web-first-steps')
     expect(content(mounted.root)).toContain('Your realm and this computer at a glance.')
-    mounted.app.unmount()
-  })
-
-  it('puts the welcome banner above the desktop cards', async () => {
-    currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
-    isNewUser.value = true
-    desktopMode.value = true
-    const mounted = await mountApp(DashboardClient)
-    await flush()
-    const text = content(mounted.root)
-
-    expect(text.indexOf('New here? Start with the basics.')).toBeGreaterThan(-1)
-    expect(text.indexOf('New here? Start with the basics.')).toBeLessThan(text.indexOf('desktop-home-cards'))
     mounted.app.unmount()
   })
 

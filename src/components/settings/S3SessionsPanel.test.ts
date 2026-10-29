@@ -44,13 +44,18 @@ const aruna = {
   revokeS3Credential: vi.fn(async () => undefined),
 }
 
+// The query of the settings route; the first steps link here with `create=key`.
+const routeQuery = ref<Record<string, string>>({})
+const DialogStub = defineComponent({ props: { open: Boolean }, setup: (props) => () => h('div', props.open ? 'create dialog open' : '') })
+
 const S3SessionsPanel = compileClientComponent(new URL('./S3SessionsPanel.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/RefreshButton.vue': moduleDefault(ButtonStub),
   '@/components/ui/RefusalNote.vue': moduleDefault(NoteStub),
   '@/components/ui/Badge.vue': moduleDefault(defineComponent((_, { slots }) => () => h('span', slots.default?.()))),
-  '@/components/data/CreateCredentialDialog.vue': moduleDefault(defineComponent(() => () => null)),
+  '@/components/data/CreateCredentialDialog.vue': moduleDefault(DialogStub),
+  'vue-router': { useRoute: () => ({ query: routeQuery.value }) },
   '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => null) }),
   '@/composables/useAruna': { useAruna: () => aruna, isUnsupportedEndpoint },
   '@/lib/api': Api,
@@ -71,6 +76,7 @@ beforeEach(() => {
   aruna.currentUser.value = { id: 'u1' }
   aruna.credentials.value = []
   aruna.revokeS3Credential.mockClear()
+  routeQuery.value = {}
 })
 
 afterEach(() => {
@@ -149,5 +155,17 @@ describe('S3SessionsPanel', () => {
     await flush()
 
     expect(content(root)).toBe('')
+  })
+
+  it('opens the create dialog when the first steps link here for a key', async () => {
+    stubFetch([])
+    const plain = await mountApp(S3SessionsPanel)
+    expect(content(plain.root)).not.toContain('create dialog open')
+    plain.app.unmount()
+
+    routeQuery.value = { tab: 'access', create: 'key' }
+    const linked = await mountApp(S3SessionsPanel)
+    expect(content(linked.root)).toContain('create dialog open')
+    linked.app.unmount()
   })
 })
