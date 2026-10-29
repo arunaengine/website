@@ -42,15 +42,22 @@ const HeaderStub = defineComponent({
   setup: (props, { slots }) => () => h('header', [h('h1', props.title), h('p', props.description), slots.actions?.()]),
 })
 const LinkStub = defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()) })
+// Each editor keeps its own draft, so a new one shows as a new instance.
+const editors = { made: 0 }
+const sessionEpoch = ref(1)
 const NameStub = defineComponent({
   props: { name: String, save: Function },
-  setup: (props) => () => h('button', { onClick: () => (props.save as (name: string) => Promise<void>)('New name') }, `Rename ${props.name}`),
+  setup: (props) => {
+    editors.made++
+    return () => h('button', { onClick: () => (props.save as (name: string) => Promise<void>)('New name') }, `Rename ${props.name}`)
+  },
 })
 const PanelStub = defineComponent({ props: { node: Object, hideName: Boolean, probe: Object }, setup: (props) => () => h('section', `details hideName=${props.hideName}`) })
 
 const NodeView = compileClientComponent(new URL('./NodeView.vue', import.meta.url), {
   vue: VueRuntime,
-  'vue-router': { RouterLink: LinkStub, useRoute: () => ({ params: params.value }) },
+  // The route reads the params ref on each access, so a test can navigate.
+  'vue-router': { RouterLink: LinkStub, useRoute: () => ({ get params() { return params.value } }) },
   '@/components/dashboard/PageHeader.vue': moduleDefault(HeaderStub),
   '@/components/ui/Badge.vue': moduleDefault(Plain),
   '@/components/ui/EmptyState.vue': moduleDefault(defineComponent({ props: { title: String }, setup: (props) => () => h('p', props.title) })),
@@ -59,7 +66,7 @@ const NodeView = compileClientComponent(new URL('./NodeView.vue', import.meta.ur
   '@/components/nodes/node-display': NodeDisplay,
   '@/components/nodes/node-probe': { nodeApiBase: (node: RealmNodeInfo) => node.info?.urls.api ?? null, probeNode },
   '@/composables/useAruna': {
-    useAruna: () => ({ currentUser, nodeInfo, usageInfo: ref(null), isRealmAdmin, searchBuckets, sessionEpoch: ref(1) }),
+    useAruna: () => ({ currentUser, nodeInfo, usageInfo: ref(null), isRealmAdmin, searchBuckets, sessionEpoch }),
   },
   '@/composables/useNodeNames': { useNodeNames: () => ({ renameNode, renameDevice }) },
   '@/composables/useRealmNodes': { computerName: () => 'This computer', useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'mgmt' }) },
@@ -144,5 +151,36 @@ describe('node page', () => {
     await flush()
     expect(content(mounted.root)).toContain("This node is not in the realm's node list.")
     mounted.app.unmount()
+  })
+
+  it('starts a fresh rename editor for another node or session, so no draft moves along', async () => {
+    isRealmAdmin.value = true
+    realm.value = { nodes: [record(), record({ node_id: 'store-2', display_name: 'Giessen storage 2' })] }
+    const mounted = await mountApp(NodeView)
+    await flush()
+    const made = editors.made
+
+    params.value = { nodeId: 'store-2' }
+    await flush()
+    expect(editors.made).toBe(made + 1)
+    sessionEpoch.value++
+    await flush()
+    expect(editors.made).toBe(made + 2)
+    mounted.app.unmount()
+  })
+
+  it('never says there are none when a node did not answer the bucket search', async () => {
+    searchBuckets.mockResolvedValue({ hits: [], nodes_failed: 1, failed_nodes: ['store-1'] })
+    const empty = await mountApp(NodeView)
+    await flush()
+    expect(content(empty.root)).not.toContain('None that you can open.')
+    expect(content(empty.root)).toContain('Not every node answered, so its buckets may be missing.')
+    empty.app.unmount()
+
+    searchBuckets.mockResolvedValue({ hits: [{ bucket: 'refseq', node_id: 'store-1', group_id: 'g1' }], nodes_failed: 1 })
+    const some = await mountApp(NodeView)
+    await flush()
+    expect(content(some.root)).toContain('At least 1 bucket you can open.')
+    some.app.unmount()
   })
 })

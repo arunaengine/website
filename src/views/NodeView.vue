@@ -69,23 +69,28 @@ watch([nodeId, () => (node.value ? nodeApiBase(node.value) : null), isLocal], as
 }, { immediate: true })
 
 // The buckets this node holds that the signed-in user may read; the realm search has no node
-// filter, so a few pages are read and the rest counts as "at least".
+// filter, so a few pages are read and the rest counts as "at least", as does a node that did
+// not answer.
 const MAX_PAGES = 5
 const buckets = ref<BucketSearchHit[] | null>(null)
 const moreBuckets = ref(false)
+const unanswered = ref(false)
 let bucketRound = 0
 watch([nodeId, sessionEpoch, currentUser], async () => {
   const mine = ++bucketRound
   buckets.value = null
+  unanswered.value = false
   if (!currentUser.value) return
   const found: BucketSearchHit[] = []
   let cursor: string | undefined
   let pages = 0
+  let failed = false
   try {
     do {
       const page = await searchBuckets('', { limit: 50, cursor })
       if (mine !== bucketRound) return
       found.push(...page.hits.filter((hit) => hit.node_id === nodeId.value))
+      failed ||= page.nodes_failed > 0
       cursor = page.next_cursor ?? undefined
       pages++
     } while (cursor && pages < MAX_PAGES)
@@ -94,7 +99,8 @@ watch([nodeId, sessionEpoch, currentUser], async () => {
     return
   }
   buckets.value = found
-  moreBuckets.value = Boolean(cursor)
+  unanswered.value = failed
+  moreBuckets.value = Boolean(cursor) || failed
 }, { immediate: true })
 const bucketLink = (hit: BucketSearchHit) => ({
   name: 'bucket',
@@ -111,7 +117,8 @@ const bucketLink = (hit: BucketSearchHit) => ({
       :docs="{ topic: 'realm-nodes-groups', section: 'Nodes and the realm' }"
     >
       <template v-if="node && rename" #actions>
-        <NodeNameEdit :name="name" :value="node.display_name" :save="rename"><span class="sr-only">{{ name }}</span></NodeNameEdit>
+        <!-- A draft belongs to one node and one session; another node starts a fresh editor. -->
+        <NodeNameEdit :key="`${sessionEpoch}/${node.node_id}`" :name="name" :value="node.display_name" :save="rename"><span class="sr-only">{{ name }}</span></NodeNameEdit>
       </template>
     </PageHeader>
 
@@ -166,6 +173,7 @@ const bucketLink = (hit: BucketSearchHit) => ({
           <h2 class="font-display text-sm font-semibold text-aruna-navy">Buckets on this node</h2>
           <p v-if="buckets === null" class="mt-1 text-xs text-muted-foreground">Reading the buckets you can open…</p>
           <p v-else-if="!buckets.length && !moreBuckets" class="mt-1 text-xs text-muted-foreground">None that you can open.</p>
+          <p v-else-if="!buckets.length && unanswered" class="mt-1 text-xs text-muted-foreground">Not every node answered, so its buckets may be missing.</p>
           <template v-else>
             <ul class="mt-2 flex flex-wrap gap-2 text-sm">
               <li v-for="hit in buckets" :key="`${hit.group_id}/${hit.bucket}`">
