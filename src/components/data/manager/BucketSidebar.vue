@@ -159,6 +159,17 @@ function databaseOf(name: string, nodeId: string | null): { title: string } | nu
 // node is named only when it is not this node, as the pins are keyed.
 const shortcutNode = (hit: ListedBucket) => (realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id)
 type AllRow = { key: string; bucket: string; nodeId: string | null; hit: ListedBucket | null; pinned: boolean }
+// Recent buckets move up only within the first batch the nodes answered, so a later page never
+// reorders rows already shown; the batch starts over when the list does.
+const hitKey = (hit: ListedBucket) => `${hit.node_id}/${hit.bucket}`
+const firstBatch = ref(new Set<string>())
+watch(
+  () => all.hits.value,
+  (hits, previous) => {
+    if (!previous?.length || hits.length < previous.length) firstBatch.value = new Set(hits.map(hitKey))
+  },
+  { immediate: true },
+)
 const allRows = computed<AllRow[]>(() => {
   const hits = all.hits.value
   const used = new Set<ListedBucket>()
@@ -168,7 +179,8 @@ const allRows = computed<AllRow[]>(() => {
     // A distributed bucket is one merged row; a pin on any of its nodes is that row.
     const onNode = (candidate: ListedBucket) =>
       (candidate.set_id ? candidate.nodes : [candidate.node_id]).some((id) => (realmNodes.isLocalNode(id) ? null : id) === nodeId)
-    const hit = hits.find((candidate) => !used.has(candidate) && candidate.bucket === entry.bucket && onNode(candidate)) ?? null
+    const hit = hits.find((candidate) => !used.has(candidate) && candidate.bucket === entry.bucket && onNode(candidate)
+      && (pinned || firstBatch.value.has(hitKey(candidate)))) ?? null
     if (!hit && !pinned) return []
     if (hit) used.add(hit)
     return [{ key: `${nodeId ?? ''}/${entry.bucket}`, bucket: entry.bucket, nodeId, hit, pinned }]

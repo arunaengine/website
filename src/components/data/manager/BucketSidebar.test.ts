@@ -936,5 +936,29 @@ describe('database buckets in the list', () => {
     expect(state.shortcuts.togglePin).toHaveBeenCalledWith('shared', 'node-2')
     allBuckets.hits.value = []
   })
+
+  it('keeps the order when a recent bucket arrives with a later page', async () => {
+    nodeChoice.value = null
+    allBuckets.needsName.value = false
+    const listed = (count: number, from = 0) =>
+      Array.from({ length: count }, (_, index) => ({ bucket: `b${String(from + index).padStart(2, '0')}`, node_id: 'home', group_id: 'g1' }))
+    const shown = (root: Parameters<typeof content>[0]) =>
+      nodes(root).filter((node) => String(node.props['aria-label']).startsWith('Open b')).map((node) => content(node))
+    allBuckets.hits.value = listed(25)
+    allBuckets.more.value = true
+    loadMore.mockImplementationOnce(async () => {
+      allBuckets.hits.value = [...allBuckets.hits.value, ...listed(5, 25)]
+      allBuckets.more.value = false
+    })
+    const state = manager()
+    state.shortcuts.recent.value = [{ bucket: 'b27', nodeId: null, groupId: 'g1' }]
+    const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
+    await flush()
+
+    await click(button(root, 'Next'))
+    await flush()
+    expect(shown(root)).toEqual(['b25', 'b26', 'b27', 'b28', 'b29'])
+    allBuckets.hits.value = []
+  })
 })
 
