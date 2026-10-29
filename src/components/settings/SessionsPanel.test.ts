@@ -1,7 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { button, click, compileClientComponent, content, moduleDefault, mountApp } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 import { SESSION_KIND_LABELS, type UserSession } from '@/lib/api/sessions'
 import { relativeTime } from '@/lib/utils'
 
@@ -60,29 +60,44 @@ beforeEach(() => {
 })
 
 describe('SessionsPanel', () => {
-  it('lists a session with its kind, label and state', async () => {
+  it('names where a sign-in is, keeps its label and id for hover', async () => {
     sessions.value = [session({ kind: 'portal', label: 'Portal sign-in', current: true })]
     const { root } = await mountApp(SessionsPanel)
+    const where = nodes(root).find((node) => node.tag === 'td' && content(node).includes('Portal'))!
 
-    const text = content(root)
-    expect(text).toContain('Portal sign-in')
-    expect(text).toContain('this browser')
-    expect(text).toContain('active')
+    expect(content(where)).toContain('this browser')
+    expect(content(root)).not.toContain('Portal sign-in')
+    expect(where.props.title).toBe('Portal sign-in, s1')
   })
 
-  it('shows this browser and the newest ten first, the rest on request', async () => {
+  it('shows this browser and the newest five first, the rest on request', async () => {
     sessions.value = Array.from({ length: 13 }, (_, index) =>
-      session({ session_id: `s${index}`, label: `Session ${index}`, created_at: new Date(Date.UTC(2026, 9, 1 + index)).toISOString() }))
+      session({ session_id: `s${index}`, created_at: new Date(Date.UTC(2026, 9, 1 + index)).toISOString() }))
     sessions.value[0] = { ...sessions.value[0], current: true }
     const { root } = await mountApp(SessionsPanel)
+    const ids = () =>
+      nodes(root).filter((node) => node.tag === 'td' && /, s\d+$/.test(String(node.props.title))).map((node) => String(node.props.title).split(', ').pop())
 
-    const text = content(root)
-    expect(text).toContain('Session 0')
-    expect(text).toContain('Session 12')
-    expect(text).toContain('Session 4')
-    expect(text).not.toContain('Session 3 ')
+    expect(ids()).toEqual(['s0', 's12', 's11', 's10', 's9'])
     await click(button(root, 'Show all 13'))
-    expect(content(root)).toContain('Session 3 ')
+    expect(ids()).toHaveLength(13)
+  })
+
+  it('signs out every other open sign-in after asking, never this browser', async () => {
+    sessions.value = [
+      session({ session_id: 'here', current: true }),
+      session({ session_id: 'a' }),
+      session({ session_id: 'b' }),
+      session({ session_id: 'gone', revoked: true }),
+    ]
+    const { root } = await mountApp(SessionsPanel)
+
+    await click(button(root, 'Sign out all others'))
+    expect(revoke).not.toHaveBeenCalled()
+    expect(content(root)).toContain('Sign out 2 other sign-ins?')
+    await click(button(root, 'Sign out'))
+    expect(revoke.mock.calls).toEqual([['a'], ['b']])
+    expect(signOut).not.toHaveBeenCalled()
   })
 
   it('marks a revoked session and offers no revoke action for it', async () => {
@@ -99,7 +114,7 @@ describe('SessionsPanel', () => {
 
     await click(button(root, 'Revoke'))
     expect(revoke).not.toHaveBeenCalled()
-    expect(content(root)).toContain('Revoke this session?')
+    expect(content(root)).toContain('Revoke this sign-in?')
 
     await click(button(root, 'Revoke'))
     expect(revoke).toHaveBeenCalledWith('s1')

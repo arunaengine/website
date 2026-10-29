@@ -25,8 +25,8 @@ watch(currentUser, (user) => {
   void load()
 }, { immediate: true })
 
-// This browser first, then the newest; the list opens with the newest ten.
-const SHOWN = 10
+// This browser first, then the newest; the list opens with the newest five.
+const SHOWN = 5
 const all = ref(false)
 const sorted = computed(() =>
   [...sessions.value].sort((a, b) => Number(b.current) - Number(a.current) || b.created_at.localeCompare(a.created_at)),
@@ -37,9 +37,12 @@ function expired(session: UserSession): boolean {
   return new Date(session.expires_at).getTime() <= Date.now()
 }
 
-function stateLabel(session: UserSession): string {
-  if (session.revoked) return 'revoked'
-  return expired(session) ? 'expired' : 'active'
+// The other sign-ins that still work; "Sign out all others" revokes each of them in turn.
+const others = computed(() => sessions.value.filter((session) => !session.current && !session.revoked && !expired(session)))
+const confirmingOthers = ref(false)
+async function signOutOthers() {
+  confirmingOthers.value = false
+  for (const session of others.value) await revoke(session.session_id)
 }
 
 async function confirmRevoke(session: UserSession) {
@@ -53,60 +56,56 @@ async function confirmRevoke(session: UserSession) {
   <section class="surface overflow-hidden">
     <header class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
       <div class="min-w-0">
-        <h3 class="font-display text-sm font-semibold text-aruna-navy">Sessions</h3>
-        <p class="text-xs text-muted-foreground">
-          Every token issued for your account is bound to a session. Revoking one stops it everywhere it is used.
-        </p>
+        <h3 class="font-display text-sm font-semibold text-aruna-navy">Sign-ins</h3>
+        <p class="text-xs text-muted-foreground">Where your account is signed in. Revoke one to sign it out everywhere.</p>
       </div>
-      <RefreshButton :busy="loading" sr-label="Refresh sessions" @click="load" />
+      <div class="flex items-center gap-2">
+        <template v-if="others.length">
+          <template v-if="confirmingOthers">
+            <span class="text-[11px] text-muted-foreground">Sign out {{ others.length }} other {{ others.length === 1 ? 'sign-in' : 'sign-ins' }}?</span>
+            <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" @click="signOutOthers">Sign out</Button>
+            <Button variant="ghost" size="sm" @click="confirmingOthers = false">Cancel</Button>
+          </template>
+          <Button v-else variant="outline" size="sm" @click="confirmingOthers = true">Sign out all others</Button>
+        </template>
+        <RefreshButton :busy="loading" sr-label="Refresh sign-ins" @click="load" />
+      </div>
     </header>
 
-    <p v-if="!currentUser" class="px-5 py-6 text-xs text-muted-foreground">Sign in to see your sessions.</p>
+    <p v-if="!currentUser" class="px-5 py-6 text-xs text-muted-foreground">Sign in to see where you are signed in.</p>
     <template v-else>
       <RefusalNote v-if="error" :message="error" class="mx-5 mt-4" />
       <div class="min-w-0 overflow-x-auto">
         <table class="w-full min-w-max text-sm">
           <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground">
             <tr>
-              <th class="px-5 py-2 text-left font-semibold">Kind</th>
-              <th class="px-5 py-2 text-left font-semibold">Label</th>
-              <th class="px-5 py-2 text-left font-semibold">Created</th>
+              <th class="px-5 py-2 text-left font-semibold">Where</th>
+              <th class="px-5 py-2 text-left font-semibold">Signed in</th>
               <th class="px-5 py-2 text-left font-semibold">Expires</th>
-              <th class="px-5 py-2 text-left font-semibold">State</th>
               <th class="px-5 py-2"></th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="session in rows" :key="session.session_id" class="border-t border-border">
-              <td class="px-5 py-2.5">
-                <Badge size="sm" variant="secondary" class="uppercase">{{ SESSION_KIND_LABELS[session.kind] }}</Badge>
-              </td>
-              <td class="px-5 py-2.5 text-[12px] text-foreground">
-                {{ session.label || session.session_id.slice(0, 8) }}
-                <Badge v-if="session.current" size="sm" variant="accent" class="ml-1.5 uppercase">this browser</Badge>
+              <td class="px-5 py-2.5 text-[12px] text-foreground" :title="[session.label, session.session_id].filter(Boolean).join(', ')">
+                {{ SESSION_KIND_LABELS[session.kind] }}
+                <Badge v-if="session.current" size="sm" variant="accent" class="ml-1.5">this browser</Badge>
               </td>
               <td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="new Date(session.created_at).toLocaleString()">
                 {{ relativeTime(session.created_at) }}
               </td>
               <td
                 class="px-5 py-2.5 text-[11px]"
-                :class="expired(session) ? 'text-destructive' : 'text-muted-foreground'"
+                :class="session.revoked || expired(session) ? 'text-destructive' : 'text-muted-foreground'"
                 :title="new Date(session.expires_at).toLocaleString()"
               >
-                {{ relativeTime(session.expires_at) }}
-              </td>
-              <td class="px-5 py-2.5">
-                <Badge
-                  size="sm"
-                  :variant="session.revoked ? 'destructive' : expired(session) ? 'secondary' : 'accent'"
-                  class="uppercase"
-                >{{ stateLabel(session) }}</Badge>
+                {{ session.revoked ? 'revoked' : expired(session) ? `expired ${relativeTime(session.expires_at)}` : relativeTime(session.expires_at) }}
               </td>
               <td class="px-5 py-2.5 text-right">
                 <template v-if="!session.revoked">
                   <div v-if="confirming === session.session_id" class="flex items-center justify-end gap-2">
                     <span class="text-[11px] text-muted-foreground">
-                      {{ session.current ? 'This signs you out here.' : 'Revoke this session?' }}
+                      {{ session.current ? 'This signs you out here.' : 'Revoke this sign-in?' }}
                     </span>
                     <Button
                       variant="ghost"
@@ -128,15 +127,15 @@ async function confirmRevoke(session: UserSession) {
               </td>
             </tr>
             <tr v-if="!rows.length">
-              <td colspan="6" class="px-5 py-6 text-center text-xs text-muted-foreground">
-                {{ loading ? 'Loading sessions…' : 'No sessions listed by this node.' }}
+              <td colspan="4" class="px-5 py-6 text-center text-xs text-muted-foreground">
+                {{ loading ? 'Loading sign-ins…' : 'No sign-ins listed by this node.' }}
               </td>
             </tr>
           </tbody>
         </table>
       </div>
       <div v-if="sorted.length > SHOWN" class="border-t border-border px-5 py-2">
-        <Button variant="ghost" size="sm" @click="all = !all">{{ all ? 'Show the newest 10' : `Show all ${sorted.length}` }}</Button>
+        <Button variant="ghost" size="sm" @click="all = !all">{{ all ? `Show the newest ${SHOWN}` : `Show all ${sorted.length}` }}</Button>
       </div>
     </template>
   </section>
