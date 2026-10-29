@@ -13,7 +13,7 @@ const listBucketObjects = vi.fn(async () => ({ bucket: 'far-db', objects: [{ key
 const currentUser = ref<{ id: string } | null>(null)
 const myGroups = ref<Array<{ id: string; name: string }>>([])
 const sessionEpoch = ref(0)
-const searchBuckets = vi.fn(async (_q: string, _options: unknown) => ({ hits: [] as unknown[], nodes_queried: 0, nodes_failed: 0, failed_nodes: [] }))
+const searchBuckets = vi.fn(async (_q: string, _options: unknown) => ({ hits: [] as unknown[], nodes_queried: 0, nodes_failed: 0, failed_nodes: [] as string[] }))
 
 const component = compileClientComponent(new URL('./TesDataRefDialog.vue', import.meta.url), {
   vue: VueRuntime,
