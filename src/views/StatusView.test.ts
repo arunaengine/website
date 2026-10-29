@@ -114,6 +114,18 @@ describe('realm node cards', () => {
   })
 })
 
+describe('this node header', () => {
+  it('says nothing about a healthy node and one plain word about a node with a problem', async () => {
+    nodeInfo.value = { node: { peer_id: 'p', status: 'healthy' }, services: { interfaces: { rest: { status: 'available' }, s3: { status: 'available' } } } }
+    const healthy = await renderedText()
+    expect(healthy).toContain('This node')
+    expect(healthy).not.toMatch(/healthy/i)
+
+    nodeInfo.value = { node: { peer_id: 'p', status: 'degraded' }, services: { interfaces: { rest: { status: 'available' }, s3: { status: 'available' } } } }
+    expect((await renderedText()).match(/degraded/gi)).toHaveLength(1)
+  })
+})
+
 describe('node outage presentation', () => {
   it('requires a failed browser probe instead of treating configured DHT state as an outage', () => {
     const predicate = source.match(/const unreachableNodes = computed\([\s\S]*?\n\)/)?.[0] ?? ''

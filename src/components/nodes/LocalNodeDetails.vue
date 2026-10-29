@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import QuotaBar from '@/components/ui/QuotaBar.vue'
-import { statusVariant } from './node-display'
+import { statusProblem } from './node-display'
 import { backendQuota } from '@/lib/storage'
 import { formatBytes } from '@/lib/utils'
 import type { InfoResponse } from '@/lib/api'
@@ -82,8 +82,6 @@ const interfaces = computed(() => [
     : [{ label: 'OAI-PMH', status: props.info.services.interfaces.rest.status, url: oaiUrl.value, oai: true }]),
 ])
 
-// "not_configured" reads as "not configured".
-const statusWord = (status?: string | null) => (status || 'unknown').replace(/_/g, ' ')
 
 const services = computed(() =>
   (['network', 'blob', 'database'] as const)
@@ -120,7 +118,7 @@ const backends = computed(() =>
         >
           <span class="min-w-16 shrink-0 whitespace-nowrap text-xs font-medium text-foreground">{{ iface.label }}</span>
           <!-- A working interface needs no word; only one that is not says so. -->
-          <span v-if="iface.status !== 'available'" class="shrink-0 text-[11px] text-destructive">{{ statusWord(iface.status) }}</span>
+          <span v-if="statusProblem(iface.status)" class="shrink-0 text-[11px] text-destructive">{{ statusProblem(iface.status)!.word }}</span>
           <span class="min-w-0 flex-1 truncate text-right font-mono text-[11px] text-muted-foreground" :title="iface.url">
             {{ iface.url || '-' }}
           </span>
@@ -144,7 +142,7 @@ const backends = computed(() =>
           class="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background/60 px-2 py-1 text-xs text-foreground"
         >
           {{ service.name }}
-          <span v-if="service.status !== 'available'" class="text-[11px] text-destructive">{{ statusWord(service.status) }}</span>
+          <span v-if="statusProblem(service.status)" class="text-[11px] text-destructive">{{ statusProblem(service.status)!.word }}</span>
         </span>
       </div>
     </div>
@@ -171,7 +169,12 @@ const backends = computed(() =>
               available to groups
             </Badge>
             <span class="flex-1" />
-            <Badge size="sm" :variant="statusVariant(backend.status)" class="uppercase">{{ backend.status }}</Badge>
+            <!-- A working backend says nothing; a backend with a problem says it in one word. -->
+            <span
+              v-if="statusProblem(backend.status)"
+              class="text-[11px]"
+              :class="statusProblem(backend.status)!.failed ? 'text-destructive' : 'text-amber-700 dark:text-amber-300'"
+            >{{ statusProblem(backend.status)!.word }}</span>
           </div>
           <div class="mt-1">
             <QuotaBar

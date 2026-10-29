@@ -75,6 +75,16 @@ export function statusTone(status?: string | null): StateTone {
   return 'count'
 }
 
+/**
+ * A status as one plain word, only when it is not fine ("not configured", "degraded"); null when
+ * all is well, so nothing needs to be said. `failed` tells a failure from a lesser problem.
+ */
+export function statusProblem(status?: string | null): { word: string; failed: boolean } | null {
+  const tone = statusTone(status)
+  if (tone === 'done') return null
+  return { word: (status || 'unknown').replace(/_/g, ' '), failed: tone === 'failed' }
+}
+
 export function statusVariant(status?: string | null): BadgeVariant {
   return toneVariant(statusTone(status))
 }

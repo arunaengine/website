@@ -14,7 +14,7 @@ import LocalNodeDetails from '@/components/nodes/LocalNodeDetails.vue'
 import NodeDetailPanel from '@/components/nodes/NodeDetailPanel.vue'
 import LocationAggregates from '@/components/placement/LocationAggregates.vue'
 import SectionSkeleton from '@/components/ui/SectionSkeleton.vue'
-import { givenName, isDegradedStatus, statusVariant } from '@/components/nodes/node-display'
+import { givenName, isDegradedStatus, statusProblem } from '@/components/nodes/node-display'
 import { nodeApiBase, probeNode, type NodeProbe } from '@/components/nodes/node-probe'
 import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
@@ -420,9 +420,12 @@ watch(
             <HardDrive class="h-4 w-4 text-primary" />
             <h2 class="font-display text-sm font-semibold text-aruna-navy">This node</h2>
           </div>
-          <Badge v-if="nodeInfo" :variant="statusVariant(nodeInfo.node.status)" size="sm" class="uppercase">
-            {{ nodeInfo.node.status || 'unknown' }}
-          </Badge>
+          <!-- A healthy node needs no word; only a problem is named. -->
+          <span
+            v-if="nodeInfo && statusProblem(nodeInfo.node.status)"
+            class="text-[11px]"
+            :class="statusProblem(nodeInfo.node.status)!.failed ? 'text-destructive' : 'text-amber-700 dark:text-amber-300'"
+          >{{ statusProblem(nodeInfo.node.status)!.word }}</span>
         </header>
         <div class="space-y-4 p-5">
           <dl v-if="usageInfo" class="grid gap-3 sm:grid-cols-3">

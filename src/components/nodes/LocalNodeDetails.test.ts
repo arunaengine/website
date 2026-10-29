@@ -97,4 +97,20 @@ describe('node interfaces', () => {
     expect(row('S3')).toContain('not configured')
     expect(content(root)).not.toContain('AVAILABLE')
   })
+
+  it('names a storage backend only when it has a problem, and never next to a pill', async () => {
+    const backends = info('https://api.example.org/api/v1')
+    backends.services.blob = {
+      status: 'ok',
+      backends: [
+        { name: 'fast', backend: 's3', allow_tenants: false, default: true, status: 'ok' },
+        { name: 'cold', backend: 'filesystem', allow_tenants: false, default: false, status: 'degraded' },
+      ],
+    }
+    const { root } = await mountApp(details, { props: { info: backends } })
+    const row = (name: string) => content(element(root, (node) => node.tag === 'li' && content(node).startsWith(name)))
+
+    expect(row('fast')).not.toMatch(/\bok\b/i)
+    expect(row('cold').match(/degraded/gi)).toHaveLength(1)
+  })
 })
