@@ -7,7 +7,10 @@ import Select from '@/components/ui/Select.vue'
 import ResultsHome from '@/components/compute/run/ResultsHome.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
 import { injectCustomRun, outputDestination } from '@/composables/useCustomRun'
-import { atOrBelow, entryPath, type TesDataRefEntry } from '@/lib/tes'
+import { useDatabases } from '@/composables/useDatabases'
+import { useRealmNodes } from '@/composables/useRealmNodes'
+import { parseArunaArn } from '@/lib/sync'
+import { atOrBelow, entryPath, parseS3Url, type TesDataRefEntry } from '@/lib/tes'
 import { isSecretName } from '@/lib/savedRuns'
 import { Star } from '@lucide/vue'
 
@@ -27,6 +30,22 @@ const secrets = computed(() => envRows.value.filter((row) => isSecretName(row.ke
 const fixed = computed(() => inputs.value.filter((entry) => !asked.value.some((path) => atOrBelow(entry, path))))
 const pickOf = (path: string) => inputs.value.find((entry) => atOrBelow(entry, path))
 const pickText = (entry: TesDataRefEntry) => (entry.kind === 'file' ? entry.url : `${entry.bucket}/${entry.prefix}`)
+
+// A fixed input read from a database names it by title and release; a bucket matched by name
+// alone that several nodes hold as a database counts only on this node.
+const databases = useDatabases()
+databases.ensure()
+const { localNodeId } = useRealmNodes()
+function databaseOf(entry: TesDataRefEntry): { title: string; release: string | null } | null {
+  const arn = entry.kind === 'file' ? parseArunaArn(entry.url) : null
+  const bucket = entry.kind === 'folder' ? entry.bucket : (arn?.bucket ?? parseS3Url(entry.url)?.bucket)
+  if (!bucket) return null
+  const matches = databases.rows.value.filter((row) => row.bucket === bucket && (!arn || row.places.some((place) => place.nodeId === arn.nodeId)))
+  const row = matches.length > 1 ? matches.find((match) => match.places.some((place) => place.nodeId === localNodeId.value)) : matches[0]
+  if (!row) return null
+  return { title: row.title ?? row.metadata.title ?? bucket, release: row.metadata.version ?? null }
+}
+const fixedRows = computed(() => fixed.value.map((entry) => ({ entry, database: databaseOf(entry) })))
 
 const choosing = ref<string | null>(null)
 // The dialog adds each pick on its own and then closes; the picks of one choice are one answer.
@@ -70,8 +89,12 @@ const resultsFolder = ref('')
         </div>
         <Button size="sm" variant="outline" @click="choosing = path">{{ pickOf(path) ? 'Change' : 'Choose' }}</Button>
       </div>
-      <div v-for="entry in fixed" :key="entryPath(entry)" class="surface-inline flex flex-wrap items-center gap-3 p-3 text-sm">
-        <div class="min-w-0 flex-1">
+      <div v-for="{ entry, database } in fixedRows" :key="entryPath(entry)" class="surface-inline flex flex-wrap items-center gap-3 p-3 text-sm">
+        <div v-if="database" class="min-w-0 flex-1" :title="entryPath(entry)">
+          <p class="font-medium">{{ database.title }}<template v-if="database.release">, release {{ database.release }}</template></p>
+          <p class="truncate font-mono text-[11px] text-muted-foreground">{{ pickText(entry) }}</p>
+        </div>
+        <div v-else class="min-w-0 flex-1">
           <p class="font-medium">{{ fileName(entryPath(entry)) }}</p>
           <p class="truncate font-mono text-[11px] text-muted-foreground">{{ entryPath(entry) }}</p>
           <p class="truncate font-mono text-xs">{{ pickText(entry) }}</p>

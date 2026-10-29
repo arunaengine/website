@@ -1,12 +1,14 @@
 import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it } from 'vitest'
+import * as Sync from '@/lib/sync'
 import * as Tes from '@/lib/tes'
 import { compileClientComponent, content, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 
 const Slotted = (tag: string) =>
   defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()) })
 const Empty = defineComponent(() => () => null)
+const databaseRows = ref<unknown[]>([])
 const IMAGE = 'harbor.computational.bio.uni-giessen.de/aruna/bakta-rs@sha256:2bf286e66203f8cd5dac0e5b08a7f75156f986330d437d6eef937a3b900f32cc'
 
 function custom() {
@@ -40,6 +42,9 @@ const component = compileClientComponent(new URL('./SavedRunStart.vue', import.m
   '@/components/compute/TesDataRefDialog.vue': moduleDefault(Empty),
   '@/composables/useCustomRun': { injectCustomRun: custom, outputDestination: () => '' },
   '@/lib/tes': Tes,
+  '@/lib/sync': Sync,
+  '@/composables/useDatabases': { useDatabases: () => ({ rows: databaseRows, ensure: () => {} }) },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ localNodeId: ref('node-1') }) },
   '@/lib/savedRuns': { isSecretName: () => false },
   '@lucide/vue': { Star: Empty },
 })
@@ -60,6 +65,21 @@ describe('saved run start', () => {
 
     expect(labels).toEqual(['genome.fasta', 'db'])
     expect(paths).toEqual(['/work/in/genome.fasta', '/work/in/db'])
+  })
+
+  it('names a fixed database input by its title and release with the bucket path in small print', async () => {
+    databaseRows.value = [{
+      bucket: 'bakta-database',
+      places: [{ bucket: 'bakta-database', nodeId: 'node-2' }],
+      title: 'Bakta database (light)',
+      metadata: { database: true, version: '6.0 light', identifiers: [] },
+    }]
+    const { root } = await mountApp(component)
+    const text = content(root)
+
+    expect(text).toContain('Bakta database (light), release 6.0 light')
+    expect(text).toContain('bakta-database/db/')
+    databaseRows.value = []
   })
 })
 
