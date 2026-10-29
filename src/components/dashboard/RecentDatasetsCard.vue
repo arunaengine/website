@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// The latest datasets, newest first from the registry. Run records have their own card, so they are
-// left out; a wider window keeps five datasets to show. A node that cannot order by recency falls
-// back to the loaded catalog window; a failed refresh keeps the list shown.
+// The latest datasets, newest first from the registry. Run records have their own card, so the
+// registry walk pages past them until five datasets are found. A node that cannot order by recency
+// falls back to the loaded catalog window, without runs too; a failed refresh keeps the list shown.
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { MetadataDoc } from '@/data/types'
@@ -11,7 +11,6 @@ import { relativeTime } from '@/lib/utils'
 
 const props = withDefaults(defineProps<{ refreshRevision?: number }>(), { refreshRevision: 0 })
 const SHOWN = 5
-const READ = 25
 
 const { metadata, listRecentMetadata, sessionEpoch } = useAruna()
 const recent = ref<MetadataDoc[] | null>(null)
@@ -21,7 +20,7 @@ let round = 0
 async function load() {
   const mine = ++round
   const epoch = sessionEpoch.value
-  const answer = await listRecentMetadata(READ).catch(() => null)
+  const answer = await listRecentMetadata(SHOWN, { skipRuns: true }).catch(() => null)
   if (mine !== round || epoch !== sessionEpoch.value) return
   if (answer || !settled.value) recent.value = answer
   settled.value = true

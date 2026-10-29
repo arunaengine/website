@@ -1,5 +1,6 @@
 import { ApiError, apiRequest, type ListMetadataResponse, type MetadataDocumentListItem } from '@/lib/api'
 import type { MetadataDoc } from '@/data/types'
+import { datasetPurposeOf } from '@/lib/datasetPurpose'
 import { mapMetadataDoc } from './mapping'
 import {
   acceptedProfileItems,
@@ -21,6 +22,8 @@ export const RECENT_METADATA_LIMIT = 5
 // walks at most this many pages before giving up on filling it.
 export const RECENT_PAGE_FACTOR = 2
 export const RECENT_MAX_PAGES = 3
+// Skipping run records can need many more pages before five datasets turn up.
+export const RECENT_MAX_PAGES_FILTERED = 20
 // A node that does not know `order=recent` ignores the parameter rather than
 // rejecting it, so the response itself is the probe (see isRecencyOrdered).
 let recentOrderUnsupported = false
@@ -165,18 +168,20 @@ export interface RecentWalk {
 // Walks recency-ordered pages until `limit` non-profile documents are found.
 // Filtering profiles/ out of a page can leave the tile short (a window holding
 // only profiles empties it), so a full raw page that came up short is followed
-// by the next one, bounded by RECENT_MAX_PAGES.
+// by the next one, bounded by RECENT_MAX_PAGES. `keep` narrows further; only kept documents count.
 export async function walkRecentPages(
   fetchPage: (offset: number, size: number) => Promise<ListMetadataResponse>,
   limit: number,
+  keep: (doc: MetadataDocumentListItem) => boolean = () => true,
+  maxPages = RECENT_MAX_PAGES,
 ): Promise<RecentWalk> {
   const size = limit * RECENT_PAGE_FACTOR
   const documents: MetadataDocumentListItem[] = []
-  for (let page = 0; page < RECENT_MAX_PAGES; page++) {
+  for (let page = 0; page < maxPages; page++) {
     const response = await fetchPage(page * size, size)
     if (!isRecencyOrdered(response.documents)) return { ordered: false, documents: [] }
     for (const doc of response.documents) {
-      if (!doc.document_path.startsWith('profiles/')) documents.push(doc)
+      if (!doc.document_path.startsWith('profiles/') && keep(doc)) documents.push(doc)
     }
     // Only a full raw page can hide more documents behind it.
     if (documents.length >= limit || response.total_returned < size) break
@@ -188,11 +193,20 @@ export async function walkRecentPages(
 // derives recency from the creation-ordered catalog window. Null means the node
 // cannot order by recency, or the walk found nothing to show, and the caller
 // should fall back to that window.
-export async function listRecentMetadata(limit = RECENT_METADATA_LIMIT): Promise<MetadataDoc[] | null> {
+/** False for a run record, which conforms to the Process Run profile. */
+export const notRunRecord = (doc: MetadataDocumentListItem) => datasetPurposeOf(mapMetadataDoc(doc)) !== 'process-run'
+
+// `skipRuns` leaves run records out while paging, so the newest datasets fill the limit.
+export async function listRecentMetadata(
+  limit = RECENT_METADATA_LIMIT,
+  options: { skipRuns?: boolean } = {},
+): Promise<MetadataDoc[] | null> {
   if (recentOrderUnsupported) return null
   const walk = await walkRecentPages(
     (offset, size) => listCatalogPage({ limit: size, offset, summary: true, order: 'recent' }),
     limit,
+    options.skipRuns ? notRunRecord : undefined,
+    options.skipRuns ? RECENT_MAX_PAGES_FILTERED : RECENT_MAX_PAGES,
   )
   if (!walk.ordered) {
     recentOrderUnsupported = true

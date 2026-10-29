@@ -14,6 +14,8 @@ import {
   sparqlCoverageStatus,
   useAruna,
   walkRecentPages,
+  notRunRecord,
+  RECENT_MAX_PAGES_FILTERED,
 } from './useAruna'
 import { ApiError, apiRequest } from '@/lib/api'
 import type {
@@ -140,6 +142,25 @@ describe('the recent page walk', () => {
     }, 5)
     expect(offsets).toEqual([0])
     expect(walk).toEqual({ ordered: true, documents: [] })
+  })
+
+  it('pages past runs until enough datasets turn up when asked to skip them', async () => {
+    const runDoc = (index: number) => ({
+      ...doc(`runs/${index}`, stamp(index)),
+      rocrate_summary: { '@graph': [{ '@id': './', '@type': 'Dataset', name: `run ${index}`, conformsTo: { '@id': 'https://w3id.org/ro/wfrun/process/0.5' } }] },
+    })
+    expect(notRunRecord(runDoc(1) as MetadataDocumentListItem)).toBe(false)
+    expect(notRunRecord(doc('data/1', stamp(1)))).toBe(true)
+
+    const offsets: number[] = []
+    // The newest 40 records are runs; the datasets come after them.
+    const walk = await walkRecentPages(async (offset, size) => {
+      offsets.push(offset)
+      const docs = Array.from({ length: size }, (_, index) => offset + index).map((at) => (at < 40 ? runDoc(at) : doc(`data/${at}`, stamp(at))))
+      return page(docs as MetadataDocumentListItem[], offset, size)
+    }, 5, notRunRecord, RECENT_MAX_PAGES_FILTERED)
+    expect(offsets).toEqual([0, 10, 20, 30, 40])
+    expect(walk.documents.map((item) => item.document_path)).toEqual(['data/40', 'data/41', 'data/42', 'data/43', 'data/44'])
   })
 
   it('reports an unordered page once', async () => {

@@ -48,7 +48,7 @@ describe('recent datasets', () => {
     listRecentMetadata.mockClear().mockResolvedValueOnce([run('r1', 'Annotate my genome with Bakta'), doc('d1', 'Reef census', '2026-10-28')])
     const mixed = await mountApp(RecentDatasetsCard)
     await flush()
-    expect(listRecentMetadata).toHaveBeenCalledWith(25)
+    expect(listRecentMetadata).toHaveBeenCalledWith(5, { skipRuns: true })
     expect(content(mixed.root)).toContain('Reef census')
     expect(content(mixed.root)).not.toContain('Annotate my genome')
     mixed.app.unmount()
