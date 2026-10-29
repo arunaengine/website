@@ -97,8 +97,8 @@ export interface JobExecutionResponse {
   executor_node_id: string
   // JobState::name() in practice, kept open for states the backend adds.
   state: string
-  started_at_ms: number | null
-  observed_at_ms: number | null
+  started_at_ms?: number | null
+  observed_at_ms?: number | null
   canonical: boolean
 }
 

@@ -650,6 +650,20 @@ describe('distributed job detail components', () => {
     mounted.app.unmount()
   })
 
+  it('shows an execution the node sends without times instead of failing', async () => {
+    const listed = {
+      ...family,
+      execution_list: [{ execution_id: '01EXECUTIONNOTIME', executor_node_id: 'node-giessen', state: 'running', canonical: false }],
+      executions: 1,
+    } as JobFamilyResponse
+
+    const mounted = await mount(executionsTable(), { family: listed })
+
+    expect(mounted.errors).toEqual([])
+    expect(content(mounted.root)).toContain('not recorded')
+    mounted.app.unmount()
+  })
+
   it('names a catch-up instead of hiding the quiet execution', async () => {
     const listed: JobFamilyResponse = {
       ...family,

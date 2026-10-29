@@ -22,7 +22,7 @@ const caughtUp = computed(
 )
 
 function silentFor(execution: JobExecutionResponse): string {
-  if (execution.observed_at_ms === null) return 'silent'
+  if (execution.observed_at_ms == null) return 'silent'
   return `silent for ${formatDuration(Date.now() - execution.observed_at_ms)}`
 }
 
@@ -42,11 +42,12 @@ function roleOf(execution: JobExecutionResponse): string {
   }
 }
 
-function timeOf(ms: number | null): string {
-  return ms === null ? 'not recorded' : new Date(ms).toLocaleTimeString()
+// The node leaves an unknown time out, so it arrives as null or not at all.
+function timeOf(ms: number | null | undefined): string {
+  return ms == null ? 'not recorded' : new Date(ms).toLocaleTimeString()
 }
-function isoOf(ms: number | null): string | undefined {
-  return ms === null ? undefined : new Date(ms).toISOString()
+function isoOf(ms: number | null | undefined): string | undefined {
+  return ms == null ? undefined : new Date(ms).toISOString()
 }
 </script>
 
