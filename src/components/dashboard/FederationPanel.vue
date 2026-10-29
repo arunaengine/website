@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useNow } from '@vueuse/core'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import type { RealmNodeInfo } from '@/lib/api'
-import { connectionLabel, connectionVariant, kindLabel } from '@/components/nodes/node-display'
+import { connectionLabel, connectionVariant, kindLabel, nodeName } from '@/components/nodes/node-display'
 import { THIS_COMPUTER, useRealmNodes } from '@/composables/useRealmNodes'
 import { isDesktop } from '@/lib/desktop'
 import { relativeTime, truncateMiddle } from '@/lib/utils'
@@ -169,6 +169,13 @@ function heartbeatLabel(node: RealmNodeInfo): string | null {
   return ms && now.value ? relativeTime(new Date(ms).toISOString()) : null
 }
 
+// Each node goes by the shared name rule, cut to fit under its ring; the id stays in the tooltip.
+const LABEL_MAX = 22
+function label(node: RealmNodeInfo): string {
+  const chars = Array.from(nodeName(node))
+  return chars.length > LABEL_MAX ? `${chars.slice(0, LABEL_MAX - 1).join('')}…` : chars.join('')
+}
+
 function nodeTitle(node: RealmNodeInfo): string {
   const parts = [truncateMiddle(node.node_id), kindLabel[node.kind], connectionLabel(node)]
   const beat = heartbeatLabel(node)
@@ -307,7 +314,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
               role="link"
               tabindex="0"
               :opacity="nodeOpacity(p.node)"
-              :aria-label="`View ${truncateMiddle(p.node.node_id)} on the status page`"
+              :aria-label="`View ${nodeName(p.node)} on the status page`"
               @click="openNode(p.node.node_id)"
               @keydown.enter="openNode(p.node.node_id)"
             >
@@ -337,12 +344,12 @@ function loadArc(cx: number, cy: number, permille: number): string {
                 :x="p.cx"
                 :y="p.cy + RING + 14"
                 text-anchor="middle"
-                font-family="JetBrains Mono, monospace"
+                font-family="Inter, sans-serif"
                 font-size="10"
                 font-weight="600"
                 fill="hsl(var(--foreground))"
               >
-                {{ truncateMiddle(p.node.node_id, 6, 4) }}
+                {{ label(p.node) }}
               </text>
             </g>
 
@@ -352,7 +359,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
               class="fed-node cursor-pointer focus:outline-none"
               role="link"
               tabindex="0"
-              :aria-label="`View ${truncateMiddle(hub.node_id)} on the status page`"
+              :aria-label="`View ${nodeName(hub)} on the status page`"
               @click="openNode(hub.node_id)"
               @keydown.enter="openNode(hub.node_id)"
             >
@@ -372,15 +379,16 @@ function loadArc(cx: number, cy: number, permille: number): string {
                 :x="CX"
                 :y="CY + RING + 16"
                 text-anchor="middle"
-                font-family="JetBrains Mono, monospace"
+                font-family="Inter, sans-serif"
                 font-size="10"
                 font-weight="600"
                 fill="hsl(var(--foreground))"
               >
-                {{ truncateMiddle(hub.node_id, 6, 4) }}
+                {{ label(hub) }}
               </text>
-              <text :x="CX" :y="CY + RING + 27" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="hsl(var(--muted-foreground))">
-                {{ hubName ?? 'this node' }}
+              <!-- In the browser the hub serves this portal; in the desktop its name above already says which. -->
+              <text v-if="!desktop" :x="CX" :y="CY + RING + 27" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="hsl(var(--muted-foreground))">
+                this node
               </text>
             </g>
 

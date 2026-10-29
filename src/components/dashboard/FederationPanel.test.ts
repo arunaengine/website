@@ -27,12 +27,16 @@ beforeAll(async () => {
   FederationPanel = (await import('./FederationPanel.vue')).default
 })
 
-function realmNode(nodeId: string, kind: string): Record<string, unknown> {
-  return { node_id: nodeId, kind, configured: true, present: true, connection_status: 'connected' }
+function realmNode(nodeId: string, kind: string, displayName?: string): Record<string, unknown> {
+  return { node_id: nodeId, kind, configured: true, present: true, connection_status: 'connected', display_name: displayName }
 }
 
 describe('topology', () => {
-  const nodes = [realmNode('aaaa-mgmt-1111', 'management'), realmNode('bbbb-server-2222', 'server'), realmNode('cccc-server-3333', 'server')]
+  const nodes = [
+    realmNode('aaaa-mgmt-1111', 'management', 'Giessen management'),
+    realmNode('bbbb-server-2222', 'server', 'Giessen storage 1'),
+    realmNode('cccc-server-3333', 'server', 'Giessen storage 2'),
+  ]
   const render = () => renderToString(createSSRApp({ render: () => h(FederationPanel, { nodes, localPeerId: 'aaaa-mgmt-1111' }) }))
 
   beforeEach(() => {
@@ -57,11 +61,24 @@ describe('topology', () => {
     const html = await render()
 
     expect(html).toContain(', node-1</title>')
-    expect(html).toMatch(/>\s*node-1\s*<\/text>/)
+    // The hub carries its name once, as its label; no caption repeats it.
+    expect(html).toMatch(/>\s*Giessen management\s*<\/text>/)
+    expect(html).not.toMatch(/>\s*node-1\s*<\/text>/)
     expect(html).toContain('Connections as seen by node-1.')
     expect(html).not.toMatch(/>\s*this node\s*</)
     expect(html).not.toContain(', this node')
     expect(html).not.toContain('Edges show connections')
+  })
+
+  it('labels every node by its name, never by a shortened id', async () => {
+    const html = await render()
+    for (const name of ['Giessen management', 'Giessen storage 1', 'Giessen storage 2']) {
+      expect(html).toMatch(new RegExp(`>\\s*${name}\\s*</text>`))
+    }
+    // The id stays in the hover title only, never in a visible label.
+    expect(html).not.toMatch(/<text[^>]*>\s*(aaaa|bbbb|cccc)/)
+    expect(html).toContain('aria-label="View Giessen storage 1 on the status page"')
+    expect(html.match(/>\s*this node\s*<\/text>/g)).toHaveLength(1)
   })
 
   it('keeps this node and the portal footnote in the browser', async () => {
