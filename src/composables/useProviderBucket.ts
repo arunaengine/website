@@ -18,7 +18,8 @@ export function useProviderBucket(
 
   // Once per group and node: the links of every bucket arrive in one list.
   watch(
-    [groupId, nodeId, sessionEpoch],
+    // The node's address joins once the realm names the node.
+    [groupId, nodeId, sessionEpoch, () => (nodeId.value ? nodeApiBase(nodeId.value) : apiBaseUrl.value)],
     async ([id, node]) => {
       const current = ++seq
       links.value = []

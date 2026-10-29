@@ -56,6 +56,8 @@ function client() {
 async function load() {
   const current = generation
   stopPoll()
+  // The node's address is known once the realm names it; the watch below reads again then.
+  if (!client().baseUrl) return
   try {
     const answer = await getBucketCheck(props.bucket, { limit: 1000 }, client())
     if (current !== generation) return
@@ -74,7 +76,7 @@ async function load() {
 }
 
 watch(
-  () => [props.bucket, props.nodeId],
+  () => [props.bucket, props.nodeId, client().baseUrl],
   () => {
     generation += 1
     progress.value = null

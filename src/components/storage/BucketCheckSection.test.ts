@@ -6,6 +6,8 @@ import * as Utils from '@/lib/utils'
 import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
 
 const getBucketCheck = vi.fn()
+// Another node's address, unknown until the realm read with the token names the node.
+const farBase = ref<string | null>('https://b.test/api/v1')
 const startBucketCheck = vi.fn()
 const cleanBucketCheck = vi.fn()
 
@@ -34,7 +36,7 @@ const Section = compileClientComponent(new URL('./BucketCheckSection.vue', impor
   '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('i', p.label) })),
   '@/composables/useAruna': { isUnsupportedEndpoint: (err: unknown) => err instanceof Api.ApiError && err.status === 404 },
   '@/composables/aruna/state': { apiBaseUrl: ref('https://a.test/api/v1'), authToken: ref('token') },
-  '@/composables/s3/endpoints': { localNodeId: () => 'n1', nodeApiBase: () => 'https://a.test/api/v1' },
+  '@/composables/s3/endpoints': { localNodeId: () => 'n1', nodeApiBase: (node: string) => (node === 'n1' ? 'https://a.test/api/v1' : farBase.value) },
   '@/lib/api': { ...Api, getBucketCheck, startBucketCheck, cleanBucketCheck },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
   '@/lib/utils': Utils,
@@ -65,6 +67,19 @@ beforeEach(() => {
 })
 
 describe('BucketCheckSection', () => {
+  it('reads another node once its address is known, without an error before', async () => {
+    farBase.value = null
+    getBucketCheck.mockResolvedValue(done(2))
+    const mounted = await mountApp(defineComponent(() => () => h(Section, { bucket: 'reef', nodeId: 'n2' })))
+    await flush()
+    expect(getBucketCheck).not.toHaveBeenCalled()
+
+    farBase.value = 'https://b.test/api/v1'
+    await flush()
+    expect(getBucketCheck).toHaveBeenCalledWith('reef', { limit: 1000 }, { baseUrl: 'https://b.test/api/v1', token: 'token' })
+    mounted.app.unmount()
+  })
+
   it('starts a check', async () => {
     getBucketCheck.mockResolvedValue({ bucket: 'reef', broken: [] })
     const mounted = await mount()

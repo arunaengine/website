@@ -4,7 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@/composables/useAruna', () => ({
   useAruna: () => ({ apiBaseUrl: ref('https://home.test/api/v1'), authToken: ref('t'), sessionEpoch: ref(1) }),
 }))
-vi.mock('@/composables/s3/endpoints', () => ({ nodeApiBase: (id: string) => `https://${id}.test/api/v1` }))
+// Node 3's address is unknown until the realm read with the token names it.
+const named = vi.hoisted(() => ({ node3: null as null | { value: boolean } }))
+vi.mock('@/composables/s3/endpoints', async () => {
+  const { ref } = await import('vue')
+  named.node3 = ref(true)
+  return { nodeApiBase: (id: string) => (id !== 'node-3' || named.node3!.value ? `https://${id}.test/api/v1` : null) }
+})
 
 const { useProviderBucket } = await import('./useProviderBucket')
 
@@ -47,6 +53,18 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('provider bucket line', () => {
+  it('asks a node once the realm names its address', async () => {
+    serve([{ ...LINK, backend_id: 'split', backend_prefix: 'team-a-results/' }])
+    named.node3!.value = false
+    const { provider } = start('node-3')
+    await settle()
+    expect(urls).toEqual([])
+
+    named.node3!.value = true
+    await settle()
+    expect(provider.value).toBe('team-a-results')
+  })
+
   it('asks the browsed node and names the first folder of a whole-bucket link', async () => {
     serve([{ ...LINK, backend_id: 'split', backend_prefix: 'team-a-results/' }])
     const { provider } = start('node-2')
