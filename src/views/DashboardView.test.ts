@@ -392,7 +392,9 @@ describe('authenticated dashboard scope', () => {
 
     expect(text).toContain('scope toggle realm')
     expect(text).toContain('Storage 2 KB stored 64 B referenced')
-    expect(text).toContain('Data 11 objects 3 buckets, 2 databases')
+    // The database list holds only what this caller may read, so it is no realm total.
+    expect(text).toContain('Data 11 objects 3 buckets')
+    expect(text).not.toContain('database')
     expect(text).toContain('Work 9 datasets')
     expect(text).toContain('group quota cards')
     expect(text).not.toContain('my stats cards')

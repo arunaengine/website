@@ -17,7 +17,6 @@ import { RouterLink, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
-import { useDatabases } from '@/composables/useDatabases'
 import { useNodeImports } from '@/composables/useNodeImports'
 import { computerName, useRealmNodes } from '@/composables/useRealmNodes'
 import { useDashboardScope } from '@/composables/useDashboardScope'
@@ -182,18 +181,12 @@ const publicOverview = computed(() => realmInfo.value?.public_overview)
 const realmTotals = computed(() => usageInfo.value?.realm ?? null)
 const realmBuckets = useRealmBucketCount(realmTotals)
 const plural = (count: number, one: string, many: string) => (count === 1 ? one : many)
-const databases = useDatabases()
-databases.ensure()
+// No database count here: the list holds only the databases the caller may read, not the realm's.
 const realmDataLine = computed(() => {
   const totals = realmTotals.value
   if (!totals) return ''
   const buckets = realmBuckets.value ?? { count: totals.buckets, exact: true }
-  const parts = [`${countText(buckets, formatCount)} ${plural(buckets.exact ? buckets.count : 2, 'bucket', 'buckets')}`]
-  if (databases.state.value === 'ready') {
-    const count = databases.rows.value.length
-    parts.push(`${databases.complete.value ? '' : 'at least '}${formatCount(count)} ${plural(count, 'database', 'databases')}`)
-  }
-  return parts.join(', ')
+  return `${countText(buckets, formatCount)} ${plural(buckets.exact ? buckets.count : 2, 'bucket', 'buckets')}`
 })
 // A guest sees the public counts; unknown stays unknown, never zero.
 const realmDatasets = computed(() => (currentUser.value ? realmDocuments.value : publicOverview.value?.live_datasets) ?? null)
