@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useNow } from '@vueuse/core'
-import { useRouter } from 'vue-router'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import type { RealmNodeInfo } from '@/lib/api'
 import { connectionLabel, connectionVariant, kindLabel } from '@/components/nodes/node-display'
@@ -18,11 +17,9 @@ const props = defineProps<{
   computer?: { id: string; name: string; peers: string[] } | null
 }>()
 
-const router = useRouter()
-
-function openNode(id: string) {
-  void router.push({ name: 'status', query: { node: id } })
-}
+// The page decides what a chosen node opens, so choosing the same node again works too.
+const emit = defineEmits<{ select: [nodeId: string] }>()
+const openNode = (id: string) => emit('select', id)
 
 // Topology coordinate system: everything below lives in this viewBox.
 const VW = 600

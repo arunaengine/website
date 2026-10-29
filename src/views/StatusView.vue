@@ -226,25 +226,35 @@ const lastUpdatedLabel = computed(() =>
 function toggleNode(nodeId: string) {
   expandedId.value = expandedId.value === nodeId ? '' : nodeId
 }
-const expandedNode = computed(() => sortedNodes.value.find((node) => node.node_id === expandedId.value) ?? null)
+// The cards and their details come from the same realm snapshot as the map; in the desktop that
+// is a realm node's, which knows the names and heartbeats the device's own copy lacks.
+const cardNodes = computed(() =>
+  [...panelInfra.value].sort((a, b) => kindOrder[a.kind] - kindOrder[b.kind] || a.node_id.localeCompare(b.node_id)),
+)
+const expandedNode = computed(() => cardNodes.value.find((node) => node.node_id === expandedId.value) ?? null)
 // The Status page reads no import jobs; the landing view shows them.
 const noImports = new Map()
 
 const targetNodeId = computed(() => (typeof route.query.node === 'string' ? route.query.node : ''))
 let highlightedTarget = ''
 
+async function showNode(id: string) {
+  expandedId.value = id
+  await nextTick()
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  document
+    .getElementById(`status-node-${id}`)
+    ?.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' })
+}
+
+// A link from elsewhere names the node in the query; a node chosen on the map opens directly.
 watch(
-  [targetNodeId, sortedNodes] as const,
-  async ([id, nodes]) => {
+  [targetNodeId, cardNodes] as const,
+  ([id, nodes]) => {
     if (!id || id === highlightedTarget) return
     if (!nodes.some((node) => node.node_id === id)) return
     highlightedTarget = id
-    expandedId.value = id
-    await nextTick()
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    document
-      .getElementById(`status-node-${id}`)
-      ?.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' })
+    void showNode(id)
   },
   { immediate: true },
 )
@@ -327,6 +337,7 @@ watch(
           :nodes="panelInfra"
           :local-peer-id="(realmView?.info ?? nodeInfo)?.node.peer_id"
           :computer="computer"
+          @select="showNode"
         />
       </section>
 
@@ -351,11 +362,11 @@ watch(
             <Boxes class="h-4 w-4 text-primary" />
             <h2 class="font-display text-sm font-semibold text-aruna-navy">Realm nodes</h2>
           </div>
-          <Badge variant="outline" size="count">{{ sortedNodes.length }}</Badge>
+          <Badge variant="outline" size="count">{{ cardNodes.length }}</Badge>
         </header>
-        <div v-if="sortedNodes.length" class="px-5 py-4">
+        <div v-if="cardNodes.length" class="px-5 py-4">
           <NodeCards
-            :nodes="sortedNodes"
+            :nodes="cardNodes"
             :devices="[]"
             :imports="noImports"
             :local-node-id="localPeerId"
