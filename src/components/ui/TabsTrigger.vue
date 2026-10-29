@@ -7,7 +7,7 @@ const props = defineProps<TabsTriggerProps & { class?: string }>()
 const forwarded = useForwardProps(props)
 const classes = computed(() =>
   cn(
-    'inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow disabled:pointer-events-none disabled:opacity-50',
+    'inline-flex h-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-sm font-medium ring-offset-background transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm dark:data-[state=active]:shadow-none disabled:pointer-events-none disabled:opacity-50',
     props.class,
   ),
 )

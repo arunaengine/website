@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// The portal's switch for a small set of choices: a bordered box holding one
-// small button per option, the picked one filled. The option labels name what
-// each shows, so the control needs no caption of its own.
+// The portal's segmented control for a small set of choices: a muted track holding one button
+// per option, the picked one on the card background. The option labels name what each shows,
+// so the control needs no caption of its own.
 import type { Component } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import { cn } from '@/lib/utils'
@@ -25,7 +25,7 @@ function select(value: string) {
 
 <template>
   <div
-    :class="cn('inline-flex rounded-md border border-border p-0.5', props.class)"
+    :class="cn('inline-flex gap-0.5 rounded-lg border border-border-subtle bg-muted p-0.5', props.class)"
     role="group"
     :aria-label="ariaLabel"
   >
@@ -33,7 +33,10 @@ function select(value: string) {
       v-for="option in options"
       :key="option.value"
       size="sm"
-      :variant="modelValue === option.value ? 'secondary' : 'ghost'"
+      variant="ghost"
+      :class="modelValue === option.value
+        ? 'bg-card text-foreground shadow-sm hover:bg-card hover:text-foreground dark:shadow-none'
+        : 'text-muted-foreground hover:bg-transparent hover:text-foreground'"
       :aria-pressed="modelValue === option.value"
       @click="select(option.value)"
     >

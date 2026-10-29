@@ -38,4 +38,11 @@ describe('dashboard scope toggle', () => {
     await click(button(root, 'Whole realm'))
     expect(update).toHaveBeenCalledWith('realm')
   })
+
+  it('puts the picked option on the card background in a muted track', async () => {
+    const { root } = await mountApp(toggle, { props: { modelValue: 'personal' } })
+    expect(String(button(root, 'My groups').props.class)).toContain('bg-card')
+    expect(String(button(root, 'Whole realm').props.class)).toContain('text-muted-foreground')
+    expect(String(button(root, 'My groups').parent!.props.class)).toContain('bg-muted')
+  })
 })
