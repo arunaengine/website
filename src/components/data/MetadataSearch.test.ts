@@ -122,4 +122,33 @@ describe('bucket metadata search', () => {
     expect(content(root)).toContain('Some parts of this bucket could not be searched')
     expect(content(root)).not.toContain('Show more')
   })
+
+  it('keeps a failed first name page through details paging and asks for it again', async () => {
+    const named = { key: 'reads/hello.txt', bucket: 'ncbi', issuer_node_id: 'n1', group_id: 'g1' }
+    let nameAnswers = 0
+    searchObjects.mockReset()
+    searchObjects.mockImplementation(async (_q: string, options: { match: string; cursor?: string }) => {
+      if (options.match === 'metadata') return { hits: [], next_cursor: options.cursor ? null : 'd2', coverage: { complete: true } }
+      nameAnswers += 1
+      if (nameAnswers < 3) throw new Error('down')
+      return { hits: [named], next_cursor: null, coverage: { complete: true } }
+    })
+    const { root } = await mountApp(component, { props: { bucket: 'ncbi', nodeId: null } })
+    ;(element(root, (node) => node.tag === 'input').props['onUpdate:modelValue'] as (value: string) => void)('hello')
+    await flush()
+    const more = () => (element(root, (node) => node.tag === 'button' && content(node) === 'Show more').props.onClick as () => void)()
+
+    more()
+    await flush()
+    expect(searchObjects).toHaveBeenLastCalledWith('hello', { bucket: 'ncbi', match: 'substring', limit: 50, cursor: undefined })
+    expect(content(root)).toContain('The name search failed')
+    expect(content(root)).not.toContain('Nothing matches.')
+
+    more()
+    await flush()
+    expect(content(root)).toContain('reads/hello.txt')
+    expect(content(root)).not.toContain('The name search failed')
+    expect(content(root)).not.toContain('Show more')
+  })
 })
+

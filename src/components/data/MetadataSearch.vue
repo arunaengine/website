@@ -74,8 +74,8 @@ async function search(more = false) {
     const namesCursor = more ? nameCursor.value : null
     const [page, named] = await Promise.all([
       !more || detailsCursor ? searchObjects(query.value, { bucket: props.bucket, match: 'metadata', limit: 50, cursor: detailsCursor ?? undefined }) : null,
-      words.length >= 2 && (!more || namesCursor)
-        ? searchObjects(words, { bucket: props.bucket, match: 'substring', limit: 50, cursor: namesCursor ?? undefined }).catch(() => 'failed' as const)
+      words.length >= 2 && (!more || namesCursor !== null)
+        ? searchObjects(words, { bucket: props.bucket, match: 'substring', limit: 50, cursor: namesCursor || undefined }).catch(() => 'failed' as const)
         : null,
     ])
     if (run !== runs) return
@@ -84,10 +84,12 @@ async function search(more = false) {
     const seen = new Set<string>()
     hits.value = found.filter((hit) => !seen.has(`${hit.issuer_node_id}/${hit.key}`) && Boolean(seen.add(`${hit.issuer_node_id}/${hit.key}`)))
     cursor.value = page?.next_cursor ?? null
-    // A failed name page keeps its cursor, so Show more asks for it again.
-    if (names || !more) nameCursor.value = names?.next_cursor ?? null
+    // A failed name page keeps its place ('' is the first page), so Show more asks for it again.
+    if (names) nameCursor.value = names.next_cursor ?? null
+    else if (named === 'failed') nameCursor.value = namesCursor ?? ''
+    else if (!more) nameCursor.value = null
     nameWords.value = words
-    nameFailed.value = named === 'failed'
+    nameFailed.value = named === null ? more && nameFailed.value : named === 'failed'
     complete.value = (!more || complete.value) && (page?.coverage.complete ?? true) && (names?.coverage.complete ?? true)
   } catch (cause) {
     if (run === runs) failure.value = errorMessage(cause)
@@ -135,6 +137,6 @@ function drop(index: number) {
     <p v-else-if="hits && complete && !nameFailed" class="text-xs text-muted-foreground">Nothing matches.</p>
     <p v-if="hits && !complete" class="text-[11px] text-muted-foreground">Some parts of this bucket could not be searched, so matches may be missing.</p>
     <p v-if="hits && nameFailed" class="text-[11px] text-muted-foreground">The name search failed, so matches by name may be missing.</p>
-    <Button v-if="cursor || nameCursor" size="sm" variant="ghost" :disabled="busy" @click="search(true)">Show more</Button>
+    <Button v-if="cursor || nameCursor !== null" size="sm" variant="ghost" :disabled="busy" @click="search(true)">Show more</Button>
   </section>
 </template>
