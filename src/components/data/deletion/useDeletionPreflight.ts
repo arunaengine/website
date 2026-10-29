@@ -6,6 +6,8 @@ import { useAruna } from '@/composables/useAruna'
 import { useS3 } from '@/composables/useS3'
 import {
   exactFileBacklinkPreflight,
+  locationOf,
+  targetIdentity,
   preflightBacklinks,
   type BacklinkPreflightResponse,
   type BacklinkPreflightStorageOperation,
@@ -236,10 +238,13 @@ export function mergeBulkBacklinkPreflights(
     const covers = entryCovers(target, { key, exact })
     for (const result of response.targets) {
       const targetedVersions = result.targeted_versions.filter(covers)
-      if (!targetedVersions.length) continue
-      const existing = targets.get(result.content_w3id)
+      const location = locationOf(result.location_iri)
+      if (!targetedVersions.length && !(location && covers(location))) continue
+      // Stored bytes are one target by content identity, unread ones one target by location.
+      const identity = targetIdentity(result)
+      const existing = targets.get(identity)
       if (!existing) {
-        targets.set(result.content_w3id, { ...result, targeted_versions: targetedVersions })
+        targets.set(identity, { ...result, targeted_versions: targetedVersions })
         continue
       }
       const locations = new Map(
@@ -263,7 +268,7 @@ export function mergeBulkBacklinkPreflights(
       const wouldRemoveLast =
         existing.would_remove_last_resolvable_aruna_location ||
         result.would_remove_last_resolvable_aruna_location
-      targets.set(result.content_w3id, {
+      targets.set(identity, {
         ...existing,
         targeted_versions: [...locations.values()],
         visible_references: [...references.values()],

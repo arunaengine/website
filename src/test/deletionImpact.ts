@@ -5,6 +5,7 @@ import { defineComponent, h, type Component } from 'vue'
 import * as VueRuntime from 'vue'
 import * as Utils from '@/lib/utils'
 import { compileClientComponent, moduleDefault } from '@/test/clientRender'
+import * as Backlinks from '@/lib/backlinks'
 import type { BacklinkPreflightResponse } from '@/lib/backlinks'
 
 export const CONTENT_W3ID = 'w3id://content/reef'
@@ -32,6 +33,7 @@ export function referencedContent(count: number): BacklinkPreflightResponse {
     targets: [
       {
         content_w3id: CONTENT_W3ID,
+        location_iri: null,
         targeted_versions: [],
         visible_references: Array.from({ length: count }, (_, index) => ({
           document_id: `d-${index + 1}`,
@@ -134,6 +136,7 @@ export function referencesPanel(): Component {
       vue: VueRuntime,
       '@lucide/vue': namedIcons,
       '@/lib/utils': Utils,
+      '@/lib/backlinks': Backlinks,
       '@/components/ui/CompactList.vue': moduleDefault(compactList()),
       '@/components/ui/DocsLink.vue': moduleDefault(DocsLinkStub),
       '@/components/ui/NodeLabel.vue': moduleDefault(NodeLabelStub),

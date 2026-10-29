@@ -14,6 +14,7 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 import { namedIcons, referencedContent } from '@/test/deletionImpact'
+import * as Backlinks from '@/lib/backlinks'
 import type { BacklinkPreflightResponse } from '@/lib/backlinks'
 
 const Slotted = (tag: string) =>
@@ -45,6 +46,7 @@ const component = compileClientComponent(new URL('./ReferencedBy.vue', import.me
   vue: VueRuntime,
   'vue-router': { RouterLink: RouterLinkStub },
   '@lucide/vue': namedIcons,
+  '@/lib/backlinks': Backlinks,
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
   '@/components/ui/DocsLink.vue': moduleDefault(DocsLinkStub),
   '@/components/ui/NodeLabel.vue': moduleDefault(NodeLabelStub),
@@ -133,6 +135,21 @@ describe('referenced by', () => {
     expect(popover(root)).toContain('Not checked: literal content url. literal objects are not indexed')
     const docs = element(root, (node) => node.props['data-topic'] === 'data-and-deletion')
     expect(docs.props['data-section']).toBe('What the reference check covers')
+  })
+
+  it('stays complete for unread files found by location and says so in one short line', async () => {
+    const response = referencedContent(1)
+    response.targets = [
+      { ...response.targets[0], content_w3id: null, location_iri: 's3://bakrep/a/b.gff3' },
+      { ...response.targets[0], content_w3id: 'https://w3id.org/aruna/data/abc', location_iri: null, visible_references: [{ document_id: 'd9', title: 'Stored run' }] },
+    ]
+    response.coverage.excluded_forms = [{ form: 'unread_content_w3id', reason: 'a long backend reason about content identities' }]
+    const root = await render(response)
+
+    expect(button(root, 'Complete')).toBeTruthy()
+    expect(links(root)).toEqual(['Reef survey 01', 'Stored run'])
+    expect(popover(root)).toContain('Files not read yet are found by their location only.')
+    expect(popover(root)).not.toContain('a long backend reason')
   })
 
   it('discloses restricted references without naming them', async () => {

@@ -156,6 +156,7 @@ describe('Data Manager version-aware deletion', () => {
     const response = {
       targets: [{
         content_w3id: 'https://w3id.org/aruna/data/sibling',
+        location_iri: null,
         targeted_versions: [{ node_id: 'node-a', bucket: 'data', key: 'foo.bar', version_id: 'v1' }],
         visible_references: [{ document_id: 'sibling-doc', title: 'Sibling dataset' }],
         hidden_references_exist: false,

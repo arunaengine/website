@@ -38,8 +38,11 @@ export interface BacklinkPreflightVisibleReference {
   title: string
 }
 
+// Exactly one of the two names a target: the content identity of stored bytes, or the
+// `s3://bucket/key` location of reference and pending versions, whose bytes were never read.
 export interface BacklinkPreflightTargetResult {
-  content_w3id: string
+  content_w3id: string | null
+  location_iri: string | null
   targeted_versions: BacklinkPreflightLocation[]
   visible_references: BacklinkPreflightVisibleReference[]
   hidden_references_exist: boolean
@@ -79,23 +82,43 @@ export interface BacklinkPreflightResponse {
   coverage: BacklinkPreflightCoverage
 }
 
+/** The excluded form a location target brings: a stated limit of the lookup, not a failure. */
+export const UNREAD_CONTENT_FORM = 'unread_content_w3id'
+
+/** What names a target, whichever of the two it carries. */
+export function targetIdentity(target: Pick<BacklinkPreflightTargetResult, 'content_w3id' | 'location_iri'>): string {
+  return target.content_w3id ?? target.location_iri ?? ''
+}
+
+/** The bucket and key an `s3://bucket/key` location names; null for anything else. */
+export function locationOf(iri: string | null): { bucket: string; key: string } | null {
+  const match = iri?.match(/^s3:\/\/([^/]+)\/(.+)$/)
+  return match ? { bucket: match[1], key: match[2] } : null
+}
+
 export function exactFileBacklinkPreflight(
   response: BacklinkPreflightResponse,
   bucket: string,
   key: string,
 ): BacklinkPreflightResponse {
-  const exact = response.targets.every((target) =>
-    target.targeted_versions.every(
-      (location) => location.bucket !== bucket || location.key === key,
-    ),
-  )
+  // A location target names its key as well as listing its versions.
+  const named = (target: BacklinkPreflightTargetResult) => locationOf(target.location_iri)
+  const exact = response.targets.every((target) => {
+    const location = named(target)
+    return (
+      (!location || location.bucket !== bucket || location.key === key) &&
+      target.targeted_versions.every((version) => version.bucket !== bucket || version.key === key)
+    )
+  })
   return {
     ...response,
     targets: response.targets.flatMap((target) => {
       const targetedVersions = target.targeted_versions.filter(
         (location) => location.bucket === bucket && location.key === key,
       )
-      return targetedVersions.length ? [{ ...target, targeted_versions: targetedVersions }] : []
+      const location = named(target)
+      const thisFile = location?.bucket === bucket && location.key === key
+      return targetedVersions.length || thisFile ? [{ ...target, targeted_versions: targetedVersions }] : []
     }),
     complete: exact && response.complete,
     coverage: {

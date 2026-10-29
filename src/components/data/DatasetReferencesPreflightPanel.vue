@@ -6,7 +6,7 @@ import DocsLink from '@/components/ui/DocsLink.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import type { BacklinkPreflightResponse, BacklinkPreflightTargetResult } from '@/lib/backlinks'
+import { targetIdentity, UNREAD_CONTENT_FORM, type BacklinkPreflightResponse, type BacklinkPreflightTargetResult } from '@/lib/backlinks'
 import { relativeTime } from '@/lib/utils'
 
 const props = withDefaults(defineProps<{
@@ -55,9 +55,9 @@ const targets = computed(() => props.preflight?.targets ?? [])
 const referenceRows = computed(() =>
   targets.value.flatMap((target) =>
     target.visible_references.map((reference) => ({
-      key: `${target.content_w3id}\n${reference.document_id}`,
+      key: `${targetIdentity(target)}\n${reference.document_id}`,
       text: reference.title,
-      detail: target.content_w3id,
+      detail: targetIdentity(target),
       to: { name: 'dataset', params: { id: reference.document_id } },
     })),
   ),
@@ -70,7 +70,7 @@ const hiddenReferences = computed(() =>
 function contentRows(matching: (target: BacklinkPreflightTargetResult) => boolean) {
   return targets.value
     .filter(matching)
-    .map((target) => ({ key: target.content_w3id, text: target.content_w3id }))
+    .map((target) => ({ key: targetIdentity(target), text: targetIdentity(target) }))
 }
 
 const lastLocationRows = computed(() =>
@@ -125,7 +125,10 @@ const nodeRows = computed(() =>
 
 const excludedForms = computed(() =>
   (props.preflight?.coverage.excluded_forms ?? [])
-    .map((excluded) => `${displayValue(excluded.form)} (${excluded.reason})`)
+    .map((excluded) =>
+      excluded.form === UNREAD_CONTENT_FORM
+        ? 'files not read yet, found by location only'
+        : `${displayValue(excluded.form)} (${excluded.reason})`)
     .join(', '),
 )
 </script>

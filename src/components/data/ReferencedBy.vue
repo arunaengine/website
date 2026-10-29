@@ -9,7 +9,7 @@ import DocsLink from '@/components/ui/DocsLink.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Popover from '@/components/ui/Popover.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import type { BacklinkPreflightResponse, BacklinkPreflightVisibleReference } from '@/lib/backlinks'
+import { UNREAD_CONTENT_FORM, type BacklinkPreflightResponse, type BacklinkPreflightVisibleReference } from '@/lib/backlinks'
 import { relativeTime } from '@/lib/utils'
 
 const props = defineProps<{
@@ -159,8 +159,10 @@ const badgeClass = computed(() =>
                   <span v-if="row.asOf">as of {{ row.asOf }}</span>
                 </li>
               </ul>
+              <!-- A stated limit, not a failure: it never makes the lookup partial. -->
               <p v-for="excluded in preflight.coverage.excluded_forms" :key="excluded.form" class="text-muted-foreground">
-                Not checked: {{ displayValue(excluded.form) }}. {{ excluded.reason }}
+                <template v-if="excluded.form === UNREAD_CONTENT_FORM">Files not read yet are found by their location only.</template>
+                <template v-else>Not checked: {{ displayValue(excluded.form) }}. {{ excluded.reason }}</template>
               </p>
               <DocsLink topic="data-and-deletion" section="What the reference check covers" />
             </div>
