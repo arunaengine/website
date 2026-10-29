@@ -74,8 +74,10 @@ const RowStub = defineComponent({
     place: { type: String, default: null },
     placeTitle: { type: String, default: null },
     linkedTo: { type: String, default: undefined },
+    pinnable: { type: Boolean, default: true },
+    pinned: Boolean,
   },
-  emits: ['open'],
+  emits: ['open', 'toggle-pin'],
   setup: (props, { slots, emit }) => () =>
     h('div', [
       h(
@@ -84,6 +86,7 @@ const RowStub = defineComponent({
         props.bucket,
       ),
       h('span', { role: 'tooltip' }, slots.tooltip?.()),
+      props.pinnable ? h('button', { 'aria-label': `${props.pinned ? 'Unpin' : 'Pin'} ${props.bucket}`, onClick: () => emit('toggle-pin') }) : null,
       props.job ? h('em', { 'data-testid': 'row-job' }, `${props.bucket}: ${(props.job as { kind: string }).kind}`) : null,
       props.place ? h('small', { 'data-testid': 'row-place', title: props.placeTitle }, `${props.bucket}: ${props.place}`) : null,
       props.linkedTo === undefined
@@ -209,7 +212,7 @@ function manager() {
     openSearchHit: vi.fn(),
     openBucket: vi.fn(),
     openBucketOn: vi.fn(),
-    shortcuts: { togglePin: vi.fn(), recent: ref([]) },
+    shortcuts: { togglePin: vi.fn(), pinned: ref<{ bucket: string; nodeId: string | null }[]>([]), recent: ref<{ bucket: string; nodeId: string | null; groupId?: string }[]>([]) },
     sidebarBuckets: ref([]),
     recentBuckets: ref([]),
     workspaceBuckets: ref([]),
@@ -813,5 +816,31 @@ describe('Bucket sidebar search keys', () => {
     await typeValue(field, 'reef-s')
     expect(selected(root)).toEqual([])
     nodeChoice.value = null
+  })
+})
+
+describe('All nodes list order and pins', () => {
+  it('lists pins first, then recently browsed buckets, then the rest, and pins by node', async () => {
+    nodeChoice.value = null
+    allBuckets.needsName.value = false
+    allBuckets.hits.value = [
+      { bucket: 'alpha', node_id: 'home', group_id: 'g1' },
+      { bucket: 'mid', node_id: 'home', group_id: 'g1' },
+      { bucket: 'zeta', node_id: 'node-2', group_id: 'g1' },
+      { bucket: 'beta', node_id: 'node-2', group_id: 'g1' },
+    ]
+    const state = manager()
+    state.shortcuts.pinned.value = [{ bucket: 'zeta', nodeId: 'node-2' }, { bucket: 'gamma', nodeId: null }]
+    state.shortcuts.recent.value = [{ bucket: 'mid', nodeId: null, groupId: 'g1' }, { bucket: 'elsewhere', nodeId: null, groupId: 'g2' }]
+    const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
+    await flush()
+    const order = nodes(root).filter((node) => String(node.props['aria-label']).startsWith('Open ')).map((node) => content(node))
+
+    expect(order).toEqual(['zeta', 'gamma', 'mid', 'alpha', 'beta'])
+    expect(element(root, (node) => node.props['aria-label'] === 'Unpin zeta')).toBeTruthy()
+    await click(element(root, (node) => node.props['aria-label'] === 'Pin beta'))
+    await click(element(root, (node) => node.props['aria-label'] === 'Pin alpha'))
+    expect(state.shortcuts.togglePin.mock.calls).toEqual([['beta', 'node-2'], ['alpha', null]])
+    allBuckets.hits.value = []
   })
 })

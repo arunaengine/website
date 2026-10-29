@@ -24,7 +24,8 @@ import { defaultPlacement, mockEnabled, placementLabel } from '@/lib/distributed
 import { exampleBuckets } from '@/lib/distributedMockData'
 import { folderName } from '@/lib/deviceApi'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
-import { isHiddenBucket } from '@/lib/workspaces'
+import { isFolderBucket, isHiddenBucket } from '@/lib/workspaces'
+import type { BucketShortcut } from '@/composables/useBucketShortcuts'
 import { Boxes, ChevronRight, FolderPlus, FolderSync, History, KeyRound, Plus, Trash2 } from '@lucide/vue'
 import { computed, ref, useId, watch } from 'vue'
 
@@ -142,6 +143,31 @@ function hitActive(hit: ListedBucket): boolean {
   return hit.bucket === bucket.value && (hit.set_id ? hit.nodes.some(opened) : opened(hit.node_id))
 }
 const spread = (hit: ListedBucket) => (hit.set_id ? hit.nodes.length : 0)
+
+// All nodes rows: pins first, then this group's recently browsed buckets, then the rest. A row's
+// node is named only when it is not this node, as the pins are keyed.
+const shortcutNode = (hit: ListedBucket) => (realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id)
+type AllRow = { key: string; bucket: string; nodeId: string | null; hit: ListedBucket | null; pinned: boolean }
+const allRows = computed<AllRow[]>(() => {
+  const hits = all.hits.value
+  const used = new Set<ListedBucket>()
+  // A pin stays a row even before its page was listed; a recent one shows only when listed.
+  const take = (entry: BucketShortcut, pinned: boolean): AllRow[] => {
+    const nodeId = entry.nodeId ?? null
+    const hit = hits.find((candidate) => !used.has(candidate) && candidate.bucket === entry.bucket && shortcutNode(candidate) === nodeId) ?? null
+    if (!hit && !pinned) return []
+    if (hit) used.add(hit)
+    return [{ key: `${nodeId ?? ''}/${entry.bucket}`, bucket: entry.bucket, nodeId, hit, pinned }]
+  }
+  const pins = shortcuts.pinned.value.filter((entry) => !isFolderBucket(entry.bucket)).flatMap((entry) => take(entry, true))
+  const recents = shortcuts.recent.value.filter((entry) => (entry.groupId ?? '') === selectedGroupId.value).flatMap((entry) => take(entry, false))
+  const rest = hits.filter((hit) => !used.has(hit)).map((hit) => ({ key: `${hit.node_id}/${hit.bucket}`, bucket: hit.bucket, nodeId: shortcutNode(hit), hit, pinned: false }))
+  return [...pins, ...recents, ...rest]
+})
+function openRow(row: AllRow) {
+  if (row.hit) openHit(row.hit)
+  else openBucketOn(row.bucket, row.nodeId)
+}
 // The desktop names every row's place, short; the tooltip adds location, kind and id.
 function rowPlace(nodeId: string | null): { place: string | null; placeTitle: string | null } {
   if (!desktop) return { place: null, placeTitle: null }
@@ -162,7 +188,7 @@ const listId = `bucket-results-${useId()}`
 const databaseRows = ref<{ openers: (() => void)[] } | null>(null)
 const groupOpeners = computed<(() => void)[]>(() => {
   if (databaseMode.value) return databaseRows.value?.openers ?? []
-  if (searchList.value) return all.error.value ? [] : all.hits.value.map((hit) => () => openHit(hit))
+  if (searchList.value) return all.error.value ? [] : allRows.value.map((row) => () => openRow(row))
   if (bucketsLoading.value || (bucketsError.value && (bucketsAuthError.value || !bucketsLoaded.value))) return []
   return nodeBuckets.value.map((entry) => () => openBucketOn(entry.bucket, entry.nodeId))
 })
@@ -254,26 +280,42 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
       <template v-else-if="searchList">
         <Spinner v-if="all.loading.value && !all.hits.value.length" show-label label="Loading buckets…" class="px-3 py-4" />
         <p v-else-if="all.error.value" class="px-3 py-3 text-xs text-destructive">{{ all.error.value }}</p>
-        <ul v-else-if="all.hits.value.length || examples.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
-          <li v-for="(hit, index) in all.hits.value" :key="`${hit.node_id}/${hit.bucket}`">
+        <ul v-else-if="allRows.length || examples.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
+          <li v-for="(row, index) in allRows" :key="row.key">
             <BucketRow
-              :bucket="hit.bucket"
-              :pinnable="false"
+              v-if="row.hit"
+              :bucket="row.bucket"
+              :pinned="row.pinned"
               option
               :highlighted="index === activeIndex"
-              :job="jobOf(hit.bucket, hit.node_id)"
-              :active="hitActive(hit)"
-              :node-count="spread(hit)"
-              v-bind="rowPlace(hit.node_id)"
-              :linked-to="linkedTo(hit.node_id, hit.bucket)"
-              @open="openHit(hit)"
+              :job="jobOf(row.bucket, row.hit.node_id)"
+              :active="hitActive(row.hit)"
+              :node-count="spread(row.hit)"
+              v-bind="rowPlace(row.hit.node_id)"
+              :linked-to="linkedTo(row.hit.node_id, row.bucket)"
+              @open="openRow(row)"
+              @toggle-pin="shortcuts.togglePin(row.bucket, row.nodeId)"
             >
-              <template #tooltip>{{ hitNodes(hit) }}</template>
+              <template #tooltip>{{ hitNodes(row.hit) }}</template>
               <template #link>
-                <IconButton v-if="hitSource(hit)" :label="`Link a local folder to ${hit.bucket}…`" side="right" @click="emitSync(hitSource(hit))">
+                <IconButton v-if="hitSource(row.hit)" :label="`Link a local folder to ${row.bucket}…`" side="right" @click="emitSync(hitSource(row.hit))">
                   <FolderSync class="h-3 w-3" />
                 </IconButton>
               </template>
+            </BucketRow>
+            <BucketRow
+              v-else
+              :bucket="row.bucket"
+              :node-id="row.nodeId"
+              pinned
+              option
+              :highlighted="index === activeIndex"
+              :active="row.bucket === bucket && row.nodeId === remoteNodeId"
+              v-bind="rowPlace(row.nodeId)"
+              @open="openRow(row)"
+              @toggle-pin="shortcuts.togglePin(row.bucket, row.nodeId)"
+            >
+              <template #tooltip>{{ rowNode(row.nodeId) }}</template>
             </BucketRow>
           </li>
           <MockBucketRows :filter="bucketNameFilter" :active="bucket" @open="openBucket" />
