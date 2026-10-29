@@ -178,6 +178,9 @@ export interface RealmNodeInfo {
   last_seen_ms?: number
   // Realm-administered name for people; absent when unset. Never an identifier.
   display_name?: string | null
+  // Where the node stands, once the realm carries it: a place name and map coordinates.
+  place?: string | null
+  coordinates?: { lat: number; lon: number } | null
   placement?: RealmNodePlacement | null
   // Latest self-published node document; null until the node publishes one.
   info?: RealmNodePublishedInfo | null

@@ -1,8 +1,14 @@
 import { createSSRApp, h } from 'vue'
 import { renderToString } from '@vue/server-renderer'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { RealmNodeInfo } from '@/lib/api'
 import NodeCards from './NodeCards.vue'
+
+// Links render as anchors naming where they go.
+vi.mock('vue-router', async () => {
+  const { defineComponent, h } = await import('vue')
+  return { RouterLink: defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()) }) }
+})
 
 type Overrides = Partial<RealmNodeInfo> & { labels?: Record<string, string>; api?: string; load?: number; jobs?: number; imports?: number }
 const node = (overrides: Overrides = {}): RealmNodeInfo => ({
@@ -94,5 +100,10 @@ describe('node cards', () => {
     // The Pencil waits for hover or keyboard focus on the card.
     expect(html).toMatch(/class="group [^"]*"/)
     expect(html).toMatch(/aria-label="Rename node-2"[^>]*class="[^"]*opacity-0[^"]*group-focus-within:opacity-100|class="[^"]*opacity-0[^"]*group-focus-within:opacity-100[^"]*"[^>]*aria-label="Rename node-2"/)
+  })
+
+  it('links each name to its node page', async () => {
+    const html = await renderToString(createSSRApp({ render: () => h(NodeCards, { nodes: [node()], devices: [] }) }))
+    expect(html).toContain(`data-to="${JSON.stringify({ name: 'node', params: { nodeId: '12D3KooWHashHashHash' } }).replace(/"/g, '&quot;')}"`)
   })
 })

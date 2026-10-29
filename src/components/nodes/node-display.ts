@@ -1,6 +1,24 @@
 import type { RealmNodeInfo } from '@/lib/api'
 import { stateVariant, toneVariant, type BadgeVariant, type StateTone } from '@/lib/stateBadge'
 import { nodeApiBase } from './node-probe'
+import { formatCount } from '@/lib/formatCount'
+
+/** Whether a node is online: a realm node by its presence, a device by its recent contact. */
+export function nodeOnline(node: Pick<RealmNodeInfo, 'kind' | 'present' | 'connection_status'>): boolean {
+  return node.kind === 'user' ? node.connection_status === 'connected' || node.connection_status === 'seen' : node.present
+}
+
+/** The node's role for people: management, storage or device. */
+export const roleLabel: Record<RealmNodeInfo['kind'], string> = { management: 'management', server: 'storage', user: 'device' }
+
+/** What a node's last heartbeat says it runs, imports first as they explain a busy node; null when idle. */
+export function nodeActivity(node: Pick<RealmNodeInfo, 'info'>): string | null {
+  const utilization = node.info?.utilization
+  const jobs = (count: number) => `${formatCount(count)} ${count === 1 ? 'job' : 'jobs'}`
+  if (utilization?.imports_running) return `Importing, ${jobs(utilization.imports_running)}`
+  if (utilization?.jobs_running) return `Busy, ${jobs(utilization.jobs_running)}`
+  return null
+}
 
 /** The name a node was given: the realm's display name, then its name labels; null without one. */
 export function givenName(node: Pick<RealmNodeInfo, 'display_name' | 'info'>): string | null {

@@ -3,7 +3,7 @@ import Badge from '@/components/ui/Badge.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import LocalNodeDetails from './LocalNodeDetails.vue'
 import NodeNameEdit from './NodeNameEdit.vue'
-import { connectionLabel, kindLabel, nodeName, statusVariant } from './node-display'
+import { nodeName, statusVariant } from './node-display'
 import { nodeApiBase, type NodeProbe } from './node-probe'
 import type { RealmNodeInfo } from '@/lib/api'
 import { formatBytes, formatNumber } from '@/lib/utils'
@@ -15,12 +15,14 @@ defineProps<{
   probe?: NodeProbe | null
   /** Offered to a realm admin: names the node, null resets it. */
   rename?: (nodeId: string, name: string | null) => Promise<void>
+  /** The node page names the node in its own header. */
+  hideName?: boolean
 }>()
 </script>
 
 <template>
   <div class="space-y-4">
-    <div>
+    <div v-if="!hideName">
       <h2 class="font-display text-sm font-semibold text-aruna-navy">Name</h2>
       <div class="mt-1 text-xs text-foreground/90">
         <!-- Keyed by node, so a draft for one node never saves onto the next one shown. -->
@@ -31,22 +33,11 @@ defineProps<{
       </div>
     </div>
 
+    <!-- Role and online state are on the card or page header already; these are the rest. -->
     <dl class="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-      <div>
-        <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Kind</dt>
-        <dd class="mt-1 text-xs text-foreground/90">{{ kindLabel[node.kind] }}</dd>
-      </div>
-      <div>
-        <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Connection</dt>
-        <dd class="mt-1 text-xs text-foreground/90">{{ connectionLabel(node) }}</dd>
-      </div>
       <div>
         <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Configured</dt>
         <dd class="mt-1 text-xs text-foreground/90">{{ node.configured ? 'yes' : 'no' }}</dd>
-      </div>
-      <div>
-        <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Present</dt>
-        <dd class="mt-1 text-xs text-foreground/90">{{ node.present ? 'yes' : 'no' }}</dd>
       </div>
       <div v-if="probe?.latencyMs !== undefined" title="Best of two REST /info round trips measured from this browser">
         <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Latency</dt>
@@ -77,12 +68,13 @@ defineProps<{
       <p v-else class="mt-1 text-xs text-muted-foreground">Not in the realm's record placement map.</p>
     </div>
 
-    <div v-if="Object.keys(node.info?.labels ?? {}).length" class="border-t border-border/70 pt-3">
-      <h2 class="font-display text-sm font-semibold text-aruna-navy">Labels</h2>
+    <!-- Labels are for admins; they wait folded until asked for. -->
+    <details v-if="Object.keys(node.info?.labels ?? {}).length" class="border-t border-border/70 pt-3">
+      <summary class="cursor-pointer font-display text-sm font-semibold text-aruna-navy">Labels ({{ Object.keys(node.info?.labels ?? {}).length }})</summary>
       <ul class="mt-1.5 space-y-0.5 font-mono text-[11px] text-foreground/90">
         <li v-for="(value, key) in node.info?.labels" :key="key" class="break-all">{{ key }}={{ value }}</li>
       </ul>
-    </div>
+    </details>
 
     <div>
       <h2 class="font-display text-sm font-semibold text-aruna-navy">Node id</h2>

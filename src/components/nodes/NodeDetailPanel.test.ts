@@ -21,15 +21,19 @@ const node: RealmNodeInfo = {
 }
 
 describe('node details', () => {
-  it('lists the labels and the browser latency, with kind and connection as plain words', async () => {
+  it('folds the labels, shows the browser latency, and leaves role and state to the card or page', async () => {
     const html = await renderToString(createSSRApp({ render: () => h(NodeDetailPanel, { node, probe: { state: 'ok', latencyMs: 41.6 } as never }) }))
     const text = html.replace(/<!--[^>]*-->/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
 
-    expect(text).toContain('Labels name=Giessen storage aruna-engine.org/tier=hot')
+    expect(html).toMatch(/<details[^>]*>\s*<summary[^>]*>Labels \(2\)<\/summary>/)
+    expect(text).toContain('name=Giessen storage aruna-engine.org/tier=hot')
     expect(text).toContain('Latency 42 ms')
-    expect(text).toContain('Kind server')
-    expect(text).toContain('Connection connected')
-    expect(html).not.toContain('uppercase">connected')
+    for (const repeated of ['Kind', 'Connection', 'Present']) expect(text).not.toContain(repeated)
+  })
+
+  it('leaves the name to the page header when asked', async () => {
+    const html = await renderToString(createSSRApp({ render: () => h(NodeDetailPanel, { node, hideName: true }) }))
+    expect(html).not.toContain('>Name<')
   })
 
   it('names the node first, with a rename for a realm admin', async () => {

@@ -2,9 +2,10 @@
 // The realm nodes in calm cards: a readable name, its location, whether it is online and one line of
 // facts. Devices are summed up in one line, never listed. The Status page adds a Details link.
 import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import NodeNameEdit from '@/components/nodes/NodeNameEdit.vue'
-import { nodeName } from '@/components/nodes/node-display'
+import { nodeActivity, nodeName } from '@/components/nodes/node-display'
 import type { RealmNodeInfo } from '@/lib/api'
 import { formatCount } from '@/lib/formatCount'
 import { LOCATION_AFFINITY_KEY } from '@/lib/placement'
@@ -42,14 +43,7 @@ function facts(node: RealmNodeInfo): string {
   return parts.join(', ')
 }
 
-// What the node's last heartbeat says it runs: imports first, as they explain a busy node.
-function activity(node: RealmNodeInfo): string | null {
-  const utilization = node.info?.utilization
-  const jobs = (count: number) => `${formatCount(count)} ${count === 1 ? 'job' : 'jobs'}`
-  if (utilization?.imports_running) return `Importing, ${jobs(utilization.imports_running)}`
-  if (utilization?.jobs_running) return `Busy, ${jobs(utilization.jobs_running)}`
-  return null
-}
+const activity = nodeActivity
 
 const devicesLine = computed(() => {
   const count = props.devices.length
@@ -65,9 +59,9 @@ const devicesLine = computed(() => {
       <li v-for="node in nodes" :key="node.node_id" class="group min-w-0 rounded-md border border-border px-3 py-2.5">
         <div class="flex min-w-0 items-center gap-2">
           <NodeNameEdit v-if="rename" quiet :name="nodeName(node)" :value="node.display_name" :save="(name) => rename!(node.node_id, name)">
-            <span class="truncate text-sm font-medium text-foreground" :title="node.node_id">{{ nodeName(node) }}</span>
+            <RouterLink :to="{ name: 'node', params: { nodeId: node.node_id } }" class="truncate text-sm font-medium text-foreground hover:underline" :title="node.node_id">{{ nodeName(node) }}</RouterLink>
           </NodeNameEdit>
-          <span v-else class="truncate text-sm font-medium text-foreground" :title="node.node_id">{{ nodeName(node) }}</span>
+          <RouterLink v-else :to="{ name: 'node', params: { nodeId: node.node_id } }" class="truncate text-sm font-medium text-foreground hover:underline" :title="node.node_id">{{ nodeName(node) }}</RouterLink>
           <span v-if="node.node_id === localNodeId" class="text-[11px] text-muted-foreground">this node</span>
           <Badge v-if="location(node)" variant="outline" size="sm">{{ location(node) }}</Badge>
           <span class="ml-auto shrink-0 text-[11px]" :class="node.present ? 'text-muted-foreground' : 'text-destructive'">

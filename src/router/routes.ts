@@ -148,6 +148,8 @@ export function portalRoutes(): RouteRecordRaw[] {
         // Public user profile resolved from the realm's user directory
         { path: 'users/:id', name: 'user', component: () => import('@/views/UserProfileView.vue') },
         { path: 'status', name: 'status', component: () => import('@/views/StatusView.vue') },
+        // One realm node, reached from the landing view and the Status page
+        { path: 'nodes/:nodeId', name: 'node', component: () => import('@/views/NodeView.vue') },
         ...desktopRoutes(),
         // Settings (consolidates account preferences, members, tokens)
         { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },

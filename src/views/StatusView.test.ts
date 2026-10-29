@@ -34,7 +34,10 @@ const AggregatesStub = defineComponent({
 let StatusView: Component
 
 beforeAll(async () => {
-  vi.doMock('vue-router', () => ({ useRoute: () => ({ query: {} }) }))
+  vi.doMock('vue-router', () => ({
+    useRoute: () => ({ query: {} }),
+    RouterLink: defineComponent((_, { slots }) => () => h('a', slots.default?.())),
+  }))
   vi.doMock('@/composables/useAruna', () => ({
     useAruna: () => ({ realm, realmInfo, nodeInfo, usageInfo, currentUser, apiBaseUrl, loadInfo, sessionEpoch: ref(0), loadRealmView: vi.fn(async () => null), isRealmAdmin: ref(false) }),
   }))
