@@ -11,7 +11,8 @@ const props = defineProps<{ target: PartOfTarget }>()
 
 const part = useFilePartOf(computed(() => props.target))
 const all = ref(false)
-watch(() => [props.target.bucket, props.target.key], () => (all.value = false))
+// Separate sources compare by value, so a new target object for the same file keeps the list open.
+watch([() => props.target.bucket, () => props.target.key], () => (all.value = false))
 // An empty answer hides only when it is complete and nothing more or hidden exists.
 const settledEmpty = computed(() => {
   const found = part.found.value
