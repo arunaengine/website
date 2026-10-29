@@ -52,4 +52,14 @@ describe('saved run start', () => {
     expect(content(subtitle)).toBe('Saved on this computer, bakta-rs')
     expect(subtitle.props.title).toBe(IMAGE)
   })
+
+  it('labels each input by its file name with the container path in small print', async () => {
+    const { root } = await mountApp(component)
+    const labels = nodes(root).filter((node) => node.tag === 'p' && String(node.props.class).includes('font-medium')).map(content)
+    const paths = nodes(root).filter((node) => node.tag === 'p' && String(node.props.class).includes('text-[11px]')).map(content)
+
+    expect(labels).toEqual(['genome.fasta', 'db'])
+    expect(paths).toEqual(['/work/in/genome.fasta', '/work/in/db'])
+  })
 })
+

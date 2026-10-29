@@ -18,6 +18,9 @@ const image = computed(() => run.value?.task.executors[0]?.image ?? '')
 // The tool by its image name: the last path part, without registry, tag or digest.
 const toolName = computed(() => image.value.split('@')[0]!.split('/').pop()!.replace(/:[^:]*$/, '') || image.value)
 const nameOf = (path: string) => run.value?.task.inputs?.find((input) => input.path === path)?.name || path
+// An input reads by its file name; its container path follows in small print.
+const fileName = (path: string) => path.replace(/\/+$/, '').split('/').pop() || path
+const labelOf = (path: string) => (nameOf(path) === path ? fileName(path) : nameOf(path))
 const asked = computed(() => run.value?.ask.inputs ?? [])
 // Secret values are never saved, so each start asks for them.
 const secrets = computed(() => envRows.value.filter((row) => isSecretName(row.key)))
@@ -60,7 +63,8 @@ const resultsFolder = ref('')
     <div id="saved-inputs" class="space-y-2">
       <div v-for="path in asked" :key="path" class="surface-inline flex flex-wrap items-center gap-3 p-3 text-sm">
         <div class="min-w-0 flex-1">
-          <p class="text-xs text-muted-foreground">{{ nameOf(path) }}</p>
+          <p class="font-medium">{{ labelOf(path) }}</p>
+          <p class="truncate font-mono text-[11px] text-muted-foreground">{{ path }}</p>
           <p v-if="pickOf(path)" class="truncate font-mono text-xs">{{ pickText(pickOf(path)!) }}</p>
           <p v-else class="text-xs text-amber-700 dark:text-amber-300">Not chosen yet</p>
         </div>
@@ -68,7 +72,8 @@ const resultsFolder = ref('')
       </div>
       <div v-for="entry in fixed" :key="entryPath(entry)" class="surface-inline flex flex-wrap items-center gap-3 p-3 text-sm">
         <div class="min-w-0 flex-1">
-          <p class="text-xs text-muted-foreground">{{ entry.name }}</p>
+          <p class="font-medium">{{ fileName(entryPath(entry)) }}</p>
+          <p class="truncate font-mono text-[11px] text-muted-foreground">{{ entryPath(entry) }}</p>
           <p class="truncate font-mono text-xs">{{ pickText(entry) }}</p>
         </div>
         <span class="text-xs text-muted-foreground">Fixed in this run</span>
