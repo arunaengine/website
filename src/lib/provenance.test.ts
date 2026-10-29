@@ -120,6 +120,23 @@ describe('provenance graph', () => {
     expect(graph.boxes['dataset:d1']!.pending.map((hop) => hop.kind === 'version' && hop.id)).toEqual([arn('genome.gff3', V2)])
   })
 
+  it('keeps a run record\'s inputs through its run when the result has no exact version', () => {
+    const record = {
+      '@graph': [
+        { '@id': '#run-01JOB', '@type': 'CreateAction', name: 'Bakta', object: [{ '@id': '#in' }], result: [{ '@id': '#out' }] },
+        { '@id': '#in', '@type': 'MediaObject', name: 'genome.fasta', contentUrl: [arn('genome.fasta', V1)] },
+        { '@id': '#out', '@type': 'MediaObject', name: 'genome.gff3', contentUrl: ['s3://lab/genome.gff3'] },
+      ],
+    }
+    const graph = emptyGraph()
+    startDataset(graph, 'Bakta run', 'd1', record)
+
+    expect(graph.boxes['dataset:d1']!.from).toEqual(['#out'])
+    expect(graph.boxes['#out']!.from).toEqual(['run:01JOB'])
+    expect(graph.boxes['run:01JOB']!.pending).toEqual([{ kind: 'version', id: arn('genome.fasta', V1), name: 'genome.fasta', digest: '#in', role: 'Input file' }])
+    expect(graph.seen['run:01JOB']).toBe('run:01JOB')
+  })
+
   it('reads stored file parts, whose links come in any order', () => {
     const stored = { '@graph': [{ '@id': '#a', '@type': 'MediaObject', name: 'a', contentUrl: [arn('a', V1), 's3://lab/a'] }] }
     expect(dataParts(stored)).toEqual([{ id: '#a', name: 'a', exact: arn('a', V1) }])

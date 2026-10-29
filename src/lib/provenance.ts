@@ -140,11 +140,32 @@ export function startDataset(graph: Graph, title: string, documentId: string, cr
   const actions = graphNodes(crate).filter((node) => isType(node, 'CreateAction'))
   const results = new Set(actions.flatMap((action) => values(action.result)))
   const inputs = new Set(actions.flatMap((action) => values(action.object)).filter((id) => !results.has(id)))
+  const action = actions.find((node) => values(node.result).length)
+  const run = action ? seedRun(graph, action, crate) : null
   for (const part of dataParts(crate)) {
-    if (results.size && inputs.has(part.id)) continue
+    if (run && inputs.has(part.id)) continue
     if (part.exact) root.pending.push({ kind: 'version', id: part.exact, name: part.name, digest: part.id, role: 'File' })
-    else add(graph, root.id, box(part.id, 'unversioned', 'File', part.name, { detail: 'No exact version recorded' }))
+    else {
+      const file = add(graph, root.id, box(part.id, 'unversioned', 'File', part.name, { detail: 'No exact version recorded' }))
+      if (run && results.has(part.id)) add(graph, file, run)
+    }
   }
+}
+
+/**
+ * The run of a loaded run record, with its inputs waiting, so they keep a path before any result
+ * is read. A result's origin names the run by its job id, the `#run-<job id>` of the crate.
+ */
+function seedRun(graph: Graph, action: Record<string, unknown>, crate: unknown): Box {
+  const runId = String(action['@id']).replace(/^#run-/, '')
+  const id = `run:${runId}`
+  graph.boxes[id] ??= box(id, 'run', 'Run', typeof action.name === 'string' ? action.name : `Run ${shortName(runId)}`)
+  graph.seen[id] = id
+  for (const input of runInputs(crate).parts) {
+    if (input.exact) graph.boxes[id].pending.push({ kind: 'version', id: input.exact, name: input.name, digest: input.id, role: 'Input file' })
+    else add(graph, id, box(input.id, 'unversioned', 'Input file', input.name, { detail: 'No exact version recorded' }))
+  }
+  return graph.boxes[id]
 }
 
 function graphNodes(crate: unknown): Record<string, unknown>[] {
