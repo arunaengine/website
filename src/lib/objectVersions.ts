@@ -83,6 +83,26 @@ export function sortVersions(entries: ObjectVersionEntry[]): ObjectVersionEntry[
   })
 }
 
+/** The stored versions of the keys directly under `prefix`, delete markers left out. */
+export function folderVersions(page: VersionPage, prefix: string): ObjectVersionEntry[] {
+  const entries: ObjectVersionEntry[] = []
+  for (const record of page.Versions ?? []) {
+    if (!record.Key || !record.VersionId || !record.Key.startsWith(prefix)) continue
+    const name = record.Key.slice(prefix.length)
+    if (!name || name.includes('/')) continue
+    entries.push({
+      key: record.Key,
+      versionId: record.VersionId,
+      isLatest: Boolean(record.IsLatest),
+      deleteMarker: false,
+      size: record.Size,
+      lastModified: record.LastModified,
+      etag: record.ETag?.replaceAll('"', ''),
+    })
+  }
+  return entries
+}
+
 /**
  * Keys directly under `prefix` whose head is a delete marker. A delimited
  * listing keeps deeper keys in CommonPrefixes, but the check is repeated here

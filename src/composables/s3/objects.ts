@@ -20,6 +20,7 @@ import { Upload } from '@aws-sdk/lib-storage'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import {
   deletedEntries,
+  folderVersions,
   keyVersions,
   sortVersions,
   type DeletedObjectEntry,
@@ -679,6 +680,39 @@ export async function listDeletedObjects(
     keyMarker = page.NextKeyMarker
     versionMarker = page.NextVersionIdMarker
     if (!page.IsTruncated || (!keyMarker && !versionMarker)) return { deleted, truncated: false }
+  }
+}
+
+export interface FolderVersionList {
+  versions: ObjectVersionEntry[]
+  truncated: boolean
+}
+
+/** The stored versions of the keys directly under `prefix`, so a listed file can name its version. */
+export async function listFolderVersions(
+  bucket: string,
+  prefix: string,
+  nodeId?: string | null,
+): Promise<FolderVersionList> {
+  const versions: ObjectVersionEntry[] = []
+  let keyMarker: string | undefined
+  let versionMarker: string | undefined
+  for (;;) {
+    const page = await client(nodeId).send(
+      new ListObjectVersionsCommand({
+        Bucket: bucket,
+        Prefix: prefix || undefined,
+        Delimiter: '/',
+        KeyMarker: keyMarker,
+        VersionIdMarker: versionMarker,
+        MaxKeys: VERSION_PAGE_SIZE,
+      }),
+    )
+    versions.push(...folderVersions(page, prefix))
+    if (versions.length >= VERSION_LIMIT) return { versions: versions.slice(0, VERSION_LIMIT), truncated: true }
+    keyMarker = page.NextKeyMarker
+    versionMarker = page.NextVersionIdMarker
+    if (!page.IsTruncated || (!keyMarker && !versionMarker)) return { versions, truncated: false }
   }
 }
 

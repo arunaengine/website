@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deletedEntries, keyVersions, sortVersions, type VersionPage } from './objectVersions'
+import { deletedEntries, folderVersions, keyVersions, sortVersions, type VersionPage } from './objectVersions'
 
 const page: VersionPage = {
   Versions: [
@@ -56,6 +56,23 @@ describe('object version pages', () => {
     ])
 
     expect(sorted.map((entry) => entry.versionId)).toEqual(['01C', '01B', '01A'])
+  })
+
+  it('lists the stored versions directly under one prefix, without markers', () => {
+    const at = new Date('2026-01-01T00:00:00Z')
+    const listing: VersionPage = {
+      Versions: [
+        { Key: 'raw/one.txt', VersionId: 'v1', IsLatest: true, ETag: '"e1"', Size: 3, LastModified: at },
+        { Key: 'raw/deep/two.txt', VersionId: 'v2', IsLatest: true },
+        { Key: 'other/three.txt', VersionId: 'v3', IsLatest: true },
+        { Key: 'raw/', VersionId: 'v4', IsLatest: true },
+      ],
+      DeleteMarkers: [{ Key: 'raw/one.txt', VersionId: 'm1', IsLatest: false }],
+    }
+
+    expect(folderVersions(listing, 'raw/')).toEqual([
+      { key: 'raw/one.txt', versionId: 'v1', isLatest: true, deleteMarker: false, size: 3, lastModified: at, etag: 'e1' },
+    ])
   })
 
   it('lists marker-headed keys under one prefix only', () => {

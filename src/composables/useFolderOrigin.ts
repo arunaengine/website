@@ -1,12 +1,14 @@
-// Where the files of the open page came from. Each file's origin is asked of the bucket's node,
-// four at a time and kept per version, and a run is named once. One origin shared by every file
+// Where the files of the open page came from. Each file's origin is asked of the bucket's node for
+// its exact version, four at a time and kept per version, and a run is named once. One origin shared by every file
 // is said once above the list; files of different origins each name theirs. Pages of more than
 // 50 files are not asked, so a large folder costs no requests.
 import { computed, ref, watch, type Ref } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
+import { useS3 } from '@/composables/useS3'
 import { useTes } from '@/composables/useTes'
 import type { OriginResponse } from '@/lib/api'
+import type { ObjectVersionEntry } from '@/lib/objectVersions'
 
 export interface FileOrigin {
   /** Same for files of one origin: the run, or the kind for anything else. */
@@ -25,16 +27,19 @@ let epochSeen: number | null = null
 
 type Listed = { key: string; etag?: string; lastModified?: Date }
 
-// The listing names no version, so the answer must be of the version listed: its creation time
-// is the listed modification time, to the second. An overwrite in between is left unknown.
-function sameVersion(file: Listed, answer: OriginResponse | null): boolean {
-  if (!answer || !file.lastModified) return true
-  const created = Date.parse(answer.created_at)
-  return Number.isNaN(created) || Math.floor(created / 1000) === Math.floor(file.lastModified.getTime() / 1000)
+// The file listing names no version, so the folder's versions name it: exactly one stored version
+// of the key with the listed ETag and modification second. None or several leave it unknown.
+function listedVersion(file: Listed, versions: ObjectVersionEntry[]): string | null {
+  if (!file.etag || !file.lastModified) return null
+  const second = Math.floor(file.lastModified.getTime() / 1000)
+  const matches = versions.filter((entry) =>
+    entry.key === file.key && entry.etag === file.etag && entry.lastModified && Math.floor(entry.lastModified.getTime() / 1000) === second)
+  return matches.length === 1 ? matches[0].versionId : null
 }
 
 export function useFolderOrigin(bucket: Ref<string>, nodeId: Ref<string | null>, files: Ref<Listed[]>) {
   const { getFileOrigin, getRun, sessionEpoch } = useAruna()
+  const s3 = useS3()
   const { getTask } = useTes()
   // The same bytes uploaded again keep the ETag, so the time tells the versions apart.
   const cacheKey = (file: Listed) =>
@@ -71,16 +76,32 @@ export function useFolderOrigin(bucket: Ref<string>, nodeId: Ref<string | null>,
       })
       const asked = { bucket: bucket.value, nodeId: nodeId.value }
       const keyed = files.value.length <= MAX_FILES ? files.value.map((file) => ({ file, key: cacheKey(file) })) : []
+      const open = keyed.filter(({ key }) => !origins.value.has(key) && !inFlight.has(key))
+      // One listing of the folder's versions names the version of every listed file.
+      let versions: { versions: ObjectVersionEntry[]; truncated: boolean } | null = null
+      if (open.length) {
+        const folder = open[0].file.key.slice(0, open[0].file.key.lastIndexOf('/') + 1)
+        versions = await s3.listFolderVersions(asked.bucket, folder, asked.nodeId).catch(() => null)
+        if (controller.signal.aborted || epoch !== sessionEpoch.value) return
+      }
       const read = ({ file, key }: (typeof keyed)[number]) => {
         if (origins.value.has(key)) return Promise.resolve()
         let flight = inFlight.get(key)
         if (!flight) {
-          flight = getFileOrigin(asked.bucket, { key: file.key }, controller.signal, asked.nodeId)
+          // Without the listing nothing is known yet; a complete one without a match stays unknown.
+          if (!versions) return Promise.resolve()
+          const versionId = listedVersion(file, versions.versions)
+          if (!versionId) {
+            if (!versions.truncated) origins.value = new Map(origins.value).set(key, null)
+            return Promise.resolve()
+          }
+          flight = getFileOrigin(asked.bucket, { key: file.key, version_id: versionId }, controller.signal, asked.nodeId)
             .catch(() => null)
             .then((answer) => {
-              if (controller.signal.aborted || epoch !== sessionEpoch.value || !sameVersion(file, answer)) return
-              origins.value = new Map(origins.value).set(key, answer)
-              if (answer?.origin?.kind === 'job') void readRun(answer.origin.run_id, epoch)
+              if (controller.signal.aborted || epoch !== sessionEpoch.value) return
+              const exact = answer && answer.version_id === versionId ? answer : null
+              origins.value = new Map(origins.value).set(key, exact)
+              if (exact?.origin?.kind === 'job') void readRun(exact.origin.run_id, epoch)
             })
             .finally(() => {
               if (inFlight.get(key) === flight) inFlight.delete(key)
