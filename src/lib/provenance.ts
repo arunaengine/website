@@ -136,7 +136,12 @@ export function startFile(graph: Graph, id: string, name: string, origin: Origin
 export function startDataset(graph: Graph, title: string, documentId: string, crate: unknown) {
   const root = box(`dataset:${documentId}`, 'file', 'Dataset', title, { link: { label: 'Open the dataset', document: documentId } })
   add(graph, null, root)
+  // A run record lists its run's inputs as parts too; with results they show through the run only.
+  const actions = graphNodes(crate).filter((node) => isType(node, 'CreateAction'))
+  const results = new Set(actions.flatMap((action) => values(action.result)))
+  const inputs = new Set(actions.flatMap((action) => values(action.object)).filter((id) => !results.has(id)))
   for (const part of dataParts(crate)) {
+    if (results.size && inputs.has(part.id)) continue
     if (part.exact) root.pending.push({ kind: 'version', id: part.exact, name: part.name, digest: part.id, role: 'File' })
     else add(graph, root.id, box(part.id, 'unversioned', 'File', part.name, { detail: 'No exact version recorded' }))
   }

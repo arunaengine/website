@@ -106,6 +106,20 @@ describe('provenance graph', () => {
     expect(graph.steps).toBe(2)
   })
 
+  it('starts a run record from its results, its inputs showing through the run only', () => {
+    const record = {
+      '@graph': [
+        { '@id': '#run', '@type': 'CreateAction', object: [{ '@id': '#in' }], result: [{ '@id': '#out' }] },
+        { '@id': '#in', '@type': 'MediaObject', name: 'genome.fasta', contentUrl: [arn('genome.fasta', V1)] },
+        { '@id': '#out', '@type': 'MediaObject', name: 'genome.gff3', contentUrl: [arn('genome.gff3', V2)] },
+      ],
+    }
+    const graph = emptyGraph()
+    startDataset(graph, 'Bakta run', 'd1', record)
+
+    expect(graph.boxes['dataset:d1']!.pending.map((hop) => hop.kind === 'version' && hop.id)).toEqual([arn('genome.gff3', V2)])
+  })
+
   it('reads stored file parts, whose links come in any order', () => {
     const stored = { '@graph': [{ '@id': '#a', '@type': 'MediaObject', name: 'a', contentUrl: [arn('a', V1), 's3://lab/a'] }] }
     expect(dataParts(stored)).toEqual([{ id: '#a', name: 'a', exact: arn('a', V1) }])
