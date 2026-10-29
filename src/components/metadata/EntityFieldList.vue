@@ -4,7 +4,7 @@ import ExternalLink from '@/components/ui/ExternalLink.vue'
 import type { PresentedField, PresentedValue } from '@/lib/cratePresenter'
 
 // Aligned label/value ledger for presented fields. Every row carries its
-// machine term as a mono token; hrefs render only through ExternalLink.
+// machine term in its tooltip; hrefs render only through ExternalLink.
 const props = defineProps<{ fields: PresentedField[] }>()
 const emit = defineEmits<{ (e: 'jump', id: string): void }>()
 
@@ -44,23 +44,12 @@ function plainTitle(value: PresentedValue): string | undefined {
       :key="field.id"
       class="mb-3 last:mb-0 sm:mb-0 sm:grid sm:grid-cols-[minmax(10rem,14rem)_minmax(0,1fr)] sm:gap-x-6 sm:border-b sm:border-border/50 sm:py-2 sm:last:border-b-0"
     >
-      <dt class="mb-0.5 flex flex-wrap items-baseline gap-x-1.5 sm:mb-0 sm:pt-px" :title="field.description">
+      <!-- The raw property name and its term stay in the tooltip, not next to the label. -->
+      <dt class="mb-0.5 flex flex-wrap items-baseline gap-x-1.5 sm:mb-0 sm:pt-px" :title="[field.description, field.termUri ?? field.key].filter(Boolean).join('\n')">
         <span
           class="text-[11px] font-medium uppercase tracking-wider"
           :class="field.profiled ? 'text-foreground/80' : 'text-muted-foreground'"
         >{{ field.label }}</span>
-        <!-- The mono token also shows when key and label coincide but a term
-             URI resolves it (a context-mapped custom key like p0000010): the
-             link to the ontology is then the only honest explanation. -->
-        <ExternalLink
-          v-if="field.termUri"
-          :href="field.termUri"
-          :label="field.key"
-          :show-icon="false"
-          class="font-mono text-[10px] text-muted-foreground/60"
-          :title="field.termUri"
-        />
-        <span v-else-if="field.key.toLowerCase() !== field.label.toLowerCase()" class="font-mono text-[10px] text-muted-foreground/60">{{ field.key }}</span>
       </dt>
       <dd class="min-w-0">
         <div v-if="chips(field)" class="flex flex-wrap gap-1.5">
