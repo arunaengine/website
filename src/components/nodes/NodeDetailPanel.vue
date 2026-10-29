@@ -23,7 +23,8 @@ defineProps<{
     <div>
       <h2 class="font-display text-sm font-semibold text-aruna-navy">Name</h2>
       <div class="mt-1 text-xs text-foreground/90">
-        <NodeNameEdit v-if="rename" :name="nodeName(node)" :value="node.display_name" :save="(name) => rename!(node.node_id, name)">
+        <!-- Keyed by node, so a draft for one node never saves onto the next one shown. -->
+        <NodeNameEdit v-if="rename" :key="node.node_id" :name="nodeName(node)" :value="node.display_name" :save="(name) => rename!(node.node_id, name)">
           {{ nodeName(node) }}
         </NodeNameEdit>
         <template v-else>{{ nodeName(node) }}</template>
