@@ -2,7 +2,7 @@ import * as VueRuntime from 'vue'
 import { computed, defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Utils from '@/lib/utils'
-import { click, compileClientComponent, content, element, moduleDefault, mountApp } from '@/test/clientRender'
+import { click, compileClientComponent, content, element, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 
 const currentUser = ref<Record<string, unknown> | null>({ id: 'u-1' })
 const myGroups = ref([
@@ -104,7 +104,7 @@ describe('ContextSwitcher', () => {
   it('names the active group and switches to another', async () => {
     const { root } = await mountApp(ContextSwitcher)
     expect(content(root)).toContain('Water quality')
-    expect(content(root)).toContain('Demo realmrealm-1')
+    expect(content(root)).toContain('Demo realmWater quality')
 
     await click(element(root, (node) => content(node).includes('Soil archive') && node.tag === 'button'))
 
@@ -154,26 +154,24 @@ describe('ContextSwitcher', () => {
       .toEqual({ name: 'groups' })
   })
 
-  it('keeps the realm name and short id next to the group on a narrow bar', async () => {
+  it('keeps the realm name above the group in sentence case, with its id only in the tooltip', async () => {
     realm.value = { ...realm.value, id: 'AbCdEfGh-full-realm-id' }
     const { root } = await mountApp(ContextSwitcher)
 
     const label = element(root, (node) => content(node).includes('Water quality') && node.tag === 'span'
       && String(node.props.class ?? '').includes('flex-col'))
     expect(String(label.props.class)).not.toContain('hidden')
-    expect(content(label)).toContain('Demo realmAbCdEfGh')
-    expect(content(label)).not.toContain('full-realm-id')
+    const name = element(label, (node) => node.tag === 'span' && content(node).trim() === 'Demo realm')
+    expect(name.props.title).toBe('AbCdEfGh-full-realm-id')
+    expect(String(name.props.class)).toContain('truncate')
+    expect(String(name.props.class)).not.toContain('uppercase')
+    expect(content(label)).not.toContain('AbCdEfGh')
   })
 
-  it('cuts a long realm name but never the short id', async () => {
-    realm.value = { ...realm.value, name: 'A very long realm name for the header', id: 'AbCdEfGh-full-realm-id' }
+  it('draws no coloured dot or square for the realm', async () => {
     const { root } = await mountApp(ContextSwitcher)
-
-    const name = element(root, (node) => node.tag === 'span' && content(node) === 'A very long realm name for the header')
-    const id = element(root, (node) => node.tag === 'span' && content(node) === 'AbCdEfGh')
-    expect(String(name.props.class)).toContain('truncate')
-    expect(String(id.props.class)).toContain('shrink-0')
-    expect(String(id.props.class)).not.toContain('truncate')
+    expect(nodes(root).some((node) => String(node.props.style ?? '').includes('background'))).toBe(false)
+    expect(nodes(root).some((node) => typeof node.props.style === 'object' && node.props.style && 'backgroundColor' in (node.props.style as object))).toBe(false)
   })
 
   it('falls back to the realm without a membership', async () => {
