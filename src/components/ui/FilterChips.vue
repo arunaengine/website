@@ -21,7 +21,7 @@ function select(value: string) {
       type="button"
       :aria-pressed="option.value === modelValue"
       :class="[
-        'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
+        'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
         option.value === modelValue
           ? 'border-primary/40 bg-primary/[0.12] text-foreground'
           : 'border-transparent text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground',

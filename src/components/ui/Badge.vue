@@ -4,7 +4,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const badgeVariants = cva(
-  'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring',
+  'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
   {
     variants: {
       variant: {
@@ -28,7 +28,7 @@ const badgeVariants = cva(
       },
       size: {
         md: '',
-        sm: 'text-[10px] px-1.5 py-0 leading-4',
+        sm: 'px-1.5 py-0 leading-4',
         // A bare count: a true circle up to three digits, a pill beyond.
         count: 'h-5 min-w-5 justify-center px-0 py-0 leading-none tabular-nums',
       },
@@ -41,8 +41,13 @@ type Variant = VariantProps<typeof badgeVariants>['variant']
 type Size = VariantProps<typeof badgeVariants>['size']
 
 const props = defineProps<{ variant?: Variant; size?: Size; class?: string }>()
+// Badges read in sentence case: an uppercase or letter spacing a caller still passes is dropped.
+const SHOUTING = /^(uppercase|tracking-\S+)$/
 const classes = computed(() =>
-  cn(badgeVariants({ variant: props.variant, size: props.size }), props.class),
+  cn(
+    badgeVariants({ variant: props.variant, size: props.size }),
+    props.class?.split(/\s+/).filter((name) => !SHOUTING.test(name)).join(' '),
+  ),
 )
 </script>
 
