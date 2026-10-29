@@ -163,6 +163,8 @@ export function isRecencyOrdered(documents: Pick<MetadataDocumentListItem, 'upda
 export interface RecentWalk {
   ordered: boolean
   documents: MetadataDocumentListItem[]
+  /** The walk found `limit` documents or read to the end; false when the page cap stopped it. */
+  complete: boolean
 }
 
 // Walks recency-ordered pages until `limit` non-profile documents are found.
@@ -179,28 +181,28 @@ export async function walkRecentPages(
   const documents: MetadataDocumentListItem[] = []
   for (let page = 0; page < maxPages; page++) {
     const response = await fetchPage(page * size, size)
-    if (!isRecencyOrdered(response.documents)) return { ordered: false, documents: [] }
+    if (!isRecencyOrdered(response.documents)) return { ordered: false, documents: [], complete: false }
     for (const doc of response.documents) {
       if (!doc.document_path.startsWith('profiles/') && keep(doc)) documents.push(doc)
     }
     // Only a full raw page can hide more documents behind it.
-    if (documents.length >= limit || response.total_returned < size) break
+    if (documents.length >= limit || response.total_returned < size) return { ordered: true, documents: documents.slice(0, limit), complete: true }
   }
-  return { ordered: true, documents: documents.slice(0, limit) }
+  return { ordered: true, documents: documents.slice(0, limit), complete: false }
 }
 
-// Newest documents first, straight from the registry, so the dashboard never
-// derives recency from the creation-ordered catalog window. Null means the node
-// cannot order by recency, or the walk found nothing to show, and the caller
-// should fall back to that window.
 /** False for a run record, which conforms to the Process Run profile. */
 export const notRunRecord = (doc: MetadataDocumentListItem) => datasetPurposeOf(mapMetadataDoc(doc)) !== 'process-run'
 
-// `skipRuns` leaves run records out while paging, so the newest datasets fill the limit.
+// Newest documents first, straight from the registry, so the dashboard never
+// derives recency from the creation-ordered catalog window. Null means the node
+// cannot order by recency, and the caller falls back to that window. `skipRuns`
+// leaves run records out while paging; `complete` is false when the page cap cut
+// the walk short, so no list may claim there is nothing older.
 export async function listRecentMetadata(
   limit = RECENT_METADATA_LIMIT,
   options: { skipRuns?: boolean } = {},
-): Promise<MetadataDoc[] | null> {
+): Promise<{ documents: MetadataDoc[]; complete: boolean } | null> {
   if (recentOrderUnsupported) return null
   const walk = await walkRecentPages(
     (offset, size) => listCatalogPage({ limit: size, offset, summary: true, order: 'recent' }),
@@ -212,8 +214,7 @@ export async function listRecentMetadata(
     recentOrderUnsupported = true
     return null
   }
-  if (!walk.documents.length) return null
-  return walk.documents.map(mapMetadataDoc)
+  return { documents: walk.documents.map(mapMetadataDoc), complete: walk.complete }
 }
 
 export async function listGroupMetadata(

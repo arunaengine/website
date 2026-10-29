@@ -2,6 +2,7 @@
 // The latest datasets, newest first from the registry. Run records have their own card, so the
 // registry walk pages past them until five datasets are found. A node that cannot order by recency
 // falls back to the loaded catalog window, without runs too; a failed refresh keeps the list shown.
+// It says there are none only when the registry was read to its end.
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { MetadataDoc } from '@/data/types'
@@ -13,7 +14,7 @@ const props = withDefaults(defineProps<{ refreshRevision?: number }>(), { refres
 const SHOWN = 5
 
 const { metadata, listRecentMetadata, sessionEpoch } = useAruna()
-const recent = ref<MetadataDoc[] | null>(null)
+const recent = ref<{ documents: MetadataDoc[]; complete: boolean } | null>(null)
 const settled = ref(false)
 let round = 0
 
@@ -32,10 +33,11 @@ watch(sessionEpoch, () => {
 }, { flush: 'sync' })
 
 const shown = computed(() =>
-  (recent.value ?? [...metadata.value].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
+  (recent.value?.documents ?? [...metadata.value].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
     .filter((doc) => datasetPurposeOf(doc) !== 'process-run')
     .slice(0, SHOWN),
 )
+const knownNone = computed(() => recent.value?.complete === true)
 </script>
 
 <template>
@@ -45,6 +47,8 @@ const shown = computed(() =>
       <RouterLink :to="{ name: 'datasets' }" class="text-xs font-medium text-primary hover:underline">All datasets</RouterLink>
     </header>
     <p v-if="!settled" class="px-5 pb-4 text-xs text-muted-foreground">Reading the latest datasets…</p>
+    <!-- The walk stopped early or only the loaded window was read: older datasets may exist. -->
+    <p v-else-if="!shown.length && !knownNone" class="px-5 pb-4 text-xs text-muted-foreground">No recent datasets.</p>
     <div v-else-if="!shown.length" class="flex items-center justify-between gap-3 px-5 pb-4 text-xs text-muted-foreground">
       <span>No datasets you can see yet.</span>
       <RouterLink :to="{ name: 'dataset-new' }" class="font-medium text-primary hover:underline">Create dataset</RouterLink>

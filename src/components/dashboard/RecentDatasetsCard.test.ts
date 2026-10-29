@@ -21,7 +21,7 @@ const run = (ulid: string, title: string) => ({ ...doc(ulid, title, '2026-10-29'
 
 describe('recent datasets', () => {
   it('lists the newest datasets from the registry, each opening the dataset', async () => {
-    listRecentMetadata.mockResolvedValueOnce([doc('d2', 'Reef census', '2026-10-29'), doc('d1', 'Coral survey', '2026-10-28')])
+    listRecentMetadata.mockResolvedValueOnce({ documents: [doc('d2', 'Reef census', '2026-10-29'), doc('d1', 'Coral survey', '2026-10-28')], complete: true })
     const mounted = await mountApp(RecentDatasetsCard)
     await flush()
 
@@ -45,7 +45,7 @@ describe('recent datasets', () => {
   })
 
   it('leaves run records to the runs card and offers to create a dataset when none remain', async () => {
-    listRecentMetadata.mockClear().mockResolvedValueOnce([run('r1', 'Annotate my genome with Bakta'), doc('d1', 'Reef census', '2026-10-28')])
+    listRecentMetadata.mockClear().mockResolvedValueOnce({ documents: [run('r1', 'Annotate my genome with Bakta'), doc('d1', 'Reef census', '2026-10-28')], complete: true })
     const mixed = await mountApp(RecentDatasetsCard)
     await flush()
     expect(listRecentMetadata).toHaveBeenCalledWith(5, { skipRuns: true })
@@ -53,12 +53,31 @@ describe('recent datasets', () => {
     expect(content(mixed.root)).not.toContain('Annotate my genome')
     mixed.app.unmount()
 
-    listRecentMetadata.mockResolvedValueOnce([run('r1', 'Annotate my genome with Bakta'), run('r2', 'Align my genome')])
-    const runsOnly = await mountApp(RecentDatasetsCard)
+    // The registry was read to its end and holds no dataset.
+    listRecentMetadata.mockResolvedValueOnce({ documents: [], complete: true })
+    const none = await mountApp(RecentDatasetsCard)
     await flush()
-    expect(content(runsOnly.root)).toContain('No datasets you can see yet.')
-    const create = element(runsOnly.root, (node) => node.tag === 'a' && content(node) === 'Create dataset')
+    expect(content(none.root)).toContain('No datasets you can see yet.')
+    const create = element(none.root, (node) => node.tag === 'a' && content(node) === 'Create dataset')
     expect(JSON.parse(String(create.props['data-to']))).toEqual({ name: 'dataset-new' })
-    runsOnly.app.unmount()
+    none.app.unmount()
+  })
+
+  it('never claims there are none when the walk stopped early or only the loaded window was read', async () => {
+    listRecentMetadata.mockResolvedValueOnce({ documents: [], complete: false })
+    const cut = await mountApp(RecentDatasetsCard)
+    await flush()
+    expect(content(cut.root)).toContain('No recent datasets.')
+    expect(content(cut.root)).not.toContain('No datasets you can see yet.')
+    expect(content(cut.root)).not.toContain('Create dataset')
+    cut.app.unmount()
+
+    listRecentMetadata.mockResolvedValueOnce(null)
+    metadata.value = [run('r1', 'Annotate my genome with Bakta')]
+    const window = await mountApp(RecentDatasetsCard)
+    await flush()
+    expect(content(window.root)).toContain('No recent datasets.')
+    window.app.unmount()
+    metadata.value = []
   })
 })

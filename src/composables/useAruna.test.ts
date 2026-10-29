@@ -110,7 +110,7 @@ describe('the recent page walk', () => {
       return page(dataDocs(size), offset, size)
     }, 5)
     expect(offsets).toEqual([0])
-    expect(walk).toEqual({ ordered: true, documents: dataDocs(5) })
+    expect(walk).toEqual({ ordered: true, documents: dataDocs(5), complete: true })
   })
 
   it('deepens past a profile-only window', async () => {
@@ -129,9 +129,9 @@ describe('the recent page walk', () => {
       offsets.push(offset)
       return page(profileDocs(size, offset), offset, size)
     }, 5)
-    // Empty and ordered: the caller turns this into its own fallback list.
+    // Cut short by the cap: nothing found, and no claim that nothing is older.
     expect(offsets).toEqual([0, 10, 20])
-    expect(walk).toEqual({ ordered: true, documents: [] })
+    expect(walk).toEqual({ ordered: true, documents: [], complete: false })
   })
 
   it('stops on a short page', async () => {
@@ -141,7 +141,7 @@ describe('the recent page walk', () => {
       return page(profileDocs(2), offset, size)
     }, 5)
     expect(offsets).toEqual([0])
-    expect(walk).toEqual({ ordered: true, documents: [] })
+    expect(walk).toEqual({ ordered: true, documents: [], complete: true })
   })
 
   it('pages past runs until enough datasets turn up when asked to skip them', async () => {
@@ -170,7 +170,7 @@ describe('the recent page walk', () => {
       return page([...dataDocs(size)].reverse(), offset, size)
     }, 5)
     expect(offsets).toEqual([0])
-    expect(walk).toEqual({ ordered: false, documents: [] })
+    expect(walk).toEqual({ ordered: false, documents: [], complete: false })
   })
 })
 
