@@ -154,5 +154,28 @@ describe('provenance view', () => {
     await click(button(root, 'Show the files'))
     expect(content(root)).toContain('/work/in/db/f3')
   })
+
+  it('draws folded files reached a second time without their sources again', async () => {
+    const exact = (key: string, tail: string) => `https://w3id.org/aruna/data/arn:aruna:r:n2:s3/db/${key}@01K8W1B3D5F7H9KMQ1S3V5X${tail}`
+    const dbFiles = ['a', 'b'].map((key, index) => ({ '@id': `s3://db/${key}`, '@type': 'MediaObject', name: key, contentUrl: [`s3://db/${key}`, exact(key, `00${index}`)] }))
+    const result = { '@id': 's3://db/out', '@type': 'MediaObject', name: 'out', contentUrl: ['s3://db/out', exact('out', '009')] }
+    aruna.getRun.mockImplementation(async (runId: string) => ({ run_id: runId, run_crate: runId }))
+    aruna.fetchRoCrateRaw.mockImplementation(async (doc: string) => doc === 'r1'
+      ? { '@graph': [{ '@id': '#run', '@type': 'CreateAction', name: 'Bakta', object: dbFiles.map((file) => ({ '@id': file['@id'] })) }, ...dbFiles] }
+      : { '@graph': [{ '@id': '#prep', '@type': 'CreateAction', name: 'Prepare' }] })
+    aruna.getVersionOrigin.mockImplementation(async (id: string) => origin({
+      origin: { kind: 'job', run_id: id.includes('/out@') ? 'r1' : 'prep' },
+      ...(id.includes('/out@') ? {} : { bucket_metadata: { database: true, title: 'Bakta database (light)' } as never, releases: [{ crate_version: 'cv', label: '6.0 light', upstream: [] }] as never }),
+    }))
+    const start = { kind: 'dataset', documentId: '01M63099Q2000108CB51QQDB2P', title: 'Bakta run', crate: { '@graph': [...dbFiles, result] } }
+    const { root } = await mountApp(component, { props: { start } })
+    await click(button(root, 'Show all'))
+    await flush()
+    const text = content(root)
+
+    expect(text.split('2 files of Bakta database (light) 6.0 light')).toHaveLength(3)
+    expect(text).toContain('Where these came from is shown above.')
+    expect(text.split('Database release')).toHaveLength(2)
+  })
 })
 
