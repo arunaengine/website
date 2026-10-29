@@ -16,6 +16,7 @@ import BucketStorageDialog from '@/components/data/BucketStorageDialog.vue'
 import DatabaseRows from '@/components/data/manager/DatabaseRows.vue'
 import MockBucketRows from '@/components/data/manager/MockBucketRows.vue'
 import { useBucketSearch } from '@/composables/useBucketSearch'
+import { useListedUsage } from '@/composables/useBucketUsage'
 import { useDatabases } from '@/composables/useDatabases'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
@@ -31,7 +32,7 @@ import { folderName } from '@/lib/deviceApi'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
 import { isFolderBucket, isHiddenBucket } from '@/lib/workspaces'
 import type { BucketShortcut } from '@/composables/useBucketShortcuts'
-import { Boxes, Check, ChevronLeft, ChevronRight, FolderPlus, FolderSync, History, KeyRound, ListFilter, Plus, Trash2 } from '@lucide/vue'
+import { Boxes, Check, ChevronLeft, ChevronRight, FolderPlus, FolderSync, History, KeyRound, ListFilter, Trash2 } from '@lucide/vue'
 import { computed, ref, useId, watch } from 'vue'
 
 const props = defineProps<{ manager: DataManager }>()
@@ -238,29 +239,60 @@ function openRow(row: AllRow) {
   if (row.hit) openHit(row.hit)
   else openBucketOn(row.bucket, row.nodeId)
 }
-// The desktop names every row's place, short; the tooltip adds location, kind and id.
-function rowPlace(nodeId: string | null): { place: string | null; placeTitle: string | null } {
-  if (!desktop) return { place: null, placeTitle: null }
-  const node = realmNodes.nodeById(nodeId ?? realmNodes.localNodeId.value)
+// Every row names its node, linked to the node's page; the desktop names this computer so and
+// adds location, kind and id to the title.
+type RowPlace = { place: string | null; placeTitle: string | null; placeNode: string | null }
+function rowPlace(nodeId: string | null): RowPlace {
+  const id = nodeId ?? realmNodes.localNodeId.value
+  if (!desktop) return { place: realmNodes.displayName(id), placeTitle: null, placeNode: id }
+  const node = realmNodes.nodeById(id)
   if (node) {
     const short = node.kind === 'user' && node.isLocal ? 'This computer' : node.label
-    return { place: short, placeTitle: `${placeName(node)} (${placeTitle(node)})` }
+    return { place: short, placeTitle: `${placeName(node)} (${placeTitle(node)})`, placeNode: id }
   }
-  return { place: realmNodes.isLocalNode(nodeId) ? 'This computer' : realmNodes.displayName(nodeId), placeTitle: null }
+  return { place: realmNodes.isLocalNode(nodeId) ? 'This computer' : realmNodes.displayName(nodeId), placeTitle: null, placeNode: id }
 }
 // One node's list names a row's place only where it is not that node.
-function listPlace(nodeId: string | null): { place: string | null; placeTitle: string | null } {
+function listPlace(nodeId: string | null): RowPlace {
   const other = (id: string | null) => (id && !realmNodes.isLocalNode(id) ? id : null)
-  return other(nodeId) === other(remoteNodeId.value) ? { place: null, placeTitle: null } : rowPlace(nodeId)
+  return other(nodeId) === other(remoteNodeId.value) ? { place: null, placeTitle: null, placeNode: null } : rowPlace(nodeId)
 }
+
+// Pinned rows first, then databases, then the other buckets; a lone group needs no label.
+function sectioned<R>(rows: R[], pinned: (row: R) => boolean, database: (row: R) => boolean): { label: string; rows: R[] }[] {
+  const pins = rows.filter(pinned)
+  const bases = rows.filter((row) => !pinned(row) && database(row))
+  const rest = rows.filter((row) => !pinned(row) && !database(row))
+  const sections = [{ label: 'Pinned', rows: pins }, { label: 'Databases', rows: bases }, { label: 'Other buckets', rows: rest }].filter((section) => section.rows.length)
+  return sections.length === 1 && sections[0].label === 'Other buckets' ? [{ label: '', rows: rest }] : sections
+}
+const rowNodeId = (row: AllRow) => row.hit?.node_id ?? row.nodeId
+const allSections = computed(() => sectioned(pageRows.value, (row) => row.pinned, (row) => Boolean(databaseOf(row.bucket, rowNodeId(row)))))
+const shownRows = computed(() => allSections.value.flatMap((section) => section.rows))
+type NodeEntry = (typeof nodeBuckets.value)[number]
+const nodeSections = computed(() => sectioned(nodeBuckets.value, (entry) => entry.pinned, (entry) => Boolean(databaseOf(entry.bucket, entry.nodeId ?? null))))
+const shownEntries = computed(() => nodeSections.value.flatMap((section) => section.rows))
+// The position of a row in the shown order, for the arrow key highlight.
+const rowIndex = (row: AllRow) => shownRows.value.indexOf(row)
+const entryIndex = (entry: NodeEntry) => shownEntries.value.indexOf(entry)
+
+// Each shown row names its files and size once its node answered.
+const usage = useListedUsage()
+const usageNode = (nodeId: string | null) => (nodeId && !realmNodes.isLocalNode(nodeId) ? nodeId : null)
+const factsOf = (name: string, nodeId: string | null) => usage.textOf(name, usageNode(nodeId))
+watch(
+  () => (searchList.value ? shownRows.value.map((row) => ({ bucket: row.bucket, nodeId: usageNode(rowNodeId(row)) })) : shownEntries.value.map((entry) => ({ bucket: entry.bucket, nodeId: usageNode(entry.nodeId ?? null) }))),
+  (entries) => usage.ensure(entries),
+  { immediate: true },
+)
 // Arrow keys move through the shown rows of this group, then of other groups.
 const listId = `bucket-results-${useId()}`
 const databaseRows = ref<{ openers: (() => void)[] } | null>(null)
 const groupOpeners = computed<(() => void)[]>(() => {
   if (databaseMode.value) return databaseRows.value?.openers ?? []
-  if (searchList.value) return all.error.value ? [] : pageRows.value.map((row) => () => openRow(row))
+  if (searchList.value) return all.error.value ? [] : shownRows.value.map((row) => () => openRow(row))
   if (bucketsLoading.value || (bucketsError.value && (bucketsAuthError.value || !bucketsLoaded.value))) return []
-  return nodeBuckets.value.map((entry) => () => openBucketOn(entry.bucket, entry.nodeId))
+  return shownEntries.value.map((entry) => () => openBucketOn(entry.bucket, entry.nodeId))
 })
 // The database view lists no other groups, so its keys reach only its own rows.
 const openers = computed(() => [
@@ -320,15 +352,17 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
 <template>
   <aside class="space-y-3">
     <div class="surface overflow-hidden" :aria-busy="bucketsRefreshing">
-      <header class="flex items-center justify-between border-b border-border px-3 py-3">
-        <h2 class="text-sm font-semibold text-foreground">Buckets</h2>
+      <header class="flex items-center justify-between gap-2 px-3.5 pb-2 pt-3">
+        <h2 class="text-sm font-semibold text-foreground">
+          Buckets <span class="font-normal tabular-nums text-muted-foreground">{{ formatCount(searchList ? all.hits.value.length : nodeBuckets.length) }}</span>
+        </h2>
         <div class="flex items-center gap-2">
           <!-- Background revalidation only: the cached list stays readable behind it. -->
           <Spinner v-if="bucketsRefreshing" label="Refreshing buckets…" />
-          <Badge variant="outline" size="count">{{ formatCount(searchList ? all.hits.value.length : nodeBuckets.length) }}</Badge>
+          <Button v-if="desktop" size="sm" data-tour="bucket-create" @click="emit('new-bucket')"><FolderPlus class="h-4 w-4" /> New bucket</Button>
         </div>
       </header>
-      <div class="flex items-center gap-2 border-b border-border px-3 py-2">
+      <div class="flex items-center gap-2 px-3.5 pb-1">
         <Input
           v-model="bucketNameFilter"
           placeholder="Find a bucket"
@@ -369,48 +403,50 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
       <template v-else-if="searchList">
         <Spinner v-if="all.loading.value && !all.hits.value.length" show-label label="Loading buckets…" class="px-3 py-4" />
         <p v-else-if="all.error.value" class="px-3 py-3 text-xs text-destructive">{{ all.error.value }}</p>
-        <ul v-else-if="allRows.length || examples.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
-          <li v-for="(row, index) in pageRows" :key="row.key">
-            <BucketRow
-              v-if="row.hit"
-              :bucket="row.bucket"
-              :database="Boolean(databaseOf(row.bucket, row.hit.node_id))"
-              :subtitle="databaseOf(row.bucket, row.hit.node_id)?.title ?? null"
-              :pinned="row.pinned"
-              option
-              :highlighted="index === activeIndex"
-              :job="jobOf(row.bucket, row.hit.node_id)"
-              :active="hitActive(row.hit)"
-              :node-count="spread(row.hit)"
-              v-bind="rowPlace(row.hit.node_id)"
-              :linked-to="linkedTo(row.hit.node_id, row.bucket)"
-              @open="openRow(row)"
-              @toggle-pin="shortcuts.togglePin(row.bucket, row.nodeId)"
-            >
-              <template #tooltip>{{ hitNodes(row.hit) }}</template>
-              <template #link>
-                <IconButton v-if="hitSource(row.hit)" :label="`Link a local folder to ${row.bucket}…`" side="right" @click="emitSync(hitSource(row.hit))">
-                  <FolderSync class="h-3 w-3" />
-                </IconButton>
-              </template>
-            </BucketRow>
-            <BucketRow
-              v-else
-              :bucket="row.bucket"
-              :node-id="row.nodeId"
-              :database="Boolean(databaseOf(row.bucket, row.nodeId))"
-              :subtitle="databaseOf(row.bucket, row.nodeId)?.title ?? null"
-              pinned
-              option
-              :highlighted="index === activeIndex"
-              :active="row.bucket === bucket && row.nodeId === remoteNodeId"
-              v-bind="rowPlace(row.nodeId)"
-              @open="openRow(row)"
-              @toggle-pin="shortcuts.togglePin(row.bucket, row.nodeId)"
-            >
-              <template #tooltip>{{ rowNode(row.nodeId) }}</template>
-            </BucketRow>
-          </li>
+        <ul v-else-if="allRows.length || examples.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto pb-1">
+          <template v-for="section in allSections" :key="section.label">
+            <li v-if="section.label" role="presentation" class="px-3.5 pb-1 pt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{{ section.label }}</li>
+            <li v-for="row in section.rows" :key="row.key" role="presentation">
+              <BucketRow
+                v-if="row.hit"
+                :bucket="row.bucket"
+                :database="Boolean(databaseOf(row.bucket, row.hit.node_id))"
+                :subtitle="databaseOf(row.bucket, row.hit.node_id)?.title ?? null"
+                :facts="factsOf(row.bucket, row.hit.node_id)"
+                :pinned="row.pinned"
+                option
+                :highlighted="rowIndex(row) === activeIndex"
+                :job="jobOf(row.bucket, row.hit.node_id)"
+                :active="hitActive(row.hit)"
+                :nodes="row.hit.set_id ? row.hit.nodes : []"
+                v-bind="rowPlace(row.hit.node_id)"
+                :linked-to="linkedTo(row.hit.node_id, row.bucket)"
+                @open="openRow(row)"
+                @toggle-pin="shortcuts.togglePin(row.bucket, row.nodeId)"
+              >
+                <template #link>
+                  <IconButton v-if="hitSource(row.hit)" :label="`Link a local folder to ${row.bucket}…`" side="right" @click="emitSync(hitSource(row.hit))">
+                    <FolderSync class="h-3 w-3" />
+                  </IconButton>
+                </template>
+              </BucketRow>
+              <BucketRow
+                v-else
+                :bucket="row.bucket"
+                :node-id="row.nodeId"
+                :database="Boolean(databaseOf(row.bucket, row.nodeId))"
+                :subtitle="databaseOf(row.bucket, row.nodeId)?.title ?? null"
+                :facts="factsOf(row.bucket, row.nodeId)"
+                pinned
+                option
+                :highlighted="rowIndex(row) === activeIndex"
+                :active="row.bucket === bucket && row.nodeId === remoteNodeId"
+                v-bind="rowPlace(row.nodeId)"
+                @open="openRow(row)"
+                @toggle-pin="shortcuts.togglePin(row.bucket, row.nodeId)"
+              />
+            </li>
+          </template>
           <MockBucketRows :filter="bucketNameFilter" :active="bucket" @open="openBucket" />
         </ul>
         <p v-else-if="!all.loading.value" class="px-3 py-4 text-xs text-muted-foreground">No buckets found.</p>
@@ -418,14 +454,13 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           {{ all.failedNodes.value }} {{ all.failedNodes.value === 1 ? 'node' : 'nodes' }} did not answer.
           <button type="button" class="text-primary hover:underline" @click="all.reload()">Retry</button>
         </p>
-        <div v-if="page > 1 || hasNextPage" class="flex items-center justify-center gap-2 border-t border-border/70 p-2">
-          <Button variant="outline" size="sm" :disabled="page <= 1 || all.loading.value" @click="page--">
-            <ChevronLeft class="size-3.5" /> Prev
-          </Button>
-          <span class="px-1 text-center text-xs tabular-nums text-muted-foreground">Page {{ page }}</span>
-          <Button variant="outline" size="sm" :disabled="!hasNextPage || all.loading.value" @click="nextPage">
-            Next <ChevronRight class="size-3.5" />
-          </Button>
+        <div v-if="page > 1 || hasNextPage" class="flex items-center justify-end gap-2 border-t border-border/70 px-3.5 py-2">
+          <IconButton label="Previous buckets" variant="outline" size="icon" class="h-8 w-8" :disabled="page <= 1 || all.loading.value" @click="page--">
+            <ChevronLeft class="size-3.5" />
+          </IconButton>
+          <IconButton label="Next buckets" variant="outline" size="icon" class="h-8 w-8" :disabled="!hasNextPage || all.loading.value" @click="nextPage">
+            <ChevronRight class="size-3.5" />
+          </IconButton>
         </div>
       </template>
       <template v-else>
@@ -439,51 +474,55 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         <template v-else>
           <!-- A failed revalidation keeps the last good list and reports itself above it. -->
           <p v-if="bucketsError" class="border-b border-border/70 px-3 py-2 text-xs text-destructive">{{ bucketsError }}</p>
-          <ul v-if="nodeBuckets.length || examples.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
-            <li
-              v-for="(entry, index) in nodeBuckets"
-              :key="`${entry.nodeId ?? 'local'}/${entry.bucket}`"
-            >
-              <BucketRow
-                :bucket="entry.bucket"
-                option
-                :database="Boolean(databaseOf(entry.bucket, entry.nodeId ?? null))"
-                :subtitle="databaseOf(entry.bucket, entry.nodeId ?? null)?.title ?? null"
-                :highlighted="index === activeIndex"
-                :node-id="entry.nodeId"
-                :pinned="entry.pinned"
-                :synced="syncByBucket.has(syncKeyFor(entry.nodeId, entry.bucket))"
-                :job="jobOf(entry.bucket, entry.nodeId)"
-                :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
-                v-bind="listPlace(entry.nodeId ?? null)"
-                :linked-to="linkedTo(entry.nodeId ?? null, entry.bucket)"
-                @open="openBucketOn(entry.bucket, entry.nodeId)"
-                @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
+          <ul v-if="nodeBuckets.length || examples.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto pb-1">
+            <template v-for="section in nodeSections" :key="section.label">
+              <li v-if="section.label" role="presentation" class="px-3.5 pb-1 pt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{{ section.label }}</li>
+              <li
+                v-for="entry in section.rows"
+                :key="`${entry.nodeId ?? 'local'}/${entry.bucket}`"
+                role="presentation"
               >
-                <template #tooltip>{{ rowNode(entry.nodeId) }}</template>
-                <template #link>
-                  <IconButton
-                    v-if="bindSourceFor(entry.bucket, entry.nodeId ?? null, selectedGroupId)"
-                    :label="`Link a local folder to ${entry.bucket}…`"
-                    side="right"
-                    @click="emitSync(bindSourceFor(entry.bucket, entry.nodeId ?? null, selectedGroupId))"
-                  >
-                    <FolderSync class="h-3 w-3" />
-                  </IconButton>
-                </template>
-                <template #actions>
-                  <IconButton
-                    label="Delete bucket…"
-                    class="text-muted-foreground hover:text-destructive"
-                    :disabled-reason="deleteRefusal(entry.bucket, entry.nodeId)"
-                    side="right"
-                    @click="requestDelete({ kind: 'bucket', bucket: entry.bucket, nodeId: entry.nodeId })"
-                  >
-                    <Trash2 class="h-3 w-3" />
-                  </IconButton>
-                </template>
-              </BucketRow>
-            </li>
+                <BucketRow
+                  :bucket="entry.bucket"
+                  option
+                  :database="Boolean(databaseOf(entry.bucket, entry.nodeId ?? null))"
+                  :subtitle="databaseOf(entry.bucket, entry.nodeId ?? null)?.title ?? null"
+                  :facts="factsOf(entry.bucket, entry.nodeId ?? null)"
+                  :highlighted="entryIndex(entry) === activeIndex"
+                  :node-id="entry.nodeId"
+                  :pinned="entry.pinned"
+                  :synced="syncByBucket.has(syncKeyFor(entry.nodeId, entry.bucket))"
+                  :job="jobOf(entry.bucket, entry.nodeId)"
+                  :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
+                  v-bind="listPlace(entry.nodeId ?? null)"
+                  :linked-to="linkedTo(entry.nodeId ?? null, entry.bucket)"
+                  @open="openBucketOn(entry.bucket, entry.nodeId)"
+                  @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
+                >
+                  <template #link>
+                    <IconButton
+                      v-if="bindSourceFor(entry.bucket, entry.nodeId ?? null, selectedGroupId)"
+                      :label="`Link a local folder to ${entry.bucket}…`"
+                      side="right"
+                      @click="emitSync(bindSourceFor(entry.bucket, entry.nodeId ?? null, selectedGroupId))"
+                    >
+                      <FolderSync class="h-3 w-3" />
+                    </IconButton>
+                  </template>
+                  <template #actions>
+                    <IconButton
+                      label="Delete bucket…"
+                      class="text-muted-foreground hover:text-destructive"
+                      :disabled-reason="deleteRefusal(entry.bucket, entry.nodeId)"
+                      side="right"
+                      @click="requestDelete({ kind: 'bucket', bucket: entry.bucket, nodeId: entry.nodeId })"
+                    >
+                      <Trash2 class="h-3 w-3" />
+                    </IconButton>
+                  </template>
+                </BucketRow>
+              </li>
+            </template>
             <MockBucketRows :filter="bucketNameFilter" :active="bucket" @open="openBucket" />
           </ul>
           <p v-else class="px-3 py-4 text-xs text-muted-foreground">No buckets in this group yet.</p>
@@ -565,12 +604,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           </li>
         </ul>
       </div>
-      <footer v-if="desktop" class="border-t border-border p-3">
-        <Button variant="outline" size="sm" class="w-full" data-tour="bucket-create" @click="emit('new-bucket')">
-          <Plus class="h-4 w-4" /> New bucket
-        </Button>
-      </footer>
-      <footer v-else class="space-y-2 border-t border-border p-3">
+      <footer v-if="!desktop" class="space-y-2 border-t border-border p-3">
         <div class="flex gap-2">
           <Input
             v-model="newBucketName"

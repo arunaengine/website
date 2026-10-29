@@ -67,6 +67,9 @@ const choose = vi.fn((nodeId: string | null) => {
   if (nodeId) showNode(nodeId)
 })
 
+// The listed usage the sidebar reads, by bucket name, and what it asked for.
+const listedFacts = new Map<string, string>()
+const usageAsked: unknown[] = []
 const Empty = defineComponent(() => () => null)
 // The row renders its name and action slot so the sidebar's own controls are visible.
 const RowStub = defineComponent({
@@ -81,6 +84,9 @@ const RowStub = defineComponent({
     pinned: Boolean,
     database: Boolean,
     subtitle: { type: String, default: null },
+    facts: { type: String, default: null },
+    nodes: { type: Array, default: () => [] },
+    placeNode: { type: String, default: null },
   },
   emits: ['open', 'toggle-pin'],
   setup: (props, { slots, emit }) => () =>
@@ -93,6 +99,8 @@ const RowStub = defineComponent({
       h('span', { role: 'tooltip' }, slots.tooltip?.()),
       props.database ? h('i', { 'data-testid': 'database-icon' }, `${props.bucket} is a database`) : null,
       props.subtitle ? h('small', { 'data-testid': 'row-subtitle' }, `${props.bucket}: ${props.subtitle}`) : null,
+      props.facts ? h('small', { 'data-testid': 'row-facts' }, `${props.bucket}: ${props.facts}`) : null,
+      props.nodes.length ? h('small', { 'data-testid': 'row-nodes' }, `${props.bucket}: ${props.nodes.join(', ')}`) : null,
       props.pinnable ? h('button', { 'aria-label': `${props.pinned ? 'Unpin' : 'Pin'} ${props.bucket}`, onClick: () => emit('toggle-pin') }) : null,
       props.job ? h('em', { 'data-testid': 'row-job' }, `${props.bucket}: ${(props.job as { kind: string }).kind}`) : null,
       props.place ? h('small', { 'data-testid': 'row-place', title: props.placeTitle }, `${props.bucket}: ${props.place}`) : null,
@@ -106,14 +114,14 @@ const RowStub = defineComponent({
 })
 const IconButtonStub = defineComponent({
   inheritAttrs: false,
-  props: { label: { type: String, default: '' }, disabledReason: { type: String, default: null } },
+  props: { label: { type: String, default: '' }, disabled: Boolean, disabledReason: { type: String, default: null } },
   setup: (props, { attrs, slots }) => () =>
     h(
       'button',
       {
         ...attrs,
         'aria-label': props.label,
-        disabled: Boolean(props.disabledReason),
+        disabled: props.disabled || Boolean(props.disabledReason),
         title: props.disabledReason ?? props.label,
       },
       slots.default?.(),
@@ -158,6 +166,7 @@ const sidebarModules = {
   '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Passthrough),
   '@/lib/distributedMockData': { exampleBuckets: () => [] },
   '@/lib/distributedMock': { mockEnabled: () => false, defaultPlacement: () => ({}), placementLabel: () => '' },
+  '@/composables/useBucketUsage': { useListedUsage: () => ({ ensure: (entries: unknown[]) => usageAsked.push(entries), textOf: (name: string) => listedFacts.get(name) ?? null }) },
   '@/composables/useBucketSearch': {
     useBucketSearch: () => ({ hits: otherSearch, error: otherError, searched: ref(true), nodesFailed: otherFailed }),
   },
@@ -281,8 +290,13 @@ async function pickNode() {
   await flush()
 }
 
-function hovers(root: Parameters<typeof content>[0]) {
-  return nodes(root).filter((node) => node.props.role === 'tooltip').map((node) => content(node).trim())
+// The node each row names on its facts line.
+function places(root: Parameters<typeof content>[0]) {
+  return nodes(root).filter((node) => node.props['data-testid'] === 'row-place').map((node) => content(node).split(': ')[1])
+}
+
+function pager(root: Parameters<typeof content>[0], label: 'Previous buckets' | 'Next buckets') {
+  return element(root, (node) => node.props['aria-label'] === label)
 }
 
 function field(root: Parameters<typeof content>[0]) {
@@ -650,13 +664,13 @@ describe('Bucket sidebar node choice', () => {
     allBuckets.needsName.value = false
   })
 
-  it('lists every node with its node on hover and opens a bucket on its node', async () => {
+  it('lists every node with the node of each row and opens a bucket on its node', async () => {
     const state = withBucket()
     const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
     const text = content(root)
 
     expect(text).toContain('results')
-    expect(hovers(root)).toEqual(['On name-node-2', 'On name-home'])
+    expect(places(root)).toEqual(['name-node-2', 'name-home'])
     expect(text).not.toContain('reef-survey')
 
     await click(element(root, (node) => node.props['aria-label'] === 'Open results'))
@@ -688,17 +702,16 @@ describe('Bucket sidebar node choice', () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
     await flush()
     expect(shown(root)).toHaveLength(25)
-    expect(content(root)).toContain('Page 1')
-    expect(button(root, 'Prev').props.disabled).toBe(true)
+    expect(content(root)).not.toContain('Page')
+    expect(pager(root, 'Previous buckets').props.disabled).toBe(true)
 
-    await click(button(root, 'Next'))
+    await click(pager(root, 'Next buckets'))
     await flush()
     expect(loadMore).toHaveBeenCalledOnce()
     expect(shown(root)).toEqual(['b25', 'b26', 'b27', 'b28', 'b29'])
-    expect(content(root)).toContain('Page 2')
-    expect(button(root, 'Next').props.disabled).toBe(true)
+    expect(pager(root, 'Next buckets').props.disabled).toBe(true)
 
-    await click(button(root, 'Prev'))
+    await click(pager(root, 'Previous buckets'))
     expect(shown(root)[0]).toBe('b00')
     allBuckets.hits.value = []
   })
@@ -712,7 +725,8 @@ describe('Bucket sidebar node choice', () => {
 
     expect(showNode).toHaveBeenCalledWith('node-2')
     expect(content(root)).toContain('reef-survey')
-    expect(hovers(root)).toEqual(['On name-home'])
+    // One node's rows leave its name to the header.
+    expect(places(root)).toEqual([])
     expect(content(root)).not.toContain('results')
     expect(createButton(root).props.title).toBe('Creates the bucket on name-node-2')
   })
@@ -883,6 +897,61 @@ describe('All nodes list order and pins', () => {
   })
 })
 
+describe('Bucket sidebar sections', () => {
+  const labels = (root: Parameters<typeof content>[0]) =>
+    nodes(root).filter((node) => node.tag === 'li' && node.props.role === 'presentation' && !node.children.some((child) => child.kind === 'element')).map((node) => content(node).trim())
+  const order = (root: Parameters<typeof content>[0]) =>
+    nodes(root).filter((node) => String(node.props['aria-label'] ?? '').startsWith('Open ')).map((node) => content(node))
+
+  it('lists pins, then databases, then the other buckets, each row with its files and size', async () => {
+    nodeChoice.value = null
+    allBuckets.needsName.value = false
+    databaseRows.value = [{ bucket: 'bakta-database', places: [{ bucket: 'bakta-database', nodeId: 'node-2' }], title: 'Bakta database (light)', metadata: { database: true, identifiers: [] } }]
+    allBuckets.hits.value = [
+      { bucket: 'laptop', node_id: 'node-2', group_id: 'g1' },
+      { bucket: 'bakta-database', node_id: 'node-2', group_id: 'g1' },
+      { bucket: 'images', node_id: 'home', group_id: 'g1' },
+    ]
+    listedFacts.set('laptop', '16 files, 50.2 MB')
+    usageAsked.length = 0
+    const state = manager()
+    state.shortcuts.pinned.value = [{ bucket: 'images', nodeId: null }]
+    try {
+      const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
+      await flush()
+
+      expect(labels(root)).toEqual(['Pinned', 'Databases', 'Other buckets'])
+      expect(order(root)).toEqual(['images', 'bakta-database', 'laptop'])
+      expect(nodes(root).filter((node) => node.props['data-testid'] === 'row-facts').map((node) => content(node))).toEqual(['laptop: 16 files, 50.2 MB'])
+      // Earlier tests leave their lists mounted, so only this list's request is looked for.
+      expect(usageAsked).toContainEqual([
+        { bucket: 'images', nodeId: null },
+        { bucket: 'bakta-database', nodeId: 'node-2' },
+        { bucket: 'laptop', nodeId: 'node-2' },
+      ])
+
+      // The arrow keys follow the shown order.
+      const field = element(root, (node) => node.props['aria-label'] === 'Find a bucket')
+      ;(field.props.onKeydown as (event: unknown) => void)({ key: 'ArrowDown', preventDefault: () => {} })
+      await flush()
+      expect(nodes(root).filter((node) => node.props['aria-selected'] === true).map((node) => content(node))).toEqual(['images'])
+    } finally {
+      databaseRows.value = []
+      allBuckets.hits.value = []
+      listedFacts.clear()
+    }
+  })
+
+  it('names no section when every row is an ordinary bucket', async () => {
+    nodeChoice.value = null
+    allBuckets.hits.value = [{ bucket: 'laptop', node_id: 'node-2', group_id: 'g1' }]
+    const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
+    await flush()
+    expect(labels(root)).toEqual([])
+    allBuckets.hits.value = []
+  })
+})
+
 describe('database buckets in the list', () => {
   it('marks a database with its icon and title in both lists', async () => {
     nodeChoice.value = null
@@ -1018,7 +1087,7 @@ describe('database buckets in the list', () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
     await flush()
 
-    await click(button(root, 'Next'))
+    await click(pager(root, 'Next buckets'))
     await flush()
     expect(shown(root)).toEqual(['b25', 'b26', 'b27', 'b28', 'b29'])
     allBuckets.hits.value = []
@@ -1047,9 +1116,9 @@ describe('database buckets in the list', () => {
     const before = shown(root)
     expect(before[0]).toContain('b03')
 
-    await click(button(root, 'Next'))
+    await click(pager(root, 'Next buckets'))
     await flush()
-    await click(button(root, 'Prev'))
+    await click(pager(root, 'Previous buckets'))
     expect(shown(root)).toEqual(before)
     allBuckets.hits.value = []
   })
@@ -1070,11 +1139,11 @@ describe('database buckets in the list', () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
     await flush()
 
-    await click(button(root, 'Next'))
+    await click(pager(root, 'Next buckets'))
     await flush()
-    expect(content(root)).toContain('Page 1')
+    expect(pager(root, 'Previous buckets').props.disabled).toBe(true)
     expect(shown(root)).toEqual(listed(25).map((entry) => entry.bucket))
-    await click(button(root, 'Next'))
+    await click(pager(root, 'Next buckets'))
     expect(shown(root)).toEqual(['b25', 'b26', 'b27', 'b28', 'b29'])
     allBuckets.hits.value = []
   })
@@ -1093,12 +1162,12 @@ describe('database buckets in the list', () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
     await flush()
 
-    void (button(root, 'Next').props.onClick as () => Promise<void>)()
+    void (pager(root, 'Next buckets').props.onClick as () => Promise<void>)()
     state.bucketNameFilter.value = 'b2'
     await flush()
     answer()
     await flush()
-    expect(content(root)).toContain('Page 1')
+    expect(pager(root, 'Previous buckets').props.disabled).toBe(true)
     allBuckets.hits.value = []
     allBuckets.more.value = false
   })

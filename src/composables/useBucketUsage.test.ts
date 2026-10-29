@@ -41,3 +41,24 @@ describe('bucket usage', () => {
     expect(read.value?.objects).toBe(3)
   })
 })
+
+describe('listed bucket usage', () => {
+  it('asks each bucket once, four at a time, and names it once read', async () => {
+    asked.length = 0
+    const { useListedUsage } = await import('./useBucketUsage')
+    const listed = useListedUsage()
+    const entries = ['a', 'b', 'c', 'd', 'e'].map((bucket) => ({ bucket, nodeId: bucket === 'e' ? 'n2' : null }))
+    listed.ensure(entries)
+    listed.ensure(entries)
+    expect(asked.map((entry) => entry.bucket)).toEqual(['a', 'b', 'c', 'd'])
+
+    asked[0].resolve(usage({ bucket: 'a', objects: 2 }))
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(asked.map((entry) => `${entry.node}/${entry.bucket}`).at(-1)).toBe('n2/e')
+    expect(listed.textOf('a', null)).toBe('2 files, 50.2 MB')
+    expect(listed.textOf('b', null)).toBeNull()
+    listed.ensure(entries)
+    expect(asked).toHaveLength(5)
+  })
+})
