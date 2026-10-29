@@ -30,4 +30,24 @@ describe('run file groups', () => {
     expect(groups.slice(1).map((group) => group.files.map((entry) => entry.name))).toEqual([['a.tsv'], ['b.tsv']])
     expect(groups[2]!.bytes.complete).toBe(false)
   })
+
+  it('keeps files of different releases apart and metadata of different buckets apart', () => {
+    const OLD = { id: 'release-old', kind: 'release' as const, name: 'Release old', version: 'old', links: [] }
+    const NEW = { id: 'release-new', kind: 'release' as const, name: 'Release new', version: 'new', links: [] }
+    const files = [
+      file('db', 'a.bin', '1', { partOf: [DATABASE, OLD] }),
+      file('db', 'b.bin', '1', { partOf: [DATABASE, OLD] }),
+      file('db', 'c.bin', '1', { partOf: [DATABASE, NEW] }),
+      file('other', 'd.bin', '1', { partOf: [DATABASE] }),
+      file('other', 'e.bin', '1', { partOf: [DATABASE] }),
+    ]
+    const groups = groupFiles(files)
+
+    expect(groups.map((group) => [group.release?.version ?? null, group.bucket, group.files.length])).toEqual([
+      ['old', 'db', 2],
+      ['new', 'db', 1],
+      [null, 'other', 2],
+    ])
+  })
 })
+

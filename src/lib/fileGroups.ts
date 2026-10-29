@@ -50,10 +50,12 @@ function groupOf(key: string, files: RunCrateFileRef[], endpoint?: string | null
 export function groupFiles(files: RunCrateFileRef[], endpoint?: string | null): FileGroup[] {
   const byKey = new Map<string, RunCrateFileRef[]>()
   for (const file of files) {
-    const part = file.partOf?.find((entry) => entry.kind === 'database') ?? file.partOf?.find((entry) => entry.kind === 'release')
     const identity = parseDataIdentity(file, endpoint)
-    const bucket = identity.s3 ? `bucket:${identity.arn?.nodeId ?? ''}/${identity.s3.bucket}` : null
-    const key = part?.id ?? bucket ?? `file:${file.id}`
+    const place = identity.s3 ? `${identity.arn?.nodeId ?? ''}/${identity.s3.bucket}` : null
+    // Files group by their whole membership (every release and the metadata), within one bucket.
+    const parts = (file.partOf ?? []).map((part) => part.id).sort().join('\n')
+    const bucket = place ? `bucket:${place}` : null
+    const key = parts ? `parts:${place ?? file.id}\n${parts}` : (bucket ?? `file:${file.id}`)
     byKey.set(key, [...(byKey.get(key) ?? []), file])
   }
   return [...byKey].flatMap(([key, members]) => {
