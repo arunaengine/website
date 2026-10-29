@@ -234,7 +234,8 @@ export function useDataManager() {
   const s3 = useS3()
 
   const bucket = computed(() => routeString(route.params.bucketId))
-  const prefix = computed(() => routeString(route.query.prefix))
+  // Links from run records end a folder with a slash; the view adds its own.
+  const prefix = computed(() => routeString(route.query.prefix).replace(/\/+$/, ''))
   const s3Prefix = computed(() => (prefix.value ? `${prefix.value}/` : ''))
 
   // Federated bucket search + cross-node browsing. The optional ?node=<id> route

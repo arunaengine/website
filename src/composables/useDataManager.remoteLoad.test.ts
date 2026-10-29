@@ -103,7 +103,7 @@ describe('a folder on another node opened by its address', () => {
         { path: '/buckets/:bucketId', name: 'bucket', component: View },
       ],
     })
-    await router.push({ name: 'bucket', params: { bucketId: 'laptop' }, query: { group: 'g-a', node: 'n-2', prefix: 'results/alignment' } })
+    await router.push({ name: 'bucket', params: { bucketId: 'laptop' }, query: { group: 'g-a', node: 'n-2', prefix: 'results/alignment/' } })
     let manager: ReturnType<typeof useDataManager> | null = null
     const host = defineComponent({
       setup: () => {
