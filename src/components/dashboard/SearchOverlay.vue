@@ -113,7 +113,7 @@ const items = computed<QuickItem[]>(() => [
     key: `b:${hit.node_id}:${hit.bucket}`,
     section: 'buckets',
     title: hit.bucket,
-    subtitle: `Node: ${nodeDisplayName(hit.node_id)} · Group: ${hit.group_name || truncateMiddle(hit.group_id)}`,
+    subtitle: `Node: ${nodeDisplayName(hit.node_id)}, Group: ${hit.group_name || truncateMiddle(hit.group_id)}`,
     routeName: 'bucket',
     routeParams: { bucketId: hit.bucket },
     routeQuery: { group: hit.group_id, ...(!isLocalNode(hit.node_id) ? { node: hit.node_id } : {}) },
@@ -122,7 +122,7 @@ const items = computed<QuickItem[]>(() => [
     key: `o:${hit.issuer_node_id}:${hit.bucket}:${hit.key}`,
     section: 'objects',
     title: hit.key,
-    subtitle: `${OBJECT_SEARCH_MODE_LABELS[hit.mode]} · Node: ${nodeDisplayName(hit.issuer_node_id)} · Group: ${truncateMiddle(hit.group_id)} · Bucket: ${hit.bucket}`,
+    subtitle: `${OBJECT_SEARCH_MODE_LABELS[hit.mode]}, Node: ${nodeDisplayName(hit.issuer_node_id)}, Group: ${truncateMiddle(hit.group_id)}, Bucket: ${hit.bucket}`,
     routeName: 'bucket',
     routeParams: { bucketId: hit.bucket },
     routeQuery: {
@@ -202,7 +202,7 @@ const quickSummary = computed(() => {
     .map((section) => [section, counts.get(section) ?? 0] as const)
     .filter(([, count]) => count > 0)
     .map(([section, count]) => `${count} ${QUICK_KIND_LABELS[section].toLowerCase()}${count === 1 ? '' : 's'}`)
-    .join(' · ')
+    .join(', ')
 })
 const activeKey = computed(() => items.value[activeIndex.value]?.key ?? null)
 

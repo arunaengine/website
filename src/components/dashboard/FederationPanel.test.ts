@@ -101,18 +101,18 @@ describe('topology', () => {
 
     const html = await render()
 
-    expect(html).toContain('· node-1</title>')
+    expect(html).toContain(', node-1</title>')
     expect(html).toMatch(/>\s*node-1\s*<\/text>/)
     expect(html).toContain('Connections as seen by node-1.')
     expect(html).not.toMatch(/>\s*this node\s*</)
-    expect(html).not.toContain('· this node')
+    expect(html).not.toContain(', this node')
     expect(html).not.toContain('Edges show connections')
   })
 
   it('keeps this node and the portal footnote in the browser', async () => {
     const html = await render()
 
-    expect(html).toContain('· this node</title>')
+    expect(html).toContain(', this node</title>')
     expect(html).toMatch(/>\s*this node\s*<\/text>/)
     expect(html).toContain('Edges show connections as seen by the node serving this portal, not full mesh topology.')
     expect(html).not.toContain('Connections as seen by')

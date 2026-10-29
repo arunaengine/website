@@ -309,7 +309,7 @@ async function createFolder() {
             v-if="selectedGroupId"
             :to="{ name: 'group', params: { id: selectedGroupId } }"
             class="max-w-[12rem] truncate font-medium text-foreground hover:underline"
-            :title="`${selectedGroupName} (${selectedGroupId}) · Switch the group in the top bar`"
+            :title="`${selectedGroupName} (${selectedGroupId}). Switch the group in the top bar`"
           >
             {{ selectedGroupName }}
           </RouterLink>

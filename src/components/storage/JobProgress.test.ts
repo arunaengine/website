@@ -33,7 +33,7 @@ async function mount(job: ProgressJob) {
 describe('JobProgress', () => {
   it('shows the count and pauses', async () => {
     const { root, actions } = await mount(JOB)
-    expect(content(root)).toContain('92,410 of 214,880 · 2 skipped')
+    expect(content(root)).toContain('92,410 of 214,880, 2 skipped')
     expect(element(root, (node) => node.props.role === 'progressbar').props['aria-valuenow']).toBe(43)
     await click(button(root, 'Pause'))
     expect(actions).toEqual(['pause'])
@@ -122,7 +122,7 @@ describe('JobProgress', () => {
 
   it('shows a step without a total as a count only', async () => {
     const { root } = await mount({ ...JOB, kind: 'move', total: 0, counted: false, failed: 3 })
-    expect(content(root)).toContain('92,410 · 2 skipped · 3 failed')
+    expect(content(root)).toContain('92,410, 2 skipped, 3 failed')
     expect(() => element(root, (node) => node.props.role === 'progressbar')).toThrow()
   })
 
@@ -130,7 +130,7 @@ describe('JobProgress', () => {
     const rename = { ...JOB, kind: 'rename', done: 152, total: 3877, skipped: 0, left: 'about 7 h left' } as const
     const { root } = await mount(rename)
     expect(content(root)).toContain('Renaming files in your storage')
-    expect(content(root)).toContain('152 of 3,877 renamed · about 7 h left')
+    expect(content(root)).toContain('152 of 3,877 renamed, about 7 h left')
     expect(content(root)).toContain('Runs on the server. You can close this window.')
     expect(element(root, (node) => node.props.role === 'progressbar').props['aria-valuenow']).toBe(4)
   })
@@ -141,7 +141,7 @@ describe('JobProgress', () => {
     expect(content(quiet.root)).not.toContain('skipped')
     expect(content(quiet.root)).not.toContain('failed')
     const failed = await mount({ ...rename, failed: 3 })
-    expect(content(failed.root)).toContain('152 of 3,877 renamed · 3 failed')
+    expect(content(failed.root)).toContain('152 of 3,877 renamed, 3 failed')
   })
 
   it('names the bar and reads its value', async () => {

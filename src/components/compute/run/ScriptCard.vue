@@ -96,7 +96,7 @@ function addInputFor(path: string) {
       <template v-else-if="unassigned">
         {{ unassigned }} path{{ unassigned === 1 ? '' : 's' }} in the script not assigned.
       </template>
-      <template v-else>{{ language.file }} · saved to your bucket when you press Run.</template>
+      <template v-else>{{ language.file }}, saved to your bucket when you press Run.</template>
     </template>
     <template #controls>
       <Button variant="outline" size="sm" @click="loadScriptOpen = true">

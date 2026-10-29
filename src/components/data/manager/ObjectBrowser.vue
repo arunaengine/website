@@ -434,7 +434,7 @@ async function onDrop(event: DragEvent) {
             <Button
               variant="outline"
               size="sm"
-              :title="`${referenceStats.count} referenced object${referenceStats.count === 1 ? '' : 's'} · ${formatBytes(referenceStats.bytes)}, open per-source breakdown`"
+              :title="`${referenceStats.count} referenced object${referenceStats.count === 1 ? '' : 's'}, ${formatBytes(referenceStats.bytes)}, open per-source breakdown`"
             >
               <Link2 class="h-4 w-4 text-primary" />
               <span class="text-xs">{{ referenceStats.count }} referenced, {{ formatBytes(referenceStats.bytes) }}</span>

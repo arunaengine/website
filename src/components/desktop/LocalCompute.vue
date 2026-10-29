@@ -26,7 +26,7 @@ const summary = computed(() => {
   const limit = current.limits.max_concurrent
   return [current.backend, limit ? `${limit} ${limit === 1 ? 'job' : 'jobs'} at a time` : null, `${current.running} running now`]
     .filter(Boolean)
-    .join(' · ')
+    .join(', ')
 })
 
 // Running counts change all the time, so they are read again on every visit.

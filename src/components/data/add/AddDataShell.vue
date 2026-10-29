@@ -211,9 +211,8 @@ function rowEditable(row: BuilderRow): boolean {
                   class="mt-1 text-[10px]"
                 />
                 <p v-if="row.state === 'submitting' && row.phase" class="mt-1 text-[10px] text-muted-foreground">
-                  {{ row.phase }}
-                  <template v-if="row.progressTotal != null">
-                    · {{ row.progressUnit === 'bytes' ? formatBytes(row.progressCurrent ?? 0) : row.progressCurrent }}
+                  {{ row.phase }}<template v-if="row.progressTotal != null">,
+                    {{ row.progressUnit === 'bytes' ? formatBytes(row.progressCurrent ?? 0) : row.progressCurrent }}
                     / {{ row.progressUnit === 'bytes' ? formatBytes(row.progressTotal) : row.progressTotal }}
                   </template>
                   <span v-if="row.currentPath" class="block truncate font-mono" :title="row.currentPath">{{ row.currentPath }}</span>

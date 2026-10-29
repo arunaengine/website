@@ -47,7 +47,7 @@ function choose(row: DatabaseRow) {
           <p class="text-sm font-medium text-foreground">{{ row.title || row.bucket }}</p>
           <p class="text-xs text-muted-foreground">
             <span class="font-mono">{{ row.bucket }}</span>
-            <template v-if="row.public"> · Public</template>
+            <template v-if="row.public">, Public</template>
           </p>
         </div>
         <Button size="sm" variant="outline" @click="choose(row)">Add from this database</Button>

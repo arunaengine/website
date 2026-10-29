@@ -136,7 +136,7 @@ describe('activity', () => {
   it('names the realm check without inventing a time', async () => {
     const html = await render()
 
-    expect(html).toContain('Last check: never · Test realm is reachable')
+    expect(html).toContain('Last check: never, Test realm is reachable')
   })
 
   it('explains an absent node instead of showing empty counts', async () => {

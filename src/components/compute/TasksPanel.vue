@@ -208,7 +208,7 @@ function taskResources(task: TesTask): string {
   if (r.cpu_cores != null) parts.push(`${r.cpu_cores} cpu`)
   if (r.ram_gb != null) parts.push(`${formatResourceGb(r.ram_gb)} RAM`)
   if (r.disk_gb != null) parts.push(`${formatResourceGb(r.disk_gb)} disk`)
-  return parts.join(' · ')
+  return parts.join(', ')
 }
 
 function resourcesHint(task: TesTask): string | undefined {
@@ -401,7 +401,6 @@ onUnmounted(() => {
     <p v-else-if="serviceState === 'ready' && serviceInfo" class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
       <span class="font-medium text-foreground" :title="`GA4GH TES ${serviceInfo.type.version}`">Run service</span>
       <template v-if="serviceInfo.storage?.length">
-        <span>·</span>
         <Badge v-for="s in serviceInfo.storage" :key="s" variant="outline" class="font-mono">{{ s }}</Badge>
       </template>
     </p>

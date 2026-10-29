@@ -394,10 +394,10 @@ export function useDatasetSearch(searchBox: Ref<{ focus: () => void } | null>) {
   const browseSummary = computed(() => {
     const shown = formatNumber(hits.value.length)
     const page = formatNumber(browsePage.value)
-    if (pageCount.value === null) return `Page ${page} · ${shown} Datasets on this page.`
+    if (pageCount.value === null) return `Page ${page}, ${shown} Datasets on this page.`
     // Favourites are fetched by id, so only the server estimate reads "about".
     const about = favouritesOnly.value ? '' : 'about '
-    return `Page ${page} of ${about}${formatNumber(pageCount.value)} · ${shown} Datasets on this page.`
+    return `Page ${page} of ${about}${formatNumber(pageCount.value)}, ${shown} Datasets on this page.`
   })
 
   function goToPage(page: number) {
@@ -501,7 +501,7 @@ export function useDatasetSearch(searchBox: Ref<{ focus: () => void } | null>) {
   // because a cursor cannot be reconstructed from it.
   const searchSummary = computed(() => {
     const count = visibleResults.value.length
-    return `Page ${formatNumber(searchPage.value)} · ${formatNumber(count)} result${count === 1 ? '' : 's'} on this page.`
+    return `Page ${formatNumber(searchPage.value)}, ${formatNumber(count)} result${count === 1 ? '' : 's'} on this page.`
   })
 
   function showSearchPage(page: number) {

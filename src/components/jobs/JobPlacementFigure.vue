@@ -159,7 +159,7 @@ function candidateVerdict(verdictName: string, rank?: number): string {
             </span>
             <span class="inline-flex items-center gap-1.5">
               <span aria-hidden="true" class="inline-block h-2 w-2 rounded-full bg-aruna-sky" />
-              {{ formatBytes(movedBytes) }} moved · ~{{ estimatedTime(movedMs) }}
+              {{ formatBytes(movedBytes) }} moved, ~{{ estimatedTime(movedMs) }}
             </span>
           </div>
         </template>
@@ -230,7 +230,7 @@ function candidateVerdict(verdictName: string, rank?: number): string {
                     class="whitespace-nowrap px-3 py-2"
                     :class="input.source_node_id ? 'text-sky-600 dark:text-aruna-aqua' : 'text-emerald-600 dark:text-emerald-400'"
                   >
-                    <template v-if="input.source_node_id">moved · ~{{ estimatedTime(input.transfer_ms) }}</template>
+                    <template v-if="input.source_node_id">moved, ~{{ estimatedTime(input.transfer_ms) }}</template>
                     <template v-else>stays</template>
                   </td>
                 </tr>
@@ -263,7 +263,7 @@ function candidateVerdict(verdictName: string, rank?: number): string {
                   <td class="px-3 py-2">
                     <div class="flex flex-wrap items-center gap-1">
                       <NodeLabel :node-id="candidate.node_id" size="sm" />
-                      <span v-if="candidate.executor_kind" class="text-muted-foreground">· {{ candidate.executor_kind }}</span>
+                      <span v-if="candidate.executor_kind" class="text-muted-foreground">{{ candidate.executor_kind }}</span>
                     </div>
                   </td>
                   <td class="whitespace-nowrap px-3 py-2 text-foreground">

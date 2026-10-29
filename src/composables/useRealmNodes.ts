@@ -62,7 +62,7 @@ function placeName(node: RealmNodeInfo, thisComputer: boolean): string {
   if (thisComputer) return name
   // "default" is the backend's placeholder for a node without a location.
   const location = node.placement?.location
-  return location && location !== 'default' ? `${name} · ${location}` : name
+  return location && location !== 'default' ? `${name}, ${location}` : name
 }
 
 export function useRealmNodes() {

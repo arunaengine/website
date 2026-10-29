@@ -49,7 +49,7 @@ const resultsFolder = ref('')
       <Star class="mt-1 h-4 w-4 text-primary" />
       <div class="min-w-0 flex-1">
         <h2 class="font-display text-base font-semibold text-aruna-navy">{{ run.name }}</h2>
-        <p class="font-mono text-xs text-muted-foreground">Saved on this computer · {{ run.task.executors[0]?.image }}</p>
+        <p class="font-mono text-xs text-muted-foreground">Saved on this computer, {{ run.task.executors[0]?.image }}</p>
       </div>
       <Button variant="outline" size="sm" @click="editSaved">Edit saved run</Button>
     </header>

@@ -341,7 +341,7 @@ function reasonTone(link: RepositoryLink): string {
             <dt class="text-muted-foreground">{{ isPullLink(link) ? 'Last update' : 'Last push' }}</dt>
             <dd>
               <template v-if="link.last_push">
-                {{ relativeTime(link.last_push.pushed_at) }} ·
+                {{ relativeTime(link.last_push.pushed_at) }},
                 <RouterLink v-if="here(link)" :to="{ name: 'job', params: { jobId: link.last_push.job_id } }" class="text-primary hover:underline">job</RouterLink>
                 <span v-else class="font-mono">job {{ link.last_push.job_id }}</span>
               </template>

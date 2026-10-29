@@ -159,7 +159,7 @@ async function handleSignOut() {
             <div class="hidden min-w-0 max-w-40 flex-col text-left leading-none sm:flex">
               <div class="truncate text-[13px] font-medium leading-none text-foreground">{{ currentUser.name }}</div>
               <div class="mt-0.5 truncate text-[11px] leading-none text-muted-foreground">
-                {{ homeRealm ?? `${realm.shortName} · ${role.replace('realm-', '')}` }}
+                {{ homeRealm ?? `${realm.shortName}, ${role.replace('realm-', '')}` }}
               </div>
             </div>
             <ChevronDown class="hidden h-3.5 w-3.5 shrink-0 text-muted-foreground sm:block" />

@@ -503,7 +503,7 @@ describe('distributed job detail components', () => {
     expect(mounted.errors).toEqual([])
     expect(text).toContain('Mixed: 1 of 3 moved')
     expect(text).toContain('1 of 3 inputs (300 MB, about 4s) was copied to node-giessen; 1.2 GB stayed.')
-    expect(text).toContain('300 MB moved · ~4s')
+    expect(text).toContain('300 MB moved, ~4s')
     mounted.app.unmount()
   })
 
@@ -1038,7 +1038,7 @@ describe('distributed job detail components', () => {
     const cases: Array<[Record<string, unknown>, Record<string, unknown>, string]> = [
       [{ state: 'QUEUED', tags: { [nodeTag]: 'node-2' } }, {}, 'Waiting for a response from node-2'],
       [{ state: 'QUEUED' }, {}, 'Queued, waiting for a node'],
-      [{ state: 'INITIALIZING' }, { progress: { current: 2, total: 5, unit: 'inputs' } }, 'Copying inputs · 2 / 5 inputs'],
+      [{ state: 'INITIALIZING' }, { progress: { current: 2, total: 5, unit: 'inputs' } }, 'Copying inputs, 2 / 5 inputs'],
       [{ state: 'INITIALIZING' }, {}, 'Copying inputs'],
       [{ state: 'RUNNING', logs: [{ start_time: started, logs: [], outputs: [] }] }, {}, 'Running for'],
       [
@@ -1271,7 +1271,7 @@ describe('distributed job detail components', () => {
     expect(text).toContain('line 20')
     expect(text).toContain('line 13')
     expect(text).not.toContain('line 12')
-    expect(text).toContain('stderr: 2 lines · last: warn two')
+    expect(text).toContain('stderr: 2 lines, last: warn two')
     expect(text).toContain('Open full log')
     mounted.app.unmount()
   })

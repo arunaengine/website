@@ -223,7 +223,7 @@ const familySummary = computed(() => {
   const family = nativeFamily.value
   if (!family) return ''
   const aliases = `${family.alias_count} alias${family.alias_count === 1 ? '' : 'es'}`
-  return `${aliases} · revision ${family.revision} · ${truncateMiddle(family.projection_digest, 6, 4)}`
+  return `${aliases}, revision ${family.revision}, ${truncateMiddle(family.projection_digest, 6, 4)}`
 })
 
 const requestDetails = computed<Detail[]>(() => {
@@ -357,7 +357,7 @@ const summary = computed<Summary | null>(() => {
           : 'Queued, waiting for a node',
       }
     case 'INITIALIZING':
-      return { tone: 'info', headline: copyProgress.value ? `Copying inputs · ${copyProgress.value}` : 'Copying inputs' }
+      return { tone: 'info', headline: copyProgress.value ? `Copying inputs, ${copyProgress.value}` : 'Copying inputs' }
     case 'RUNNING':
       return { tone: 'info', headline: duration ? `Running for ${duration}${where}` : `Running${where}` }
     case 'PAUSED':
@@ -419,11 +419,11 @@ const stages = computed(() => {
     executorKind.value ? `executor ${executorKind.value}` : '',
   ]
     .filter(Boolean)
-    .join(' · ')
+    .join(', ')
   const queued = list[0]
   const running = list[2]
   if (queued && queued.state !== 'pending') queued.detail = where || 'any node with an executor'
-  if (running && running.state !== 'pending' && where) running.detail = [where, running.detail].filter(Boolean).join(' · ')
+  if (running && running.state !== 'pending' && where) running.detail = [where, running.detail].filter(Boolean).join(', ')
   return list
 })
 
@@ -623,7 +623,7 @@ function hidden(text: string): number {
 function stderrSummary(i: number): string {
   const lines = executorStderr(i).split('\n').filter((line) => line.trim())
   if (!lines.length) return ''
-  return `${lines.length} line${lines.length === 1 ? '' : 's'} · last: ${lines[lines.length - 1]}`
+  return `${lines.length} line${lines.length === 1 ? '' : 's'}, last: ${lines[lines.length - 1]}`
 }
 
 const logOpen = ref(false)
@@ -800,12 +800,12 @@ async function confirmDelete() {
             </div>
             <div v-if="executorLog(i)?.start_time || executorLog(i)?.end_time" class="text-[11px] text-muted-foreground">
               <span v-if="executorLog(i)!.start_time">started {{ relativeTime(executorLog(i)!.start_time!) }}</span>
-              <span v-if="executorLog(i)!.end_time"> · ended {{ relativeTime(executorLog(i)!.end_time!) }}</span>
+              <span v-if="executorLog(i)!.end_time">, ended {{ relativeTime(executorLog(i)!.end_time!) }}</span>
             </div>
             <template v-if="executorStdout(i) || executorStderr(i)">
               <div v-if="executorStdout(i)">
                 <div class="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {{ executorStderr(i) ? 'stdout' : 'output' }}<span v-if="hidden(executorStdout(i))"> · last {{ tail(executorStdout(i)).length }} lines</span>
+                  {{ executorStderr(i) ? 'stdout' : 'output' }}<span v-if="hidden(executorStdout(i))">, last {{ tail(executorStdout(i)).length }} lines</span>
                 </div>
                 <div class="relative mt-1">
                   <pre class="overflow-x-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-3 font-mono text-[11px] leading-relaxed">{{ tail(executorStdout(i)).join('\n') }}</pre>
@@ -889,7 +889,7 @@ async function confirmDelete() {
             </div>
             <div class="flex flex-wrap items-center justify-between gap-2">
               <span class="text-[11px] text-muted-foreground">
-                {{ outputRange }}<template v-if="capturedCount"> · captured files are in the run dataset</template>
+                {{ outputRange }}<template v-if="capturedCount">. Captured files are in the run dataset.</template>
               </span>
               <Pagination
                 v-if="outputRows.length > OUTPUT_PAGE"

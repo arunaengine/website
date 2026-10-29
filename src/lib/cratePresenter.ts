@@ -246,7 +246,7 @@ function inlineSummary(node: Record<string, unknown>): PresentedValue | undefine
     }
     if (parts.length >= 6) break
   }
-  if (parts.length) return { text: parts.join(' · ') }
+  if (parts.length) return { text: parts.join(', ') }
   const name = stringProp(node.name)
   return name ? { text: name } : undefined
 }

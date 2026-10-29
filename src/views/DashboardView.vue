@@ -416,8 +416,8 @@ const pageDescription = computed(() =>
                 <div class="bg-primary/30" :style="{ width: `${100 - realmData.storedPercent}%` }" />
               </div>
               <div class="text-xs text-muted-foreground">
-                <span class="font-medium text-foreground">{{ formatBytes(realmData.stored) }} stored</span>
-                · {{ formatBytes(realmData.referenced) }} referenced
+                <span class="font-medium text-foreground">{{ formatBytes(realmData.stored) }} stored</span>,
+                {{ formatBytes(realmData.referenced) }} referenced
               </div>
               <div v-if="realmData.referenced > 0" class="text-xs text-muted-foreground">
                 Referenced files stay at their source and don't count toward quotas.

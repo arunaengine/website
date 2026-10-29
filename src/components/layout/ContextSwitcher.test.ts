@@ -104,7 +104,7 @@ describe('ContextSwitcher', () => {
   it('names the active group and switches to another', async () => {
     const { root } = await mountApp(ContextSwitcher)
     expect(content(root)).toContain('Water quality')
-    expect(content(root)).toContain('Demo realm· realm-1')
+    expect(content(root)).toContain('Demo realmrealm-1')
 
     await click(element(root, (node) => content(node).includes('Soil archive') && node.tag === 'button'))
 
@@ -161,7 +161,7 @@ describe('ContextSwitcher', () => {
     const label = element(root, (node) => content(node).includes('Water quality') && node.tag === 'span'
       && String(node.props.class ?? '').includes('flex-col'))
     expect(String(label.props.class)).not.toContain('hidden')
-    expect(content(label)).toContain('Demo realm· AbCdEfGh')
+    expect(content(label)).toContain('Demo realmAbCdEfGh')
     expect(content(label)).not.toContain('full-realm-id')
   })
 
@@ -170,7 +170,7 @@ describe('ContextSwitcher', () => {
     const { root } = await mountApp(ContextSwitcher)
 
     const name = element(root, (node) => node.tag === 'span' && content(node) === 'A very long realm name for the header')
-    const id = element(root, (node) => node.tag === 'span' && content(node) === '· AbCdEfGh')
+    const id = element(root, (node) => node.tag === 'span' && content(node) === 'AbCdEfGh')
     expect(String(name.props.class)).toContain('truncate')
     expect(String(id.props.class)).toContain('shrink-0')
     expect(String(id.props.class)).not.toContain('truncate')

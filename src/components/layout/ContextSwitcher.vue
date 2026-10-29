@@ -68,7 +68,7 @@ function roleOf(id: string) {
             :title="realmId"
           >
             <span class="min-w-0 truncate">{{ hasGroups ? realmDisplayName : 'Realm' }}</span>
-            <span class="shrink-0">{{ hasGroups ? `· ${realmId.slice(0, 8)}` : realmId.slice(0, 8) }}</span>
+            <span class="shrink-0">{{ realmId.slice(0, 8) }}</span>
           </span>
           <span
             class="mt-0.5 max-w-28 truncate text-[13px] font-semibold leading-none text-foreground sm:max-w-40"

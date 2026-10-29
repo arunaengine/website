@@ -643,9 +643,9 @@ describe('narrow TopBar search panel', () => {
     expect(text).not.toContain('Groups')
     expect(text).not.toContain('Users')
     expect(text).not.toContain('Partial object inventory')
-    expect(text).toContain('1 dataset · 1 object · 1 group · 1 user')
-    expect(text).toContain('Distributed best-effort · Node: Storage node B · Group: group-a · Bucket: raw-data')
-    expect(text).not.toContain('Object · Distributed best-effort')
+    expect(text).toContain('1 dataset, 1 object, 1 group, 1 user')
+    expect(text).toContain('Distributed best-effort, Node: Storage node B, Group: group-a, Bucket: raw-data')
+    expect(text).not.toContain('Object, Distributed best-effort')
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
@@ -682,7 +682,7 @@ describe('narrow TopBar search panel', () => {
     await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'sample')
 
     const text = content(element(mounted.root, (node) => node.props.role === 'dialog'))
-    expect(text).toContain('3 datasets · 1 group')
+    expect(text).toContain('3 datasets, 1 group')
     expect(text).not.toContain('0 object')
     expect(text).not.toContain('No visible live object')
     expect(mounted.errors).toEqual([])
@@ -732,7 +732,7 @@ describe('narrow TopBar search panel', () => {
     expect(content(options[1])).toContain('File')
     expect(content(options[2])).toContain('File')
     expect(content(element(mounted.root, (node) => node.props.role === 'dialog')))
-      .toContain('1 dataset · 2 files')
+      .toContain('1 dataset, 2 files')
 
     // A file hit still opens the dataset that carries it.
     await click(options[1])
@@ -758,7 +758,7 @@ describe('narrow TopBar search panel', () => {
     const options = allNodes(mounted.root).filter((node) => node.props.role === 'option')
     expect(options.map((node) => node.props.id)).toEqual(['qs-b:node-a:test', 'qs-b:node-b:test'])
     expect(content(options[1])).toContain('Bucket')
-    expect(content(options[1])).toContain('Node: Storage node B · Group: test')
+    expect(content(options[1])).toContain('Node: Storage node B, Group: test')
     expect(content(element(mounted.root, (node) => node.props.role === 'dialog'))).toContain('2 buckets')
 
     await click(options[1])

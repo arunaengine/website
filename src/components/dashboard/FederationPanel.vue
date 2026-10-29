@@ -211,7 +211,7 @@ function nodeTitle(node: RealmNodeInfo): string {
   const parts = [truncateMiddle(node.node_id), kindLabel[node.kind], connectionLabel(node)]
   const beat = heartbeatLabel(node)
   if (beat) parts.push(`heartbeat ${beat}`)
-  return parts.join(' · ')
+  return parts.join(', ')
 }
 
 const kindStroke: Record<RealmNodeInfo['kind'], string> = {
@@ -402,7 +402,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
               @click="openNode(hub.node_id)"
               @keydown.enter="openNode(hub.node_id)"
             >
-              <title>{{ nodeTitle(hub) }} · {{ hubName ?? 'this node' }}</title>
+              <title>{{ nodeTitle(hub) }}, {{ hubName ?? 'this node' }}</title>
               <circle :cx="CX" :cy="CY" :r="RING + 10" fill="url(#fed-glow-hub)" />
               <circle :cx="CX" :cy="CY" :r="RING + 2" fill="hsl(var(--card))" stroke="#55C4DE" stroke-width="1.5" />
               <path

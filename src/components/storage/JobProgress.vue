@@ -78,10 +78,10 @@ function abort() {
     <p v-if="!job.starting" class="text-[11px] tabular-nums text-muted-foreground">
       {{ formatNumber(job.done) }}<template v-if="job.total"> of {{ job.counted ? '' : 'at least ' }}{{ formatNumber(job.total) }}</template>
       <template v-if="job.kind === 'rename'"> renamed</template>
-      <template v-if="job.skipped && job.kind !== 'rename'"> · {{ formatNumber(job.skipped) }} skipped</template>
-      <template v-if="job.failed"> · {{ formatNumber(job.failed) }} failed</template>
-      <template v-if="job.waiting"> · waiting</template>
-      <template v-if="job.left"> · {{ job.left }}</template>
+      <template v-if="job.skipped && job.kind !== 'rename'">, {{ formatNumber(job.skipped) }} skipped</template>
+      <template v-if="job.failed">, {{ formatNumber(job.failed) }} failed</template>
+      <template v-if="job.waiting">, waiting</template>
+      <template v-if="job.left">, {{ job.left }}</template>
     </p>
     <p v-if="job.kind === 'rename'" class="text-[11px] text-muted-foreground">Runs on the server. You can close this window.</p>
     <div v-if="asking" class="space-y-2 rounded-md border border-border bg-muted/40 px-3 py-2">

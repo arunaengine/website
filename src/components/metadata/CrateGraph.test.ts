@@ -109,7 +109,7 @@ describe('CrateGraph in view mode', () => {
 
     expect(cards(root)).toHaveLength(3)
     expect(nodes(file).some((node) => node.tag === 'svg')).toBe(true)
-    expect(content(file)).toContain('2 KB · text/csv')
+    expect(content(file)).toContain('2 KB, text/csv')
     expect(content(file)).toContain('File')
     expect(content(card(root, 'Ada Lovelace'))).toContain('Person')
     expect(content(card(root, 'Example dataset'))).toContain('Root')

@@ -113,7 +113,7 @@ export function referenceSourceName(
   return 'external source'
 }
 
-// Full "…<name> · <source_path>" tail of the preview line.
+// Full "…<name>, <source_path>" tail of the preview line.
 export function referenceSourceLabel(
   entry: StagingReferenceEntry,
   options: ReferenceLabelOptions = {},
@@ -122,5 +122,5 @@ export function referenceSourceLabel(
     { kind: entry.kind, originNodeId: entry.origin_node_id, connectorId: entry.connector_id },
     options,
   )
-  return entry.source_path ? `${name} · ${entry.source_path}` : name
+  return entry.source_path ? `${name}, ${entry.source_path}` : name
 }

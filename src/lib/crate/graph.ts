@@ -99,7 +99,7 @@ function factsOf(kind: GraphNodeKind, entity: DraftEntity): string {
       return count(partsOf(entity).length, 'part')
     case 'file': {
       const size = first('contentSize')
-      return [size ? formatContentSize(size) : '', first('encodingFormat')].filter(Boolean).join(' · ')
+      return [size ? formatContentSize(size) : '', first('encodingFormat')].filter(Boolean).join(', ')
     }
     case 'contextual':
       return entity.types.map(typeLabel).join(', ')

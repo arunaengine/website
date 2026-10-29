@@ -33,7 +33,7 @@ const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
         </DialogTitle>
         <p class="mt-0.5 font-mono text-[11px] text-muted-foreground">
           <span class="break-all">{{ props.bucket }}/{{ props.objectKey }}</span>
-          <span v-if="props.size !== undefined"> · {{ formatBytes(props.size) }}</span>
+          <span v-if="props.size !== undefined">, {{ formatBytes(props.size) }}</span>
         </p>
       </div>
     </template>

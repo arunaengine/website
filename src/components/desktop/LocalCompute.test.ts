@@ -45,7 +45,7 @@ describe('this computer on the Compute page', () => {
       const mounted = await mountApp(LocalCompute)
       await flush()
       expect(load).toHaveBeenCalledTimes(visit)
-      expect(content(mounted.root)).toContain('docker · 1 job at a time · 2 running now')
+      expect(content(mounted.root)).toContain('docker, 1 job at a time, 2 running now')
       mounted.app.unmount()
     }
   })

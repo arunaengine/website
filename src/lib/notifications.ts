@@ -89,7 +89,7 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
     title: () => 'Data uploaded',
     detail: (n) => {
       if (!n.bucket || !n.key) return n.path
-      const size = typeof n.size_bytes === 'number' ? ` · ${formatBytes(n.size_bytes)}` : ''
+      const size = typeof n.size_bytes === 'number' ? `, ${formatBytes(n.size_bytes)}` : ''
       return `${n.bucket}/${n.key}${size}`
     },
     link: (n) => {

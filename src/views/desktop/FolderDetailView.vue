@@ -264,7 +264,7 @@ function when(ms: number | null | undefined): string {
 
 function side(entrySide: FolderEntry['local'], missing: string): string {
   if (!entrySide) return missing
-  return [bytes(entrySide.size, missing), when(entrySide.modified_at_ms)].filter(Boolean).join(' · ')
+  return [bytes(entrySide.size, missing), when(entrySide.modified_at_ms)].filter(Boolean).join(', ')
 }
 
 function progressText(path: string): string {
@@ -298,7 +298,7 @@ const filesText = computed(() => {
   const parts = [`${c.in_sync} in sync`]
   if (c.uploading) parts.push(`${c.uploading} sending`)
   if (c.errors) parts.push(`${c.errors} failed`)
-  return parts.join(' · ')
+  return parts.join(', ')
 })
 </script>
 

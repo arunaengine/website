@@ -78,7 +78,7 @@ const checkLabel = computed(() => {
   >
     <template #state>
       <template v-if="complete">
-        {{ inputs.length }} input{{ inputs.length === 1 ? '' : 's' }} ·
+        {{ inputs.length }} input{{ inputs.length === 1 ? '' : 's' }},
         {{ outputRows.length }} output{{ outputRows.length === 1 ? '' : 's' }}
       </template>
       <template v-else-if="!outputsValid">An output needs a bucket and a key.</template>

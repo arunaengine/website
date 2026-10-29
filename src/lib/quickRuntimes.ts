@@ -56,7 +56,7 @@ export const RUNTIMES: Runtime[] = [
   {
     id: 'python-uv',
     label: 'Python',
-    hint: 'uv · python 3.13 · packages from PyPI',
+    hint: 'uv, python 3.13, packages from PyPI',
     image: 'ghcr.io/astral-sh/uv:python3.13-bookworm-slim',
     command: ['uv', 'run', '--no-project'],
     env: { UV_CACHE_DIR: '.uv-cache' },
@@ -67,7 +67,7 @@ export const RUNTIMES: Runtime[] = [
   {
     id: 'deno',
     label: 'JavaScript / TypeScript',
-    hint: 'deno · packages from npm',
+    hint: 'deno, packages from npm',
     image: 'denoland/deno:alpine-2.9.3',
     command: ['deno', 'run', '-A'],
     env: { DENO_DIR: '.deno-cache' },
@@ -78,7 +78,7 @@ export const RUNTIMES: Runtime[] = [
   {
     id: 'bash',
     label: 'Bash',
-    hint: 'bash 5.2 · no packages',
+    hint: 'bash 5.2, no packages',
     image: 'bash:5.2',
     command: ['bash'],
     language: 'bash',

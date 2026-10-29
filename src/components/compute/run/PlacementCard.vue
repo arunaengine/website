@@ -285,7 +285,7 @@ function isCustom(rowId: number): boolean {
               <span class="truncate font-medium">{{ node.label }}</span>
               <span class="truncate text-[11px] text-muted-foreground">{{ node.executorKinds.join(', ') }}</span>
               <span class="truncate text-[11px] text-muted-foreground">
-                {{ Object.entries(node.info?.labels ?? {}).filter(([key]) => !key.startsWith('aruna-engine.org/')).map(([key, value]) => `${key}=${value}`).join(' · ') }}
+                {{ Object.entries(node.info?.labels ?? {}).filter(([key]) => !key.startsWith('aruna-engine.org/')).map(([key, value]) => `${key}=${value}`).join(', ') }}
               </span>
             </li>
             <li v-if="!filtered.length" class="px-3 py-1.5 text-[11px] text-muted-foreground">

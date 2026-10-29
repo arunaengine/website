@@ -104,7 +104,7 @@ const canSync = computed(() => syncState.value === 'ready' && syncStatus.value.r
 const lastCheck = computed(() => {
   const at = syncStatus.value.lastSyncMs
   const when = at ? relativeTime(new Date(at).toISOString()) : 'never'
-  return `Last check: ${when} · ${realm.value.name} is ${syncStatus.value.realmReachable ? 'reachable' : 'not reachable'}`
+  return `Last check: ${when}, ${realm.value.name} is ${syncStatus.value.realmReachable ? 'reachable' : 'not reachable'}`
 })
 
 async function run(work: () => Promise<unknown>): Promise<void> {
@@ -270,7 +270,7 @@ const when = (ms: number | null): string => (ms ? relativeTime(new Date(ms).toIS
           <History class="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span class="min-w-0 flex-1">
             {{ entry.text }}
-            <span class="text-muted-foreground"> · {{ folder }}<template v-if="entry.atMs"> · {{ when(entry.atMs) }}</template></span>
+            <span class="text-muted-foreground">, {{ folder }}<template v-if="entry.atMs">, {{ when(entry.atMs) }}</template></span>
           </span>
         </li>
       </ul>

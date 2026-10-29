@@ -25,12 +25,12 @@ const link = computed(() => {
   <p v-if="short">
     <template v-if="origin.kind === 'source'">
       <a v-if="link" :href="link.href" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">
-        From {{ origin.database ?? host }}<template v-if="origin.database && host"> · {{ host }}</template>
+        From {{ origin.database ?? host }}<template v-if="origin.database && host">, {{ host }}</template>
       </a>
       <template v-else>From {{ origin.database ?? 'an external source' }}</template>
     </template>
     <template v-else-if="origin.kind === 'upload'">
-      Uploaded by {{ origin.user }} · {{ stamp(origin.time).slice(0, 10) }}<template v-if="origin.device"> · {{ origin.device }}</template>
+      Uploaded by {{ origin.user }}, {{ stamp(origin.time).slice(0, 10) }}<template v-if="origin.device">, {{ origin.device }}</template>
     </template>
     <a v-else-if="origin.kind === 'copy' && link" :href="link.href" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Copy of another version</a>
     <a v-else-if="origin.kind === 'sync' && link" :href="link.href" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Synced from {{ origin.sync.includes(' to ') ? origin.sync.split(' ')[0] : 'another bucket' }}</a>

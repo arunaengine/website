@@ -80,7 +80,7 @@ describe('crateGraph', () => {
     const draft = seeded()
 
     expect(nodeById(draft, './')?.facts).toBe('1 part')
-    expect(nodeById(draft, 's3://bucket/reads.csv')?.facts).toBe('2 KB · text/csv')
+    expect(nodeById(draft, 's3://bucket/reads.csv')?.facts).toBe('2 KB, text/csv')
     expect(nodeById(draft, '#ada-lovelace')?.facts).toBe('Person')
     expect(nodeById(draft, 'https://ror.org/03yrm5c26')?.facts).toBe('ror.org')
   })

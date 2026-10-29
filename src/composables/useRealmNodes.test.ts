@@ -47,8 +47,8 @@ describe('place names in the desktop', () => {
   it('names each place in words and keeps kind and id for the tooltip', () => {
     const { displayName, nodeById } = useRealmNodes()
 
-    expect(displayName('node1aaaa0001')).toBe('node-1 · Giessen')
-    expect(displayName('node2bbbb0002')).toBe('node2bbbb0002.example.org · Heidelberg')
+    expect(displayName('node1aaaa0001')).toBe('node-1, Giessen')
+    expect(displayName('node2bbbb0002')).toBe('node2bbbb0002.example.org, Heidelberg')
     expect(displayName('device0001aaaa')).toBe('This computer')
     expect(displayName('device0002bbbb')).toBe('lab-laptop')
     expect(nodeById('device0002bbbb')?.title).toMatch(/^device device0/)

@@ -9,7 +9,7 @@ const copied = ref(false)
 let timer: ReturnType<typeof setTimeout> | undefined
 
 // Hover and non-hover devices both need the untruncated text, count included.
-const full = computed(() => (props.count === undefined ? props.value : `${props.value} · ${props.count}`))
+const full = computed(() => (props.count === undefined ? props.value : `${props.value} (${props.count})`))
 const classes = computed(() => cn('chip max-w-[12rem]', props.class))
 
 async function copy() {
@@ -24,7 +24,7 @@ async function copy() {
   <Tooltip :label="full">
     <button type="button" :class="classes" :aria-label="`Copy ${value}`" :title="full" @click="copy">
       <span class="truncate" aria-live="polite">{{ copied ? 'Copied' : value }}</span>
-      <span v-if="count !== undefined" class="shrink-0">· {{ count }}</span>
+      <span v-if="count !== undefined" class="shrink-0">{{ count }}</span>
     </button>
   </Tooltip>
 </template>

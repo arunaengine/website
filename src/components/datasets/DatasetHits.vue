@@ -63,7 +63,7 @@ const { realm } = useAruna()
       <FileJson2 class="h-4 w-4 text-primary" />
       <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ textQuery ? 'Dataset results' : 'Datasets with this profile' }}</h2>
       <span class="text-xs text-muted-foreground">{{ visibleResults.length }}</span>
-      <span v-if="searchStale" class="text-xs text-muted-foreground">· previous results</span>
+      <span v-if="searchStale" class="text-xs text-muted-foreground">(previous results)</span>
     </div>
     <div class="grid gap-4 transition-opacity sm:grid-cols-2 lg:grid-cols-3" :class="searchStale ? 'opacity-40' : ''">
       <template v-for="line in visibleResults" :key="line.hit.document_id">
