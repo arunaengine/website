@@ -66,21 +66,23 @@ const open = (row: Row) => void router.push({ name: 'node', params: { nodeId: ro
 </script>
 
 <template>
-  <div class="min-w-0">
+  <!-- The table fits its own width: a narrow card folds role, location and then the work into a
+       small line under the name; the state always stays. -->
+  <div class="@container min-w-0">
     <div v-if="rows.length > PAGE_SIZE" class="px-4 pt-3">
       <Input v-model="query" placeholder="Find a node" aria-label="Find a node" class="h-8 max-w-xs text-xs" />
     </div>
     <div class="overflow-x-auto">
-      <table class="w-full min-w-max text-sm">
+      <table class="w-full text-sm">
         <thead class="text-[11px] uppercase tracking-wider text-muted-foreground">
           <tr>
-            <th class="px-4 py-2 text-left font-semibold">Node</th>
-            <th class="px-4 py-2 text-left font-semibold">Location</th>
-            <th class="px-4 py-2 text-left font-semibold">Role</th>
-            <th class="px-4 py-2 text-left font-semibold">Stored</th>
-            <th class="px-4 py-2 text-left font-semibold">CPU</th>
-            <th class="px-4 py-2 text-left font-semibold">Activity</th>
-            <th class="px-4 py-2 text-left font-semibold">State</th>
+            <th class="px-3 py-2 pl-4 text-left font-semibold">Node</th>
+            <th class="hidden px-3 py-2 text-left font-semibold @min-[40rem]:table-cell">Location</th>
+            <th class="hidden px-3 py-2 text-left font-semibold @min-[48rem]:table-cell">Role</th>
+            <th class="px-3 py-2 text-left font-semibold">Stored</th>
+            <th class="px-3 py-2 text-left font-semibold">CPU</th>
+            <th class="hidden px-3 py-2 text-left font-semibold @min-[32rem]:table-cell">Activity</th>
+            <th class="px-3 py-2 pr-4 text-right font-semibold">State</th>
           </tr>
         </thead>
         <tbody>
@@ -90,23 +92,27 @@ const open = (row: Row) => void router.push({ name: 'node', params: { nodeId: ro
             class="cursor-pointer border-t border-border hover:bg-muted/40"
             @click="open(row)"
           >
-            <td class="px-4 py-2.5">
-              <RouterLink :to="{ name: 'node', params: { nodeId: row.node.node_id } }" class="font-medium text-foreground hover:underline" :title="row.node.node_id" @click.stop>
+            <td class="w-full max-w-0 px-3 py-2.5 pl-4">
+              <RouterLink :to="{ name: 'node', params: { nodeId: row.node.node_id } }" class="block truncate font-medium text-foreground hover:underline" :title="`${row.name} (${row.node.node_id})`" @click.stop>
                 {{ row.name }}
               </RouterLink>
+              <span class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground @min-[48rem]:hidden">
+                <span>{{ roleLabel[row.node.kind] }}<template v-if="row.here || row.place || row.location"><span class="@min-[40rem]:hidden">, {{ row.here ? 'this computer' : [row.place, row.location].filter(Boolean).join(', ') }}</span></template></span>
+                <Badge v-if="nodeActivity(row.node)" variant="sky" size="sm" class="gap-1 @min-[32rem]:hidden"><Download class="h-3 w-3" /> {{ nodeActivity(row.node) }}</Badge>
+              </span>
             </td>
-            <td class="px-4 py-2.5 text-xs">
+            <td class="hidden whitespace-nowrap px-3 py-2.5 text-xs @min-[40rem]:table-cell">
               <span v-if="row.here" class="text-muted-foreground">this computer</span>
               <span v-else class="inline-flex items-center gap-1.5">
                 <span v-if="row.place" class="text-foreground">{{ row.place }}</span>
                 <Badge v-if="row.location" variant="outline" size="sm">{{ row.location }}</Badge>
               </span>
             </td>
-            <td class="px-4 py-2.5 text-xs text-muted-foreground">{{ roleLabel[row.node.kind] }}</td>
-            <td class="px-4 py-2.5 text-xs tabular-nums text-foreground">{{ row.node.info ? formatBytes(row.node.info.utilization.storage_bytes_used) : '' }}</td>
-            <td class="px-4 py-2.5 text-xs tabular-nums">
+            <td class="hidden whitespace-nowrap px-3 py-2.5 text-xs text-muted-foreground @min-[48rem]:table-cell">{{ roleLabel[row.node.kind] }}</td>
+            <td class="whitespace-nowrap px-3 py-2.5 text-xs tabular-nums text-foreground">{{ row.node.info ? formatBytes(row.node.info.utilization.storage_bytes_used) : '' }}</td>
+            <td class="whitespace-nowrap px-3 py-2.5 text-xs tabular-nums">
               <span v-if="cpu(row.node) !== null" class="inline-flex items-center gap-2" :title="`1-minute load at ${cpu(row.node)}% of the CPU cores`">
-                <span class="inline-block h-1.5 w-12 overflow-hidden rounded-full bg-muted">
+                <span class="hidden h-1.5 w-8 overflow-hidden rounded-full bg-muted @min-[40rem]:inline-block">
                   <span
                     class="block h-full rounded-full"
                     :class="cpu(row.node)! > 70 ? 'bg-amber-500' : 'bg-aruna-royal'"
@@ -116,10 +122,10 @@ const open = (row: Row) => void router.push({ name: 'node', params: { nodeId: ro
                 {{ cpu(row.node) }}%
               </span>
             </td>
-            <td class="px-4 py-2.5 text-xs">
+            <td class="hidden whitespace-nowrap px-3 py-2.5 text-xs @min-[32rem]:table-cell">
               <Badge v-if="nodeActivity(row.node)" variant="sky" size="sm" class="gap-1"><Download class="h-3 w-3" /> {{ nodeActivity(row.node) }}</Badge>
             </td>
-            <td class="px-4 py-2.5 text-xs" :class="nodeOnline(row.node) ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'">
+            <td class="whitespace-nowrap px-3 py-2.5 pr-4 text-right text-xs" :class="nodeOnline(row.node) ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'">
               {{ nodeOnline(row.node) ? 'online' : 'offline' }}
             </td>
           </tr>

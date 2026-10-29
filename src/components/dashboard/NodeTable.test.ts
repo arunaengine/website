@@ -83,6 +83,27 @@ describe('the realm node table', () => {
     mounted.app.unmount()
   })
 
+  it('fits a narrow card: role, location and work fold under the name, the state column always stays', async () => {
+    const mounted = await mountApp(NodeTable, { props: { nodes: [realmNode(3, { place: 'Giessen' })] } })
+    const headers = nodes(mounted.root).filter((node) => node.tag === 'th')
+    const header = (label: string) => String(headers.find((node) => content(node).trim() === label)!.props.class)
+
+    expect(nodes(mounted.root).some((node) => String(node.props.class ?? '').startsWith('@container'))).toBe(true)
+    expect(header('Role')).toContain('hidden')
+    expect(header('Role')).toContain('@min-[48rem]:table-cell')
+    expect(header('Location')).toContain('@min-[40rem]:table-cell')
+    expect(header('Activity')).toContain('@min-[32rem]:table-cell')
+    for (const always of ['Node', 'Stored', 'CPU', 'State']) expect(header(always)).not.toContain('hidden')
+    expect(String(element(mounted.root, (node) => node.tag === 'table').props.class)).not.toContain('min-w-max')
+
+    // The folded line under the name says what the hidden columns would.
+    const name = element(mounted.root, (node) => node.tag === 'td' && content(node).includes('Giessen storage 3'))
+    const folded = name.children.find((node) => String(node.props.class ?? '').includes('@min-[48rem]:hidden'))!
+    expect(content(folded).replace(/\s+/g, ' ')).toContain('storage, Giessen')
+    expect(content(folded)).toContain('Importing, 2 jobs')
+    mounted.app.unmount()
+  })
+
   it('puts this computer first and opens a node page from its row', async () => {
     const computer = realmNode(9, { node_id: 'laptop', kind: 'user', display_name: 'Microbiology laptop', connection_status: 'seen', present: false })
     const mounted = await mountApp(NodeTable, { props: { nodes: many(3), computer } })
