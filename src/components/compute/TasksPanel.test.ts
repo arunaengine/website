@@ -176,3 +176,25 @@ describe('local paging next to other nodes', () => {
   })
 })
 
+describe('other nodes that do not answer', () => {
+  it('names them with a retry even when no run is listed', async () => {
+    desktopMode.value = false
+    realmNodes.value = [{ name: 'node-2', isLocal: false, apiBase: 'https://n2.test/api/v1' }]
+    listTasks.mockReset().mockImplementation(async (_params: unknown, baseUrl?: string) => {
+      if (baseUrl) throw new Error('down')
+      return { tasks: [] }
+    })
+    const mounted = await mountApp(TasksPanel)
+    await flush()
+    const text = content(mounted.root)
+
+    expect(text).toContain('Runs on node-2 could not be read.')
+    expect(text).not.toContain('No runs yet')
+    listTasks.mockClear()
+    await click(element(mounted.root, (node) => content(node) === 'Retry' && typeof node.props.onClick === 'function'))
+    expect(listTasks).toHaveBeenCalledWith({ view: 'BASIC', page_size: 50 }, 'https://n2.test/api/v1')
+    realmNodes.value = []
+    mounted.app.unmount()
+  })
+})
+

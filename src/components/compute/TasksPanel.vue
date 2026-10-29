@@ -357,6 +357,7 @@ const painted = useFirstPaint(() =>
 const emptyTitle = computed(() => {
   if (listState.value === 'unsupported') return 'Runs cannot be listed until this node accepts them.'
   if (listState.value === 'signed-out') return 'Sign in to see the runs you started.'
+  if (otherNodes.value.failed.length) return 'No runs on the nodes that answered'
   return olderHidden.value ? 'No runs in the last 48 hours' : 'No runs yet'
 })
 const emptyDescription = computed(() => {
@@ -437,6 +438,13 @@ onUnmounted(() => {
     </Notice>
     <ErrorPanel v-else-if="serviceState === 'error'" :message="serviceError || 'Failed to load the run service info.'" @retry="loadServiceInfo" />
 
+    <!-- Outside the list, so an empty list still shows what other nodes did not answer. -->
+    <Notice v-if="otherNodes.failed.length" tone="error" class="flex items-center gap-2">
+      <span class="flex-1">Runs on {{ otherNodes.failed.join(', ') }} could not be read.</span>
+      <Button variant="outline" size="sm" :disabled="spinning" @click="onReload">Retry</Button>
+    </Notice>
+    <p v-if="otherNodes.truncated.length" class="text-[11px] text-muted-foreground">Only the newest 50 runs of {{ otherNodes.truncated.join(', ') }} are shown.</p>
+
     <!-- 'loading' also covers the pre-fetch gap while init() awaits service
          info and a session that has not resolved yet. -->
     <ListShell
@@ -458,8 +466,6 @@ onUnmounted(() => {
         </div>
       </template>
       <template #tools>
-        <span v-if="otherNodes.failed.length" class="text-[11px] text-destructive">Runs on {{ otherNodes.failed.join(', ') }} could not be read.</span>
-        <span v-if="otherNodes.truncated.length" class="text-[11px] text-muted-foreground">Only the newest 50 runs of {{ otherNodes.truncated.join(', ') }} are shown.</span>
         <span v-if="deleteError" class="text-[11px] text-destructive">{{ deleteError }}</span>
         <span v-if="lastPollError" class="text-[11px] text-muted-foreground" :title="lastPollError">Refresh failed, retrying.</span>
         <RefreshButton :busy="spinning" sr-label="Refresh runs" @click="onReload" />
