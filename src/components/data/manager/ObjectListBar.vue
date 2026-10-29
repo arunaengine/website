@@ -85,13 +85,14 @@ function onEscape() {
 
 <template>
   <div class="flex min-w-0 flex-1 items-center gap-1.5">
-    <form ref="form" class="relative min-w-0 flex-1" @submit.prevent="emit('search-bucket')" @focusin="focused = true" @focusout="focused = false">
+    <form ref="form" class="relative min-w-[5.5rem] flex-1" @submit.prevent="emit('search-bucket')" @focusin="focused = true" @focusout="focused = false">
       <Search class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
       <Input
         v-model="text"
         :placeholder="placeholder"
         aria-label="Filter this folder or search the bucket"
-        class="h-8 pl-8 pr-7 text-sm"
+        class="h-8 pl-8 text-sm"
+        :class="text ? 'pr-7' : 'pr-2'"
         @keydown.esc="onEscape"
       />
       <button

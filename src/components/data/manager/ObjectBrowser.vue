@@ -546,7 +546,7 @@ async function onDrop(event: DragEvent) {
         @dragleave="dragActive = false"
         @drop.prevent="onDrop"
       >
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-2.5">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-2.5 @max-[600px]:px-3">
           <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted-foreground">
             <span v-if="usage" class="tabular-nums">{{ usageText(usage, true) }}</span>
             <Badge v-if="syncPartners.length" variant="success" size="sm" class="max-w-full gap-1">
@@ -640,7 +640,7 @@ async function onDrop(event: DragEvent) {
             </span>
           </div>
         </div>
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pb-2 pt-2.5">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pb-2 pt-2.5 @max-[600px]:px-3">
           <div class="flex min-w-0 max-w-full items-center gap-2">
             <Breadcrumbs :bucket="bucket" :path="prefix" single-line @navigate="openCrumb" />
             <Spinner v-if="listLoading" label="Loading objects" class="shrink-0" />
@@ -659,12 +659,12 @@ async function onDrop(event: DragEvent) {
             <Button v-if="desktop && currentBindSource && !currentLinkedFolder && !remoteBlocked" variant="outline" size="sm" aria-label="Link a local folder" title="Keep a folder on this computer and this bucket in step" @click="emit('sync-to-computer', currentBindSource)"><FolderSync class="h-4 w-4" /><span :class="toolbarLabel">Link a local folder</span></Button>
             <Button v-if="notebooks && !remoteNodeId" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" aria-label="New notebook" :title="writeRestrictionMessage ?? 'Create a notebook here'" @click="emit('new-notebook')"><NotebookPen class="h-4 w-4" /><span :class="toolbarLabel">New notebook</span></Button>
             <!-- The Add data pipeline always targets the connected node. -->
-            <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix" aria-label="Upload" :title="writeRestrictionMessage ?? 'Upload files or add data from other sources'" @click="emit('add-data')"><Upload class="h-4 w-4" /><span>Upload</span></Button>
+            <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix" aria-label="Upload" :title="writeRestrictionMessage ?? 'Upload files or add data from other sources'" @click="emit('add-data')"><Upload class="h-4 w-4" /><span :class="desktop ? '' : '@max-[360px]:sr-only'">Upload</span></Button>
             <Button v-if="!remoteBlocked" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" aria-label="New folder" :title="writeRestrictionMessage ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /><span :class="toolbarLabel">New folder</span></Button>
           </div>
         </div>
-        <SearchHint v-if="hinting" :text="searchText" :folder="hintFolder" :bucket="bucket" class="mx-4 mb-2 hidden shadow-none @max-[600px]:block" />
-        <p v-if="sharedOrigin && !wholeBucket && !remoteBlocked" class="flex min-w-0 items-center gap-1.5 px-4 pb-2.5 text-sm text-muted-foreground">
+        <SearchHint v-if="hinting" :text="searchText" :folder="hintFolder" :bucket="bucket" class="mx-3 mb-2 hidden shadow-none @max-[600px]:block" />
+        <p v-if="sharedOrigin && !wholeBucket && !remoteBlocked" class="flex min-w-0 items-center gap-1.5 px-4 pb-2.5 text-sm text-muted-foreground @max-[600px]:px-3">
           <FlaskConical class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span class="truncate">{{ relativeTime(sharedOrigin.time) }} by
             <RouterLink v-if="sharedOrigin.to" :to="sharedOrigin.to" class="text-primary hover:underline">{{ sharedOrigin.label }}</RouterLink>
@@ -901,8 +901,8 @@ async function onDrop(event: DragEvent) {
               </td>
               <td class="px-2 @max-[600px]:block">
                 <div class="flex items-center justify-end gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100 [@media(hover:none)]:opacity-100 @max-[600px]:opacity-100">
-                  <IconButton label="Preview" variant="outline" class="@max-[600px]:hidden" @click.stop="openDetails(object, 'preview')"><Eye class="size-3.5" /></IconButton>
-                  <IconButton label="Download" variant="outline" class="@max-[600px]:hidden" @click.stop="locked.download(object)"><Download class="size-3.5" /></IconButton>
+                  <IconButton label="Preview" variant="outline" size="icon" class="h-8 w-8 @max-[600px]:hidden" @click.stop="openDetails(object, 'preview')"><Eye class="size-3.5" /></IconButton>
+                  <IconButton label="Download" variant="outline" size="icon" class="h-8 w-8 @max-[600px]:hidden" @click.stop="locked.download(object)"><Download class="size-3.5" /></IconButton>
                   <RowMenu
                     :name="object.name"
                     :change-reason="objectReason(object.key)"
@@ -963,7 +963,7 @@ async function onDrop(event: DragEvent) {
             </tr>
           </tbody>
         </table>
-        <div v-if="!isEmpty || page > 1 || nextToken" class="flex flex-wrap items-center justify-between gap-3 px-4 py-2 text-xs text-muted-foreground">
+        <div v-if="!isEmpty || page > 1 || nextToken" class="flex flex-wrap items-center justify-between gap-3 px-4 py-2 text-xs text-muted-foreground @max-[600px]:px-3">
           <span class="tabular-nums">{{ rangeText }}</span>
           <div class="flex items-center gap-2">
             <Select
@@ -971,7 +971,7 @@ async function onDrop(event: DragEvent) {
               :options="PAGE_SIZE_OPTIONS"
               aria-label="Files per page"
               title="Files per page"
-              class="h-8 w-20 text-xs text-foreground"
+              class="h-8 w-20 text-xs text-foreground @max-[600px]:hidden"
               @update:model-value="(value: string) => setPageSize(Number(value))"
             />
             <IconButton label="Previous page" variant="outline" size="icon" class="h-8 w-8" :disabled="page <= 1 || listLoading" @click="previousPage">

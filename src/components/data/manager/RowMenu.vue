@@ -51,7 +51,8 @@ function blocked(action: RowAction): boolean {
 <template>
   <DropdownMenu>
     <DropdownMenuTrigger as-child>
-      <Button variant="ghost" size="icon-sm" title="More actions" aria-label="More actions" @click.stop>
+      <!-- A phone shows only this button, borderless, with a full touch target. -->
+      <Button variant="outline" size="icon" class="h-8 w-8 @max-[600px]:size-11 @max-[600px]:border-transparent @max-[600px]:bg-transparent @max-[600px]:shadow-none" title="More actions" aria-label="More actions" @click.stop>
         <MoreHorizontal class="size-3.5" />
       </Button>
     </DropdownMenuTrigger>

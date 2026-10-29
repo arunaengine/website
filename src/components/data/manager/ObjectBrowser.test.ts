@@ -323,7 +323,8 @@ describe('object browser link a local folder', () => {
     desktopMode.on = false
     const web = await render()
     expect(String(label(web, 'New folder').props.class)).toContain('@max-[600px]:sr-only')
-    expect(label(web, 'Upload').props.class).toBeFalsy()
+    // Upload keeps its word down to 360 px, where the search box needs the room.
+    expect(label(web, 'Upload').props.class).toBe('@max-[360px]:sr-only')
   })
 })
 
@@ -626,9 +627,19 @@ describe('object browser selection', () => {
     const form = element(root, (node) => node.tag === 'form')
     const tools = form.parent!.parent!
 
-    expect(String(form.props.class)).toContain('min-w-0 flex-1')
+    expect(String(form.props.class)).toContain('min-w-[5.5rem] flex-1')
     expect(String(tools.props.class)).toContain('min-w-[min(100%,300px)] flex-1')
     expect(String(tools.parent!.props.class)).toContain('flex-wrap')
+  })
+
+  it('fits a 320 px phone: no page size, one borderless menu button and a box wide enough for Search', async () => {
+    const root = await render()
+    const row = element(root, (node) => node.tag === 'tr' && content(node).includes('reads.fastq'))
+    const more = element(row, (node) => node.props['aria-label'] === 'More actions')
+
+    expect(String(element(root, (node) => node.tag === 'select').props.class)).toContain('@max-[600px]:hidden')
+    expect(String(more.props.class)).toContain('@max-[600px]:size-11 @max-[600px]:border-transparent')
+    expect(String(element(root, (node) => node.tag === 'form').props.class)).toContain('min-w-[5.5rem]')
   })
 
   it('shows the search hint as a block under the toolbar on a phone', async () => {
