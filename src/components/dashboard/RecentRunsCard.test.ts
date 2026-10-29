@@ -50,4 +50,15 @@ describe('recent runs', () => {
       mounted.app.unmount()
     }
   })
+
+  it('gives the run name the width the fixed short columns leave, with the full name on hover', async () => {
+    const mounted = await mountApp(RecentRunsCard, { props: { runs: [run('t1', 'Annotate my genome with Bakta', 'COMPLETE', 'store-1')], state: 'ready' } })
+    const table = element(mounted.root, (node) => node.tag === 'table')
+    expect(String(table.props.class)).toContain('table-fixed')
+    const cols = nodes(table).filter((node) => node.tag === 'col').map((node) => node.props.class ?? '')
+    expect(cols).toEqual(['', 'w-[4.5rem]', 'w-24', 'w-[5.5rem]'])
+    const name = element(mounted.root, (node) => node.tag === 'a' && content(node) === 'Annotate my genome with Bakta')
+    expect(name.props.title).toBe('Annotate my genome with Bakta')
+    mounted.app.unmount()
+  })
 })
