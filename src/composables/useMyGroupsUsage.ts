@@ -2,13 +2,13 @@
 // personal tiles and the per-group cards so the requests are made once.
 // Physical stored bytes have no group dimension (dedup), so they are never
 // carried here and never summed.
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { assessQuota, quotaCountedBytes, referencedBytes, type QuotaState } from '@/lib/quota'
 import { errorMessage } from '@/lib/utils'
 import type { GroupQuotaStatus, UsageResponse } from '@/lib/api'
 
-const { myGroups, getGroupUsage } = useAruna()
+const { myGroups, getGroupUsage, sessionEpoch } = useAruna()
 
 export interface GroupUsageEntry {
   groupId: string
@@ -70,6 +70,15 @@ const loading = ref(false)
 let loadSeq = 0
 let inflight: Promise<void> | null = null
 let loadedKey: string | null = null
+
+// Another account or realm: its totals go at once, and a load under way ends unseen.
+watch(() => sessionEpoch?.value, () => {
+  loadSeq++
+  inflight = null
+  loadedKey = null
+  loading.value = false
+  entries.value = []
+}, { flush: 'sync' })
 
 function membershipKey(): string {
   return myGroups.value.map((group) => group.id).join(',')

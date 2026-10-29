@@ -5,7 +5,10 @@ import type { GroupUsageEntry } from './useMyGroupsUsage'
 const aruna = vi.hoisted(() => ({
   myGroups: { value: [] as Array<{ id: string; name: string }> },
   getGroupUsage: vi.fn<(groupId: string) => Promise<UsageResponse>>(),
+  sessionEpoch: null as unknown as { value: number },
 }))
+// A real ref, so the composable sees a session change.
+aruna.sessionEpoch = (await import('vue')).ref(1)
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
 
 const { aggregateGroupUsage, useMyGroupsUsage } = await import('./useMyGroupsUsage')
@@ -134,5 +137,27 @@ describe('shared my groups usage', () => {
     await load()
 
     expect(aruna.getGroupUsage).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('group usage across accounts', () => {
+  it('drops the totals of the last account at once and ignores its late answers', async () => {
+    const { useMyGroupsUsage: shared } = await import('./useMyGroupsUsage')
+    const usageState = shared()
+    let answer!: (value: UsageResponse) => void
+    aruna.myGroups.value = [{ id: 'g-a', name: 'Account A group' }]
+    aruna.getGroupUsage.mockReset().mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
+    const loading = usageState.refresh()
+    expect(usageState.entries.value.map((entry) => entry.groupId)).toEqual(['g-a'])
+
+    aruna.myGroups.value = []
+    aruna.sessionEpoch.value++
+    expect(usageState.entries.value).toEqual([])
+    expect(usageState.aggregate.value.processRuns).toBe(0)
+
+    answer(usage({ process_run_count: 4 }))
+    await loading
+    expect(usageState.entries.value).toEqual([])
+    expect(usageState.aggregate.value.processRuns).toBe(0)
   })
 })
