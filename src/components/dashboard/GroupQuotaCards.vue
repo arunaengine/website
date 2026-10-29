@@ -1,56 +1,52 @@
 <script setup lang="ts">
 import { watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { HardDrive } from '@lucide/vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
-import RefreshButton from '@/components/ui/RefreshButton.vue'
-import QuotaBar from '@/components/ui/QuotaBar.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import ViewToggle from '@/components/ui/ViewToggle.vue'
+import GroupStorage from '@/components/dashboard/GroupStorage.vue'
 import { useMyGroupsUsage, entryState, QUOTA_SEVERITY, type GroupUsageEntry } from '@/composables/useMyGroupsUsage'
-import { useRefresh } from '@/composables/useRefresh'
+import { countText } from '@/composables/useBucketCount'
+import { useReachableUsage } from '@/composables/useReachableUsage'
+import { useViewMode } from '@/composables/useViewMode'
+import { distinctCount } from '@/lib/distribution'
+import { formatCount } from '@/lib/formatCount'
 import { QUOTA_STATE_BADGES } from '@/lib/quota'
-import { formatBytes } from '@/lib/utils'
 
 const { entries, membershipKey, refresh, retry } = useMyGroupsUsage()
+const reach = useReachableUsage()
+const view = useViewMode('dashboard-groups')
 const props = defineProps<{ refreshRevision: number }>()
 
+// Only states that need attention get a badge; an unlimited group shows "no quota" in its line.
 function badgeFor(entry: GroupUsageEntry) {
-  return QUOTA_STATE_BADGES[entryState(entry)]
+  const state = entryState(entry)
+  return state === 'unlimited' ? null : QUOTA_STATE_BADGES[state]
 }
 
-// Percentage of the soft quota in use (matches the QuotaBar's own reading).
-function quotaPct(entry: GroupUsageEntry): number {
-  const quota = entry.quota?.quota_bytes
-  if (quota == null || quota <= 0) return 0
-  return Math.round(((entry.usedBytes ?? 0) / quota) * 100)
+// A group's total counts a distributed bucket once per node unless the node says otherwise.
+function bucketCount(entry: GroupUsageEntry): { text: string; count: number } {
+  if (entry.buckets == null) return { text: 'Unknown', count: 2 }
+  if (entry.bucketsDistinct || entry.buckets <= 1) return { text: formatCount(entry.buckets), count: entry.buckets }
+  const listed = reach.groups.value.find((group) => group.groupId === entry.groupId)
+  const whole = Boolean(listed && !listed.error && !listed.missing)
+  const counted = distinctCount(entry.buckets, listed?.copies ?? 0, listed?.buckets ?? 0, whole)
+  return { text: countText(counted, formatCount), count: counted.exact ? counted.count : 2 }
 }
 
-// Muted tail of the primary usage line. Separators live inside the string so
-// spacing survives template whitespace condensing (" 9.9 MB" + this).
-function quotaRemainder(entry: GroupUsageEntry): string {
-  const quota = entry.quota?.quota_bytes
-  return quota != null ? ` / ${formatBytes(quota)}` : ' · unlimited'
+function counts(entry: GroupUsageEntry) {
+  const known = (value: number | null | undefined) => (value == null ? 'Unknown' : formatCount(value))
+  const word = (value: number | null | undefined, one: string, many: string) => (value === 1 ? one : many)
+  const buckets = bucketCount(entry)
+  return [
+    { key: 'objects', value: known(entry.objects), label: word(entry.objects, 'object', 'objects') },
+    { key: 'buckets', value: buckets.text, label: word(buckets.count, 'bucket', 'buckets') },
+    { key: 'datasets', value: known(entry.datasetCount), label: word(entry.datasetCount, 'dataset', 'datasets') },
+    { key: 'runs', value: known(entry.processRunCount), label: word(entry.processRunCount, 'run', 'runs') },
+  ]
 }
-
-// Secondary detail moved off the primary usage line: the hard cap (when it
-// differs from the quota) and any referenced-but-not-counted footprint.
-function quotaDetail(entry: GroupUsageEntry): string {
-  const parts: string[] = []
-  const quota = entry.quota?.quota_bytes
-  const cap = entry.quota?.ceiling_bytes
-  if (quota != null && cap != null && cap !== quota) parts.push(`cap ${formatBytes(cap)}`)
-  const referenced = entry.referencedBytes ?? 0
-  if (referenced > 0) parts.push(`${formatBytes(referenced)} referenced (not counted)`)
-  return parts.join(' · ')
-}
-
-function purposeCountLabel(value: number | null | undefined): string {
-  return value == null ? 'Unknown' : String(value.toLocaleString())
-}
-
-const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
 
 // Ready entries first, sorted by severity then name; then loading; then errors.
 const RANK: Record<GroupUsageEntry['status'], number> = { ready: 0, loading: 1, error: 2 }
@@ -65,7 +61,7 @@ function sortedEntries() {
   })
 }
 
-// This card owns the freshness of the shared usage: mounting the dashboard
+// This section owns the freshness of the shared usage: mounting the dashboard
 // reloads it, and the personal tiles join the same round.
 watch(membershipKey, () => void refresh(), { immediate: true })
 
@@ -75,95 +71,88 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
 </script>
 
 <template>
-  <div class="surface overflow-hidden">
-    <header class="flex items-center justify-between border-b border-border px-5 py-4">
-      <div class="flex items-center gap-2">
-        <HardDrive class="h-4 w-4 text-primary" />
-        <h2 class="font-display text-sm font-semibold text-aruna-navy">Per group</h2>
-        <Badge variant="outline" size="count">{{ entries.length }}</Badge>
-      </div>
-      <RefreshButton :busy="refreshBusy" sr-label="Refresh the per-group figures" @click="onRefresh" />
-    </header>
+  <section class="space-y-3.5" aria-labelledby="dashboard-groups-heading">
+    <div class="flex items-center justify-between gap-2 pt-2">
+      <h3 id="dashboard-groups-heading" class="font-display text-sm font-semibold text-aruna-navy">Groups</h3>
+      <ViewToggle v-model="view" />
+    </div>
 
     <ErrorPanel
       v-if="entries.length && entries.filter((e) => e.status === 'error').length * 2 > entries.length"
       message="Could not load storage for most of your groups."
-      class="m-5"
       @retry="refresh"
     />
 
-    <div class="grid gap-3.5 p-5 sm:grid-cols-2 xl:grid-cols-3">
-      <div
-        v-for="entry in sortedEntries()"
-        :key="entry.groupId"
-        class="rounded-lg border border-border bg-background p-3"
-      >
+    <div v-if="view === 'cards'" class="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+      <div v-for="entry in sortedEntries()" :key="entry.groupId" class="surface p-4">
         <div class="flex items-center justify-between gap-2">
           <RouterLink
-            :to="{ name: 'group', params: { id: entry.groupId }, hash: '#storage-use' }"
-            class="min-w-0 truncate text-xs font-medium text-foreground hover:text-primary hover:underline"
+            :to="{ name: 'group', params: { id: entry.groupId } }"
+            class="min-w-0 truncate text-sm font-medium text-foreground hover:text-primary hover:underline"
           >
             {{ entry.name }}
           </RouterLink>
-          <Badge
-            v-if="entry.status === 'ready' && badgeFor(entry)"
-            :variant="badgeFor(entry)!.variant"
-            size="sm"
-            class="shrink-0 uppercase"
-          >
+          <Badge v-if="entry.status === 'ready' && badgeFor(entry)" :variant="badgeFor(entry)!.variant" class="shrink-0">
             {{ badgeFor(entry)!.label }}
           </Badge>
         </div>
-
-        <Skeleton v-if="entry.status === 'loading'" class="mt-2 h-8" />
+        <Skeleton v-if="entry.status === 'loading'" class="mt-2 h-16" />
         <div v-else-if="entry.status === 'error'" class="mt-2">
           <p class="text-xs text-destructive">{{ entry.error }}</p>
           <Button variant="ghost" size="sm" class="mt-1 h-6 px-2 text-xs" @click="retry(entry)">Retry</Button>
         </div>
         <template v-else>
-          <dl class="mt-2 grid grid-cols-3 gap-2 border-t border-border/70 pt-2">
-            <div>
-              <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Datasets</dt>
-              <dd class="mt-0.5 font-mono text-xs font-semibold tabular-nums text-foreground">{{ purposeCountLabel(entry.datasetCount) }}</dd>
-            </div>
-            <div>
-              <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Profiles</dt>
-              <dd class="mt-0.5 font-mono text-xs font-semibold tabular-nums text-foreground">{{ purposeCountLabel(entry.profileCount) }}</dd>
-            </div>
-            <div>
-              <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Process runs</dt>
-              <dd class="mt-0.5 font-mono text-xs font-semibold tabular-nums text-foreground">{{ purposeCountLabel(entry.processRunCount) }}</dd>
+          <GroupStorage class="mt-2" :entry="entry" />
+          <dl class="mt-3 grid grid-cols-4 gap-2 border-t border-border/70 pt-2.5 text-xs tabular-nums">
+            <div v-for="count in counts(entry)" :key="count.key" class="flex flex-col-reverse">
+              <dt class="text-[10px] text-muted-foreground">{{ count.label }}</dt>
+              <dd class="font-medium text-foreground">{{ count.value }}</dd>
             </div>
           </dl>
-          <div v-if="entry.quota" class="mt-2">
-            <div class="flex items-baseline justify-between gap-2 text-[11px]">
-              <span class="min-w-0 truncate tabular-nums"><span class="font-medium text-foreground">{{ formatBytes(entry.usedBytes ?? 0) }}</span><span class="text-muted-foreground">{{ quotaRemainder(entry) }}</span></span>
-              <span
-                v-if="entry.quota.quota_bytes != null"
-                class="shrink-0 tabular-nums text-muted-foreground"
-              >{{ quotaPct(entry) }}%</span>
-            </div>
-            <QuotaBar
-              class="mt-1.5"
-              :used="entry.usedBytes ?? 0"
-              :quota="entry.quota.quota_bytes"
-              :ceiling="entry.quota.ceiling_bytes"
-              :referenced="entry.referencedBytes ?? 0"
-              :warn="entry.quota.warning"
-              :show-labels="false"
-              compact
-            />
-            <p
-              v-if="quotaDetail(entry)"
-              class="mt-1 text-[10px] leading-tight text-muted-foreground tabular-nums"
-            >{{ quotaDetail(entry) }}</p>
-          </div>
-          <p v-else class="mt-2 text-[11px] text-muted-foreground">
-            {{ formatBytes(entry.usedBytes ?? 0) }} · no quota policy reported<template v-if="entry.referencedBytes"> · {{ formatBytes(entry.referencedBytes) }} referenced (not counted)</template>
-          </p>
         </template>
       </div>
     </div>
 
-  </div>
+    <div v-else class="surface overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="border-b border-border text-muted-foreground">
+          <tr>
+            <th class="px-4 py-2 font-medium">Group</th>
+            <th class="px-4 py-2 font-medium">Storage</th>
+            <th class="px-4 py-2 font-medium">Objects</th>
+            <th class="px-4 py-2 font-medium">Buckets</th>
+            <th class="px-4 py-2 font-medium">Datasets</th>
+            <th class="px-4 py-2 font-medium">Runs</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-border">
+          <tr v-for="entry in sortedEntries()" :key="entry.groupId">
+            <td class="px-4 py-2.5">
+              <div class="flex items-center gap-2">
+                <RouterLink
+                  :to="{ name: 'group', params: { id: entry.groupId } }"
+                  class="font-medium text-foreground hover:text-primary hover:underline"
+                >
+                  {{ entry.name }}
+                </RouterLink>
+                <Badge v-if="entry.status === 'ready' && badgeFor(entry)" :variant="badgeFor(entry)!.variant" class="shrink-0">
+                  {{ badgeFor(entry)!.label }}
+                </Badge>
+              </div>
+            </td>
+            <td v-if="entry.status === 'loading'" colspan="5" class="px-4 py-2.5"><Skeleton class="h-6" /></td>
+            <td v-else-if="entry.status === 'error'" colspan="5" class="px-4 py-2.5">
+              <span class="text-destructive">{{ entry.error }}</span>
+              <Button variant="ghost" size="sm" class="ml-2 h-6 px-2 text-xs" @click="retry(entry)">Retry</Button>
+            </td>
+            <template v-else>
+              <td class="w-[42%] px-4 py-2.5"><GroupStorage :entry="entry" /></td>
+              <td v-for="count in counts(entry)" :key="count.key" class="px-4 py-2.5 tabular-nums">{{ count.value }}</td>
+            </template>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="text-xs text-muted-foreground">A bucket stored on several nodes counts once.</p>
+  </section>
 </template>

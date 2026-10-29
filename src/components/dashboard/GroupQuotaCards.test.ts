@@ -6,8 +6,7 @@ import { ModuleKind, ScriptTarget, transpileModule } from 'typescript'
 import * as VueRuntime from 'vue'
 import { createRenderer, defineComponent, h, nextTick, type App, type Component } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useRefresh } from '@/composables/useRefresh'
-import { refreshButton } from '@/test/clientRender'
+import { memoryStorage } from '@/test/storage'
 import type { UsageResponse } from '@/lib/api'
 import * as Quota from '@/lib/quota'
 import * as Utils from '@/lib/utils'
@@ -21,6 +20,11 @@ const aruna = vi.hoisted(() => ({
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
 
 const MyGroupsUsage = await import('@/composables/useMyGroupsUsage')
+const ReachableUsage = await import('@/composables/useReachableUsage')
+const BucketCount = await import('@/composables/useBucketCount')
+const ViewMode = await import('@/composables/useViewMode')
+const Distribution = await import('@/lib/distribution')
+const FormatCount = await import('@/lib/formatCount')
 const { myGroups, getGroupUsage } = aruna
 
 const SlotStub = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
@@ -68,14 +72,17 @@ const GroupQuotaCards = compileClientComponent(new URL('./GroupQuotaCards.vue', 
   '@lucide/vue': icons,
   '@/components/ui/Badge.vue': moduleDefault(SlotStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
-  '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
-  '@/components/ui/QuotaBar.vue': moduleDefault(SlotStub),
+  '@/components/ui/ViewToggle.vue': moduleDefault(SlotStub),
+  '@/components/dashboard/GroupStorage.vue': moduleDefault(SlotStub),
   '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
   '@/components/ui/ErrorPanel.vue': moduleDefault(ErrorPanelStub),
   '@/composables/useMyGroupsUsage': MyGroupsUsage,
-  '@/composables/useRefresh': { useRefresh },
+  '@/composables/useReachableUsage': ReachableUsage,
+  '@/composables/useBucketCount': BucketCount,
+  '@/composables/useViewMode': ViewMode,
+  '@/lib/distribution': Distribution,
+  '@/lib/formatCount': FormatCount,
   '@/lib/quota': Quota,
-  '@/lib/utils': Utils,
 })
 
 beforeEach(() => {
@@ -86,6 +93,7 @@ beforeEach(() => {
 const mountedApps: App<HostNode>[] = []
 afterEach(() => {
   for (const app of mountedApps.splice(0)) app.unmount()
+  vi.unstubAllGlobals()
 })
 
 type HostKind = 'root' | 'element' | 'text' | 'comment'
@@ -186,15 +194,52 @@ function usage(overrides: Partial<UsageResponse> = {}): UsageResponse {
 }
 
 describe('group purpose counts', () => {
-  it('names itself as the per-group breakdown of the personal tiles', async () => {
+  it('shows each group as a card with its counts in singular and plural', async () => {
     myGroups.value = [{ id: 'header-1', name: 'Research group' }]
-    getGroupUsage.mockResolvedValue(usage({ dataset_count: 1, profile_count: 1, process_run_count: 1 }))
+    getGroupUsage.mockResolvedValue(usage({ dataset_count: 1, profile_count: 1, process_run_count: 3 }))
     const mounted = mountCards()
 
     await flush()
+    const text = content(mounted.root)
 
-    expect(content(mounted.root)).toContain('Per group')
-    expect(content(mounted.root)).not.toContain('Group statistics')
+    expect(text).toContain('Groups')
+    expect(text).toContain('Research group')
+    expect(text).toContain('objects 2 bucket 1 dataset 1 runs 3')
+    expect(text).toContain('A bucket stored on several nodes counts once.')
+  })
+
+  it('shows the same figures as table rows when the table was chosen', async () => {
+    const storage = memoryStorage()
+    storage.setItem('aruna.view.dashboard-groups', 'table')
+    vi.stubGlobal('localStorage', storage)
+    myGroups.value = [{ id: 'table-1', name: 'Research group' }]
+    getGroupUsage.mockResolvedValue(usage({ dataset_count: 4, profile_count: 0, process_run_count: 5 }))
+    const mounted = mountCards()
+
+    await flush()
+    const text = content(mounted.root)
+
+    expect(text).toContain('Group Storage Objects Buckets Datasets Runs')
+    expect(text).toContain('Research group v-if 2 1 4 5')
+  })
+
+  it('badges a group near its quota and leaves an unlimited one plain', async () => {
+    myGroups.value = [
+      { id: 'near-1', name: 'Near' },
+      { id: 'free-1', name: 'Free' },
+    ]
+    getGroupUsage.mockImplementation(async (groupId) =>
+      groupId === 'near-1'
+        ? usage({ quota: { quota_bytes: 6, ceiling_bytes: 12, warn_threshold_percent: 80, warning: true } })
+        : usage({ quota: { quota_bytes: null, ceiling_bytes: null, warn_threshold_percent: 80, warning: false } }),
+    )
+    const mounted = mountCards()
+
+    await flush()
+    const text = content(mounted.root)
+
+    expect(text).toContain('Near Near quota')
+    expect(text).not.toContain('Unlimited')
   })
 
   it('renders null as unknown while preserving an explicit zero and exact count', async () => {
@@ -207,9 +252,8 @@ describe('group purpose counts', () => {
     await flush()
     const text = content(mounted.root)
 
-    expect(text).toMatch(/Datasets Unknown/)
-    expect(text).toMatch(/Profiles 0/)
-    expect(text).toMatch(/Process runs 12/)
+    expect(text).toMatch(/datasets Unknown/)
+    expect(text).toMatch(/runs 12/)
     expect(text).not.toContain('~12')
   })
 
