@@ -401,7 +401,8 @@ export function useObjectPreview() {
     lockCheck.value = 'checking'
     const node = nodeOf(target) ?? localNodeId()
     try {
-      const baseUrl = node ? await nodeApiBaseReady(node) : null
+      // A reset or a newer load ends the wait for the node's address too.
+      const baseUrl = node ? await nodeApiBaseReady(node, probes.signal) : null
       if (id !== loadId) return
       if (!baseUrl) throw new Error('The node publishes no API address.')
       const answer = await getBucketEncryption(target.bucket, { baseUrl, token: authToken.value })
