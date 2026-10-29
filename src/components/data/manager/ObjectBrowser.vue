@@ -42,14 +42,16 @@ import { featureEnabled } from '@/lib/config'
 import { isNotebookKey } from '@/lib/notebook/document'
 import { collectDropFiles } from '@/lib/upload/dropEntries'
 import { stateVariant } from '@/lib/stateBadge'
-import { fileRows, type RowAction, type SelectionAction } from '@/lib/objectListing'
+import { fileRows, pageRange, sortRows, splitName, type ListSort, type RowAction, type SelectionAction, type SortKey } from '@/lib/objectListing'
 import type { TransferMode, TransferSource } from '@/lib/objectMove'
-import { formatBytes, relativeTime } from '@/lib/utils'
+import { copyToClipboard, formatBytes, relativeTime } from '@/lib/utils'
+import { formatCount } from '@/lib/formatCount'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   ArrowLeftRight,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CloudOff,
@@ -382,6 +384,8 @@ function onBarAction(action: SelectionAction) {
 function onObjectAction(object: ObjectEntry, action: RowAction) {
   const key = object.key
   if (action === 'details') openDetails(object)
+  else if (action === 'preview') openDetails(object, 'preview')
+  else if (action === 'share') void share([object.key])
   else if (action === 'download') void locked.download(object)
   else if (action === 'access') emit('public-access', [{ kind: 'file', bucket: bucket.value, key }])
   else if (action === 'delete' || action === 'purge') deleteObject(object, action === 'purge')
@@ -392,10 +396,48 @@ function onFolderAction(folder: FolderEntry, action: RowAction) {
   const key = folder.prefix
   if (action === 'open') openFolder(folder)
   else if (action === 'details') openDetails({ key, name: `${folder.name}/` })
+  else if (action === 'share') void share([key])
   else if (action === 'access') emit('public-access', [{ kind: 'folder', bucket: bucket.value, key }])
   else if (action === 'delete' || action === 'purge') deleteFolder(folder, action === 'purge')
-  else if (action !== 'download') openTransfer(action, [{ key, folder: true }])
+  else if (action !== 'download' && action !== 'preview') openTransfer(action, [{ key, folder: true }])
 }
+
+// A page's rows in the chosen order; folders keep their name order on top.
+const sort = ref<ListSort>({ key: 'name', descending: false })
+function sortBy(key: SortKey) {
+  sort.value = { key, descending: sort.value.key === key ? !sort.value.descending : key !== 'name' }
+}
+const ariaSort = (key: SortKey) => (sort.value.key === key ? (sort.value.descending ? 'descending' : 'ascending') : undefined)
+const folderRows = computed(() =>
+  sortRows(visibleFolders.value, { key: 'name', descending: sort.value.key === 'name' && sort.value.descending }, (folder) => folder))
+const objectRows = computed(() => sortRows(fileRows(visibleObjects.value, deletedRows.value), sort.value, (row) => row.entry))
+const fileFacts = (object: ObjectEntry) =>
+  [object.size !== undefined ? formatBytes(object.size) : '', object.lastModified ? relativeTime(object.lastModified.toISOString()) : ''].filter(Boolean).join(', ')
+
+// "1 to 25 of 40"; a filter names what it narrowed instead.
+const rangeText = computed(() => {
+  const listed = folders.value.length + objects.value.length
+  const shownCount = visibleFolders.value.length + visibleObjects.value.length
+  if (!nameFilter.value && shownCount === listed) return pageRange(page.value, pageSize.value, listed, !nextToken.value)
+  return `${formatCount(shownCount)} of ${formatCount(listed)} in ${prefix.value.split('/').at(-1) || bucket.value}`
+})
+
+// Share copies the portal links that open the files or folders, one per line.
+const shareNote = ref('')
+let shareTimer: ReturnType<typeof setTimeout> | undefined
+async function share(keys: string[]) {
+  const link = (key: string) => {
+    const folder = key.endsWith('/')
+    const at = folder ? key.slice(0, -1) : key.split('/').slice(0, -1).join('/')
+    const query = { ...(at ? { prefix: at } : {}), ...(remoteNodeId.value ? { node: remoteNodeId.value } : {}), ...(activeGroupId.value ? { group: activeGroupId.value } : {}), ...(folder ? {} : { object: key }) }
+    return new URL(router.resolve({ name: 'bucket', params: { bucketId: bucket.value }, query }).href, window.location.origin).href
+  }
+  await copyToClipboard(keys.map(link).join('\n'))
+  shareNote.value = keys.length === 1 ? 'Link copied' : `${formatCount(keys.length)} links copied`
+  clearTimeout(shareTimer)
+  shareTimer = setTimeout(() => (shareNote.value = ''), 2500)
+}
+onBeforeUnmount(() => clearTimeout(shareTimer))
 
 // The marker version travels with the request: choosing Restore in the dialog
 // deletes exactly that marker.
@@ -436,6 +478,7 @@ async function onDrop(event: DragEvent) {
             Stored in provider bucket <span class="font-mono text-foreground">{{ providerBucket }}</span>
           </span>
           <Spinner v-if="listLoading" label="Loading objects" class="shrink-0" />
+          <span role="status" class="shrink-0 text-xs text-muted-foreground">{{ shareNote }}</span>
         </div>
         <div class="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
           <WatchButton
@@ -612,47 +655,73 @@ async function onDrop(event: DragEvent) {
         <Notice v-else-if="listStale" tone="warning" class="rounded-none border-x-0 border-t-0">
           Some folders are shown from a copy and may be out of date.
         </Notice>
-        <table class="w-full text-sm">
-          <thead class="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
-            <tr>
-              <th class="w-10 px-4 py-2">
-                <input
-                  type="checkbox"
-                  class="h-3.5 w-3.5 rounded border-border accent-primary"
-                  :checked="allListedSelected"
-                  :indeterminate="someListedSelected && !allListedSelected"
-                  :disabled="selectableListedCount === 0 || listLoading"
-                  aria-label="Select all listed folders and files"
-                  @change="setAllListedSelected(($event.target as HTMLInputElement).checked)"
-                />
+        <!-- Fixed column widths: a column hidden on a narrow view keeps the actions in their place.
+             On a phone the rows become a list with the size and date on a second line. -->
+        <table class="w-full table-fixed text-sm @max-[600px]:block">
+          <colgroup class="@max-[600px]:hidden">
+            <col class="w-11" />
+            <col />
+            <col class="w-24" />
+            <col class="w-24 @max-[960px]:w-0" />
+            <col class="w-[132px]" />
+          </colgroup>
+          <thead class="text-[11px] uppercase tracking-wider text-muted-foreground @max-[600px]:hidden">
+            <tr class="border-b border-border">
+              <th class="p-0">
+                <label class="flex h-11 w-11 items-center justify-center">
+                  <input
+                    type="checkbox"
+                    class="h-3.5 w-3.5 rounded border-border accent-primary"
+                    :checked="allListedSelected"
+                    :indeterminate="someListedSelected && !allListedSelected"
+                    :disabled="selectableListedCount === 0 || listLoading"
+                    aria-label="Select all listed folders and files"
+                    @change="setAllListedSelected(($event.target as HTMLInputElement).checked)"
+                  />
+                </label>
               </th>
-              <th class="px-4 py-2 text-left font-semibold">Name</th>
-              <th class="px-4 py-2 text-right font-semibold">Size</th>
-              <th class="hidden px-4 py-2 text-left font-semibold sm:table-cell">Modified</th>
-              <th class="px-4 py-2"></th>
+              <th class="px-3 py-2 text-left font-medium" :aria-sort="ariaSort('name')">
+                <button type="button" class="inline-flex items-center gap-1 uppercase hover:text-foreground" @click="sortBy('name')">
+                  Name <ChevronDown v-if="sort.key === 'name'" class="h-3 w-3" :class="sort.descending ? 'rotate-180' : ''" />
+                </button>
+              </th>
+              <th class="px-3 py-2 text-right font-medium" :aria-sort="ariaSort('size')">
+                <button type="button" class="inline-flex items-center gap-1 uppercase hover:text-foreground" @click="sortBy('size')">
+                  Size <ChevronDown v-if="sort.key === 'size'" class="h-3 w-3" :class="sort.descending ? 'rotate-180' : ''" />
+                </button>
+              </th>
+              <th class="overflow-hidden px-3 py-2 text-left font-medium @max-[960px]:p-0" :aria-sort="ariaSort('modified')">
+                <button type="button" class="inline-flex items-center gap-1 uppercase hover:text-foreground @max-[960px]:hidden" @click="sortBy('modified')">
+                  Modified <ChevronDown v-if="sort.key === 'modified'" class="h-3 w-3" :class="sort.descending ? 'rotate-180' : ''" />
+                </button>
+              </th>
+              <th class="p-0"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="@max-[600px]:block">
             <tr
-              v-for="folder in visibleFolders"
+              v-for="folder in folderRows"
               :key="folder.prefix"
-              class="cursor-pointer border-t border-border hover:bg-muted/50"
+              class="group cursor-pointer border-b border-border hover:bg-muted/50 @max-[600px]:flex @max-[600px]:items-center"
               @click="openFolder(folder)"
             >
-              <td class="w-10 px-4 py-2.5" @click.stop>
-                <input
-                  type="checkbox"
-                  class="h-3.5 w-3.5 rounded border-border accent-primary"
-                  :checked="selectedPrefixes.has(folder.prefix)"
-                  :disabled="Boolean(folderReason(folder.prefix)) || listLoading"
-                  :title="folderReason(folder.prefix) ?? `Select ${folder.name}`"
-                  :aria-label="`Select ${folder.name}`"
-                  @change="setFolderSelected(folder.prefix, ($event.target as HTMLInputElement).checked)"
-                />
+              <td class="p-0 @max-[600px]:block" @click.stop>
+                <label class="flex h-11 w-11 items-center justify-center">
+                  <input
+                    type="checkbox"
+                    class="h-3.5 w-3.5 rounded border-border accent-primary"
+                    :checked="selectedPrefixes.has(folder.prefix)"
+                    :disabled="Boolean(folderReason(folder.prefix)) || listLoading"
+                    :title="folderReason(folder.prefix) ?? `Select ${folder.name}`"
+                    :aria-label="`Select ${folder.name}`"
+                    @change="setFolderSelected(folder.prefix, ($event.target as HTMLInputElement).checked)"
+                  />
+                </label>
               </td>
-              <td class="px-4 py-2.5">
-                <span class="flex items-center gap-2">
-                  <ObjectIcon :name="folder.name" folder class="h-4 w-4" /> {{ folder.name }}
+              <td class="px-3 py-2 @max-[600px]:block @max-[600px]:min-w-0 @max-[600px]:flex-1 @max-[600px]:px-1">
+                <span class="flex min-w-0 items-center gap-2">
+                  <ObjectIcon :name="folder.name" folder class="h-4 w-4" />
+                  <button type="button" class="min-w-0 truncate text-left text-foreground hover:underline" :title="`${folder.name}/`" @click.stop="openFolder(folder)">{{ folder.name }}/</button>
                   <Badge v-if="folderPublic(folder.prefix)" variant="success" size="sm" class="shrink-0 uppercase" title="Everyone can read this folder">
                     <Globe class="mr-0.5 h-3 w-3" aria-hidden="true" /> public
                   </Badge>
@@ -670,10 +739,10 @@ async function onDrop(event: DragEvent) {
                   </Tooltip>
                 </span>
               </td>
-              <td class="px-4 py-2.5 text-right text-muted-foreground">-</td>
-              <td class="hidden px-4 py-2.5 text-muted-foreground sm:table-cell">-</td>
-              <td class="px-4 py-2.5">
-                <div class="flex items-center justify-end gap-1">
+              <td class="@max-[600px]:hidden"></td>
+              <td class="@max-[600px]:hidden"></td>
+              <td class="px-2 @max-[600px]:block">
+                <div class="flex items-center justify-end gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100 [@media(hover:none)]:opacity-100 @max-[600px]:opacity-100">
                   <RowMenu
                     :name="`${folder.name}/`"
                     folder
@@ -687,34 +756,43 @@ async function onDrop(event: DragEvent) {
             <!-- Row click opens the file details; the action buttons stop
                  propagation and open the tab they name. -->
             <template
-              v-for="{ deleted, entry: object } in fileRows(visibleObjects, deletedRows)"
+              v-for="{ deleted, entry: object } in objectRows"
               :key="`${deleted ? 'deleted:' : ''}${object.key}`"
             >
             <tr
               v-if="!deleted"
-              class="cursor-pointer border-t border-border hover:bg-muted/30"
+              class="group cursor-pointer border-b border-border hover:bg-muted/30 @max-[600px]:flex @max-[600px]:items-center"
               :class="isNotebook(object) ? 'bg-primary/5' : ''"
               @click="openObject(object)"
             >
-              <td class="w-10 px-4 py-2.5" @click.stop>
-                <input
-                  type="checkbox"
-                  class="h-3.5 w-3.5 rounded border-border accent-primary"
-                  :checked="selectedObjectKeys.has(object.key)"
-                  :disabled="Boolean(objectReason(object.key)) || listLoading"
-                  :title="objectReason(object.key) ?? `Select ${object.name}`"
-                  :aria-label="`Select ${object.name}`"
-                  @change="setObjectSelected(object.key, ($event.target as HTMLInputElement).checked)"
-                />
+              <td class="p-0 @max-[600px]:block" @click.stop>
+                <label class="flex h-11 w-11 items-center justify-center">
+                  <input
+                    type="checkbox"
+                    class="h-3.5 w-3.5 rounded border-border accent-primary"
+                    :checked="selectedObjectKeys.has(object.key)"
+                    :disabled="Boolean(objectReason(object.key)) || listLoading"
+                    :title="objectReason(object.key) ?? `Select ${object.name}`"
+                    :aria-label="`Select ${object.name}`"
+                    @change="setObjectSelected(object.key, ($event.target as HTMLInputElement).checked)"
+                  />
+                </label>
               </td>
-              <td class="px-4 py-2.5">
-                <span class="flex items-center gap-2">
+              <td class="px-3 py-2 @max-[600px]:block @max-[600px]:min-w-0 @max-[600px]:flex-1 @max-[600px]:px-1">
+                <span class="flex min-w-0 items-center gap-2 @max-[600px]:items-start">
                   <ObjectIcon :name="object.name" class="h-4 w-4" />
-                  <span
-                    class="truncate"
-                    :class="brokenReason(object.key) ? 'text-destructive' : isNotebook(object) ? 'font-medium text-primary' : ''"
-                    :title="brokenReason(object.key) ?? undefined"
-                  >{{ object.name }}</span>
+                  <span class="min-w-0">
+                    <button
+                      type="button"
+                      class="flex min-w-0 max-w-full text-left hover:underline @max-[600px]:items-end"
+                      :class="brokenReason(object.key) ? 'text-destructive' : isNotebook(object) ? 'font-medium text-primary' : 'text-foreground'"
+                      :title="brokenReason(object.key) ?? object.name"
+                      @click.stop="openObject(object)"
+                    >
+                      <span class="truncate @max-[600px]:line-clamp-2 @max-[600px]:whitespace-normal @max-[600px]:break-all">{{ splitName(object.name)[0] }}</span><span class="shrink-0 whitespace-nowrap">{{ splitName(object.name)[1] }}</span>
+                    </button>
+                    <span class="hidden text-xs tabular-nums text-muted-foreground @max-[600px]:block">{{ fileFacts(object) }}</span>
+                  </span>
                   <Badge v-if="isNotebook(object)" variant="royal" size="sm" class="shrink-0">Notebook</Badge>
                   <Badge v-if="locked.keyPending(object.key)" variant="warn" size="sm" class="shrink-0">
                     Key pending
@@ -738,12 +816,14 @@ async function onDrop(event: DragEvent) {
                   </Tooltip>
                 </span>
               </td>
-              <td class="whitespace-nowrap px-4 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ object.size !== undefined ? formatBytes(object.size) : '-' }}</td>
-              <td class="hidden px-4 py-2.5 text-xs text-muted-foreground sm:table-cell">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '-' }}</td>
-              <td class="px-4 py-2.5">
-                <div class="flex items-center justify-end gap-1">
-                  <IconButton label="Preview" @click.stop="openDetails(object, 'preview')"><Eye class="size-3.5" /></IconButton>
-                  <IconButton label="Download" @click.stop="locked.download(object)"><Download class="size-3.5" /></IconButton>
+              <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground @max-[600px]:hidden">{{ object.size !== undefined ? formatBytes(object.size) : '' }}</td>
+              <td class="overflow-hidden whitespace-nowrap px-3 py-2 text-muted-foreground @max-[960px]:p-0 @max-[600px]:hidden">
+                <span class="@max-[960px]:hidden">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '' }}</span>
+              </td>
+              <td class="px-2 @max-[600px]:block">
+                <div class="flex items-center justify-end gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100 [@media(hover:none)]:opacity-100 @max-[600px]:opacity-100">
+                  <IconButton label="Preview" variant="outline" class="@max-[600px]:hidden" @click.stop="openDetails(object, 'preview')"><Eye class="size-3.5" /></IconButton>
+                  <IconButton label="Download" variant="outline" class="@max-[600px]:hidden" @click.stop="locked.download(object)"><Download class="size-3.5" /></IconButton>
                   <RowMenu
                     :name="object.name"
                     :change-reason="objectReason(object.key)"
@@ -757,19 +837,21 @@ async function onDrop(event: DragEvent) {
                  here so a restore never leaves the browser. -->
             <tr
               v-else
-              class="border-t border-border bg-muted/20 text-muted-foreground"
+              class="border-b border-border bg-muted/20 text-muted-foreground @max-[600px]:flex @max-[600px]:items-center"
             >
-              <td class="w-10 px-4 py-2.5"></td>
-              <td class="px-4 py-2.5">
-                <span class="flex items-center gap-2">
+              <td class="w-11 p-0 @max-[600px]:block"></td>
+              <td class="px-3 py-2 @max-[600px]:block @max-[600px]:min-w-0 @max-[600px]:flex-1 @max-[600px]:px-1">
+                <span class="flex min-w-0 items-center gap-2">
                   <ObjectIcon :name="object.name" class="h-4 w-4 opacity-60" />
-                  <span class="truncate line-through">{{ object.name }}</span>
+                  <span class="truncate line-through" :title="object.name">{{ object.name }}</span>
                   <Badge :variant="stateVariant('deleted')" size="sm">Deleted</Badge>
                 </span>
               </td>
-              <td class="px-4 py-2.5 text-right font-mono text-xs">-</td>
-              <td class="hidden px-4 py-2.5 text-xs sm:table-cell">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '-' }}</td>
-              <td class="px-4 py-2.5">
+              <td class="@max-[600px]:hidden"></td>
+              <td class="overflow-hidden whitespace-nowrap px-3 py-2 @max-[960px]:p-0 @max-[600px]:hidden">
+                <span class="@max-[960px]:hidden">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '' }}</span>
+              </td>
+              <td class="px-2 @max-[600px]:block">
                 <div class="flex items-center justify-end gap-1">
                   <Spinner v-if="restoringKey === object.key" label="Restoring the object" />
                   <IconButton
@@ -787,39 +869,37 @@ async function onDrop(event: DragEvent) {
               </td>
             </tr>
             </template>
-            <tr v-if="(listLoading || (!listedOnce && !listError)) && !visibleFolders.length && !visibleObjects.length && !deletedRows.length">
-              <td colspan="5" class="px-4 py-10">
+            <tr v-if="(listLoading || (!listedOnce && !listError)) && !visibleFolders.length && !visibleObjects.length && !deletedRows.length" class="@max-[600px]:block">
+              <td colspan="5" class="px-4 py-10 @max-[600px]:block">
                 <Spinner show-label label="Loading objects…" class="justify-center" />
               </td>
             </tr>
-            <tr v-else-if="isEmpty">
-              <td colspan="5" class="px-4 py-10 text-center text-xs text-muted-foreground">
+            <tr v-else-if="isEmpty" class="@max-[600px]:block">
+              <td colspan="5" class="px-4 py-10 text-center text-xs text-muted-foreground @max-[600px]:block">
                 <template v-if="nameFilter">No names here start with "{{ nameFilter }}".</template>
                 <template v-else-if="nextToken || folders.length || objects.length">No matches on this page.</template>
-                <template v-else>{{ canWriteCurrentPrefix ? 'This prefix is empty. Drop files here or use Add data.' : 'This prefix is empty. This session is read-only here.' }}</template>
+                <template v-else>{{ canWriteCurrentPrefix ? 'This folder is empty. Drop files here or use Upload.' : 'This folder is empty. This session is read-only here.' }}</template>
               </td>
             </tr>
           </tbody>
         </table>
-        <div v-if="!isEmpty || page > 1 || nextToken" class="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-2">
-          <label class="flex items-center gap-2 text-xs text-muted-foreground">
-            Per page
+        <div v-if="!isEmpty || page > 1 || nextToken" class="flex flex-wrap items-center justify-between gap-3 px-4 py-2 text-xs text-muted-foreground">
+          <span class="tabular-nums">{{ rangeText }}</span>
+          <div class="flex items-center gap-2">
             <Select
               :model-value="String(pageSize)"
               :options="PAGE_SIZE_OPTIONS"
               aria-label="Files per page"
+              title="Files per page"
               class="h-8 w-20 text-xs text-foreground"
               @update:model-value="(value: string) => setPageSize(Number(value))"
             />
-          </label>
-          <div class="flex items-center gap-2">
-            <Button variant="outline" size="sm" :disabled="page <= 1 || listLoading" @click="previousPage">
-              <ChevronLeft class="size-3.5" /> Prev
-            </Button>
-            <span class="px-1 text-center text-xs tabular-nums text-muted-foreground">Page {{ page }}</span>
-            <Button variant="outline" size="sm" :disabled="!nextToken || listLoading" @click="nextPage">
-              Next <ChevronRight class="size-3.5" />
-            </Button>
+            <IconButton label="Previous page" variant="outline" size="icon" class="h-8 w-8" :disabled="page <= 1 || listLoading" @click="previousPage">
+              <ChevronLeft class="size-3.5" />
+            </IconButton>
+            <IconButton label="Next page" variant="outline" size="icon" class="h-8 w-8" :disabled="!nextToken || listLoading" @click="nextPage">
+              <ChevronRight class="size-3.5" />
+            </IconButton>
           </div>
         </div>
         </template>

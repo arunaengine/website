@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actionBlocker, deletedOnPage, fileRows, filtersChanged, lastListedKey, shownDeleted, shownEntries } from './objectListing'
+import { actionBlocker, deletedOnPage, fileRows, filtersChanged, lastListedKey, pageRange, shownDeleted, shownEntries, sortRows, splitName } from './objectListing'
 
 const folder = { prefix: 'raw/genomes/', name: 'genomes' }
 const file = { key: 'raw/reads.fastq', name: 'reads.fastq' }
@@ -68,5 +68,41 @@ describe('list bar actions', () => {
     expect(actionBlocker('download', 0, 2)).not.toBeNull()
     expect(actionBlocker('download', 1, 2)).toBeNull()
     expect(actionBlocker('move', 0, 2)).toBeNull()
+  })
+})
+
+describe('object list order and ranges', () => {
+  const day = (n: number) => new Date(Date.UTC(2026, 9, n))
+  const rows = [
+    { name: 'b10.fna', size: 5, lastModified: day(3) },
+    { name: 'b2.fna', size: 50, lastModified: day(1) },
+    { name: 'a.fna', lastModified: day(2) },
+  ]
+  const names = (sorted: typeof rows) => sorted.map((row) => row.name)
+
+  it('orders names naturally and either way', () => {
+    expect(names(sortRows(rows, { key: 'name', descending: false }, (row) => row))).toEqual(['a.fna', 'b2.fna', 'b10.fna'])
+    expect(names(sortRows(rows, { key: 'name', descending: true }, (row) => row))).toEqual(['b10.fna', 'b2.fna', 'a.fna'])
+  })
+
+  it('orders by size or date and keeps a row without one last', () => {
+    expect(names(sortRows(rows, { key: 'size', descending: true }, (row) => row))).toEqual(['b2.fna', 'b10.fna', 'a.fna'])
+    expect(names(sortRows(rows, { key: 'size', descending: false }, (row) => row))).toEqual(['b10.fna', 'b2.fna', 'a.fna'])
+    expect(names(sortRows(rows, { key: 'modified', descending: false }, (row) => row))).toEqual(['b2.fna', 'a.fna', 'b10.fna'])
+  })
+
+  it('keeps the end of a long name whole', () => {
+    expect(splitName('GCF_000005845.2_ASM584v2_genomic_vs_my_genome_alignment_minimap2.paf')).toEqual([
+      'GCF_000005845.2_ASM584v2_genomic_vs_my_genome_alignment_',
+      'minimap2.paf',
+    ])
+    expect(splitName('genome.embl')).toEqual(['genome.embl', ''])
+  })
+
+  it('names the total only once the last page is listed', () => {
+    expect(pageRange(1, 25, 9, true)).toBe('1 to 9 of 9')
+    expect(pageRange(2, 1000, 1000, false)).toBe('1,001 to 2,000')
+    expect(pageRange(3, 10, 1, true)).toBe('21 of 21')
+    expect(pageRange(1, 25, 0, true)).toBe('')
   })
 })

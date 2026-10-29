@@ -78,7 +78,7 @@ describe('object browser row actions', () => {
   it('shows a broken file in red with the reason', async () => {
     brokenFiles.reasons = { [listedObject.key]: 'File missing on storage' }
     const root = await render()
-    const name = element(root, (node) => node.tag === 'span' && node.props.title === 'File missing on storage')
+    const name = element(root, (node) => node.tag === 'button' && node.props.title === 'File missing on storage')
     expect(JSON.stringify(name.props.class)).toContain('text-destructive')
     expect(content(name)).toContain('reads.fastq')
     brokenFiles.reasons = {}
@@ -93,7 +93,7 @@ describe('object browser row actions', () => {
         .filter((node) => node.tag === 'button' && node.props['aria-label'])
         .map((node) => String(node.props['aria-label'])),
     ).toEqual(['Preview', 'Download', 'More actions'])
-    expect(menuLabels(row)).toEqual(['Details', 'Download', 'Rename', 'Move to', 'Copy to', 'Change access', 'Delete', 'Delete permanently…'])
+    expect(menuLabels(row)).toEqual(['Preview', 'Download', 'Rename', 'Copy to', 'Move to', 'Share', 'Make public', 'Delete', 'Delete permanently…'])
     // Icon only: the label is the accessible name, not visible text.
     expect(content(action(root, 'Preview')).trim()).toBe('')
   })
@@ -177,13 +177,46 @@ describe('object browser row actions', () => {
     )
   })
 
-  it('opens the details on the general tab from the menu', async () => {
+  it('opens the details from the name, and the preview from the menu', async () => {
     openDetails.mockClear()
     const root = await render()
 
-    await click(menuItem(root, 'Details'))
-
+    await bubbleClick(element(root, (node) => node.tag === 'button' && node.props.title === listedObject.name))
+    expect(openDetails).toHaveBeenCalledTimes(1)
     expect(openDetails).toHaveBeenCalledWith(listedObject)
+
+    await click(menuItem(root, 'Preview'))
+    expect(openDetails).toHaveBeenLastCalledWith(listedObject, 'preview')
+  })
+
+  it('keeps the end of a long name whole, so the extension stays in view', async () => {
+    const long = { ...listedObject, key: 'raw/GCF_000005845.2_ASM584v2_genomic_vs_my_genome_alignment_minimap2.paf', name: 'GCF_000005845.2_ASM584v2_genomic_vs_my_genome_alignment_minimap2.paf' }
+    const objects = ref([long])
+    const root = await render({ objects, visibleObjects: objects })
+    const name = element(root, (node) => node.tag === 'button' && node.props.title === long.name)
+    const [start, end] = name.children.filter((node) => node.tag === 'span')
+
+    expect(content(name)).toBe(long.name)
+    expect(String(start.props.class)).toContain('truncate')
+    expect(content(end)).toBe('minimap2.paf')
+    expect(String(end.props.class)).toContain('shrink-0')
+  })
+
+  it('copies a portal link to the file from Share', async () => {
+    const writeText = vi.fn(async () => undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    vi.stubGlobal('window', { location: { origin: 'https://portal.example' } })
+    const resolve = vi.fn((to: { query: Record<string, string> }) => ({ href: `/data/reef?${new URLSearchParams(to.query)}` }))
+    try {
+      const root = await render({ router: { push, resolve }, activeGroupId: ref('g1') })
+      await click(menuItem(root, 'Share'))
+
+      expect(resolve).toHaveBeenCalledWith({ name: 'bucket', params: { bucketId: 'reef' }, query: { prefix: 'raw', group: 'g1', object: listedObject.key } })
+      expect(writeText).toHaveBeenCalledWith('https://portal.example/data/reef?prefix=raw&group=g1&object=raw%2Freads.fastq')
+      expect(content(root)).toContain('Link copied')
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('blocks rename, move and delete in the menu of a row this session cannot change', async () => {
@@ -576,25 +609,27 @@ describe('object browser selection', () => {
 })
 
 describe('object browser pages', () => {
-  it('turns pages with Prev and Next and sets the page size', async () => {
+  it('turns pages and names the listed range, with the total on the last page', async () => {
     const nextPage = vi.fn()
     const previousPage = vi.fn()
     const setPageSize = vi.fn()
-    const first = await render({ nextPage, previousPage, setPageSize, nextToken: ref('t2') })
+    const two = ref([listedObject, { ...listedObject, key: 'raw/b.fastq', name: 'b.fastq' }])
+    const first = await render({ nextPage, previousPage, setPageSize, nextToken: ref('t2'), pageSize: ref(2), objects: two, visibleObjects: two })
 
-    expect(content(first)).toContain('Page 1')
-    expect(button(first, 'Prev').props.disabled).toBe(true)
-    await click(button(first, 'Next'))
+    expect(content(first)).toContain('1 to 2')
+    expect(content(first)).not.toContain(' of ')
+    expect(action(first, 'Previous page').props.disabled).toBe(true)
+    await click(action(first, 'Next page'))
     expect(nextPage).toHaveBeenCalled()
 
     const size = element(first, (node) => node.tag === 'select')
     await (size.props.onChange as (event: unknown) => unknown)({ target: { value: '100' } })
     expect(setPageSize).toHaveBeenCalledWith(100)
 
-    const last = await render({ nextPage, previousPage, page: ref(3) })
-    expect(content(last)).toContain('Page 3')
-    expect(button(last, 'Next').props.disabled).toBe(true)
-    await click(button(last, 'Prev'))
+    const last = await render({ nextPage, previousPage, page: ref(3), pageSize: ref(2), objects: two, visibleObjects: two })
+    expect(content(last)).toContain('5 to 6 of 6')
+    expect(action(last, 'Next page').props.disabled).toBe(true)
+    await click(action(last, 'Previous page'))
     expect(previousPage).toHaveBeenCalled()
   })
 })
@@ -610,8 +645,8 @@ describe('object browser filtered pages', () => {
     })
 
     expect(content(root)).toContain('No matches on this page.')
-    expect(button(root, 'Next').props.disabled).toBe(false)
-    await click(button(root, 'Next'))
+    expect(action(root, 'Next page').props.disabled).toBe(false)
+    await click(action(root, 'Next page'))
     expect(nextPage).toHaveBeenCalled()
   })
 })
@@ -694,8 +729,8 @@ describe('object browser public access', () => {
     const root = await render({ folders: ref([listedFolder]) })
     const row = element(root, (node) => node.tag === 'tr' && content(node).includes(listedFolder.name))
 
-    expect(content(element(row, (node) => node.tag === 'td' && content(node).trim() === listedFolder.name))).toBe(` ${listedFolder.name} `)
-    expect(menuLabels(row)).toEqual(['Open', 'Details', 'Move to', 'Copy to', 'Change access', 'Delete folder', 'Delete permanently…'])
+    expect(content(element(row, (node) => node.tag === 'button' && node.props.title === `${listedFolder.name}/`))).toBe(`${listedFolder.name}/`)
+    expect(menuLabels(row)).toEqual(['Open', 'Details', 'Rename', 'Copy to', 'Move to', 'Make public', 'Delete folder', 'Delete permanently…'])
 
     await click(menuItem(root, 'Details', `${listedFolder.name}/`))
 
@@ -712,8 +747,9 @@ describe('object browser public access', () => {
 
     const fileRow = element(root, (node) => node.tag === 'tr' && content(node).includes(listedObject.name))
     const folderRow = element(root, (node) => node.tag === 'tr' && content(node).includes(listedFolder.name))
-    expect(content(fileRow)).toContain('public')
-    expect(content(folderRow)).not.toContain('public')
+    const marked = (row: HostNode) => nodes(row).some((node) => String(node.props.title ?? '').startsWith('Everyone can read'))
+    expect(marked(fileRow)).toBe(true)
+    expect(marked(folderRow)).toBe(false)
   })
 })
 

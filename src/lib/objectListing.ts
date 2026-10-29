@@ -1,5 +1,6 @@
 // What the object list shows after its filters, and which list bar actions a
 // selection allows. Pure, so the Data view and its tests share one answer.
+import { formatCount } from './formatCount'
 import type { DeletedObjectEntry } from './objectVersions'
 
 export type ListingShow = 'all' | 'files' | 'folders'
@@ -60,7 +61,7 @@ export function fileRows<O extends { key: string }>(objects: O[], deleted: Delet
   return rows.sort((a, b) => (a.entry.key < b.entry.key ? -1 : a.entry.key > b.entry.key ? 1 : 0))
 }
 
-export type RowAction = 'open' | 'details' | 'download' | 'rename' | 'move' | 'copy' | 'access' | 'delete' | 'purge'
+export type RowAction = 'open' | 'details' | 'preview' | 'download' | 'rename' | 'move' | 'copy' | 'share' | 'access' | 'delete' | 'purge'
 
 export type SelectionAction = 'download' | 'move' | 'copy' | 'rename' | 'access' | 'delete'
 
@@ -71,4 +72,40 @@ export function actionBlocker(action: SelectionAction, files: number, folders: n
   if (action === 'rename' && count !== 1) return 'Tick exactly one file or folder to rename it.'
   if (action === 'download' && !files) return 'Folders cannot be downloaded here. Tick files.'
   return null
+}
+
+export type SortKey = 'name' | 'size' | 'modified'
+export interface ListSort {
+  key: SortKey
+  descending: boolean
+}
+
+type Sortable = { name: string; size?: number; lastModified?: Date }
+const value = (entry: Sortable, key: SortKey) =>
+  key === 'size' ? entry.size : key === 'modified' ? entry.lastModified?.getTime() : undefined
+
+/** The rows of one page in the chosen order; a row without the value goes last either way. */
+export function sortRows<R>(rows: R[], sort: ListSort, entry: (row: R) => Sortable): R[] {
+  const sign = sort.descending ? -1 : 1
+  return [...rows].sort((a, b) => {
+    if (sort.key === 'name') return sign * entry(a).name.localeCompare(entry(b).name, undefined, { numeric: true })
+    const left = value(entry(a), sort.key)
+    const right = value(entry(b), sort.key)
+    if (left === undefined || right === undefined) return left === right ? 0 : left === undefined ? 1 : -1
+    return sign * (left - right)
+  })
+}
+
+/** A long name in two parts, so a cut keeps the end with the extension in view. */
+export function splitName(name: string, keep = 12): [string, string] {
+  return name.length > 24 ? [name.slice(0, -keep), name.slice(-keep)] : [name, '']
+}
+
+/** The listed rows of a page as "1 to 25", with "of N" once the last page names the total. */
+export function pageRange(page: number, pageSize: number, listed: number, last: boolean): string {
+  if (!listed) return ''
+  const first = (page - 1) * pageSize + 1
+  const end = first + listed - 1
+  const shown = first === end ? formatCount(first) : `${formatCount(first)} to ${formatCount(end)}`
+  return last ? `${shown} of ${formatCount(end)}` : shown
 }

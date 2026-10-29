@@ -403,7 +403,7 @@ describe('Data Manager versions and restore', () => {
     expect(functionSource(managerSource, 'setShowDeleted')).toContain('storeValue(SHOW_DELETED_KEY')
     expect(functionSource(managerSource, 'loadDeleted')).toContain('s3.listDeletedObjects(')
     expect(listBar.template).toContain('Include deleted')
-    expect(objectBrowser.template).toContain('fileRows(visibleObjects, deletedRows)')
+    expect(objectBrowserSource).toContain('fileRows(visibleObjects.value, deletedRows.value)')
     expect(objectBrowser.template).toContain('>Deleted</Badge>')
     expect(objectBrowser.template).toContain('label="Restore"')
     // Unavailable on a bucket held by another node, with the reason in its place.

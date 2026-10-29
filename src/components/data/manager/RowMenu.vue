@@ -9,7 +9,7 @@ import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import type { RowAction } from '@/lib/objectListing'
 import { computed } from 'vue'
-import { Copy, Download, Folder, FolderInput, Globe, Info, MoreHorizontal, PencilLine, Trash2 } from '@lucide/vue'
+import { Copy, Download, Eye, Folder, FolderInput, Globe, Info, MoreHorizontal, Pencil, Share2, Trash2 } from '@lucide/vue'
 
 const props = defineProps<{
   name: string
@@ -21,23 +21,26 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ (e: 'pick', action: RowAction): void }>()
 
-const ICONS = { open: Folder, details: Info, download: Download, rename: PencilLine, move: FolderInput, copy: Copy, access: Globe, delete: Trash2, purge: Trash2 }
+const ICONS = { open: Folder, details: Info, preview: Eye, download: Download, rename: Pencil, move: FolderInput, copy: Copy, share: Share2, access: Globe, delete: Trash2, purge: Trash2 }
 const LABELS: Record<RowAction, string> = {
   open: 'Open',
   details: 'Details',
+  preview: 'Preview',
   download: 'Download',
   rename: 'Rename',
   move: 'Move to',
   copy: 'Copy to',
-  access: 'Change access',
+  share: 'Share',
+  access: 'Make public',
   delete: 'Delete',
   purge: 'Delete permanently…',
 }
 
+// A file row opens its details on a click, so its menu starts with what the row does not.
 const groups = computed<RowAction[][]>(() => {
-  const change: RowAction[] = props.folder ? ['move', 'copy'] : ['rename', 'move', 'copy']
+  const change: RowAction[] = props.folder ? ['copy', 'move'] : ['copy', 'move', 'share']
   if (props.access) change.push('access')
-  return [props.folder ? ['open', 'details'] : ['details', 'download'], change, ['delete', 'purge']]
+  return [props.folder ? ['open', 'details', 'rename'] : ['preview', 'download', 'rename'], change, ['delete', 'purge']]
 })
 
 function blocked(action: RowAction): boolean {

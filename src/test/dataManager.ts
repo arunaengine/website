@@ -10,6 +10,7 @@ import * as StateBadge from '@/lib/stateBadge'
 import * as DropEntries from '@/lib/upload/dropEntries'
 import * as NotebookDocument from '@/lib/notebook/document'
 import * as ObjectListing from '@/lib/objectListing'
+import * as FormatCount from '@/lib/formatCount'
 import * as Utils from '@/lib/utils'
 import * as Workspaces from '@/lib/workspaces'
 import { compileClientComponent, moduleDefault } from '@/test/clientRender'
@@ -34,11 +35,11 @@ export const ButtonStub = defineComponent({
 
 export const IconButtonStub = defineComponent({
   inheritAttrs: false,
-  props: { label: String, disabledReason: String, variant: String, size: String, class: String },
+  props: { label: String, disabled: Boolean, disabledReason: String, variant: String, size: String, class: String },
   setup: (props, { attrs, slots }) => () =>
     h(
       'button',
-      { ...attrs, 'aria-label': props.label, disabled: Boolean(props.disabledReason) },
+      { ...attrs, 'aria-label': props.label, disabled: props.disabled || Boolean(props.disabledReason) },
       slots.default?.(),
     ),
 })
@@ -179,6 +180,7 @@ export function objectBrowser(): Component {
       '@/lib/upload/dropEntries': DropEntries,
       '@/lib/notebook/document': NotebookDocument,
       '@/lib/objectListing': ObjectListing,
+      '@/lib/formatCount': FormatCount,
       '@/lib/utils': Utils,
       '@/lib/workspaces': Workspaces,
       '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
