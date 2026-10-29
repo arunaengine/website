@@ -76,9 +76,31 @@ describe('TES input picker my buckets', () => {
     expect(text).toContain('On other nodes')
     expect(text).toContain('far')
     expect(text).not.toContain('foreign')
-    expect(text).not.toMatch(/here\s+demo/)
+    expect(text).not.toMatch(/here\s*demo/)
     await click(button(root, 'far'))
     expect(content(root)).toContain('pick far n2')
+    currentUser.value = null
+    myGroups.value = []
+  })
+})
+
+describe('TES input picker remote identity', () => {
+  it('merges distributed buckets by set and keeps ordinary buckets per node', async () => {
+    currentUser.value = { id: 'u1' }
+    myGroups.value = [{ id: 'g1', name: 'demo' }]
+    const hit = (bucket: string, node: string, set_id?: string) => ({ arn: '', bucket, node_id: node, group_id: 'g1', created_at: '', set_id })
+    searchBuckets.mockResolvedValue({
+      hits: [hit('reads', 'n1'), hit('reads', 'n2'), hit('reads', 'n3'), hit('shared', 'n1', 's1'), hit('shared', 'n2', 's1'), hit('wide', 'n2', 's2'), hit('wide', 'n3', 's2')],
+      nodes_queried: 3, nodes_failed: 0, failed_nodes: [],
+    })
+    const { root } = await mountApp(component, { props: { open: true, mode: 'input' } })
+    await flush()
+
+    const text = content(root)
+    expect(text).toMatch(/reads\s*demo\s*node n2/)
+    expect(text).toMatch(/reads\s*demo\s*node n3/)
+    expect(text).not.toContain('shared')
+    expect(text.match(/wide/g)).toHaveLength(1)
     currentUser.value = null
     myGroups.value = []
   })

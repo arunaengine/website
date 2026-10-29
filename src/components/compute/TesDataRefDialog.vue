@@ -88,9 +88,10 @@ async function loadRemoteOwn() {
   const listing = await listBuckets(searchBuckets, undefined, current).catch(() => null)
   if (!current()) return
   const hits = (listing?.hits ?? []).filter((hit) => groups.has(hit.group_id))
-  const local = new Set(hits.filter((hit) => isLocalNode(hit.node_id)).map((hit) => hit.bucket))
-  const seen = new Set<string>()
-  remoteOwn.value = hits.filter((hit) => !local.has(hit.bucket) && !seen.has(hit.bucket) && Boolean(seen.add(hit.bucket)))
+  // One row per distributed bucket (none when this node holds a member), one per other bucket.
+  const identity = (hit: BucketSearchHit) => hit.set_id ?? `${hit.node_id}/${hit.bucket}`
+  const seen = new Set(hits.filter((hit) => hit.set_id && isLocalNode(hit.node_id)).map(identity))
+  remoteOwn.value = hits.filter((hit) => !isLocalNode(hit.node_id) && !seen.has(identity(hit)) && Boolean(seen.add(identity(hit))))
 }
 watch(sessionEpoch, () => {
   remoteRun++
@@ -289,7 +290,7 @@ watch(
           <p v-if="remoteOwn === null" class="text-[11px] text-muted-foreground">Listing your buckets on the other nodes…</p>
           <button
             v-for="hit in remoteOwn ?? []"
-            :key="hit.bucket"
+            :key="`${hit.node_id}/${hit.bucket}`"
             type="button"
             class="flex w-full items-center gap-2 rounded-md border border-border px-3 py-1.5 text-left text-xs hover:bg-muted/40"
             @click="chooseBucket(hit)"
