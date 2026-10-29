@@ -71,6 +71,9 @@ interface UploadContext {
   prefix: string
   nodeId: string | null
   groupId: string | null
+  /** The session and account the files were picked in; another one never uploads them. */
+  epoch: number
+  account: string | null
 }
 
 function routeString(value: unknown): string {
@@ -1197,8 +1200,13 @@ export function useDataManager() {
       prefix: s3Prefix.value,
       nodeId: remoteNodeId.value,
       groupId: activeGroupId.value,
+      epoch: sessionEpoch.value,
+      account: stickyScope.value,
     }
   }
+  const uploadCurrent = (context: UploadContext) => context.epoch === sessionEpoch.value && context.account === stickyScope.value
+  // A quota question still open belongs to the account that asked it.
+  watch([sessionEpoch, stickyScope], () => (precheck.value = null))
 
   // Advisory only: this may warn but never blocks. Every path ends in an upload.
   async function requestUpload(files: File[]) {
@@ -1208,6 +1216,7 @@ export function useDataManager() {
     const groupId = context.groupId
     if (groupId) {
       const usage = await groupUsageFresh(groupId)
+      if (!uploadCurrent(context)) return
       const quota = usage?.quota
       if (usage && quota && quota.quota_bytes != null) {
         const used = quotaCountedBytes(usage)
@@ -1233,6 +1242,7 @@ export function useDataManager() {
   // cancel/retry live in the floating transfers panel; the session fingerprint
   // inside the queue guards against key/endpoint changes.
   function uploadFiles(context: UploadContext) {
+    if (!uploadCurrent(context)) return
     const checkOverwrite = context.bucket === bucket.value && context.prefix === s3Prefix.value
     for (const file of context.files) {
       const key = `${context.prefix}${file.name}`
