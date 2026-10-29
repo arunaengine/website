@@ -333,12 +333,14 @@ describe('SettingsView access tab', () => {
     expect(panelText(root, 'access')).not.toContain('Devices panel')
   })
 
-  it('stacks connection, sessions and keys', async () => {
+  it('stacks sign-ins, keys and the folded API connection', async () => {
     const { root, errors } = await mount('?tab=access')
 
     const text = panelText(root, 'access')
     expect(text).not.toContain('Interoperability')
-    const markers = ['API connection', 'Sessions panel', 'S3 access keys']
+    // The connection waits folded at the bottom.
+    expect(source).toContain('<details class="surface overflow-hidden">')
+    const markers = ['Sessions panel', 'S3 access keys', 'Advanced: API connection']
     const positions = markers.map((marker) => text.indexOf(marker))
     expect(errors).toEqual([])
     expect(positions.every((position) => position >= 0)).toBe(true)

@@ -37,7 +37,7 @@ import { apiOrigin } from '@/lib/api'
 import { isDesktop } from '@/lib/desktop'
 import { errorMessage } from '@/lib/utils'
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
-import { ChevronRight, ExternalLink, Eye, Palette, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, Plus, Save } from '@lucide/vue'
+import { ChevronRight, Code2, ExternalLink, Eye, Palette, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, Plus, Save } from '@lucide/vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { SETTINGS_TAB_ANCHORS } from '@/components/layout/nav'
 import { asyncChunkError } from '@/lib/chunk-recovery'
@@ -269,11 +269,7 @@ const createGroupOpen = ref(false)
       <template v-else>
       <TabsContent value="access" class="container mt-0 min-w-0 space-y-5 py-6">
         <ConnectTools v-if="desktop" />
-        <section class="surface">
-          <header class="border-b border-border px-5 py-4">
-            <h3 class="font-display text-sm font-semibold text-aruna-navy">Session &amp; API connection</h3>
-            <p class="text-xs text-muted-foreground">Sign-in is handled by the realm's identity provider; the issued Aruna token authenticates this browser.</p>
-          </header>
+        <section v-if="authPending || !isAuthenticated" class="surface">
           <!-- While the stored session restores, show a placeholder instead of
                flashing "Not signed in" plus a Sign in button. -->
           <div v-if="authPending" class="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
@@ -291,6 +287,19 @@ const createGroupOpen = ref(false)
             </div>
             <Button size="sm" :disabled="signingIn" @click="startSignIn"><LogIn class="h-3.5 w-3.5" /> Sign in</Button>
           </div>
+        </section>
+
+        <SessionsPanel />
+
+        <!-- The desktop lists every long-lived key above, with the place it works. -->
+        <S3SessionsPanel :keys="shown('s3-keys') && !desktop" />
+        <!-- API address, bearer token, identity and the API reference, folded away. -->
+        <details class="surface overflow-hidden">
+          <summary class="cursor-pointer px-5 py-3.5">
+            <span class="inline-flex items-center gap-2 font-display text-sm font-semibold text-aruna-navy"><Code2 class="h-4 w-4 text-primary" /> Advanced: API connection</span>
+            <span class="block text-xs text-muted-foreground">API address, bearer token and the API reference.</span>
+          </summary>
+          <div class="border-t border-border">
           <div v-if="isAuthenticated && userInfo" class="border-b border-border px-5 py-3">
             <button
               type="button"
@@ -344,12 +353,9 @@ const createGroupOpen = ref(false)
             </div>
             <Button size="sm" variant="outline" @click="saveConnection">Apply connection</Button>
           </div>
-        </section>
+          </div>
+        </details>
 
-        <SessionsPanel />
-
-        <!-- The desktop lists every long-lived key above, with the place it works. -->
-        <S3SessionsPanel :keys="shown('s3-keys') && !desktop" />
       </TabsContent>
 
       <TabsContent value="devices" class="container mt-0 min-w-0 space-y-5 py-6">
