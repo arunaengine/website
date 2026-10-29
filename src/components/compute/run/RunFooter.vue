@@ -36,7 +36,7 @@ const summary = computed(() =>
     `${outputRows.value.length} output${outputRows.value.length === 1 ? '' : 's'}`,
     `${String(cpuCores.value).trim() || '?'} cores, ${String(ramGb.value).trim() || '?'} GB`,
     placementSummary.value,
-  ].join(' · '),
+  ].join(', '),
 )
 const unassigned = computed(() => unassignedPaths.value.length)
 // A warning, not a problem: the run may start and simply store nothing.
@@ -45,7 +45,8 @@ const noOutputs = computed(() => outputRows.value.length === 0)
 
 <template>
   <div class="surface flex flex-wrap items-center gap-2.5 px-5 py-3">
-    <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-xs text-muted-foreground" aria-live="polite">
+    <!-- On a narrow screen the status takes its own line above the buttons. -->
+    <div class="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-1.5 text-xs text-muted-foreground sm:basis-0" aria-live="polite">
       <template v-if="problems.length">
         <span class="font-semibold text-amber-700 dark:text-amber-300">
           {{ problems.length }} thing{{ problems.length === 1 ? '' : 's' }} still needed:
@@ -66,7 +67,7 @@ const noOutputs = computed(() => outputRows.value.length === 0)
         </span>
         <span class="min-w-0 truncate" :title="summary">{{ summary }}</span>
         <span v-if="unassigned" class="text-amber-700 dark:text-amber-300">
-          · {{ unassigned }} path{{ unassigned === 1 ? '' : 's' }} not assigned
+          {{ unassigned }} path{{ unassigned === 1 ? '' : 's' }} not assigned
         </span>
       </template>
       <span
@@ -76,12 +77,14 @@ const noOutputs = computed(() => outputRows.value.length === 0)
         No output captured: this run stores nothing but the logs.
       </span>
     </div>
-    <Button data-tutorial="run-request" variant="outline" @click="emit('show-request')">
-      <Braces class="size-3.5" /> Show request
-    </Button>
-    <Button variant="outline" @click="emit('cancel')">Cancel</Button>
-    <Button data-tutorial="run-submit" :disabled="props.running" @click="emit('run')">
-      <Play class="size-3.5" /> {{ props.running ? 'Starting…' : 'Run' }}
-    </Button>
+    <div class="ml-auto flex items-center gap-2.5">
+      <Button data-tutorial="run-request" variant="outline" @click="emit('show-request')">
+        <Braces class="size-3.5" /> Show request
+      </Button>
+      <Button variant="outline" @click="emit('cancel')">Cancel</Button>
+      <Button data-tutorial="run-submit" :disabled="props.running" @click="emit('run')">
+        <Play class="size-3.5" /> {{ props.running ? 'Starting…' : 'Run' }}
+      </Button>
+    </div>
   </div>
 </template>
