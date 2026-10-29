@@ -75,6 +75,10 @@ describe('place names in the desktop', () => {
     expect(useRealmNodes().displayName('node1aaaa0001')).toBe('Giessen storage')
     desktop.on = true
     expect(useRealmNodes().displayName('node1aaaa0001')).toBe('Giessen storage, Giessen')
+    // The given name alone, without the place the desktop adds, for a crate's device.
+    expect(useRealmNodes().nodeById('node1aaaa0001')?.given).toBe('Giessen storage')
+    realmInfo.value = { nodes: [node('node1aaaa0002', 'user', {})] }
+    expect(useRealmNodes().nodeById('node1aaaa0002')?.given).toBeNull()
   })
 })
 

@@ -29,7 +29,11 @@ const RunProvenancePanel = compileClientComponent(new URL('./RunProvenancePanel.
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
       displayName: (id: string) => (id === 'node-2' ? 'Giessen' : id),
-      nodes: ref([{ nodeId: 'device-1', info: { labels: { name: 'laptop' } } }]),
+      // `given` is the shared name rule's answer: the realm display name first, then the labels.
+      nodes: ref([
+        { nodeId: 'device-1', info: { labels: { name: 'laptop' } }, given: 'laptop' },
+        { nodeId: 'device-2', info: { labels: { device: 'old-slug' } }, given: 'Microbiology laptop' },
+      ]),
     }),
   },
   '@/lib/config': { featureEnabled: () => false },
@@ -142,6 +146,19 @@ describe('RunProvenancePanel grouped files', () => {
     const mounted = await mountApp(RunProvenancePanel, { props: { run: { inputs, outputs: [] } } })
 
     expect(content(mounted.root)).toContain('from a device')
+    mounted.app.unmount()
+  })
+
+  it('names the device by its realm display name and the input by its stored file name, still linked', async () => {
+    const inputs = [stored('laptop', 'inputs/genome.fasta', '5400000', { device: 'device-2', name: 'genome' })]
+    const mounted = await mountApp(RunProvenancePanel, { props: { run: { inputs, outputs: [] } } })
+    const text = content(mounted.root)
+
+    expect(text).toContain('from Microbiology laptop')
+    expect(text).not.toContain('old-slug')
+    expect(text).not.toContain('from a device')
+    const name = nodes(mounted.root).find((node) => node.tag === 'a' && content(node).trim() === 'genome.fasta')
+    expect(name).toBeTruthy()
     mounted.app.unmount()
   })
 })

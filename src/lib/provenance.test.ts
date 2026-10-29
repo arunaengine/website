@@ -120,6 +120,20 @@ describe('provenance graph', () => {
     expect(graph.boxes['dataset:d1']!.pending.map((hop) => hop.kind === 'version' && hop.id)).toEqual([arn('genome.gff3', V2)])
   })
 
+  it('names a run input by its stored file name, not by the input name the crate gives it', () => {
+    const record = {
+      '@graph': [
+        { '@id': '#run-01JOB', '@type': 'CreateAction', name: 'Bakta', object: [{ '@id': '#in' }], result: [{ '@id': '#out' }] },
+        { '@id': '#in', '@type': 'MediaObject', name: 'genome', contentUrl: [arn('inputs/genome.fasta', V1)] },
+        { '@id': '#out', '@type': 'MediaObject', name: 'genome.gff3', contentUrl: ['s3://lab/genome.gff3'] },
+      ],
+    }
+    const graph = emptyGraph()
+    startDataset(graph, 'Bakta run', 'd1', record)
+
+    expect(graph.boxes['run:01JOB']!.pending).toEqual([{ kind: 'version', id: arn('inputs/genome.fasta', V1), name: 'genome.fasta', digest: '#in', role: 'Input file' }])
+  })
+
   it('keeps a run record\'s inputs through its run when the result has no exact version', () => {
     const record = {
       '@graph': [

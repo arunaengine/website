@@ -137,10 +137,9 @@ const savedTo = computed(() => {
   return links.every((link) => link.kind === 's3' && link.bucketId === first.bucketId && link.prefix === first.prefix) ? first : null
 })
 
-// The name a device was enrolled with, if the realm lists one.
+// The device's name by the shared rule (its realm display name first), if the realm lists one.
 function deviceName(nodeId: string): string {
-  const labels = realmNodes.value.find((node) => node.nodeId === nodeId)?.info?.labels ?? {}
-  return labels['name'] || labels['display_name'] || labels['device'] || ''
+  return realmNodes.value.find((node) => node.nodeId === nodeId)?.given ?? ''
 }
 
 function inputNote(row: FileRow): string {
@@ -163,10 +162,12 @@ function toggle(key: string) {
 type ListRow = { kind: 'file'; key: string; row: FileRow; label: string; nested: boolean } | { kind: 'group'; key: string; group: FileGroup }
 
 // A file reads by its name without the path; a grouped file by its path below the shared folder.
+// The stored file's own name ("genome.fasta") says more than the input's name ("genome").
 function fileLabel(file: RunCrateFileRef, group?: FileGroup): string {
   const key = parseDataIdentity(file, s3.endpoint.value).s3?.key
   if (group && key?.startsWith(group.folder)) return key.slice(group.folder.length)
-  return file.name.split('/').filter(Boolean).pop() ?? file.name
+  const stored = key?.split('/').filter(Boolean).pop()
+  return stored || (file.name.split('/').filter(Boolean).pop() ?? file.name)
 }
 
 function listRows(files: RunCrateFileRef[]): ListRow[] {

@@ -19,6 +19,8 @@ export interface RealmNodeDisplay {
   label: string
   /** The label without the location the desktop adds to it. */
   name?: string
+  /** The name the node was given (display name first, then its name labels); null without one. */
+  given?: string | null
   /** Hover text for the label: the node id, or kind and short id in the desktop. */
   title?: string
   s3Url: string | null
@@ -76,6 +78,7 @@ export function useRealmNodes() {
         info: node.info,
         label: desktop ? placeName(node, thisComputer) : nodeLabel(node),
         name: desktop ? plainName(node, thisComputer) : nodeLabel(node),
+        given: givenName(node),
         title: desktop ? `${kindLabel[node.kind]} ${truncateMiddle(node.node_id, 8, 4)}` : node.node_id,
         // The connected node's own S3 endpoint comes from /info even when the
         // node has not published a realm record yet.

@@ -58,13 +58,24 @@ function fileNamed(id: string, kind: BoxKind, role: string, name: string, extra:
   return box(id, kind, role, last, last === name ? extra : { ...extra, path: name })
 }
 
+// The last part of the key a versioned id names; null for any other id.
+function keyName(id: string): string | null {
+  const arn = /s3\/[^/]+\/(.+)@[0-9A-Z]{26}$/.exec(id)
+  if (!arn) return null
+  const key = decodeURIComponent(arn[1])
+  return key.split('/').pop() || key
+}
+
+// A run input's box name: the stored file's name ("genome.fasta") for a bare input name
+// ("genome"); a container path keeps its own name, whose last part is the title anyway.
+function inputName(input: { name: string; exact: string | null }): string {
+  return input.name.includes('/') || !input.exact ? input.name : (keyName(input.exact) ?? input.name)
+}
+
 /** The last part of a key in a versioned id, or a short form of any other id. */
 export function shortName(id: string): string {
-  const arn = /s3\/[^/]+\/(.+)@[0-9A-Z]{26}$/.exec(id)
-  if (arn) {
-    const key = decodeURIComponent(arn[1])
-    return key.split('/').pop() || key
-  }
+  const key = keyName(id)
+  if (key) return key
   const tail = id.replace(DATA_PREFIX, '')
   return tail.length > 20 ? `${tail.slice(0, 8)}…${tail.slice(-6)}` : tail
 }
@@ -172,7 +183,7 @@ function seedRun(graph: Graph, action: Record<string, unknown>, crate: unknown):
   graph.boxes[id] ??= box(id, 'run', 'Run', typeof action.name === 'string' ? action.name : `Run ${shortName(runId)}`)
   graph.seen[id] = id
   for (const input of runInputs(crate).parts) {
-    if (input.exact) graph.boxes[id].pending.push({ kind: 'version', id: input.exact, name: input.name, digest: input.id, role: 'Input file' })
+    if (input.exact) graph.boxes[id].pending.push({ kind: 'version', id: input.exact, name: inputName(input), digest: input.id, role: 'Input file' })
     else add(graph, id, fileNamed(input.id, 'unversioned', 'Input file', input.name, { detail: 'No exact version recorded' }))
   }
   return graph.boxes[id]
@@ -260,7 +271,7 @@ async function follow(graph: Graph, boxId: string, hop: Hop, readers: Readers, c
     else created.detail = runRecordDetail(run.run_crate_status)
     add(graph, boxId, created)
     for (const input of parts) {
-      if (input.exact) created.pending.push({ kind: 'version', id: input.exact, name: input.name, digest: input.id, role: 'Input file' })
+      if (input.exact) created.pending.push({ kind: 'version', id: input.exact, name: inputName(input), digest: input.id, role: 'Input file' })
       else add(graph, id, fileNamed(input.id, 'unversioned', 'Input file', input.name, { detail: 'No exact version recorded' }))
     }
   } catch (cause) {
