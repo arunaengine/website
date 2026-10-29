@@ -71,9 +71,7 @@ const anything = computed(
     <Badge v-if="verdict" :variant="verdictVariant" size="sm" :title="verdict.explanation">
       {{ verdict.label }}
     </Badge>
-    <Badge v-if="placement.logicalState" variant="outline" size="sm" title="Logical state">
-      {{ logicalStateLabel }}
-    </Badge>
+    <!-- The run header shows the state already; here only the placement facts follow. -->
     <template v-if="!compact">
       <span v-if="placement.executorKind" class="text-muted-foreground">
         executor <span class="font-mono text-foreground">{{ placement.executorKind }}</span>

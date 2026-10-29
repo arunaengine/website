@@ -810,8 +810,8 @@ describe('distributed job detail components', () => {
 
     expect(tagged.errors).toEqual([])
     expect(taggedText).toContain('Compute-to-data')
-    // The logical state is worded by the shared job state map, never raw.
-    expect(taggedText).toContain('Succeeded')
+    // The run header already shows the state, so the tags do not repeat it.
+    expect(taggedText).not.toContain('Succeeded')
     expect(taggedText).not.toContain('succeeded')
     expect(taggedText).toContain('docker')
     expect(taggedText).toContain('region=eu-central')
@@ -1279,8 +1279,8 @@ describe('distributed job detail components', () => {
       expect(mounted.errors).toEqual([])
       expect(text.indexOf('Progress')).toBeLessThan(text.indexOf('Placement'))
       expect(text.indexOf('Placement')).toBeLessThan(text.indexOf('Executions'))
-      expect(text.indexOf('Executions')).toBeLessThan(text.indexOf('Output'))
-      expect(text.indexOf('Outputs')).toBeLessThan(text.indexOf('Request'))
+      expect(text.indexOf('Executions')).toBeLessThan(text.indexOf('Log'))
+      expect(text.indexOf('Files')).toBeLessThan(text.indexOf('Request'))
       expect(text).toContain('2 cores')
       mounted.app.unmount()
     }

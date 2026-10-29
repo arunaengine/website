@@ -766,7 +766,7 @@ async function confirmDelete() {
         </section>
 
         <section data-tutorial="run-executors" class="space-y-3">
-          <h3 class="font-display text-sm font-semibold text-aruna-navy">Output</h3>
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Log</h3>
           <p v-if="!task.logs?.length && !nativeResult" class="text-xs text-muted-foreground">Nothing captured yet.</p>
           <div v-for="(executor, i) in task.executors" :key="i" class="surface space-y-3 p-4">
             <div class="flex items-start justify-between gap-3">
@@ -818,7 +818,7 @@ async function confirmDelete() {
 
         <!-- Outputs and the run dataset -->
         <section data-tutorial="run-artifacts" class="space-y-3">
-          <h3 class="font-display text-sm font-semibold text-aruna-navy">Outputs</h3>
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Files</h3>
 
           <div v-if="outputRows.length" class="space-y-1.5">
             <div class="overflow-x-auto rounded-md border border-border">
