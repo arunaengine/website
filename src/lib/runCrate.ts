@@ -11,6 +11,17 @@ export interface RunCrateFileRef {
   contentSize?: string
   contentUrl?: string
   contentUrls?: string[]
+  /** A DOI or other identifier the crate gives the file, such as for a database release. */
+  identifier?: string
+  /** The release or version the crate names for the file. */
+  version?: string
+}
+
+/** Where the run executed: the node, its executor kind and any reason the crate records. */
+export interface RunCrateSite {
+  nodeId?: string
+  kind?: string
+  reason?: string
 }
 
 export interface RunCrateAgent {
@@ -51,6 +62,9 @@ export interface RunCrateModel {
   error?: string
   agent?: RunCrateAgent
   workspaceBucket?: string
+  site?: RunCrateSite
+  cpuCores?: string
+  ramBytes?: string
   inputs: RunCrateFileRef[]
   outputs: RunCrateFileRef[]
 }
@@ -98,7 +112,8 @@ function refIdsOf(value: unknown): string[] {
 }
 
 const WORKSPACE_PREFIX = 'workspace/'
-const WORKSPACE_PROPERTY_ID = 'https://w3id.org/aruna/terms/workspace-bucket'
+const ARUNA_TERMS = 'https://w3id.org/aruna/terms/'
+const WORKSPACE_PROPERTY_ID = `${ARUNA_TERMS}workspace-bucket`
 const WFRUN = 'https://w3id.org/ro/terms/workflow-run#'
 
 function fileRef(id: string, byId: Map<string, Record<string, unknown>>): RunCrateFileRef {
@@ -112,6 +127,8 @@ function fileRef(id: string, byId: Map<string, Record<string, unknown>>): RunCra
     contentSize: stringOf(entity?.contentSize),
     contentUrl: primaryContentUrl(contentUrlValues(entity?.contentUrl)),
     contentUrls: contentUrlValues(entity?.contentUrl),
+    identifier: stringOf(entity?.identifier),
+    version: stringOf(entity?.version),
   }
 }
 
@@ -149,15 +166,25 @@ function containerOf(
     : undefined
 }
 
-function workspaceOf(
+// One additional property of the action by its Aruna term, such as the workspace bucket.
+function propertyOf(
   value: unknown,
   byId: Map<string, Record<string, unknown>>,
+  propertyId: string,
 ): string | undefined {
   for (const id of refIdsOf(value)) {
     const property = byId.get(id)
-    if (stringOf(property?.propertyID) === WORKSPACE_PROPERTY_ID) return stringOf(property?.value)
+    if (stringOf(property?.propertyID) === propertyId) return stringOf(property?.value)
   }
   return undefined
+}
+
+function siteOf(value: unknown, byId: Map<string, Record<string, unknown>>): RunCrateSite | undefined {
+  const id = idOf(value)
+  const place = id ? byId.get(id) : undefined
+  if (!place) return undefined
+  const site = { nodeId: stringOf(place.identifier), kind: stringOf(place.additionalType), reason: stringOf(place.description) }
+  return site.nodeId || site.kind || site.reason ? site : undefined
 }
 
 // Actual crates carry the schema.org local name; tolerate full IRIs too.
@@ -215,7 +242,10 @@ export function parseRunCrate(crate: unknown, documentPath: string): RunCrateMod
     endTime: stringOf(action.endTime),
     error: stringOf(action.error),
     agent,
-    workspaceBucket: workspaceOf(action.additionalProperty, byId),
+    workspaceBucket: propertyOf(action.additionalProperty, byId, WORKSPACE_PROPERTY_ID),
+    site: siteOf(action.location, byId),
+    cpuCores: propertyOf(action.additionalProperty, byId, `${ARUNA_TERMS}cpu-cores`),
+    ramBytes: propertyOf(action.additionalProperty, byId, `${ARUNA_TERMS}ram-bytes`),
     inputs: refIdsOf(action.object).map((id) => fileRef(id, byId)),
     outputs: refIdsOf(action.result).map((id) => fileRef(id, byId)),
   }
