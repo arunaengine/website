@@ -30,7 +30,8 @@ const saving = ref<string | null>(null)
 // Each save has its number; choosing a node makes the ones before it stale.
 let saveRun = 0
 
-const nodes = computed(() => realmInfo.value?.nodes ?? [])
+// Placement attributes belong to the realm's nodes; a device is its owner's computer.
+const nodes = computed(() => (realmInfo.value?.nodes ?? []).filter((node) => node.kind !== 'user'))
 const options = computed(() =>
   nodes.value.map((node) => ({ value: node.node_id, label: realmNodes.displayName(node.node_id) })),
 )

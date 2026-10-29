@@ -11,6 +11,7 @@ const realmInfo = ref({
   nodes: [
     { node_id: 'n1', placement: { location: 'giessen' }, info: { labels: {} } },
     { node_id: 'n2', placement: { location: 'marburg' }, info: { labels: {} } },
+    { node_id: 'laptop', kind: 'user', placement: { location: 'default' }, info: { labels: {} } },
   ],
 })
 
@@ -53,6 +54,14 @@ beforeEach(() => {
 })
 
 describe('NodeAttributesSection', () => {
+  it('offers the realm nodes only, no device', async () => {
+    const { root } = await mountApp(section)
+    await flush()
+    const options = element(root, (node) => node.tag === 'select').props.options as { value: string }[]
+
+    expect(options.map((option) => option.value)).toEqual(['n1', 'n2'])
+  })
+
   it('starts another node without the wait or the result of a save still on its way', async () => {
     mutateRealmPlacement.mockResolvedValueOnce(undefined)
     let read: () => void = () => {}
