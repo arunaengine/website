@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import Badge from '@/components/ui/Badge.vue'
-import NodeLabel from '@/components/ui/NodeLabel.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
 import LocalNodeDetails from './LocalNodeDetails.vue'
 import NodeNameEdit from './NodeNameEdit.vue'
-import { nodeName, statusVariant } from './node-display'
+import { nodeName, statusProblem, statusVariant } from './node-display'
 import { nodeApiBase, type NodeProbe } from './node-probe'
 import type { RealmNodeInfo } from '@/lib/api'
 import { formatBytes, formatNumber } from '@/lib/utils'
@@ -48,7 +48,8 @@ defineProps<{
     <div class="border-t border-border/70 pt-3">
       <h2 class="font-display text-sm font-semibold text-aruna-navy">Record placement</h2>
       <dl v-if="node.placement" class="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-        <div>
+        <!-- "default" names no place, so only a real location shows. -->
+        <div v-if="node.placement.location && node.placement.location !== 'default'">
           <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Location</dt>
           <dd class="mt-0.5 text-xs text-foreground/90">{{ node.placement.location }}</dd>
         </div>
@@ -79,7 +80,8 @@ defineProps<{
     <div>
       <h2 class="font-display text-sm font-semibold text-aruna-navy">Node id</h2>
       <div class="mt-1 flex items-start gap-2 rounded-md border border-border/70 bg-background/60 px-2.5 py-1.5">
-        <NodeLabel :node-id="node.node_id" copy class="flex-1 text-foreground/90" />
+        <span class="hash min-w-0 flex-1 break-all text-xs text-foreground/90">{{ node.node_id }}</span>
+        <CopyButton :value="node.node_id" label="Copy node id" />
       </div>
     </div>
 
@@ -114,7 +116,8 @@ defineProps<{
       <div class="border-t border-border/70 pt-3">
         <div class="mb-2 flex items-center gap-2">
           <span class="text-[10px] font-semibold uppercase tracking-wider text-primary">{{ isLocal ? 'This node' : 'Node details' }}</span>
-          <Badge size="sm" :variant="statusVariant(probe.info.node.status)" class="uppercase">{{ probe.info.node.status || 'unknown' }}</Badge>
+          <!-- A fine status says nothing; only a problem is named. -->
+          <Badge v-if="statusProblem(probe.info.node.status)" size="sm" :variant="statusVariant(probe.info.node.status)" class="uppercase">{{ statusProblem(probe.info.node.status)!.word }}</Badge>
         </div>
         <LocalNodeDetails
           :info="probe.info"

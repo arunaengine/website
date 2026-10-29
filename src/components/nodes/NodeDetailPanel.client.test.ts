@@ -19,7 +19,7 @@ const EditStub = defineComponent({
 const NodeDetailPanel = compileClientComponent(new URL('./NodeDetailPanel.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/Badge.vue': moduleDefault(Empty),
-  '@/components/ui/NodeLabel.vue': moduleDefault(Empty),
+  '@/components/ui/CopyButton.vue': moduleDefault(Empty),
   './LocalNodeDetails.vue': moduleDefault(Empty),
   './NodeNameEdit.vue': moduleDefault(EditStub),
   './node-display': NodeDisplay,

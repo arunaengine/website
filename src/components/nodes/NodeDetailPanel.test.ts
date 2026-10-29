@@ -1,8 +1,11 @@
 import { createSSRApp, h } from 'vue'
 import { renderToString } from '@vue/server-renderer'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { RealmNodeInfo } from '@/lib/api'
-import NodeDetailPanel from './NodeDetailPanel.vue'
+
+// The interface list has its own tests; here only the panel's own lines count.
+vi.mock('./LocalNodeDetails.vue', () => ({ default: { render: () => null } }))
+const NodeDetailPanel = (await import('./NodeDetailPanel.vue')).default
 
 const node: RealmNodeInfo = {
   node_id: 'server-node',
@@ -43,5 +46,29 @@ describe('node details', () => {
 
     const admin = await renderToString(createSSRApp({ render: () => h(NodeDetailPanel, { node, rename: async () => {} }) }))
     expect(admin).toContain('aria-label="Rename Giessen storage"')
+  })
+
+  it('shows the node id itself with a copy button, never the display name', async () => {
+    const html = await renderToString(createSSRApp({ render: () => h(NodeDetailPanel, { node: { ...node, node_id: 'b4f1c0de9a7e44d1a3c5f0e2b7d9c8a1f3e5d7c9b1a3f5e7d9c1b3a5f7e9d1c3', display_name: 'Giessen storage 1' }, hideName: true }) }))
+    const box = html.slice(html.indexOf('>Node id<'))
+    // The id is the text people read and copy, not only a tooltip.
+    const shown = box.replace(/<[^>]+>/g, ' ')
+    expect(shown).toContain('b4f1c0de9a7e44d1a3c5f0e2b7d9c8a1f3e5d7c9b1a3f5e7d9c1b3a5f7e9d1c3')
+    expect(shown).not.toContain('Giessen storage 1')
+    expect(box).toContain('aria-label="Copy node id"')
+  })
+
+  it('names the node status only when it is a problem, and hides a "default" location', async () => {
+    const info = { node: { status: 'available' } } as never
+    const placed = { ...node, placement: { location: 'default', weight: 100, full: false, draining: false } }
+    const fine = await renderToString(createSSRApp({ render: () => h(NodeDetailPanel, { node: placed, probe: { state: 'ok', info } as never }) }))
+    const text = fine.replace(/<!--[^>]*-->/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+    expect(text).not.toMatch(/available/i)
+    expect(text).not.toContain('default')
+    expect(text).toContain('Weight 100')
+    expect(text).toContain('Draining no')
+
+    const draining = await renderToString(createSSRApp({ render: () => h(NodeDetailPanel, { node, probe: { state: 'ok', info: { node: { status: 'draining' } } } as never }) }))
+    expect(draining.replace(/<[^>]+>/g, ' ')).toContain('draining')
   })
 })
