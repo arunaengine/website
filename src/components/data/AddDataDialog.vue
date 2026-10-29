@@ -97,6 +97,7 @@ function onImportsCreated() {
     :group-id="groupId"
     :basket="basket"
     :existing-keys="existingKeys"
+    :basket-shown="tab !== 'list' && tab !== 'databases'"
     @update:open="(v: boolean) => emit('update:open', v)"
     @staged="emit('staged')"
   >

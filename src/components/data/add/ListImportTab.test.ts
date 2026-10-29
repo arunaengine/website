@@ -11,6 +11,7 @@ const source = { groupSel: ref('g1'), connectorSel: ref('c1'), connectorOptions:
 const Slotted = (tag: string) => defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()) })
 const component = compileClientComponent(new URL('./ListImportTab.vue', import.meta.url), {
   vue: VueRuntime,
+  '@lucide/vue': { FileUp: Slotted('span') },
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
   '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
   '@/components/ui/Input.vue': moduleDefault(defineComponent({
@@ -87,6 +88,7 @@ describe('import from a list', () => {
     ;(element(root, (node) => node.props['aria-label'] === 'List file').props.onChange as (event: unknown) => void)({ target: { files: [file] } })
     await new Promise((resolve) => setTimeout(resolve, 0))
     await flush()
+    expect(content(root)).toContain('run1.csv, kept as lists/run1.csv')
     const pressed = click(button(root, 'Start import'))
     await flush()
     await change(labelled(root, 'Use of url'), 'skip')

@@ -15,6 +15,7 @@ import {
   rowPasses, rowsOf, unknownColumns, type ColumnChoice, type ColumnUse,
 } from '@/lib/tableImport'
 import { errorMessage } from '@/lib/utils'
+import { FileUp } from '@lucide/vue'
 
 const props = defineProps<{ bucket: string; source: ConnectorSource }>()
 const emit = defineEmits<{ started: [jobId: string] }>()
@@ -29,6 +30,7 @@ const link = ref('')
 const listBucket = ref(props.bucket)
 const listKey = ref('')
 const file = ref<File | null>(null)
+const picker = ref<HTMLInputElement | null>(null)
 const presetName = ref('')
 
 const text = ref('')
@@ -246,7 +248,11 @@ const SELECT = 'h-9 w-full rounded-md border border-input bg-field px-2 text-sm'
         <span class="text-muted-foreground">/</span>
         <Input :model-value="listKey" @change="listKey = ($event.target as HTMLInputElement).value" class="min-w-0 flex-1 font-mono text-xs" placeholder="lists/run1.csv" aria-label="Key of the list" />
       </template>
-      <input v-else type="file" accept=".csv,.tsv,.txt,.gz" aria-label="List file" class="text-xs" @change="file = ($event.target as HTMLInputElement).files?.[0] ?? null" />
+      <template v-else>
+        <Button variant="outline" size="sm" @click="picker?.click()"><FileUp class="h-3.5 w-3.5" /> Choose a list file</Button>
+        <span class="min-w-0 truncate text-xs text-muted-foreground">{{ file ? `${file.name}, kept as lists/${file.name}` : 'No file chosen' }}</span>
+        <input ref="picker" type="file" accept=".csv,.tsv,.txt,.gz" aria-label="List file" class="hidden" @change="file = ($event.target as HTMLInputElement).files?.[0] ?? null" />
+      </template>
       <select v-model="presetName" :class="[SELECT, 'w-auto']" aria-label="Preset">
         <option value="">Preset: none</option>
         <option v-for="preset in PRESETS" :key="preset.name" :value="preset.name">Preset: {{ preset.name }}</option>

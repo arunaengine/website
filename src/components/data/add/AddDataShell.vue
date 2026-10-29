@@ -25,14 +25,16 @@ import { ref } from 'vue'
 import { AlertTriangle, CloudDownload, FolderInput, Upload, X } from '@lucide/vue'
 import { STRATEGY_OPTIONS } from './useConnectorSource'
 
-const props = defineProps<{
+// A tab that finishes on its own (list import, databases) hides the basket and its Add.
+const props = withDefaults(defineProps<{
   open: boolean
   bucket: string
   prefix: string
   groupId: string | null
   basket: ReturnType<typeof useBuilderBasket>
   existingKeys: ReadonlySet<string>
-}>()
+  basketShown?: boolean
+}>(), { basketShown: true })
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
   (e: 'staged'): void
@@ -129,7 +131,7 @@ function rowEditable(row: BuilderRow): boolean {
       <slot />
 
       <!-- Basket -->
-      <section class="overflow-hidden rounded-md border border-border">
+      <section v-if="basketShown" class="overflow-hidden rounded-md border border-border">
         <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/20 px-3 py-2">
           <div class="flex items-center gap-2">
             <FolderInput class="h-4 w-4 text-primary" />
@@ -264,6 +266,7 @@ function rowEditable(row: BuilderRow): boolean {
       <DialogFooter class="sm:justify-between">
         <DialogClose as-child><Button variant="outline">Close</Button></DialogClose>
         <Button
+          v-if="basketShown"
           :disabled="!basket.canSubmit.value || writesDisabled"
           :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
           @click="submitAll"
