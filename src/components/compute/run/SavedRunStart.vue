@@ -14,6 +14,9 @@ import { Star } from '@lucide/vue'
 const { savedStart, inputs, outputRows, openInputs, resultsChosen, bucketOptions, envRows, answerInput, chooseResults, editSaved } = injectCustomRun()
 
 const run = computed(() => savedStart.value?.run ?? null)
+const image = computed(() => run.value?.task.executors[0]?.image ?? '')
+// The tool by its image name: the last path part, without registry, tag or digest.
+const toolName = computed(() => image.value.split('@')[0]!.split('/').pop()!.replace(/:[^:]*$/, '') || image.value)
 const nameOf = (path: string) => run.value?.task.inputs?.find((input) => input.path === path)?.name || path
 const asked = computed(() => run.value?.ask.inputs ?? [])
 // Secret values are never saved, so each start asks for them.
@@ -49,7 +52,7 @@ const resultsFolder = ref('')
       <Star class="mt-1 h-4 w-4 text-primary" />
       <div class="min-w-0 flex-1">
         <h2 class="font-display text-base font-semibold text-aruna-navy">{{ run.name }}</h2>
-        <p class="font-mono text-xs text-muted-foreground">Saved on this computer, {{ run.task.executors[0]?.image }}</p>
+        <p class="text-xs text-muted-foreground" :title="image">Saved on this computer, {{ toolName }}</p>
       </div>
       <Button variant="outline" size="sm" @click="editSaved">Edit saved run</Button>
     </header>
