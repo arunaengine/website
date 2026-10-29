@@ -121,7 +121,7 @@ describe('node outage presentation', () => {
     expect(predicate).not.toContain('node.configured')
     expect(predicate).not.toContain('connection_status')
     expect(source).toContain('The browser API probe failed')
-    expect(source).toContain('present in DHT')
+    expect(source).toContain('nodes\'} online')
   })
 })
 
@@ -209,7 +209,9 @@ describe('device summary', () => {
     // Devices are owner-bound computers: they stay out of the placement buckets.
     expect(text).toContain('eu-west=1')
     expect(text).not.toContain('(not in placement map)')
-    expect(text).toContain('1 / 1 present in DHT')
+    // A plain line instead of the DHT term, with the replication beside it.
+    expect(text).toContain('1 of 1 node online, replication ×2')
+    expect(text).not.toContain('present in DHT')
   })
 
   it('claims no activity for a device it has never heard from', async () => {

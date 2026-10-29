@@ -195,9 +195,12 @@ const sortedNodes = computed(() =>
   ),
 )
 
-const connectedCount = computed(
-  () => sortedNodes.value.filter((node) => node.connection_status === 'connected').length,
-)
+// Online as the cards say it: the node is present in the realm.
+const realmLine = computed(() => {
+  const online = cardNodes.value.filter((node) => node.present).length
+  const total = cardNodes.value.length
+  return `${online} of ${total} ${total === 1 ? 'node' : 'nodes'} online, replication ${replicationLabel.value}`
+})
 const replicationLabel = computed(() => {
   const factor = realmInfo.value?.metadata_replication.default_replication_factor
   if (factor === null) return 'all eligible nodes'
@@ -333,14 +336,7 @@ watch(
               </div>
             </div>
           </div>
-          <div class="flex items-center gap-2">
-            <Badge variant="outline" class="tabular-nums">
-              {{ connectedCount }} / {{ sortedNodes.length }} present in DHT
-            </Badge>
-            <Badge variant="outline" class="tabular-nums">
-              replication {{ replicationLabel }}
-            </Badge>
-          </div>
+          <p class="text-xs tabular-nums text-muted-foreground">{{ realmLine }}</p>
         </div>
       </section>
 
