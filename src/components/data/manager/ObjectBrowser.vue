@@ -551,29 +551,6 @@ async function onDrop(event: DragEvent) {
         {{ writeRestrictionMessage }}
       </p>
 
-      <!-- Remote bucket whose endpoint the browser cannot use: an honest
-           info panel instead of a broken listing. -->
-      <div v-if="remoteBlocked" class="surface p-8 text-center">
-        <CloudOff class="mx-auto h-6 w-6 text-muted-foreground" />
-        <p class="mt-3 text-sm font-medium text-foreground">
-          Hosted on {{ realmNodes.displayName(remoteNodeId) }}, browsing is unavailable from this origin.
-        </p>
-        <p class="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
-          {{
-            remoteEndpointMissing
-              ? 'The node does not publish an S3 endpoint, so its objects cannot be listed here.'
-              : 'The node’s S3 endpoint is unreachable from this browser, or it does not allow cross-origin browsing.'
-          }}
-        </p>
-        <div class="mt-4 flex justify-center gap-2">
-          <RefreshButton v-if="!remoteEndpointMissing" :busy="retrySpinning" label="Try again" @click="onRetryObjects" />
-          <Button v-if="showSyncButton && desktop && currentBindSource && !currentLinkedFolder" size="sm" @click="emit('sync-to-computer', currentBindSource)">
-            <FolderSync class="h-3.5 w-3.5" /> Link a local folder
-          </Button>
-        </div>
-      </div>
-
-      <template v-else>
       <div
         data-tour="bucket-dropzone"
         class="surface overflow-hidden"
@@ -599,6 +576,27 @@ async function onDrop(event: DragEvent) {
           @open="openHit"
           @back="backToFolder"
         />
+        <!-- Remote bucket whose endpoint the browser cannot use: an honest info panel instead of a
+             broken listing. The whole-bucket search goes through the REST API, so it stays. -->
+        <div v-else-if="remoteBlocked" class="p-8 text-center">
+          <CloudOff class="mx-auto h-6 w-6 text-muted-foreground" />
+          <p class="mt-3 text-sm font-medium text-foreground">
+            Hosted on {{ realmNodes.displayName(remoteNodeId) }}, browsing is unavailable from this origin.
+          </p>
+          <p class="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
+            {{
+              remoteEndpointMissing
+                ? 'The node does not publish an S3 endpoint, so its objects cannot be listed here.'
+                : 'The node’s S3 endpoint is unreachable from this browser, or it does not allow cross-origin browsing.'
+            }}
+          </p>
+          <div class="mt-4 flex justify-center gap-2">
+            <RefreshButton v-if="!remoteEndpointMissing" :busy="retrySpinning" label="Try again" @click="onRetryObjects" />
+            <Button v-if="showSyncButton && desktop && currentBindSource && !currentLinkedFolder" size="sm" @click="emit('sync-to-computer', currentBindSource)">
+              <FolderSync class="h-3.5 w-3.5" /> Link a local folder
+            </Button>
+          </div>
+        </div>
         <template v-else>
         <Notice v-if="listError && listAuthError" tone="warning" class="rounded-none border-x-0 border-t-0">
           <p>The temporary S3 session was rejected. Close it, then explicitly open this node and group again.</p>
@@ -819,16 +817,17 @@ async function onDrop(event: DragEvent) {
             </Button>
           </div>
         </div>
+        </template>
         <button
-          v-if="searchText.trim().length >= 2"
+          v-if="!wholeBucket && searchText.trim().length >= 2"
           type="button"
           class="flex w-full items-center gap-2 border-t border-border px-4 py-2 text-left text-xs text-primary hover:bg-muted/50"
           @click="searchBucket"
         >
           <Search class="h-3.5 w-3.5" /> Search the whole bucket for "{{ searchText.trim() }}"
         </button>
-        </template>
       </div>
+      <template v-if="!remoteBlocked">
       <TransferDialog
         v-model:open="transferOpen"
         :mode="transferMode"

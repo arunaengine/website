@@ -839,4 +839,15 @@ describe('the one search box', () => {
     expect(element(root, (node) => node.tag === 'table')).toBeTruthy()
     expect(box().props.modelValue).toBe('')
   })
+
+  it('keeps the box and the whole-bucket search when the bucket cannot be listed here', async () => {
+    const { root, type, enter } = await setup({ remoteBlocked: ref(true), remoteEndpointMissing: ref(true), remoteNodeId: ref('node-2') })
+    expect(content(root)).toContain('browsing is unavailable from this origin')
+    expect(() => element(root, (node) => node.tag === 'table')).toThrow()
+
+    await type('coli')
+    expect(content(root)).toContain('Search the whole bucket for "coli"')
+    await enter()
+    expect(content(root)).toContain('whole bucket reef coli')
+  })
 })
