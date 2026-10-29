@@ -153,6 +153,10 @@ export interface RealmNodePublishedInfo {
     documents_held?: number
     load_permille?: number
     heartbeat_at_ms: number
+    // Background jobs from the node's heartbeat, and the staging imports among them; absent
+    // while the answering node holds no heartbeat from it.
+    jobs_running?: number
+    imports_running?: number
   }
   updated_at_ms: number
 }
@@ -172,6 +176,8 @@ export interface RealmNodeInfo {
   // Unix ms of a device's last authenticated contact with the answering node.
   // Devices only, and absent until that node has seen one.
   last_seen_ms?: number
+  // Realm-administered name for people; absent when unset. Never an identifier.
+  display_name?: string | null
   placement?: RealmNodePlacement | null
   // Latest self-published node document; null until the node publishes one.
   info?: RealmNodePublishedInfo | null

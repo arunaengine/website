@@ -1,5 +1,30 @@
 import type { RealmNodeInfo } from '@/lib/api'
 import { stateVariant, toneVariant, type BadgeVariant, type StateTone } from '@/lib/stateBadge'
+import { nodeApiBase } from './node-probe'
+
+/** The name a node was given: the realm's display name, then its name labels; null without one. */
+export function givenName(node: Pick<RealmNodeInfo, 'display_name' | 'info'>): string | null {
+  const labels = node.info?.labels ?? {}
+  return node.display_name || labels['name'] || labels['display_name'] || labels['device'] || null
+}
+
+/**
+ * A node's name for people: the realm's display name, then its own name labels, then the first part
+ * of its API host ("api.node-2.example.org" is "node-2"). Never its id.
+ */
+export function nodeName(node: Pick<RealmNodeInfo, 'kind' | 'display_name' | 'info' | 'rest_url'>): string {
+  const named = givenName(node)
+  if (named) return named
+  let host = ''
+  try {
+    host = new URL(nodeApiBase(node as RealmNodeInfo) ?? '').hostname
+  } catch {
+    // No address published yet.
+  }
+  if (/^[\d.]+$|:/.test(host)) return host
+  const parts = host.split('.').filter(Boolean)
+  return (parts[0] === 'api' ? parts[1] : parts[0]) || (node.kind === 'user' ? 'Device' : 'Unnamed node')
+}
 
 export type { BadgeVariant }
 

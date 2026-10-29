@@ -50,7 +50,7 @@ describe('place names in the desktop', () => {
     const { displayName, nodeById } = useRealmNodes()
 
     expect(displayName('node1aaaa0001')).toBe('node-1, Giessen')
-    expect(displayName('node2bbbb0002')).toBe('node2bbbb0002.example.org, Heidelberg')
+    expect(displayName('node2bbbb0002')).toBe('node2bbbb0002, Heidelberg')
     expect(displayName('device0001aaaa')).toBe('This computer')
     expect(displayName('device0002bbbb')).toBe('lab-laptop')
     expect(nodeById('device0002bbbb')?.title).toMatch(/^device device0/)
@@ -63,8 +63,18 @@ describe('place names in the desktop', () => {
     const { displayName, nodeById } = useRealmNodes()
 
     expect(displayName('node1aaaa0001')).toBe('node-1')
-    expect(displayName('device0001aaaa')).toMatch(/^device /)
+    // A node without a name goes by the first part of its API host, never by its id.
+    expect(displayName('device0001aaaa')).toBe('device0001aaaa')
+    expect(displayName('node2bbbb0002')).toBe('node2bbbb0002')
     expect(nodeById('node1aaaa0001')?.title).toBe('node1aaaa0001')
+  })
+
+  it('names a node by its realm display name first, everywhere', () => {
+    realmInfo.value = { nodes: [{ ...node('node1aaaa0001', 'server', { name: 'node-1' }, 'Giessen'), display_name: 'Giessen storage' }] }
+    desktop.on = false
+    expect(useRealmNodes().displayName('node1aaaa0001')).toBe('Giessen storage')
+    desktop.on = true
+    expect(useRealmNodes().displayName('node1aaaa0001')).toBe('Giessen storage, Giessen')
   })
 })
 
@@ -84,7 +94,7 @@ describe('places to pick', () => {
 
     expect(targets.value.map((node) => [node.nodeId, node.label])).toEqual([
       ['node1aaaa0001', 'node-1, Giessen'],
-      ['node2bbbb0002', 'node2bbbb0002.example.org, Heidelberg'],
+      ['node2bbbb0002', 'node2bbbb0002, Heidelberg'],
       ['device0001aaaa', 'This computer'],
     ])
     expect(isTarget('device0002bbbb')).toBe(false)
@@ -98,6 +108,7 @@ describe('computerName', () => {
     expect(computerName(device({ device: 'Microbiology laptop' }))).toBe('Microbiology laptop')
     expect(computerName(device({ name: 'Lab PC', device: 'old' }))).toBe('Lab PC')
     expect(computerName(device({}))).toBe('This computer')
+    expect(computerName({ ...device({ device: 'old' }), display_name: 'Lab laptop' })).toBe('Lab laptop')
     expect(computerName(undefined)).toBe('This computer')
   })
 })

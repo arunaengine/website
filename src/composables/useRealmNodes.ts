@@ -5,7 +5,7 @@ import { computed } from 'vue'
 import { useAruna } from './useAruna'
 import { useDeviceStatus } from './useDeviceStatus'
 import { nodeApiBase } from '@/components/nodes/node-probe'
-import { kindLabel } from '@/components/nodes/node-display'
+import { givenName, kindLabel, nodeName } from '@/components/nodes/node-display'
 import { isDesktop } from '@/lib/desktop'
 import { truncateMiddle } from '@/lib/utils'
 import type { RealmNodeInfo } from '@/lib/api'
@@ -33,38 +33,21 @@ export interface RealmNodeDisplay {
   executorKinds: string[]
 }
 
-function nodeLabel(node: RealmNodeInfo): string {
-  const labels = node.info?.labels ?? {}
-  const named = labels['name'] || labels['display_name']
-  return named || `${kindLabel[node.kind]} ${truncateMiddle(node.node_id, 8, 4)}`
-}
-
-function hostOf(url: string | null): string | null {
-  try {
-    return url ? new URL(url).host : null
-  } catch {
-    return null
-  }
-}
+const nodeLabel = (node: RealmNodeInfo): string => nodeName(node)
 
 /**
- * This computer's name: the one the realm knows it by (its enrolled device name), else "This
+ * This computer's name: the realm's display name, then the one it was enrolled with, else "This
  * computer". The desktop shell does not hand the portal its stored label or the hostname yet.
  */
-export function computerName(node?: Pick<RealmNodeInfo, 'info'> | null): string {
-  const labels = node?.info?.labels ?? {}
-  return labels['name'] || labels['display_name'] || labels['device'] || THIS_COMPUTER
+export function computerName(node?: Pick<RealmNodeInfo, 'info' | 'display_name'> | null): string {
+  return (node && givenName(node)) || THIS_COMPUTER
 }
 /** The name of a computer without one; a "this computer" badge beside it would say it twice. */
 export const THIS_COMPUTER = 'This computer'
 
-// The desktop names places in words: this computer, a device by its enrolled
-// name, a node by its name or host.
+// The desktop names places in words: this computer, any other node by the name rule.
 function plainName(node: RealmNodeInfo, thisComputer: boolean): string {
-  if (thisComputer) return 'This computer'
-  const labels = node.info?.labels ?? {}
-  const named = labels['name'] || labels['display_name'] || labels['device']
-  return named || (node.kind === 'user' ? 'Device' : (hostOf(nodeApiBase(node)) ?? 'Node'))
+  return thisComputer ? 'This computer' : nodeName(node)
 }
 
 // The plain name, with the node's location when it has one.

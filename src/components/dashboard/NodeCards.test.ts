@@ -29,6 +29,7 @@ async function text(nodes: RealmNodeInfo[], imports = new Map<string, NodeImport
 describe('node cards', () => {
   it('names a node by its label, else by the first part of its API host, never by its id', async () => {
     expect(await text([node({ labels: { name: 'Giessen storage' } })])).toContain('Giessen storage')
+    expect(await text([{ ...node({ labels: { name: 'old label' } }), display_name: 'Giessen storage 1' }])).toContain('Giessen storage 1')
     const shown = await text([node()])
     expect(shown).toContain('node-2')
     expect(shown).not.toContain('12D3KooW')

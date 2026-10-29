@@ -15,6 +15,7 @@ import { useRefresh } from '@/composables/useRefresh'
 import { Plus, X } from '@lucide/vue'
 import type { UserDevice } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
+import { givenName } from '@/components/nodes/node-display'
 
 const DEVICE_STEPS = ['Device', 'Hand off', 'Watch it join']
 const FIRST_STEP = 1
@@ -82,7 +83,7 @@ const rows = computed<DeviceRow[]>(() =>
     const status = device.status === 'enrolled' ? (online ? 'online' : 'unknown') : device.status
     const variant: Variant = status === 'online' ? 'success' : status === 'claimed' ? 'sky' : status === 'pending' ? 'outline' : 'secondary'
     const seen = node?.last_seen_ms ? relativeTime(new Date(node.last_seen_ms).toISOString()) : online ? 'just now' : ''
-    return { id: device.id, name: node?.info?.labels?.['device'] || null, shortId: (device.node_id ?? device.id).slice(0, 8), status, variant, lastSeen: seen }
+    return { id: device.id, name: node ? givenName(node) : null, shortId: (device.node_id ?? device.id).slice(0, 8), status, variant, lastSeen: seen }
   }),
 )
 const confirming = ref('')

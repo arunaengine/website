@@ -3,7 +3,7 @@
 // facts. Devices are summed up in one line, never listed. The Status page adds a Details link.
 import { computed } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
-import { nodeApiBase } from '@/components/nodes/node-probe'
+import { nodeName } from '@/components/nodes/node-display'
 import type { NodeImports } from '@/composables/useNodeImports'
 import type { RealmNodeInfo } from '@/lib/api'
 import { formatCount } from '@/lib/formatCount'
@@ -22,22 +22,6 @@ const props = defineProps<{
   openId?: string
 }>()
 defineEmits<{ details: [nodeId: string] }>()
-
-/** The node's `name` label, else the first part of its API host ("api.node-2.example" is "node-2"). */
-function nodeName(node: RealmNodeInfo): string {
-  const labels = node.info?.labels ?? {}
-  const named = labels['name'] || labels['display_name']
-  if (named) return named
-  let host = ''
-  try {
-    host = new URL(nodeApiBase(node) ?? '').hostname
-  } catch {
-    // No address published yet.
-  }
-  if (/^[\d.]+$|:/.test(host)) return host
-  const parts = host.split('.').filter(Boolean)
-  return (parts[0] === 'api' ? parts[1] : parts[0]) || 'Unnamed node'
-}
 
 function location(node: RealmNodeInfo): string | null {
   const value = node.info?.labels?.[LOCATION_AFFINITY_KEY] || node.placement?.location || ''

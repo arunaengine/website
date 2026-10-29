@@ -12,6 +12,8 @@ import SignInPanel from '@/components/auth/SignInPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import type { RealmView } from '@/composables/aruna/realm'
+import type { RealmNodeInfo } from '@/lib/api'
+import { givenName } from '@/components/nodes/node-display'
 import { ArrowRight, Plus } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
@@ -155,8 +157,14 @@ const panelRealm = computed(() => realmView.value?.realm ?? realmInfo.value)
 const infraNodes = computed(() => (panelRealm.value?.nodes ?? []).filter((node) => node.kind !== 'user'))
 const deviceNodes = computed(() => (panelRealm.value?.nodes ?? []).filter((node) => node.kind === 'user'))
 
-// This computer by its own /system/info, the device node, named as the realm knows it.
-const deviceName = computed(() => computerName(deviceNodes.value.find((node) => node.node_id === nodeInfo.value?.node.peer_id)))
+// This computer by its own /system/info, the device node, named by its own realm record first and
+// by a realm node's copy when its own has no name yet.
+const ownRecord = (nodes?: RealmNodeInfo[]) => nodes?.find((node) => node.node_id === nodeInfo.value?.node.peer_id)
+const deviceRecord = computed(() => {
+  const local = ownRecord(realmInfo.value?.nodes)
+  return local && givenName(local) ? local : (ownRecord(panelRealm.value?.nodes) ?? local)
+})
+const deviceName = computed(() => computerName(deviceRecord.value))
 
 const onlineNodes = computed(() => infraNodes.value.filter((node) => node.present).length)
 

@@ -125,6 +125,15 @@ describe('devices panel', () => {
     expect(rendered).not.toContain('offline')
   })
 
+  it('names a device by its realm display name first', async () => {
+    realmInfo.value = { nodes: [{ node_id: '73ea340a1234', connection_status: 'seen', display_name: 'Lab laptop', info: { labels: { device: 'Microbiology laptop' } } }] }
+    devices.value = [device({ id: '73ea340a1234', node_id: '73ea340a1234' })]
+    const rendered = await text()
+
+    expect(rendered).toContain('Lab laptop 73ea340a online')
+    expect(rendered).not.toContain('Microbiology laptop')
+  })
+
   it('says the realm caps nothing when it does not', async () => {
     devices.value = [device()]
     expect(await text()).toContain('1 enrolled')

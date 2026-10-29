@@ -14,7 +14,7 @@ import LocalNodeDetails from '@/components/nodes/LocalNodeDetails.vue'
 import NodeDetailPanel from '@/components/nodes/NodeDetailPanel.vue'
 import LocationAggregates from '@/components/placement/LocationAggregates.vue'
 import SectionSkeleton from '@/components/ui/SectionSkeleton.vue'
-import { isDegradedStatus, statusVariant } from '@/components/nodes/node-display'
+import { givenName, isDegradedStatus, statusVariant } from '@/components/nodes/node-display'
 import { nodeApiBase, probeNode, type NodeProbe } from '@/components/nodes/node-probe'
 import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
@@ -179,7 +179,9 @@ const computer = computed(() => {
   const info = nodeInfo.value
   if (!desktop || !info?.connections) return null
   const id = info.node.peer_id
-  const name = computerName(panelDevices.value.find((node) => node.node_id === id))
+  // Its own realm record first; a realm node's copy when its own has no name yet.
+  const local = deviceNodes.value.find((node) => node.node_id === id)
+  const name = computerName(local && givenName(local) ? local : (panelDevices.value.find((node) => node.node_id === id) ?? local))
   const peers = info.connections.filter((peer) => peer.status === 'connected').map((peer) => peer.peer_id)
   return { id, name, peers }
 })

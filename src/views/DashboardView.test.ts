@@ -3,6 +3,8 @@ import { createSSRApp, defineComponent, h, ref, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, content, compileClientComponent, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
+import * as NodeDisplay from '@/components/nodes/node-display'
+const RealmNodes = await vi.importActual<typeof import('@/composables/useRealmNodes')>('@/composables/useRealmNodes')
 
 const firstPaintMock = vi.hoisted(() => ({
   useFirstPaint: () => ({ value: true }),
@@ -71,7 +73,7 @@ const loadImports = vi.fn(async () => undefined)
 const importsStub = { useNodeImports: () => ({ imports: ref(new Map()), total: importsTotal, load: loadImports }) }
 const realmNodesStub = {
   useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'own-device' }),
-  computerName: (node?: { info?: { labels?: Record<string, string> } }) => node?.info?.labels?.device || 'This computer',
+  computerName: RealmNodes.computerName,
 }
 const reloadDatabases = vi.fn(async () => undefined)
 const databasesStub = { useDatabases: () => ({ rows: databaseRows, state: databaseState, complete: ref(true), ensure: () => {}, reload: reloadDatabases }) }
@@ -230,6 +232,7 @@ beforeAll(async () => {
     '@/components/dashboard/WebStart.vue': moduleDefault(WebStartStub),
     '@/composables/useNodeImports': importsStub,
     '@/composables/useRealmNodes': realmNodesStub,
+    '@/components/nodes/node-display': NodeDisplay,
     '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
     '@/components/ui/EmptyState.vue': moduleDefault(EmptyStub),
     '@/components/desktop/HomeCards.vue': moduleDefault(HomeCardsStub),
@@ -488,6 +491,25 @@ describe('desktop home', () => {
 
     expect(content(mounted.root)).toContain('device row Microbiology laptop')
     expect(content(mounted.root).indexOf('device row')).toBeGreaterThan(content(mounted.root).indexOf('Realm'))
+    mounted.app.unmount()
+  })
+
+  it('names this computer by its own realm record first, then by the realm node copy', async () => {
+    currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
+    desktopMode.value = true
+    nodeInfo.value = { node: { peer_id: 'own-device' } }
+    realmInfo.value = { metadata_replication: { default_replication_factor: 3 }, nodes: [{ node_id: 'own-device', kind: 'user', display_name: 'Lab laptop' }] }
+    loadRealmView.mockResolvedValue({ info: { node: { peer_id: 'mgmt' } }, realm: { nodes: [{ node_id: 'own-device', kind: 'user', display_name: 'Old name' }] } })
+    let mounted = await mountApp(DashboardClient)
+    await flush()
+    expect(content(mounted.root)).toContain('device row Lab laptop')
+    mounted.app.unmount()
+
+    // Its own record has no name yet; the realm node's copy does.
+    realmInfo.value = { metadata_replication: { default_replication_factor: 3 }, nodes: [{ node_id: 'own-device', kind: 'user' }] }
+    mounted = await mountApp(DashboardClient)
+    await flush()
+    expect(content(mounted.root)).toContain('device row Old name')
     mounted.app.unmount()
   })
 
