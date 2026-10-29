@@ -7,10 +7,14 @@ import { compileClientComponent, content, element, flush, mountApp, moduleDefaul
 const hit = { key: 'GCF_000005845.2_ASM584v2/', bucket: 'ncbi', issuer_node_id: 'n2', group_id: 'g1' }
 const searchObjects = vi.fn(async (_q: string, _options: { match: string }) => ({ hits: [hit] as unknown[], next_cursor: null as string | null, coverage: { complete: true } }))
 
+// Searching while typing waits for a pause; it is over at once unless a test holds it.
+let held: (() => void) | null = null
+let holding = false
+const useDebounceFn = (fn: () => void) => Object.assign(() => (holding ? (held = fn) : fn()), { cancel: () => (held = null) })
+
 const component = compileClientComponent(new URL('./MetadataSearch.vue', import.meta.url), {
   vue: VueRuntime,
-  // Searching while typing waits for a pause; here the pause is over at once.
-  '@vueuse/core': { watchDebounced: (source: never, callback: never) => VueRuntime.watch(source, callback) },
+  '@vueuse/core': { useDebounceFn },
   '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => h('i')) }),
   '@/components/ui/Button.vue': moduleDefault(defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()) })),
   '@/composables/useAruna': { useAruna: () => ({ searchObjects, sessionEpoch: ref(1) }) },
@@ -211,5 +215,45 @@ describe('bucket metadata search', () => {
     expect(searchObjects).toHaveBeenCalledTimes(3)
     expect(content(root)).toContain('The name search failed')
     expect(content(root)).not.toContain('Searching')
+  })
+
+  it('starts no search after leaving while a typed search still waits', async () => {
+    searchObjects.mockReset()
+    holding = true
+    const { app, root } = await mountApp(component, { props: { bucket: 'ncbi', nodeId: null } })
+    ;(element(root, (node) => node.tag === 'input').props['onUpdate:modelValue'] as (value: string) => void)('coli')
+    await flush()
+    expect(held).not.toBeNull()
+    app.unmount()
+    held?.()
+    holding = false
+    await flush()
+
+    expect(searchObjects).not.toHaveBeenCalled()
+  })
+
+  it('ends a running search and its paging as soon as the words change', async () => {
+    let answer: (value: unknown) => void = () => {}
+    searchObjects.mockReset()
+    searchObjects.mockImplementation(async (_q: string, options: { match: string; cursor?: string }) => {
+      if (options.match === 'metadata') return { hits: [], next_cursor: null, coverage: { complete: true } }
+      if (!options.cursor) return { hits: [], next_cursor: 'n2', coverage: { complete: true } }
+      return new Promise((resolve) => (answer = resolve)) as never
+    })
+    const { root } = await mountApp(component, { props: { bucket: 'ncbi', nodeId: null } })
+    const input = element(root, (node) => node.tag === 'input')
+    ;(input.props['onUpdate:modelValue'] as (value: string) => void)('coli')
+    await flush()
+    expect(content(root)).toContain('Searching…')
+
+    ;(input.props['onUpdate:modelValue'] as (value: string) => void)('')
+    await flush()
+    answer({ hits: [hit], next_cursor: 'n3', coverage: { complete: true } })
+    await flush()
+
+    expect(content(root)).not.toContain('Searching…')
+    expect(content(root)).not.toContain('GCF_')
+    expect(content(root)).not.toContain('Show more')
+    expect(searchObjects).toHaveBeenCalledTimes(3)
   })
 })

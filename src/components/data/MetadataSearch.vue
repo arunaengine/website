@@ -2,7 +2,7 @@
 // One box that searches a bucket's files and folders: words match file names and search columns,
 // `column=value` matches a filter column exactly and becomes a chip.
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { watchDebounced } from '@vueuse/core'
+import { useDebounceFn } from '@vueuse/core'
 import Button from '@/components/ui/Button.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -31,6 +31,7 @@ const complete = ref(true)
 const failure = ref<string | null>(null)
 const busy = ref(false)
 let runs = 0
+let unmounted = false
 
 // Another bucket, node or session drops every answer still on its way, and the paging.
 watch(() => [props.bucket, props.nodeId, sessionEpoch.value], () => {
@@ -64,8 +65,10 @@ function takeChips() {
 // come back empty with a cursor; the search follows it until a hit arrives or the cursor ends.
 // A newer search, another bucket or leaving the view ends it.
 async function search(more = false) {
+  if (unmounted) return
   if (quoteOpen()) typed.value += '"'
   takeChips()
+  searchSoon.cancel()
   if (query.value.trim().length < 2) return
   const run = ++runs
   busy.value = true
@@ -82,7 +85,11 @@ async function search(more = false) {
     if (run === runs) busy.value = false
   }
 }
-onBeforeUnmount(() => runs++)
+onBeforeUnmount(() => {
+  unmounted = true
+  runs++
+  searchSoon.cancel()
+})
 
 /** One page of each search; the number of new hits, or null once a newer search took over. */
 async function step(more: boolean, run: number): Promise<number | null> {
@@ -114,9 +121,16 @@ async function step(more: boolean, run: number): Promise<number | null> {
 }
 
 // Words search while typing; a `column=value` waits for Enter or a space.
-watchDebounced(typed, (text) => {
-  if (!text.includes('=') && !quoteOpen() && text.trim().length >= 2) void search()
-}, { debounce: 400 })
+const searchSoon = useDebounceFn(() => void search(), 400)
+// An edit ends the search under way and its paging at once, before the pause is over.
+watch(typed, (text) => {
+  runs++
+  busy.value = false
+  cursor.value = null
+  nameCursor.value = null
+  if (!text.includes('=') && !quoteOpen() && text.trim().length >= 2) void searchSoon()
+  else searchSoon.cancel()
+}, { flush: 'sync' })
 
 function drop(index: number) {
   chips.value = chips.value.filter((_, at) => at !== index)
