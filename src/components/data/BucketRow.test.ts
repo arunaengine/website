@@ -1,6 +1,6 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h } from 'vue'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { compileClientComponent, content, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 
 const Empty = defineComponent(() => () => null)
@@ -11,10 +11,11 @@ const Label = defineComponent({
 const TooltipStub = defineComponent((_, { slots }) => () => h('div', [slots.default?.(), slots.content?.()]))
 const BucketRow = compileClientComponent(new URL('./BucketRow.vue', import.meta.url), {
   vue: VueRuntime,
-  'vue-router': { RouterLink: Empty },
+  'vue-router': { RouterLink: defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => h('a', { to: props.to }, slots.default?.()) }) },
   '@lucide/vue': new Proxy({}, { get: () => Empty }),
   '@/components/storage/BucketJobLabel.vue': moduleDefault(Label),
   '@/components/ui/Tooltip.vue': moduleDefault(TooltipStub),
+  '@/components/ui/Popover.vue': moduleDefault(TooltipStub),
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id }) },
 })
 
@@ -45,50 +46,63 @@ describe('BucketRow step label', () => {
   })
 })
 
-describe('BucketRow link column', () => {
-  const column = (root: Parameters<typeof content>[0]) =>
-    nodes(root).filter((node) => String(node.props.class ?? '').includes('h-7 w-7'))
-  const link = { link: () => h('button', { 'aria-label': 'Link a local folder' }) }
+describe('BucketRow lines and chips', () => {
+  it('marks a linked bucket as synced, with its folder in the title, in place of the link button', async () => {
+    const root = await mount({ linkedTo: 'test-data' }, { link: () => h('button', { 'aria-label': 'Link a local folder' }) })
+    const chip = nodes(root).find((node) => node.props.role === 'img')
 
-  it('marks a linked bucket with its folder in place of the link button', async () => {
-    const root = await mount({ linkedTo: 'test-data' }, link)
-    const mark = nodes(root).find((node) => node.props.role === 'img')
-
-    expect(mark?.props['aria-label']).toBe('Linked to test-data')
+    expect(content(chip!).trim()).toBe('synced')
+    expect(chip?.props.title).toBe('Linked to test-data')
+    expect(chip?.props.tabindex).toBe(0)
     expect(nodes(root).some((node) => node.props['aria-label'] === 'Link a local folder')).toBe(false)
-    // The tooltip opens on focus too, inside the same fixed column.
-    expect(mark?.props.tabindex).toBe('0')
-    expect(nodes(column(root)[0])).toContain(mark)
   })
 
-  it('keeps the same column on unlinked rows, with the button or empty', async () => {
-    const offered = column(await mount({ linkedTo: null }, link))
-    const empty = column(await mount({ linkedTo: null }))
-
-    expect(offered).toHaveLength(1)
-    expect(nodes(offered[0]).some((node) => node.props['aria-label'] === 'Link a local folder')).toBe(true)
-    expect(empty).toHaveLength(1)
-    expect(nodes(empty[0]).filter((node) => node.kind === 'element')).toEqual([empty[0]])
+  it('offers the link button on an unlinked row', async () => {
+    const root = await mount({ linkedTo: null }, { link: () => h('button', { 'aria-label': 'Link a local folder' }) })
+    expect(nodes(root).some((node) => node.props['aria-label'] === 'Link a local folder')).toBe(true)
+    expect(nodes(root).some((node) => node.props.role === 'img')).toBe(false)
   })
 
-  it('leaves the other node to the place column instead of a server icon', async () => {
-    const desktop = await mount({ nodeId: 'node-2', linkedTo: null })
-    const web = await mount({ nodeId: 'node-2' })
+  it('names the files and the node on one line, the node linked to its page', async () => {
+    const root = await mount({ facts: '16 files, 50.2 MB', nodeId: 'node-2' })
+    const link = nodes(root).find((node) => node.tag === 'a')
 
-    expect(content(desktop)).not.toContain('Stored on another node')
-    expect(content(web)).toContain('Stored on another node')
+    expect(content(root)).toContain('16 files, 50.2 MB,node-2')
+    expect(link?.props.to).toEqual({ name: 'node', params: { nodeId: 'node-2' } })
   })
 
-  it('adds no column outside the desktop', async () => {
-    expect(column(await mount({}, link))).toHaveLength(0)
+  it('names the nodes of a distributed bucket in its chip, not on the facts line', async () => {
+    const root = await mount({ facts: '68,231 files referenced', nodes: ['n1', 'n2'], placeNode: 'n1', place: 'Giessen 1' })
+    const links = nodes(root).filter((node) => node.tag === 'a')
+
+    expect(content(root)).toContain('2 nodes')
+    expect(links.map((node) => node.props.to)).toEqual([
+      { name: 'node', params: { nodeId: 'n1' } },
+      { name: 'node', params: { nodeId: 'n2' } },
+    ])
+    expect(content(root)).not.toContain('Giessen 1')
   })
 
-  it('gives the place a fixed width after the other row marks', async () => {
-    const root = await mount({ place: 'This computer', job: JOB, synced: true })
-    const place = nodes(root).find((node) => content(node) === 'This computer' && node.tag === 'span')
-    const group = nodes(root).find((node) => node.children?.includes(place as never))
+  it('shows a description line, and no facts line when nothing is known', async () => {
+    const root = await mount({ subtitle: 'Bakta database (light) 6.0', database: true })
+    expect(content(root)).toContain('Bakta database (light) 6.0')
+    expect(nodes(root).filter((node) => node.tag === 'p')).toHaveLength(1)
+  })
 
-    expect(String(place?.props.class)).toContain('w-20')
-    expect(group?.children.at(-1)).toBe(place)
+  it('pins on a long press and does not open the bucket then', async () => {
+    vi.useFakeTimers()
+    try {
+      const events: string[] = []
+      const mounted = await mountApp(defineComponent(() => () => h(BucketRow, { bucket: 'genes', onOpen: () => events.push('open'), onTogglePin: () => events.push('pin') })))
+      const row = mounted.root.children[0]
+      ;(row.props.onPointerdown as (event: unknown) => void)({ pointerType: 'touch' })
+      vi.advanceTimersByTime(600)
+      const name = nodes(mounted.root).find((node) => node.tag === 'button' && content(node) === 'genes')!
+      ;(name.props.onClick as () => void)()
+      ;(name.props.onClick as () => void)()
+      expect(events).toEqual(['pin', 'open'])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
