@@ -60,6 +60,8 @@ const currentUser = ref<{ id: string } | null>({ id: 'u-1' })
 const loadReferences = vi.fn()
 const filePublic = ref(false)
 const resetReferences = vi.fn()
+// Another node's address is known once the realm read with the token names the node.
+let addressKnown: Promise<void> = Promise.resolve()
 
 const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.meta.url), {
   vue: VueRuntime,
@@ -96,7 +98,10 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   },
   '@/composables/s3/endpoints': {
     localNodeId: () => 'node-1',
-    nodeApiBase: (nodeId: string) => `https://${nodeId}/api/v1`,
+    nodeApiBaseReady: async (nodeId: string) => {
+      await addressKnown
+      return `https://${nodeId}/api/v1`
+    },
     endpointForNode: () => 'https://s3.node-1.example',
   },
   '@/lib/publicAccess': PublicAccessLib,
@@ -311,6 +316,20 @@ describe('file details references', () => {
 
     await mount('general', { nodeId: 'remote-node' })
     expect(loadReferences).toHaveBeenCalledWith(expect.anything(), 'https://remote-node/api/v1')
+  })
+
+  it('waits for the address of another node opened by a link, then asks it', async () => {
+    let name!: () => void
+    addressKnown = new Promise((resolve) => (name = resolve))
+    await mount('general', { nodeId: 'node-2', versionId: '01J000000000000000000PIN0' })
+    expect(loadReferences).not.toHaveBeenCalled()
+    expect(apiRequest).not.toHaveBeenCalled()
+
+    name()
+    await flush()
+    expect(loadReferences).toHaveBeenCalledWith(expect.anything(), 'https://node-2/api/v1')
+    expect(apiRequest).toHaveBeenCalledWith(expect.stringContaining('/ga4gh/drs/v1/objects/'), {}, { baseUrl: 'https://node-2/api/v1', token: 'token-1' })
+    addressKnown = Promise.resolve()
   })
 
   it('skips the lookup for a signed-out viewer', async () => {

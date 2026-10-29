@@ -23,6 +23,11 @@ export function nodeApiBase(nodeId: string): string | null {
   return url.endsWith('/api/v1') ? url : `${url}/api/v1`
 }
 
+/** `nodeApiBase` once the realm read with the token can name the node; null when it does not. */
+export function nodeApiBaseReady(nodeId: string): Promise<string | null> {
+  return useAruna().nodeClientReady(nodeId).then((client) => client.baseUrl, () => null)
+}
+
 // Resolves the S3 endpoint serving `nodeId`; null/the local peer id map to the
 // connected node. Resolution never changes the active session.
 export function endpointForNode(nodeId?: string | null): string | null {

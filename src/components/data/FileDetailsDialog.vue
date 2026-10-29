@@ -27,7 +27,7 @@ import PublicAccessDialog from '@/components/data/PublicAccessDialog.vue'
 import ObjectRulesEditor from '@/components/storage/ObjectRulesEditor.vue'
 import PolicyColumn from '@/components/storage/PolicyColumn.vue'
 import PreviewBody from '@/components/preview/PreviewBody.vue'
-import { endpointForNode, localNodeId, nodeApiBase } from '@/composables/s3/endpoints'
+import { endpointForNode, localNodeId, nodeApiBaseReady } from '@/composables/s3/endpoints'
 import { useAruna } from '@/composables/useAruna'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -156,11 +156,13 @@ async function loadChecksums() {
   checksums.value = []
   allChecksums.value = false
   const version = currentVersion.value
-  const realmId = nodeInfo.value?.node.realm_id
   const nodeId = props.nodeId ?? localNodeId()
-  const baseUrl = nodeId ? nodeApiBase(nodeId) : null
   // A referenced file stays at its source, so the node holds no checksum record for it.
-  if (!props.open || props.folder || mock.value || props.referencedFrom || !version || !realmId || !nodeId || !baseUrl) return
+  if (!props.open || props.folder || mock.value || props.referencedFrom || !version || !nodeId) return
+  // A link opened on a fresh load names another node before the realm does.
+  const baseUrl = await nodeApiBaseReady(nodeId)
+  const realmId = nodeInfo.value?.node.realm_id
+  if (seq !== checksumSeq || !baseUrl || !realmId) return
   const lookup = (id: string) =>
     apiRequest<DrsObjectResponse>(`/ga4gh/drs/v1/objects/${encodeURIComponent(id)}`, {}, { baseUrl, token: authToken.value ?? undefined })
   try {
@@ -232,8 +234,11 @@ const fileReferences = computed(() =>
     : null,
 )
 
-function loadReferences() {
-  const apiBase = props.nodeId ? nodeApiBase(props.nodeId) : apiBaseUrl.value
+let referenceSeq = 0
+async function loadReferences() {
+  const seq = ++referenceSeq
+  const apiBase = props.nodeId ? await nodeApiBaseReady(props.nodeId) : apiBaseUrl.value
+  if (seq !== referenceSeq) return
   if (!currentUser.value || !apiBase || props.folder || mock.value) {
     resetReferences()
     return
@@ -250,9 +255,10 @@ watch(
     pinnedVersion.value = props.versionId ?? null
     if (props.open) {
       void loadHead()
-      loadReferences()
+      void loadReferences()
     } else {
       head.value = null
+      referenceSeq++
       resetReferences()
     }
   },
