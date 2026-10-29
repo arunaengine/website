@@ -15,6 +15,20 @@ export interface RunCrateFileRef {
   identifier?: string
   /** The release or version the crate names for the file. */
   version?: string
+  /** The bucket's database at admission and the releases the file belongs to. */
+  partOf?: RunCratePart[]
+  /** The device the file came from, by its node id. */
+  device?: string
+}
+
+/** A dataset an input belongs to: its bucket's database metadata or a release. */
+export interface RunCratePart {
+  id: string
+  kind: 'database' | 'release'
+  name?: string
+  version?: string
+  /** Links the crate gives for it, such as a DOI. */
+  links: string[]
 }
 
 /** Where the run executed: the node, its executor kind and any reason the crate records. */
@@ -116,8 +130,30 @@ const ARUNA_TERMS = 'https://w3id.org/aruna/terms/'
 const WORKSPACE_PROPERTY_ID = `${ARUNA_TERMS}workspace-bucket`
 const WFRUN = 'https://w3id.org/ro/terms/workflow-run#'
 
+const DATABASE_PREFIX = '#bucket-metadata-'
+
+function partOf(id: string, byId: Map<string, Record<string, unknown>>): RunCratePart | null {
+  const entity = byId.get(id)
+  if (!entity || !typesOf(entity).includes('Dataset')) return null
+  const database = id.startsWith(DATABASE_PREFIX)
+  const links = database ? [entity.identifier].flat() : refIdsOf(entity.isBasedOn)
+  return {
+    id,
+    kind: database ? 'database' : 'release',
+    name: stringOf(entity.name)?.replace(/ \(at admission\)$/, ''),
+    version: stringOf(entity.version),
+    links: links.filter((link): link is string => typeof link === 'string' && Boolean(link)),
+  }
+}
+
+function deviceOf(value: unknown, byId: Map<string, Record<string, unknown>>): string | undefined {
+  const device = refIdsOf(value).map((id) => byId.get(id)).find((entity) => entity && typesOf(entity).includes('IndividualProduct'))
+  return device ? stringOf(device.identifier) : undefined
+}
+
 function fileRef(id: string, byId: Map<string, Record<string, unknown>>): RunCrateFileRef {
   const entity = byId.get(id)
+  const parts = refIdsOf(entity?.isPartOf).map((partId) => partOf(partId, byId)).filter((part): part is RunCratePart => part !== null)
   const fallbackName = id.startsWith(WORKSPACE_PREFIX)
     ? id.slice(WORKSPACE_PREFIX.length)
     : (id.split('/').filter(Boolean).pop() ?? id)
@@ -129,6 +165,8 @@ function fileRef(id: string, byId: Map<string, Record<string, unknown>>): RunCra
     contentUrls: contentUrlValues(entity?.contentUrl),
     identifier: stringOf(entity?.identifier),
     version: stringOf(entity?.version),
+    partOf: parts.length ? parts : undefined,
+    device: deviceOf(entity?.isBasedOn, byId),
   }
 }
 
@@ -254,7 +292,7 @@ export function parseRunCrate(crate: unknown, documentPath: string): RunCrateMod
 /** Ids of the entities the run provenance panel already presents itself. */
 export function runClaimedIds(run: RunCrateModel): string[] {
   const ids = [run.actionId, run.agent?.id, run.instrument?.id, run.container?.id]
-  for (const file of [...run.inputs, ...run.outputs]) ids.push(file.id)
+  for (const file of [...run.inputs, ...run.outputs]) ids.push(file.id, ...(file.partOf ?? []).map((part) => part.id))
   return ids.filter((id): id is string => Boolean(id))
 }
 

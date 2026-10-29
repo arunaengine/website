@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseRunCrate, runDuration, runState } from './runCrate'
+import { parseRunCrate, runClaimedIds, runDuration, runState } from './runCrate'
 
 const RUN = 'https://w3id.org/aruna/01RUNRECORD'
 const crate = {
@@ -46,4 +46,28 @@ describe('run state and duration', () => {
     expect(runDuration({ ...run, endTime: 'later' })).toBe('')
     expect(runState({ inputs: [], outputs: [] })).toBeNull()
   })
+
+  it('reads the database and release an input is part of and the device it came from', () => {
+    const run = parseRunCrate({
+      '@graph': [
+        { '@id': 'ro-crate-metadata.json', about: { '@id': RUN } },
+        { '@id': RUN, '@type': 'Dataset', conformsTo: { '@id': 'https://w3id.org/ro/wfrun/process/0.5' }, name: 'Bakta', mentions: { '@id': '#run-01EXEC' } },
+        { '@id': '#run-01EXEC', '@type': 'CreateAction', object: [{ '@id': 'db-file' }, { '@id': 'genome' }] },
+        { '@id': 'db-file', '@type': 'File', name: '/work/in/db/psc.dmnd', isPartOf: [{ '@id': '#bucket-metadata-0123' }, { '@id': 'https://w3id.org/aruna/rel' }] },
+        { '@id': '#bucket-metadata-0123', '@type': 'Dataset', name: 'Bakta database (light) (at admission)', version: '6.0', identifier: ['https://doi.org/10.5281/zenodo.14916843'] },
+        { '@id': 'https://w3id.org/aruna/rel', '@type': 'Dataset', name: 'Release 6.0 light', version: '6.0 light', isBasedOn: [{ '@id': 'https://zenodo.org/records/14916843' }] },
+        { '@id': 'genome', '@type': 'File', name: '/work/in/genome.fasta', isBasedOn: { '@id': '#device-d1' } },
+        { '@id': '#device-d1', '@type': 'IndividualProduct', name: 'Aruna device', identifier: 'node-laptop' },
+      ],
+    }, 'runs/01EXEC')!
+
+    expect(run.inputs[0]!.partOf).toEqual([
+      { id: '#bucket-metadata-0123', kind: 'database', name: 'Bakta database (light)', version: '6.0', links: ['https://doi.org/10.5281/zenodo.14916843'] },
+      { id: 'https://w3id.org/aruna/rel', kind: 'release', name: 'Release 6.0 light', version: '6.0 light', links: ['https://zenodo.org/records/14916843'] },
+    ])
+    expect(run.inputs[1]).toMatchObject({ device: 'node-laptop' })
+    expect(run.inputs[1]!.partOf).toBeUndefined()
+    expect(runClaimedIds(run)).toEqual(expect.arrayContaining(['#bucket-metadata-0123', 'https://w3id.org/aruna/rel']))
+  })
 })
+
