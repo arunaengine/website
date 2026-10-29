@@ -120,4 +120,39 @@ describe('provenance view', () => {
   it('says when a file has no content id to search by', async () => {
     expect(content(await render())).toContain('Not available for this file.')
   })
+
+  it('folds the files of one database release and shows their chain once', async () => {
+    const version = (key: string, index: number) => `https://w3id.org/aruna/data/arn:aruna:r:n2:s3/bakta-db/${key}@01K8W1B3D5F7H9KMQ1S3V${String(index).padStart(5, '0')}`
+    const files = Array.from({ length: 66 }, (_, index) => ({ '@id': `s3://bakta-db/db/f${index}`, '@type': 'File', name: `/work/in/db/f${index}`, contentUrl: [`s3://bakta-db/db/f${index}`, version(`db/f${index}`, index)] }))
+    const genome = 'https://w3id.org/aruna/data/arn:aruna:r:n2:s3/laptop/genome.fasta@01K8W1B3D5F7H9KMQ1S3V5X7Z9'
+    const tarball = 'https://w3id.org/aruna/data/arn:aruna:r:n2:s3/bakta-db/db-light.tar.xz@01K8W1B3D5F7H9KMQ1S3V5X7Z8'
+    aruna.getRun.mockImplementation(async (runId: string) => ({ run_id: runId, run_crate: runId }))
+    aruna.fetchRoCrateRaw.mockImplementation(async (doc: string) => doc === 'r1'
+      ? { '@graph': [{ '@id': '#run', '@type': 'CreateAction', name: 'Bakta', object: [{ '@id': 'genome' }, ...files.map((file) => ({ '@id': file['@id'] }))] }, { '@id': 'genome', '@type': 'File', name: 'genome.fasta', contentUrl: ['s3://laptop/genome.fasta', genome] }, ...files] }
+      : { '@graph': [{ '@id': '#prep', '@type': 'CreateAction', name: 'Prepare Bakta DB 6.0 light', object: [{ '@id': 'tar' }] }, { '@id': 'tar', '@type': 'File', name: 'db-light.tar.xz', contentUrl: ['s3://bakta-db/db-light.tar.xz', tarball] }] })
+    aruna.getVersionOrigin.mockImplementation(async (id: string) => {
+      if (id === genome) return origin({ origin: { kind: 'upload' } as never })
+      if (id === tarball) return origin({ origin: { kind: 'source' } as never, source: { url: 'https://zenodo.org/records/14916843' } as never })
+      return origin({
+        origin: { kind: 'job', run_id: 'prep' },
+        bucket_metadata: { database: true, title: 'Bakta database (light)' } as never,
+        releases: [{ crate_version: 'cv-6', label: '6.0 light', upstream: [{ name: 'DOI', value: '10.5281/zenodo.14916843', url: 'https://doi.org/10.5281/zenodo.14916843' }] }] as never,
+      })
+    })
+    const root = await render()
+    await click(button(root, 'Show all'))
+    await flush()
+    const text = content(root)
+
+    expect(text).toContain('66 files of Bakta database (light) 6.0 light')
+    expect(text).toContain('genome.fasta')
+    expect(text.split('Database release')).toHaveLength(2)
+    expect(text.split('Prepare Bakta DB 6.0 light')).toHaveLength(2)
+    expect(text).toContain('zenodo.org')
+    expect(text).not.toContain('/work/in/db/f3')
+
+    await click(button(root, 'Show the files'))
+    expect(content(root)).toContain('/work/in/db/f3')
+  })
 })
+

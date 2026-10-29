@@ -10,6 +10,7 @@ import { ArrowLeft } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { apiErrorMessage } from '@/lib/api'
 import {
+  drawnChain,
   emptyGraph,
   expand,
   expandAll,
@@ -17,6 +18,7 @@ import {
   startDataset,
   startFile,
   type Box,
+  type DrawnNode,
   type Graph,
   type ProvenanceStart,
   type Readers,
@@ -126,7 +128,7 @@ async function findUses() {
 const BOX = 'rounded-[10px] border border-border px-3 py-2.5 text-xs'
 const MUTED = 'border-dashed bg-muted/50'
 
-function boxView(item: Box): VNode {
+function boxView(item: Box, repeat = false): VNode {
   const muted = item.kind === 'hidden' || item.kind === 'unversioned' || item.kind === 'silent'
   const root = graph.roots.includes(item.id)
   const lines: VNode[] = [
@@ -134,6 +136,7 @@ function boxView(item: Box): VNode {
     h('p', { class: 'font-medium' }, item.title),
   ]
   if (item.detail) lines.push(h('p', { class: item.kind === 'hidden' ? 'font-mono text-muted-foreground' : 'text-muted-foreground' }, item.detail))
+  if (repeat && item.from.length) lines.push(h('p', { class: 'text-muted-foreground' }, 'Where it came from is shown above.'))
   for (const found of item.identifiers) {
     lines.push(
       h('p', [
@@ -155,26 +158,54 @@ function boxView(item: Box): VNode {
   return h('div', { class: [BOX, muted ? MUTED : 'bg-background', ring], 'data-box': item.id }, lines)
 }
 
-// One box, then an arrow and the boxes it came from, each with their own sources.
+// Sibling files folded into one box: how many, of which release, opened to their names.
+const openFolds = ref(new Set<string>())
+function foldView(node: DrawnNode): VNode {
+  const items = node.ids.map((id) => graph.boxes[id]).filter((item): item is Box => Boolean(item))
+  const first = items[0]!
+  const release = first.from.map((id) => graph.boxes[id]).find((item) => item?.kind === 'database')
+  const open = openFolds.value.has(node.key)
+  const toggle = () => {
+    const next = new Set(openFolds.value)
+    if (!next.delete(node.key)) next.add(node.key)
+    openFolds.value = next
+  }
+  const lines: VNode[] = [
+    h('div', { class: 'mb-0.5 text-[10px] uppercase tracking-wider text-muted-foreground' }, first.role),
+    h('p', { class: 'font-medium' }, release ? `${items.length} files of ${release.title}` : `${items.length} files`),
+    h('button', { type: 'button', class: 'mt-1 text-primary hover:underline', 'aria-expanded': open, onClick: toggle }, open ? 'Hide the files' : 'Show the files'),
+  ]
+  if (open) lines.push(h('ul', { class: 'mt-1 max-h-40 space-y-0.5 overflow-y-auto text-muted-foreground' }, items.map((item) => h('li', { key: item.id, class: 'break-all' }, item.title))))
+  if (items.some((item) => item.pending.length)) {
+    const expandAllOf = async () => {
+      const current = fenced()
+      for (const item of items) if (current()) await expand(graph, item.id, readers, current)
+    }
+    lines.push(h('button', { type: 'button', class: 'mt-1 block text-primary hover:underline', onClick: expandAllOf }, 'Show where these came from'))
+  }
+  return h('div', { class: [BOX, 'bg-background'], 'data-box': node.key }, lines)
+}
+
+// One entry, then an arrow and the entries it came from, each with their own sources.
 const Branch: ReturnType<typeof defineComponent> = defineComponent({
-  props: { id: { type: String, required: true }, trail: { type: Array as PropType<string[]>, default: () => [] } },
+  props: { node: { type: Object as PropType<DrawnNode>, required: true } },
   setup(branch) {
     return () => {
-      const item = graph.boxes[branch.id]
+      const node = branch.node
+      const item = graph.boxes[node.ids[0]!]
       if (!item) return null
-      // A box already shown on this path is not drawn again, so a cycle ends.
-      const sources = item.from.filter((id) => !branch.trail.includes(id))
-      const trail = [...branch.trail, item.id]
-      const children = sources.length
+      const view = node.ids.length > 1 ? foldView(node) : boxView(item, node.repeat)
+      const children = node.sources.length
         ? [
-            h('div', { class: 'flex w-11 flex-none justify-center text-muted-foreground', 'aria-hidden': 'true' }, [h(ArrowLeft, { class: 'h-5 w-5' })]),
-            h('div', { class: 'flex flex-col gap-3.5' }, sources.map((id) => h(Branch, { id, trail, key: id }))),
+            h('div', { class: 'flex w-6 flex-none justify-center text-muted-foreground', 'aria-hidden': 'true' }, [h(ArrowLeft, { class: 'h-4 w-4' })]),
+            h('div', { class: 'flex flex-col gap-2.5' }, node.sources.map((source) => h(Branch, { node: source, key: source.key }))),
           ]
         : []
-      return h('div', { class: 'flex items-center' }, [h('div', { class: 'w-56 flex-none' }, [boxView(item)]), ...children])
+      return h('div', { class: 'flex items-center' }, [h('div', { class: 'w-36 flex-none' }, [view]), ...children])
     }
   },
 })
+const chain = computed(() => drawnChain(graph))
 </script>
 
 <template>
@@ -192,8 +223,8 @@ const Branch: ReturnType<typeof defineComponent> = defineComponent({
     <p v-else-if="exported" role="status" class="text-xs text-muted-foreground">Saved as provenance.zip.</p>
 
     <div class="overflow-x-auto py-2">
-      <div class="flex flex-col gap-3.5">
-        <Branch v-for="id in graph.roots" :key="id" :id="id" />
+      <div class="flex flex-col gap-2.5">
+        <Branch v-for="node in chain" :key="node.key" :node="node" />
       </div>
     </div>
 

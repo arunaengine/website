@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError, type OriginResponse } from '@/lib/api'
-import { bucketOf, dataParts, emptyGraph, expand, expandAll, hasPending, runInputs, runRecordDetail, startDataset, startFile, type Readers } from './provenance'
+import { bucketOf, dataParts, drawnChain, emptyGraph, expand, expandAll, hasPending, runInputs, runRecordDetail, startDataset, startFile, type Box, type Readers } from './provenance'
 
 const bakrep = { database: true, title: 'BakRep', dataset: 'd1', identifiers: [] }
 
@@ -204,5 +204,33 @@ describe('runRecordDetail', () => {
     expect(runRecordDetail({ status: 'local' })).toBe('Run record kept on the device')
     expect(runRecordDetail({ status: 'pending' })).toBe('No run record yet')
     expect(runRecordDetail(null)).toBe('No run record yet')
+  })
+})
+
+describe('drawn chain', () => {
+  it('folds sibling files with the same sources and draws a shared chain once', () => {
+    const graph = emptyGraph()
+    const put = (id: string, kind: Box['kind'], role: string, from: string[] = []) => {
+      graph.boxes[id] = { id, kind, role, title: id, identifiers: [], from, pending: [] }
+    }
+    const files = Array.from({ length: 66 }, (_, index) => `db-${index}`)
+    put('result', 'file', 'This file', ['run:bakta'])
+    put('run:bakta', 'run', 'Run', ['genome', ...files])
+    put('genome', 'file', 'Input file')
+    for (const id of files) put(id, 'file', 'Input file', ['release:6', 'run:prep'])
+    put('release:6', 'database', 'Database release')
+    put('run:prep', 'run', 'Run', ['tarball'])
+    put('tarball', 'file', 'Input file', ['source:zenodo'])
+    put('source:zenodo', 'source', 'Source')
+    put('other', 'file', 'File', ['run:bakta'])
+    graph.roots = ['result', 'other']
+
+    const [result, other] = drawnChain(graph)
+    const run = result!.sources[0]!
+    expect(run.sources.map((node) => node.ids.length)).toEqual([1, 66])
+    const folded = run.sources[1]!
+    expect(folded.sources.map((node) => node.ids[0])).toEqual(['release:6', 'run:prep'])
+    expect(folded.sources[1]!.sources[0]!.sources[0]!.ids).toEqual(['source:zenodo'])
+    expect(other!.sources[0]).toMatchObject({ ids: ['run:bakta'], repeat: true, sources: [] })
   })
 })

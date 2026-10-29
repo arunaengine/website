@@ -282,5 +282,40 @@ export async function expandAll(graph: Graph, readers: Readers, stopped: () => b
   }
 }
 
+/** One entry of the drawn chain: a box, or sibling files folded because they share their sources. */
+export interface DrawnNode {
+  key: string
+  ids: string[]
+  /** Drawn before in the chain, so its sources are not drawn again. */
+  repeat: boolean
+  sources: DrawnNode[]
+}
+
+/**
+ * The chain as drawn: sibling files that came from the same boxes fold into one entry, and a box
+ * reached again is drawn without its sources, so a shared chain shows once.
+ */
+export function drawnChain(graph: Graph): DrawnNode[] {
+  const drawn = new Set<string>()
+  const walk = (ids: string[], trail: string[]): DrawnNode[] => {
+    const groups = new Map<string, string[]>()
+    for (const id of ids) {
+      const item = graph.boxes[id]
+      // A box already on this path is not drawn again, so a cycle ends.
+      if (!item || trail.includes(id)) continue
+      const from = [...item.from].sort().join('\n')
+      const key = item.kind === 'file' && from ? `${item.role}\n${from}` : `box:${id}`
+      groups.set(key, [...(groups.get(key) ?? []), id])
+    }
+    return [...groups.values()].map((members) => {
+      const repeat = members.every((id) => drawn.has(id))
+      for (const id of members) drawn.add(id)
+      const first = graph.boxes[members[0]!]!
+      return { key: members.join('\n'), ids: members, repeat, sources: repeat ? [] : walk(first.from, [...trail, ...members]) }
+    })
+  }
+  return walk(graph.roots, [])
+}
+
 /** Whether any box still has links to read. */
 export const hasPending = (graph: Graph) => Object.values(graph.boxes).some((item) => item.pending.length && item.kind !== 'silent')
