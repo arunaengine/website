@@ -175,6 +175,7 @@ function foldView(node: DrawnNode): VNode {
     h('p', { class: 'font-medium' }, release ? `${items.length} files of ${release.title}` : `${items.length} files`),
     h('button', { type: 'button', class: 'mt-1 text-primary hover:underline', 'aria-expanded': open, onClick: toggle }, open ? 'Hide the files' : 'Show the files'),
   ]
+  if (node.repeat) lines.push(h('p', { class: 'text-muted-foreground' }, 'Where these came from is shown above.'))
   if (open) lines.push(h('ul', { class: 'mt-1 max-h-40 space-y-0.5 overflow-y-auto text-muted-foreground' }, items.map((item) => h('li', { key: item.id, class: 'break-all' }, item.title))))
   if (items.some((item) => item.pending.length)) {
     const expandAllOf = async () => {
