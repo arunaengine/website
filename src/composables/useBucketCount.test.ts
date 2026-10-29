@@ -5,7 +5,7 @@ import type { BucketSearchHit, UsageTotals } from '@/lib/api'
 const aruna = vi.hoisted(() => ({ sessionEpoch: { value: 1 }, searchBuckets: vi.fn() }))
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
 
-const { listBuckets, useRealmBucketCount } = await import('./useBucketCount')
+const { countText, listBuckets, useRealmBucketCount } = await import('./useBucketCount')
 
 const hit = (bucket: string, node: string, group = 'g1', set?: string): BucketSearchHit => ({
   arn: `${node}/${bucket}`, bucket, node_id: node, group_id: group, created_at: '', set_id: set ?? null,
@@ -48,5 +48,12 @@ describe('bucket counts', () => {
     expect(counted.value).toEqual({ count: 3, exact: true })
     expect(aruna.searchBuckets).not.toHaveBeenCalled()
     scope.stop()
+  })
+})
+
+describe('bucket count text', () => {
+  it('reads an upper bound as up to and an exact count as the number', () => {
+    expect(countText({ count: 15, exact: false }, String)).toBe('up to 15')
+    expect(countText({ count: 14, exact: true }, String)).toBe('14')
   })
 })

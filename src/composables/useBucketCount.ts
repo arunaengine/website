@@ -1,6 +1,6 @@
 // Bucket counts with a distributed bucket counted once. Each node counts the member bucket it
 // holds, so node totals count such a bucket once per node; the set ids of the buckets the caller
-// can list correct them. A count stays "at most" unless every counted bucket was listed.
+// can list correct them. A count stays "up to" unless every counted bucket was listed.
 import { computed, ref, watch, type Ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import type { BucketSearchHit, BucketSearchResponse, UsageTotals } from '@/lib/api'
@@ -35,9 +35,9 @@ export async function listBuckets(search: Search, groupId: string | undefined, c
   }
 }
 
-/** A corrected count as text: the number, or "at most" the number when it is not exact. */
+/** A corrected count as text: the number, or "up to" the number when it is not exact. */
 export function countText(counted: { count: number; exact: boolean }, format: (value: number) => string): string {
-  return counted.exact ? format(counted.count) : `at most ${format(counted.count)}`
+  return counted.exact ? format(counted.count) : `up to ${format(counted.count)}`
 }
 
 const realmListing = ref<{ epoch: number; listing: Listing } | null>(null)
