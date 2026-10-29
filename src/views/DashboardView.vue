@@ -184,10 +184,12 @@ const onlineNodes = computed(() => infraNodes.value.filter((node) => node.presen
 
 // Imports explain a busy node; each node's heartbeat counts them in the realm snapshot. A node
 // without a heartbeat count adds nothing known, so the sum is then a lower bound.
+// Heartbeats carry the counts only after a rollout: until one does, the cell shows a dash.
 const activity = computed(() => {
   const counts = infraNodes.value.map((node) => node.info?.utilization?.imports_running)
   return {
     running: counts.reduce<number>((sum, count) => sum + (count ?? 0), 0),
+    reported: counts.some((count) => count !== undefined),
     atLeast: counts.some((count) => count === undefined),
     nodes: infraNodes.value.filter((node) => (node.info?.utilization?.imports_running ?? 0) > 0),
   }
@@ -343,7 +345,7 @@ const pageDescription = computed(() =>
             <template v-if="activity.running" #value>
               <b>{{ activity.atLeast ? 'at least ' : '' }}{{ formatCount(activity.running) }}</b> {{ activity.running === 1 ? 'import' : 'imports' }} running
             </template>
-            <template v-else #value>none</template>
+            <template v-else #value>{{ activity.reported ? 'none' : '-' }}</template>
             <!-- Each importing node by name, opening its page. -->
             <template v-if="activity.nodes.length">
               on
@@ -352,7 +354,6 @@ const pageDescription = computed(() =>
                 <RouterLink :to="{ name: 'node', params: { nodeId: busy.node_id } }" class="hover:underline">{{ nodeName(busy) }}</RouterLink>
               </template>
             </template>
-            <template v-else-if="activity.atLeast">Not every node reports its imports.</template>
           </OverviewCell>
           <OverviewCell v-else label="Realm">
             <template v-if="realmNodesText" #value>

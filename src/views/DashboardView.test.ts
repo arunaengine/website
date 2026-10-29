@@ -738,7 +738,24 @@ describe('realm nodes in the overview', () => {
     realmInfo.value = { metadata_replication: { default_replication_factor: null }, nodes: [beat('mgmt-node', 'management', 1000)] }
     await flush()
     await flush()
-    expect(content(mounted.root)).toContain('Activitynone')
+    // No heartbeat carries a count yet: a dash, and nothing more.
+    expect(content(mounted.root)).toContain('Activity-')
+    expect(content(mounted.root)).not.toContain('Not every node')
+    mounted.app.unmount()
+
+    // The reporting nodes say 0: just "none", though another node has no count yet.
+    loadRealmView.mockResolvedValue({
+      info: { node: { peer_id: 'mgmt-node' } },
+      realm: { nodes: [
+        { ...beat('mgmt-node', 'management', 9000), info: { utilization: { heartbeat_at_ms: 9000, imports_running: 0 } } },
+        beat('server-node', 'server', 8000),
+      ] },
+    })
+    mounted = await mountApp(DashboardClient)
+    await flush()
+    const text = content(mounted.root)
+    expect(text).toContain('Activitynone')
+    expect(text).not.toContain('Not every node')
     mounted.app.unmount()
   })
 })
