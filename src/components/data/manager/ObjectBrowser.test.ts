@@ -14,6 +14,7 @@ import {
 import {
   brokenFiles,
   bucketSearches,
+  bucketUsage,
   debounceHold,
   desktopMode,
   fakeManager,
@@ -233,12 +234,13 @@ describe('object browser row actions', () => {
 })
 
 describe('object browser toolbar', () => {
-  it('opens the bucket settings from one labelled icon', async () => {
+  it('opens the bucket settings from one labelled button that keeps only its icon on a phone', async () => {
     push.mockClear()
     const root = await render()
     const settings = action(root, 'Bucket settings')
 
-    expect(content(settings).trim()).toBe('')
+    expect(content(settings).trim()).toBe('Settings')
+    expect(element(settings, (node) => node.tag === 'span').props.class).toBe('@max-[600px]:sr-only')
     await bubbleClick(settings)
 
     expect(push).toHaveBeenCalledWith(
@@ -264,13 +266,33 @@ describe('object browser link a local folder', () => {
     expect(onSyncToComputer).toHaveBeenCalledWith(source)
   })
 
-  it('keeps every toolbar label in the desktop and hides them below xl on the web', async () => {
+  it('keeps every toolbar label in the desktop and keeps only icons on a phone on the web', async () => {
     desktopMode.on = true
-    const label = (root: HostNode) => element(action(root, 'Add data'), (node) => node.tag === 'span' && content(node) === 'Add data')
+    const label = (root: HostNode) => element(action(root, 'New folder'), (node) => node.tag === 'span' && content(node) === 'New folder')
     expect(label(await render()).props.class).toBeFalsy()
 
     desktopMode.on = false
-    expect(label(await render()).props.class).toBe('hidden xl:inline')
+    expect(label(await render()).props.class).toBe('@max-[600px]:sr-only')
+  })
+
+  it('names the file count and size of the bucket and the nodes it syncs with', async () => {
+    bucketUsage.value.value = { objects: 16 }
+    const relationship = { source: 'arn:aruna:realm:self:s3/reef', target: 'arn:aruna:realm:laptop-1:s3/reef' }
+    try {
+      const root = await render({ syncsForKey: () => [{ relationship, direction: 'outgoing' }] })
+      const text = content(root)
+      expect(text).toContain('16 files stored')
+      expect(text).toContain('synced with node laptop-1')
+      expect(element(root, (node) => node.tag === 'a' && content(node) === 'node laptop-1').props.to).toEqual({ name: 'node', params: { nodeId: 'laptop-1' } })
+    } finally {
+      bucketUsage.value.value = null
+    }
+  })
+
+  it('shows no count while the usage is unknown, never a zero', async () => {
+    const root = await render()
+    expect(content(root)).not.toContain('files stored')
+    expect(content(root)).not.toContain('synced with')
   })
 
   it('keeps the button out of the web portal', async () => {
@@ -293,13 +315,14 @@ describe('object browser link a local folder', () => {
     const source = { bucket: 'reef', nodeId: 'realm-1', groupId: 'g1' }
     const desktop = await render({ currentBindSource: computed(() => source) })
 
-    for (const text of ['Link a local folder', 'New folder', 'Add data']) {
+    for (const text of ['Link a local folder', 'New folder', 'Upload']) {
       expect(String(label(desktop, text).props.class ?? '')).not.toContain('hidden')
     }
 
     desktopMode.on = false
     const web = await render()
-    expect(String(label(web, 'Add data').props.class)).toContain('hidden xl:inline')
+    expect(String(label(web, 'New folder').props.class)).toContain('@max-[600px]:sr-only')
+    expect(label(web, 'Upload').props.class).toBeFalsy()
   })
 })
 
@@ -597,14 +620,29 @@ describe('object browser selection', () => {
     }
   })
 
-  it('lets the list bar fit a narrow screen', async () => {
+  it('lets the toolbar wrap on a narrow screen with the search box taking the free width', async () => {
     const root = await render()
-    const bar = element(root, (node) => String(node.props.class ?? '').includes('h-12'))
-    const filter = element(root, (node) => String(node.props.class ?? '').includes('w-80'))
+    const form = element(root, (node) => node.tag === 'form')
+    const tools = form.parent!.parent!
 
-    expect(String(bar.props.class)).toContain('overflow-x-auto')
-    expect(String(filter.props.class)).toContain('shrink')
-    expect(String(filter.props.class)).not.toContain('shrink-0')
+    expect(String(form.props.class)).toContain('min-w-0 flex-1')
+    expect(String(tools.props.class)).toContain('min-w-[min(100%,300px)] flex-1')
+    expect(String(tools.parent!.props.class)).toContain('flex-wrap')
+  })
+
+  it('shows the search hint as a block under the toolbar on a phone', async () => {
+    const root = await render()
+    const box = element(root, (node) => node.tag === 'input' && node.props.placeholder === 'Search files')
+    ;(element(root, (node) => node.tag === 'form').props.onFocusin as () => void)()
+    ;(box.props['onUpdate:modelValue'] as (next: string) => void)('gff')
+    await flush()
+    const hints = nodes(root).filter((node) => node.props['data-hint'])
+
+    expect(hints).toHaveLength(2)
+    expect(String(hints[0].props.class)).toContain('@max-[600px]:hidden')
+    expect(String(hints[1].props.class)).toContain('hidden')
+    expect(String(hints[1].props.class)).toContain('@max-[600px]:block')
+    expect(content(hints[1])).toBe('Filtering raw for gff')
   })
 
   it('marks the filter button and offers the reset once a filter is set', async () => {
@@ -830,7 +868,7 @@ describe('the one search box', () => {
     const opened: unknown[] = []
     const host = defineComponent({ setup: () => () => h(browser, { manager, 'onOpen-hit': (hit: unknown) => opened.push(hit) }) })
     const { root } = await mountApp(host)
-    const box = () => element(root, (node) => node.tag === 'input' && node.props.placeholder === 'Filter this folder, Enter searches the bucket')
+    const box = () => element(root, (node) => node.tag === 'input' && node.props.placeholder === 'Search files')
     const type = async (value: string) => {
       ;(box().props['onUpdate:modelValue'] as (next: string) => void)(value)
       await flush()
@@ -885,7 +923,7 @@ describe('the one search box', () => {
   it('has one search box in the list bar and none above it', async () => {
     const { root } = await setup()
     const boxes = nodes(root).filter((node) => node.tag === 'input' && node.props.type !== 'checkbox')
-    expect(boxes.map((node) => node.props.placeholder)).toEqual(['Filter this folder, Enter searches the bucket'])
+    expect(boxes.map((node) => node.props.placeholder)).toEqual(['Search files'])
   })
 
   it('hands Enter to the open search even with an empty box, where its chips may stand alone', async () => {

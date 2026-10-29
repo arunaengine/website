@@ -277,7 +277,8 @@ async function createFolder() {
 </script>
 
 <template>
-  <div>
+  <!-- The content width, not the window, sets the layout: the app's sidebar takes its part. -->
+  <div class="@container">
     <PageHeader
       :title="headerTitle"
       :description="headerDescription"

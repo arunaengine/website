@@ -14,6 +14,7 @@ import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import ObjectListBar from '@/components/data/manager/ObjectListBar.vue'
 import MetadataSearch from '@/components/data/MetadataSearch.vue'
 import RowMenu from '@/components/data/manager/RowMenu.vue'
+import SearchHint from '@/components/data/manager/SearchHint.vue'
 import SelectionBar from '@/components/data/manager/SelectionBar.vue'
 import TransferDialog from '@/components/data/manager/TransferDialog.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
@@ -26,6 +27,7 @@ import { exampleMark } from '@/lib/distributedMockData'
 import type { BindSource } from '@/lib/bindSource'
 import { folderName } from '@/lib/deviceApi'
 import { useBrokenFiles } from '@/composables/useBrokenFiles'
+import { useBucketUsage, usageText } from '@/composables/useBucketUsage'
 import { useLockedBucket } from '@/composables/useLockedBucket'
 import { useProviderBucket } from '@/composables/useProviderBucket'
 import type { DataManager } from '@/composables/useDataManager'
@@ -48,6 +50,7 @@ import type { TransferMode, TransferSource } from '@/lib/objectMove'
 import { copyToClipboard, formatBytes, relativeTime } from '@/lib/utils'
 import { formatCount } from '@/lib/formatCount'
 import { isWorkspaceBucket } from '@/lib/workspaces'
+import { parseArunaArn } from '@/lib/sync'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
@@ -67,8 +70,10 @@ import {
   Lock,
   NotebookPen,
   Plus,
+  RefreshCw,
   Search,
   Settings,
+  Upload,
   Trash2,
   Undo2,
 } from '@lucide/vue'
@@ -87,8 +92,8 @@ const emit = defineEmits<{
 const s3 = useS3()
 // Aruna Desktop binds a bucket to a folder; the web only syncs between nodes.
 const desktop = isDesktop()
-// The desktop never hides toolbar labels; its toolbar wraps instead.
-const toolbarLabel = desktop ? '' : 'hidden xl:inline'
+// The desktop never hides toolbar labels; its toolbar wraps instead. A phone keeps only the icons.
+const toolbarLabel = desktop ? '' : '@max-[600px]:sr-only'
 const { isRealmAdmin } = useAruna()
 const { getBucketPlacement } = usePlacementPolicies()
 const { shown } = usePortalFeatures()
@@ -163,7 +168,19 @@ const {
   restoreObject,
   requestDelete,
   publicAccess,
+  syncsForKey,
 } = props.manager
+
+const usage = useBucketUsage(bucket, remoteNodeId)
+// The other nodes this bucket syncs with, each named once.
+const syncPartners = computed(() => {
+  const own = remoteNodeId.value ?? realmNodes.localNodeId.value
+  const ids = syncsForKey('').map(({ relationship, direction }) =>
+    parseArunaArn(direction === 'outgoing' ? relationship.target : relationship.source)?.nodeId ?? null)
+  return [...new Set(ids)].filter((id): id is string => Boolean(id) && id !== own).map((id) => ({ id, name: realmNodes.displayName(id) }))
+})
+const hinting = ref(false)
+const hintFolder = computed(() => prefix.value.split('/').at(-1) || bucket.value)
 
 // A link to part of the bucket names that part, so the note never claims the whole bucket.
 const linkedPart = computed(() => {
@@ -468,107 +485,6 @@ async function onDrop(event: DragEvent) {
     <EmptyState v-if="!bucket" title="Select a bucket to browse its objects." />
 
     <template v-else>
-      <!-- On a narrow screen the actions move below the path instead of squeezing it. -->
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <div class="flex min-w-[10rem] flex-1 items-center gap-2">
-          <Breadcrumbs :bucket="bucket" :path="prefix" single-line @navigate="openCrumb" />
-          <Badge v-if="lockedOnNode" :variant="stateVariant('locked')" size="sm" class="shrink-0">
-            <Lock class="mr-0.5 h-3 w-3" aria-hidden="true" /> Locked on the node
-          </Badge>
-          <Badge v-if="availableToYou" variant="success" size="sm" class="shrink-0">Available to you</Badge>
-          <span v-if="providerBucket" class="min-w-0 truncate text-xs text-muted-foreground">
-            Stored in provider bucket <span class="font-mono text-foreground">{{ providerBucket }}</span>
-          </span>
-          <Spinner v-if="listLoading" label="Loading objects" class="shrink-0" />
-          <span role="status" class="shrink-0 text-xs text-muted-foreground">{{ shareNote }}</span>
-        </div>
-        <div class="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
-          <WatchButton
-            surface="bucket"
-            :path-prefix="watchPathPrefix"
-            :group-id="activeGroupId"
-            :resource-label="`${bucket}/${s3Prefix}`"
-            bell
-          />
-          <!-- A dot instead of a count: the settings page names what it holds. -->
-          <span v-if="showStorageButton" data-tour="bucket-settings" class="relative inline-flex">
-            <IconButton
-              label="Bucket settings"
-              variant="outline"
-              size="icon"
-              class="h-8 w-8"
-              @click="openBucketSettings"
-            >
-              <Settings class="h-4 w-4" />
-            </IconButton>
-            <span
-              v-if="storageCount"
-              class="pointer-events-none absolute right-1 top-1 size-1.5 rounded-full bg-primary"
-              aria-hidden="true"
-            />
-          </span>
-          <Popover v-if="showReferenceStats">
-            <Button
-              variant="outline"
-              size="sm"
-              :title="`${referenceStats.count} referenced object${referenceStats.count === 1 ? '' : 's'}, ${formatBytes(referenceStats.bytes)}, open per-source breakdown`"
-            >
-              <Link2 class="h-4 w-4 text-primary" />
-              <span class="text-xs">{{ referenceStats.count }} referenced, {{ formatBytes(referenceStats.bytes) }}</span>
-            </Button>
-            <template #content>
-              <div class="space-y-2">
-                <div>
-                  <p class="text-sm font-semibold text-foreground">Referenced data</p>
-                  <p class="mt-0.5 text-xs text-muted-foreground">
-                    {{ referenceStats.count }} object{{ referenceStats.count === 1 ? '' : 's' }} in this
-                    bucket point{{ referenceStats.count === 1 ? 's' : '' }} at data held elsewhere,
-                    {{ formatBytes(referenceStats.bytes) }} in total.
-                  </p>
-                </div>
-                <ul class="space-y-1 border-t border-border pt-2">
-                  <li
-                    v-for="group in referenceStats.groups"
-                    :key="group.key"
-                    class="flex items-start justify-between gap-3 text-xs"
-                  >
-                    <span class="min-w-0 text-foreground">
-                      <RouterLink
-                        v-if="group.connectorId && activeGroupId && shown('connectors')"
-                        :to="{ name: 'group', params: { id: activeGroupId }, query: { tab: 'sources', connector: group.connectorId } }"
-                        class="block truncate text-primary hover:underline"
-                        :title="`${referenceGroupLabel(group)}, open the connector`"
-                      >
-                        {{ referenceGroupLabel(group) }}
-                      </RouterLink>
-                      <RouterLink
-                        v-else-if="group.originNodeId"
-                        :to="{ name: 'status', query: { node: group.originNodeId } }"
-                        class="block truncate text-primary hover:underline"
-                        :title="`${referenceGroupLabel(group)}, open the node on the Status page`"
-                      >
-                        {{ referenceGroupLabel(group) }}
-                      </RouterLink>
-                      <span v-else class="block truncate" :title="referenceGroupLabel(group)">{{ referenceGroupLabel(group) }}</span>
-                      <span v-if="group.sourcePaths.length" class="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground" :title="group.sourcePaths.join('\n')">
-                        {{ group.sourcePaths.join(', ') }}<template v-if="group.count > group.sourcePaths.length">, …</template>
-                      </span>
-                    </span>
-                    <span class="shrink-0 font-mono text-muted-foreground">
-                      {{ group.count }}, {{ formatBytes(group.bytes) }}
-                    </span>
-                  </li>
-                </ul>
-              </div>
-            </template>
-          </Popover>
-          <!-- The Add data pipeline always targets the connected node. -->
-          <Button v-if="desktop && currentBindSource && !currentLinkedFolder && !remoteBlocked" variant="outline" size="sm" aria-label="Link a local folder" title="Keep a folder on this computer and this bucket in step" @click="emit('sync-to-computer', currentBindSource)"><FolderSync class="h-4 w-4" /><span :class="toolbarLabel">Link a local folder</span></Button>
-          <Button v-if="!remoteBlocked" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="New folder" :title="writeRestrictionMessage ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /><span :class="toolbarLabel">New folder</span></Button>
-          <Button v-if="notebooks && !remoteNodeId" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="New notebook" :title="writeRestrictionMessage ?? 'Create a notebook here'" @click="emit('new-notebook')"><NotebookPen class="h-4 w-4" /><span :class="toolbarLabel">New notebook</span></Button>
-          <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="Add data" :title="writeRestrictionMessage ?? 'Add data'" @click="emit('add-data')"><Plus class="h-4 w-4" /><span :class="toolbarLabel">Add data</span></Button>
-        </div>
-      </div>
       <div v-if="deletedLoading || (showDeleted && deletedTruncated)" class="flex flex-wrap items-center gap-x-3 gap-y-1">
         <Spinner v-if="deletedLoading" label="Loading deleted objects" />
         <p v-if="showDeleted && deletedTruncated" class="text-xs text-muted-foreground">
@@ -609,13 +525,124 @@ async function onDrop(event: DragEvent) {
         @dragleave="dragActive = false"
         @drop.prevent="onDrop"
       >
-        <ObjectListBar
-          v-model:text="searchText"
-          :manager="manager"
-          :whole-bucket="wholeBucket"
-          @search-bucket="searchBucket"
-          @back="backToFolder"
-        />
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-2.5">
+          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted-foreground">
+            <span v-if="usage" class="tabular-nums">{{ usageText(usage, true) }}</span>
+            <Badge v-if="syncPartners.length" variant="success" size="sm" class="max-w-full gap-1">
+              <RefreshCw class="h-3 w-3 shrink-0" aria-hidden="true" />
+              <span class="truncate">synced with
+                <template v-for="(partner, index) in syncPartners" :key="partner.id"><template v-if="index">, </template><RouterLink :to="{ name: 'node', params: { nodeId: partner.id } }" class="hover:underline">{{ partner.name }}</RouterLink></template>
+              </span>
+            </Badge>
+            <Badge v-if="lockedOnNode" :variant="stateVariant('locked')" size="sm" class="shrink-0">
+              <Lock class="mr-0.5 h-3 w-3" aria-hidden="true" /> Locked on the node
+            </Badge>
+            <Badge v-if="availableToYou" variant="success" size="sm" class="shrink-0">Available to you</Badge>
+            <span v-if="providerBucket" class="min-w-0 truncate text-xs">
+              Stored in provider bucket <span class="font-mono text-foreground">{{ providerBucket }}</span>
+            </span>
+            <Popover v-if="showReferenceStats">
+              <Button
+                variant="outline"
+                size="sm"
+                :title="`${referenceStats.count} referenced object${referenceStats.count === 1 ? '' : 's'}, ${formatBytes(referenceStats.bytes)}, open per-source breakdown`"
+              >
+                <Link2 class="h-4 w-4 text-primary" />
+                <span class="text-xs">{{ referenceStats.count }} referenced, {{ formatBytes(referenceStats.bytes) }}</span>
+              </Button>
+              <template #content>
+                <div class="space-y-2">
+                  <div>
+                    <p class="text-sm font-semibold text-foreground">Referenced data</p>
+                    <p class="mt-0.5 text-xs text-muted-foreground">
+                      {{ referenceStats.count }} object{{ referenceStats.count === 1 ? '' : 's' }} in this
+                      bucket point{{ referenceStats.count === 1 ? 's' : '' }} at data held elsewhere,
+                      {{ formatBytes(referenceStats.bytes) }} in total.
+                    </p>
+                  </div>
+                  <ul class="space-y-1 border-t border-border pt-2">
+                    <li
+                      v-for="group in referenceStats.groups"
+                      :key="group.key"
+                      class="flex items-start justify-between gap-3 text-xs"
+                    >
+                      <span class="min-w-0 text-foreground">
+                        <RouterLink
+                          v-if="group.connectorId && activeGroupId && shown('connectors')"
+                          :to="{ name: 'group', params: { id: activeGroupId }, query: { tab: 'sources', connector: group.connectorId } }"
+                          class="block truncate text-primary hover:underline"
+                          :title="`${referenceGroupLabel(group)}, open the connector`"
+                        >
+                          {{ referenceGroupLabel(group) }}
+                        </RouterLink>
+                        <RouterLink
+                          v-else-if="group.originNodeId"
+                          :to="{ name: 'status', query: { node: group.originNodeId } }"
+                          class="block truncate text-primary hover:underline"
+                          :title="`${referenceGroupLabel(group)}, open the node on the Status page`"
+                        >
+                          {{ referenceGroupLabel(group) }}
+                        </RouterLink>
+                        <span v-else class="block truncate" :title="referenceGroupLabel(group)">{{ referenceGroupLabel(group) }}</span>
+                        <span v-if="group.sourcePaths.length" class="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground" :title="group.sourcePaths.join('\n')">
+                          {{ group.sourcePaths.join(', ') }}<template v-if="group.count > group.sourcePaths.length">, …</template>
+                        </span>
+                      </span>
+                      <span class="shrink-0 font-mono text-muted-foreground">
+                        {{ group.count }}, {{ formatBytes(group.bytes) }}
+                      </span>
+                    </li>
+                  </ul>
+                </div>
+              </template>
+            </Popover>
+          </div>
+          <div class="ml-auto flex shrink-0 items-center gap-1.5">
+            <WatchButton
+              surface="bucket"
+              :path-prefix="watchPathPrefix"
+              :group-id="activeGroupId"
+              :resource-label="`${bucket}/${s3Prefix}`"
+              bell
+              :label-class="toolbarLabel"
+            />
+            <!-- A dot instead of a count: the settings page names what it holds. -->
+            <span v-if="showStorageButton" data-tour="bucket-settings" class="relative inline-flex">
+              <Button variant="outline" size="sm" aria-label="Bucket settings" title="Bucket settings" @click="openBucketSettings">
+                <Settings class="h-4 w-4" /><span :class="toolbarLabel">Settings</span>
+              </Button>
+              <span
+                v-if="storageCount"
+                class="pointer-events-none absolute right-1 top-1 size-1.5 rounded-full bg-primary"
+                aria-hidden="true"
+              />
+            </span>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pb-2 pt-2.5">
+          <div class="flex min-w-0 max-w-full items-center gap-2">
+            <Breadcrumbs :bucket="bucket" :path="prefix" single-line @navigate="openCrumb" />
+            <Spinner v-if="listLoading" label="Loading objects" class="shrink-0" />
+            <span role="status" class="shrink-0 text-xs text-muted-foreground">{{ shareNote }}</span>
+          </div>
+          <div class="ml-auto flex min-w-[min(100%,300px)] flex-1 items-center justify-end gap-1.5">
+            <ObjectListBar
+              v-model:text="searchText"
+              v-model:hinting="hinting"
+              class="max-w-md"
+              :manager="manager"
+              :whole-bucket="wholeBucket"
+              @search-bucket="searchBucket"
+              @back="backToFolder"
+            />
+            <Button v-if="desktop && currentBindSource && !currentLinkedFolder && !remoteBlocked" variant="outline" size="sm" aria-label="Link a local folder" title="Keep a folder on this computer and this bucket in step" @click="emit('sync-to-computer', currentBindSource)"><FolderSync class="h-4 w-4" /><span :class="toolbarLabel">Link a local folder</span></Button>
+            <Button v-if="notebooks && !remoteNodeId" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" aria-label="New notebook" :title="writeRestrictionMessage ?? 'Create a notebook here'" @click="emit('new-notebook')"><NotebookPen class="h-4 w-4" /><span :class="toolbarLabel">New notebook</span></Button>
+            <!-- The Add data pipeline always targets the connected node. -->
+            <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix" aria-label="Upload" :title="writeRestrictionMessage ?? 'Upload files or add data from other sources'" @click="emit('add-data')"><Upload class="h-4 w-4" /><span>Upload</span></Button>
+            <Button v-if="!remoteBlocked" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" aria-label="New folder" :title="writeRestrictionMessage ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /><span :class="toolbarLabel">New folder</span></Button>
+          </div>
+        </div>
+        <SearchHint v-if="hinting" :text="searchText" :folder="hintFolder" :bucket="bucket" class="mx-4 mb-2 hidden shadow-none @max-[600px]:block" />
         <MetadataSearch
           v-if="wholeBucket"
           ref="bucketSearch"

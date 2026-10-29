@@ -42,6 +42,8 @@ const props = defineProps<{
   size?: 'sm' | 'default'
   // A small bell that opens a popover, where a watch can also change its events.
   bell?: boolean
+  // Shows "Notify me" next to the bell, with this class on the text.
+  labelClass?: string
 }>()
 
 const NO_SYNC_REASON = 'This folder is not the source of a sync'
@@ -242,12 +244,12 @@ const onDelete = () => exclusive(async () => {
       <Button
         variant="outline"
         :size="bell ? 'icon' : size ?? 'default'"
-        :class="bell ? 'h-8 w-8' : undefined"
+        :class="bell ? (labelClass === undefined ? 'h-8 w-8' : 'h-8 w-auto px-2.5') : undefined"
         disabled
         :title="unavailableReason"
-        :aria-label="bell ? title : undefined"
+        :aria-label="bell && labelClass === undefined ? title : undefined"
       >
-        <Bell v-if="bell" class="h-4 w-4" />
+        <template v-if="bell"><Bell class="h-4 w-4" /><span v-if="labelClass !== undefined" :class="labelClass">Notify me</span></template>
         <template v-else><Eye class="h-4 w-4" /> Watch</template>
       </Button>
     </span>
@@ -257,13 +259,14 @@ const onDelete = () => exclusive(async () => {
     <Button
       variant="outline"
       size="icon"
-      class="h-8 w-8"
+      :class="labelClass === undefined ? 'h-8 w-8' : 'h-8 w-auto px-2.5'"
       :aria-pressed="watching"
-      :aria-label="title"
+      :aria-label="labelClass === undefined ? title : undefined"
       :title="watching ? `You are watching this ${isData ? 'folder' : 'path'}` : title"
     >
       <BellRing v-if="watching" class="h-4 w-4 text-primary" />
       <Bell v-else class="h-4 w-4" />
+      <span v-if="labelClass !== undefined" :class="labelClass">Notify me</span>
     </Button>
     <template #content>
       <p class="text-sm font-semibold text-foreground">{{ title }}</p>

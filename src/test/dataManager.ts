@@ -63,6 +63,9 @@ export const MenuItemStub = defineComponent({
     h('button', { ...attrs, role: attrs.role ?? 'menuitem', disabled: props.disabled }, slots.default?.()),
 })
 
+/** The usage the browser under test reads for the open bucket. */
+export const bucketUsage = { value: ref<{ objects: number } | null>(null) }
+
 /** Whether the browser under test runs inside Aruna Desktop. */
 export const desktopMode = { on: false }
 
@@ -99,6 +102,10 @@ function lockedBucket(...args: unknown[]) {
 }
 
 let compiled: Component | null = null
+const SearchHintStub = defineComponent({
+  props: { text: String, folder: String, bucket: String },
+  setup: (props, { attrs }) => () => h('aside', { ...attrs, 'data-hint': true }, `Filtering ${props.folder} for ${props.text}`),
+})
 let compiledBar: Component | null = null
 let compiledMenu: Component | null = null
 let compiledSelection: Component | null = null
@@ -150,6 +157,7 @@ export function objectListBar(): Component {
       vue: VueRuntime,
       '@lucide/vue': new Proxy({}, { get: () => IconStub }),
       '@vueuse/core': {
+        useElementSize: () => ({ width: VueRuntime.ref(0), height: VueRuntime.ref(0) }),
         useDebounceFn: (fn: (...args: unknown[]) => unknown) => (...args: unknown[]) => {
           if (!debounceHold.on) return fn(...args)
           debounceHold.queue.push(() => fn(...args))
@@ -165,6 +173,7 @@ export function objectListBar(): Component {
       '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Slotted('span')),
       '@/components/ui/IconButton.vue': moduleDefault(IconButtonStub),
       '@/components/ui/Input.vue': moduleDefault(Slotted('input')),
+      '@/components/data/manager/SearchHint.vue': moduleDefault(SearchHintStub),
     },
   )
   return compiledBar
@@ -223,6 +232,9 @@ export function objectBrowser(): Component {
       '@/components/data/MetadataSearch.vue': moduleDefault(BucketSearchStub),
       '@/components/data/manager/RowMenu.vue': moduleDefault(rowMenu()),
       '@/components/data/manager/SelectionBar.vue': moduleDefault(selectionBar()),
+      '@/components/data/manager/SearchHint.vue': moduleDefault(SearchHintStub),
+      '@/composables/useBucketUsage': { useBucketUsage: () => bucketUsage.value, usageText: (usage: { objects: number }) => `${usage.objects} files stored` },
+      '@/lib/sync': { parseArunaArn: (arn: string) => ({ nodeId: arn.split(':')[3] ?? null }) },
       '@/components/data/manager/TransferDialog.vue': moduleDefault(Slotted('aside')),
       '@/components/watches/WatchButton.vue': moduleDefault(Slotted('button')),
       '@/components/storage/KeyedReadNotice.vue': moduleDefault(Slotted('aside')),
@@ -284,6 +296,7 @@ export function fakeManager(overrides: Record<string, unknown> = {}) {
     s3Prefix: ref('raw/'),
     remoteNodeId: ref(null),
     realmNodes: { displayName: (id: string) => `node ${id}`, nodeById: () => null, localNodeId: ref(null) },
+    syncsForKey: () => [],
     references: { prefixHasReferences: () => false, keyIsReferenced: () => false },
     referenceStats: computed(() => ({ count: 0, bytes: 0, groups: [] })),
     showReferenceStats: computed(() => false),

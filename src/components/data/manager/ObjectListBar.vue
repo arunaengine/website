@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The one search box and the filter menu of the file list. Typing filters this folder; Enter
-// searches the whole bucket, where a `column=value` matches a metadata column.
+// searches the whole bucket, where a `column=value` matches a metadata column. While typing, a
+// hint under the box says so; a phone shows it under the toolbar instead (`hinting`).
 import Button from '@/components/ui/Button.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
@@ -9,10 +10,11 @@ import DropdownMenuLabel from '@/components/ui/DropdownMenuLabel.vue'
 import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import Input from '@/components/ui/Input.vue'
+import SearchHint from '@/components/data/manager/SearchHint.vue'
 import type { DataManager } from '@/composables/useDataManager'
 import { filtersChanged, type ListingShow } from '@/lib/objectListing'
-import { useDebounceFn } from '@vueuse/core'
-import { computed, watch } from 'vue'
+import { useDebounceFn, useElementSize } from '@vueuse/core'
+import { computed, ref, watch } from 'vue'
 import {
   Check,
   ListFilter,
@@ -27,6 +29,7 @@ const emit = defineEmits<{
   (e: 'back'): void
 }>()
 const text = defineModel<string>('text', { default: '' })
+const hinting = defineModel<boolean>('hinting', { default: false })
 
 const {
   nameFilter,
@@ -35,7 +38,17 @@ const {
   showDeleted,
   setShowDeleted,
   remoteNodeId,
+  bucket,
+  prefix,
 } = props.manager
+
+// A box narrower than its long placeholder says only "Search".
+const form = ref<HTMLElement | null>(null)
+const { width } = useElementSize(form)
+const placeholder = computed(() => (width.value && width.value < 150 ? 'Search' : 'Search files'))
+const focused = ref(false)
+watch(() => focused.value && Boolean(text.value.trim()) && !props.wholeBucket, (value) => (hinting.value = value), { immediate: true })
+const folder = computed(() => prefix.value.split('/').at(-1) || bucket.value)
 
 const SHOW_OPTIONS: { value: ListingShow; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -71,14 +84,14 @@ function onEscape() {
 </script>
 
 <template>
-  <div class="flex h-12 items-center gap-2 overflow-x-auto border-b border-border bg-muted/50 px-4 text-xs md:overflow-visible">
-    <form class="relative w-80 min-w-40 shrink" @submit.prevent="emit('search-bucket')">
+  <div class="flex min-w-0 flex-1 items-center gap-1.5">
+    <form ref="form" class="relative min-w-0 flex-1" @submit.prevent="emit('search-bucket')" @focusin="focused = true" @focusout="focused = false">
       <Search class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
       <Input
         v-model="text"
-        placeholder="Filter this folder, Enter searches the bucket"
+        :placeholder="placeholder"
         aria-label="Filter this folder or search the bucket"
-        class="h-8 pl-8 pr-7 text-xs"
+        class="h-8 pl-8 pr-7 text-sm"
         @keydown.esc="onEscape"
       />
       <button
@@ -90,6 +103,7 @@ function onEscape() {
       >
         <X class="h-3.5 w-3.5" />
       </button>
+      <SearchHint v-if="hinting" :text="text" :folder="folder" :bucket="bucket" class="absolute inset-x-0 top-full z-20 mt-1 @max-[600px]:hidden" />
     </form>
     <DropdownMenu>
       <span class="relative inline-flex shrink-0">

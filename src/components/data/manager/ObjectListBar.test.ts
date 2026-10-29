@@ -15,6 +15,9 @@ const InputStub = defineComponent({
 // The pause before a typed filter applies is over at once here.
 const useDebounceFn = (fn: (value: string) => void) => Object.assign((value: string) => fn(value), { cancel: () => {} })
 
+const boxWidth = ref(0)
+const icons = new Proxy({}, { get: () => defineComponent(() => () => null) })
+const SearchHint = compileClientComponent(new URL('./SearchHint.vue', import.meta.url), { vue: VueRuntime, '@lucide/vue': icons })
 const ObjectListBar = compileClientComponent(new URL('./ObjectListBar.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
@@ -27,7 +30,8 @@ const ObjectListBar = compileClientComponent(new URL('./ObjectListBar.vue', impo
   '@/components/ui/IconButton.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/lib/objectListing': ObjectListing,
-  '@vueuse/core': { useDebounceFn },
+  '@/components/data/manager/SearchHint.vue': moduleDefault(SearchHint),
+  '@vueuse/core': { useDebounceFn, useElementSize: () => ({ width: boxWidth }) },
   '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => null) }),
 })
 
@@ -39,11 +43,8 @@ function manager() {
     showDeleted: ref(false),
     setShowDeleted: () => {},
     remoteNodeId: ref(null),
-    activeGroupId: ref('g1'),
-    selectedObjectKeys: ref(new Set()),
-    selectedPrefixes: ref(new Set()),
-    selectedCount: ref(0),
-    clearSelection: () => {},
+    bucket: ref('laptop'),
+    prefix: ref('results/bakta/final'),
   }
 }
 
@@ -51,6 +52,7 @@ async function mount(wholeBucket = false, listShow = 'all') {
   const state = manager()
   state.listShow.value = listShow
   const text = ref('')
+  const hinting = ref(false)
   const events: string[] = []
   const bucket = ref(wholeBucket)
   const Host = defineComponent(() => () =>
@@ -59,6 +61,7 @@ async function mount(wholeBucket = false, listShow = 'all') {
       text: text.value,
       wholeBucket: bucket.value,
       'onUpdate:text': (value: string) => (text.value = value),
+      'onUpdate:hinting': (value: boolean) => (hinting.value = value),
       onSearchBucket: () => events.push('search-bucket'),
       onBack: () => events.push('back'),
     }))
@@ -68,7 +71,12 @@ async function mount(wholeBucket = false, listShow = 'all') {
     ;(input().props['onUpdate:modelValue'] as (next: string) => void)(value)
     await flush()
   }
-  return { mounted, state, text, events, bucket, input, type }
+  const form = () => element(mounted.root, (node) => node.tag === 'form')
+  const focus = async (on: boolean) => {
+    ;(form().props[on ? 'onFocusin' : 'onFocusout'] as () => void)()
+    await flush()
+  }
+  return { mounted, state, text, hinting, events, bucket, input, type, focus }
 }
 
 describe('the one search box of the file list', () => {
@@ -76,8 +84,48 @@ describe('the one search box of the file list', () => {
     const { mounted } = await mount()
     const boxes = nodes(mounted.root).filter((node) => node.tag === 'input')
     expect(boxes).toHaveLength(1)
-    expect(boxes[0].props.placeholder).toBe('Filter this folder, Enter searches the bucket')
-    expect(content(mounted.root)).not.toContain('Search names and details')
+    expect(boxes[0].props.placeholder).toBe('Search files')
+    expect(boxes[0].props['aria-label']).toBe('Filter this folder or search the bucket')
+    mounted.app.unmount()
+  })
+
+  it('says only Search in a narrow box', async () => {
+    boxWidth.value = 120
+    try {
+      const { mounted, input } = await mount()
+      expect(input().props.placeholder).toBe('Search')
+      mounted.app.unmount()
+    } finally {
+      boxWidth.value = 0
+    }
+  })
+
+  it('explains while typing what the text filters and what Enter does', async () => {
+    const { mounted, hinting, type, focus } = await mount()
+    await focus(true)
+    expect(hinting.value).toBe(false)
+    await type('gff')
+    const text = content(mounted.root)
+    expect(text).toContain('Filtering final for "gff"')
+    expect(text).toContain('Press Enter to search all of laptop. Use column=value for an exact match')
+    expect(hinting.value).toBe(true)
+
+    await type('organism=coli')
+    expect(content(mounted.root)).toContain('Press Enter to search all of laptop for organism=coli.')
+    expect(content(mounted.root)).not.toContain('Filtering')
+
+    await focus(false)
+    expect(hinting.value).toBe(false)
+    expect(content(mounted.root)).not.toContain('Press Enter')
+    mounted.app.unmount()
+  })
+
+  it('shows no hint during a bucket search', async () => {
+    const { mounted, hinting, type, focus } = await mount(true)
+    await focus(true)
+    await type('coli')
+    expect(hinting.value).toBe(false)
+    expect(content(mounted.root)).not.toContain('Press Enter')
     mounted.app.unmount()
   })
 
