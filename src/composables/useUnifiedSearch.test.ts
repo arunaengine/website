@@ -174,4 +174,26 @@ describe('unified document coverage', () => {
     expect(search.objects.value.map((object) => object.key)).toEqual(['a.fastq', 'b.fastq'])
     expect(search.objectCursor.value).toBeNull()
   })
+
+  it('stops following empty object pages on cancel and searches again on retry', async () => {
+    const coverage = { scope: 'realm', mode: 'distributed_best_effort', complete: false, truncated: true, partitions: [] }
+    // Each page answers on a later turn, like a request over the network.
+    mocks.searchObjects.mockImplementation((_term: string, options: { cursor?: string }) =>
+      new Promise((resolve) => setTimeout(() => resolve({ hits: [], next_cursor: `${options.cursor ?? ''}x`, coverage }), 0)))
+
+    const search = useUnifiedSearch(ref('rare'), { types: [], includeObjects: true })
+    await vi.waitFor(() => expect(mocks.searchObjects.mock.calls.length).toBeGreaterThan(2))
+    search.cancel()
+    const calls = mocks.searchObjects.mock.calls.length
+    await new Promise((resolve) => setTimeout(resolve, 5))
+
+    expect(mocks.searchObjects).toHaveBeenCalledTimes(calls)
+    expect(search.pending.value).toBe(false)
+    expect(search.searched.value).toBe(false)
+    expect(search.objects.value).toEqual([])
+
+    mocks.searchObjects.mockResolvedValue({ hits: [{ kind: 'object', issuer_node_id: 'node-a', group_id: 'group-a', bucket: 'raw-data', key: 'rare.txt' }], next_cursor: null, coverage })
+    search.retry()
+    await vi.waitFor(() => expect(search.objects.value.map((object) => object.key)).toEqual(['rare.txt']))
+  })
 })

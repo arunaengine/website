@@ -304,7 +304,26 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     }
   }
 
+  /** Ends the search and paging under way; a search cut short is cleared, and `retry` runs it again. */
+  function cancel() {
+    const cut = pending.value || timer !== undefined
+    clearTimeout(timer)
+    timer = undefined
+    ++seq
+    controller?.abort()
+    controller = null
+    sectionController?.abort()
+    sectionController = null
+    loadingSection.value = null
+    if (cut) {
+      cursorQuery = ''
+      reset()
+    }
+  }
+
   function retry() {
+    clearTimeout(timer)
+    timer = undefined
     const term = query.value.trim()
     if (term.length >= UNIFIED_MIN_CHARS) void runSearch(term)
   }
@@ -324,7 +343,10 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     reset()
     const term = query.value.trim()
     if (term.length < UNIFIED_MIN_CHARS) return
-    timer = window.setTimeout(() => void runSearch(term), UNIFIED_DEBOUNCE_MS)
+    timer = window.setTimeout(() => {
+      timer = undefined
+      void runSearch(term)
+    }, UNIFIED_DEBOUNCE_MS)
   })
 
   if (query.value.trim().length >= UNIFIED_MIN_CHARS) void runSearch(query.value.trim())
@@ -363,6 +385,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     complete,
     empty,
     loadMore,
+    cancel,
     retry,
   }
 }

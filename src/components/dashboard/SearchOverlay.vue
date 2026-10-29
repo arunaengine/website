@@ -28,7 +28,7 @@ import { errorMessage, truncateMiddle } from '@/lib/utils'
 import { ArrowRight, Search, Settings2, X } from '@lucide/vue'
 import { useMediaQuery } from '@vueuse/core'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 type QuickSection = 'datasets' | 'files' | 'buckets' | 'objects' | 'databases' | 'groups' | 'people'
 
@@ -72,6 +72,7 @@ const { realm } = useRealm()
 const { authToken } = useAruna()
 const { displayName: nodeDisplayName, isLocalNode } = useRealmNodes()
 const router = useRouter()
+const route = useRoute()
 const { objectSearchMode } = useSearchSettings()
 const databases = useDatabases()
 const objectModeOptions = Object.entries(OBJECT_SEARCH_MODE_LABELS).map(([value, label]) => ({ value, label }))
@@ -91,6 +92,7 @@ const {
   error: quickError,
   complete: quickComplete,
   retry: retrySearch,
+  cancel: cancelSearch,
 } = useUnifiedSearch(q, { limit: 5, includeObjects: true, objectMode: objectSearchMode })
 
 function objectParentPrefix(key: string): string | undefined {
@@ -214,6 +216,12 @@ watch(q, (value) => {
   // The list of databases is read once, when the first search needs it.
   if (value.trim().length >= 2) databases.ensure()
 })
+// Closed results stop the search and its paging; a search cut short runs again when they reopen.
+watch(showResults, (shown) => {
+  if (!shown) cancelSearch()
+  else if (q.value.trim().length >= 2 && !quickSearched.value && !quickPending.value) retrySearch()
+})
+watch(() => route.fullPath, () => (showResults.value = false))
 watch(isNarrowSearch, (narrow) => {
   if (!narrow && panelOpen.value) requestPanelClose(false)
 })

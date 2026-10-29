@@ -39,6 +39,7 @@ const authToken = ref<string | null>('token-a')
 const objectSearchMode = ref('distributed_best_effort')
 const mediaQuery = vi.fn(() => narrow)
 const routerPush = vi.fn()
+const route = VueRuntime.reactive({ fullPath: '/' })
 let configuredObjectMode: Ref<string> | undefined
 const search = {
   documents: ref<Array<Record<string, unknown>>>([]),
@@ -57,6 +58,7 @@ const search = {
   loadingSection: ref<string | null>(null),
   loadMore: vi.fn(),
   retry: vi.fn(),
+  cancel: vi.fn(),
 }
 
 function compileClientComponent(url: URL, modules: Record<string, unknown>) {
@@ -100,7 +102,7 @@ const coverageIcon = compileClientComponent(
 const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/search/CoverageIcon.vue': moduleDefault(coverageIcon),
-  'vue-router': { useRouter: () => ({ push: routerPush }) },
+  'vue-router': { useRouter: () => ({ push: routerPush }), useRoute: () => route },
   '@vueuse/core': { useMediaQuery: mediaQuery },
   '@lucide/vue': icons,
   '@/components/ui/Badge.vue': moduleDefault(defineComponent((_, { attrs, slots }) => () => h('span', attrs, slots.default?.()))),
@@ -409,6 +411,7 @@ function resetSearch() {
   search.loadingSection.value = null
   search.loadMore.mockReset()
   search.retry.mockReset()
+  search.cancel.mockReset()
   configuredObjectMode = undefined
 }
 
@@ -420,6 +423,7 @@ beforeEach(() => {
   objectSearchMode.value = 'distributed_best_effort'
   mediaQuery.mockClear()
   routerPush.mockReset()
+  route.fullPath = '/'
   resetSearch()
 })
 
@@ -530,6 +534,37 @@ describe('narrow TopBar search panel', () => {
 
     await focusout(input, { closest: () => null })
     expect(findElement(mounted.root, (node) => node.props.id === 'quick-search-results')).toBeUndefined()
+    mounted.app.unmount()
+  })
+
+  it('stops the search when its results close and runs a cut search again on reopening', async () => {
+    narrow.value = false
+    const mounted = await mount()
+    const input = element(mounted.root, (node) => node.tag === 'input')
+    await callHandler(input.props.onFocus, {})
+    await inputValue(input, 'sample')
+    search.pending.value = true
+
+    await keydown(input, 'Escape')
+    expect(search.cancel).toHaveBeenCalledOnce()
+
+    search.pending.value = false
+    await callHandler(input.props.onFocus, {})
+    await flush()
+    expect(search.retry).toHaveBeenCalledOnce()
+    mounted.app.unmount()
+  })
+
+  it('stops the search when the route changes', async () => {
+    narrow.value = false
+    const mounted = await mount()
+    const input = element(mounted.root, (node) => node.tag === 'input')
+    await callHandler(input.props.onFocus, {})
+    await inputValue(input, 'sample')
+
+    route.fullPath = '/buckets'
+    await flush()
+    expect(search.cancel).toHaveBeenCalledOnce()
     mounted.app.unmount()
   })
 
