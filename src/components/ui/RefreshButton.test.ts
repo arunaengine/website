@@ -27,4 +27,16 @@ describe('refresh button', () => {
     expect(button.props['aria-label']).toBe('Refresh devices')
     expect(content(button).trim()).toBe('')
   })
+
+  it('is a 36 px icon button with its label as name inside a page header', async () => {
+    const { defineComponent, h, provide } = await import('vue')
+    const Header = defineComponent(() => {
+      provide(Symbol.for('in page header'), true)
+      return () => h(refreshButton(), { busy: false })
+    })
+    const { root } = await mountApp(Header)
+    const button = element(root, (node) => node.tag === 'button')
+    expect(button.props['aria-label']).toBe('Refresh')
+    expect(content(button).trim()).toBe('')
+  })
 })

@@ -68,6 +68,8 @@ export function refreshButton(): Component {
       vue: VueRuntime,
       '@lucide/vue': new Proxy({}, { get: () => IconStub }),
       '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+      '@/components/ui/Tooltip.vue': moduleDefault(defineComponent((_, { slots }) => () => slots.default?.())),
+      '@/components/ui/pageHeader': { IN_PAGE_HEADER: Symbol.for('in page header') },
       '@/lib/utils': Utils,
     },
   )

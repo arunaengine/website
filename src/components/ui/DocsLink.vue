@@ -2,15 +2,17 @@
 // The one way a surface points at the manual: a link to a docs section that
 // exists. `section` names a section title and resolves to the anchor DocsView
 // renders for it, so a moved heading breaks the link test instead of the page.
-// `icon` keeps the target and drops the label into aria-label and title.
+// `icon` keeps the target and drops the label into aria-label and title; `button` is the 36 px
+// icon button of a page header, with the label in its tooltip.
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { BookOpen } from '@lucide/vue'
+import Tooltip from '@/components/ui/Tooltip.vue'
 import { docsTopicBySlug, sectionId } from '@/docs/v1'
 
 const props = withDefaults(
-  defineProps<{ topic: string; section?: string; label?: string; icon?: boolean }>(),
-  { section: undefined, label: undefined, icon: false },
+  defineProps<{ topic: string; section?: string; label?: string; icon?: boolean; button?: boolean }>(),
+  { section: undefined, label: undefined, icon: false, button: false },
 )
 
 const subject = computed(() => props.section ?? docsTopicBySlug(props.topic)?.title ?? props.topic)
@@ -25,8 +27,17 @@ const target = computed(() => ({
 </script>
 
 <template>
+  <Tooltip v-if="button" :label="text">
+    <RouterLink
+      :to="target"
+      :aria-label="text"
+      class="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-input bg-background text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <BookOpen class="size-4" aria-hidden="true" />
+    </RouterLink>
+  </Tooltip>
   <RouterLink
-    v-if="icon"
+    v-else-if="icon"
     :to="target"
     :aria-label="text"
     :title="text"
