@@ -961,6 +961,36 @@ describe('database buckets in the list', () => {
     allBuckets.hits.value = []
   })
 
+  it('keeps a recent distributed bucket in place when its local member arrives later', async () => {
+    nodeChoice.value = null
+    allBuckets.needsName.value = false
+    const listed = (count: number, from = 0) =>
+      Array.from({ length: count }, (_, index) => ({ bucket: `b${String(from + index).padStart(2, '0')}`, node_id: 'home', group_id: 'g1' }))
+    const shown = (root: Parameters<typeof content>[0]) =>
+      nodes(root).filter((node) => String(node.props['aria-label']).startsWith('Open b')).map((node) => content(node))
+    const remote = { bucket: 'b03', node_id: 'node-2', group_id: 'g1', set_id: 's1', nodes: ['node-2'] }
+    allBuckets.hits.value = listed(25).map((hit) => (hit.bucket === 'b03' ? remote : hit)) as never
+    allBuckets.more.value = true
+    // The later page holds this node's member, which now stands for the merged row.
+    loadMore.mockImplementationOnce(async () => {
+      const merged = { ...remote, node_id: 'home', nodes: ['node-2', 'home'] }
+      allBuckets.hits.value = [...allBuckets.hits.value.map((hit) => (hit.bucket === 'b03' ? merged : hit)), ...listed(5, 25)] as never
+      allBuckets.more.value = false
+    })
+    const state = manager()
+    state.shortcuts.recent.value = [{ bucket: 'b03', nodeId: 'node-2', groupId: 'g1' }]
+    const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
+    await flush()
+    const before = shown(root)
+    expect(before[0]).toContain('b03')
+
+    await click(button(root, 'Next'))
+    await flush()
+    await click(button(root, 'Prev'))
+    expect(shown(root)).toEqual(before)
+    allBuckets.hits.value = []
+  })
+
   it('fills a short page before it moves on, so no bucket is skipped', async () => {
     nodeChoice.value = null
     allBuckets.needsName.value = false

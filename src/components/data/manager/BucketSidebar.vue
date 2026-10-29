@@ -160,8 +160,9 @@ function databaseOf(name: string, nodeId: string | null): { title: string } | nu
 const shortcutNode = (hit: ListedBucket) => (realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id)
 type AllRow = { key: string; bucket: string; nodeId: string | null; hit: ListedBucket | null; pinned: boolean }
 // Recent buckets move up only within the first batch the nodes answered, so a later page never
-// reorders rows already shown; the batch starts over when the list does.
-const hitKey = (hit: ListedBucket) => `${hit.node_id}/${hit.bucket}`
+// reorders rows already shown; the batch starts over when the list does. A distributed bucket is
+// known by its set, since a member listed later may stand for the merged row.
+const hitKey = (hit: ListedBucket) => (hit.set_id ? `set:${hit.set_id}` : `${hit.node_id}/${hit.bucket}`)
 const firstBatch = ref(new Set<string>())
 watch(
   () => all.hits.value,
