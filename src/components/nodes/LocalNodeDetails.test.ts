@@ -57,4 +57,44 @@ describe('node interfaces', () => {
     expect(content(row)).toContain('-')
     expect(nodes(row).some((node) => node.tag === 'a')).toBe(false)
   })
+
+  it('shows the addresses a server published before its own, and its listen address only as a fallback', async () => {
+    const published = await mountApp(details, { props: { info: info('http://127.0.0.1:8080/api/v1'), publicApi: 'https://api.node-2.example.org/api/v1', publicS3: 'https://s3.node-2.example.org' } })
+    const text = content(published.root)
+    expect(text).toContain('https://api.node-2.example.org/api/v1')
+    expect(text).toContain('https://s3.node-2.example.org')
+    expect(text).toContain('https://api.node-2.example.org/api/v1/oai')
+    expect(text).not.toContain('127.0.0.1')
+    published.app.unmount()
+
+    const bare = await mountApp(details, { props: { info: info() } })
+    expect(content(element(bare.root, (node) => node.tag === 'li' && content(node).includes('REST')))).toContain('0.0.0.0:8080')
+    bare.app.unmount()
+  })
+
+  it('calls the addresses of a device local, names the realm API and leaves OAI-PMH out', async () => {
+    const { root } = await mountApp(details, {
+      props: { info: info('http://127.0.0.1:34116/api/v1'), device: true, realmApi: 'https://api.mgmt.example.org/api/v1' },
+    })
+    const text = content(root)
+
+    expect(text).toContain('Local addresses')
+    expect(text).toContain('Tools on this computer can connect here.')
+    expect(text).toContain('http://127.0.0.1:34116/api/v1')
+    expect(content(element(root, (node) => node.tag === 'li' && content(node).includes('Realm API')))).toContain('https://api.mgmt.example.org/api/v1')
+    expect(text).not.toContain('OAI-PMH')
+    expect(text).not.toContain('Interfaces')
+  })
+
+  it('says nothing about a working interface and one plain word about one that is not', async () => {
+    const working = info('https://api.example.org/api/v1')
+    working.services.interfaces.rest.status = 'available'
+    working.services.interfaces.s3.status = 'not_configured'
+    const { root } = await mountApp(details, { props: { info: working } })
+    const row = (label: string) => content(element(root, (node) => node.tag === 'li' && content(node).startsWith(label)))
+
+    expect(row('REST')).not.toMatch(/available/i)
+    expect(row('S3')).toContain('not configured')
+    expect(content(root)).not.toContain('AVAILABLE')
+  })
 })

@@ -23,6 +23,7 @@ const NodeDetailPanel = compileClientComponent(new URL('./NodeDetailPanel.vue', 
   './LocalNodeDetails.vue': moduleDefault(Empty),
   './NodeNameEdit.vue': moduleDefault(EditStub),
   './node-display': NodeDisplay,
+  './node-probe': { nodeApiBase: () => null },
   '@/lib/utils': Utils,
   '@lucide/vue': new Proxy({}, { get: () => Empty }),
 })

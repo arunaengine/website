@@ -233,6 +233,15 @@ function toggleNode(nodeId: string) {
 }
 // The cards and their details come from the same realm snapshot as the map; in the desktop that
 // is a realm node's, which knows the names and heartbeats the device's own copy lacks.
+// This node's realm record. In the desktop it is this computer's own node, which listens here only.
+const ownRecord = computed(() => (realmInfo.value?.nodes ?? []).find((node) => node.node_id === localPeerId.value) ?? null)
+const ownDevice = computed(() => ownRecord.value?.kind === 'user' || desktop)
+// Where tools reach the realm: a management node's public API, else the first one the realm names.
+const realmApi = computed(() => {
+  const management = panelInfra.value.find((node) => node.kind === 'management' && nodeApiBase(node))
+  return (management && nodeApiBase(management)) || realmInfo.value?.management_urls?.[0] || null
+})
+
 const cardNodes = computed(() =>
   [...panelInfra.value].sort((a, b) => kindOrder[a.kind] - kindOrder[b.kind] || a.node_id.localeCompare(b.node_id)),
 )
@@ -431,7 +440,14 @@ watch(
               <p class="mt-0.5 text-[11px] text-muted-foreground">Node-reported total; includes every bucket this node serves</p>
             </div>
           </dl>
-          <LocalNodeDetails v-if="nodeInfo" :info="nodeInfo" />
+          <LocalNodeDetails
+            v-if="nodeInfo"
+            :info="nodeInfo"
+            :public-api="ownRecord ? nodeApiBase(ownRecord) : null"
+            :public-s3="ownRecord?.info?.urls.s3 ?? null"
+            :device="ownDevice"
+            :realm-api="ownDevice ? realmApi : null"
+          />
         </div>
       </section>
       </template>

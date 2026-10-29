@@ -9,7 +9,18 @@ import { formatBytes } from '@/lib/utils'
 import type { InfoResponse } from '@/lib/api'
 import Notice from '@/components/ui/Notice.vue'
 
-const props = defineProps<{ info: InfoResponse }>()
+/**
+ * `publicApi` and `publicS3` are the addresses the node published in the realm; they come before the
+ * ones it reports itself. A device (`device`) listens on this computer only, so its addresses are
+ * local and `realmApi` names where tools reach the realm.
+ */
+const props = defineProps<{
+  info: InfoResponse
+  publicApi?: string | null
+  publicS3?: string | null
+  device?: boolean
+  realmApi?: string | null
+}>()
 
 interface Detail {
   label: string
@@ -52,17 +63,27 @@ const connectionCount = computed(() => {
   return undefined
 })
 
-// The node serves OAI-PMH under its REST base (aruna api/src/routes/oai.rs).
+// A published address first, then the node's own, then its listen address.
+const address = (published: string | null | undefined, own: { url?: string | null; bind?: string | null }) =>
+  published || own.url || own.bind || ''
+const restUrl = computed(() => address(props.publicApi, props.info.services.interfaces.rest))
+// The node serves OAI-PMH under its REST base (aruna api/src/routes/oai.rs), never under a listen
+// address; no one harvests a device.
 const oaiUrl = computed(() => {
-  const rest = props.info.services.interfaces.rest.url
-  return rest ? `${rest.replace(/\/+$/, '')}/oai` : ''
+  const base = props.publicApi || props.info.services.interfaces.rest.url
+  return base ? `${base.replace(/\/+$/, '')}/oai` : ''
 })
 
 const interfaces = computed(() => [
-  { label: 'REST', ...props.info.services.interfaces.rest },
-  { label: 'S3', ...props.info.services.interfaces.s3 },
-  { label: 'OAI-PMH', status: props.info.services.interfaces.rest.status, url: oaiUrl.value, bind: '', oai: true },
+  { label: 'REST', status: props.info.services.interfaces.rest.status, url: restUrl.value },
+  { label: 'S3', status: props.info.services.interfaces.s3.status, url: address(props.publicS3, props.info.services.interfaces.s3) },
+  ...(props.device
+    ? props.realmApi ? [{ label: 'Realm API', status: 'available', url: props.realmApi }] : []
+    : [{ label: 'OAI-PMH', status: props.info.services.interfaces.rest.status, url: oaiUrl.value, oai: true }]),
 ])
+
+// "not_configured" reads as "not configured".
+const statusWord = (status?: string | null) => (status || 'unknown').replace(/_/g, ' ')
 
 const services = computed(() =>
   (['network', 'blob', 'database'] as const)
@@ -90,7 +111,7 @@ const backends = computed(() =>
     </dl>
 
     <div>
-      <h2 class="font-display text-sm font-semibold text-aruna-navy">Interfaces</h2>
+      <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ device ? 'Local addresses' : 'Interfaces' }}</h2>
       <ul class="mt-1.5 space-y-1.5">
         <li
           v-for="iface in interfaces"
@@ -98,9 +119,10 @@ const backends = computed(() =>
           class="flex items-center gap-2 rounded-md border border-border/70 bg-background/60 px-2.5 py-1.5"
         >
           <span class="min-w-16 shrink-0 whitespace-nowrap text-xs font-medium text-foreground">{{ iface.label }}</span>
-          <Badge size="sm" :variant="statusVariant(iface.status)" class="shrink-0 uppercase">{{ iface.status || 'unknown' }}</Badge>
-          <span class="min-w-0 flex-1 truncate text-right font-mono text-[11px] text-muted-foreground" :title="iface.url || iface.bind || ''">
-            {{ iface.url || iface.bind || '-' }}
+          <!-- A working interface needs no word; only one that is not says so. -->
+          <span v-if="iface.status !== 'available'" class="shrink-0 text-[11px] text-destructive">{{ statusWord(iface.status) }}</span>
+          <span class="min-w-0 flex-1 truncate text-right font-mono text-[11px] text-muted-foreground" :title="iface.url">
+            {{ iface.url || '-' }}
           </span>
           <template v-if="'oai' in iface && iface.url">
             <CopyButton :value="iface.url" label="Copy OAI-PMH base URL" />
@@ -108,7 +130,9 @@ const backends = computed(() =>
           </template>
         </li>
       </ul>
-      <p class="mt-1.5 text-[11px] text-muted-foreground">OAI-PMH lets other services collect the metadata of public datasets.</p>
+      <p class="mt-1.5 text-[11px] text-muted-foreground">
+        {{ device ? 'Tools on this computer can connect here.' : 'OAI-PMH lets other services collect the metadata of public datasets.' }}
+      </p>
     </div>
 
     <div v-if="services.length">
@@ -120,7 +144,7 @@ const backends = computed(() =>
           class="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background/60 px-2 py-1 text-xs text-foreground"
         >
           {{ service.name }}
-          <Badge size="sm" :variant="statusVariant(service.status)" class="uppercase">{{ service.status }}</Badge>
+          <span v-if="service.status !== 'available'" class="text-[11px] text-destructive">{{ statusWord(service.status) }}</span>
         </span>
       </div>
     </div>

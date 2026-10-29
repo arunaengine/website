@@ -4,7 +4,7 @@ import NodeLabel from '@/components/ui/NodeLabel.vue'
 import LocalNodeDetails from './LocalNodeDetails.vue'
 import NodeNameEdit from './NodeNameEdit.vue'
 import { connectionLabel, kindLabel, nodeName, statusVariant } from './node-display'
-import type { NodeProbe } from './node-probe'
+import { nodeApiBase, type NodeProbe } from './node-probe'
 import type { RealmNodeInfo } from '@/lib/api'
 import { formatBytes, formatNumber } from '@/lib/utils'
 import { TriangleAlert } from '@lucide/vue'
@@ -124,7 +124,12 @@ defineProps<{
           <span class="text-[10px] font-semibold uppercase tracking-wider text-primary">{{ isLocal ? 'This node' : 'Node details' }}</span>
           <Badge size="sm" :variant="statusVariant(probe.info.node.status)" class="uppercase">{{ probe.info.node.status || 'unknown' }}</Badge>
         </div>
-        <LocalNodeDetails :info="probe.info" />
+        <LocalNodeDetails
+          :info="probe.info"
+          :public-api="nodeApiBase(node)"
+          :public-s3="node.info?.urls.s3 ?? null"
+          :device="node.kind === 'user'"
+        />
       </div>
     </template>
   </div>

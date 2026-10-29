@@ -39,6 +39,11 @@ const CardsStub = defineComponent({
     h('div', (props.nodes as Array<{ node_id: string; present: boolean; info?: { labels?: Record<string, string> } | null }>).map((entry) =>
       h('button', { 'data-card': entry.node_id, onClick: () => emit('details', entry.node_id) }, `card ${entry.info?.labels?.name ?? 'unnamed'} ${entry.present ? 'online' : 'offline'}${props.rename ? ' renamable' : ''}`))),
 })
+// What the page hands the own node's details: is it a device, and which addresses come first.
+const LocalStub = defineComponent({
+  props: { device: Boolean, realmApi: String, publicApi: String },
+  setup: (props) => () => h('div', `local device=${props.device} realm=${props.realmApi ?? '-'} api=${props.publicApi ?? '-'}`),
+})
 const DetailStub = defineComponent({ props: { node: { type: Object, required: true } }, setup: (props) => () => h('div', `details ${(props.node as { node_id: string }).node_id}`) })
 
 const StatusView = compileClientComponent(new URL('./StatusView.vue', import.meta.url), {
@@ -53,13 +58,16 @@ const StatusView = compileClientComponent(new URL('./StatusView.vue', import.met
   '@/components/ui/CopyButton.vue': moduleDefault(Empty),
   '@/components/ui/ListSkeleton.vue': moduleDefault(Empty),
   '@/components/ui/NodeLabel.vue': moduleDefault(Empty),
-  '@/components/nodes/LocalNodeDetails.vue': moduleDefault(Empty),
+  '@/components/nodes/LocalNodeDetails.vue': moduleDefault(LocalStub),
   '@/components/nodes/NodeDetailPanel.vue': moduleDefault(DetailStub),
   '@/components/placement/LocationAggregates.vue': moduleDefault(Empty),
   '@/components/ui/SectionSkeleton.vue': moduleDefault(Empty),
   '@/components/ui/EmptyState.vue': moduleDefault(Empty),
   '@/components/nodes/node-display': NodeDisplay,
-  '@/components/nodes/node-probe': { nodeApiBase: () => null, probeNode: () => new Promise(() => undefined) },
+  '@/components/nodes/node-probe': {
+    nodeApiBase: (entry: { info?: { urls?: { api?: string } } | null }) => entry.info?.urls?.api ?? null,
+    probeNode: () => new Promise(() => undefined),
+  },
   '@/composables/useAruna': {
     useAruna: () => ({
       realm: ref({ id: 'realm-id', name: 'Test realm', description: '', color: '#08216C' }),
@@ -139,6 +147,32 @@ describe('status nodes', () => {
     mounted = await mountApp(StatusView)
     await flush()
     expect(content(mounted.root)).toContain('card Giessen storage online renamable')
+    mounted.app.unmount()
+  })
+
+  it('calls the desktop node a device and names the realm API from the realm snapshot', async () => {
+    desktop.on = true
+    nodeInfo.value = { node: { peer_id: 'own-device' }, services: { interfaces: { rest: { status: 'available' }, s3: { status: 'available' } } } }
+    realmInfo.value = { metadata_replication: { default_replication_factor: 2 }, nodes: [{ ...node('own-device'), kind: 'user' }] }
+    const mgmt = { ...node('mgmt', 'Giessen management'), kind: 'management' }
+    mgmt.info = { ...mgmt.info!, urls: { api: 'https://api.mgmt.example.org/api/v1' } } as never
+    loadRealmView.mockResolvedValue({ info: { node: { peer_id: 'mgmt' } }, realm: { nodes: [mgmt] } })
+    const mounted = await mountApp(StatusView)
+    await flush()
+
+    expect(content(mounted.root)).toContain('local device=true realm=https://api.mgmt.example.org/api/v1')
+    mounted.app.unmount()
+  })
+
+  it('hands a server its published API address and no realm row', async () => {
+    const server = node('server-a', 'Giessen storage')
+    server.info = { ...server.info!, urls: { api: 'https://api.server-a.example.org/api/v1' } } as never
+    nodeInfo.value = { node: { peer_id: 'server-a' }, services: { interfaces: { rest: { status: 'available' }, s3: { status: 'available' } } } }
+    realmInfo.value = { metadata_replication: { default_replication_factor: 2 }, nodes: [server] }
+    const mounted = await mountApp(StatusView)
+    await flush()
+
+    expect(content(mounted.root)).toContain('local device=false realm=- api=https://api.server-a.example.org/api/v1')
     mounted.app.unmount()
   })
 })
