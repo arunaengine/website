@@ -224,7 +224,7 @@ const pageDescription = computed(() =>
   currentUser.value || authPending.value
     ? desktop
       ? 'Your realm and this computer at a glance.'
-      : 'Live data from the local Aruna API.'
+      : ''
     : 'You are browsing public data as a guest. Sign in to create datasets and manage your groups.',
 )
 </script>
@@ -304,7 +304,7 @@ const pageDescription = computed(() =>
               <b>{{ formatCount(realmNodesText.count) }}</b> {{ plural(realmNodesText.count, 'node', 'nodes') }} {{ realmNodesText.word }}
             </template>
             <template v-else #value>Unknown</template>
-            <template v-if="replication">{{ replication }} </template>
+            {{ replication ? `${replication} ` : '' }}
             <RouterLink :to="{ name: 'status' }" class="text-primary hover:underline">Status</RouterLink>
           </OverviewCell>
         </div>

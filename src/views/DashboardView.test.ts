@@ -528,6 +528,15 @@ describe('desktop home', () => {
     mounted.app.unmount()
   })
 
+  it('keeps a space between the replication and the Status link', async () => {
+    currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
+    const mounted = await mountApp(DashboardClient)
+    await flush()
+
+    expect(content(mounted.root)).toContain('Replication ×3 Status')
+    mounted.app.unmount()
+  })
+
   it('keeps the web dashboard without them', async () => {
     currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
     const mounted = await mountApp(DashboardClient)
@@ -535,7 +544,8 @@ describe('desktop home', () => {
 
     expect(content(mounted.root)).not.toContain('desktop-home-cards')
     expect(content(mounted.root)).not.toContain('device row')
-    expect(content(mounted.root)).toContain('Live data from the local Aruna API.')
+    // The web dashboard needs no technical subtitle.
+    expect(content(mounted.root)).not.toContain('Live data from the local Aruna API.')
     mounted.app.unmount()
   })
 })
