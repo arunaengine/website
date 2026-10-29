@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { computed, createSSRApp, defineComponent, h, ref, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,9 +11,10 @@ const devices = ref<UserDevice[]>([])
 const devicesError = ref<string | null>(null)
 const deviceLimit = ref<number | null>(null)
 const revoke = vi.fn()
+const realmInfo = ref<{ nodes: Record<string, unknown>[] }>({ nodes: [] })
 
 vi.mock('@/composables/useAruna', () => ({
-  useAruna: () => ({ currentUser, realmInfo: ref({ nodes: [{ node_id: 'node-1' }] }) }),
+  useAruna: () => ({ currentUser, realmInfo }),
 }))
 
 vi.mock('@/composables/useDeviceEnrollment', () => ({
@@ -44,6 +46,7 @@ beforeEach(() => {
   devices.value = []
   devicesError.value = null
   deviceLimit.value = null
+  realmInfo.value = { nodes: [{ node_id: 'node-1' }] }
 })
 
 function device(over: Partial<UserDevice> = {}): UserDevice {
@@ -70,9 +73,8 @@ describe('devices panel', () => {
     ]
     const rendered = await text()
 
-    expect(rendered).toContain('enrolled')
+    expect(rendered).toContain('offline')
     expect(rendered).toContain('pending')
-    expect(rendered).toContain('enrolled devices do not expire')
     expect(rendered).toContain('Remove')
   })
 
@@ -94,13 +96,26 @@ describe('devices panel', () => {
     expect(rendered).toContain('1 of 2 devices')
   })
 
+  it('names a device by its label and shows when it was last seen', async () => {
+    realmInfo.value = {
+      nodes: [{ node_id: '73ea340a1234', connection_status: 'connected', last_seen_ms: Date.now() - 120_000, info: { labels: { device: 'Microbiology laptop' } } }],
+    }
+    devices.value = [device({ id: '73ea340a1234', node_id: '73ea340a1234' }), device({ id: 'enr-9abcdef12', node_id: null, status: 'pending' })]
+    const rendered = await text()
+
+    expect(rendered).toContain('Name Status Last seen')
+    expect(rendered).toContain('Microbiology laptop 73ea340a online 2m ago')
+    expect(rendered).toContain('enr-9abc pending unknown')
+  })
+
   it('says the realm caps nothing when it does not', async () => {
     devices.value = [device()]
     expect(await text()).toContain('1 enrolled')
   })
 
-  it('states what removing an enrolled device costs', async () => {
-    expect(await text()).toContain('disconnects it from the realm')
+  it('states what removing a device costs before it is removed', () => {
+    const source = readFileSync(new URL('./DevicesPanel.vue', import.meta.url), 'utf8')
+    expect(source).toContain("row.status === 'pending' ? 'Its code stops working.' : 'It has to be enrolled again.'")
   })
 
   it('offers an empty account nothing to remove', async () => {

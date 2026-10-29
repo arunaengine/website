@@ -1,24 +1,25 @@
 <script setup lang="ts">
 // My devices (aruna#271). Self-scoped: /access/users/me/devices only ever answers with
 // the caller's own user nodes and the enrollments still in flight, so this
-// needs no admin gate. Rows reuse SecretsTable through its view-model props.
+// needs no admin gate. Name, state and last contact come from the realm's node list.
 import { computed, ref, watch } from 'vue'
+import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import DeviceLane from '@/components/onboarding/DeviceLane.vue'
-import SecretsTable, { type SecretRow } from '@/components/onboarding/SecretsTable.vue'
 import WizardSteps from '@/components/onboarding/WizardSteps.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceEnrollment } from '@/composables/useDeviceEnrollment'
 import { useRefresh } from '@/composables/useRefresh'
 import { Plus, X } from '@lucide/vue'
 import type { UserDevice } from '@/lib/api'
+import { relativeTime } from '@/lib/utils'
 
 const DEVICE_STEPS = ['Device', 'Hand off', 'Watch it join']
 const FIRST_STEP = 1
 
-const { currentUser } = useAruna()
+const { currentUser, realmInfo } = useAruna()
 const { devices, devicesError, busyIds, deviceCount, deviceLimit, loadingDevices, loadDevices, revoke } =
   useDeviceEnrollment()
 
@@ -62,41 +63,40 @@ const capLabel = computed(() =>
     : `${deviceCount.value} of ${deviceLimit.value} devices`,
 )
 
-// An enrolled device is a realm member addressed by its node id; the other two
-// states are an enrollment secret that has not landed as a member yet.
-const STATUS: Record<UserDevice['status'], Pick<SecretRow, 'status' | 'statusLabel' | 'statusVariant'>> = {
-  enrolled: { status: 'claimed', statusLabel: 'enrolled', statusVariant: 'success' },
-  claimed: { status: 'claimed', statusLabel: 'claimed', statusVariant: 'sky' },
-  pending: { status: 'outstanding', statusLabel: 'pending', statusVariant: 'outline' },
-  expired: { status: 'expired', statusLabel: 'expired', statusVariant: 'secondary' },
+// An enrolled device is a realm member addressed by its node id; the others are an enrollment
+// whose code has not landed as a member yet.
+type Variant = 'success' | 'secondary' | 'outline' | 'sky'
+interface DeviceRow {
+  id: string
+  name: string | null
+  shortId: string
+  status: string
+  variant: Variant
+  lastSeen: string
 }
-
-const rows = computed<SecretRow[]>(() =>
+const rows = computed<DeviceRow[]>(() =>
   devices.value.map((device) => {
-    return {
-      id: device.id,
-      kindLabel: 'device',
-      kindVariant: 'secondary',
-      expiresAt: device.expires_at ?? null,
-      expiresHint: device.status === 'enrolled' ? 'enrolled devices do not expire' : undefined,
-      claimedBy: device.node_id,
-      // Devices are summarized on the Status page, never listed, so no row to open.
-      claimedLink: null,
-      ...STATUS[device.status],
-    }
+    const node = (realmInfo.value?.nodes ?? []).find((entry) => entry.node_id === device.node_id)
+    const online = node?.connection_status === 'connected'
+    const status = device.status === 'enrolled' ? (online ? 'online' : 'offline') : device.status
+    const variant: Variant = status === 'online' ? 'success' : status === 'claimed' ? 'sky' : status === 'pending' ? 'outline' : 'secondary'
+    const seen = node?.last_seen_ms ? relativeTime(new Date(node.last_seen_ms).toISOString()) : online ? 'just now' : ''
+    return { id: device.id, name: node?.info?.labels?.['device'] || null, shortId: (device.node_id ?? device.id).slice(0, 8), status, variant, lastSeen: seen }
   }),
 )
+const confirming = ref('')
+function remove(id: string) {
+  confirming.value = ''
+  void revoke(id)
+}
 </script>
 
 <template>
   <div>
     <header class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
       <div class="min-w-0">
-        <h3 class="font-display text-sm font-semibold text-aruna-navy">Devices</h3>
-        <p class="text-xs text-muted-foreground">
-          Computers enrolled as user nodes under your account. Removing an enrolled device disconnects it from the realm
-          and it has to be enrolled again; removing a pending one makes its code unusable.
-        </p>
+        <h3 class="font-display text-sm font-semibold text-aruna-navy">Your devices</h3>
+        <p class="text-xs text-muted-foreground">Computers that run Aruna Desktop under your account.</p>
       </div>
       <div class="flex shrink-0 items-center gap-2">
         <span class="text-[11px] tabular-nums text-muted-foreground">{{ capLabel }}</span>
@@ -127,15 +127,37 @@ const rows = computed<SecretRow[]>(() =>
       <p v-if="!currentUser" class="text-xs text-muted-foreground">Sign in to see the devices on your account.</p>
       <template v-else>
         <RefusalNote v-if="devicesError" :message="devicesError" class="mb-3" />
-        <SecretsTable
-          :rows="rows"
-          :busy-ids="[...busyIds]"
-          :can-revoke="true"
-          revoke-label="Remove"
-          busy-label="Removing…"
-          empty-text="No devices on your account yet."
-          @revoke="revoke"
-        />
+        <table v-if="rows.length" class="w-full text-sm">
+          <thead class="text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th class="py-2 pr-4 text-left font-semibold">Name</th>
+              <th class="py-2 pr-4 text-left font-semibold">Status</th>
+              <th class="py-2 pr-4 text-left font-semibold">Last seen</th>
+              <th class="py-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in rows" :key="row.id" class="border-t border-border">
+              <td class="py-2.5 pr-4">
+                <span v-if="row.name" class="text-foreground">{{ row.name }}</span>
+                <span class="font-mono text-[11px] text-muted-foreground" :class="row.name ? 'ml-1.5' : ''">{{ row.shortId }}</span>
+              </td>
+              <td class="py-2.5 pr-4"><Badge size="sm" :variant="row.variant">{{ row.status }}</Badge></td>
+              <td class="py-2.5 pr-4 text-[11px] text-muted-foreground">{{ row.lastSeen || 'unknown' }}</td>
+              <td class="py-2.5 text-right">
+                <div v-if="confirming === row.id" class="flex items-center justify-end gap-2">
+                  <span class="text-[11px] text-muted-foreground">{{ row.status === 'pending' ? 'Its code stops working.' : 'It has to be enrolled again.' }}</span>
+                  <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="busyIds.has(row.id)" @click="remove(row.id)">Remove</Button>
+                  <Button variant="ghost" size="sm" @click="confirming = ''">Cancel</Button>
+                </div>
+                <Button v-else variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="busyIds.has(row.id)" @click="confirming = row.id">
+                  {{ busyIds.has(row.id) ? 'Removing…' : 'Remove' }}
+                </Button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="text-xs text-muted-foreground">No devices on your account yet.</p>
       </template>
     </div>
   </div>
