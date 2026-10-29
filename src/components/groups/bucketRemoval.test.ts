@@ -4,7 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const sessionEpoch = ref(1)
 const writesDisabled = ref(false)
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => ({ authToken: ref('t'), sessionEpoch }) }))
-vi.mock('@/composables/s3/endpoints', () => ({ nodeApiBaseReady: async (id: string) => `https://${id}.test/api/v1` }))
+// Resolving the node's address may take a while on a fresh load.
+const address = vi.hoisted(() => ({ known: Promise.resolve() }))
+vi.mock('@/composables/s3/endpoints', () => ({
+  nodeApiBaseReady: async (id: string) => {
+    await address.known
+    return `https://${id}.test/api/v1`
+  },
+}))
 vi.mock('@/lib/connectivity', () => ({ useConnectivity: () => ({ writesDisabled }) }))
 
 const { removeBucket } = await import('./bucketRemoval')
@@ -43,6 +50,19 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('bucket removal', () => {
+  it('sends nothing when the session changed while the node address resolved', async () => {
+    serve()
+    let name!: () => void
+    address.known = new Promise((resolve) => (name = resolve))
+    const removal = removeBucket('node-2', 'raw-data')
+    sessionEpoch.value = 2
+    name()
+
+    await expect(removal).rejects.toThrow('Your session changed. Nothing was deleted.')
+    expect(calls).toEqual([])
+    address.known = Promise.resolve()
+  })
+
   it('purges on the bucket node and finishes when the purge job succeeded', async () => {
     serve()
     await removeBucket('node-2', 'raw-data')

@@ -20,6 +20,8 @@ export async function removeBucket(
   const { writesDisabled } = useConnectivity()
   const epoch = sessionEpoch.value
   const baseUrl = await nodeApiBaseReady(nodeId)
+  // The token is read below, so the session that asked must still be the one that sends.
+  if (sessionEpoch.value !== epoch) throw new Error('Your session changed. Nothing was deleted.')
   if (!baseUrl) throw new Error('This node has no API address.')
   const client = { baseUrl, token: authToken.value || undefined }
   const scope: StorageDeletionScope = { kind: 'bucket', bucket }
