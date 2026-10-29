@@ -16,6 +16,10 @@ describe('MetadataView', () => {
     expect(source).toContain('<template v-if="tab === \'overview\'">')
   })
 
+  it('opens the developer section for every old graph link, also on a reused page', () => {
+    expect(source).toContain("watch(routeTab, (value) => value === 'graph' && (developersOpen.value = true), { immediate: true })")
+  })
+
   it('shows the dataset id once, in the developer section with a copy button', () => {
     expect(source.match(/\{\{ detailId \}\}/g)).toHaveLength(1)
     expect(source).toContain('<CopyButton :value="detailId" label="Copy the dataset id" />')

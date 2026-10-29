@@ -142,9 +142,11 @@ providePageContext(() => {
   }
 })
 
-// The graph now sits in "For developers"; an old link to its tab opens that section.
+// The graph now sits in "For developers"; an old link to its tab opens that section, also on a
+// query change or Back, which reuse this page.
 const routeTab = useRouteTab(['overview', 'graph', 'provenance', 'history'], 'overview')
-const developersOpen = ref(routeTab.value === 'graph')
+const developersOpen = ref(false)
+watch(routeTab, (value) => value === 'graph' && (developersOpen.value = true), { immediate: true })
 const history = useDatasetHistory(
   detailId,
   () => docState.value === 'found' && Boolean(currentUser.value),
