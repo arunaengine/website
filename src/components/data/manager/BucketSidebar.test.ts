@@ -898,4 +898,3 @@ describe('database buckets in the list', () => {
     allBuckets.hits.value = []
   })
 })
-
