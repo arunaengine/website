@@ -158,7 +158,10 @@ function sessionBar(): Component {
     },
     '@/composables/useRealmNodes': {
       useRealmNodes: () => ({
-        nodes: ref([{ nodeId: 'node-a', label: 'Node A', executorKinds: ['docker'] }]),
+        nodes: ref([
+          { nodeId: 'node-a', label: 'Node A', executorKinds: ['docker'] },
+          { nodeId: 'device-1', label: 'Laptop', kind: 'user', executorKinds: ['apptainer'] },
+        ]),
         displayName: () => 'Node A',
         nodeById: () => ({ apiBase: 'https://node-a.example/api/v1' }),
       }),
@@ -216,6 +219,15 @@ function runningSession(overrides: Record<string, unknown> = {}) {
 }
 
 describe('the session bar', () => {
+  it('offers no device as a node or its executors for a session', async () => {
+    const root = await render()
+    await openOptions(root)
+    const values = (label: string) => (select(root, label).props.options as { value: string }[]).map((option) => option.value)
+
+    expect(values('Node')).toEqual(['', 'node-a'])
+    expect(values('Executor kind')).toEqual(['', 'docker'])
+  })
+
   it('offers Start while no session runs', async () => {
     const root = await render()
     expect(content(root)).not.toContain('No session')

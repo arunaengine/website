@@ -36,7 +36,10 @@ import { ChevronDown, CircleStop, Play, RefreshCw, RotateCcw } from '@lucide/vue
 const { notebook, session } = injectNotebook()
 const { apiBaseUrl, authToken } = useAruna()
 const { getComputeConfig } = useComputeAdmin()
-const { nodes, displayName, nodeById } = useRealmNodes()
+const realmNodes = useRealmNodes()
+const { displayName, nodeById } = realmNodes
+// A session is a realm run, so no device is offered to run it.
+const nodes = computed(() => realmNodes.nodes.value.filter((node) => node.kind !== 'user'))
 const now = useNow(1_000)
 
 const kernelOpen = ref(false)
