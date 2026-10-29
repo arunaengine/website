@@ -920,5 +920,21 @@ describe('database buckets in the list', () => {
     expect(order).toEqual(['reads-old', 'reads-2026'])
     allBuckets.hits.value = []
   })
+
+  it('shows a distributed bucket pinned on one of its other nodes once, keeping that pin', async () => {
+    nodeChoice.value = null
+    allBuckets.needsName.value = false
+    allBuckets.hits.value = [{ bucket: 'shared', node_id: 'home', group_id: 'g1', set_id: 's1', nodes: ['home', 'node-2'] } as never]
+    const state = manager()
+    state.shortcuts.pinned.value = [{ bucket: 'shared', nodeId: 'node-2' }]
+    const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
+    await flush()
+    const order = nodes(root).filter((node) => String(node.props['aria-label']).startsWith('Open ')).map((node) => content(node))
+
+    expect(order).toEqual(['shared'])
+    await click(element(root, (node) => node.props['aria-label'] === 'Unpin shared'))
+    expect(state.shortcuts.togglePin).toHaveBeenCalledWith('shared', 'node-2')
+    allBuckets.hits.value = []
+  })
 })
 

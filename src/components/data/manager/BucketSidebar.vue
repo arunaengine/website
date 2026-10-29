@@ -165,7 +165,10 @@ const allRows = computed<AllRow[]>(() => {
   // A pin stays a row even before its page was listed; a recent one shows only when listed.
   const take = (entry: BucketShortcut, pinned: boolean): AllRow[] => {
     const nodeId = entry.nodeId ?? null
-    const hit = hits.find((candidate) => !used.has(candidate) && candidate.bucket === entry.bucket && shortcutNode(candidate) === nodeId) ?? null
+    // A distributed bucket is one merged row; a pin on any of its nodes is that row.
+    const onNode = (candidate: ListedBucket) =>
+      (candidate.set_id ? candidate.nodes : [candidate.node_id]).some((id) => (realmNodes.isLocalNode(id) ? null : id) === nodeId)
+    const hit = hits.find((candidate) => !used.has(candidate) && candidate.bucket === entry.bucket && onNode(candidate)) ?? null
     if (!hit && !pinned) return []
     if (hit) used.add(hit)
     return [{ key: `${nodeId ?? ''}/${entry.bucket}`, bucket: entry.bucket, nodeId, hit, pinned }]
