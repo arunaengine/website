@@ -329,6 +329,7 @@ const TaskDetailPanel = compileClientComponent(url('components/compute/TaskDetai
   '@/composables/useObjectPreview': ObjectPreview,
   '@/composables/useRefresh': RefreshComposable,
   '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ deviceClient: ref(null) }) },
+  '@/composables/s3/endpoints': { resolveObjectUrl: () => null },
   '@/lib/crateImport': { downloadCrateJson: () => undefined },
   '@/lib/deviceApi': { getLocalRunCrate: async () => null, requireDevice: () => ({}) },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id }) },
