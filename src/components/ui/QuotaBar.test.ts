@@ -3,7 +3,7 @@ import { renderToString } from '@vue/server-renderer'
 import { describe, expect, it } from 'vitest'
 import QuotaBar from './QuotaBar.vue'
 
-const render = (props: Record<string, unknown>) =>
+const render = (props: { used: number; quota: number | null }) =>
   renderToString(createSSRApp({ render: () => h(QuotaBar, { showLabels: false, legend: false, ...props }) }))
 
 describe('quota bar', () => {
