@@ -5,7 +5,7 @@ import { apiRequest, listGroupDataPaths, type NotificationListResponse } from '@
 import { assistantChatScopeKey } from '@/lib/assistant/chatHistory'
 import { issueBucket, type IssueTarget } from '@/lib/vault/keyIssue'
 import { apiBaseUrl, authToken, realmInfo, sessionEpoch, userInfo } from './aruna/state'
-import { localNodeId, nodeApiBase } from './s3/endpoints'
+import { localNodeId, nodeApiBase, nodeApiBaseReady } from './s3/endpoints'
 import { useNotifications } from './useNotifications'
 import { useUserVault } from './useUserVault'
 
@@ -35,6 +35,13 @@ function targetOf(bucket: string, nodeId: string | null | undefined): IssueTarge
   const node = nodeId || localNodeId()
   const baseUrl = node ? nodeApiBase(node) : null
   return node && baseUrl ? { bucket, nodeId: node, client: { baseUrl, token: authToken.value } } : null
+}
+
+/** `targetOf` once the realm read with the token can name the node. */
+async function targetReady(bucket: string, nodeId: string | null | undefined): Promise<IssueTarget | null> {
+  const node = nodeId || localNodeId()
+  if (node) await nodeApiBaseReady(node)
+  return targetOf(bucket, nodeId)
 }
 
 /** The API base, realm and user that waiting buckets are kept under; empty while signed out. */
@@ -84,7 +91,7 @@ async function pendingNotices(history: boolean): Promise<Map<string, { target: I
     const query = { limit: 200, cursor }
     const page = await apiRequest<NotificationListResponse>('/system/notifications', { query }, client)
     for (const entry of page.notifications.filter(isPending)) {
-      const target = targetOf(entry.bucket!, entry.node_id)
+      const target = await targetReady(entry.bucket!, entry.node_id)
       if (!target || (entry.read && !history)) continue
       const key = `${target.nodeId}\u0000${target.bucket}`
       const notice = notices.get(key) ?? { target, ids: [] }
@@ -168,7 +175,7 @@ async function issueNow(targets: IssueTarget[], epoch: number, scope: string): P
 async function issueWaiting(extra: IssueTarget[] = [], history = false): Promise<void> {
   const epoch = sessionEpoch.value
   const scope = waitingScope()
-  const known = loadWaiting(scope).map((entry) => targetOf(entry.bucket, entry.nodeId))
+  const known = await Promise.all(loadWaiting(scope).map((entry) => targetReady(entry.bucket, entry.nodeId)))
   const found = [...extra, ...known.filter((target): target is IssueTarget => target !== null)]
   const finished = (await issueFor(found, epoch, scope)) ?? new Set<string>()
   let notices: Awaited<ReturnType<typeof pendingNotices>>
@@ -202,7 +209,7 @@ async function issueAfterGrant(groupId: string, requests: string[] | undefined):
       for (const entry of page.entries) {
         // `/{realm}/g/{group}/data/{node}/{bucket}`
         const [, , , , , node, bucket] = entry.permission_path.split('/')
-        const target = node && bucket ? targetOf(bucket, node) : null
+        const target = node && bucket ? await targetReady(bucket, node) : null
         if (target) targets.push(target)
       }
       token = page.continuation_token

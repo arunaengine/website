@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const sessionEpoch = ref(1)
 const writesDisabled = ref(false)
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => ({ authToken: ref('t'), sessionEpoch }) }))
-vi.mock('@/composables/s3/endpoints', () => ({ nodeApiBase: (id: string) => `https://${id}.test/api/v1` }))
+vi.mock('@/composables/s3/endpoints', () => ({ nodeApiBaseReady: async (id: string) => `https://${id}.test/api/v1` }))
 vi.mock('@/lib/connectivity', () => ({ useConnectivity: () => ({ writesDisabled }) }))
 
 const { removeBucket } = await import('./bucketRemoval')

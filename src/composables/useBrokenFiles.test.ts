@@ -10,7 +10,14 @@ vi.mock('@/lib/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/api')>()),
   getBucketCheck: (...args: unknown[]) => getBucketCheck(...args),
 }))
-vi.mock('./s3/endpoints', () => ({ nodeApiBase: () => 'https://b.test/api/v1' }))
+// Another node's address is known once the realm read with the token names the node.
+const address = vi.hoisted(() => ({ known: Promise.resolve() }))
+vi.mock('./s3/endpoints', () => ({
+  nodeApiBaseReady: async () => {
+    await address.known
+    return 'https://b.test/api/v1'
+  },
+}))
 
 const file = (key: string, reason: string) => ({ key, version_id: 'v', reason, found_at_ms: 1 })
 const settle = async () => {
@@ -34,6 +41,23 @@ describe('useBrokenFiles', () => {
     expect(broken.reasonOf('a.txt')).toBe('File missing on storage')
     expect(broken.reasonOf('b.txt')).toBe('Storage removed')
     expect(broken.reasonOf('c.txt')).toBeNull()
+    scope.stop()
+  })
+
+  it('reads another node once the realm names its address', async () => {
+    let name!: () => void
+    address.known = new Promise((resolve) => (name = resolve))
+    getBucketCheck.mockResolvedValueOnce({ bucket: 'reef', broken: [file('a.txt', 'missing_blob')] })
+    const scope = effectScope()
+    const broken = scope.run(() => useBrokenFiles(ref('reef'), ref('node-b')))!
+    await settle()
+    expect(getBucketCheck).not.toHaveBeenCalled()
+
+    name()
+    await settle()
+    expect(getBucketCheck).toHaveBeenCalledWith('reef', { after: undefined, limit: 500 }, { baseUrl: 'https://b.test/api/v1', token: 'token' })
+    expect(broken.reasonOf('a.txt')).toBe('File missing on storage')
+    address.known = Promise.resolve()
     scope.stop()
   })
 

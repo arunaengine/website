@@ -1,7 +1,7 @@
 import { ref, watch, type Ref } from 'vue'
 import { getBucketCheck, type BrokenReason } from '@/lib/api'
 import { apiBaseUrl, authToken } from './aruna/state'
-import { nodeApiBase } from './s3/endpoints'
+import { nodeApiBaseReady } from './s3/endpoints'
 
 const PAGE = 500
 
@@ -19,7 +19,8 @@ export function useBrokenFiles(bucket: Ref<string>, nodeId: Ref<string | null>, 
 
   async function load() {
     const run = ++seq
-    const baseUrl = nodeId.value ? nodeApiBase(nodeId.value) : apiBaseUrl.value
+    const baseUrl = nodeId.value ? await nodeApiBaseReady(nodeId.value) : apiBaseUrl.value
+    if (run !== seq) return
     if (!bucket.value || !baseUrl || !authToken.value) {
       reasons.value = {}
       return

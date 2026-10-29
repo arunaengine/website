@@ -27,7 +27,7 @@ vi.mock('@/composables/useAruna', () => ({
 vi.mock('@/composables/useGlobalErrors', () => ({ reportGlobalError: vi.fn() }))
 vi.mock('./useUserVault', () => ({ useUserVault: () => vault }))
 vi.mock('./useNotifications', () => ({ useNotifications: () => notifications }))
-vi.mock('./s3/endpoints', () => ({ localNodeId: () => 'n0', nodeApiBase: (node: string) => `https://${node}.test/api/v1` }))
+vi.mock('./s3/endpoints', () => ({ localNodeId: () => 'n0', nodeApiBase: (node: string) => `https://${node}.test/api/v1`, nodeApiBaseReady: async (node: string) => `https://${node}.test/api/v1` }))
 vi.mock('./aruna/state', async () => {
   const { ref } = await import('vue')
   return {
