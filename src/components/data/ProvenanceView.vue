@@ -134,7 +134,7 @@ function boxView(item: Box, repeat = false): VNode {
   const root = graph.roots.includes(item.id)
   const lines: VNode[] = [
     h('div', { class: 'mb-0.5 text-[10px] uppercase tracking-wider text-muted-foreground' }, item.role),
-    h('p', { class: 'break-words font-medium' }, item.title),
+    h('p', { class: 'break-words [overflow-wrap:anywhere] font-medium' }, item.title),
   ]
   if (item.detail) lines.push(h('p', { class: item.kind === 'hidden' ? 'font-mono text-muted-foreground' : 'text-muted-foreground' }, item.detail))
   if (repeat && item.from.length) lines.push(h('p', { class: 'text-muted-foreground' }, 'Where it came from is shown above.'))
@@ -142,15 +142,15 @@ function boxView(item: Box, repeat = false): VNode {
     lines.push(
       h('p', [
         `${found.name} `,
-        h(ExternalLink, { href: found.url, label: found.value, class: 'break-all font-mono' }),
+        h(ExternalLink, { href: found.url, label: found.value, class: 'break-words [overflow-wrap:anywhere] font-mono' }),
       ]),
     )
   }
   if (item.link?.document) {
     lines.push(h(RouterLink, { to: { name: 'dataset', params: { id: item.link.document } }, class: 'text-primary hover:underline' }, () => item.link?.label))
   } else if (item.link?.url) {
-    // Long identifiers such as a DOI break inside the narrow box.
-    lines.push(h(ExternalLink, { href: item.link.url, label: item.link.label, class: 'break-all' }))
+    // Words wrap at spaces; only an unbroken identifier such as a DOI breaks inside the box.
+    lines.push(h(ExternalLink, { href: item.link.url, label: item.link.label, class: 'break-words [overflow-wrap:anywhere]' }))
   }
   if (item.pending.length) {
     const label = item.kind === 'silent' ? 'Try again' : 'Show where this came from'
@@ -178,7 +178,7 @@ function foldView(node: DrawnNode): VNode {
     h('button', { type: 'button', class: 'mt-1 text-primary hover:underline', 'aria-expanded': open, onClick: toggle }, open ? 'Hide the files' : 'Show the files'),
   ]
   if (node.repeat) lines.push(h('p', { class: 'text-muted-foreground' }, 'Where these came from is shown above.'))
-  if (open) lines.push(h('ul', { class: 'mt-1 max-h-40 space-y-0.5 overflow-y-auto text-muted-foreground' }, items.map((item) => h('li', { key: item.id, class: 'break-all' }, item.title))))
+  if (open) lines.push(h('ul', { class: 'mt-1 max-h-40 space-y-0.5 overflow-y-auto text-muted-foreground' }, items.map((item) => h('li', { key: item.id, class: 'break-words [overflow-wrap:anywhere]' }, item.title))))
   if (items.some((item) => item.pending.length)) {
     const expandAllOf = async () => {
       const current = fenced()

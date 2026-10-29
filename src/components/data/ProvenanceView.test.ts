@@ -154,7 +154,9 @@ describe('provenance view', () => {
     expect(nodes(root).some((node) => String(node.props.class).split(' ').includes('w-32'))).toBe(true)
     expect(nodes(root).some((node) => String(node.props.class).split(' ').includes('w-5'))).toBe(true)
     const doi = nodes(root).find((node) => node.tag === 'a' && node.props.href === 'https://doi.org/10.5281/zenodo.14916843')
-    expect(String(doi?.props.class)).toContain('break-all')
+    // Words wrap at spaces; only unbroken identifiers break, never "Open the sourc" + "e".
+    expect(String(doi?.props.class)).toContain('[overflow-wrap:anywhere]')
+    expect(nodes(root).some((node) => String(node.props.class).split(' ').includes('break-all'))).toBe(false)
 
     await click(button(root, 'Show the files'))
     expect(content(root)).toContain('/work/in/db/f3')
