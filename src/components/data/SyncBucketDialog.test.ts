@@ -87,7 +87,8 @@ const dialog = compileClientComponent(new URL('./SyncBucketDialog.vue', import.m
   '@/composables/useEncryptedSource': { useEncryptedSource: () => sourceEncrypted },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
-      nodes: computed(() => NODES),
+      nodes: computed(() => [...NODES, { nodeId: 'device-1', label: 'Laptop', isLocal: false, reachable: true, apiBase: 'http://d/api/v1', kind: 'user' }]),
+      targets: computed(() => NODES),
       localNodeId: ref('node-a'),
       nodeById: (id: string) => NODES.find((node) => node.nodeId === id) ?? null,
       displayName: (id: string | null) => NODES.find((node) => node.nodeId === id)?.label ?? 'this node',
@@ -119,6 +120,7 @@ describe('sync bucket dialog', () => {
     const root = await render()
 
     expect(button(root, 'Sync now').props.disabled).toBe(true)
+    expect(content(root)).not.toContain('Laptop')
     await click(button(root, 'Node B'))
     await click(button(root, 'Sync now'))
 

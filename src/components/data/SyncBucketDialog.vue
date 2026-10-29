@@ -111,8 +111,9 @@ const sourceEncrypted = useEncryptedSource(
 // A reference sync copies no data, so it has nothing to store unencrypted.
 const offerPlaintext = computed(() => sourceEncrypted.value === true && mode.value !== 'reference')
 
+// Only places of the realm (and this computer in the desktop app) hold a synced copy.
 const nodeOptions = computed(() =>
-  realmNodes.nodes.value.map((node) => ({
+  realmNodes.targets.value.map((node) => ({
     value: node.nodeId,
     label: `${node.label}${node.isLocal ? ' (this node)' : ''}${node.reachable ? '' : ' (unreachable)'}`,
   })),
