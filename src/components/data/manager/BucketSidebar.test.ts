@@ -960,5 +960,54 @@ describe('database buckets in the list', () => {
     expect(shown(root)).toEqual(['b25', 'b26', 'b27', 'b28', 'b29'])
     allBuckets.hits.value = []
   })
+
+  it('fills a short page before it moves on, so no bucket is skipped', async () => {
+    nodeChoice.value = null
+    allBuckets.needsName.value = false
+    const listed = (count: number, from = 0) =>
+      Array.from({ length: count }, (_, index) => ({ bucket: `b${String(from + index).padStart(2, '0')}`, node_id: 'home', group_id: 'g1' }))
+    const shown = (root: Parameters<typeof content>[0]) =>
+      nodes(root).filter((node) => String(node.props['aria-label']).startsWith('Open b')).map((node) => content(node))
+    allBuckets.hits.value = listed(5)
+    allBuckets.more.value = true
+    loadMore.mockImplementationOnce(async () => {
+      allBuckets.hits.value = [...allBuckets.hits.value, ...listed(25, 5)]
+      allBuckets.more.value = false
+    })
+    const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
+    await flush()
+
+    await click(button(root, 'Next'))
+    await flush()
+    expect(content(root)).toContain('Page 1')
+    expect(shown(root)).toEqual(listed(25).map((entry) => entry.bucket))
+    await click(button(root, 'Next'))
+    expect(shown(root)).toEqual(['b25', 'b26', 'b27', 'b28', 'b29'])
+    allBuckets.hits.value = []
+  })
+
+  it('does not move a replaced search on with an old Next', async () => {
+    nodeChoice.value = null
+    allBuckets.needsName.value = false
+    allBuckets.hits.value = Array.from({ length: 25 }, (_, index) => ({ bucket: `b${index}`, node_id: 'home', group_id: 'g1' }))
+    allBuckets.more.value = true
+    let answer!: () => void
+    loadMore.mockImplementationOnce(() => new Promise<void>((resolve) => (answer = () => {
+      allBuckets.hits.value = [...allBuckets.hits.value, { bucket: 'b25', node_id: 'home', group_id: 'g1' }]
+      resolve()
+    })))
+    const state = manager()
+    const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
+    await flush()
+
+    void (button(root, 'Next').props.onClick as () => Promise<void>)()
+    state.bucketNameFilter.value = 'b2'
+    await flush()
+    answer()
+    await flush()
+    expect(content(root)).toContain('Page 1')
+    allBuckets.hits.value = []
+    allBuckets.more.value = false
+  })
 })
 

@@ -198,13 +198,26 @@ const allRows = computed<AllRow[]>(() => {
 // needed. The nodes name no total, so no page count is shown.
 const BUCKETS_PER_PAGE = 25
 const page = ref(1)
-watch([selectedGroupId, bucketNameFilter, bucketNodeChoice], () => (page.value = 1))
+// Each list starts its own count, so a Next still reading for a replaced list does nothing.
+let pageRun = 0
+watch([selectedGroupId, bucketNameFilter, bucketNodeChoice], () => {
+  pageRun++
+  page.value = 1
+})
 const pageRows = computed(() => allRows.value.slice((page.value - 1) * BUCKETS_PER_PAGE, page.value * BUCKETS_PER_PAGE))
 const pageFilled = () => allRows.value.length > page.value * BUCKETS_PER_PAGE
 const hasNextPage = computed(() => pageFilled() || all.more.value)
+// A short page (rows filtered or merged away) fills up first and stays, so no row is skipped;
+// a full page moves on once the next one has rows. A few reads at most per click.
 async function nextPage() {
-  if (!pageFilled() && all.more.value) await all.loadMore()
-  if (pageFilled()) page.value++
+  const run = ++pageRun
+  const short = allRows.value.length < page.value * BUCKETS_PER_PAGE
+  const enough = () => (short ? allRows.value.length >= page.value * BUCKETS_PER_PAGE : pageFilled())
+  for (let reads = 0; !enough() && all.more.value && reads < 10; reads++) {
+    await all.loadMore()
+    if (run !== pageRun) return
+  }
+  if (!short && pageFilled()) page.value++
 }
 
 function openRow(row: AllRow) {
