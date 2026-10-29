@@ -190,7 +190,8 @@ const pagesLoaded = ref(0)
 const refreshing = ref(false)
 const lastPollError = ref<string | null>(null)
 // Each node lists only the runs it owns, so the first page also reads the other nodes.
-const { nodes: realmNodes } = useRealmNodes()
+// Only places of the realm are asked; a device is its owner's computer.
+const { targets: realmNodes } = useRealmNodes()
 const otherNodes = ref<{ failed: string[]; truncated: string[] }>({ failed: [], truncated: [] })
 function otherNodeTasks() {
   const others = desktop ? [] : realmNodes.value.filter((node) => !node.isLocal && node.apiBase)

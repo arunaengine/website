@@ -7,7 +7,7 @@ import { click, compileClientComponent, content, element, flush, moduleDefault, 
 
 const desktopMode = ref(true)
 const listTasks = vi.fn()
-const realmNodes = ref<Array<{ name: string; isLocal: boolean; apiBase: string | null }>>([])
+const realmNodes = ref<Array<{ name: string; isLocal: boolean; apiBase: string | null; kind?: string }>>([])
 
 const Plain = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
 const Empty = defineComponent(() => () => null)
@@ -52,7 +52,12 @@ const TasksPanel = compileClientComponent(new URL('./TasksPanel.vue', import.met
   '@/composables/useJobs': { useJobs: () => ({ deleteJob: vi.fn() }) },
   '@/composables/useNow': { useNow: () => ref(Date.now()) },
   '@/composables/useRefresh': { useRefresh: (run: () => unknown) => ({ busy: ref(false), refresh: run }) },
-  '@/composables/useRealmNodes': { useRealmNodes: () => ({ nodes: realmNodes }) },
+  '@/composables/useRealmNodes': {
+    useRealmNodes: () => ({
+      nodes: realmNodes,
+      targets: computed(() => realmNodes.value.filter((node) => node.kind !== 'user')),
+    }),
+  },
   '@/composables/useFirstPaint': { useFirstPaint: (ready: () => boolean) => computed(ready) },
   '@/lib/utils': Utils,
   '@/lib/poll': { follow: () => () => {}, onWake: () => () => {} },
@@ -193,6 +198,23 @@ describe('other nodes that do not answer', () => {
     listTasks.mockClear()
     await click(element(mounted.root, (node) => content(node) === 'Retry' && typeof node.props.onClick === 'function'))
     expect(listTasks).toHaveBeenCalledWith({ view: 'BASIC', page_size: 50 }, 'https://n2.test/api/v1')
+    realmNodes.value = []
+    mounted.app.unmount()
+  })
+})
+
+describe('runs of devices', () => {
+  it('asks no device for its runs', async () => {
+    desktopMode.value = false
+    realmNodes.value = [
+      { name: 'node-2', isLocal: false, apiBase: 'https://n2.test/api/v1' },
+      { name: 'laptop', isLocal: false, apiBase: 'https://laptop.test/api/v1', kind: 'user' },
+    ]
+    listTasks.mockReset().mockResolvedValue({ tasks: [] })
+    const mounted = await mountApp(TasksPanel)
+    await flush()
+
+    expect(listTasks.mock.calls.map(([, baseUrl]) => baseUrl)).toEqual([undefined, 'https://n2.test/api/v1'])
     realmNodes.value = []
     mounted.app.unmount()
   })
