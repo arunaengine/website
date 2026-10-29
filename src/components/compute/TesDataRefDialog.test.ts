@@ -54,7 +54,10 @@ const component = compileClientComponent(new URL('./TesDataRefDialog.vue', impor
   '@/composables/useS3': { useS3: () => s3State },
   '@/composables/useAruna': { useAruna: () => ({ currentUser, myGroups, nodeInfo: ref({ node: { realm_id: 'realm' } }), listBucketObjects, searchBuckets, sessionEpoch }) },
   '@/composables/useBucketCount': {
-    listBuckets: async (search: typeof searchBuckets) => ({ hits: (await search('', {})).hits, complete: true }),
+    listBuckets: async (search: typeof searchBuckets) => {
+      const answer = await search('', {})
+      return { hits: answer.hits, complete: answer.nodes_failed === 0 }
+    },
   },
   '@/components/ui/NodeLabel.vue': moduleDefault(defineComponent({ props: { nodeId: String }, setup: (props) => () => h('span', `node ${props.nodeId}`) })),
   '@/composables/useGroupSelection': { activeGroupId: ref('') },
@@ -101,6 +104,26 @@ describe('TES input picker remote identity', () => {
     expect(text).toMatch(/reads\s*demo\s*node n3/)
     expect(text).not.toContain('shared')
     expect(text.match(/wide/g)).toHaveLength(1)
+    currentUser.value = null
+    myGroups.value = []
+  })
+})
+
+describe('TES input picker remote failures', () => {
+  it('shows a failed or partial listing and lists again on retry', async () => {
+    currentUser.value = { id: 'u1' }
+    myGroups.value = [{ id: 'g1', name: 'demo' }]
+    searchBuckets.mockRejectedValueOnce(new Error('down'))
+    const { root } = await mountApp(component, { props: { open: true, mode: 'input' } })
+    await flush()
+    expect(content(root)).toContain('Could not list your buckets on the other nodes.')
+
+    searchBuckets.mockResolvedValueOnce({ hits: [{ arn: '', bucket: 'far', node_id: 'n2', group_id: 'g1', created_at: '' }], nodes_queried: 3, nodes_failed: 1, failed_nodes: ['n3'] })
+    await click(button(root, 'Retry'))
+    await flush()
+    const text = content(root)
+    expect(text).toContain('far')
+    expect(text).toContain('Some nodes did not answer, so this list may be incomplete.')
     currentUser.value = null
     myGroups.value = []
   })

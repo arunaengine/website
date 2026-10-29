@@ -78,6 +78,7 @@ const chooseBucket = (hit: BucketSearchHit) => chooseDatabase(hit.bucket, hit.no
 
 // The own groups' buckets that no copy on this node serves; this node's are browsed above them.
 const remoteOwn = ref<BucketSearchHit[] | null>(null)
+const remoteState = ref<'complete' | 'partial' | 'failed'>('complete')
 let remoteRun = 0
 async function loadRemoteOwn() {
   const run = ++remoteRun
@@ -87,6 +88,7 @@ async function loadRemoteOwn() {
   const groups = new Set(myGroups.value.map((group) => group.id))
   const listing = await listBuckets(searchBuckets, undefined, current).catch(() => null)
   if (!current()) return
+  remoteState.value = !listing ? 'failed' : listing.complete ? 'complete' : 'partial'
   const hits = (listing?.hits ?? []).filter((hit) => groups.has(hit.group_id))
   // One row per distributed bucket (none when this node holds a member), one per other bucket.
   const identity = (hit: BucketSearchHit) => hit.set_id ?? `${hit.node_id}/${hit.bucket}`
@@ -285,7 +287,7 @@ watch(
           <p v-else class="flex items-center gap-2"><LogIn class="h-3.5 w-3.5" /> Sign in first to create credentials.</p>
         </div>
         <ObjectBrowserPanel v-else selectable @add="addSelection" @selection-change="pendingSelection = $event" />
-        <div v-if="currentUser && (remoteOwn === null || remoteOwn.length)" class="space-y-1">
+        <div v-if="currentUser && (remoteOwn === null || remoteOwn.length || remoteState !== 'complete')" class="space-y-1">
           <p class="text-[11px] font-medium text-foreground">On other nodes</p>
           <p v-if="remoteOwn === null" class="text-[11px] text-muted-foreground">Listing your buckets on the other nodes…</p>
           <button
@@ -300,6 +302,10 @@ watch(
             <span class="shrink-0 text-muted-foreground">{{ groupName(hit.group_id) }}</span>
             <NodeLabel :node-id="hit.node_id" size="sm" class="shrink-0" />
           </button>
+          <Notice v-if="remoteOwn && remoteState !== 'complete'" :tone="remoteState === 'failed' ? 'error' : 'warning'" class="flex items-center gap-2">
+            <span class="flex-1">{{ remoteState === 'failed' ? 'Could not list your buckets on the other nodes.' : 'Some nodes did not answer, so this list may be incomplete.' }}</span>
+            <Button variant="outline" size="sm" @click="loadRemoteOwn">Retry</Button>
+          </Notice>
         </div>
       </template>
       <DatabasesTab v-else-if="source === 'databases'" bucket="" @choose="chooseDatabase" />
