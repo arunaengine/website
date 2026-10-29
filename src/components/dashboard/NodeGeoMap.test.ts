@@ -13,21 +13,23 @@ class FakeMarker {
   tooltip: unknown = null
   popup: unknown = null
   style: Record<string, unknown>
-  clicks = 0
+  clicks: unknown[] = []
   constructor(public at: number[], style: Record<string, unknown>) {
     this.style = style
   }
   bindTooltip(content: unknown) { this.tooltip = content; return this }
   setTooltipContent(content: unknown) { this.tooltip = content; return this }
   getTooltip() { return this.tooltip }
-  bindPopup(content: unknown) { this.popup = content; return this }
+  // Leaflet opens a bound popup from a click listener of its own.
+  openPopup = () => {}
+  bindPopup(content: unknown) { this.popup = content; this.clicks.push(this.openPopup); return this }
   setPopupContent(content: unknown) { this.popup = content; return this }
-  unbindPopup() { this.popup = null; return this }
+  unbindPopup() { this.popup = null; this.clicks = this.clicks.filter((fn) => fn !== this.openPopup); return this }
   getPopup() { return this.popup }
   setStyle(style: Record<string, unknown>) { this.style = { ...this.style, ...style }; return this }
   setRadius() { return this }
-  on() { this.clicks++; return this }
-  off() { this.clicks = 0; return this }
+  on(_event: string, fn: unknown) { this.clicks.push(fn); return this }
+  off(_event: string, fn?: unknown) { this.clicks = fn ? this.clicks.filter((entry) => entry !== fn) : []; return this }
 }
 const L = {
   TileLayer: {
@@ -150,5 +152,16 @@ describe('node map', () => {
     expect(fetches[0].init.cache).toBeUndefined()
     expect(fetches[0].init.headers).toBeUndefined()
     expect(fetches[0].url).toBe('https://tile.example/1/2/3.png')
+  })
+
+  it('keeps the chooser of a place with several nodes opening after a heartbeat, and one select per single node', async () => {
+    const { list } = await mount([node('a', 50.58), node('b', 50.58), node('c', 51.2)])
+    const [shared, single] = leaflet.markers
+    list.value = [node('a', 50.58, { present: false }), node('b', 50.58), node('c', 51.2)]
+    await flush()
+
+    expect(shared.clicks).toEqual([shared.openPopup])
+    expect(single.clicks).toHaveLength(1)
+    expect(single.clicks[0]).not.toBe(single.openPopup)
   })
 })

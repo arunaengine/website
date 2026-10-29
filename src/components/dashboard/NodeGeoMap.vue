@@ -88,6 +88,8 @@ function choices(nodes: RealmNodeInfo[]): HTMLElement {
 }
 
 const placed = new Map<string, L.CircleMarker>()
+// The marker's own click handler, so a redraw removes it and not the popup's.
+const selects = new Map<L.CircleMarker, () => void>()
 let fitted = ''
 function draw() {
   if (!map || !markers) return
@@ -97,6 +99,7 @@ function draw() {
     if (keys.includes(key)) continue
     markers.removeLayer(marker)
     placed.delete(key)
+    selects.delete(marker)
   }
   places.forEach((place, index) => {
     const fill = color(place.nodes)
@@ -114,11 +117,15 @@ function draw() {
     const tooltip = label(place.nodes.length === 1 ? names[0] : `${names.length} nodes: ${names.join(', ')}`)
     if (marker.getTooltip()) marker.setTooltipContent(tooltip)
     else marker.bindTooltip(tooltip)
-    marker.off('click')
+    const previous = selects.get(marker)
+    if (previous) marker.off('click', previous)
+    selects.delete(marker)
     if (place.nodes.length === 1) {
       marker.unbindPopup()
       const nodeId = place.nodes[0].node_id
-      marker.on('click', () => emit('select', nodeId))
+      const select = () => emit('select', nodeId)
+      selects.set(marker, select)
+      marker.on('click', select)
     } else if (marker.getPopup()) marker.setPopupContent(choices(place.nodes))
     else marker.bindPopup(choices(place.nodes))
   })
