@@ -24,6 +24,9 @@ const typed = ref('')
 const chips = ref<{ column: string; value: string }[]>([])
 const hits = ref<ObjectSearchHit[] | null>(null)
 const cursor = ref<string | null>(null)
+const nameCursor = ref<string | null>(null)
+const nameWords = ref('')
+const nameFailed = ref(false)
 const complete = ref(true)
 const failure = ref<string | null>(null)
 const busy = ref(false)
@@ -36,6 +39,9 @@ watch(() => [props.bucket, props.nodeId, sessionEpoch.value], () => {
   chips.value = []
   hits.value = null
   cursor.value = null
+  nameCursor.value = null
+  nameWords.value = ''
+  nameFailed.value = false
   complete.value = true
   failure.value = null
   busy.value = false
@@ -62,18 +68,27 @@ async function search(more = false) {
   busy.value = true
   failure.value = null
   try {
-    // Plain words also match file names; the details search pages on its own.
-    const words = chips.value.length ? '' : typed.value.trim()
+    // Plain words also match file names; each search pages on its own cursor.
+    const words = more ? nameWords.value : chips.value.length ? '' : typed.value.trim()
+    const detailsCursor = more ? cursor.value : null
+    const namesCursor = more ? nameCursor.value : null
     const [page, named] = await Promise.all([
-      searchObjects(query.value, { bucket: props.bucket, match: 'metadata', limit: 50, cursor: more ? cursor.value ?? undefined : undefined }),
-      !more && words.length >= 2 ? searchObjects(words, { bucket: props.bucket, match: 'substring', limit: 50 }).catch(() => null) : null,
+      !more || detailsCursor ? searchObjects(query.value, { bucket: props.bucket, match: 'metadata', limit: 50, cursor: detailsCursor ?? undefined }) : null,
+      words.length >= 2 && (!more || namesCursor)
+        ? searchObjects(words, { bucket: props.bucket, match: 'substring', limit: 50, cursor: namesCursor ?? undefined }).catch(() => 'failed' as const)
+        : null,
     ])
     if (run !== runs) return
-    const found = [...(more ? hits.value ?? [] : named?.hits ?? []), ...page.hits]
+    const names = named === 'failed' ? null : named
+    const found = [...(more ? hits.value ?? [] : []), ...(names?.hits ?? []), ...(page?.hits ?? [])]
     const seen = new Set<string>()
     hits.value = found.filter((hit) => !seen.has(`${hit.issuer_node_id}/${hit.key}`) && Boolean(seen.add(`${hit.issuer_node_id}/${hit.key}`)))
-    cursor.value = page.next_cursor ?? null
-    complete.value = page.coverage.complete
+    cursor.value = page?.next_cursor ?? null
+    // A failed name page keeps its cursor, so Show more asks for it again.
+    if (names || !more) nameCursor.value = names?.next_cursor ?? null
+    nameWords.value = words
+    nameFailed.value = named === 'failed'
+    complete.value = (!more || complete.value) && (page?.coverage.complete ?? true) && (names?.coverage.complete ?? true)
   } catch (cause) {
     if (run === runs) failure.value = errorMessage(cause)
   } finally {
@@ -117,8 +132,9 @@ function drop(index: number) {
         </button>
       </li>
     </ul>
-    <p v-else-if="hits" class="text-xs text-muted-foreground">Nothing matches.</p>
+    <p v-else-if="hits && complete && !nameFailed" class="text-xs text-muted-foreground">Nothing matches.</p>
     <p v-if="hits && !complete" class="text-[11px] text-muted-foreground">Some parts of this bucket could not be searched, so matches may be missing.</p>
-    <Button v-if="cursor" size="sm" variant="ghost" :disabled="busy" @click="search(true)">Show more</Button>
+    <p v-if="hits && nameFailed" class="text-[11px] text-muted-foreground">The name search failed, so matches by name may be missing.</p>
+    <Button v-if="cursor || nameCursor" size="sm" variant="ghost" :disabled="busy" @click="search(true)">Show more</Button>
   </section>
 </template>

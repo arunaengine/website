@@ -86,4 +86,40 @@ describe('bucket metadata search', () => {
     expect(content(root).split('reads/ui-hello.txt')).toHaveLength(2)
     expect(content(root)).toContain('GCF_')
   })
+
+  it('keeps a failed name search from reading as nothing found', async () => {
+    searchObjects.mockReset()
+    searchObjects.mockImplementation(async (_q: string, options: { match: string }) => {
+      if (options.match === 'substring') throw new Error('down')
+      return { hits: [], next_cursor: null, coverage: { complete: true } }
+    })
+    const { root } = await mountApp(component, { props: { bucket: 'ncbi', nodeId: null } })
+    ;(element(root, (node) => node.tag === 'input').props['onUpdate:modelValue'] as (value: string) => void)('hello')
+    await flush()
+
+    expect(content(root)).not.toContain('Nothing matches.')
+    expect(content(root)).toContain('The name search failed')
+  })
+
+  it('pages name matches past the first page and keeps partial coverage', async () => {
+    const named = (key: string) => ({ key, bucket: 'ncbi', issuer_node_id: 'n1', group_id: 'g1' })
+    searchObjects.mockReset()
+    searchObjects.mockImplementation(async (_q: string, options: { match: string; cursor?: string }) => {
+      if (options.match === 'metadata') return { hits: [], next_cursor: null, coverage: { complete: true } }
+      return options.cursor === 'n2'
+        ? { hits: [named('b/second.txt')], next_cursor: null, coverage: { complete: true } }
+        : { hits: [named('a/first.txt')], next_cursor: 'n2', coverage: { complete: false } }
+    })
+    const { root } = await mountApp(component, { props: { bucket: 'ncbi', nodeId: null } })
+    ;(element(root, (node) => node.tag === 'input').props['onUpdate:modelValue'] as (value: string) => void)('hello')
+    await flush()
+    ;(element(root, (node) => node.tag === 'button' && content(node) === 'Show more').props.onClick as () => void)()
+    await flush()
+
+    expect(searchObjects).toHaveBeenLastCalledWith('hello', { bucket: 'ncbi', match: 'substring', limit: 50, cursor: 'n2' })
+    expect(content(root)).toContain('a/first.txt')
+    expect(content(root)).toContain('b/second.txt')
+    expect(content(root)).toContain('Some parts of this bucket could not be searched')
+    expect(content(root)).not.toContain('Show more')
+  })
 })
