@@ -9,6 +9,7 @@ const Slotted = (tag: string) =>
   defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()) })
 const Empty = defineComponent(() => () => null)
 const databaseRows = ref<unknown[]>([])
+let extraInputs: unknown[] = []
 const IMAGE = 'harbor.computational.bio.uni-giessen.de/aruna/bakta-rs@sha256:2bf286e66203f8cd5dac0e5b08a7f75156f986330d437d6eef937a3b900f32cc'
 
 function custom() {
@@ -21,7 +22,7 @@ function custom() {
       },
       notes: [],
     }),
-    inputs: ref([{ kind: 'folder', bucket: 'bakta-database', prefix: 'db/', name: 'db', basePath: '/work/in/db/', files: [], directory: true }]),
+    inputs: ref([{ kind: 'folder', bucket: 'bakta-database', prefix: 'db/', name: 'db', basePath: '/work/in/db/', files: [], directory: true }, ...extraInputs]),
     outputRows: ref([]),
     openInputs: ref([]),
     resultsChosen: ref(false),
@@ -93,6 +94,18 @@ describe('saved run start', () => {
 
     expect(content(root)).not.toContain('Bakta database (light)')
     databaseRows.value = []
+  })
+
+  it('keeps the saved name of a fixed input and falls back to its file name', async () => {
+    extraInputs = [
+      { kind: 'file', url: 's3://refs/genome.fa', path: '/work/in/ref/genome.fa', name: 'Reference genome' },
+      { kind: 'file', url: 's3://refs/notes.txt', path: '/work/in/notes.txt', name: '' },
+    ]
+    const { root } = await mountApp(component)
+    const labels = nodes(root).filter((node) => node.tag === 'p' && String(node.props.class).includes('font-medium')).map(content)
+
+    expect(labels).toEqual(['genome.fasta', 'db', 'Reference genome', 'notes.txt'])
+    extraInputs = []
   })
 })
 

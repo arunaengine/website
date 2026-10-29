@@ -95,7 +95,7 @@ const resultsFolder = ref('')
           <p class="truncate font-mono text-[11px] text-muted-foreground">{{ pickText(entry) }}</p>
         </div>
         <div v-else class="min-w-0 flex-1">
-          <p class="font-medium">{{ fileName(entryPath(entry)) }}</p>
+          <p class="font-medium">{{ entry.name || fileName(entryPath(entry)) }}</p>
           <p class="truncate font-mono text-[11px] text-muted-foreground">{{ entryPath(entry) }}</p>
           <p class="truncate font-mono text-xs">{{ pickText(entry) }}</p>
         </div>
