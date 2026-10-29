@@ -1,7 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { compileClientComponent, element, mountApp } from '@/test/clientRender'
+import { compileClientComponent, content, element, mountApp, nodes } from '@/test/clientRender'
 import { insideFloatingLayer } from '@/components/ui/layers'
 
 const SlotStub = defineComponent({
@@ -22,6 +22,11 @@ const Popover = compileClientComponent(new URL('./Popover.vue', import.meta.url)
     PopoverPortal: SlotStub,
     PopoverContent: ContentStub,
     PopoverArrow: ArrowStub,
+    TooltipProvider: SlotStub,
+    TooltipRoot: SlotStub,
+    TooltipTrigger: SlotStub,
+    TooltipPortal: SlotStub,
+    TooltipContent: defineComponent({ inheritAttrs: false, setup: (_, { slots }) => () => h('p', { role: 'tooltip' }, slots.default?.()) }),
   },
   '@/components/ui/layers': { insideFloatingLayer },
 })
@@ -45,5 +50,13 @@ describe('Popover', () => {
 
     expect(contentClass(root)).toContain('z-[var(--z-assistant-modal)]')
     expect(contentClass(root)).not.toContain('z-50')
+  })
+
+  it('adds a hover and focus tooltip to its trigger only when asked', async () => {
+    const plain = await mountApp(Popover)
+    expect(nodes(plain.root).some((node) => node.props.role === 'tooltip')).toBe(false)
+
+    const tipped = await mountApp(Popover, { props: { tooltip: 'Stored on Giessen storage 1' } })
+    expect(content(element(tipped.root, (node) => node.props.role === 'tooltip')).trim()).toBe('Stored on Giessen storage 1')
   })
 })

@@ -1,5 +1,16 @@
 <script setup lang="ts">
-import { PopoverArrow, PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'radix-vue'
+import {
+  PopoverArrow,
+  PopoverContent,
+  PopoverPortal,
+  PopoverRoot,
+  PopoverTrigger,
+  TooltipContent,
+  TooltipPortal,
+  TooltipProvider,
+  TooltipRoot,
+  TooltipTrigger,
+} from 'radix-vue'
 import { insideFloatingLayer } from '@/components/ui/layers'
 
 const props = withDefaults(
@@ -10,6 +21,8 @@ const props = withDefaults(
     raised?: boolean
     /** Set to control the popover; left out, it opens and closes on its own. */
     open?: boolean
+    /** Shown on hover and focus; a tap on a touch screen opens the popover instead. */
+    tooltip?: string
   }>(),
   { open: undefined },
 )
@@ -22,7 +35,25 @@ function keepOpen(event: Event) {
 
 <template>
   <PopoverRoot :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
-    <PopoverTrigger as-child>
+    <TooltipProvider v-if="tooltip" :delay-duration="120">
+      <TooltipRoot>
+        <TooltipTrigger as-child>
+          <PopoverTrigger as-child>
+            <slot />
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipPortal>
+          <TooltipContent
+            side="top"
+            :side-offset="6"
+            class="z-50 rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=open]:fade-in-0"
+          >
+            {{ tooltip }}
+          </TooltipContent>
+        </TooltipPortal>
+      </TooltipRoot>
+    </TooltipProvider>
+    <PopoverTrigger v-else as-child>
       <slot />
     </PopoverTrigger>
     <PopoverPortal>
