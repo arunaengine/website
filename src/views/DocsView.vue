@@ -219,10 +219,8 @@ function glossaryLink(anchor: string) {
       :description="topic?.summary ?? 'Guides for the common workflows and a wiki for every term the portal uses.'"
     >
       <template #breadcrumbs>
-        <span>·</span>
         <Badge variant="outline">{{ docsVersion }}</Badge>
         <template v-if="topic">
-          <span>·</span>
           <Badge variant="secondary">{{ topic.kind }}</Badge>
         </template>
       </template>

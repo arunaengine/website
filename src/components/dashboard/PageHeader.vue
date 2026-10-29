@@ -35,13 +35,11 @@ const { realm } = useRealm()
     <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0 opacity-60" />
     <div class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-aruna-aqua/60 to-transparent" />
     <div class="container relative flex flex-col gap-3 pb-5 pt-6">
-      <div class="flex items-center gap-2 text-[11px] text-muted-foreground">
+      <div class="flex items-center gap-3 text-[11px] text-muted-foreground">
         <span class="eyebrow">{{ eyebrow }}</span>
-        <span>·</span>
         <RealmBadge :realm="realm" />
         <slot name="breadcrumbs" />
         <template v-if="docs">
-          <span>·</span>
           <DocsLink :topic="docs.topic" :section="docs.section" label="Read the docs" />
         </template>
       </div>

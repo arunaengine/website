@@ -65,7 +65,6 @@ const askPrompt = computed(() =>
     >
       <template #breadcrumbs>
         <template v-if="groupFilter">
-          <span>·</span>
           <Badge variant="outline" :title="groupFilter">
             Group: {{ groupNames.get(groupFilter) ?? truncateMiddle(groupFilter) }}
           </Badge>
