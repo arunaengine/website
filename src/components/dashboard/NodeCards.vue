@@ -3,6 +3,7 @@
 // facts. Devices are summed up in one line, never listed. The Status page adds a Details link.
 import { computed } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
+import NodeNameEdit from '@/components/nodes/NodeNameEdit.vue'
 import { nodeName } from '@/components/nodes/node-display'
 import type { RealmNodeInfo } from '@/lib/api'
 import { formatCount } from '@/lib/formatCount'
@@ -18,6 +19,8 @@ const props = defineProps<{
   /** Offers a Details link per card; `openId` is the card whose details show. */
   details?: boolean
   openId?: string
+  /** Offered to a realm admin: names a node, null resets it. */
+  rename?: (nodeId: string, name: string | null) => Promise<void>
 }>()
 defineEmits<{ details: [nodeId: string] }>()
 
@@ -59,7 +62,10 @@ const devicesLine = computed(() => {
     <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <li v-for="node in nodes" :key="node.node_id" class="min-w-0 rounded-md border border-border px-3 py-2.5">
         <div class="flex min-w-0 items-center gap-2">
-          <span class="truncate text-sm font-medium text-foreground" :title="node.node_id">{{ nodeName(node) }}</span>
+          <NodeNameEdit v-if="rename" :name="nodeName(node)" :value="node.display_name" :save="(name) => rename!(node.node_id, name)">
+            <span class="truncate text-sm font-medium text-foreground" :title="node.node_id">{{ nodeName(node) }}</span>
+          </NodeNameEdit>
+          <span v-else class="truncate text-sm font-medium text-foreground" :title="node.node_id">{{ nodeName(node) }}</span>
           <span v-if="node.kind !== 'server'" class="text-[11px] text-muted-foreground">{{ node.kind }}</span>
           <span v-if="node.node_id === localNodeId" class="text-[11px] text-muted-foreground">this node</span>
           <Badge v-if="location(node)" variant="outline" size="sm">{{ location(node) }}</Badge>

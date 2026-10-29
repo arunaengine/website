@@ -36,7 +36,7 @@ let StatusView: Component
 beforeAll(async () => {
   vi.doMock('vue-router', () => ({ useRoute: () => ({ query: {} }) }))
   vi.doMock('@/composables/useAruna', () => ({
-    useAruna: () => ({ realm, realmInfo, nodeInfo, usageInfo, currentUser, apiBaseUrl, loadInfo, sessionEpoch: ref(0), loadRealmView: vi.fn(async () => null) }),
+    useAruna: () => ({ realm, realmInfo, nodeInfo, usageInfo, currentUser, apiBaseUrl, loadInfo, sessionEpoch: ref(0), loadRealmView: vi.fn(async () => null), isRealmAdmin: ref(false) }),
   }))
   vi.doMock('@vueuse/core', () => ({
     useDocumentVisibility: () => ref('hidden'),
@@ -49,6 +49,7 @@ beforeAll(async () => {
   vi.doMock('@/components/nodes/LocalNodeDetails.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/nodes/NodeDetailPanel.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/placement/LocationAggregates.vue', () => ({ default: AggregatesStub }))
+  vi.doMock('@/composables/useNodeNames', () => ({ useNodeNames: () => ({ renameNode: vi.fn() }) }))
   vi.doMock('@/components/dashboard/FederationPanel.vue', () => ({
     default: defineComponent({ props: { nodes: Array }, setup: (props) => () => h('div', `node map ${props.nodes?.length}`) }),
   }))

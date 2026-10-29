@@ -13,13 +13,17 @@ import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useDeviceTransfers } from '@/composables/useDeviceTransfers'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
 import { THIS_COMPUTER } from '@/composables/useRealmNodes'
+import { useNodeNames } from '@/composables/useNodeNames'
+import NodeNameEdit from '@/components/nodes/NodeNameEdit.vue'
 import { isMoving } from '@/lib/deviceApi'
 import { formatCount } from '@/lib/formatCount'
 import { nodePill } from '@/lib/nodePill'
 import { needsYouCount } from '@/lib/syncStates'
 import { FolderPlus, Laptop } from '@lucide/vue'
 
-defineProps<{ name: string }>()
+/** `nodeId` and `value` let the owner rename this computer through the device route. */
+const props = defineProps<{ name: string; nodeId?: string | null; value?: string | null }>()
+const { renameDevice } = useNodeNames()
 
 const { shown } = usePortalFeatures()
 const { status, refresh, deviceClient } = useDeviceStatus()
@@ -76,7 +80,10 @@ onMounted(async () => {
 <template>
   <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border px-5 py-3" aria-label="This computer">
     <Laptop class="h-4 w-4 shrink-0 text-muted-foreground" />
-    <RouterLink :to="{ name: 'device' }" class="text-sm font-semibold text-foreground hover:underline">{{ name }}</RouterLink>
+    <NodeNameEdit v-if="props.nodeId" :name="name" :value="value" :save="(next) => renameDevice(props.nodeId!, next)">
+      <RouterLink :to="{ name: 'device' }" class="text-sm font-semibold text-foreground hover:underline">{{ name }}</RouterLink>
+    </NodeNameEdit>
+    <RouterLink v-else :to="{ name: 'device' }" class="text-sm font-semibold text-foreground hover:underline">{{ name }}</RouterLink>
     <Badge v-if="name !== THIS_COMPUTER" variant="secondary" size="sm">this computer</Badge>
     <Badge :variant="pill.variant" size="sm">{{ pill.label }}</Badge>
     <p class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 text-xs text-muted-foreground">

@@ -31,4 +31,13 @@ describe('node details', () => {
     expect(text).toContain('Connection connected')
     expect(html).not.toContain('uppercase">connected')
   })
+
+  it('names the node first, with a rename for a realm admin', async () => {
+    const plain = await renderToString(createSSRApp({ render: () => h(NodeDetailPanel, { node: { ...node, display_name: 'Giessen storage 1' } }) }))
+    expect(plain.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')).toContain('Name Giessen storage 1')
+    expect(plain).not.toContain('Rename')
+
+    const admin = await renderToString(createSSRApp({ render: () => h(NodeDetailPanel, { node, rename: async () => {} }) }))
+    expect(admin).toContain('aria-label="Rename Giessen storage"')
+  })
 })

@@ -18,6 +18,7 @@ import { givenName, isDegradedStatus, statusVariant } from '@/components/nodes/n
 import { nodeApiBase, probeNode, type NodeProbe } from '@/components/nodes/node-probe'
 import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
+import { useNodeNames } from '@/composables/useNodeNames'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { onWake, POLL_SLOW_MS } from '@/lib/poll'
 import { aggregateByLocation } from '@/lib/placement'
@@ -31,7 +32,9 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 
 const route = useRoute()
-const { realm, realmInfo, nodeInfo, usageInfo, apiBaseUrl, currentUser, loadInfo, sessionEpoch, loadRealmView } = useAruna()
+const { realm, realmInfo, nodeInfo, usageInfo, apiBaseUrl, currentUser, loadInfo, sessionEpoch, loadRealmView, isRealmAdmin } = useAruna()
+const { renameNode } = useNodeNames()
+const rename = computed(() => (isRealmAdmin.value ? renameNode : undefined))
 
 // The very first latency round waits out page-load network contention (asset
 // and bootstrap requests share the connection pool); the cells show a muted
@@ -371,11 +374,12 @@ watch(
             :local-node-id="localPeerId"
             :open-id="expandedId"
             details
+            :rename="rename"
             @details="toggleNode"
           />
           <!-- One node's details at a time, below the cards: labels, latency and what it reports. -->
           <div v-if="expandedNode" :id="`status-node-${expandedNode.node_id}`" class="mt-3 rounded-md border border-border bg-muted/10 px-4 py-4">
-            <NodeDetailPanel :node="expandedNode" :is-local="isLocal(expandedNode)" :probe="probeFor(expandedNode)" />
+            <NodeDetailPanel :node="expandedNode" :is-local="isLocal(expandedNode)" :probe="probeFor(expandedNode)" :rename="rename" />
           </div>
         </div>
         <div v-else-if="!deviceNodes.length" class="p-3">

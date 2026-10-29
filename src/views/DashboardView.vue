@@ -19,6 +19,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { useNodeNames } from '@/composables/useNodeNames'
 import { useDatabases } from '@/composables/useDatabases'
 import { computerName } from '@/composables/useRealmNodes'
 import { useDashboardScope } from '@/composables/useDashboardScope'
@@ -44,7 +45,8 @@ const DeviceRow = defineAsyncComponent({
 const desktop = isDesktop()
 
 const router = useRouter()
-const { currentUser, myGroups, nodeInfo, realmInfo, usageInfo, loading, bootstrapped, sessionEpoch, refresh, refreshedEpoch, loadInfo, loadRealmView } = useAruna()
+const { currentUser, myGroups, nodeInfo, realmInfo, usageInfo, loading, bootstrapped, sessionEpoch, refresh, refreshedEpoch, loadInfo, loadRealmView, isRealmAdmin } = useAruna()
+const { renameNode } = useNodeNames()
 const { authPending } = useAuth()
 const { dashboardRevision } = useNotifications()
 const { scope, setScope } = useDashboardScope()
@@ -299,9 +301,14 @@ const pageDescription = computed(() =>
           </OverviewCell>
         </div>
         <div v-if="currentUser && infraNodes.length" class="border-t border-border px-5 py-4">
-          <NodeCards :nodes="infraNodes" :devices="deviceNodes" />
+          <NodeCards :nodes="infraNodes" :devices="deviceNodes" :rename="isRealmAdmin ? renameNode : undefined" />
         </div>
-        <DeviceRow v-if="desktop && currentUser" :name="deviceName" />
+        <DeviceRow
+          v-if="desktop && currentUser"
+          :name="deviceName"
+          :node-id="deviceRecord ? deviceRecord.node_id : null"
+          :value="deviceRecord?.display_name ?? null"
+        />
       </section>
 
       <GroupQuotaCards v-if="currentUser && myGroups.length" :refresh-revision="cardsRevision" />

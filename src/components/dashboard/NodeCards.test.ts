@@ -85,4 +85,10 @@ describe('node cards', () => {
     expect(shown).toContain('node-2 this node online 2 KB stored, full, draining Details')
     expect(shown).toContain('node-3 online 2 KB stored Hide details')
   })
+
+  it('offers a rename on each card only when renaming is allowed', async () => {
+    expect(await renderToString(createSSRApp({ render: () => h(NodeCards, { nodes: [node()], devices: [] }) }))).not.toContain('Rename')
+    const html = await renderToString(createSSRApp({ render: () => h(NodeCards, { nodes: [node()], devices: [], rename: async () => {} }) }))
+    expect(html).toContain('aria-label="Rename node-2"')
+  })
 })

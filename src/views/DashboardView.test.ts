@@ -32,7 +32,10 @@ const scope = ref<'personal' | 'realm'>('personal')
 const desktopMode = ref(false)
 const HomeCardsStub = defineComponent(() => () => h('div', 'desktop-home-cards'))
 const WebStartStub = defineComponent(() => () => h('div', 'web-first-steps'))
-const DeviceRowStub = defineComponent({ props: { name: String }, setup: (props) => () => h('div', `device row ${props.name}`) })
+const DeviceRowStub = defineComponent({ props: { name: String, nodeId: String }, setup: (props) => () => h('div', `device row ${props.name} ${props.nodeId ?? ''}`) })
+const isRealmAdmin = ref(false)
+const renameNode = vi.fn(async () => undefined)
+const nodeNamesStub = { useNodeNames: () => ({ renameNode }) }
 const setScope = vi.fn(async () => undefined)
 const refresh = vi.fn(async () => undefined)
 let servedEpoch = -1
@@ -58,9 +61,10 @@ const databaseRows = ref<unknown[]>([])
 const databaseState = ref('idle')
 // Renders what it was handed, so the view's own node/device split is testable.
 const NodeCardsStub = defineComponent({
-  props: { nodes: { type: Array, default: () => [] }, devices: { type: Array, default: () => [] } },
+  props: { nodes: { type: Array, default: () => [] }, devices: { type: Array, default: () => [] }, rename: Function },
   setup: (props) => () =>
     h('div', [
+      props.rename ? 'renamable ' : '',
       ...(props.nodes as Array<{ node_id: string; info?: { utilization?: { heartbeat_at_ms?: number } } }>).map((node) =>
         h('span', ` ${node.node_id} beat ${node.info?.utilization?.heartbeat_at_ms} `),
       ),
@@ -130,6 +134,7 @@ beforeAll(async () => {
       refresh,
       loadInfo,
       loadRealmView,
+      isRealmAdmin,
     }),
   }))
   vi.doMock('@/composables/useAuth', () => ({
@@ -155,6 +160,7 @@ beforeAll(async () => {
   vi.doMock('@/components/dashboard/OverviewCell.vue', () => ({ default: OverviewCellStub }))
   vi.doMock('@/composables/useDatabases', () => databasesStub)
   vi.doMock('@/components/dashboard/NodeCards.vue', () => ({ default: NodeCardsStub }))
+  vi.doMock('@/composables/useNodeNames', () => nodeNamesStub)
   vi.doMock('@/components/dashboard/WebStart.vue', () => ({ default: WebStartStub }))
   vi.doMock('@/composables/useRealmNodes', () => realmNodesStub)
   vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: SkeletonStub }))
@@ -186,6 +192,7 @@ beforeAll(async () => {
         refreshedEpoch: () => servedEpoch,
         loadInfo,
         loadRealmView,
+        isRealmAdmin,
       }),
     },
     '@/composables/useAuth': { useAuth: () => ({ authPending }) },
@@ -224,6 +231,7 @@ beforeAll(async () => {
     '@/components/dashboard/OverviewCell.vue': moduleDefault(OverviewCellStub),
     '@/composables/useDatabases': databasesStub,
     '@/components/dashboard/NodeCards.vue': moduleDefault(NodeCardsStub),
+    '@/composables/useNodeNames': nodeNamesStub,
     '@/components/dashboard/WebStart.vue': moduleDefault(WebStartStub),
     '@/composables/useRealmNodes': realmNodesStub,
     '@/components/nodes/node-display': NodeDisplay,
@@ -266,6 +274,7 @@ beforeEach(() => {
   databaseRows.value = []
   databaseState.value = 'idle'
   reloadDatabases.mockClear()
+  isRealmAdmin.value = false
   signIn.mockClear()
 })
 
@@ -494,7 +503,8 @@ describe('desktop home', () => {
     loadRealmView.mockResolvedValue({ info: { node: { peer_id: 'mgmt' } }, realm: { nodes: [{ node_id: 'own-device', kind: 'user', display_name: 'Old name' }] } })
     let mounted = await mountApp(DashboardClient)
     await flush()
-    expect(content(mounted.root)).toContain('device row Lab laptop')
+    // The row renames this computer through the device route, by its node id.
+    expect(content(mounted.root)).toContain('device row Lab laptop own-device')
     mounted.app.unmount()
 
     // Its own record has no name yet; the realm node's copy does.
@@ -583,6 +593,19 @@ describe('realm nodes in the overview', () => {
     expect(loadRealmView).not.toHaveBeenCalled()
     expect(content(web.root)).toContain('mgmt-node beat 1000')
     web.app.unmount()
+  })
+
+  it('lets a realm admin rename nodes from the cards, nobody else', async () => {
+    let mounted = await mountApp(DashboardClient)
+    await flush()
+    expect(content(mounted.root)).not.toContain('renamable')
+    mounted.app.unmount()
+
+    isRealmAdmin.value = true
+    mounted = await mountApp(DashboardClient)
+    await flush()
+    expect(content(mounted.root)).toContain('renamable')
+    mounted.app.unmount()
   })
 
   it('sums the imports the realm snapshot reports in the header, and drops them with a new snapshot', async () => {

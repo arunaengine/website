@@ -134,6 +134,15 @@ describe('devices panel', () => {
     expect(rendered).not.toContain('Microbiology laptop')
   })
 
+  it('lets the owner rename an enrolled device, not an enrollment still in flight', async () => {
+    realmInfo.value = { nodes: [{ node_id: '73ea340a1234', connection_status: 'seen', display_name: 'Lab laptop' }] }
+    devices.value = [device({ id: '73ea340a1234', node_id: '73ea340a1234' }), device({ id: 'enr-9abcdef12', node_id: null, status: 'pending' })]
+    const html = await renderToString(createSSRApp({ render: () => h(DevicesPanel) }))
+
+    expect(html).toContain('aria-label="Rename Lab laptop"')
+    expect(html.match(/aria-label="Rename /g)).toHaveLength(1)
+  })
+
   it('says the realm caps nothing when it does not', async () => {
     devices.value = [device()]
     expect(await text()).toContain('1 enrolled')

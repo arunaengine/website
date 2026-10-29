@@ -2,7 +2,8 @@
 import Badge from '@/components/ui/Badge.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import LocalNodeDetails from './LocalNodeDetails.vue'
-import { connectionLabel, kindLabel, statusVariant } from './node-display'
+import NodeNameEdit from './NodeNameEdit.vue'
+import { connectionLabel, kindLabel, nodeName, statusVariant } from './node-display'
 import type { NodeProbe } from './node-probe'
 import type { RealmNodeInfo } from '@/lib/api'
 import { formatBytes, formatNumber } from '@/lib/utils'
@@ -12,11 +13,23 @@ defineProps<{
   node: RealmNodeInfo
   isLocal?: boolean
   probe?: NodeProbe | null
+  /** Offered to a realm admin: names the node, null resets it. */
+  rename?: (nodeId: string, name: string | null) => Promise<void>
 }>()
 </script>
 
 <template>
   <div class="space-y-4">
+    <div>
+      <h2 class="font-display text-sm font-semibold text-aruna-navy">Name</h2>
+      <div class="mt-1 text-xs text-foreground/90">
+        <NodeNameEdit v-if="rename" :name="nodeName(node)" :value="node.display_name" :save="(name) => rename!(node.node_id, name)">
+          {{ nodeName(node) }}
+        </NodeNameEdit>
+        <template v-else>{{ nodeName(node) }}</template>
+      </div>
+    </div>
+
     <dl class="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
       <div>
         <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Kind</dt>

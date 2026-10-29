@@ -16,6 +16,8 @@ import { Plus, X } from '@lucide/vue'
 import type { UserDevice } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
 import { givenName } from '@/components/nodes/node-display'
+import NodeNameEdit from '@/components/nodes/NodeNameEdit.vue'
+import { useNodeNames } from '@/composables/useNodeNames'
 
 const DEVICE_STEPS = ['Device', 'Hand off', 'Watch it join']
 const FIRST_STEP = 1
@@ -69,12 +71,16 @@ const capLabel = computed(() =>
 type Variant = 'success' | 'secondary' | 'outline' | 'sky'
 interface DeviceRow {
   id: string
+  /** Set for an enrolled device: the node id it is renamed by. */
+  nodeId: string | null
   name: string | null
+  value: string | null
   shortId: string
   status: string
   variant: Variant
   lastSeen: string
 }
+const { renameDevice } = useNodeNames()
 const rows = computed<DeviceRow[]>(() =>
   devices.value.map((device) => {
     const node = (realmInfo.value?.nodes ?? []).find((entry) => entry.node_id === device.node_id)
@@ -83,7 +89,8 @@ const rows = computed<DeviceRow[]>(() =>
     const status = device.status === 'enrolled' ? (online ? 'online' : 'unknown') : device.status
     const variant: Variant = status === 'online' ? 'success' : status === 'claimed' ? 'sky' : status === 'pending' ? 'outline' : 'secondary'
     const seen = node?.last_seen_ms ? relativeTime(new Date(node.last_seen_ms).toISOString()) : online ? 'just now' : ''
-    return { id: device.id, name: node ? givenName(node) : null, shortId: (device.node_id ?? device.id).slice(0, 8), status, variant, lastSeen: seen }
+    const nodeId = device.status === 'enrolled' ? device.node_id : null
+    return { id: device.id, nodeId, name: node ? givenName(node) : null, value: node?.display_name ?? null, shortId: (device.node_id ?? device.id).slice(0, 8), status, variant, lastSeen: seen }
   }),
 )
 const confirming = ref('')
@@ -141,8 +148,15 @@ function remove(id: string) {
           <tbody>
             <tr v-for="row in rows" :key="row.id" class="border-t border-border">
               <td class="py-2.5 pr-4">
-                <span v-if="row.name" class="text-foreground">{{ row.name }}</span>
-                <span class="font-mono text-[11px] text-muted-foreground" :class="row.name ? 'ml-1.5' : ''">{{ row.shortId }}</span>
+                <!-- The owner names an enrolled device; an enrollment in flight has no node to name yet. -->
+                <NodeNameEdit v-if="row.nodeId" :name="row.name ?? row.shortId" :value="row.value" :save="(name) => renameDevice(row.nodeId!, name)">
+                  <span v-if="row.name" class="text-foreground">{{ row.name }}</span>
+                  <span class="font-mono text-[11px] text-muted-foreground" :class="row.name ? 'ml-1.5' : ''">{{ row.shortId }}</span>
+                </NodeNameEdit>
+                <template v-else>
+                  <span v-if="row.name" class="text-foreground">{{ row.name }}</span>
+                  <span class="font-mono text-[11px] text-muted-foreground" :class="row.name ? 'ml-1.5' : ''">{{ row.shortId }}</span>
+                </template>
               </td>
               <td class="py-2.5 pr-4"><Badge size="sm" :variant="row.variant">{{ row.status }}</Badge></td>
               <td class="py-2.5 pr-4 text-[11px] text-muted-foreground">{{ row.lastSeen || 'unknown' }}</td>

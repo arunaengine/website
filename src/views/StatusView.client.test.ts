@@ -10,6 +10,8 @@ const realmInfo = ref<Record<string, any> | null>(null)
 const nodeInfo = ref<Record<string, any> | null>(null)
 const loadRealmView = vi.fn(async (): Promise<unknown> => null)
 const desktop = { on: false }
+const isRealmAdmin = ref(false)
+const renameNode = vi.fn(async () => undefined)
 
 const node = (node_id: string, name?: string, present = true) => ({
   node_id,
@@ -31,11 +33,11 @@ const MapStub = defineComponent({
     h('div', (props.nodes as Array<{ node_id: string }>).map((entry) => h('button', { 'data-map': entry.node_id, onClick: () => emit('select', entry.node_id) }, `map ${entry.node_id}`))),
 })
 const CardsStub = defineComponent({
-  props: { nodes: { type: Array, default: () => [] }, openId: String },
+  props: { nodes: { type: Array, default: () => [] }, openId: String, rename: Function },
   emits: ['details'],
   setup: (props, { emit }) => () =>
     h('div', (props.nodes as Array<{ node_id: string; present: boolean; info?: { labels?: Record<string, string> } | null }>).map((entry) =>
-      h('button', { 'data-card': entry.node_id, onClick: () => emit('details', entry.node_id) }, `card ${entry.info?.labels?.name ?? 'unnamed'} ${entry.present ? 'online' : 'offline'}`))),
+      h('button', { 'data-card': entry.node_id, onClick: () => emit('details', entry.node_id) }, `card ${entry.info?.labels?.name ?? 'unnamed'} ${entry.present ? 'online' : 'offline'}${props.rename ? ' renamable' : ''}`))),
 })
 const DetailStub = defineComponent({ props: { node: { type: Object, required: true } }, setup: (props) => () => h('div', `details ${(props.node as { node_id: string }).node_id}`) })
 
@@ -69,8 +71,10 @@ const StatusView = compileClientComponent(new URL('./StatusView.vue', import.met
       loadInfo: vi.fn(async () => undefined),
       sessionEpoch: ref(0),
       loadRealmView,
+      isRealmAdmin,
     }),
   },
+  '@/composables/useNodeNames': { useNodeNames: () => ({ renameNode }) },
   '@/composables/useRefresh': { useRefresh: (run: () => unknown) => ({ busy: ref(false), refresh: run }) },
   '@vueuse/core': { useDocumentVisibility: () => ref('hidden'), useIntervalFn: () => ({ pause: vi.fn(), resume: vi.fn() }) },
   '@/lib/poll': { onWake: () => () => {}, POLL_SLOW_MS: 15_000 },
@@ -89,6 +93,7 @@ beforeEach(() => {
   nodeInfo.value = { node: { peer_id: 'own-device' } }
   realmInfo.value = { metadata_replication: { default_replication_factor: 2 }, nodes: [node('server-a', 'Giessen storage')] }
   loadRealmView.mockReset().mockResolvedValue(null)
+  isRealmAdmin.value = false
 })
 
 afterEach(() => vi.unstubAllGlobals())
@@ -121,6 +126,19 @@ describe('status nodes', () => {
     expect(content(mounted.root)).not.toContain('details server-a')
     await click(onMap())
     expect(content(mounted.root)).toContain('details server-a')
+    mounted.app.unmount()
+  })
+
+  it('offers renaming on the cards to a realm admin only', async () => {
+    let mounted = await mountApp(StatusView)
+    await flush()
+    expect(content(mounted.root)).not.toContain('renamable')
+    mounted.app.unmount()
+
+    isRealmAdmin.value = true
+    mounted = await mountApp(StatusView)
+    await flush()
+    expect(content(mounted.root)).toContain('card Giessen storage online renamable')
     mounted.app.unmount()
   })
 })

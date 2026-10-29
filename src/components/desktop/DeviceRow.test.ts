@@ -53,6 +53,12 @@ const docker = (): DeviceCompute => ({
 
 const Plain = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
 const ButtonStub = defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()) })
+const renameDevice = vi.fn(async () => undefined)
+// Shows the name it wraps and saves a fixed new one, to see which route the row hands it.
+const NameEditStub = defineComponent({
+  props: { name: String, save: Function },
+  setup: (props, { slots }) => () => h('span', [slots.default?.(), h('button', { onClick: () => (props.save as (name: string) => Promise<void>)('Lab laptop') }, 'Rename')]),
+})
 const BindStub = defineComponent({ props: { open: Boolean }, setup: (props) => () => h('div', props.open ? 'bind-dialog-open' : '') })
 
 const DeviceRow = compileClientComponent(new URL('./DeviceRow.vue', import.meta.url), {
@@ -68,6 +74,8 @@ const DeviceRow = compileClientComponent(new URL('./DeviceRow.vue', import.meta.
   '@/composables/useDeviceTransfers': { useDeviceTransfers: () => ({ all: transfers, state: transfersState, load: vi.fn(async () => undefined) }) },
   '@/composables/useSyncedFolders': { useSyncedFolders: () => ({ folders, listState: foldersState, load: loadFolders }) },
   '@/composables/useRealmNodes': { THIS_COMPUTER: 'This computer' },
+  '@/composables/useNodeNames': { useNodeNames: () => ({ renameDevice }) },
+  '@/components/nodes/NodeNameEdit.vue': moduleDefault(NameEditStub),
   '@/lib/deviceApi': DeviceApi,
   '@/lib/formatCount': FormatCount,
   '@/lib/nodePill': NodePill,
@@ -163,5 +171,16 @@ describe('device row', () => {
     const unknown = await mountApp(DeviceRow, { props: { name: 'This computer' } })
     expect(loadCompute).toHaveBeenCalledTimes(1)
     unknown.app.unmount()
+  })
+
+  it('renames this computer through the device route, by its node id, once the realm lists it', async () => {
+    const unknown = await mountApp(DeviceRow, { props: { name: 'This computer' } })
+    expect(() => button(unknown.root, 'Rename')).toThrow()
+    unknown.app.unmount()
+
+    const mounted = await mountApp(DeviceRow, { props: { name: 'Microbiology laptop', nodeId: 'dev-node-1', value: null } })
+    await click(button(mounted.root, 'Rename'))
+    expect(renameDevice).toHaveBeenCalledWith('dev-node-1', 'Lab laptop')
+    mounted.app.unmount()
   })
 })
