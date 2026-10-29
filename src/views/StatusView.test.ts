@@ -50,6 +50,7 @@ beforeAll(async () => {
   vi.doMock('@/components/nodes/NodeDetailPanel.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/placement/LocationAggregates.vue', () => ({ default: AggregatesStub }))
   vi.doMock('@/composables/useNodeNames', () => ({ useNodeNames: () => ({ renameNode: vi.fn() }) }))
+  vi.doMock('@/composables/useDeviceStatus', () => ({ useDeviceStatus: () => ({ identity: ref(null) }) }))
   vi.doMock('@/components/dashboard/FederationPanel.vue', () => ({
     default: defineComponent({ props: { nodes: Array }, setup: (props) => () => h('div', `node map ${props.nodes?.length}`) }),
   }))

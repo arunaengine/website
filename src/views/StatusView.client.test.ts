@@ -11,6 +11,8 @@ const nodeInfo = ref<Record<string, any> | null>(null)
 const loadRealmView = vi.fn(async (): Promise<unknown> => null)
 const desktop = { on: false }
 const isRealmAdmin = ref(false)
+// The desktop's own node, as the shell's device status names it.
+const identity = ref<{ nodeId: string; realm: string } | null>(null)
 const renameNode = vi.fn(async () => undefined)
 
 const node = (node_id: string, name?: string, present = true) => ({
@@ -83,6 +85,7 @@ const StatusView = compileClientComponent(new URL('./StatusView.vue', import.met
     }),
   },
   '@/composables/useNodeNames': { useNodeNames: () => ({ renameNode }) },
+  '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ identity }) },
   '@/composables/useRefresh': { useRefresh: (run: () => unknown) => ({ busy: ref(false), refresh: run }) },
   '@vueuse/core': { useDocumentVisibility: () => ref('hidden'), useIntervalFn: () => ({ pause: vi.fn(), resume: vi.fn() }) },
   '@/lib/poll': { onWake: () => () => {}, POLL_SLOW_MS: 15_000 },
@@ -102,6 +105,7 @@ beforeEach(() => {
   realmInfo.value = { metadata_replication: { default_replication_factor: 2 }, nodes: [node('server-a', 'Giessen storage')] }
   loadRealmView.mockReset().mockResolvedValue(null)
   isRealmAdmin.value = false
+  identity.value = null
 })
 
 afterEach(() => vi.unstubAllGlobals())
@@ -173,6 +177,31 @@ describe('status nodes', () => {
     await flush()
 
     expect(content(mounted.root)).toContain('local device=false realm=- api=https://api.server-a.example.org/api/v1')
+    mounted.app.unmount()
+  })
+
+  it('treats a realm node serving the desktop as a server, not as this computer', async () => {
+    desktop.on = true
+    identity.value = { nodeId: 'own-device', realm: 'r' }
+    // The sidecar is down: the shell reaches the remembered realm API, served by the management node.
+    nodeInfo.value = { node: { peer_id: 'mgmt' }, services: { interfaces: { rest: { status: 'available' }, s3: { status: 'available' } } } }
+    realmInfo.value = { metadata_replication: { default_replication_factor: 2 }, nodes: [{ ...node('mgmt', 'Giessen management'), kind: 'management' }] }
+    let mounted = await mountApp(StatusView)
+    await flush()
+    expect(content(mounted.root)).toContain('local device=false')
+    mounted.app.unmount()
+
+    // Without a realm record yet, only the desktop's own node is a device.
+    realmInfo.value = { metadata_replication: { default_replication_factor: 2 }, nodes: [] }
+    mounted = await mountApp(StatusView)
+    await flush()
+    expect(content(mounted.root)).toContain('local device=false')
+    mounted.app.unmount()
+
+    nodeInfo.value = { node: { peer_id: 'own-device' }, services: { interfaces: { rest: { status: 'available' }, s3: { status: 'available' } } } }
+    mounted = await mountApp(StatusView)
+    await flush()
+    expect(content(mounted.root)).toContain('local device=true')
     mounted.app.unmount()
   })
 })

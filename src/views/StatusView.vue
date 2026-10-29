@@ -19,6 +19,7 @@ import { nodeApiBase, probeNode, type NodeProbe } from '@/components/nodes/node-
 import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
 import { useNodeNames } from '@/composables/useNodeNames'
+import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { onWake, POLL_SLOW_MS } from '@/lib/poll'
 import { aggregateByLocation } from '@/lib/placement'
@@ -238,7 +239,12 @@ function toggleNode(nodeId: string) {
 // is a realm node's, which knows the names and heartbeats the device's own copy lacks.
 // This node's realm record. In the desktop it is this computer's own node, which listens here only.
 const ownRecord = computed(() => (realmInfo.value?.nodes ?? []).find((node) => node.node_id === localPeerId.value) ?? null)
-const ownDevice = computed(() => ownRecord.value?.kind === 'user' || desktop)
+// The serving node's own kind decides; without its record only the desktop's own node is a device.
+// A desktop that reaches a remembered realm API meanwhile is served by a realm node.
+const { identity } = useDeviceStatus()
+const ownDevice = computed(() =>
+  ownRecord.value ? ownRecord.value.kind === 'user' : desktop && Boolean(localPeerId.value) && identity.value?.nodeId === localPeerId.value,
+)
 // Where tools reach the realm: a management node's public API, else the first one the realm names.
 const realmApi = computed(() => {
   const management = panelInfra.value.find((node) => node.kind === 'management' && nodeApiBase(node))
