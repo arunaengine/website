@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  PopoverAnchor,
   PopoverArrow,
   PopoverContent,
   PopoverPortal,
@@ -35,13 +36,16 @@ function keepOpen(event: Event) {
 
 <template>
   <PopoverRoot :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
-    <!-- The wrapper anchors the popover: a tooltip trigger in between would hide the button from it. -->
-    <PopoverTrigger v-if="tooltip" as-child>
+    <!-- The button stays the trigger and the focus target; the wrapper only places the popover,
+         as the tooltip trigger around the button would hide it from the popover. -->
+    <PopoverAnchor v-if="tooltip" as-child>
       <span class="inline-flex">
         <TooltipProvider :delay-duration="120">
           <TooltipRoot>
             <TooltipTrigger as-child>
-              <slot />
+              <PopoverTrigger as-child>
+                <slot />
+              </PopoverTrigger>
             </TooltipTrigger>
             <TooltipPortal>
               <TooltipContent
@@ -55,7 +59,7 @@ function keepOpen(event: Event) {
           </TooltipRoot>
         </TooltipProvider>
       </span>
-    </PopoverTrigger>
+    </PopoverAnchor>
     <PopoverTrigger v-else as-child>
       <slot />
     </PopoverTrigger>

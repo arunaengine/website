@@ -18,7 +18,8 @@ const Popover = compileClientComponent(new URL('./Popover.vue', import.meta.url)
   vue: VueRuntime,
   'radix-vue': {
     PopoverRoot: SlotStub,
-    PopoverTrigger: SlotStub,
+    PopoverAnchor: defineComponent({ inheritAttrs: false, setup: (_, { slots }) => () => h('div', { 'data-part': 'anchor' }, slots.default?.()) }),
+    PopoverTrigger: defineComponent({ inheritAttrs: false, setup: (_, { slots }) => () => h('div', { 'data-part': 'trigger' }, slots.default?.()) }),
     PopoverPortal: SlotStub,
     PopoverContent: ContentStub,
     PopoverArrow: ArrowStub,
@@ -58,8 +59,13 @@ describe('Popover', () => {
 
     const tipped = await mountApp(Popover, { props: { tooltip: 'Stored on Giessen storage 1' } })
     expect(content(element(tipped.root, (node) => node.props.role === 'tooltip')).trim()).toBe('Stored on Giessen storage 1')
-    // A real element anchors the popover, between its trigger and the tooltip's.
-    const tooltip = element(tipped.root, (node) => node.props.role === 'tooltip')
-    expect(nodes(tipped.root).some((node) => node.tag === 'span' && node.props.class === 'inline-flex' && nodes(node).includes(tooltip))).toBe(true)
+    // The button itself is the trigger, so focus and aria-expanded stay on it; a wrapper places the popover.
+    const Host = defineComponent(() => () => h(Popover, { tooltip: 'Stored on Giessen storage 1' }, { default: () => h('button', 'icon') }))
+    const host = await mountApp(Host)
+    const icon = element(host.root, (node) => node.tag === 'button')
+    expect(icon.parent!.props['data-part']).toBe('trigger')
+    const anchor = element(host.root, (node) => node.props['data-part'] === 'anchor')
+    expect(nodes(anchor).includes(icon)).toBe(true)
+    expect(nodes(anchor).some((node) => node.props['data-part'] === 'trigger' && !nodes(node).includes(icon))).toBe(false)
   })
 })
