@@ -133,7 +133,7 @@ function boxView(item: Box, repeat = false): VNode {
   const root = graph.roots.includes(item.id)
   const lines: VNode[] = [
     h('div', { class: 'mb-0.5 text-[10px] uppercase tracking-wider text-muted-foreground' }, item.role),
-    h('p', { class: 'font-medium' }, item.title),
+    h('p', { class: 'break-words font-medium' }, item.title),
   ]
   if (item.detail) lines.push(h('p', { class: item.kind === 'hidden' ? 'font-mono text-muted-foreground' : 'text-muted-foreground' }, item.detail))
   if (repeat && item.from.length) lines.push(h('p', { class: 'text-muted-foreground' }, 'Where it came from is shown above.'))
@@ -141,14 +141,15 @@ function boxView(item: Box, repeat = false): VNode {
     lines.push(
       h('p', [
         `${found.name} `,
-        h(ExternalLink, { href: found.url, label: found.value, class: 'font-mono' }),
+        h(ExternalLink, { href: found.url, label: found.value, class: 'break-all font-mono' }),
       ]),
     )
   }
   if (item.link?.document) {
     lines.push(h(RouterLink, { to: { name: 'dataset', params: { id: item.link.document } }, class: 'text-primary hover:underline' }, () => item.link?.label))
   } else if (item.link?.url) {
-    lines.push(h(ExternalLink, { href: item.link.url, label: item.link.label }))
+    // Long identifiers such as a DOI break inside the narrow box.
+    lines.push(h(ExternalLink, { href: item.link.url, label: item.link.label, class: 'break-all' }))
   }
   if (item.pending.length) {
     const label = item.kind === 'silent' ? 'Try again' : 'Show where this came from'

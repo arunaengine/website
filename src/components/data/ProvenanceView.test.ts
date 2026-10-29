@@ -3,7 +3,7 @@ import * as VueRuntime from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, type OriginResponse } from '@/lib/api'
 import * as Provenance from '@/lib/provenance'
-import { button, click, compileClientComponent, content, flush, mountApp, moduleDefault } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, flush, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 
 const aruna = vi.hoisted(() => ({
   getVersionOrigin: vi.fn(),
@@ -150,6 +150,8 @@ describe('provenance view', () => {
     expect(text.split('Prepare Bakta DB 6.0 light')).toHaveLength(2)
     expect(text).toContain('zenodo.org')
     expect(text).not.toContain('/work/in/db/f3')
+    const doi = nodes(root).find((node) => node.tag === 'a' && node.props.href === 'https://doi.org/10.5281/zenodo.14916843')
+    expect(String(doi?.props.class)).toContain('break-all')
 
     await click(button(root, 'Show the files'))
     expect(content(root)).toContain('/work/in/db/f3')
