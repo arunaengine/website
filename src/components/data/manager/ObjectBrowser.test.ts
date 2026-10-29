@@ -755,8 +755,8 @@ describe('object browser name filter', () => {
 })
 
 describe('the one search box', () => {
-  async function setup() {
-    const manager = fakeManager({ openDetails, download, requestDelete, router: { push } })
+  async function setup(overrides: Record<string, unknown> = {}) {
+    const manager = fakeManager({ openDetails, download, requestDelete, router: { push }, ...overrides })
     const opened: unknown[] = []
     const host = defineComponent({ setup: () => () => h(browser, { manager, 'onOpen-hit': (hit: unknown) => opened.push(hit) }) })
     const { root } = await mountApp(host)
@@ -816,5 +816,27 @@ describe('the one search box', () => {
     const { root } = await setup()
     const boxes = nodes(root).filter((node) => node.tag === 'input' && node.props.type !== 'checkbox')
     expect(boxes.map((node) => node.props.placeholder)).toEqual(['Filter this folder, Enter searches the bucket'])
+  })
+
+  it('hands Enter to the open search even with an empty box, where its chips may stand alone', async () => {
+    bucketSearches.count = 0
+    const { type, enter } = await setup()
+    await type('coli')
+    await enter()
+    await type('')
+    await enter()
+    expect(bucketSearches.count).toBe(1)
+  })
+
+  it('ends the search and empties the box when the folder changes', async () => {
+    const { root, manager, box, type, enter } = await setup()
+    await type('reads')
+    await enter()
+    ;(manager.s3Prefix as { value: string }).value = 'raw/genomes/'
+    await flush()
+
+    expect(content(root)).not.toContain('whole bucket')
+    expect(element(root, (node) => node.tag === 'table')).toBeTruthy()
+    expect(box().props.modelValue).toBe('')
   })
 })

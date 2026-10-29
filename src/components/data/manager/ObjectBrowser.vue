@@ -335,10 +335,10 @@ function onTransferDone(moved: string[]) {
 const searchText = ref('')
 const wholeBucket = ref(false)
 const bucketSearch = ref<{ search: () => Promise<void> } | null>(null)
+// An open search decides itself what to search for: its chips may stand alone in an empty box.
 function searchBucket() {
-  if (searchText.value.trim().length < 2) return
-  if (wholeBucket.value) void bucketSearch.value?.search()
-  else wholeBucket.value = true
+  if (wholeBucket.value) return void bucketSearch.value?.search()
+  if (searchText.value.trim().length >= 2) wholeBucket.value = true
 }
 function backToFolder() {
   wholeBucket.value = false
@@ -349,7 +349,8 @@ function openHit(hit: ObjectSearchHit) {
   backToFolder()
   emit('open-hit', hit)
 }
-watch([bucket, remoteNodeId], () => (wholeBucket.value = false))
+// Another folder, bucket or node ends the search and its results, and empties the box.
+watch([bucket, remoteNodeId, s3Prefix], backToFolder)
 
 // One file after another: a locked bucket reads them through one keyed reader.
 // Another bucket, node or session ends the batch; its rows belong to the old one.
