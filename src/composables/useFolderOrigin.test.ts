@@ -77,7 +77,7 @@ describe('folder origin', () => {
   it('stops the walk on a new listing or when the view goes, and shares reads under way', async () => {
     const pending: { key: string; signal?: AbortSignal; resolve: (value: unknown) => void }[] = []
     getFileOrigin.mockImplementation((_bucket: string, query: { key: string }, signal?: AbortSignal) =>
-      new Promise((resolve) => pending.push({ key: query.key, signal, resolve })))
+      new Promise((resolve) => pending.push({ key: query.key, signal, resolve: resolve as (value: unknown) => void })))
     const files = ref([{ key: 'slow.fna', etag: '1' }])
     const first = effectScope()
     first.run(() => useFolderOrigin(ref('slow'), ref(null), files))
