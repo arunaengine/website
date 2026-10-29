@@ -123,19 +123,24 @@ async function step(more: boolean, run: number, askNames: boolean): Promise<numb
 
 // Words search while typing; a `column=value` waits for Enter or a space.
 const searchSoon = useDebounceFn(() => void search(), 400)
-// An edit ends the search under way and its paging at once, before the pause is over.
-watch(typed, (text) => {
+// An edit or a removed chip ends the search under way and its paging at once.
+function stop() {
   runs++
   busy.value = false
   cursor.value = null
   nameCursor.value = null
+  searchSoon.cancel()
+}
+watch(typed, (text) => {
+  stop()
   if (!text.includes('=') && !quoteOpen() && text.trim().length >= 2) void searchSoon()
-  else searchSoon.cancel()
 }, { flush: 'sync' })
 
 function drop(index: number) {
   chips.value = chips.value.filter((_, at) => at !== index)
-  if (hits.value) void search()
+  const searched = hits.value !== null || busy.value
+  stop()
+  if (searched) void search()
 }
 </script>
 

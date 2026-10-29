@@ -257,4 +257,24 @@ describe('bucket metadata search', () => {
     expect(content(root)).not.toContain('Show more')
     expect(searchObjects).toHaveBeenCalledTimes(3)
   })
+
+  it('drops the search of a chip removed before its answer', async () => {
+    let answer: (value: unknown) => void = () => {}
+    searchObjects.mockReset()
+    searchObjects.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)) as never)
+    const { root } = await mountApp(component, { props: { bucket: 'ncbi', nodeId: null } })
+    ;(element(root, (node) => node.tag === 'input').props['onUpdate:modelValue'] as (value: string) => void)('species_taxid=562')
+    ;(element(root, (node) => node.tag === 'form').props.onSubmit as (event: Event) => void)({ preventDefault: () => {} } as Event)
+    await flush()
+    expect(content(root)).toContain('Searching…')
+
+    ;(element(root, (node) => node.props['aria-label'] === 'Remove species_taxid').props.onClick as () => void)()
+    answer({ hits: [hit], next_cursor: 'c2', coverage: { complete: true } })
+    await flush()
+
+    expect(content(root)).not.toContain('GCF_')
+    expect(content(root)).not.toContain('Searching…')
+    expect(content(root)).not.toContain('Show more')
+    expect(searchObjects).toHaveBeenCalledOnce()
+  })
 })
