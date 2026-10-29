@@ -137,4 +137,41 @@ describe('unified document coverage', () => {
     expect(search.objectCoverage.value).toBeNull()
     expect(search.objectError.value).toBe('Strict coverage unavailable')
   })
+
+  it('follows an empty object page with a cursor until a hit arrives', async () => {
+    const coverage = { scope: 'realm', mode: 'distributed_best_effort', complete: false, truncated: true, partitions: [] }
+    const hit = { kind: 'object', issuer_node_id: 'node-a', group_id: 'group-a', bucket: 'raw-data', key: 'reads/late.fastq' }
+    let answer: (value: unknown) => void = () => undefined
+    mocks.searchObjects
+      .mockResolvedValueOnce({ hits: [], next_cursor: 'c2', coverage })
+      .mockReturnValueOnce(new Promise((resolve) => { answer = resolve }))
+
+    const search = useUnifiedSearch(ref('late'), { types: [], includeObjects: true })
+    await vi.waitFor(() => expect(mocks.searchObjects).toHaveBeenCalledTimes(2))
+    expect(mocks.searchObjects).toHaveBeenLastCalledWith('late', expect.objectContaining({ cursor: 'c2' }))
+    expect(search.pending.value).toBe(true)
+
+    answer({ hits: [hit], next_cursor: 'c3', coverage })
+    await vi.waitFor(() => expect(search.pending.value).toBe(false))
+    expect(search.objects.value.map((object) => object.key)).toEqual(['reads/late.fastq'])
+    expect(search.objectCursor.value).toBe('c3')
+    expect(mocks.searchObjects).toHaveBeenCalledTimes(2)
+  })
+
+  it('follows empty object pages after Show more until a hit arrives', async () => {
+    const coverage = { scope: 'realm', mode: 'distributed_best_effort', complete: false, truncated: true, partitions: [] }
+    const hit = (key: string) => ({ kind: 'object', issuer_node_id: 'node-a', group_id: 'group-a', bucket: 'raw-data', key })
+    mocks.searchObjects
+      .mockResolvedValueOnce({ hits: [hit('a.fastq')], next_cursor: 'c2', coverage })
+      .mockResolvedValueOnce({ hits: [], next_cursor: 'c3', coverage })
+      .mockResolvedValueOnce({ hits: [hit('b.fastq')], next_cursor: null, coverage })
+
+    const search = useUnifiedSearch(ref('reads'), { types: [], includeObjects: true })
+    await vi.waitFor(() => expect(search.pending.value).toBe(false))
+    await search.loadMore('objects')
+
+    expect(mocks.searchObjects).toHaveBeenLastCalledWith('reads', expect.objectContaining({ cursor: 'c3' }))
+    expect(search.objects.value.map((object) => object.key)).toEqual(['a.fastq', 'b.fastq'])
+    expect(search.objectCursor.value).toBeNull()
+  })
 })

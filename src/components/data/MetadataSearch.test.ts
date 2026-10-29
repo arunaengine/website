@@ -138,8 +138,8 @@ describe('bucket metadata search', () => {
     await flush()
     const more = () => (element(root, (node) => node.tag === 'button' && content(node) === 'Show more').props.onClick as () => void)()
 
-    more()
-    await flush()
+    // The empty details page with a cursor was followed at once, asking for the names again.
+    expect(searchObjects).toHaveBeenCalledWith('hello', { bucket: 'ncbi', match: 'metadata', limit: 50, cursor: 'd2' })
     expect(searchObjects).toHaveBeenLastCalledWith('hello', { bucket: 'ncbi', match: 'substring', limit: 50, cursor: undefined })
     expect(content(root)).toContain('The name search failed')
     expect(content(root)).not.toContain('Nothing matches.')
@@ -149,5 +149,67 @@ describe('bucket metadata search', () => {
     expect(content(root)).toContain('reads/hello.txt')
     expect(content(root)).not.toContain('The name search failed')
     expect(content(root)).not.toContain('Show more')
+  })
+
+  it('follows an empty page with a cursor until a hit arrives, showing it still searches', async () => {
+    const strain = { key: 'GCF_000006665.1_ASM666v1/', bucket: 'ncbi-refseq', issuer_node_id: 'n2', group_id: 'g1' }
+    let second!: (value: unknown) => void
+    searchObjects.mockReset()
+    searchObjects.mockImplementation(async (_q: string, options: { match: string; cursor?: string }) => {
+      if (options.match === 'substring') return { hits: [], next_cursor: null, coverage: { complete: true } }
+      if (!options.cursor) return { hits: [], next_cursor: 'c2', coverage: { complete: true } }
+      return new Promise((resolve) => (second = resolve)) as never
+    })
+    const { root } = await mountApp(component, { props: { bucket: 'ncbi-refseq', nodeId: null } })
+    ;(element(root, (node) => node.tag === 'input').props['onUpdate:modelValue'] as (value: string) => void)('SAMN02905113')
+    await flush()
+
+    expect(searchObjects).toHaveBeenLastCalledWith('SAMN02905113', { bucket: 'ncbi-refseq', match: 'metadata', limit: 50, cursor: 'c2' })
+    expect(content(root)).toContain('Searching…')
+    expect(content(root)).not.toContain('Nothing matches.')
+
+    second({ hits: [strain], next_cursor: null, coverage: { complete: true } })
+    await flush()
+    await flush()
+    expect(content(root)).toContain('GCF_000006665.1_ASM666v1/')
+    expect(content(root)).not.toContain('Searching…')
+  })
+
+  it('stops following cursors once a newer search starts', async () => {
+    searchObjects.mockReset()
+    searchObjects.mockImplementation(async (q: string, options: { match: string; cursor?: string }) => {
+      if (options.match === 'substring') return { hits: [], next_cursor: null, coverage: { complete: true } }
+      // The first term never finds anything and always has another page.
+      if (q === 'never') return { hits: [], next_cursor: `${options.cursor ?? ''}x`, coverage: { complete: true } }
+      return { hits: [hit], next_cursor: null, coverage: { complete: true } }
+    })
+    const { root } = await mountApp(component, { props: { bucket: 'ncbi', nodeId: null } })
+    const input = element(root, (node) => node.tag === 'input')
+    ;(input.props['onUpdate:modelValue'] as (value: string) => void)('never')
+    await flush()
+    ;(input.props['onUpdate:modelValue'] as (value: string) => void)('coli')
+    await flush()
+    const calls = searchObjects.mock.calls.length
+    await flush()
+
+    expect(content(root)).toContain('GCF_')
+    expect(searchObjects.mock.calls.length).toBe(calls)
+  })
+
+  it('stops following once a later name page fails', async () => {
+    searchObjects.mockReset()
+    searchObjects.mockImplementation(async (_q: string, options: { match: string; cursor?: string }) => {
+      if (options.match === 'metadata') return { hits: [], next_cursor: null, coverage: { complete: true } }
+      if (options.cursor) throw new Error('name search down')
+      return { hits: [], next_cursor: 'n2', coverage: { complete: true } }
+    })
+    const { root } = await mountApp(component, { props: { bucket: 'ncbi', nodeId: null } })
+    ;(element(root, (node) => node.tag === 'input').props['onUpdate:modelValue'] as (value: string) => void)('rare')
+    await flush()
+    await flush()
+
+    expect(searchObjects).toHaveBeenCalledTimes(3)
+    expect(content(root)).toContain('The name search failed')
+    expect(content(root)).not.toContain('Searching')
   })
 })

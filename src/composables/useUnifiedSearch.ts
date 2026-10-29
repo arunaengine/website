@@ -158,6 +158,20 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     objectCoverage.value = response.coverage
   }
 
+  // A distributed object search examines a bounded number of files per page, so a page may come
+  // back empty with a cursor; the next pages are read until a hit arrives or the cursor ends, as
+  // long as the search is still the current one.
+  async function followObjects(term: string, current: () => boolean, signal: AbortSignal) {
+    while (current() && objectCursor.value) {
+      const response = await searchObjects(term, { mode: objectMode.value, limit, cursor: objectCursor.value, signal })
+      if (!current()) return
+      objects.value = [...objects.value, ...response.hits]
+      objectCursor.value = response.next_cursor ?? null
+      objectCoverage.value = response.coverage
+      if (response.hits.length) return
+    }
+  }
+
   async function settled<T>(promise: Promise<T>): Promise<{ value: T | null; failure: unknown | null }> {
     try {
       return { value: await promise, failure: null }
@@ -173,6 +187,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     loadingSection.value = null
     controller?.abort()
     controller = new AbortController()
+    const signal = controller.signal
     pending.value = true
     error.value = null
     const startedAt = performance.now()
@@ -209,6 +224,12 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
       objectSearched.value = searchObjectsNow
       cursorQuery = term
       searched.value = true
+      if (objectOutcome.value && !objects.value.length && objectCursor.value) {
+        pending.value = true
+        await followObjects(term, () => mySeq === seq, signal).catch((failure: unknown) => {
+          if (mySeq === seq) objectError.value = errorMessage(failure)
+        })
+      }
     } catch (err) {
       if (mySeq !== seq) return // superseded or aborted
       error.value = errorMessage(err)
@@ -246,6 +267,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
         objectCursor.value = response.next_cursor ?? null
         objectCoverage.value = response.coverage
         objectError.value = null
+        if (!response.hits.length) await followObjects(term, () => mySeq === seq && sectionController === pageController, pageController.signal)
         return
       }
       const response = await searchUnified(term, {
