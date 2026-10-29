@@ -392,8 +392,9 @@ async function onDrop(event: DragEvent) {
     <EmptyState v-if="!bucket" title="Select a bucket to browse its objects." />
 
     <template v-else>
-      <div class="flex items-center justify-between gap-2" :class="desktop ? 'flex-wrap' : 'flex-nowrap'">
-        <div class="flex min-w-0 flex-1 items-center gap-2">
+      <!-- On a narrow screen the actions move below the path instead of squeezing it. -->
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex min-w-[10rem] flex-1 items-center gap-2">
           <Breadcrumbs :bucket="bucket" :path="prefix" single-line @navigate="navigateTo" />
           <Badge v-if="lockedOnNode" :variant="stateVariant('locked')" size="sm" class="shrink-0">
             <Lock class="mr-0.5 h-3 w-3" aria-hidden="true" /> Locked on the node
@@ -404,7 +405,7 @@ async function onDrop(event: DragEvent) {
           </span>
           <Spinner v-if="listLoading" label="Loading objects" class="shrink-0" />
         </div>
-        <div class="flex items-center gap-2" :class="desktop ? 'min-w-0 flex-wrap justify-end' : 'shrink-0'">
+        <div class="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
           <WatchButton
             surface="bucket"
             :path-prefix="watchPathPrefix"
@@ -580,7 +581,7 @@ async function onDrop(event: DragEvent) {
               </th>
               <th class="px-4 py-2 text-left font-semibold">Name</th>
               <th class="px-4 py-2 text-right font-semibold">Size</th>
-              <th class="px-4 py-2 text-left font-semibold">Modified</th>
+              <th class="hidden px-4 py-2 text-left font-semibold sm:table-cell">Modified</th>
               <th class="px-4 py-2"></th>
             </tr>
           </thead>
@@ -623,7 +624,7 @@ async function onDrop(event: DragEvent) {
                 </span>
               </td>
               <td class="px-4 py-2.5 text-right text-muted-foreground">-</td>
-              <td class="px-4 py-2.5 text-muted-foreground">-</td>
+              <td class="hidden px-4 py-2.5 text-muted-foreground sm:table-cell">-</td>
               <td class="px-4 py-2.5">
                 <div class="flex items-center justify-end gap-1">
                   <RowMenu
@@ -690,8 +691,8 @@ async function onDrop(event: DragEvent) {
                   </Tooltip>
                 </span>
               </td>
-              <td class="px-4 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ object.size !== undefined ? formatBytes(object.size) : '-' }}</td>
-              <td class="px-4 py-2.5 text-xs text-muted-foreground">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '-' }}</td>
+              <td class="whitespace-nowrap px-4 py-2.5 text-right font-mono text-xs text-muted-foreground">{{ object.size !== undefined ? formatBytes(object.size) : '-' }}</td>
+              <td class="hidden px-4 py-2.5 text-xs text-muted-foreground sm:table-cell">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '-' }}</td>
               <td class="px-4 py-2.5">
                 <div class="flex items-center justify-end gap-1">
                   <IconButton label="Preview" @click.stop="openDetails(object, 'preview')"><Eye class="size-3.5" /></IconButton>
@@ -720,7 +721,7 @@ async function onDrop(event: DragEvent) {
                 </span>
               </td>
               <td class="px-4 py-2.5 text-right font-mono text-xs">-</td>
-              <td class="px-4 py-2.5 text-xs">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '-' }}</td>
+              <td class="hidden px-4 py-2.5 text-xs sm:table-cell">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '-' }}</td>
               <td class="px-4 py-2.5">
                 <div class="flex items-center justify-end gap-1">
                   <Spinner v-if="restoringKey === object.key" label="Restoring the object" />
@@ -753,7 +754,7 @@ async function onDrop(event: DragEvent) {
             </tr>
           </tbody>
         </table>
-        <div v-if="!isEmpty || page > 1 || nextToken" class="flex items-center justify-between gap-3 border-t border-border px-4 py-2">
+        <div v-if="!isEmpty || page > 1 || nextToken" class="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-2">
           <label class="flex items-center gap-2 text-xs text-muted-foreground">
             Per page
             <Select

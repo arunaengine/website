@@ -286,11 +286,12 @@ async function createFolder() {
       :docs="{ topic: 'upload-data', section: 'Create a bucket and upload' }"
     >
       <template #title>
-        <span class="flex min-w-0 items-baseline gap-2">
-          <span class="truncate" :title="headerTitle">{{ headerTitle }}</span>
+        <!-- A narrow screen puts the node below the name instead of cutting the name short. -->
+        <span class="flex min-w-0 flex-wrap items-baseline gap-x-2">
+          <span class="max-w-full truncate" :title="headerTitle">{{ headerTitle }}</span>
           <span
             v-if="route.name === 'bucket' && !notebooksView && requiredNodeId"
-            class="min-w-0 truncate text-sm font-normal text-muted-foreground"
+            class="max-w-full truncate text-sm font-normal text-muted-foreground"
             :title="headerPlace.title"
           >
             on {{ headerPlace.name }}
