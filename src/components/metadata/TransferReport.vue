@@ -2,6 +2,7 @@
 // Per-entry report of a settled transfer job. The report is frozen at the
 // terminal transition, so it is fetched once the job settles; the host keys
 // this component by job id so another job never shows a predecessor's rows.
+import { ArrowRight } from '@lucide/vue'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -130,7 +131,7 @@ function rowTarget(row: TransferRow): string {
             </td>
             <td class="px-2 py-1.5">
               <p class="break-all font-mono text-foreground">{{ rowSource(row) }}</p>
-              <p v-if="rowTarget(row)" class="break-all font-mono text-muted-foreground">→ {{ rowTarget(row) }}</p>
+              <p v-if="rowTarget(row)" class="break-all font-mono text-muted-foreground"><ArrowRight class="inline h-3 w-3 align-[-1px]" aria-hidden="true" /> {{ rowTarget(row) }}</p>
               <p v-if="row.message" class="text-muted-foreground">{{ row.message }}</p>
               <p v-if="row.detail.validation" class="text-destructive">
                 {{ row.detail.validation.code }}: {{ row.detail.validation.message }}

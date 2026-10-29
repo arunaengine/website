@@ -12,7 +12,7 @@ import { formatCount } from '@/lib/formatCount'
 import { stateVariant } from '@/lib/stateBadge'
 import { itemChip, transferLabel, transferPercent, type SyncItem } from '@/lib/syncStates'
 import { formatBytes } from '@/lib/utils'
-import { ArrowDownToLine, ArrowUpFromLine, FileText, FolderSync, Pause, Play } from '@lucide/vue'
+import { ArrowDownToLine, ArrowRight, ArrowUpFromLine, FileText, FolderSync, Pause, Play } from '@lucide/vue'
 
 const props = withDefaults(defineProps<{ item: SyncItem; busy?: boolean; compact?: boolean }>(), {
   busy: false,
@@ -92,7 +92,7 @@ function moved(transfer: DeviceTransfer): string {
 
         <p v-if="folder" class="mt-1 truncate text-[11px] text-muted-foreground" :title="folder.root">
           <span class="hash">{{ folder.root }}</span>
-          → {{ remotePath(folder.remote.bucket, folder.remote.prefix) }} on
+          <ArrowRight class="inline h-3 w-3 align-[-1px]" aria-hidden="true" /> {{ remotePath(folder.remote.bucket, folder.remote.prefix) }} on
           <NodeLabel :node-id="folder.remote.node_id" size="sm" />
         </p>
         <p v-else-if="document" class="hash mt-1 truncate">{{ subtitle }}</p>

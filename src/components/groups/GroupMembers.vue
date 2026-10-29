@@ -7,7 +7,7 @@ import Popover from '@/components/ui/Popover.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { computed, ref, watch } from 'vue'
-import { ShieldCheck, UserMinus, UserPlus, X } from '@lucide/vue'
+import { ArrowRight, ShieldCheck, UserMinus, UserPlus, X } from '@lucide/vue'
 import { useDebounceFn } from '@vueuse/core'
 import { useAruna } from '@/composables/useAruna'
 import { useUserDirectory } from '@/composables/useUserDirectory'
@@ -211,7 +211,7 @@ async function removeMember(member: GroupMember, roleId?: string) {
                         :to="{ name: 'user', params: { id: member.user_id } }"
                         class="block text-xs font-medium text-primary hover:underline"
                       >
-                        View profile →
+                        View profile <ArrowRight class="inline h-3 w-3 align-[-1px]" aria-hidden="true" />
                       </RouterLink>
                     </div>
                   </template>

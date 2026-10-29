@@ -27,7 +27,7 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { Cable, ChartArea, Database, FileJson2, HardDrive, Inbox, LogOut, Pencil, ShieldAlert, ShieldCheck, Trash2, Users } from '@lucide/vue'
+import { ArrowRight, Cable, ChartArea, Database, FileJson2, HardDrive, Inbox, LogOut, Pencil, ShieldAlert, ShieldCheck, Trash2, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
@@ -577,7 +577,7 @@ async function leave() {
             :to="{ name: 'datasets', query: { group: group.group_id } }"
             class="mt-2 inline-flex text-xs font-medium text-primary hover:underline"
           >
-            View all in Discover{{ docsEstimate !== null ? ` (about ${formatNumber(docsEstimate)})` : '' }} →
+            View all in Discover{{ docsEstimate !== null ? ` (about ${formatNumber(docsEstimate)})` : '' }} <ArrowRight class="inline h-3 w-3 align-[-1px]" aria-hidden="true" />
           </RouterLink>
         </div>
       </div>

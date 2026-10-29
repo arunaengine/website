@@ -5,7 +5,7 @@ import Popover from '@/components/ui/Popover.vue'
 import { crateGraph, crateRootId, entityKind, typesOf } from '@/lib/dataEntities'
 import { refId, toArray } from '@/lib/contextualEntities'
 import { isArunaUserId, orcidOf } from '@/lib/identifiers'
-import { Building2, ExternalLink, User as UserIcon } from '@lucide/vue'
+import { ArrowRight, Building2, ExternalLink, User as UserIcon } from '@lucide/vue'
 
 // Renders the crate's author/creator/contributor references as chips with an
 // info popover. A Person entity whose identifier carries an Aruna user id
@@ -104,7 +104,7 @@ const authors = computed<AuthorEntry[]>(() => {
             :to="{ name: 'user', params: { id: author.userId } }"
             class="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
           >
-            View portal profile →
+            View portal profile <ArrowRight class="inline h-3 w-3 align-[-1px]" aria-hidden="true" />
           </RouterLink>
           <div v-if="!author.affiliation && !author.email && !author.orcid && !author.userId" class="text-xs text-muted-foreground">
             No further details in this dataset.

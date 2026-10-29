@@ -15,7 +15,7 @@ import {
   rowPasses, rowsOf, unknownColumns, type ColumnChoice, type ColumnUse,
 } from '@/lib/tableImport'
 import { errorMessage } from '@/lib/utils'
-import { FileUp } from '@lucide/vue'
+import { ArrowRight, FileUp } from '@lucide/vue'
 
 const props = defineProps<{ bucket: string; source: ConnectorSource }>()
 const emit = defineEmits<{ started: [jobId: string] }>()
@@ -335,7 +335,7 @@ const SELECT = 'h-9 w-full rounded-md border border-input bg-field px-2 text-sm'
       <div class="min-w-0 flex-1 text-sm">
         <p>
           {{ matching.length }} of {{ preview.rows.length }}{{ partial ? ' first' : '' }} rows
-          <span v-if="targets.length" class="font-mono text-xs">→ {{ targets.slice(0, 2).join(', ') }}{{ targets.length > 2 ? `, +${targets.length - 2}` : '' }}</span>
+          <span v-if="targets.length" class="font-mono text-xs"><ArrowRight class="inline h-3 w-3 align-[-1px]" aria-hidden="true" /> {{ targets.slice(0, 2).join(', ') }}{{ targets.length > 2 ? `, +${targets.length - 2}` : '' }}</span>
         </p>
         <p class="text-[11px] text-muted-foreground">
           {{ hasSize ? 'Sizes are known, so no extra request per file.' : 'Files are linked, not copied.' }}

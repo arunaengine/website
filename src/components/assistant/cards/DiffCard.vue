@@ -3,7 +3,7 @@
 import { computed } from 'vue'
 import { lineDiff } from '@/lib/assistant/lineDiff'
 import type { DiffView } from '@/lib/assistant/types'
-import { GitCompare } from '@lucide/vue'
+import { ArrowRight, GitCompare } from '@lucide/vue'
 
 const props = defineProps<{ view: DiffView }>()
 
@@ -28,7 +28,7 @@ const MARK = { add: '+', remove: '-', same: ' ' }
       <span class="shrink-0 font-mono text-[10px] text-muted-foreground">+{{ added }} -{{ removed }}</span>
     </div>
     <p class="border-b border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground">
-      {{ view.beforeLabel }} → {{ view.afterLabel }}
+      {{ view.beforeLabel }} <ArrowRight class="inline h-3 w-3 align-[-1px]" aria-hidden="true" /> {{ view.afterLabel }}
     </p>
     <p v-if="!added && !removed" class="px-3 py-2.5 text-muted-foreground">The two texts are the same.</p>
     <div v-else class="scrollbar-thin max-h-72 overflow-auto py-1">

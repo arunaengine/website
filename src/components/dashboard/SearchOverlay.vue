@@ -25,7 +25,7 @@ import { targetKey, type DatabaseRow } from '@/lib/databases'
 import { mockEnabled } from '@/lib/distributedMock'
 import { searchFiles } from '@/lib/distributedMockData'
 import { errorMessage, truncateMiddle } from '@/lib/utils'
-import { Search, Settings2, X } from '@lucide/vue'
+import { ArrowRight, Search, Settings2, X } from '@lucide/vue'
 import { useMediaQuery } from '@vueuse/core'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -559,7 +559,7 @@ onBeforeUnmount(() => {
                   @mousedown.prevent
                   @click="openSearchPage"
                 >
-                  See all results for "{{ q }}" in Search →
+                  See all results for "{{ q }}" in Search <ArrowRight class="inline h-3 w-3 align-[-1px]" aria-hidden="true" />
                 </button>
                 <div
                   v-if="quickCoverageShown"
