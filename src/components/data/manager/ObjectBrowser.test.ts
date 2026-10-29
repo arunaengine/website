@@ -276,6 +276,39 @@ describe('object browser toolbar', () => {
   })
 })
 
+describe('object browser upload', () => {
+  it('opens Add data for a bucket on the connected node', async () => {
+    const onAddData = vi.fn()
+    const root = await render({}, { onAddData })
+    await click(action(root, 'Upload'))
+    expect(onAddData).toHaveBeenCalledOnce()
+  })
+
+  it('takes files from a picker for a bucket on another node and uploads them there', async () => {
+    const onAddData = vi.fn()
+    const requestUpload = vi.fn()
+    const root = await render({ remoteNodeId: ref('store-1'), requestUpload }, { onAddData })
+    const picker = element(root, (node) => node.tag === 'input' && node.props.type === 'file')
+    const open = vi.fn()
+    Object.assign(picker, { click: open })
+
+    await click(action(root, 'Upload'))
+    expect(open).toHaveBeenCalledOnce()
+    expect(onAddData).not.toHaveBeenCalled()
+
+    const file = { name: 'genome.fna', size: 4 }
+    const target = { files: [file], value: 'C:\\fakepath\\genome.fna' }
+    await (picker.props.onChange as (event: unknown) => void)({ target })
+    expect(requestUpload).toHaveBeenCalledWith([file])
+    expect(target.value).toBe('')
+  })
+
+  it('offers no Upload where the node cannot be browsed from here', async () => {
+    const root = await render({ remoteNodeId: ref('store-1'), remoteBlocked: ref(true) })
+    expect(() => action(root, 'Upload')).toThrow()
+  })
+})
+
 describe('object browser link a local folder', () => {
   afterEach(() => resetS3Access())
 
@@ -1027,7 +1060,7 @@ describe('the one search box', () => {
 
   it('has one search box in the list bar and none above it', async () => {
     const { root } = await setup()
-    const boxes = nodes(root).filter((node) => node.tag === 'input' && node.props.type !== 'checkbox')
+    const boxes = nodes(root).filter((node) => node.tag === 'input' && node.props.type !== 'checkbox' && node.props.type !== 'file')
     expect(boxes.map((node) => node.props.placeholder)).toEqual(['Search files'])
   })
 

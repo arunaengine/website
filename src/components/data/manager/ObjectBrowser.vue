@@ -496,6 +496,18 @@ function deleteRestorable(entry: DeletedObjectEntry) {
   })
 }
 
+const filePicker = ref<HTMLInputElement | null>(null)
+function upload() {
+  if (remoteNodeId.value) filePicker.value?.click()
+  else emit('add-data')
+}
+function onPicked(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = [...(input.files ?? [])]
+  input.value = ''
+  if (files.length && canWriteCurrentPrefix.value) void requestUpload(files)
+}
+
 async function onDrop(event: DragEvent) {
   dragActive.value = false
   if (!canWriteCurrentPrefix.value || !bucket.value) return
@@ -661,8 +673,10 @@ async function onDrop(event: DragEvent) {
             />
             <Button v-if="desktop && currentBindSource && !currentLinkedFolder && !remoteBlocked" variant="outline" size="sm" aria-label="Link a local folder" title="Keep a folder on this computer and this bucket in step" @click="emit('sync-to-computer', currentBindSource)"><FolderSync class="h-4 w-4" /><span :class="toolbarLabel">Link a local folder</span></Button>
             <Button v-if="notebooks && !remoteNodeId" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" aria-label="New notebook" :title="writeRestrictionMessage ?? 'Create a notebook here'" @click="emit('new-notebook')"><NotebookPen class="h-4 w-4" /><span :class="toolbarLabel">New notebook</span></Button>
-            <!-- The Add data pipeline always targets the connected node. -->
-            <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix" aria-label="Upload" :title="writeRestrictionMessage ?? 'Upload files or add data from other sources'" @click="emit('add-data')"><Upload class="h-4 w-4" /><span :class="desktop ? '' : '@max-[360px]:sr-only'">Upload</span></Button>
+            <!-- Add data targets the connected node; another node's bucket takes files from a
+                 picker, the same upload a drop on the list starts. -->
+            <Button v-if="!remoteBlocked" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix" aria-label="Upload" :title="writeRestrictionMessage ?? (remoteNodeId ? 'Upload files from this device' : 'Upload files or add data from other sources')" @click="upload"><Upload class="h-4 w-4" /><span :class="desktop ? '' : '@max-[360px]:sr-only'">Upload</span></Button>
+            <input ref="filePicker" type="file" multiple class="hidden" aria-hidden="true" tabindex="-1" @change="onPicked" />
             <Button v-if="!remoteBlocked" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" aria-label="New folder" :title="writeRestrictionMessage ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /><span :class="toolbarLabel">New folder</span></Button>
           </div>
         </div>
