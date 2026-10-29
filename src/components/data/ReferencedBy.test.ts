@@ -93,10 +93,10 @@ describe('referenced by', () => {
     expect(content(root)).not.toContain('Scope: ')
   })
 
-  it('says when no dataset references the file', async () => {
+  it('says once when no dataset references the file', async () => {
     const root = await render(referencedContent(0))
 
-    expect(content(root)).toContain('No dataset references this file.')
+    expect(content(root)).not.toContain('No dataset references this file.')
     expect(content(root)).toContain('0 datasets')
   })
 

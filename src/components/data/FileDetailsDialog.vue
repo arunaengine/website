@@ -147,15 +147,20 @@ async function loadHead() {
 
 // The stored checksums of the shown version, from the node that holds the file.
 const checksums = ref<FileChecksum[]>([])
+// One checksum is shown; the others open on request.
+const allChecksums = ref(false)
+const shownChecksums = computed(() => (allChecksums.value ? checksums.value : checksums.value.slice(0, 1)))
 let checksumSeq = 0
 async function loadChecksums() {
   const seq = ++checksumSeq
   checksums.value = []
+  allChecksums.value = false
   const version = currentVersion.value
   const realmId = nodeInfo.value?.node.realm_id
   const nodeId = props.nodeId ?? localNodeId()
   const baseUrl = nodeId ? nodeApiBase(nodeId) : null
-  if (!props.open || props.folder || mock.value || !version || !realmId || !nodeId || !baseUrl) return
+  // A referenced file stays at its source, so the node holds no checksum record for it.
+  if (!props.open || props.folder || mock.value || props.referencedFrom || !version || !realmId || !nodeId || !baseUrl) return
   const lookup = (id: string) =>
     apiRequest<DrsObjectResponse>(`/ga4gh/drs/v1/objects/${encodeURIComponent(id)}`, {}, { baseUrl, token: authToken.value ?? undefined })
   try {
@@ -280,7 +285,6 @@ const details = computed(() => props.folder ? [
   { label: 'Folder', value: props.objectKey },
   { label: 'Node', value: nodeName(props.nodeId) },
 ] : [
-  { label: 'Key', value: props.objectKey },
   { label: 'Size', value: shownSize.value === undefined ? 'unknown' : formatBytes(shownSize.value) },
   {
     label: 'Last modified',
@@ -304,7 +308,6 @@ const details = computed(() => props.folder ? [
           </DialogTitle>
           <p class="mt-0.5 font-mono text-[11px] text-muted-foreground">
             <span class="break-all">{{ props.bucket }}/{{ props.objectKey }}</span>
-            <span v-if="shownSize !== undefined"> · {{ formatBytes(shownSize) }}</span>
           </p>
         </div>
         <div class="flex flex-wrap items-center justify-end gap-2">
@@ -392,7 +395,7 @@ const details = computed(() => props.folder ? [
           <div v-if="checksums.length" class="border-t border-border/60 pt-2">
             <dt class="text-muted-foreground">Checksums</dt>
             <dd class="mt-1 space-y-1">
-              <div v-for="checksum in checksums" :key="checksum.label" class="flex items-baseline justify-between gap-4">
+              <div v-for="checksum in shownChecksums" :key="checksum.label" class="flex items-baseline justify-between gap-4">
                 <span class="shrink-0 text-muted-foreground">{{ checksum.label }}</span>
                 <span class="flex min-w-0 items-center justify-end gap-1">
                   <span class="hash flex min-w-0" :title="checksum.value">
@@ -402,6 +405,9 @@ const details = computed(() => props.folder ? [
                   <CopyButton :value="checksum.value" :label="`Copy the ${checksum.label} checksum`" />
                 </span>
               </div>
+              <button v-if="checksums.length > 1" type="button" class="text-primary hover:underline" @click="allChecksums = !allChecksums">
+                {{ allChecksums ? 'Show fewer' : `Show all ${checksums.length}` }}
+              </button>
             </dd>
           </div>
           <div v-if="props.groupId && !mock" class="flex items-center justify-between gap-4">

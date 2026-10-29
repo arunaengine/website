@@ -117,11 +117,6 @@ const recorded = computed(() => Boolean(origin.value || hop.value))
       <details v-if="recorded" class="border-t border-border pt-3 text-xs">
         <summary class="cursor-pointer text-sm font-medium text-foreground">Details</summary>
         <div class="mt-3 space-y-4">
-          <div v-if="origin" class="space-y-0.5">
-            <p class="mb-1 text-muted-foreground">Origin</p>
-            <OriginLine :origin="origin" />
-            <OriginLine v-if="hop" :origin="hop" />
-          </div>
           <div>
             <p class="mb-1 text-muted-foreground">Added to datasets as</p>
             <ul v-if="rows.length" class="space-y-1">

@@ -87,11 +87,6 @@ const countLabel = computed(
   () => `${references.value.length} ${references.value.length === 1 ? 'dataset' : 'datasets'}`,
 )
 
-const emptyText = computed(() =>
-  partial.value
-    ? 'No referencing dataset was found, but the lookup was partial.'
-    : 'No dataset references this file.',
-)
 
 const checkedForms = computed(() =>
   (props.preflight?.coverage.queried_forms ?? []).map(displayValue).join(', '),
@@ -188,7 +183,7 @@ const badgeClass = computed(() =>
           >{{ reference.title }}</RouterLink>
         </li>
       </ul>
-      <p v-else class="mt-2 text-muted-foreground">{{ emptyText }}</p>
+      <p v-else-if="partial" class="mt-2 text-muted-foreground">No referencing dataset was found, but the lookup was partial.</p>
       <p v-if="hidden" class="mt-2 font-medium text-amber-800 dark:text-amber-300">
         Other restricted datasets reference this file.
       </p>

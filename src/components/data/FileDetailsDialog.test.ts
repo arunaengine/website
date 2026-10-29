@@ -218,7 +218,9 @@ describe('file details checksums', () => {
       { baseUrl: 'https://node-1/api/v1', token: 'token-1' },
     )
     expect(text).toContain('Checksums')
-    expect(text.indexOf('SHA-256')).toBeLessThan(text.indexOf('MD5'))
+    expect(text).toContain('SHA-256')
+    expect(text).not.toContain('MD5')
+    expect(text).toContain('Show all 2')
     expect(element(root, (node) => node.props['data-copy'] === 'bb'.repeat(32))).toBeTruthy()
   })
 
