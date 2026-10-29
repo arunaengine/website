@@ -49,13 +49,14 @@ describe('node cards', () => {
     expect(shown).not.toMatch(/connected/i)
   })
 
-  it('tags the location, but not the default one, and names only roles other than server', async () => {
+  it('tags the location, but not the default one, and names a role other than storage in the facts', async () => {
     const shown = await text([
       node({ labels: { 'aruna-engine.org/location': 'Giessen' } }),
       node({ node_id: 'm', kind: 'management', placement: { location: 'default', weight: 1, full: false, draining: false }, api: 'https://api.mgmt.example.org' }),
     ])
     expect(shown).toContain('node-2 Giessen online')
-    expect(shown).toContain('mgmt management online')
+    // The header keeps only name and state, so a long name has room.
+    expect(shown).toContain('mgmt online Management node, 2 KB stored')
     expect(shown).not.toContain('default')
     expect(shown).not.toContain('server')
   })
@@ -90,5 +91,8 @@ describe('node cards', () => {
     expect(await renderToString(createSSRApp({ render: () => h(NodeCards, { nodes: [node()], devices: [] }) }))).not.toContain('Rename')
     const html = await renderToString(createSSRApp({ render: () => h(NodeCards, { nodes: [node()], devices: [], rename: async () => {} }) }))
     expect(html).toContain('aria-label="Rename node-2"')
+    // The Pencil waits for hover or keyboard focus on the card.
+    expect(html).toMatch(/class="group [^"]*"/)
+    expect(html).toMatch(/aria-label="Rename node-2"[^>]*class="[^"]*opacity-0[^"]*group-focus-within:opacity-100|class="[^"]*opacity-0[^"]*group-focus-within:opacity-100[^"]*"[^>]*aria-label="Rename node-2"/)
   })
 })

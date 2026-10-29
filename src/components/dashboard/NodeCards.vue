@@ -30,10 +30,12 @@ function location(node: RealmNodeInfo): string | null {
 }
 
 // load_permille is the 1-minute load average per logical core, so it reads as a CPU share.
+// A role other than storage leads the facts, so the header keeps room for the name.
 function facts(node: RealmNodeInfo): string {
+  const role = node.kind === 'management' ? 'Management node' : null
   const utilization = node.info?.utilization
-  if (!utilization) return 'No report yet'
-  const parts = [`${formatBytes(utilization.storage_bytes_used)} stored`]
+  if (!utilization) return [role, 'No report yet'].filter(Boolean).join(', ')
+  const parts = [role, `${formatBytes(utilization.storage_bytes_used)} stored`].filter((part): part is string => Boolean(part))
   if (utilization.load_permille !== undefined) parts.push(`CPU ${Math.round(utilization.load_permille / 10)}%`)
   if (node.placement?.full) parts.push('full')
   if (node.placement?.draining) parts.push('draining')
@@ -60,13 +62,12 @@ const devicesLine = computed(() => {
 <template>
   <div class="space-y-2">
     <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <li v-for="node in nodes" :key="node.node_id" class="min-w-0 rounded-md border border-border px-3 py-2.5">
+      <li v-for="node in nodes" :key="node.node_id" class="group min-w-0 rounded-md border border-border px-3 py-2.5">
         <div class="flex min-w-0 items-center gap-2">
-          <NodeNameEdit v-if="rename" :name="nodeName(node)" :value="node.display_name" :save="(name) => rename!(node.node_id, name)">
+          <NodeNameEdit v-if="rename" quiet :name="nodeName(node)" :value="node.display_name" :save="(name) => rename!(node.node_id, name)">
             <span class="truncate text-sm font-medium text-foreground" :title="node.node_id">{{ nodeName(node) }}</span>
           </NodeNameEdit>
           <span v-else class="truncate text-sm font-medium text-foreground" :title="node.node_id">{{ nodeName(node) }}</span>
-          <span v-if="node.kind !== 'server'" class="text-[11px] text-muted-foreground">{{ node.kind }}</span>
           <span v-if="node.node_id === localNodeId" class="text-[11px] text-muted-foreground">this node</span>
           <Badge v-if="location(node)" variant="outline" size="sm">{{ location(node) }}</Badge>
           <span class="ml-auto shrink-0 text-[11px]" :class="node.present ? 'text-muted-foreground' : 'text-destructive'">

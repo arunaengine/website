@@ -14,6 +14,8 @@ const props = defineProps<{
   /** The display name the realm stores now; null when unset. */
   value?: string | null
   save: (name: string | null) => Promise<void>
+  /** Shows the Pencil only while the surrounding `group` is hovered or holds focus. */
+  quiet?: boolean
 }>()
 
 const editing = ref(false)
@@ -50,6 +52,12 @@ async function submit() {
   </form>
   <span v-else class="inline-flex min-w-0 items-center gap-0.5">
     <slot />
-    <IconButton :label="`Rename ${name}`" @click="start"><Pencil class="h-3 w-3" /></IconButton>
+    <IconButton
+      :label="`Rename ${name}`"
+      :class="quiet ? 'opacity-0 focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100' : undefined"
+      @click="start"
+    >
+      <Pencil class="h-3 w-3" />
+    </IconButton>
   </span>
 </template>
