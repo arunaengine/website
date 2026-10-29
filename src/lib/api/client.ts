@@ -162,6 +162,10 @@ export async function apiRequest<T>(
       // `msg` is the GA4GH TES error shape (api/src/routes/tes.rs).
       const bodyMessage = body.message || body.error || body.msg
       if (typeof bodyMessage === 'string') message = bodyMessage
+      // A bare "Bad request" carries its reason in `details`; the reason is what the reader needs.
+      if (typeof body.details === 'string' && body.details.trim() && body.details !== message) {
+        message = `${message}: ${body.details.trim()}`
+      }
       code = typeof body.code === 'string' ? body.code : undefined
     } catch {
       // Keep the HTTP status message if the body is not JSON.

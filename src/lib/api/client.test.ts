@@ -79,3 +79,21 @@ describe('session gate', () => {
     expect(sent(fetchMock)).toBe('Bearer restored')
   })
 })
+
+describe('error message', () => {
+  it('names the reason a node gives next to a bare status word', async () => {
+    vi.stubGlobal('window', { location: { origin: 'https://portal.test' } })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'Bad request', code: 'Bad request', details: 'input s3://b/k is a reference without a version' }), { status: 400 })))
+
+    await expect(apiRequest('/ga4gh/tes/v1/tasks', { method: 'POST' }, { baseUrl: 'https://api.test', token: 't' }))
+      .rejects.toThrow('Bad request: input s3://b/k is a reference without a version')
+  })
+
+  it('keeps the TES message shape as it is', async () => {
+    vi.stubGlobal('window', { location: { origin: 'https://portal.test' } })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ status_code: 400, msg: 'input path must be absolute' }), { status: 400 })))
+
+    await expect(apiRequest('/ga4gh/tes/v1/tasks', { method: 'POST' }, { baseUrl: 'https://api.test', token: 't' }))
+      .rejects.toThrow(/^input path must be absolute$/)
+  })
+})
