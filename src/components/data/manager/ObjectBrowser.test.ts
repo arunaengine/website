@@ -13,6 +13,7 @@ import {
 } from '@/test/clientRender'
 import {
   brokenFiles,
+  bucketSearches,
   debounceHold,
   desktopMode,
   fakeManager,
@@ -532,7 +533,7 @@ describe('object browser selection', () => {
   it('lets the list bar fit a narrow screen', async () => {
     const root = await render()
     const bar = element(root, (node) => String(node.props.class ?? '').includes('h-12'))
-    const filter = element(root, (node) => String(node.props.class ?? '').includes('w-52'))
+    const filter = element(root, (node) => String(node.props.class ?? '').includes('w-80'))
 
     expect(String(bar.props.class)).toContain('overflow-x-auto')
     expect(String(filter.props.class)).toContain('shrink')
@@ -726,7 +727,7 @@ describe('object browser name filter', () => {
     debounceHold.on = true
     const nameFilter = ref('')
     const root = await render({ nameFilter })
-    const field = () => element(root, (node) => node.tag === 'input' && node.props['aria-label'] === 'Filter by name start')
+    const field = () => element(root, (node) => node.tag === 'input' && node.props['aria-label'] === 'Filter this folder or search the bucket')
     const type = async (value: string) => {
       ;(field().props['onUpdate:modelValue'] as (value: string) => void)(value)
       await flush()
@@ -750,5 +751,70 @@ describe('object browser name filter', () => {
     nameFilter.value = ''
     await flush()
     expect(field().props.modelValue).toBe('')
+  })
+})
+
+describe('the one search box', () => {
+  async function setup() {
+    const manager = fakeManager({ openDetails, download, requestDelete, router: { push } })
+    const opened: unknown[] = []
+    const host = defineComponent({ setup: () => () => h(browser, { manager, 'onOpen-hit': (hit: unknown) => opened.push(hit) }) })
+    const { root } = await mountApp(host)
+    const box = () => element(root, (node) => node.tag === 'input' && node.props.placeholder === 'Filter this folder, Enter searches the bucket')
+    const type = async (value: string) => {
+      ;(box().props['onUpdate:modelValue'] as (next: string) => void)(value)
+      await flush()
+    }
+    const enter = async () => {
+      ;(element(root, (node) => node.tag === 'form').props.onSubmit as (event: Event) => void)({ preventDefault: () => {} } as Event)
+      await flush()
+    }
+    return { root, manager, opened, box, type, enter }
+  }
+
+  it('filters this folder while typing, and Enter shows the whole bucket in its place', async () => {
+    bucketSearches.count = 0
+    const { root, manager, type, enter } = await setup()
+    await type('reads')
+    expect(manager.nameFilter.value).toBe('reads')
+    expect(content(root)).toContain('reads.fastq')
+    expect(content(root)).toContain('Search the whole bucket for "reads"')
+
+    await enter()
+    expect(content(root)).toContain('whole bucket reef reads')
+    expect(() => element(root, (node) => node.tag === 'table')).toThrow()
+    // Enter again searches again in the open view.
+    await enter()
+    expect(bucketSearches.count).toBe(1)
+  })
+
+  it('starts the bucket search from the line under the list too, and column=value never filters the folder', async () => {
+    const { root, manager, type } = await setup()
+    await type('coli species_taxid=562')
+    expect(manager.nameFilter.value).toBe('')
+    await click(element(root, (node) => node.tag === 'button' && content(node).includes('Search the whole bucket for')))
+    expect(content(root)).toContain('whole bucket reef coli species_taxid=562')
+  })
+
+  it('goes back to the folder with an empty box, and opening a hit does too', async () => {
+    const { root, manager, opened, box, type, enter } = await setup()
+    await type('reads')
+    await enter()
+    await click(button(root, 'Back to folder'))
+    expect(element(root, (node) => node.tag === 'table')).toBeTruthy()
+    expect(box().props.modelValue).toBe('')
+    expect(manager.nameFilter.value).toBe('')
+
+    await type('reads')
+    await enter()
+    await click(button(root, 'Open hit'))
+    expect(opened).toEqual([expect.objectContaining({ key: 'raw/hit.fastq' })])
+    expect(element(root, (node) => node.tag === 'table')).toBeTruthy()
+  })
+
+  it('has one search box in the list bar and none above it', async () => {
+    const { root } = await setup()
+    const boxes = nodes(root).filter((node) => node.tag === 'input' && node.props.type !== 'checkbox')
+    expect(boxes.map((node) => node.props.placeholder)).toEqual(['Filter this folder, Enter searches the bucket'])
   })
 })

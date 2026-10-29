@@ -23,7 +23,6 @@ import PublicAccessDialog from '@/components/data/PublicAccessDialog.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import MockSidebar from '@/components/data/manager/MockSidebar.vue'
 import DatabaseHeader from '@/components/data/DatabaseHeader.vue'
-import MetadataSearch from '@/components/data/MetadataSearch.vue'
 import DistributionBanner from '@/components/data/manager/DistributionBanner.vue'
 import ObjectBrowser from '@/components/data/manager/ObjectBrowser.vue'
 import UploadPanel from '@/components/data/manager/UploadPanel.vue'
@@ -416,7 +415,6 @@ async function createFolder() {
         <div class="min-w-0 space-y-4">
           <DistributionBanner v-if="storedBucket" :bucket="storedBucket" />
           <DatabaseHeader v-if="bucket && !exampleBucket" :bucket="bucket" :node-id="remoteNodeId" :set-id="bucketSetId" />
-          <MetadataSearch v-if="bucket && !exampleBucket" :bucket="bucket" :node-id="remoteNodeId" @open="openFound" />
           <ObjectBrowser
             :manager="manager"
             :notebooks="notebooksView"
@@ -426,6 +424,7 @@ async function createFolder() {
             @sync-to-computer="openBindDialog"
             @public-access="openPublicAccess"
             @new-bucket="newBucketOpen = true"
+            @open-hit="openFound"
           >
             <UploadPanel :manager="manager" />
           </ObjectBrowser>

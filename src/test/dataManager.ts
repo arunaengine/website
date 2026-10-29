@@ -148,6 +148,23 @@ export function objectListBar(): Component {
   return compiledBar
 }
 
+/** How often the browser asked the open bucket search to search again. */
+export const bucketSearches = { count: 0 }
+// The whole-bucket results as the browser shows them: its box text, Back, and one hit to open.
+const BucketSearchStub = defineComponent({
+  props: { text: String, bucket: String },
+  emits: ['back', 'open', 'update:text'],
+  setup: (props, { emit, expose }) => {
+    expose({ search: async () => void bucketSearches.count++ })
+    return () =>
+      h('section', [
+        `whole bucket ${props.bucket} ${props.text}`,
+        h('button', { onClick: () => emit('back') }, 'Back to folder'),
+        h('button', { onClick: () => emit('open', { key: 'raw/hit.fastq', bucket: props.bucket }) }, 'Open hit'),
+      ])
+  },
+})
+
 export function objectBrowser(): Component {
   compiled ??= compileClientComponent(
     new URL('../components/data/manager/ObjectBrowser.vue', import.meta.url),
@@ -180,6 +197,7 @@ export function objectBrowser(): Component {
       '@/components/data/Breadcrumbs.vue': moduleDefault(Slotted('nav')),
       '@/components/data/ObjectIcon.vue': moduleDefault(Slotted('i')),
       '@/components/data/manager/ObjectListBar.vue': moduleDefault(objectListBar()),
+      '@/components/data/MetadataSearch.vue': moduleDefault(BucketSearchStub),
       '@/components/data/manager/RowMenu.vue': moduleDefault(rowMenu()),
       '@/components/data/manager/TransferDialog.vue': moduleDefault(Slotted('aside')),
       '@/components/watches/WatchButton.vue': moduleDefault(Slotted('button')),

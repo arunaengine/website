@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// One box that searches a bucket's files and folders: words match file names and search columns,
-// `column=value` matches a filter column exactly and becomes a chip.
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+// The whole-bucket search behind the file list's one box: words match file names and search
+// columns, `column=value` matches a filter column exactly and becomes a chip. The list bar owns the
+// text; this view searches with it and shows the results in place of the folder.
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import Button from '@/components/ui/Button.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -13,14 +14,23 @@ import { Search, X } from '@lucide/vue'
 
 /** `nodeId` is the node of the open bucket; null for the connected node. */
 const props = defineProps<{ bucket: string; nodeId: string | null }>()
-const emit = defineEmits<{ open: [hit: ObjectSearchHit] }>()
+const emit = defineEmits<{ open: [hit: ObjectSearchHit]; back: [] }>()
+// The box text, held here as before so the search's own edits (chips out, a quote closed) take effect
+// at once; the two stay equal both ways.
+const text = defineModel<string>('text', { default: '' })
+const typed = ref(text.value)
+watch(text, (value) => {
+  if (value !== typed.value) typed.value = value
+}, { flush: 'sync' })
+watch(typed, (value) => {
+  if (value !== text.value) text.value = value
+}, { flush: 'sync' })
 
 const { displayName, isLocalNode } = useRealmNodes()
 // The search spans nodes by bucket name; a hit of another node names that node.
 const elsewhere = (hit: ObjectSearchHit) => (props.nodeId ? hit.issuer_node_id !== props.nodeId : !isLocalNode(hit.issuer_node_id))
 
 const { searchObjects, sessionEpoch } = useAruna()
-const typed = ref('')
 const chips = ref<{ column: string; value: string }[]>([])
 const hits = ref<ObjectSearchHit[] | null>(null)
 const cursor = ref<string | null>(null)
@@ -121,6 +131,10 @@ async function step(more: boolean, run: number, askNames: boolean): Promise<numb
   return (hits.value?.length ?? 0) - before
 }
 
+// Opening the view is the search; Enter in the box searches again.
+onMounted(() => void search())
+defineExpose({ search })
+
 // Words search while typing; a `column=value` waits for Enter or a space.
 const searchSoon = useDebounceFn(() => void search(), 400)
 // An edit or a removed chip ends the search under way and its paging at once.
@@ -145,22 +159,16 @@ function drop(index: number) {
 </script>
 
 <template>
-  <section class="space-y-2">
-    <form class="flex flex-wrap items-center gap-1.5 rounded-md border border-input bg-field px-2 py-1" @submit.prevent="search()">
+  <section class="space-y-2 px-4 py-3" aria-label="Whole bucket search">
+    <div class="flex flex-wrap items-center gap-1.5 text-xs">
       <Search class="h-3.5 w-3.5 text-muted-foreground" />
+      <span class="font-medium text-foreground">Whole bucket</span>
       <span v-for="(chip, index) in chips" :key="`${chip.column}=${chip.value}`" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
         {{ chip.column }} = {{ chip.value }}
         <button type="button" :aria-label="`Remove ${chip.column}`" @click="drop(index)"><X class="h-3 w-3" /></button>
       </span>
-      <input
-        v-model="typed"
-        class="min-w-[8rem] flex-1 bg-transparent py-1 text-sm outline-none"
-        placeholder="Search names and details"
-        aria-label="Search file details"
-        @keydown.space="takeChips"
-      />
-    </form>
-    <p class="text-[11px] text-muted-foreground">Finds file names and imported details in the whole bucket. Use column=value for an exact match.</p>
+      <Button size="sm" variant="ghost" class="ml-auto" @click="emit('back')"><X class="h-3.5 w-3.5" /> Back to folder</Button>
+    </div>
     <p v-if="failure" class="text-xs text-destructive">{{ failure }}</p>
     <ul v-if="hits?.length" class="divide-y divide-border rounded-md border border-border text-xs">
       <li v-for="hit in hits" :key="`${hit.issuer_node_id}/${hit.key}`">

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// The bar on top of the object list: the name filter and the filter menu on
-// the left, the actions for the ticked rows on the right. Its height is fixed,
+// The bar on top of the object list: the one search box and the filter menu on
+// the left, the actions for the ticked rows on the right. Typing filters this
+// folder; Enter, or any `column=value`, searches the whole bucket. Its height is fixed,
 // so ticking a row never moves the list; narrow screens scroll it sideways.
 import Button from '@/components/ui/Button.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
@@ -14,7 +15,7 @@ import Input from '@/components/ui/Input.vue'
 import type { DataManager } from '@/composables/useDataManager'
 import { actionBlocker, filtersChanged, type ListingShow, type SelectionAction } from '@/lib/objectListing'
 import { useDebounceFn } from '@vueuse/core'
-import { computed, ref, watch } from 'vue'
+import { computed, watch } from 'vue'
 import {
   Check,
   Copy,
@@ -28,8 +29,14 @@ import {
   X,
 } from '@lucide/vue'
 
-const props = defineProps<{ manager: DataManager }>()
-const emit = defineEmits<{ (e: 'action', action: SelectionAction): void }>()
+/** `wholeBucket`: the box drives the whole-bucket search, so the folder filter rests. */
+const props = defineProps<{ manager: DataManager; wholeBucket?: boolean }>()
+const emit = defineEmits<{
+  (e: 'action', action: SelectionAction): void
+  (e: 'search-bucket'): void
+  (e: 'back'): void
+}>()
+const text = defineModel<string>('text', { default: '' })
 
 const {
   nameFilter,
@@ -67,34 +74,41 @@ function blocker(action: SelectionAction): string | null {
   return actionBlocker(action, selectedObjectKeys.value.size, selectedPrefixes.value.size)
 }
 
-// Typing waits for a pause before the folder is listed again.
-const text = ref(nameFilter.value)
+// Typing waits for a pause before the folder is listed again; a `column=value` never filters it.
 let applied = nameFilter.value
 const applyText = useDebounceFn((value: string) => {
   applied = value
   nameFilter.value = value
 }, 300)
-watch(text, (value) => void applyText(value))
+watch(text, (value) => {
+  if (!props.wholeBucket) void applyText(value.includes('=') ? '' : value)
+})
 // Only a change from outside, such as a folder switch, replaces the typed text.
 watch(nameFilter, (value) => {
   if (value !== applied) text.value = applied = value
 })
 
 function clearText() {
+  if (props.wholeBucket) return emit('back')
   text.value = ''
   nameFilter.value = ''
+}
+
+function onEscape() {
+  if (props.wholeBucket) emit('back')
 }
 </script>
 
 <template>
   <div class="flex h-12 items-center gap-2 overflow-x-auto border-b border-border bg-muted/50 px-4 text-xs md:overflow-visible">
-    <div class="relative w-52 min-w-32 shrink">
+    <form class="relative w-80 min-w-40 shrink" @submit.prevent="emit('search-bucket')">
       <Search class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
       <Input
         v-model="text"
-        placeholder="Filter this folder"
-        aria-label="Filter by name start"
+        placeholder="Filter this folder, Enter searches the bucket"
+        aria-label="Filter this folder or search the bucket"
         class="h-8 pl-8 pr-7 text-xs"
+        @keydown.esc="onEscape"
       />
       <button
         v-if="text"
@@ -105,7 +119,7 @@ function clearText() {
       >
         <X class="h-3.5 w-3.5" />
       </button>
-    </div>
+    </form>
     <DropdownMenu>
       <span class="relative inline-flex shrink-0">
         <DropdownMenuTrigger as-child>

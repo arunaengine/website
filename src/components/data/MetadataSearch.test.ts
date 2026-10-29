@@ -12,7 +12,10 @@ let held: (() => void) | null = null
 let holding = false
 const useDebounceFn = (fn: () => void) => Object.assign(() => (holding ? (held = fn) : fn()), { cancel: () => (held = null) })
 
-const component = compileClientComponent(new URL('./MetadataSearch.vue', import.meta.url), {
+
+// The list bar's box and Enter, as the file list drives the search: the box holds the text,
+// submitting it searches again.
+const view = compileClientComponent(new URL('./MetadataSearch.vue', import.meta.url), {
   vue: VueRuntime,
   '@vueuse/core': { useDebounceFn },
   '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => h('i')) }),
@@ -21,6 +24,20 @@ const component = compileClientComponent(new URL('./MetadataSearch.vue', import.
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => `node ${id}`, isLocalNode: (id: string) => id === 'n1' }) },
   '@/lib/tableImport': TableImport,
   '@/lib/utils': { errorMessage: (cause: unknown) => String(cause) },
+})
+const component = defineComponent({
+  props: { bucket: String, nodeId: { type: String, default: null }, onOpen: Function, onBack: Function },
+  setup(props) {
+    const text = ref('')
+    const search = ref<{ search: () => Promise<void> } | null>(null)
+    return () =>
+      h('div', [
+        h('form', { onSubmit: (event: Event) => { event.preventDefault(); void search.value?.search() } }, [
+          h('input', { value: text.value, 'onUpdate:modelValue': (value: string) => (text.value = value) }),
+        ]),
+        h(view, { ref: search, bucket: props.bucket, nodeId: props.nodeId, text: text.value, 'onUpdate:text': (value: string) => (text.value = value), onOpen: props.onOpen, onBack: props.onBack }),
+      ])
+  },
 })
 
 describe('bucket metadata search', () => {
@@ -64,8 +81,8 @@ describe('bucket metadata search', () => {
     const input = () => element(root, (node) => node.tag === 'input')
     ;(input().props['onUpdate:modelValue'] as (value: string) => void)('assembly_level="Complete')
     await flush()
-    ;(input().props.onKeydown as (event: KeyboardEvent) => void)({ key: ' ' } as KeyboardEvent)
-    await flush()
+    // An open quote does not search while typing.
+    expect(searchObjects).not.toHaveBeenCalled()
     expect(content(root)).not.toContain('assembly_level =')
 
     ;(input().props['onUpdate:modelValue'] as (value: string) => void)('assembly_level="Complete Genome"')
@@ -264,6 +281,7 @@ describe('bucket metadata search', () => {
     searchObjects.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)) as never)
     const { root } = await mountApp(component, { props: { bucket: 'ncbi', nodeId: null } })
     ;(element(root, (node) => node.tag === 'input').props['onUpdate:modelValue'] as (value: string) => void)('species_taxid=562')
+    await flush()
     ;(element(root, (node) => node.tag === 'form').props.onSubmit as (event: Event) => void)({ preventDefault: () => {} } as Event)
     await flush()
     expect(content(root)).toContain('Searching…')
@@ -276,5 +294,23 @@ describe('bucket metadata search', () => {
     expect(content(root)).not.toContain('Searching…')
     expect(content(root)).not.toContain('Show more')
     expect(searchObjects).toHaveBeenCalledOnce()
+  })
+
+  it('searches with the box text as soon as it opens, and goes back on request', async () => {
+    searchObjects.mockClear()
+    const back = vi.fn()
+    const text = ref('coli species_taxid=562')
+    const Host = defineComponent(() => () => h(view, { bucket: 'ncbi', nodeId: null, text: text.value, 'onUpdate:text': (value: string) => (text.value = value), onBack: back }))
+    const { root } = await mountApp(Host)
+    await flush()
+
+    expect(searchObjects).toHaveBeenCalledWith('coli species_taxid=562', expect.objectContaining({ match: 'metadata' }))
+    expect(content(root)).toContain('Whole bucket')
+    expect(content(root)).toContain('species_taxid = 562')
+    // The chip leaves the box; the words stay in it.
+    expect(text.value).toBe('coli')
+    ;(element(root, (node) => node.tag === 'button' && content(node).includes('Back to folder')).props.onClick as () => void)()
+    expect(back).toHaveBeenCalledOnce()
+    expect(content(root)).not.toContain('Finds file names')
   })
 })

@@ -12,6 +12,7 @@ import Tooltip from '@/components/ui/Tooltip.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import ObjectListBar from '@/components/data/manager/ObjectListBar.vue'
+import MetadataSearch from '@/components/data/MetadataSearch.vue'
 import RowMenu from '@/components/data/manager/RowMenu.vue'
 import TransferDialog from '@/components/data/manager/TransferDialog.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
@@ -36,6 +37,7 @@ import {
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
 import { PAGE_SIZES } from '@/composables/useListPages'
 import type { PublicTarget } from '@/lib/publicAccess'
+import type { ObjectSearchHit } from '@/lib/api'
 import { featureEnabled } from '@/lib/config'
 import { isNotebookKey } from '@/lib/notebook/document'
 import { collectDropFiles } from '@/lib/upload/dropEntries'
@@ -62,6 +64,7 @@ import {
   Lock,
   NotebookPen,
   Plus,
+  Search,
   Settings,
   Trash2,
   Undo2,
@@ -75,6 +78,7 @@ const emit = defineEmits<{
   (e: 'sync-to-computer', source: BindSource): void
   (e: 'public-access', targets: PublicTarget[]): void
   (e: 'new-bucket'): void
+  (e: 'open-hit', hit: ObjectSearchHit): void
 }>()
 
 const s3 = useS3()
@@ -326,6 +330,27 @@ function onTransferDone(moved: string[]) {
   void loadDeleted()
 }
 
+// The list bar's one box: it filters this folder, and searches the whole bucket on request. The
+// bucket results take the folder's place until the user goes back.
+const searchText = ref('')
+const wholeBucket = ref(false)
+const bucketSearch = ref<{ search: () => Promise<void> } | null>(null)
+function searchBucket() {
+  if (searchText.value.trim().length < 2) return
+  if (wholeBucket.value) void bucketSearch.value?.search()
+  else wholeBucket.value = true
+}
+function backToFolder() {
+  wholeBucket.value = false
+  searchText.value = ''
+  nameFilter.value = ''
+}
+function openHit(hit: ObjectSearchHit) {
+  backToFolder()
+  emit('open-hit', hit)
+}
+watch([bucket, remoteNodeId], () => (wholeBucket.value = false))
+
 // One file after another: a locked bucket reads them through one keyed reader.
 // Another bucket, node or session ends the batch; its rows belong to the old one.
 let downloadBatch = 0
@@ -556,7 +581,24 @@ async function onDrop(event: DragEvent) {
         @dragleave="dragActive = false"
         @drop.prevent="onDrop"
       >
-        <ObjectListBar :manager="manager" @action="onBarAction" />
+        <ObjectListBar
+          v-model:text="searchText"
+          :manager="manager"
+          :whole-bucket="wholeBucket"
+          @action="onBarAction"
+          @search-bucket="searchBucket"
+          @back="backToFolder"
+        />
+        <MetadataSearch
+          v-if="wholeBucket"
+          ref="bucketSearch"
+          v-model:text="searchText"
+          :bucket="bucket"
+          :node-id="remoteNodeId"
+          @open="openHit"
+          @back="backToFolder"
+        />
+        <template v-else>
         <Notice v-if="listError && listAuthError" tone="warning" class="rounded-none border-x-0 border-t-0">
           <p>The temporary S3 session was rejected. Close it, then explicitly open this node and group again.</p>
           <p class="mt-1 break-all font-mono text-[10px]">{{ listError }}</p>
@@ -776,6 +818,15 @@ async function onDrop(event: DragEvent) {
             </Button>
           </div>
         </div>
+        <button
+          v-if="searchText.trim().length >= 2"
+          type="button"
+          class="flex w-full items-center gap-2 border-t border-border px-4 py-2 text-left text-xs text-primary hover:bg-muted/50"
+          @click="searchBucket"
+        >
+          <Search class="h-3.5 w-3.5" /> Search the whole bucket for "{{ searchText.trim() }}"
+        </button>
+        </template>
       </div>
       <TransferDialog
         v-model:open="transferOpen"
