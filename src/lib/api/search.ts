@@ -104,6 +104,8 @@ export interface ObjectSearchHit {
   checksum?: ObjectSearchChecksum | null
   size?: number | null
   updated_at?: string | null
+  /** The object's kept metadata columns; filled for `match=metadata` only, left out when empty. */
+  metadata?: Record<string, string>
 }
 
 export interface ObjectSearchIndexFreshness {
