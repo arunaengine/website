@@ -62,4 +62,17 @@ describe('file part of', () => {
     expect(part.found.value?.datasets[0]?.document_id).toBe('d2')
     scope.stop()
   })
+
+  it('does not ask again when only the target object is new', async () => {
+    aruna.getFilePartOf.mockResolvedValue(answer(['d1']))
+    const { asked, part, scope } = start()
+    await vi.waitFor(() => expect(part.state.value).toBe('ready'))
+
+    asked.value = { ...target }
+    await nextTick()
+
+    expect(part.state.value).toBe('ready')
+    expect(aruna.getFilePartOf).toHaveBeenCalledTimes(1)
+    scope.stop()
+  })
 })

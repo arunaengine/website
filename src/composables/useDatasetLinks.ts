@@ -74,7 +74,8 @@ export function useDatasetLinks(target: Ref<LinkTarget | null>) {
   }
 
   watch(
-    () => [target.value?.bucket, target.value?.key, target.value?.folder, target.value?.node, target.value?.id, sessionEpoch.value],
+    // Separate sources compare by value, so a new target object for the same file asks nothing.
+    [() => target.value?.bucket, () => target.value?.key, () => target.value?.folder, () => target.value?.node, () => target.value?.id, () => sessionEpoch.value],
     () => {
       documents.value = []
       next.value = null

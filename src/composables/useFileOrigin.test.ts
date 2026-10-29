@@ -72,4 +72,17 @@ describe('file origin', () => {
     expect(found.origin.value).toBeNull()
     scope.stop()
   })
+
+  it('does not ask again when only the target object is new', async () => {
+    aruna.getFileOrigin.mockResolvedValue(answer('v1'))
+    const { asked, found, scope } = start()
+    await vi.waitFor(() => expect(found.state.value).toBe('ready'))
+
+    asked.value = { ...target }
+    await nextTick()
+
+    expect(found.state.value).toBe('ready')
+    expect(aruna.getFileOrigin).toHaveBeenCalledTimes(1)
+    scope.stop()
+  })
 })

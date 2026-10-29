@@ -22,7 +22,8 @@ export function useFileOrigin(target: Ref<OriginTarget | null>) {
   let runs = 0
 
   watch(
-    () => [target.value?.bucket, target.value?.key, target.value?.versionId, sessionEpoch.value],
+    // Separate sources compare by value, so a new target object for the same file asks nothing.
+    [() => target.value?.bucket, () => target.value?.key, () => target.value?.versionId, () => sessionEpoch.value],
     async () => {
       const asked = target.value
       const run = ++runs

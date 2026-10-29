@@ -43,7 +43,9 @@ export function useFilePartOf(target: Ref<PartOfTarget | null>) {
     }
   }
 
-  watch(() => [target.value?.bucket, target.value?.key, sessionEpoch.value], () => void load(), { immediate: true })
+  // Separate sources compare by value, so a new target object for the same file asks nothing.
+  const sources = [() => target.value?.bucket, () => target.value?.key, () => sessionEpoch.value]
+  watch(sources, () => void load(), { immediate: true })
 
   return { found, state, error, reload: load }
 }
