@@ -36,6 +36,8 @@ const setView = ref<unknown>(null)
 const setState = ref('ordinary')
 const setError = ref<string | null>(null)
 const group = ref<GroupDetailResponse>(groupDetail(false))
+const sessionEpoch = ref(0)
+const bucketUsage = vi.fn((..._args: unknown[]) => Promise.resolve(usage.value))
 const usage = ref({ logical_bytes: 2048, objects: 52, versions: 60, delete_markers: 0, open_multipart_uploads: 0, complete: true })
 
 const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
@@ -109,8 +111,9 @@ const view = compileClientComponent(new URL('./BucketStorageView.vue', import.me
     useAruna: () => ({
       currentUser: ref({ id: 'u-1' }),
       getGroup: () => Promise.resolve(group.value),
-      getBucketUsage: () => Promise.resolve(usage.value),
+      getBucketUsage: bucketUsage,
       isRealmAdmin,
+      sessionEpoch,
     }),
   },
   '@/composables/useRealmNodes': {
@@ -262,6 +265,21 @@ describe('bucket storage page', () => {
     usage.value = { ...usage.value, delete_markers: 3 }
     expect(content(await render())).toContain('52 files, 3 delete markers, on Node B')
     usage.value = { ...usage.value, delete_markers: 0 }
+  })
+
+  it('keeps the usage of the current session only', async () => {
+    let early!: (value: unknown) => void
+    bucketUsage.mockImplementationOnce(() => new Promise((resolve) => { early = resolve as never }))
+    const root = await render()
+    bucketUsage.mockImplementation(() => Promise.resolve({ ...usage.value, logical_bytes: 4096, objects: 7 }))
+    sessionEpoch.value++
+    await flush()
+    early({ ...usage.value, logical_bytes: 999, objects: 1 })
+    await flush()
+
+    expect(content(root)).toContain('4 KB stored, 7 files')
+    expect(content(root)).not.toContain('1 file,')
+    bucketUsage.mockImplementation(() => Promise.resolve(usage.value))
   })
 
   it('keeps the file check under Storage and the sources with the transfers', async () => {

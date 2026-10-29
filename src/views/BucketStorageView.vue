@@ -45,7 +45,7 @@ import { formatBytes, formatNumber } from '@/lib/utils'
 import { ChevronLeft } from '@lucide/vue'
 
 const route = useRoute()
-const { currentUser, getGroup, getBucketUsage, isRealmAdmin } = useAruna()
+const { currentUser, getGroup, getBucketUsage, isRealmAdmin, sessionEpoch } = useAruna()
 const { shown } = usePortalFeatures()
 const { activeContext } = useS3()
 const realmNodes = useRealmNodes()
@@ -121,11 +121,13 @@ const tab = computed({
 
 // The summary line: size, files and the nodes; delete markers and open uploads only when there are any.
 const usage = ref<BucketUsageResponse | null>(null)
-watch([bucket, nodeId], async ([name, node]) => {
+let usageRun = 0
+watch([bucket, nodeId, sessionEpoch], async ([name, node]) => {
+  const run = ++usageRun
   usage.value = null
   if (example.value || !name) return
   const counted = await getBucketUsage(name, node).catch(() => null)
-  if (name === bucket.value && node === nodeId.value) usage.value = counted
+  if (run === usageRun) usage.value = counted
 }, { immediate: true })
 const plural = (count: number, one: string, many: string) => `${formatNumber(count)} ${count === 1 ? one : many}`
 const summary = computed(() => {
