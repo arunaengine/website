@@ -20,6 +20,7 @@ const Slotted = (tag: string) =>
 const component = compileClientComponent(new URL('./ProvenanceView.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/ExternalLink.vue': { __esModule: true, default: defineComponent({ props: { href: String, label: String }, setup: (props) => () => h('a', { href: props.href }, props.label) }) },
+  '@lucide/vue': { ArrowLeft: defineComponent(() => () => h('i')) },
   'vue-router': { RouterLink: defineComponent((_, { slots }) => () => h('a', slots.default?.())) },
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
   '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),

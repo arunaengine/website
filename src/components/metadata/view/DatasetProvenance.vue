@@ -21,7 +21,6 @@ const start = computed<ProvenanceStart>(() => ({
 
 <template>
   <section class="surface space-y-3 px-5 py-4">
-    <h2 class="text-sm font-medium text-foreground">Provenance</h2>
     <ProvenanceView v-if="crateHasEntities" :start="start" />
     <Skeleton v-else-if="loadingCrate" class="h-40" />
     <p v-else class="py-6 text-center text-sm text-muted-foreground">There is nothing to follow until the dataset's metadata has loaded.</p>

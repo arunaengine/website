@@ -6,6 +6,7 @@ import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
+import { ArrowLeft } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { apiErrorMessage } from '@/lib/api'
 import {
@@ -166,7 +167,7 @@ const Branch: ReturnType<typeof defineComponent> = defineComponent({
       const trail = [...branch.trail, item.id]
       const children = sources.length
         ? [
-            h('div', { class: 'w-11 flex-none text-center text-xl text-muted-foreground', 'aria-hidden': 'true' }, '←'),
+            h('div', { class: 'flex w-11 flex-none justify-center text-muted-foreground', 'aria-hidden': 'true' }, [h(ArrowLeft, { class: 'h-5 w-5' })]),
             h('div', { class: 'flex flex-col gap-3.5' }, sources.map((id) => h(Branch, { id, trail, key: id }))),
           ]
         : []
