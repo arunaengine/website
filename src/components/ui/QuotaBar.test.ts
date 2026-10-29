@@ -37,8 +37,8 @@ describe('quota bar', () => {
     const light = theme.slice(theme.indexOf(':root'), theme.indexOf('.dark'))
     const dark = theme.slice(theme.indexOf('.dark'))
     expect([light, dark].map((block) => block.match(/--quota-(stored|referenced): (#[0-9a-f]{6})/g))).toEqual([
-      ['--quota-stored: #3a62c8', '--quota-referenced: #a9d6c3'],
-      ['--quota-stored: #6286e0', '--quota-referenced: #3b6f5e'],
+      ['--quota-stored: #3a62c8', '--quota-referenced: #3e9a7c'],
+      ['--quota-stored: #5b7fdb', '--quota-referenced: #4fae8e'],
     ])
   })
 })
