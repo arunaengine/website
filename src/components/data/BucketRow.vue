@@ -4,13 +4,14 @@ import Popover from '@/components/ui/Popover.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import type { BucketJob } from '@/lib/api'
-import { ChevronDown, Database, Network, Package, Pin, RefreshCw, Server, TriangleAlert } from '@lucide/vue'
-import { computed, ref } from 'vue'
+import { Database, Network, Package, Pin, RefreshCw, Server, TriangleAlert } from '@lucide/vue'
+import { computed, ref, type Component } from 'vue'
 import { RouterLink } from 'vue-router'
 
 // One shared row for every bucket list (the Data view, the bucket search, the databases): the kind
-// icon, the name with its chips, a description line and a facts line that names the node. The name
-// button covers the row; the pin and the row's actions show on hover or focus, a long press pins.
+// icon, the name, a description line and the files and size. Where the bucket lives and its syncs
+// are small icons at the right: a tooltip on hover and focus, a popover with node links on a click
+// or tap. The name button covers the row; the pin shows on hover or focus, a long press pins.
 const props = withDefaults(
   defineProps<{
     bucket: string
@@ -23,6 +24,8 @@ const props = withDefaults(
     pinned?: boolean
     /** The bucket has sync relationships. */
     synced?: boolean
+    /** The nodes it syncs with, named in the sync icon. */
+    syncedWith?: string[]
     /** The step running on the bucket, if any. */
     job?: BucketJob | null
     /** Writes to part of the bucket are refused right now. */
@@ -56,6 +59,7 @@ const props = withDefaults(
     nodes: () => [],
     pinned: false,
     synced: false,
+    syncedWith: () => [],
     job: null,
     degraded: false,
     active: false,
@@ -76,11 +80,39 @@ const emit = defineEmits<{ (e: 'open'): void; (e: 'toggle-pin'): void }>()
 
 const realmNodes = useRealmNodes()
 
-const spread = computed(() => props.nodes.length || props.nodeCount)
-// The facts line names the node; a distributed bucket names its nodes in the chip instead.
-const placeId = computed(() => (spread.value ? null : props.placeNode ?? props.nodeId))
-const placeName = computed(() => (spread.value ? null : props.place ?? (props.nodeId ? realmNodes.displayName(props.nodeId) : null)))
-const syncedTitle = computed(() => (props.linkedTo ? `Linked to ${props.linkedTo}` : 'Sync relationships configured'))
+// "A", "A and B", "A, B and C".
+const names = (list: string[]) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list.at(-1)}` : (list[0] ?? ''))
+
+interface Mark {
+  id: string
+  icon: Component
+  tooltip: string
+  heading: string
+  links: string[]
+  /** A line for the popover when there is no node to link. */
+  note?: string
+}
+const marks = computed<Mark[]>(() => {
+  const list: Mark[] = []
+  if (props.linkedTo) {
+    list.push({ id: 'sync', icon: RefreshCw, tooltip: 'Synced with this computer', heading: 'Synced with this computer', links: [], note: `Folder ${props.linkedTo}` })
+  } else if (props.synced) {
+    const partners = props.syncedWith.map((id) => realmNodes.displayName(id))
+    const tooltip = partners.length ? `Synced with ${names(partners)}` : 'Synced with another bucket'
+    list.push({ id: 'sync', icon: RefreshCw, tooltip, heading: 'Synced with', links: props.syncedWith, note: partners.length ? undefined : 'Another bucket on the same node' })
+  }
+  if (props.nodes.length) {
+    list.push({ id: 'spread', icon: Network, tooltip: `Spread over ${names(props.nodes.map((id) => realmNodes.displayName(id)))}`, heading: 'Spread over', links: props.nodes })
+  } else if (props.nodeCount) {
+    list.push({ id: 'spread', icon: Network, tooltip: `Spread over ${props.nodeCount} nodes`, heading: 'Spread over', links: [], note: `${props.nodeCount} nodes` })
+  } else {
+    const id = props.placeNode ?? props.nodeId
+    const name = props.place ?? (props.nodeId ? realmNodes.displayName(props.nodeId) : null)
+    if (name) list.push({ id: 'place', icon: Server, tooltip: `Stored on ${name}`, heading: 'Stored on', links: id ? [id] : [], note: id ? undefined : name })
+  }
+  return list
+})
+const linkName = (id: string) => (id === (props.placeNode ?? props.nodeId) && props.place ? props.place : realmNodes.displayName(id))
 
 // A press held for half a second pins the row, and the click that follows does not open it.
 let pressTimer: ReturnType<typeof setTimeout> | undefined
@@ -143,30 +175,6 @@ function onClick() {
           @mousedown="onMousedown"
           @click="onClick"
         >{{ bucket }}</button>
-        <span
-          v-if="linkedTo || synced"
-          class="relative inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 text-[11px] text-emerald-700 dark:text-emerald-300"
-          :title="syncedTitle"
-          :aria-label="syncedTitle"
-          role="img"
-          :tabindex="linkedTo ? 0 : undefined"
-        ><RefreshCw class="h-2.5 w-2.5" aria-hidden="true" /> synced</span>
-        <Popover v-if="nodes.length">
-          <button type="button" class="relative inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-1.5 text-[11px] text-muted-foreground hover:text-foreground" :aria-label="`Stored on ${nodes.length} nodes`">
-            <Network class="h-2.5 w-2.5" aria-hidden="true" /> {{ nodes.length }} nodes <ChevronDown class="h-2.5 w-2.5" aria-hidden="true" />
-          </button>
-          <template #content>
-            <p class="text-xs font-medium text-foreground">Stored on</p>
-            <ul class="mt-1 space-y-1 text-sm">
-              <li v-for="id in nodes" :key="id">
-                <RouterLink :to="{ name: 'node', params: { nodeId: id } }" class="text-primary hover:underline">{{ realmNodes.displayName(id) }}</RouterLink>
-              </li>
-            </ul>
-          </template>
-        </Popover>
-        <span v-else-if="nodeCount" class="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-1.5 text-[11px] text-muted-foreground" :aria-label="`Stored on ${nodeCount} nodes`">
-          <Network class="h-2.5 w-2.5" aria-hidden="true" /> {{ nodeCount }} nodes
-        </span>
         <BucketJobLabel v-if="job" :job="job" class="relative" />
         <TriangleAlert
           v-if="degraded"
@@ -175,22 +183,25 @@ function onClick() {
         />
       </div>
       <p v-if="subtitle" class="truncate text-xs text-muted-foreground">{{ subtitle }}</p>
-      <p v-if="facts || placeName" class="flex min-w-0 flex-wrap items-center gap-x-1 text-xs tabular-nums text-muted-foreground">
-        <span v-if="facts">{{ facts }}<template v-if="placeName">,</template></span>
-        <span v-if="placeName" class="inline-flex min-w-0 items-center gap-1">
-          <Server class="h-3 w-3 shrink-0" aria-hidden="true" />
-          <RouterLink
-            v-if="placeId"
-            :to="{ name: 'node', params: { nodeId: placeId } }"
-            class="relative truncate text-primary hover:underline"
-            :title="placeTitle ?? undefined"
-            @mousedown.prevent
-          >{{ placeName }}</RouterLink>
-          <span v-else class="truncate" :title="placeTitle ?? undefined">{{ placeName }}</span>
-        </span>
-      </p>
+      <p v-if="facts" class="truncate text-xs tabular-nums text-muted-foreground">{{ facts }}</p>
     </div>
-    <div class="relative flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+    <div class="relative flex shrink-0 items-center gap-0.5">
+      <Popover v-for="mark in marks" :key="mark.id" :tooltip="mark.tooltip" align="end">
+        <button type="button" class="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" :aria-label="mark.tooltip" @mousedown.prevent>
+          <component :is="mark.icon" class="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+        <template #content>
+          <p class="text-xs font-medium text-foreground">{{ mark.heading }}</p>
+          <ul v-if="mark.links.length" class="mt-1 space-y-1 text-sm">
+            <li v-for="id in mark.links" :key="id">
+              <RouterLink :to="{ name: 'node', params: { nodeId: id } }" class="text-primary hover:underline" :title="mark.id === 'place' ? placeTitle ?? undefined : undefined">{{ linkName(id) }}</RouterLink>
+            </li>
+          </ul>
+          <p v-if="mark.note" class="mt-1 text-sm text-muted-foreground">{{ mark.note }}</p>
+        </template>
+      </Popover>
+    </div>
+    <div v-if="$slots.link || $slots.actions || pinnable" class="relative flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
       <slot v-if="!linkedTo" name="link" />
       <slot name="actions" />
       <button

@@ -20,6 +20,8 @@ describe('bucket usage', () => {
     expect(usageText(usage(), true)).toBe('16 files, 50.2 MB stored')
     expect(usageText(usage({ objects: 1 }))).toBe('1 file, 50.2 MB')
     expect(usageText(usage({ objects: 43_882_006, logical_bytes: 10, referenced_bytes: 10 }), true)).toBe('43,882,006 files referenced')
+    // A bucket row is calmer: the files alone.
+    expect(usageText(usage({ objects: 43_882_006, logical_bytes: 10, referenced_bytes: 10 }))).toBe('43,882,006 files')
     expect(usageText(usage({ complete: false }))).toBe('at least 16 files, 50.2 MB')
   })
 

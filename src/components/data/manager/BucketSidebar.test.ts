@@ -87,6 +87,7 @@ const RowStub = defineComponent({
     facts: { type: String, default: null },
     nodes: { type: Array, default: () => [] },
     placeNode: { type: String, default: null },
+    syncedWith: { type: Array, default: () => [] },
   },
   emits: ['open', 'toggle-pin'],
   setup: (props, { slots, emit }) => () =>
@@ -101,6 +102,7 @@ const RowStub = defineComponent({
       props.subtitle ? h('small', { 'data-testid': 'row-subtitle' }, `${props.bucket}: ${props.subtitle}`) : null,
       props.facts ? h('small', { 'data-testid': 'row-facts' }, `${props.bucket}: ${props.facts}`) : null,
       props.nodes.length ? h('small', { 'data-testid': 'row-nodes' }, `${props.bucket}: ${props.nodes.join(', ')}`) : null,
+      props.syncedWith.length ? h('small', { 'data-testid': 'row-sync' }, `${props.bucket}: ${props.syncedWith.join(', ')}`) : null,
       props.pinnable ? h('button', { 'aria-label': `${props.pinned ? 'Unpin' : 'Pin'} ${props.bucket}`, onClick: () => emit('toggle-pin') }) : null,
       props.job ? h('em', { 'data-testid': 'row-job' }, `${props.bucket}: ${(props.job as { kind: string }).kind}`) : null,
       props.place ? h('small', { 'data-testid': 'row-place', title: props.placeTitle }, `${props.bucket}: ${props.place}`) : null,
@@ -916,6 +918,8 @@ describe('Bucket sidebar sections', () => {
     usageAsked.length = 0
     const state = manager()
     state.shortcuts.pinned.value = [{ bucket: 'images', nodeId: null }]
+    state.syncKeyFor = ((node: string | null, name: string) => `${node} ${name}`) as never
+    state.syncByBucket.value = new Map([['node-2 laptop', { outgoing: 1, incoming: 0, prefixes: [''], partners: ['laptop-device'] }]])
     try {
       const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
       await flush()
@@ -923,6 +927,7 @@ describe('Bucket sidebar sections', () => {
       expect(labels(root)).toEqual(['Pinned', 'Databases', 'Other buckets'])
       expect(order(root)).toEqual(['images', 'bakta-database', 'laptop'])
       expect(nodes(root).filter((node) => node.props['data-testid'] === 'row-facts').map((node) => content(node))).toEqual(['laptop: 16 files, 50.2 MB'])
+      expect(nodes(root).filter((node) => node.props['data-testid'] === 'row-sync').map((node) => content(node))).toEqual(['laptop: laptop-device'])
       // Earlier tests leave their lists mounted, so only this list's request is looked for.
       expect(usageAsked).toContainEqual([
         { bucket: 'images', nodeId: null },

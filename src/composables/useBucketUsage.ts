@@ -6,11 +6,11 @@ import type { BucketUsageResponse } from '@/lib/api'
 import { formatCount } from '@/lib/formatCount'
 import { formatBytes } from '@/lib/utils'
 
-/** "16 files, 50.2 MB", or "68,231 files referenced" when the bytes are held elsewhere. */
+/** "16 files, 50.2 MB". Bytes held elsewhere: "68,231 files", or "68,231 files referenced" when `stored`. */
 export function usageText(usage: BucketUsageResponse, stored = false): string {
   const files = `${usage.complete ? '' : 'at least '}${formatCount(usage.objects)} ${usage.objects === 1 ? 'file' : 'files'}`
   const referenced = usage.referenced_bytes ?? 0
-  if (usage.objects && referenced && referenced >= usage.logical_bytes) return `${files} referenced`
+  if (usage.objects && referenced && referenced >= usage.logical_bytes) return stored ? `${files} referenced` : files
   return `${files}, ${formatBytes(usage.logical_bytes)}${stored ? ' stored' : ''}`
 }
 

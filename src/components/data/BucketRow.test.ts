@@ -9,13 +9,18 @@ const Label = defineComponent({
   setup: (props) => () => h('em', { 'data-testid': 'bucket-job' }, (props.job as { kind: string }).kind),
 })
 const TooltipStub = defineComponent((_, { slots }) => () => h('div', [slots.default?.(), slots.content?.()]))
+// The popover shows its hover text as a tooltip node and renders its content in place.
+const PopoverStub = defineComponent({
+  props: { tooltip: String },
+  setup: (props, { slots }) => () => h('div', { 'data-mark': true }, [h('span', { role: 'tooltip' }, props.tooltip), slots.default?.(), h('section', slots.content?.())]),
+})
 const BucketRow = compileClientComponent(new URL('./BucketRow.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': { RouterLink: defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => h('a', { to: props.to }, slots.default?.()) }) },
   '@lucide/vue': new Proxy({}, { get: () => Empty }),
   '@/components/storage/BucketJobLabel.vue': moduleDefault(Label),
   '@/components/ui/Tooltip.vue': moduleDefault(TooltipStub),
-  '@/components/ui/Popover.vue': moduleDefault(TooltipStub),
+  '@/components/ui/Popover.vue': moduleDefault(PopoverStub),
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id }) },
 })
 
@@ -46,47 +51,57 @@ describe('BucketRow step label', () => {
   })
 })
 
-describe('BucketRow lines and chips', () => {
-  it('marks a linked bucket as synced, with its folder in the title, in place of the link button', async () => {
-    const root = await mount({ linkedTo: 'test-data' }, { link: () => h('button', { 'aria-label': 'Link a local folder' }) })
-    const chip = nodes(root).find((node) => node.props.role === 'img')
+describe('BucketRow lines and marks', () => {
+  const marks = (root: Parameters<typeof content>[0]) =>
+    nodes(root).filter((node) => node.props['data-mark']).map((node) => content(node.children[0]))
+  const links = (root: Parameters<typeof content>[0]) => nodes(root).filter((node) => node.tag === 'a').map((node) => node.props.to)
 
-    expect(content(chip!).trim()).toBe('synced')
-    expect(chip?.props.title).toBe('Linked to test-data')
-    expect(chip?.props.tabindex).toBe(0)
-    expect(nodes(root).some((node) => node.props['aria-label'] === 'Link a local folder')).toBe(false)
+  it('shows only the name, the description and the files and size as text', async () => {
+    const root = await mount({ subtitle: 'Bakta database (light) 6.0', facts: '66 files, 4.1 GB', database: true, nodeId: 'node-2' })
+    const text = nodes(root).find((node) => node.props.class === 'min-w-0 flex-1')!
+    const lines = text.children.filter((node) => node.tag === 'p').map((node) => content(node))
+    expect(lines).toEqual(['Bakta database (light) 6.0', '66 files, 4.1 GB'])
   })
 
-  it('offers the link button on an unlinked row', async () => {
-    const root = await mount({ linkedTo: null }, { link: () => h('button', { 'aria-label': 'Link a local folder' }) })
-    expect(nodes(root).some((node) => node.props['aria-label'] === 'Link a local folder')).toBe(true)
-    expect(nodes(root).some((node) => node.props.role === 'img')).toBe(false)
+  it('names the node in a server icon whose popover links to the node', async () => {
+    const root = await mount({ facts: '16 files, 50.2 MB', place: 'Giessen storage 1', placeNode: 'node-1' })
+    expect(marks(root)).toEqual(['Stored on Giessen storage 1'])
+    expect(links(root)).toEqual([{ name: 'node', params: { nodeId: 'node-1' } }])
+    expect(content(root)).toContain('Giessen storage 1')
   })
 
-  it('names the files and the node on one line, the node linked to its page', async () => {
-    const root = await mount({ facts: '16 files, 50.2 MB', nodeId: 'node-2' })
-    const link = nodes(root).find((node) => node.tag === 'a')
-
-    expect(content(root)).toContain('16 files, 50.2 MB,node-2')
-    expect(link?.props.to).toEqual({ name: 'node', params: { nodeId: 'node-2' } })
-  })
-
-  it('names the nodes of a distributed bucket in its chip, not on the facts line', async () => {
-    const root = await mount({ facts: '68,231 files referenced', nodes: ['n1', 'n2'], placeNode: 'n1', place: 'Giessen 1' })
-    const links = nodes(root).filter((node) => node.tag === 'a')
-
-    expect(content(root)).toContain('2 nodes')
-    expect(links.map((node) => node.props.to)).toEqual([
+  it('names the nodes of a distributed bucket in one network icon instead', async () => {
+    const root = await mount({ nodes: ['n1', 'n2'], placeNode: 'n1', place: 'Giessen 1' })
+    expect(marks(root)).toEqual(['Spread over n1 and n2'])
+    expect(links(root)).toEqual([
       { name: 'node', params: { nodeId: 'n1' } },
       { name: 'node', params: { nodeId: 'n2' } },
     ])
-    expect(content(root)).not.toContain('Giessen 1')
   })
 
-  it('shows a description line, and no facts line when nothing is known', async () => {
-    const root = await mount({ subtitle: 'Bakta database (light) 6.0', database: true })
-    expect(content(root)).toContain('Bakta database (light) 6.0')
-    expect(nodes(root).filter((node) => node.tag === 'p')).toHaveLength(1)
+  it('names the partners of a synced bucket before its place', async () => {
+    const root = await mount({ synced: true, syncedWith: ['laptop', 'office'], nodeId: 'node-2' })
+    expect(marks(root)).toEqual(['Synced with laptop and office', 'Stored on node-2'])
+    const same = await mount({ synced: true })
+    expect(marks(same)).toEqual(['Synced with another bucket'])
+  })
+
+  it('marks a bucket linked to this computer as synced with it, and offers no link button then', async () => {
+    const link = { link: () => h('button', { 'aria-label': 'Link a local folder' }) }
+    const linked = await mount({ linkedTo: 'test-data' }, link)
+    expect(marks(linked)).toEqual(['Synced with this computer'])
+    expect(content(linked)).toContain('Folder test-data')
+    expect(nodes(linked).some((node) => node.props['aria-label'] === 'Link a local folder')).toBe(false)
+    const unlinked = await mount({ linkedTo: null }, link)
+    expect(marks(unlinked)).toEqual([])
+    expect(nodes(unlinked).some((node) => node.props['aria-label'] === 'Link a local folder')).toBe(true)
+  })
+
+  it('keeps the pin with the row actions, shown on hover or focus', async () => {
+    const root = await mount({ nodeId: 'node-2' })
+    const pin = nodes(root).find((node) => node.props['aria-label'] === 'Pin genes')!
+    expect(String(pin.parent!.props.class)).toContain('opacity-0')
+    expect(String(pin.parent!.props.class)).toContain('group-focus-within:opacity-100')
   })
 
   it('pins on a long press and does not open the bucket then', async () => {
