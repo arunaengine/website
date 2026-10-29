@@ -5,7 +5,7 @@ import * as TableImport from '@/lib/tableImport'
 import { compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
 
 const hit = { key: 'GCF_000005845.2_ASM584v2/', bucket: 'ncbi', issuer_node_id: 'n2', group_id: 'g1' }
-const searchObjects = vi.fn(async () => ({ hits: [hit], next_cursor: null, coverage: { complete: true } }))
+const searchObjects = vi.fn(async (_q: string, _options: { match: string }) => ({ hits: [hit] as unknown[], next_cursor: null as string | null, coverage: { complete: true } }))
 
 const component = compileClientComponent(new URL('./MetadataSearch.vue', import.meta.url), {
   vue: VueRuntime,
@@ -76,7 +76,7 @@ describe('bucket metadata search', () => {
     const file = { key: 'reads/ui-hello.txt', bucket: 'ncbi', issuer_node_id: 'n1', group_id: 'g1' }
     searchObjects.mockReset()
     searchObjects.mockImplementation(async (_q: string, options: { match: string }) =>
-      ({ hits: options.match === 'substring' ? [file] : [file, hit], next_cursor: null, coverage: { complete: true } }) as never)
+      ({ hits: options.match === 'substring' ? [file] : [file, hit], next_cursor: null, coverage: { complete: true } }))
     const { root } = await mountApp(component, { props: { bucket: 'ncbi', nodeId: null } })
     ;(element(root, (node) => node.tag === 'input').props['onUpdate:modelValue'] as (value: string) => void)('hello')
     await flush()
