@@ -32,6 +32,15 @@ describe('scanPaths', () => {
     ])
   })
 
+  it('marks a folder that has paths below it or follows mkdir or cd', () => {
+    expect(scanPaths('mkdir -p /work/out && wc -l in/a.txt > /work/out/count.txt', '/work')).toEqual([
+      '/work/out/',
+      '/work/in/a.txt',
+      '/work/out/count.txt',
+    ])
+    expect(scanPaths('cd /work/results && ls', '/work')).toEqual(['/work/results/'])
+  })
+
   it('reports every path once', () => {
     expect(scanPaths('cp in/a.txt in/a.txt', '/work')).toEqual(['/work/in/a.txt'])
   })
@@ -62,6 +71,12 @@ describe('classifyPath', () => {
     expect(file.label).toBe('not captured')
     const folder = classifyPath('/work/results/', targets)
     expect(folder.label).toBe('folder not captured')
+  })
+
+  it('credits a folder input for a pattern below it, with or without a trailing slash', () => {
+    const folderTargets = { workdir: '/work', inputs: [], inputDirs: ['/work/in/ui-list'], outputs: [] }
+    expect(classifyPath('/work/in/ui-list/*', folderTargets)).toMatchObject({ kind: 'input-folder', label: 'in input folder', fix: null })
+    expect(classifyPath('/work/in/ui-list/', folderTargets)).toMatchObject({ kind: 'input-folder', label: 'input folder' })
   })
 
   it('counts the inputs staged in a folder that is read whole', () => {

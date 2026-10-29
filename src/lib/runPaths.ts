@@ -35,6 +35,8 @@ export interface RunPathCheck {
 }
 
 const SPLIT = /[\s"'`(),;|<>&]+/
+// The path right after one of these commands names a folder.
+const FOLDER_COMMANDS = new Set(['mkdir', 'cd'])
 
 function normWorkdir(workdir: string): string {
   const trimmed = workdir.trim().replace(/\/+$/, '')
@@ -43,22 +45,27 @@ function normWorkdir(workdir: string): string {
 
 /**
  * Every container path a text names, as absolute paths. Options, URLs, bare
- * words, numbers and package specifiers are not paths and stay out.
+ * words, numbers and package specifiers are not paths and stay out. A folder ends in '/'.
  */
 export function scanPaths(text: string, workdir: string): string[] {
   const base = normWorkdir(workdir)
-  const found = new Set<string>()
+  const found: string[] = []
+  let previous = ''
   for (const raw of text.split(SPLIT)) {
+    const folder = FOLDER_COMMANDS.has(previous)
+    if (raw && !raw.startsWith('-')) previous = raw
     if (!raw || raw.startsWith('-') || raw.includes('://') || !raw.includes('/')) continue
     const token = raw.replace(/^\.\//, '').replace(/[.,:]+$/, '')
     if (!token || /^[\d./]+$/.test(token) || token.startsWith('@') || token.startsWith('jsr:')) continue
-    if (token.startsWith('/')) {
-      if (token === base || token.startsWith(`${base}/`)) found.add(token)
-      continue
-    }
-    found.add(`${base}/${token}`)
+    const path = token.startsWith('/') ? token : `${base}/${token}`
+    if (path !== base && !path.startsWith(`${base}/`)) continue
+    found.push(folder && !path.endsWith('/') ? `${path}/` : path)
   }
-  return [...found]
+  // A path with another path below it is a folder too.
+  const folders = found.map((path) =>
+    !path.endsWith('/') && found.some((other) => other.startsWith(`${path}/`)) ? `${path}/` : path,
+  )
+  return [...new Set(folders)]
 }
 
 function folderOf(path: string): string {
@@ -88,9 +95,12 @@ export function classifyPath(path: string, targets: RunPathTargets): RunPathChec
     if (staged) {
       return { path, kind: 'input-folder', label: `${staged} input${staged === 1 ? '' : 's'}`, fix: null }
     }
-    if ((targets.inputDirs ?? []).some((dir) => dir.trim() === path)) {
-      return { path, kind: 'input-folder', label: 'input folder', fix: null }
-    }
+  }
+  const inputFolder = (targets.inputDirs ?? [])
+    .map((dir) => dir.trim().replace(/\/*$/, '/'))
+    .find((dir) => path === dir || path.startsWith(dir))
+  if (inputFolder) {
+    return { path, kind: 'input-folder', label: path === inputFolder ? 'input folder' : 'in input folder', fix: null }
   }
   const inputDir = `${normWorkdir(targets.workdir)}/in/`
   if (path.startsWith(inputDir)) {
