@@ -24,7 +24,7 @@ const closeKeyWorker = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/vault/keyedRead', async (original) => ({ ...(await original<object>()), ...read }))
 vi.mock('@/lib/vault/keyWorker', async (original) => ({ ...(await original<object>()), closeKeyWorker }))
 vi.mock('./useUserVault', () => ({ useUserVault: () => vault }))
-vi.mock('./s3/endpoints', () => ({ localNodeId: () => 'n', nodeApiBase: () => 'https://node.test/api/v1' }))
+vi.mock('./s3/endpoints', () => ({ localNodeId: () => 'n', nodeApiBaseReady: async () => 'https://node.test/api/v1' }))
 const headObject = vi.hoisted(() => vi.fn())
 vi.mock('./useS3', () => ({ useS3: () => ({ headObject }) }))
 vi.mock('./aruna/state', async () => {
@@ -207,13 +207,17 @@ describe('version lookup', () => {
     headObject.mockImplementation(() => new Promise((resolve) => answers.push(resolve)))
     return answers
   }
+  // A read asks for the node's address first, then for the head.
+  const lookup = () => vi.advanceTimersByTimeAsync(0)
 
   it('lets a late lookup of a first click neither read nor end the second click', async () => {
     const answers = heads()
     read.ownGrants.mockResolvedValue([GRANT])
     const keyed = useKeyedRead()
     const first = keyed.readObject({ bucket: 'reef', key: 'a.csv' })
+    await lookup()
     const second = keyed.readObject({ bucket: 'reef', key: 'b.csv' })
+    await lookup()
     answers[1]!({ versionId: 'V2' })
     expect(await (await second).text()).toBe('ok')
 
@@ -228,11 +232,13 @@ describe('version lookup', () => {
     const answers = heads()
     const keyed = useKeyedRead()
     const cancelled = keyed.readObject({ bucket: 'reef', key: 'a.csv' })
+    await lookup()
     keyed.cancel()
     answers[0]!({ versionId: 'V1' })
     await expect(cancelled).rejects.toBeInstanceOf(ReadEndedError)
 
     const switched = keyed.readObject({ bucket: 'reef', key: 'a.csv' })
+    await lookup()
     sessionEpoch.value += 1
     answers[1]!({ versionId: 'V1' })
     await expect(switched).rejects.toBeInstanceOf(ReadEndedError)

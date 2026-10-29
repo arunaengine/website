@@ -14,7 +14,7 @@ import {
 } from '@/lib/vault/keyedRead'
 import { closeKeyWorker } from '@/lib/vault/keyWorker'
 import { authToken, sessionEpoch, userInfo } from './aruna/state'
-import { localNodeId, nodeApiBase } from './s3/endpoints'
+import { localNodeId, nodeApiBaseReady } from './s3/endpoints'
 import { useS3 } from './useS3'
 import { useUserVault } from './useUserVault'
 
@@ -177,7 +177,8 @@ export function useKeyedRead() {
   async function readObject(object: KeyedObject): Promise<Blob> {
     const action = begin()
     const node = object.nodeId || localNodeId()
-    const baseUrl = node ? nodeApiBase(node) : null
+    const baseUrl = node ? await nodeApiBaseReady(node) : null
+    if (action.ended()) throw new ReadEndedError()
     if (!baseUrl) throw new Error('The node publishes no API address.')
     const client = { baseUrl, token: authToken.value }
     let versionId = object.versionId

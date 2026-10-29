@@ -6,7 +6,7 @@ import { hasReferenceMetadata } from '@/lib/references'
 import { readFailure } from '@/lib/vault/keyedRead'
 import { authToken, sessionEpoch, userInfo } from './aruna/state'
 import { isS3BucketLockedError } from './s3/errors'
-import { localNodeId, nodeApiBase } from './s3/endpoints'
+import { localNodeId, nodeApiBaseReady } from './s3/endpoints'
 import { s3ErrorMessage, useS3 } from './useS3'
 
 export type PreviewKind = 'text' | 'markdown' | 'table' | 'image' | 'media' | 'pdf' | 'download'
@@ -400,8 +400,9 @@ export function useObjectPreview() {
     const id = loadId
     lockCheck.value = 'checking'
     const node = nodeOf(target) ?? localNodeId()
-    const baseUrl = node ? nodeApiBase(node) : null
     try {
+      const baseUrl = node ? await nodeApiBaseReady(node) : null
+      if (id !== loadId) return
       if (!baseUrl) throw new Error('The node publishes no API address.')
       const answer = await getBucketEncryption(target.bucket, { baseUrl, token: authToken.value })
       if (id !== loadId) return

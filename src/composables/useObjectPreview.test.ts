@@ -7,6 +7,8 @@ import { useObjectPreview } from './useObjectPreview'
 const getObjectText = vi.fn()
 const probeAccess = vi.fn()
 const getBucketEncryption = vi.fn()
+// Another node's address is known once the realm read with the token names the node.
+let addressKnown: Promise<void> = Promise.resolve()
 const downloadUrl = vi.fn()
 const SESSION = { issuerNodeId: 'node-a', groupId: 'G1', accessKeyId: 'AK1', expiresAt: 1_000_000 }
 const activeSession = shallowRef(SESSION)
@@ -17,7 +19,10 @@ vi.mock('./useS3', () => ({
 }))
 vi.mock('./s3/endpoints', () => ({
   localNodeId: () => 'node-a',
-  nodeApiBase: (id: string) => `https://${id}.test/api/v1`,
+  nodeApiBaseReady: async (id: string) => {
+    await addressKnown
+    return `https://${id}.test/api/v1`
+  },
 }))
 vi.mock('@/lib/api', async (importOriginal) => ({
   ...(await importOriginal<typeof Api>()),
@@ -60,6 +65,24 @@ describe('preview of a locked bucket', () => {
       params: { bucketId: 'reef' },
       query: { tab: 'encryption', node: 'node-b' },
     })
+  })
+
+  it('asks another node about its lock once the realm names its address', async () => {
+    getObjectText.mockRejectedValueOnce(LOCKED)
+    const preview = useObjectPreview()
+    await preview.load(TARGET)
+    let name!: () => void
+    addressKnown = new Promise((resolve) => (name = resolve))
+    getBucketEncryption.mockResolvedValueOnce(lockState('locked'))
+    const checked = preview.recheck()
+    await Promise.resolve()
+    expect(getBucketEncryption).not.toHaveBeenCalled()
+
+    name()
+    await checked
+    expect(getBucketEncryption.mock.calls[0]).toEqual(['reef', { baseUrl: 'https://node-b.test/api/v1', token: expect.any(String) }])
+    expect(preview.lockCheck.value).toBe('still')
+    addressKnown = Promise.resolve()
   })
 
   it('loads again only after the node reports an unlock', async () => {
