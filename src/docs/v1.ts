@@ -803,7 +803,7 @@ export const docsTopics: DocsTopic[] = [
       {
         route: '/app/settings',
         anchor: 'settings-access',
-        title: 'Access & connection',
+        title: 'Access',
         body: 'This tab shows your browser session, the API endpoint, and every session issued for your account.',
       },
     ],
@@ -820,7 +820,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Create and store safely',
         icon: 'KeyRound',
         steps: [
-          'Open [Settings](page:settings), then Access & connection.',
+          'Open [Settings](page:settings), then Access.',
           'Confirm the issuing [node](concept:glossary#node), restrictions, and the intended client.',
           'Copy the access key and one-time secret into the client; the portal never shows the secret again.',
           'Point the client at the issuing node; the key is invalid elsewhere.',
@@ -829,7 +829,7 @@ export const docsTopics: DocsTopic[] = [
         image: {
           src: '/docs/v1/settings-access.jpg',
           alt: 'Settings access and connection tab with the session, API connection, and sessions list',
-          caption: 'Access & connection: the browser session, the API endpoint, and issued sessions.',
+          caption: 'Access: the browser session, the API endpoint, and issued sessions.',
         },
       },
     ],
@@ -980,7 +980,7 @@ export const docsTopics: DocsTopic[] = [
           'Git signs in with an Aruna bearer token, the same kind of token the portal and the API use. Cloning and pulling need read access to the dataset. Pushing needs write access and a token without path restrictions.',
           'Send the token as a header: `git -c http.extraHeader="Authorization: Bearer $ARUNA_TOKEN" clone <clone URL>`. Inside the clone, `git config http.extraHeader "Authorization: Bearer $ARUNA_TOKEN"` keeps it for later pulls and pushes.',
           'Or let Git ask for it: enter any user name and the token as the password. A credential helper such as `git config --global credential.helper cache` remembers it for a while.',
-          'Keep the token secret: anyone holding it acts as you. Your sessions are listed under [Settings](page:settings), Access & connection, where you can revoke them.',
+          'Keep the token secret: anyone holding it acts as you. Your sessions are listed under [Settings](page:settings), Access, where you can revoke them.',
         ],
       },
       {

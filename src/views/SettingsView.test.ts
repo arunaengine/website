@@ -102,7 +102,7 @@ describe('SettingsView responsive geometry', () => {
   })
 
   it('offers every settings section as a shareable tab', () => {
-    const tabIds = ['profile', 'groups', 'access', 'assistant', 'keys', 'appearance']
+    const tabIds = ['profile', 'groups', 'access', 'devices', 'assistant', 'keys', 'appearance']
     const tabList = source.match(/const settingsTabs = \[([\s\S]*?)\] as const/)?.[1] ?? ''
     const declaredIds = Array.from(tabList.matchAll(/\{ id: '([^']+)'/g), (match) => match[1])
     const panelIds = collectElements(root, (node) => node.tag === 'TabsContent')
@@ -332,12 +332,20 @@ describe('SettingsView access tab', () => {
     userInfo.value = { user: { user_id: 'user-1' } }
   })
 
-  it('stacks connection, sessions, keys and devices', async () => {
+  it('opens the devices on a tab of their own', async () => {
+    const { root } = await mount('?tab=devices')
+
+    expect(tabsRoot(root).props['data-active']).toBe('devices')
+    expect(panelText(root, 'devices')).toContain('Devices panel')
+    expect(panelText(root, 'access')).not.toContain('Devices panel')
+  })
+
+  it('stacks connection, sessions and keys', async () => {
     const { root, errors } = await mount('?tab=access')
 
     const text = panelText(root, 'access')
     expect(text).not.toContain('Interoperability')
-    const markers = ['API connection', 'Sessions panel', 'S3 access keys', 'Devices panel']
+    const markers = ['API connection', 'Sessions panel', 'S3 access keys']
     const positions = markers.map((marker) => text.indexOf(marker))
     expect(errors).toEqual([])
     expect(positions.every((position) => position >= 0)).toBe(true)

@@ -85,7 +85,8 @@ const { shown } = usePortalFeatures()
 const settingsTabs = [
   { id: 'profile', label: 'Profile' },
   { id: 'groups', label: 'Groups' },
-  { id: 'access', label: 'Access & connection' },
+  { id: 'access', label: 'Access' },
+  { id: 'devices', label: 'Devices' },
   { id: 'assistant', label: 'Assistant' },
   { id: 'keys', label: 'Vault' },
   { id: 'appearance', label: 'Appearance' },
@@ -426,7 +427,9 @@ async function revoke(accessKeyId: string) {
         </section>
 
         <S3SessionsPanel />
+      </TabsContent>
 
+      <TabsContent value="devices" class="container mt-0 min-w-0 space-y-5 py-6">
         <section class="surface overflow-hidden">
           <DevicesPanel />
         </section>

@@ -229,7 +229,7 @@ const stages = computed(() => watchStages(watchState.value))
           </Button>
         </div>
         <p v-if="atCap && !minted" class="text-[11px] text-muted-foreground">
-          You hold every device this realm allows. Remove one under Settings, Access & connection, to enroll another.
+          You hold every device this realm allows. Remove one under Settings, Devices, to enroll another.
         </p>
       </div>
 
@@ -314,7 +314,7 @@ const stages = computed(() => watchStages(watchState.value))
         <ClaimWatchStep :stages="stages" :error="watchState.lastError">
           <template #actions>
             <Button variant="outline" size="sm" as-child>
-              <RouterLink :to="{ name: 'settings', query: { tab: 'access' } }"><ExternalLink class="h-4 w-4" /> My devices</RouterLink>
+              <RouterLink :to="{ name: 'settings', query: { tab: 'devices' } }"><ExternalLink class="h-4 w-4" /> My devices</RouterLink>
             </Button>
             <Button variant="outline" size="sm" @click="emit('update:step', HANDOFF_STEP)">
               <ArrowLeft class="h-4 w-4" /> Hand-off

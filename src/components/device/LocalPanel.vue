@@ -120,7 +120,7 @@ async function chooseStorage(): Promise<void> {
           </code>
           <p v-else class="text-xs text-muted-foreground">Aruna shows the address once it is running.</p>
           <RouterLink :to="{ name: 'settings', query: { tab: 'access' } }" class="inline-flex text-xs font-medium text-primary hover:underline">
-            Open Access &amp; connection
+            Open Access
           </RouterLink>
         </template>
       </div>
