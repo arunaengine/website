@@ -47,6 +47,15 @@ function hostOf(url: string | null): string | null {
   }
 }
 
+/**
+ * This computer's name: the one the realm knows it by (its enrolled device name), else "This
+ * computer". The desktop shell does not hand the portal its stored label or the hostname yet.
+ */
+export function computerName(node?: RealmNodeInfo | null): string {
+  const labels = node?.info?.labels ?? {}
+  return labels['name'] || labels['display_name'] || labels['device'] || 'This computer'
+}
+
 // The desktop names places in words: this computer, a device by its enrolled
 // name, a node by its name or host.
 function plainName(node: RealmNodeInfo, thisComputer: boolean): string {

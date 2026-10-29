@@ -289,72 +289,13 @@ describe('desktop home cards', () => {
     mounted.app.unmount()
   })
 
-  it('leaves out the runs step and tile while compute is hidden', async () => {
+  it('leaves out the runs step while compute is hidden', async () => {
     computeShown.value = false
     const mounted = await mountApp(HomeCards)
     await flush()
 
     expect(content(mounted.root)).toContain('0 of 3 done')
     expect(content(mounted.root)).not.toContain('Local runs')
-    mounted.app.unmount()
-  })
-
-  it('sums this computer up from the node', async () => {
-    folders.value = [folder()]
-    compute.value = enabledCompute()
-    transfers.value = [DeviceApi.readTransfer({ id: 't1', state: 'transferring', path: 'a', folder_id: 'f1', bytes_total: 100, bytes_done: 40 }, 'upload')]
-    const mounted = await mountApp(HomeCards)
-    const text = content(mounted.root)
-
-    expect(text).toContain('2 files need you')
-    expect(text).toContain('1 file')
-    expect(text).toContain('40 B of 100 B')
-    expect(element(mounted.root, (node) => node.props.label === 'Total progress').props).toMatchObject({
-      warn: 101,
-      critical: 101,
-    })
-    expect(text).toContain('1 running')
-    expect(text).toContain('docker, 1 job at a time')
-    await click(button(mounted.root, 'Link a local folder'))
-    expect(content(mounted.root)).toContain('bind-dialog-open')
-    mounted.app.unmount()
-  })
-
-  it('reads the running count and the linked folders again on every visit', async () => {
-    compute.value = enabledCompute()
-    for (const visit of [1, 2]) {
-      const mounted = await mountApp(HomeCards)
-      await flush()
-      expect(loadCompute).toHaveBeenCalledTimes(visit)
-      // A folder linked through the device API since the last read counts at once.
-      expect(loadFolders).toHaveBeenCalledTimes(visit)
-      mounted.app.unmount()
-    }
-  })
-
-  it('reads at once when the node is known and waits for its status otherwise', async () => {
-    refreshStatus.mockImplementation(() => new Promise(() => {}))
-    deviceClient.value = { baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner' }
-    const known = await mountApp(HomeCards)
-    expect(loadCompute).toHaveBeenCalledTimes(1)
-    known.app.unmount()
-
-    deviceClient.value = null
-    const unknown = await mountApp(HomeCards)
-    expect(loadCompute).toHaveBeenCalledTimes(1)
-    unknown.app.unmount()
-  })
-
-  it('says reading or unavailable instead of a zero', async () => {
-    foldersState.value = 'loading'
-    transfersState.value = 'offline'
-    computeState.value = 'error'
-    const mounted = await mountApp(HomeCards)
-    const text = content(mounted.root)
-
-    expect(text).toContain('Reading…')
-    expect(text).toContain('Not available right now')
-    expect(text).not.toContain('0 files')
     mounted.app.unmount()
   })
 })

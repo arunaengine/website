@@ -30,6 +30,7 @@ const scope = ref<'personal' | 'realm'>('personal')
 const desktopMode = ref(false)
 const HomeCardsStub = defineComponent(() => () => h('div', 'desktop-home-cards'))
 const WebStartStub = defineComponent(() => () => h('div', 'web-first-steps'))
+const DeviceRowStub = defineComponent({ props: { name: String }, setup: (props) => () => h('div', `device row ${props.name}`) })
 const setScope = vi.fn(async () => undefined)
 const refresh = vi.fn(async () => undefined)
 let servedEpoch = -1
@@ -68,7 +69,10 @@ const NodeCardsStub = defineComponent({
 const importsTotal = ref({ running: 0, atLeast: false })
 const loadImports = vi.fn(async () => undefined)
 const importsStub = { useNodeImports: () => ({ imports: ref(new Map()), total: importsTotal, load: loadImports }) }
-const realmNodesStub = { useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'own-device' }) }
+const realmNodesStub = {
+  useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'own-device' }),
+  computerName: (node?: { info?: { labels?: Record<string, string> } }) => node?.info?.labels?.device || 'This computer',
+}
 const databasesStub = { useDatabases: () => ({ rows: databaseRows, state: databaseState, complete: ref(true), ensure: () => {} }) }
 const GroupQuotaCardsStub = defineComponent({
   props: { refreshRevision: Number },
@@ -228,6 +232,7 @@ beforeAll(async () => {
     '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
     '@/components/ui/EmptyState.vue': moduleDefault(EmptyStub),
     '@/components/desktop/HomeCards.vue': moduleDefault(HomeCardsStub),
+    '@/components/desktop/DeviceRow.vue': moduleDefault(DeviceRowStub),
     '@/lib/chunk-recovery': { asyncChunkError: vi.fn() },
     '@/lib/desktop': { isDesktop: () => desktopMode.value },
   })
@@ -466,12 +471,29 @@ describe('desktop home', () => {
     mounted.app.unmount()
   })
 
+  it('ends the Overview with this computer, named as the realm knows it', async () => {
+    currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
+    desktopMode.value = true
+    nodeInfo.value = { node: { peer_id: 'own-device' } }
+    realmInfo.value = {
+      metadata_replication: { default_replication_factor: 3 },
+      nodes: [{ node_id: 'own-device', kind: 'user', info: { labels: { device: 'Microbiology laptop' } } }],
+    }
+    const mounted = await mountApp(DashboardClient)
+    await flush()
+
+    expect(content(mounted.root)).toContain('device row Microbiology laptop')
+    expect(content(mounted.root).indexOf('device row')).toBeGreaterThan(content(mounted.root).indexOf('Realm'))
+    mounted.app.unmount()
+  })
+
   it('keeps the web dashboard without them', async () => {
     currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
     const mounted = await mountApp(DashboardClient)
     await flush()
 
     expect(content(mounted.root)).not.toContain('desktop-home-cards')
+    expect(content(mounted.root)).not.toContain('device row')
     expect(content(mounted.root)).toContain('Live data from the local Aruna API.')
     mounted.app.unmount()
   })

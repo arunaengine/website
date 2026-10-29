@@ -11,7 +11,7 @@ vi.mock('@/lib/desktop', () => ({ isDesktop: () => desktop.on }))
 vi.mock('./useAruna', () => ({ useAruna: () => ({ nodeInfo, realmInfo }) }))
 vi.mock('./useDeviceStatus', () => ({ useDeviceStatus: () => ({ identity }) }))
 
-const { useRealmNodes } = await import('./useRealmNodes')
+const { computerName, useRealmNodes } = await import('./useRealmNodes')
 
 function node(id: string, kind: RealmNodeInfo['kind'], labels: Record<string, string> = {}, location?: string): RealmNodeInfo {
   return {
@@ -88,5 +88,16 @@ describe('places to pick', () => {
       ['device0001aaaa', 'This computer'],
     ])
     expect(isTarget('device0002bbbb')).toBe(false)
+  })
+})
+
+describe('computerName', () => {
+  const device = (labels: Record<string, string>) => ({ info: { labels } }) as unknown as RealmNodeInfo
+
+  it('uses the name the realm knows this computer by, else "This computer", never its id', () => {
+    expect(computerName(device({ device: 'Microbiology laptop' }))).toBe('Microbiology laptop')
+    expect(computerName(device({ name: 'Lab PC', device: 'old' }))).toBe('Lab PC')
+    expect(computerName(device({}))).toBe('This computer')
+    expect(computerName(undefined)).toBe('This computer')
   })
 })

@@ -19,7 +19,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useDatabases } from '@/composables/useDatabases'
 import { useNodeImports } from '@/composables/useNodeImports'
-import { useRealmNodes } from '@/composables/useRealmNodes'
+import { computerName, useRealmNodes } from '@/composables/useRealmNodes'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useNotifications } from '@/composables/useNotifications'
 import { useRefresh } from '@/composables/useRefresh'
@@ -31,9 +31,13 @@ import { formatCount } from '@/lib/formatCount'
 import { formatBytes } from '@/lib/utils'
 import { countText, useRealmBucketCount } from '@/composables/useBucketCount'
 
-// The desktop adds its own cards; the web build never loads them.
+// The desktop adds its own parts; the web build never loads them.
 const HomeCards = defineAsyncComponent({
   loader: () => import('@/components/desktop/HomeCards.vue'),
+  onError: asyncChunkError,
+})
+const DeviceRow = defineAsyncComponent({
+  loader: () => import('@/components/desktop/DeviceRow.vue'),
   onError: asyncChunkError,
 })
 const desktop = isDesktop()
@@ -146,16 +150,8 @@ const panelRealm = computed(() => realmView.value?.realm ?? realmInfo.value)
 const infraNodes = computed(() => (panelRealm.value?.nodes ?? []).filter((node) => node.kind !== 'user'))
 const deviceNodes = computed(() => (panelRealm.value?.nodes ?? []).filter((node) => node.kind === 'user'))
 
-// This computer by its own /system/info, the device node: the realm nodes it is connected to now.
-const computer = computed(() => {
-  const info = nodeInfo.value
-  if (!desktop || !info?.connections) return null
-  const id = info.node.peer_id
-  const labels = deviceNodes.value.find((node) => node.node_id === id)?.info?.labels ?? {}
-  const name = labels['name'] || labels['display_name'] || labels['device'] || 'This computer'
-  const peers = info.connections.filter((peer) => peer.status === 'connected').map((peer) => peer.peer_id)
-  return { id, name, peers }
-})
+// This computer by its own /system/info, the device node, named as the realm knows it.
+const deviceName = computed(() => computerName(deviceNodes.value.find((node) => node.node_id === nodeInfo.value?.node.peer_id)))
 
 const onlineNodes = computed(() => infraNodes.value.filter((node) => node.present).length)
 
@@ -307,6 +303,7 @@ const pageDescription = computed(() =>
         <div v-if="currentUser && infraNodes.length" class="border-t border-border px-5 py-4">
           <NodeCards :nodes="infraNodes" :devices="deviceNodes" :imports="nodeImports.imports.value" />
         </div>
+        <DeviceRow v-if="desktop && currentUser" :name="deviceName" />
       </section>
 
       <GroupQuotaCards v-if="currentUser && myGroups.length" :refresh-revision="cardsRevision" />
