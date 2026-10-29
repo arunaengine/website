@@ -50,7 +50,7 @@ beforeAll(async () => {
   vi.doMock('@/components/nodes/NodeDetailPanel.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/placement/LocationAggregates.vue', () => ({ default: AggregatesStub }))
   vi.doMock('@/components/dashboard/FederationPanel.vue', () => ({
-    default: defineComponent({ props: { nodes: Array, replicationFactor: Number }, setup: (props) => () => h('div', `node map ${props.nodes?.length} x${props.replicationFactor}`) }),
+    default: defineComponent({ props: { nodes: Array }, setup: (props) => () => h('div', `node map ${props.nodes?.length}`) }),
   }))
   StatusView = (await import('./StatusView.vue')).default
 })
@@ -81,7 +81,34 @@ describe('realm node map', () => {
     expect(await renderedText()).not.toContain('node map')
 
     currentUser.value = { id: 'u1' }
-    expect(await renderedText()).toContain('node map 1 x3')
+    expect(await renderedText()).toContain('node map 1')
+  })
+})
+
+describe('realm node cards', () => {
+  it('says each fact once: one state word, no kind badges, no connection pills, details on request', async () => {
+    currentUser.value = { id: 'u1' }
+    nodeInfo.value = { node: { peer_id: 'server-node', status: 'healthy' }, services: { interfaces: { rest: { status: 'ok' }, s3: { status: 'ok' }, grpc: { status: 'ok' } } } }
+    realmInfo.value = {
+      metadata_replication: { default_replication_factor: 2 },
+      nodes: [{
+        node_id: 'server-node',
+        kind: 'server',
+        configured: true,
+        present: true,
+        connection_status: 'connected',
+        placement: { location: 'eu-west', weight: 1, full: false, draining: false },
+        info: { executors: [], labels: { name: 'Giessen storage', 'aruna-engine.org/tier': 'hot' }, urls: {}, utilization: { storage_bytes_used: 2048, heartbeat_at_ms: 1 }, updated_at_ms: 1 },
+      }],
+    }
+
+    const text = await renderedText()
+
+    expect(text).toContain('Giessen storage this node eu-west online 2 KB stored Details')
+    expect(text).not.toMatch(/connected/i)
+    expect(text).not.toContain('SERVER')
+    // Labels wait behind Details.
+    expect(text).not.toContain('aruna-engine.org/tier')
   })
 })
 
@@ -174,7 +201,8 @@ describe('device summary', () => {
     expect(text).toContain('last seen 4m ago')
     expect(text).toContain('Devices do not announce themselves to the realm')
     expect(text).toContain('1 yours')
-    expect(text).toContain('server-node')
+    // The realm node is one card; devices are only counted.
+    expect(text).toContain('Realm nodes 1 Unnamed node eu-west online')
     expect(text).not.toContain('laptop-')
     expect(text).not.toContain('user-2')
     // Devices are owner-bound computers: they stay out of the placement buckets.

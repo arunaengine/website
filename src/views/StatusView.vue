@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import FederationPanel from '@/components/dashboard/FederationPanel.vue'
+import NodeCards from '@/components/dashboard/NodeCards.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -13,7 +14,7 @@ import LocalNodeDetails from '@/components/nodes/LocalNodeDetails.vue'
 import NodeDetailPanel from '@/components/nodes/NodeDetailPanel.vue'
 import LocationAggregates from '@/components/placement/LocationAggregates.vue'
 import SectionSkeleton from '@/components/ui/SectionSkeleton.vue'
-import { connectionLabel, connectionVariant, isDegradedStatus, kindLabel, kindVariant, statusVariant, type BadgeVariant } from '@/components/nodes/node-display'
+import { isDegradedStatus, statusVariant } from '@/components/nodes/node-display'
 import { nodeApiBase, probeNode, type NodeProbe } from '@/components/nodes/node-probe'
 import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
@@ -25,7 +26,7 @@ import type { RealmNodeInfo } from '@/lib/api'
 import type { RealmView } from '@/composables/aruna/realm'
 import { isDesktop } from '@/lib/desktop'
 import { computerName } from '@/composables/useRealmNodes'
-import { Boxes, ChevronRight, Globe2, HardDrive, Laptop, MapPin, MapPinned } from '@lucide/vue'
+import { Boxes, Globe2, HardDrive, Laptop, MapPinned } from '@lucide/vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 
@@ -133,40 +134,6 @@ function probeFor(node: RealmNodeInfo): NodeProbe | undefined {
   return probes.value[node.node_id]
 }
 
-function restBadge(node: RealmNodeInfo): { label: string; variant: BadgeVariant } | null {
-  const probe = probeFor(node)
-  if (probe?.state === 'unreachable') return { label: 'unreachable', variant: 'destructive' }
-  if (probe?.info) {
-    const status = probe.info.services.interfaces.rest.status
-    return { label: `rest ${status || 'unknown'}`, variant: statusVariant(status) }
-  }
-  if (!isLocal(node) && nodeApiBase(node)) return { label: 'checking…', variant: 'outline' }
-  return null
-}
-
-function usageSummary(node: RealmNodeInfo): string | null {
-  const usage = probeFor(node)?.usage
-  if (!usage) return null
-  return `${formatNumber(usage.objects)} obj · ${formatBytes(usage.stored_bytes ?? 0)}`
-}
-
-// Browser-measured /info round trip (min of a cold and a warm sample), for
-// every node including the local one.
-function latencyFor(node: RealmNodeInfo): number | null {
-  const probe = probes.value[node.node_id]
-  return probe?.state === 'ok' && probe.latencyMs !== undefined ? probe.latencyMs : null
-}
-// True while a probeable node's first latency sample has not landed yet (the
-// delayed initial round, or a fresh page load).
-function latencyPending(node: RealmNodeInfo): boolean {
-  return !probes.value[node.node_id] && Boolean(probeBase(node))
-}
-function latencyClass(ms: number): string {
-  if (ms < 150) return 'text-emerald-600 dark:text-emerald-400'
-  if (ms < 500) return 'text-amber-600 dark:text-amber-400'
-  return 'text-red-600 dark:text-red-400'
-}
-
 const kindOrder: Record<RealmNodeInfo['kind'], number> = { management: 0, server: 1, user: 2 }
 
 // Devices (kind 'user') run on their owner's computer, not on realm
@@ -259,6 +226,9 @@ const lastUpdatedLabel = computed(() =>
 function toggleNode(nodeId: string) {
   expandedId.value = expandedId.value === nodeId ? '' : nodeId
 }
+const expandedNode = computed(() => sortedNodes.value.find((node) => node.node_id === expandedId.value) ?? null)
+// The Status page reads no import jobs; the landing view shows them.
+const noImports = new Map()
 
 const targetNodeId = computed(() => (typeof route.query.node === 'string' ? route.query.node : ''))
 let highlightedTarget = ''
@@ -355,8 +325,6 @@ watch(
       <section v-if="currentUser" aria-label="Realm nodes">
         <FederationPanel
           :nodes="panelInfra"
-          :devices="panelDevices"
-          :replication-factor="realmInfo?.metadata_replication.default_replication_factor"
           :local-peer-id="(realmView?.info ?? nodeInfo)?.node.peer_id"
           :computer="computer"
         />
@@ -385,89 +353,24 @@ watch(
           </div>
           <Badge variant="outline" size="count">{{ sortedNodes.length }}</Badge>
         </header>
-        <ul class="divide-y divide-border">
-          <li v-for="node in sortedNodes" :id="`status-node-${node.node_id}`" :key="node.node_id">
-            <div
-              class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40"
-              :class="[
-                expandedId === node.node_id && 'bg-muted/30',
-                targetNodeId === node.node_id && 'ring-1 ring-inset ring-primary/40',
-              ]"
-            >
-              <button
-                type="button"
-                class="flex min-w-0 flex-1 items-center gap-3 text-left"
-                :aria-expanded="expandedId === node.node_id"
-                @click="toggleNode(node.node_id)"
-              >
-                <ChevronRight
-                  :class="['h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', expandedId === node.node_id && 'rotate-90']"
-                />
-                <Badge :variant="kindVariant[node.kind]" size="sm" class="w-24 justify-center uppercase">
-                  {{ kindLabel[node.kind] }}
-                </Badge>
-                <template v-if="node.placement">
-                  <span class="chip hidden shrink-0 sm:inline-flex" :title="`Location: ${node.placement.location}`">
-                    <MapPin class="h-3 w-3" />
-                    {{ node.placement.location }}
-                  </span>
-                  <Badge v-if="node.placement.full" variant="destructive" size="sm" class="hidden shrink-0 uppercase sm:inline-flex">
-                    full
-                  </Badge>
-                  <Badge v-if="node.placement.draining" variant="warn" size="sm" class="hidden shrink-0 uppercase sm:inline-flex">
-                    draining
-                  </Badge>
-                </template>
-                <NodeLabel :node-id="node.node_id" class="text-foreground/90" />
-                <span
-                  v-if="isLocal(node)"
-                  class="shrink-0 rounded-sm border border-aruna-aqua/30 bg-aruna-aqua/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-aruna-navy dark:text-aruna-aqua"
-                >
-                  This node
-                </span>
-              </button>
-              <CopyButton :value="node.node_id" label="Copy node id" />
-              <span
-                v-if="usageSummary(node)"
-                class="hidden shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground sm:inline"
-              >
-                {{ usageSummary(node) }}
-              </span>
-              <span
-                v-if="latencyFor(node) !== null"
-                class="shrink-0 font-mono text-[11px] tabular-nums"
-                :class="latencyClass(latencyFor(node)!)"
-                title="Best of two REST /info round trips measured from this browser"
-              >
-                {{ Math.round(latencyFor(node)!) }} ms
-              </span>
-              <span
-                v-else-if="latencyPending(node)"
-                class="shrink-0 font-mono text-[11px] text-muted-foreground"
-                title="The first latency sample is delayed until page load settles"
-              >
-                measuring…
-              </span>
-              <Badge
-                v-if="restBadge(node)"
-                :variant="restBadge(node)!.variant"
-                size="sm"
-                class="shrink-0 uppercase"
-              >
-                {{ restBadge(node)!.label }}
-              </Badge>
-              <Badge :variant="connectionVariant(node)" size="sm" class="shrink-0 uppercase">
-                {{ connectionLabel(node) }}
-              </Badge>
-            </div>
-            <div v-if="expandedId === node.node_id" class="border-t border-border bg-muted/10 px-5 py-4">
-              <NodeDetailPanel :node="node" :is-local="isLocal(node)" :probe="probeFor(node)" />
-            </div>
-          </li>
-          <li v-if="!sortedNodes.length && !deviceNodes.length" class="p-3">
-            <EmptyState compact title="No nodes reported for this realm yet." />
-          </li>
-        </ul>
+        <div v-if="sortedNodes.length" class="px-5 py-4">
+          <NodeCards
+            :nodes="sortedNodes"
+            :devices="[]"
+            :imports="noImports"
+            :local-node-id="localPeerId"
+            :open-id="expandedId"
+            details
+            @details="toggleNode"
+          />
+          <!-- One node's details at a time, below the cards: labels, latency and what it reports. -->
+          <div v-if="expandedNode" :id="`status-node-${expandedNode.node_id}`" class="mt-3 rounded-md border border-border bg-muted/10 px-4 py-4">
+            <NodeDetailPanel :node="expandedNode" :is-local="isLocal(expandedNode)" :probe="probeFor(expandedNode)" />
+          </div>
+        </div>
+        <div v-else-if="!deviceNodes.length" class="p-3">
+          <EmptyState compact title="No nodes reported for this realm yet." />
+        </div>
         <div v-if="deviceNodes.length" class="border-t border-border px-5 py-3">
           <div class="flex items-center gap-3 text-sm">
             <Laptop class="h-4 w-4 shrink-0 text-muted-foreground" />

@@ -21,8 +21,8 @@ const node = (overrides: Partial<RealmNodeInfo> & { labels?: Record<string, stri
   },
 })
 
-async function text(nodes: RealmNodeInfo[], imports = new Map<string, NodeImports>(), devices: RealmNodeInfo[] = []) {
-  const html = await renderToString(createSSRApp({ render: () => h(NodeCards, { nodes, devices, imports }) }))
+async function text(nodes: RealmNodeInfo[], imports = new Map<string, NodeImports>(), devices: RealmNodeInfo[] = [], extra: Record<string, unknown> = {}) {
+  const html = await renderToString(createSSRApp({ render: () => h(NodeCards, { nodes, devices, imports, ...extra }) }))
   return html.replace(/<!--[^>]*-->/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
@@ -60,5 +60,15 @@ describe('node cards', () => {
     expect(shown).toContain('Importing, 8 jobs')
     expect(shown.match(/Importing/g)).toHaveLength(1)
     expect(shown).toContain('2 devices, 1 active')
+  })
+
+  it('names the serving node, adds full or draining to the facts, and offers details on request', async () => {
+    const full = node({ placement: { location: 'default', weight: 1, full: true, draining: true } })
+    const other = node({ node_id: 'b', api: 'https://api.node-3.example.org' })
+    expect(await text([full, other])).not.toContain('Details')
+
+    const shown = await text([full, other], new Map(), [], { details: true, localNodeId: '12D3KooWHashHashHash', openId: 'b' })
+    expect(shown).toContain('node-2 this node online 2 KB stored, full, draining Details')
+    expect(shown).toContain('node-3 online 2 KB stored Hide details')
   })
 })

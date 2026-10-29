@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The realm nodes in calm cards: a readable name, its location, whether it is online and one line of
-// facts. Devices are summed up in one line, never listed.
+// facts. Devices are summed up in one line, never listed. The Status page adds a Details link.
 import { computed } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import { nodeApiBase } from '@/components/nodes/node-probe'
@@ -11,7 +11,17 @@ import { LOCATION_AFFINITY_KEY } from '@/lib/placement'
 import { formatBytes } from '@/lib/utils'
 import { Download } from '@lucide/vue'
 
-const props = defineProps<{ nodes: RealmNodeInfo[]; devices: RealmNodeInfo[]; imports: Map<string, NodeImports> }>()
+const props = defineProps<{
+  nodes: RealmNodeInfo[]
+  devices: RealmNodeInfo[]
+  imports: Map<string, NodeImports>
+  /** The node serving this portal, named as such. */
+  localNodeId?: string | null
+  /** Offers a Details link per card; `openId` is the card whose details show. */
+  details?: boolean
+  openId?: string
+}>()
+defineEmits<{ details: [nodeId: string] }>()
 
 /** The node's `name` label, else the first part of its API host ("api.node-2.example" is "node-2"). */
 function nodeName(node: RealmNodeInfo): string {
@@ -40,6 +50,8 @@ function facts(node: RealmNodeInfo): string {
   if (!utilization) return 'No report yet'
   const parts = [`${formatBytes(utilization.storage_bytes_used)} stored`]
   if (utilization.load_permille !== undefined) parts.push(`CPU ${Math.round(utilization.load_permille / 10)}%`)
+  if (node.placement?.full) parts.push('full')
+  if (node.placement?.draining) parts.push('draining')
   return parts.join(', ')
 }
 
@@ -64,6 +76,7 @@ const devicesLine = computed(() => {
         <div class="flex min-w-0 items-center gap-2">
           <span class="truncate text-sm font-medium text-foreground" :title="node.node_id">{{ nodeName(node) }}</span>
           <span v-if="node.kind !== 'server'" class="text-[11px] text-muted-foreground">{{ node.kind }}</span>
+          <span v-if="node.node_id === localNodeId" class="text-[11px] text-muted-foreground">this node</span>
           <Badge v-if="location(node)" variant="outline" size="sm">{{ location(node) }}</Badge>
           <span class="ml-auto shrink-0 text-[11px]" :class="node.present ? 'text-muted-foreground' : 'text-destructive'">
             {{ node.present ? 'online' : 'offline' }}
@@ -73,6 +86,15 @@ const devicesLine = computed(() => {
         <Badge v-if="importing(node)" variant="sky" size="sm" class="mt-1.5 gap-1">
           <Download class="h-3 w-3" /> {{ importing(node) }}
         </Badge>
+        <button
+          v-if="details"
+          type="button"
+          class="mt-1 block text-[11px] font-medium text-primary hover:underline"
+          :aria-expanded="openId === node.node_id"
+          @click="$emit('details', node.node_id)"
+        >
+          {{ openId === node.node_id ? 'Hide details' : 'Details' }}
+        </button>
       </li>
     </ul>
     <p v-if="devicesLine" class="text-xs text-muted-foreground">{{ devicesLine }}</p>

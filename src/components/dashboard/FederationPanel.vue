@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useNow } from '@vueuse/core'
-import { RouterLink, useRouter } from 'vue-router'
-import Badge from '@/components/ui/Badge.vue'
+import { useRouter } from 'vue-router'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import LabelChip from '@/components/ui/LabelChip.vue'
-import NodesHealth from '@/components/dashboard/NodesHealth.vue'
 import type { RealmNodeInfo } from '@/lib/api'
-import { connectionLabel, connectionVariant, kindLabel, kindVariant } from '@/components/nodes/node-display'
+import { connectionLabel, connectionVariant, kindLabel } from '@/components/nodes/node-display'
 import { THIS_COMPUTER, useRealmNodes } from '@/composables/useRealmNodes'
 import { isDesktop } from '@/lib/desktop'
 import { relativeTime, truncateMiddle } from '@/lib/utils'
@@ -15,9 +12,6 @@ import { Laptop } from '@lucide/vue'
 
 const props = defineProps<{
   nodes: RealmNodeInfo[]
-  /** Devices of the realm's users: summarized here, never drawn as nodes. */
-  devices?: RealmNodeInfo[]
-  replicationFactor?: number | null
   /** id of the node this portal is connected to */
   localPeerId?: string
   /** This computer in the desktop: its node id, name and the realm nodes it is connected to now. */
@@ -29,38 +23,6 @@ const router = useRouter()
 function openNode(id: string) {
   void router.push({ name: 'status', query: { node: id } })
 }
-
-const connectedCount = computed(() => props.nodes.filter((node) => node.connection_status === 'connected').length)
-// This computer counts as active by its own connections, as the graph shows it.
-const activeDevices = computed(
-  () =>
-    (props.devices ?? []).filter((device) =>
-      device.node_id === computer.value?.id ? computer.value.connected : device.connection_status === 'seen',
-    ).length,
-)
-const replicationLabel = computed(() => {
-  if (props.replicationFactor === null) return 'all eligible nodes'
-  return props.replicationFactor === undefined ? 'unknown' : `×${props.replicationFactor}`
-})
-
-const kindCounts = computed<Array<[RealmNodeInfo['kind'], number]>>(() => {
-  const counts = new Map<RealmNodeInfo['kind'], number>()
-  for (const node of props.nodes) counts.set(node.kind, (counts.get(node.kind) ?? 0) + 1)
-  return [...counts.entries()]
-})
-
-// Published labels flattened across nodes into `key=value → count`, most common
-// first. Only real, self-published labels, no fabricated per-node numbers.
-const labelCounts = computed<Array<[string, number]>>(() => {
-  const counts = new Map<string, number>()
-  for (const node of props.nodes) {
-    for (const [key, value] of Object.entries(node.info?.labels ?? {})) {
-      const chip = `${key}=${value}`
-      counts.set(chip, (counts.get(chip) ?? 0) + 1)
-    }
-  }
-  return [...counts.entries()].sort((a, b) => b[1] - a[1])
-})
 
 // Topology coordinate system: everything below lives in this viewBox.
 const VW = 600
@@ -255,15 +217,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
 
 <template>
   <section>
-    <div class="mb-3.5 flex flex-wrap items-center justify-between gap-2">
-      <h2 class="font-display text-[15px] font-semibold text-foreground/85">Realm nodes</h2>
-      <div class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-        <Badge variant="outline" class="tabular-nums">{{ nodes.length }} nodes</Badge>
-        <Badge variant="outline" class="tabular-nums">{{ connectedCount }} of {{ nodes.length }} present in DHT</Badge>
-        <Badge variant="outline">replication {{ replicationLabel }}</Badge>
-        <RouterLink to="/app/status" class="text-xs font-medium text-primary hover:underline">Node status</RouterLink>
-      </div>
-    </div>
+    <h2 class="mb-3.5 font-display text-[15px] font-semibold text-foreground/85">Node map</h2>
 
     <div class="surface overflow-hidden rounded-xl p-0">
       <EmptyState v-if="!nodes.length" class="m-5" title="This realm has no nodes yet." />
@@ -472,33 +426,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
             <template v-else>Edges show connections as seen by the node serving this portal, not full mesh topology.</template>
           </p>
         </div>
-
-        <!-- Real aggregates: kinds and self-published labels -->
-        <div class="flex flex-wrap items-center gap-2 border-b border-border/60 px-5 py-3">
-          <span class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Kinds</span>
-          <Badge v-for="[kind, count] in kindCounts" :key="kind" :variant="kindVariant[kind]" size="sm">
-            {{ kindLabel[kind] }} {{ count }}
-          </Badge>
-        </div>
-        <div class="flex flex-wrap items-center gap-2 border-b border-border/60 px-5 py-3">
-          <span class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Labels</span>
-          <template v-if="labelCounts.length">
-            <LabelChip v-for="[label, count] in labelCounts" :key="label" :value="label" :count="count" />
-          </template>
-          <span v-else class="text-[11px] text-muted-foreground">No nodes have published labels yet.</span>
-        </div>
-
-        <!-- Node health grid: only data the realm actually reports -->
-        <NodesHealth :nodes="nodes" :local-peer-id="desktop ? undefined : localPeerId" @select="openNode" />
       </template>
-
-      <div v-if="devices?.length" class="flex items-center gap-3 border-t border-border px-5 py-3 text-sm">
-        <Laptop class="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span class="font-medium text-foreground">Devices</span>
-        <span class="tabular-nums text-muted-foreground">
-          {{ devices.length }} enrolled, {{ activeDevices }} active
-        </span>
-      </div>
     </div>
   </section>
 </template>

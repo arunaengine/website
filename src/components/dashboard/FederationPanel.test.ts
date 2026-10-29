@@ -27,62 +27,9 @@ beforeAll(async () => {
   FederationPanel = (await import('./FederationPanel.vue')).default
 })
 
-async function renderReplication(replicationFactor?: number | null): Promise<string> {
-  const app = createSSRApp({
-    render: () => h(FederationPanel, { nodes: [], replicationFactor }),
-  })
-  const html = await renderToString(app)
-  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-}
-
 function realmNode(nodeId: string, kind: string): Record<string, unknown> {
   return { node_id: nodeId, kind, configured: true, present: true, connection_status: 'connected' }
 }
-
-function device(nodeId: string, status: string, lastSeenMs?: number): Record<string, unknown> {
-  return { node_id: nodeId, kind: 'user', configured: true, present: false, connection_status: status, last_seen_ms: lastSeenMs }
-}
-
-describe('devices in the realm', () => {
-  it('summarizes them instead of drawing them as nodes', async () => {
-    const app = createSSRApp({
-      render: () =>
-        h(FederationPanel, {
-          nodes: [realmNode('aaaa-server-1111', 'server')],
-          devices: [device('bbbb-device-2222', 'seen', 1_700_000_000_000)],
-        }),
-    })
-
-    const html = await renderToString(app)
-
-    expect(html).not.toContain('bbbb')
-    expect(html).toContain('1 enrolled, 1 active')
-  })
-
-  it('counts a device it has never heard from as inactive', async () => {
-    const app = createSSRApp({
-      render: () =>
-        h(FederationPanel, {
-          nodes: [realmNode('aaaa-server-1111', 'server')],
-          devices: [device('cccc-device-3333', 'unknown')],
-        }),
-    })
-
-    expect(await renderToString(app)).toContain('1 enrolled, 0 active')
-  })
-})
-
-describe('replication policy rendering', () => {
-  it('renders a null default as all eligible nodes', async () => {
-    const text = await renderReplication(null)
-    expect(text).toContain('replication all eligible nodes')
-    expect(text).not.toContain('replication ×1')
-  })
-
-  it('renders an absent default as unknown', async () => {
-    expect(await renderReplication()).toContain('replication unknown')
-  })
-})
 
 describe('topology', () => {
   const nodes = [realmNode('aaaa-mgmt-1111', 'management'), realmNode('bbbb-server-2222', 'server'), realmNode('cccc-server-3333', 'server')]
@@ -94,6 +41,14 @@ describe('topology', () => {
 
   it('draws a connected edge from the hub to every other node', async () => {
     expect((await render()).match(/class="fed-flow"/g)).toHaveLength(2)
+  })
+
+  it('shows only the map: no kind counts, label pills, node cards or counts the page states already', async () => {
+    const text = (await render()).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+    expect(text).toContain('Node map')
+    for (const gone of ['Kinds', 'Labels', 'present in DHT', 'replication', 'Node status', 'CONNECTED']) {
+      expect(text).not.toContain(gone)
+    }
   })
 
   it('names the realm node at the center in the desktop', async () => {
@@ -121,10 +76,9 @@ describe('topology', () => {
 
 describe('this computer', () => {
   const nodes = [realmNode('aaaa-mgmt-1111', 'management'), realmNode('bbbb-server-2222', 'server')]
-  const devices = [device('dddd-device-4444', 'seen')]
   const render = (computer: unknown) =>
     renderToString(
-      createSSRApp({ render: () => h(FederationPanel, { nodes, devices, localPeerId: 'aaaa-mgmt-1111', computer }) }),
+      createSSRApp({ render: () => h(FederationPanel, { nodes, localPeerId: 'aaaa-mgmt-1111', computer }) }),
     )
   const laptop = { id: 'dddd-device-4444', name: 'Test-laptop!' }
 
@@ -141,7 +95,6 @@ describe('this computer', () => {
     expect(html.match(/class="fed-flow"/g)).toHaveLength(1)
     expect(html).toContain('This computer shows its own.')
     expect(html).toContain('aria-label="Realm node topology. This computer, Test-laptop!, is connected."')
-    expect(html).toContain('1 enrolled, 1 active')
   })
 
   it('does not repeat "This computer" under a computer without its own name', async () => {
@@ -161,7 +114,6 @@ describe('this computer', () => {
     expect(html).toMatch(/>\s*This computer, not connected\s*<\/text>/)
     expect(html).toContain('This computer is not connected right now.')
     expect(html).toContain('aria-label="Realm node topology. This computer, Test-laptop!, is not connected."')
-    expect(html).toContain('1 enrolled, 0 active')
   })
 
   it('cuts a long name', async () => {
@@ -181,7 +133,6 @@ describe('this computer', () => {
 
     expect(html).not.toContain('Test-laptop!')
     expect(html).not.toMatch(/>\s*This computer/)
-    expect(html).toContain('1 enrolled, 1 active')
   })
 
   it('stays out of the browser', async () => {

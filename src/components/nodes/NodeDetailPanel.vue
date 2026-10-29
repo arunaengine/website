@@ -2,7 +2,7 @@
 import Badge from '@/components/ui/Badge.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import LocalNodeDetails from './LocalNodeDetails.vue'
-import { connectionLabel, connectionVariant, kindLabel, kindVariant, statusVariant } from './node-display'
+import { connectionLabel, kindLabel, statusVariant } from './node-display'
 import type { NodeProbe } from './node-probe'
 import type { RealmNodeInfo } from '@/lib/api'
 import { formatBytes, formatNumber } from '@/lib/utils'
@@ -20,11 +20,11 @@ defineProps<{
     <dl class="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
       <div>
         <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Kind</dt>
-        <dd class="mt-1"><Badge size="sm" :variant="kindVariant[node.kind]" class="uppercase">{{ kindLabel[node.kind] }}</Badge></dd>
+        <dd class="mt-1 text-xs text-foreground/90">{{ kindLabel[node.kind] }}</dd>
       </div>
       <div>
         <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Connection</dt>
-        <dd class="mt-1"><Badge size="sm" :variant="connectionVariant(node)" class="uppercase">{{ connectionLabel(node) }}</Badge></dd>
+        <dd class="mt-1 text-xs text-foreground/90">{{ connectionLabel(node) }}</dd>
       </div>
       <div>
         <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Configured</dt>
@@ -33,6 +33,10 @@ defineProps<{
       <div>
         <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Present</dt>
         <dd class="mt-1 text-xs text-foreground/90">{{ node.present ? 'yes' : 'no' }}</dd>
+      </div>
+      <div v-if="probe?.latencyMs !== undefined" title="Best of two REST /info round trips measured from this browser">
+        <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Latency</dt>
+        <dd class="mt-1 font-mono text-xs tabular-nums text-foreground/90">{{ Math.round(probe.latencyMs) }} ms</dd>
       </div>
     </dl>
 
@@ -57,6 +61,13 @@ defineProps<{
         </div>
       </dl>
       <p v-else class="mt-1 text-xs text-muted-foreground">Not in the realm's record placement map.</p>
+    </div>
+
+    <div v-if="Object.keys(node.info?.labels ?? {}).length" class="border-t border-border/70 pt-3">
+      <h2 class="font-display text-sm font-semibold text-aruna-navy">Labels</h2>
+      <ul class="mt-1.5 space-y-0.5 font-mono text-[11px] text-foreground/90">
+        <li v-for="(value, key) in node.info?.labels" :key="key" class="break-all">{{ key }}={{ value }}</li>
+      </ul>
     </div>
 
     <div>
