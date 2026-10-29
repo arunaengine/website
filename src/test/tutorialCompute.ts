@@ -236,6 +236,8 @@ const TesDataRefDialog = compileClientComponent(url('components/compute/TesDataR
   '@/components/data/add/DatabasesTab.vue': moduleDefault(GenericStub),
   '@/components/data/BucketSearchBox.vue': moduleDefault(GenericStub),
   '@/components/compute/RemoteObjectPicker.vue': moduleDefault(GenericStub),
+  '@/components/ui/NodeLabel.vue': moduleDefault(GenericStub),
+  '@/composables/useBucketCount': { listBuckets: async () => ({ hits: [], complete: true }) },
   '@/composables/useS3': S3,
   '@/composables/useAruna': arunaModule,
   '@/composables/useGroupSelection': { activeGroupId: ref('') },
