@@ -5,6 +5,7 @@ import { computed, ref, watch } from 'vue'
 import IdentifierLinksEditor from '@/components/settings/IdentifierLinksEditor.vue'
 import BucketReleases from '@/components/storage/BucketReleases.vue'
 import Badge from '@/components/ui/Badge.vue'
+import ExternalLink from '@/components/ui/ExternalLink.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -13,7 +14,7 @@ import Switch from '@/components/ui/Switch.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDatabases } from '@/composables/useDatabases'
 import { apiErrorMessage, type BucketMetadata, type IdentifierParser } from '@/lib/api'
-import { pageText, withPage } from '@/lib/databases'
+import { pageIdentifier, pageText, withPage } from '@/lib/databases'
 
 const props = defineProps<{ bucket: string; nodeId: string | null; canAdmin: boolean }>()
 
@@ -65,6 +66,8 @@ watch(() => [props.bucket, props.nodeId], () => {
 watch(() => sessionEpoch.value, () => void load())
 
 const current = computed(() => stored.value ?? EMPTY)
+// The saved DOI as a doi.org link, or the saved link itself.
+const pageLink = computed(() => pageIdentifier(pageText(current.value.identifiers)))
 const changed = computed(() => {
   const value = current.value
   return draft.value.database !== value.database
@@ -139,7 +142,11 @@ function keepRules(parser: IdentifierParser | null) {
         <dt class="text-muted-foreground">Title</dt><dd>{{ current.title || 'None' }}</dd>
         <dt class="text-muted-foreground">Version</dt><dd>{{ current.version || 'None' }}</dd>
         <dt class="text-muted-foreground">License</dt><dd>{{ current.license || 'None' }}</dd>
-        <dt class="text-muted-foreground">DOI or link</dt><dd class="font-mono text-xs">{{ pageText(current.identifiers) || 'None' }}</dd>
+        <dt class="text-muted-foreground">DOI or link</dt>
+        <dd class="font-mono text-xs">
+          <ExternalLink v-if="pageLink" :href="pageLink.url" :label="pageLink.value" />
+          <template v-else>{{ pageText(current.identifiers) || 'None' }}</template>
+        </dd>
       </dl>
       <div v-else class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[7rem_1fr_7rem_1fr] sm:items-center">
         <label for="bucket-title" class="text-muted-foreground">Title</label>
@@ -149,7 +156,10 @@ function keepRules(parser: IdentifierParser | null) {
         <label for="bucket-license" class="text-muted-foreground">License</label>
         <Input id="bucket-license" v-model="draft.license" placeholder="CC-BY-4.0 or a link" />
         <label for="bucket-page" class="text-muted-foreground">DOI or link</label>
-        <Input id="bucket-page" v-model="draft.page" class="font-mono text-xs" placeholder="10.5281/zenodo.4247252" />
+        <div class="flex min-w-0 items-center gap-2">
+          <Input id="bucket-page" v-model="draft.page" class="min-w-0 flex-1 font-mono text-xs" placeholder="10.5281/zenodo.4247252" />
+          <ExternalLink v-if="pageLink" :href="pageLink.url" label="Open" class="shrink-0 text-xs" :aria-label="`Open ${pageLink.value} in a new tab`" />
+        </div>
       </div>
       <div class="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-sm">
         <span>
