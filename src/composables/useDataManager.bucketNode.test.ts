@@ -124,4 +124,40 @@ describe('bucket address without a node', () => {
     expect(router.currentRoute.value.query).toEqual({ group: 'g-a', prefix: 'runs/', node: 'n-2' })
     await flush()
   })
+
+  it('drops a lookup of another group once a bucket of the new group opened', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/buckets', name: 'buckets', component: View },
+        { path: '/buckets/:bucketId', name: 'bucket', component: View },
+      ],
+    })
+    // Only the group-A lookup of the missing bucket waits; the bucket list answers at once.
+    let answerA: ((value: unknown) => void) | null = null
+    const answer = searchBuckets.getMockImplementation()!
+    searchBuckets.mockImplementation((query: string, options?: unknown) =>
+      query === 'laptop' && (options as { groupId?: string }).groupId === 'g-a' && !answerA
+        ? (new Promise((resolve) => (answerA = resolve)) as never)
+        : answer(query, options))
+    await router.push({ name: 'bucket', params: { bucketId: 'laptop' }, query: { group: 'g-a' } })
+    const host = defineComponent({
+      setup: () => {
+        useDataManager()
+        return () => null
+      },
+    })
+    await mountApp(host, { router })
+    for (let round = 0; round < 8; round++) await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(searchBuckets).toHaveBeenLastCalledWith('laptop', { limit: 50, groupId: 'g-a' })
+
+    await router.push({ name: 'bucket', params: { bucketId: 'laptop' }, query: { group: 'g-b' } })
+    for (let round = 0; round < 8; round++) await new Promise((resolve) => setTimeout(resolve, 0))
+    answerA!({ hits: [{ bucket: 'laptop', node_id: 'n-2', group_id: 'g-a' }], nodes_queried: 2, nodes_failed: 0, failed_nodes: [] })
+    for (let round = 0; round < 8; round++) await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(router.currentRoute.value.query).toEqual({ group: 'g-b' })
+    searchBuckets.mockImplementation(answer)
+  })
 })
+

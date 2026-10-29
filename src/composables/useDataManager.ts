@@ -828,7 +828,7 @@ export function useDataManager() {
           listError.value = s3ErrorMessage(err)
           listAuthError.value = isS3AuthError(err)
           if (isS3BucketMissingError(err)) shortcuts.remove(targetBucket, targetNode)
-          if (isS3BucketMissingError(err) && !targetNode && !routeString(route.query.node)) void findBucketNode(targetBucket)
+          if (isS3BucketMissingError(err) && !targetNode && !routeString(route.query.node)) void findBucketNode(targetBucket, requestId)
         }
       }
     } finally {
@@ -840,16 +840,23 @@ export function useDataManager() {
   }
 
   // An address without a node names a bucket this node lacks: the group's node holding it opens.
-  async function findBucketNode(name: string) {
+  async function findBucketNode(name: string, listing: number) {
     const groupId = selectedGroupId.value
     const epoch = sessionEpoch.value
+    // Bound to the listing that missed the bucket: another bucket, group or session drops it.
+    const current = () =>
+      epoch === sessionEpoch.value && listing === listRequestId && name === bucket.value
+      && groupId === selectedGroupId.value && !routeString(route.query.node)
     const found = await searchBuckets(name, { limit: 50, groupId: groupId || undefined }).catch(() => null)
-    if (epoch !== sessionEpoch.value || name !== bucket.value || routeString(route.query.node)) return
+    if (!current()) return
     const hits = (found?.hits ?? []).filter((hit) => hit.bucket === name && (!groupId || hit.group_id === groupId))
     const holder = hits.some((hit) => realmNodes.isLocalNode(hit.node_id)) ? null : hits[0]
     if (!holder) return
-    const query = { ...route.query, node: holder.node_id, ...(groupId ? {} : { group: holder.group_id }) }
-    void navigate(() => router.replace({ name: 'bucket', params: { bucketId: name }, query }))
+    void navigate(() => {
+      if (!current()) return
+      const query = { ...route.query, node: holder.node_id, ...(groupId ? {} : { group: holder.group_id }) }
+      return router.replace({ name: 'bucket', params: { bucketId: name }, query })
+    })
   }
 
   function turnPage(moved: boolean) {
