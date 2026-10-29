@@ -19,46 +19,72 @@ export interface FileOrigin {
 const MAX_FILES = 50
 const origins = ref(new Map<string, OriginResponse | null>())
 const runs = ref(new Map<string, { name: string; taskId: string | null } | null>())
+// Reads under way, shared by every page that lists the same version.
+const inFlight = new Map<string, Promise<void>>()
 let epochSeen: number | null = null
 
-type Listed = { key: string; etag?: string }
+type Listed = { key: string; etag?: string; lastModified?: Date }
 
 export function useFolderOrigin(bucket: Ref<string>, nodeId: Ref<string | null>, files: Ref<Listed[]>) {
   const { getFileOrigin, getRun, sessionEpoch } = useAruna()
   const { getTask } = useTes()
-  const cacheKey = (file: Listed) => `${nodeId.value ?? ''}/${bucket.value}/${file.key}/${file.etag ?? ''}`
+  // The same bytes uploaded again keep the ETag, so the time tells the versions apart.
+  const cacheKey = (file: Listed) =>
+    `${nodeId.value ?? ''}/${bucket.value}/${file.key}/${file.etag ?? ''}/${file.lastModified?.getTime() ?? ''}`
 
-  async function readRun(runId: string) {
+  // A run's name belongs to the account that read it: a later session drops the answer.
+  async function readRun(runId: string, epoch: number) {
     if (runs.value.has(runId)) return
     runs.value = new Map(runs.value).set(runId, null)
     const run = await getRun(runId).catch(() => null)
+    if (epoch !== sessionEpoch.value) return
     const taskId = run?.logical_job_id ?? null
     const task = taskId ? await getTask(taskId, 'BASIC').catch(() => null) : null
+    if (epoch !== sessionEpoch.value) return
     runs.value = new Map(runs.value).set(runId, { name: task?.name || 'a run', taskId })
   }
 
-  let round = 0
   watch(
     [bucket, nodeId, files, sessionEpoch],
-    async () => {
-      const mine = ++round
-      if (epochSeen !== sessionEpoch.value) {
-        epochSeen = sessionEpoch.value
+    async (_value, _old, onCleanup) => {
+      const epoch = sessionEpoch.value
+      if (epochSeen !== epoch) {
+        epochSeen = epoch
         origins.value = new Map()
         runs.value = new Map()
+        inFlight.clear()
       }
-      const missing = files.value.length <= MAX_FILES ? files.value.filter((file) => !origins.value.has(cacheKey(file))) : []
+      // A new listing, a refresh or leaving the view stops this walk and its requests.
+      const controller = new AbortController()
+      const started = new Map<string, Promise<void>>()
+      onCleanup(() => {
+        controller.abort()
+        for (const [key, flight] of started) if (inFlight.get(key) === flight) inFlight.delete(key)
+      })
       const asked = { bucket: bucket.value, nodeId: nodeId.value }
-      for (let start = 0; start < missing.length; start += 4) {
-        const batch = missing.slice(start, start + 4)
-        const answers = await Promise.all(
-          batch.map((file) => getFileOrigin(asked.bucket, { key: file.key }, undefined, asked.nodeId).catch(() => null)),
-        )
-        if (mine !== round) return
-        const next = new Map(origins.value)
-        batch.forEach((file, index) => next.set(cacheKey(file), answers[index]))
-        origins.value = next
-        for (const answer of answers) if (answer?.origin?.kind === 'job') void readRun(answer.origin.run_id)
+      const keyed = files.value.length <= MAX_FILES ? files.value.map((file) => ({ file, key: cacheKey(file) })) : []
+      const read = ({ file, key }: (typeof keyed)[number]) => {
+        if (origins.value.has(key)) return Promise.resolve()
+        let flight = inFlight.get(key)
+        if (!flight) {
+          flight = getFileOrigin(asked.bucket, { key: file.key }, controller.signal, asked.nodeId)
+            .catch(() => null)
+            .then((answer) => {
+              if (controller.signal.aborted || epoch !== sessionEpoch.value) return
+              origins.value = new Map(origins.value).set(key, answer)
+              if (answer?.origin?.kind === 'job') void readRun(answer.origin.run_id, epoch)
+            })
+            .finally(() => {
+              if (inFlight.get(key) === flight) inFlight.delete(key)
+            })
+          inFlight.set(key, flight)
+          started.set(key, flight)
+        }
+        return flight
+      }
+      for (let start = 0; start < keyed.length; start += 4) {
+        await Promise.all(keyed.slice(start, start + 4).map(read))
+        if (controller.signal.aborted) return
       }
     },
     { immediate: true },
