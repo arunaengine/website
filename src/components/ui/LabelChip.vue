@@ -24,7 +24,7 @@ async function copy() {
   <Tooltip :label="full">
     <button type="button" :class="classes" :aria-label="`Copy ${value}`" :title="full" @click="copy">
       <span class="truncate" aria-live="polite">{{ copied ? 'Copied' : value }}</span>
-      <span v-if="count !== undefined" class="shrink-0">{{ count }}</span>
+      <span v-if="count !== undefined" class="shrink-0">({{ count }})</span>
     </button>
   </Tooltip>
 </template>

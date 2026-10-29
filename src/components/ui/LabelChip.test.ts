@@ -40,7 +40,7 @@ describe('label chip', () => {
     const root = await render({ value: VALUE, count: 3 })
 
     expect(content(chip(root))).toContain(VALUE)
-    expect(content(chip(root))).toContain(`${VALUE}3`)
+    expect(content(chip(root))).toContain(`${VALUE}(3)`)
   })
 
   it('truncates the value but keeps it readable on hover', async () => {
@@ -59,7 +59,7 @@ describe('label chip', () => {
     const root = await render({ value: VALUE, count: 3 })
     const count = element(root, (node) => String(node.props.class ?? '').includes('shrink-0'))
 
-    expect(content(count).trim()).toBe('3')
+    expect(content(count).trim()).toBe('(3)')
   })
 
   describe('copying', () => {
