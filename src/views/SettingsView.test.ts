@@ -157,16 +157,6 @@ describe('SettingsView responsive geometry', () => {
     expect(source).toContain('Watched resources')
   })
 
-  it('places the credentials table inside a horizontal overflow boundary', () => {
-    const tablePath = findElementPath(root, (node) => node.tag === 'table')
-    expect(tablePath).toBeDefined()
-    const tableParent = tablePath?.at(-2)
-    const credentialsSection = tablePath?.find((node) => node.tag === 'section')
-
-    expect(tableParent?.tag).toBe('div')
-    expect(classTokens(tableParent!)).toEqual(expect.arrayContaining(['min-w-0', 'overflow-x-auto']))
-    expect(classTokens(credentialsSection!)).toContain('overflow-hidden')
-  })
 })
 
 const isAuthenticated = ref(true)
@@ -277,7 +267,10 @@ const SettingsView = compileClientComponent(new URL('./SettingsView.vue', import
   '@/components/data/CreateCredentialDialog.vue': moduleDefault(Empty),
   '@/components/onboarding/DevicesPanel.vue': moduleDefault(labelled('Devices panel')),
   '@/components/settings/SessionsPanel.vue': moduleDefault(labelled('Sessions panel')),
-  '@/components/settings/S3SessionsPanel.vue': moduleDefault(Empty),
+  '@/components/settings/S3SessionsPanel.vue': moduleDefault(defineComponent({
+    props: { keys: Boolean },
+    setup: (props) => () => h('div', props.keys ? 'S3 access keys' : 'S3 sessions only'),
+  })),
   '@/components/settings/FeatureSettings.vue': moduleDefault(Empty),
   '@/components/settings/AssistantProviders.vue': moduleDefault(Empty),
   '@/components/settings/VaultSettings.vue': moduleDefault(Empty),

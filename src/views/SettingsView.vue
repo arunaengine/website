@@ -8,7 +8,6 @@ import Avatar from '@/components/ui/Avatar.vue'
 import AccessBadge from '@/components/ui/AccessBadge.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
-import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import DevicesPanel from '@/components/onboarding/DevicesPanel.vue'
 import SessionsPanel from '@/components/settings/SessionsPanel.vue'
 import S3SessionsPanel from '@/components/settings/S3SessionsPanel.vue'
@@ -36,9 +35,9 @@ import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { RouterLink, useRouter } from 'vue-router'
 import { apiOrigin } from '@/lib/api'
 import { isDesktop } from '@/lib/desktop'
-import { errorMessage, relativeTime } from '@/lib/utils'
+import { errorMessage } from '@/lib/utils'
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
-import { ChevronRight, ExternalLink, Eye, KeyRound, Palette, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, Plus, Save } from '@lucide/vue'
+import { ChevronRight, ExternalLink, Eye, Palette, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, Plus, Save } from '@lucide/vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { SETTINGS_TAB_ANCHORS } from '@/components/layout/nav'
 import { asyncChunkError } from '@/lib/chunk-recovery'
@@ -59,7 +58,6 @@ const {
   myGroups,
   discoverableGroups,
   profiles,
-  credentials,
   authError,
   bootstrapped,
   loading,
@@ -69,7 +67,6 @@ const {
   setAuthToken,
   setApiBaseUrl,
   updateUserProfile,
-  revokeS3Credential,
 } = useAruna()
 const { signIn, isAuthenticated, authPending, stage, stageError } = useAuth()
 // Account-dependent panels paint together with the shared session bootstrap;
@@ -236,39 +233,6 @@ const { mode: appearance, setTheme } = useTheme()
 const router = useRouter()
 
 const createGroupOpen = ref(false)
-const createCredentialOpen = ref(false)
-const revokeError = ref<string | null>(null)
-
-// Revoked/expired credentials linger server-side (soft revoke, no purge
-// endpoint); keep the default view clean and reveal them on demand.
-const showInactiveCredentials = ref(false)
-const inactiveCredentials = computed(() => credentials.value.filter((credential) => credential.status !== 'active'))
-const visibleCredentials = computed(() =>
-  showInactiveCredentials.value ? credentials.value : credentials.value.filter((credential) => credential.status === 'active'),
-)
-
-const groupNames = computed(() => {
-  const names = new Map<string, string>()
-  for (const group of [...myGroups.value, ...discoverableGroups.value]) names.set(group.id, group.name)
-  return names
-})
-
-function groupLabel(groupId: string) {
-  return groupNames.value.get(groupId) ?? groupId.slice(0, 8)
-}
-
-function isExpired(iso: string): boolean {
-  return new Date(iso).getTime() <= Date.now()
-}
-
-async function revoke(accessKeyId: string) {
-  revokeError.value = null
-  try {
-    await revokeS3Credential(accessKeyId)
-  } catch (err) {
-    revokeError.value = errorMessage(err)
-  }
-}
 </script>
 
 <template>
@@ -384,49 +348,8 @@ async function revoke(accessKeyId: string) {
 
         <SessionsPanel />
 
-        <!-- The desktop lists every key above, with the place it works. -->
-        <section v-if="shown('s3-keys') && !desktop" class="surface overflow-hidden">
-          <header class="flex items-center justify-between border-b border-border px-5 py-4">
-            <div class="flex items-center gap-2">
-              <KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">S3 access keys</h3><Badge size="sm" variant="secondary" class="uppercase">Advanced</Badge><Badge variant="outline" size="count">{{ visibleCredentials.length }}</Badge>
-              <button
-                v-if="inactiveCredentials.length"
-                type="button"
-                class="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
-                @click="showInactiveCredentials = !showInactiveCredentials"
-              >
-                {{ showInactiveCredentials ? 'Hide inactive' : `Show inactive (${inactiveCredentials.length})` }}
-              </button>
-            </div>
-            <Button size="sm" :disabled="!currentUser" @click="createCredentialOpen = true"><Plus class="h-4 w-4" /> Create key</Button>
-          </header>
-          <p class="border-b border-border px-5 py-3 text-xs leading-relaxed text-muted-foreground">
-            Long-lived S3 access keys for command-line tools and services against this node. They also authenticate the GA4GH TES
-            facade over HTTP Basic. They never authenticate the REST API, which takes bearer tokens managed as sessions above.
-            A key's secret is shown once and is never stored or activated by the portal; portal storage uses temporary in-memory sessions.
-          </p>
-          <div class="min-w-0 overflow-x-auto">
-            <table class="min-w-max w-full text-sm">
-              <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground"><tr><th class="px-5 py-2 text-left font-semibold">Access key</th><th class="px-5 py-2 text-left font-semibold">Group</th><th class="px-5 py-2 text-left font-semibold">Status</th><th class="px-5 py-2 text-left font-semibold">Expires</th><th class="px-5 py-2"></th></tr></thead>
-              <tbody>
-                <tr v-for="credential in visibleCredentials" :key="credential.access_key_id" class="border-t border-border"><td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ credential.access_key_id }}</td><td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="credential.group_id">{{ groupLabel(credential.group_id) }}</td><td class="px-5 py-2.5"><Badge size="sm" :variant="credential.status === 'active' ? 'accent' : credential.status === 'revoked' ? 'destructive' : 'secondary'" class="uppercase">{{ credential.status }}</Badge></td><td class="px-5 py-2.5 text-[11px]" :class="isExpired(credential.expires_at) ? 'text-destructive' : 'text-muted-foreground'" :title="new Date(credential.expires_at).toLocaleString()">{{ isExpired(credential.expires_at) ? `expired ${relativeTime(credential.expires_at)}` : relativeTime(credential.expires_at) }}</td><td class="px-5 py-2.5 text-right"><Button v-if="credential.status === 'active'" variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="saving" @click="revoke(credential.access_key_id)">Revoke</Button></td></tr>
-                <tr v-if="!visibleCredentials.length">
-                  <td colspan="5" class="px-5 py-6 text-center text-xs text-muted-foreground">
-                    <template v-if="inactiveCredentials.length">
-                      No active S3 access keys.
-                      <button type="button" class="text-primary hover:underline" @click="showInactiveCredentials = true">Show inactive ({{ inactiveCredentials.length }})</button>
-                    </template>
-                    <template v-else>No S3 access keys for the authenticated user.</template>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p v-if="revokeError" class="border-t border-border px-5 py-2 text-xs text-destructive">{{ revokeError }}</p>
-          <CreateCredentialDialog v-model:open="createCredentialOpen" />
-        </section>
-
-        <S3SessionsPanel />
+        <!-- The desktop lists every long-lived key above, with the place it works. -->
+        <S3SessionsPanel :keys="shown('s3-keys') && !desktop" />
       </TabsContent>
 
       <TabsContent value="devices" class="container mt-0 min-w-0 space-y-5 py-6">

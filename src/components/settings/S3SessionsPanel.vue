@@ -1,10 +1,12 @@
 <script setup lang="ts">
-// The temporary S3 sessions this account holds on the connected node. Nodes
-// that do not serve the list yet answer 404/405, and the panel stays hidden.
+// Every S3 access key of this account in one table: the long-lived keys and the temporary S3
+// sessions on the connected node. A node that does not list sessions yet (404/405) shows keys only.
 import { computed, ref, watch } from 'vue'
+import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
+import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import {
   apiErrorMessage,
@@ -13,14 +15,19 @@ import {
   type S3SessionSummary,
 } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
+import { KeyRound, Plus } from '@lucide/vue'
 
-const { apiBaseUrl, authToken, currentUser, myGroups, discoverableGroups } = useAruna()
+/** `keys`: also list and create the long-lived keys (the desktop lists them elsewhere). */
+const props = withDefaults(defineProps<{ keys?: boolean }>(), { keys: true })
+
+const { apiBaseUrl, authToken, currentUser, myGroups, discoverableGroups, credentials, revokeS3Credential } = useAruna()
 
 const sessions = ref<S3SessionSummary[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 const unsupported = ref(false)
 const busyIds = ref<string[]>([])
+const createOpen = ref(false)
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
@@ -52,39 +59,70 @@ const groupNames = computed(() => {
   for (const group of [...myGroups.value, ...discoverableGroups.value]) names.set(group.id, group.name)
   return names
 })
+const groupName = (id: string) => groupNames.value.get(id) ?? id.slice(0, 8)
 
-function groupLabel(session: S3SessionSummary): string {
-  const id = session.group_id ?? session.group?.id ?? ''
-  return session.group_name ?? session.group?.name ?? groupNames.value.get(id) ?? id.slice(0, 8)
+// Revoked and expired keys stay listed by the node; they show on request.
+const showInactive = ref(false)
+const keyList = computed(() => (props.keys ? credentials.value : []))
+const inactiveCount = computed(() => keyList.value.filter((key) => key.status !== 'active').length)
+const shownKeys = computed(() => (showInactive.value ? keyList.value : keyList.value.filter((key) => key.status === 'active')))
+
+interface KeyRow {
+  id: string
+  group: string
+  groupId: string
+  kind: 'Key' | 'Temporary'
+  expires: string | null
+  status: string
 }
+const rows = computed<KeyRow[]>(() => [
+  ...shownKeys.value.map((key) => ({ id: key.access_key_id, group: groupName(key.group_id), groupId: key.group_id, kind: 'Key' as const, expires: key.expires_at, status: key.status })),
+  ...sessions.value.map((session) => {
+    const id = session.group_id ?? session.group?.id ?? ''
+    const group = session.group_name ?? session.group?.name ?? groupName(id)
+    return { id: session.access_key_id, group, groupId: id, kind: 'Temporary' as const, expires: session.expires_at ?? null, status: 'active' }
+  }),
+])
 
-async function revoke(accessKeyId: string) {
-  busyIds.value = [...busyIds.value, accessKeyId]
+const expired = (iso: string | null) => Boolean(iso) && new Date(iso!).getTime() <= Date.now()
+
+async function revoke(row: KeyRow) {
+  busyIds.value = [...busyIds.value, row.id]
   error.value = null
   try {
-    await revokeS3Session(accessKeyId, client())
-    sessions.value = sessions.value.filter((entry) => entry.access_key_id !== accessKeyId)
+    if (row.kind === 'Key') await revokeS3Credential(row.id)
+    else {
+      await revokeS3Session(row.id, client())
+      sessions.value = sessions.value.filter((entry) => entry.access_key_id !== row.id)
+    }
   } catch (cause) {
     error.value = apiErrorMessage(cause)
   } finally {
-    busyIds.value = busyIds.value.filter((entry) => entry !== accessKeyId)
+    busyIds.value = busyIds.value.filter((entry) => entry !== row.id)
   }
 }
 </script>
 
 <template>
-  <section v-if="!unsupported" class="surface overflow-hidden">
+  <section v-if="keys || !unsupported" class="surface overflow-hidden">
     <header class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
       <div class="min-w-0">
-        <h3 class="font-display text-sm font-semibold text-aruna-navy">Temporary S3 sessions</h3>
-        <p class="text-xs text-muted-foreground">
-          The in-memory S3 sessions the portal and your other clients opened on this node. Revoking one stops that key immediately.
-        </p>
+        <h3 class="flex items-center gap-2 font-display text-sm font-semibold text-aruna-navy"><KeyRound class="h-4 w-4 text-primary" /> S3 access keys</h3>
+        <p class="text-xs text-muted-foreground">Keys for command-line tools. A secret is shown once.</p>
       </div>
-      <RefreshButton :busy="loading" sr-label="Refresh S3 sessions" @click="load" />
+      <div class="flex items-center gap-2">
+        <button
+          v-if="inactiveCount"
+          type="button"
+          class="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+          @click="showInactive = !showInactive"
+        >{{ showInactive ? 'Hide inactive' : `Show inactive (${inactiveCount})` }}</button>
+        <RefreshButton :busy="loading" sr-label="Refresh S3 access keys" @click="load" />
+        <Button v-if="keys" size="sm" :disabled="!currentUser" @click="createOpen = true"><Plus class="h-4 w-4" /> Create key</Button>
+      </div>
     </header>
 
-    <p v-if="!currentUser" class="px-5 py-6 text-xs text-muted-foreground">Sign in to see your S3 sessions.</p>
+    <p v-if="!currentUser" class="px-5 py-6 text-xs text-muted-foreground">Sign in to see your S3 access keys.</p>
     <template v-else>
       <RefusalNote v-if="error" :message="error" class="mx-5 mt-4" />
       <div class="min-w-0 overflow-x-auto">
@@ -93,35 +131,42 @@ async function revoke(accessKeyId: string) {
             <tr>
               <th class="px-5 py-2 text-left font-semibold">Access key</th>
               <th class="px-5 py-2 text-left font-semibold">Group</th>
+              <th class="px-5 py-2 text-left font-semibold">Kind</th>
               <th class="px-5 py-2 text-left font-semibold">Expires</th>
               <th class="px-5 py-2"></th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="session in sessions" :key="session.access_key_id" class="border-t border-border">
-              <td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ session.access_key_id }}</td>
-              <td class="px-5 py-2.5 text-[11px] text-muted-foreground">{{ groupLabel(session) }}</td>
+            <tr v-for="row in rows" :key="`${row.kind}/${row.id}`" class="border-t border-border">
+              <td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ row.id }}</td>
+              <td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="row.groupId">{{ row.group }}</td>
               <td class="px-5 py-2.5 text-[11px] text-muted-foreground">
-                {{ session.expires_at ? relativeTime(session.expires_at) : 'unknown' }}
+                {{ row.kind }}
+                <Badge v-if="row.status !== 'active'" size="sm" :variant="row.status === 'revoked' ? 'destructive' : 'secondary'" class="ml-1.5">{{ row.status }}</Badge>
+              </td>
+              <td class="px-5 py-2.5 text-[11px]" :class="expired(row.expires) ? 'text-destructive' : 'text-muted-foreground'">
+                {{ !row.expires ? 'unknown' : expired(row.expires) ? `expired ${relativeTime(row.expires)}` : relativeTime(row.expires) }}
               </td>
               <td class="px-5 py-2.5 text-right">
                 <Button
+                  v-if="row.status === 'active'"
                   variant="ghost"
                   size="sm"
                   class="text-destructive hover:text-destructive"
-                  :disabled="busyIds.includes(session.access_key_id)"
-                  @click="revoke(session.access_key_id)"
+                  :disabled="busyIds.includes(row.id)"
+                  @click="revoke(row)"
                 >Revoke</Button>
               </td>
             </tr>
-            <tr v-if="!sessions.length">
-              <td colspan="4" class="px-5 py-6 text-center text-xs text-muted-foreground">
-                {{ loading ? 'Loading S3 sessions…' : 'No temporary S3 sessions on this node.' }}
+            <tr v-if="!rows.length">
+              <td colspan="5" class="px-5 py-6 text-center text-xs text-muted-foreground">
+                {{ loading ? 'Loading S3 access keys…' : 'No keys yet' }}
               </td>
             </tr>
           </tbody>
         </table>
       </div>
     </template>
+    <CreateCredentialDialog v-if="keys" v-model:open="createOpen" />
   </section>
 </template>
