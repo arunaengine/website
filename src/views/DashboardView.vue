@@ -184,12 +184,13 @@ const onlineNodes = computed(() => infraNodes.value.filter((node) => node.presen
 
 // Imports explain a busy node; each node's heartbeat counts them in the realm snapshot. A node
 // without a heartbeat count adds nothing known, so the sum is then a lower bound.
-// Heartbeats carry the counts only after a rollout: until one does, the cell shows a dash.
+// Heartbeats carry the counts only after a rollout: "none" needs every node to report 0, a
+// node without a count leaves a dash.
 const activity = computed(() => {
   const counts = infraNodes.value.map((node) => node.info?.utilization?.imports_running)
   return {
     running: counts.reduce<number>((sum, count) => sum + (count ?? 0), 0),
-    reported: counts.some((count) => count !== undefined),
+    reported: counts.length > 0 && counts.every((count) => count !== undefined),
     atLeast: counts.some((count) => count === undefined),
     nodes: infraNodes.value.filter((node) => (node.info?.utilization?.imports_running ?? 0) > 0),
   }

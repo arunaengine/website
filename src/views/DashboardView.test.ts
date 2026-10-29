@@ -743,12 +743,25 @@ describe('realm nodes in the overview', () => {
     expect(content(mounted.root)).not.toContain('Not every node')
     mounted.app.unmount()
 
-    // The reporting nodes say 0: just "none", though another node has no count yet.
+    // One node says 0 and another has no count yet: still a dash.
     loadRealmView.mockResolvedValue({
       info: { node: { peer_id: 'mgmt-node' } },
       realm: { nodes: [
         { ...beat('mgmt-node', 'management', 9000), info: { utilization: { heartbeat_at_ms: 9000, imports_running: 0 } } },
         beat('server-node', 'server', 8000),
+      ] },
+    })
+    mounted = await mountApp(DashboardClient)
+    await flush()
+    expect(content(mounted.root)).toContain('Activity-')
+    mounted.app.unmount()
+
+    // Every node says 0: "none", and nothing more.
+    loadRealmView.mockResolvedValue({
+      info: { node: { peer_id: 'mgmt-node' } },
+      realm: { nodes: [
+        { ...beat('mgmt-node', 'management', 9000), info: { utilization: { heartbeat_at_ms: 9000, imports_running: 0 } } },
+        { ...beat('server-node', 'server', 8000), info: { utilization: { heartbeat_at_ms: 8000, imports_running: 0 } } },
       ] },
     })
     mounted = await mountApp(DashboardClient)
