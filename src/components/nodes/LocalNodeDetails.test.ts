@@ -108,9 +108,13 @@ describe('node interfaces', () => {
       ],
     }
     const { root } = await mountApp(details, { props: { info: backends } })
-    const row = (name: string) => content(element(root, (node) => node.tag === 'li' && content(node).startsWith(name)))
+    const row = (name: string) => element(root, (node) => node.tag === 'li' && content(node).startsWith(name))
+    const saying = (name: string, word: string) => nodes(row(name)).filter((node) => node.kind === 'element' && content(node).trim().toLowerCase() === word)
 
-    expect(row('fast')).not.toMatch(/\bok\b/i)
-    expect(row('cold').match(/degraded/gi)).toHaveLength(1)
+    expect(saying('fast', 'ok')).toHaveLength(0)
+    const [degraded, ...more] = saying('cold', 'degraded')
+    expect(more).toHaveLength(0)
+    // A plain word, not a pill.
+    expect(String(degraded.props.class)).not.toContain('uppercase')
   })
 })
