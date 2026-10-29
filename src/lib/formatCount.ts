@@ -1,13 +1,8 @@
-// Counts switch to the compact form here: below it the grouped digits stay
-// readable ("9,999"), above it they stop fitting a dashboard tile.
-const COMPACT_THRESHOLD = 10_000
+import { formatNumber } from '@/lib/utils'
 
-// Compact, tile-sized counts: "1,234" below the threshold, "12.3K" / "4.5M"
-// above it. The locale is the browser's, so grouping separators and compact
-// suffixes follow the reader's conventions rather than a fixed English form.
+// Counts of objects, files, buckets, datasets, runs and jobs: the full number with thousands
+// separators ("3,612,345"), never a compact suffix, so one count reads the same everywhere.
 export function formatCount(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return '0'
-  const options: Intl.NumberFormatOptions =
-    n < COMPACT_THRESHOLD ? {} : { notation: 'compact', maximumFractionDigits: 1 }
-  return new Intl.NumberFormat(undefined, options).format(n)
+  return formatNumber(n)
 }

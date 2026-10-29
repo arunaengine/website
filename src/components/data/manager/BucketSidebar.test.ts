@@ -18,6 +18,7 @@ import * as Workspaces from '@/lib/workspaces'
 import * as BucketPlace from '@/lib/bucketPlace'
 import * as DeviceApi from '@/lib/deviceApi'
 import { bindSource } from '@/lib/bindSource'
+import * as FormatCount from '@/lib/formatCount'
 
 const aruna = vi.hoisted(() => ({ authToken: { value: 'token' }, searchBuckets: vi.fn() }))
 const listJobs = vi.hoisted(() => vi.fn())
@@ -164,6 +165,7 @@ const sidebarModules = {
   '@/lib/bucketPlace': BucketPlace,
   '@/lib/deviceApi': DeviceApi,
   '@/lib/desktop': { isDesktop: () => desktopMode.on },
+  '@/lib/formatCount': FormatCount,
   '@/composables/useDatabases': { useDatabases: () => ({ rows: databaseRows, ensure: () => {} }) },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({

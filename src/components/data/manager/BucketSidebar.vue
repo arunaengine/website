@@ -23,6 +23,7 @@ import type { DataManager } from '@/composables/useDataManager'
 import type { AdmissionResponse, BucketSearchHit } from '@/lib/api'
 import type { ListedBucket } from '@/lib/distribution'
 import { isDesktop } from '@/lib/desktop'
+import { formatCount } from '@/lib/formatCount'
 import type { BindSource } from '@/lib/bindSource'
 import { defaultPlacement, mockEnabled, placementLabel } from '@/lib/distributedMock'
 import { exampleBuckets } from '@/lib/distributedMockData'
@@ -324,7 +325,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         <div class="flex items-center gap-2">
           <!-- Background revalidation only: the cached list stays readable behind it. -->
           <Spinner v-if="bucketsRefreshing" label="Refreshing buckets…" />
-          <Badge variant="outline" size="count">{{ searchList ? all.hits.value.length : nodeBuckets.length }}</Badge>
+          <Badge variant="outline" size="count">{{ formatCount(searchList ? all.hits.value.length : nodeBuckets.length) }}</Badge>
         </div>
       </header>
       <div class="flex items-center gap-2 border-b border-border px-3 py-2">
