@@ -566,22 +566,24 @@ watch([crateJob, () => isTerminalTesState(task.value?.state)], ([job, done], [pr
 
 const exporting = ref(false)
 const exportError = ref<string | null>(null)
-const exported = ref(false)
+const exported = ref<string | null>(null)
 async function exportCrate() {
   if (!runCrate.value) return
   exporting.value = true
   exportError.value = null
-  exported.value = false
+  exported.value = null
+  // The panel may show another run before the node has assembled this one.
+  const name = `run-${props.taskId}.zip`
   try {
     const blob = await downloadProvenanceCrate({ dataset: runCrate.value.document_id })
     const anchor = document.createElement('a')
     anchor.href = URL.createObjectURL(blob)
-    anchor.download = `run-${props.taskId}.zip`
+    anchor.download = name
     document.body.append(anchor)
     anchor.click()
     anchor.remove()
     URL.revokeObjectURL(anchor.href)
-    exported.value = true
+    exported.value = name
   } catch (cause) {
     exportError.value = errorMessage(cause)
   } finally {
@@ -910,7 +912,7 @@ async function confirmDelete() {
                 <Download class="h-3.5 w-3.5" /> {{ exporting ? 'Exporting…' : 'Export as crate' }}
               </Button>
               <span v-if="exportError" class="text-destructive">{{ exportError }}</span>
-              <span v-else-if="exported" role="status" class="text-muted-foreground">Saved as run-{{ taskId }}.zip.</span>
+              <span v-else-if="exported" role="status" class="text-muted-foreground">Saved as {{ exported }}.</span>
             </template>
             <template v-else-if="localRecordJob">
               <Button variant="outline" size="sm" @click="downloadRunRecord"><Download class="h-3.5 w-3.5" /> Run record</Button>

@@ -57,11 +57,13 @@ const askPrompt = computed(() =>
 const exporting = ref(false)
 async function exportCrate() {
   exporting.value = true
+  // The page may move on to another dataset while the node assembles this one.
+  const id = detailId.value
   try {
-    const blob = await downloadProvenanceCrate({ dataset: detailId.value })
+    const blob = await downloadProvenanceCrate({ dataset: id })
     const anchor = document.createElement('a')
     anchor.href = URL.createObjectURL(blob)
-    anchor.download = `${detailId.value}.zip`
+    anchor.download = `${id}.zip`
     document.body.append(anchor)
     anchor.click()
     anchor.remove()

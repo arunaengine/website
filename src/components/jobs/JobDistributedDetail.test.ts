@@ -250,6 +250,7 @@ const family: JobFamilyResponse = {
   },
 }
 
+const downloadProvenanceCrate = vi.fn()
 const getFileOrigin = vi.fn(async (..._args: unknown[]) => ({ origin: { kind: 'job', run_id: 'node-job-1' } }))
 
 function taskPanel(
@@ -310,7 +311,7 @@ function taskPanel(
         myGroups: ref([]),
         apiBaseUrl: ref('https://node.test/api/v1'),
         metadataAtPath,
-        downloadProvenanceCrate: vi.fn(),
+        downloadProvenanceCrate,
         getFileOrigin,
         getRun: vi.fn(async (runId: string) => ({ run_id: runId, run_crate: runId === 'node-job-1' ? 'record-1' : null })),
       }),
@@ -1097,6 +1098,37 @@ describe('distributed job detail components', () => {
     expect(lookup).toHaveBeenCalledWith('runs/run')
     expect(content(mounted.root)).toMatch(/Run record: Open\s+Export as crate/)
     mounted.app.unmount()
+    wake.mockRestore()
+    followSpy.mockRestore()
+  })
+
+  it('names a run export after the run it was asked for', async () => {
+    const wake = vi.spyOn(Poll, 'onWake').mockImplementation(() => () => {})
+    const followSpy = vi.spyOn(Poll, 'follow').mockImplementation(() => () => {})
+    const base = { id: 'run', state: 'COMPLETE', executors: [{ image: 'alpine', command: ['sh'] }], inputs: [], outputs: [], logs: [], tags: {} }
+    const output = { bucket: 'reads', key: 'out/count.txt', version_id: 'v1', execution_id: 'exec-2', size: 1 }
+    const getJob = vi.fn(async () => ({ family: { ...family, outputs: [output] } }))
+    let answer!: (blob: Blob) => void
+    downloadProvenanceCrate.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve }))
+    const anchor = { href: '', download: '', click: vi.fn(), remove: vi.fn() }
+    vi.stubGlobal('document', { createElement: () => anchor, body: { append: () => {} } })
+    const created = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:crate')
+    const revoked = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const mounted = await mount(taskPanel(vi.fn(async () => base), getJob), { taskId: 'run', open: true })
+    await flushPanel()
+
+    const exportButton = findAll(mounted.root, (node) => node.tag === 'button' && content(node).includes('Export as crate'))[0]
+    void (exportButton.props.onClick as () => Promise<void>)()
+    ;(mounted.app._instance!.props as { taskId: string }).taskId = 'other'
+    await flushPanel()
+    answer(new Blob(['zip']))
+    await flushPanel()
+
+    expect(anchor.download).toBe('run-run.zip')
+    mounted.app.unmount()
+    vi.unstubAllGlobals()
+    created.mockRestore()
+    revoked.mockRestore()
     wake.mockRestore()
     followSpy.mockRestore()
   })
