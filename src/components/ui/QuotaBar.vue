@@ -88,7 +88,7 @@ const tone = computed(() => {
       :class="[
         'relative w-full overflow-hidden rounded-full bg-muted',
         compact ? 'h-1' : 'h-1.5',
-        unlimited && referencedBytes === 0 ? 'opacity-60' : '',
+        unlimited && used + referencedBytes === 0 ? 'opacity-60' : '',
       ]"
       :role="unlimited ? undefined : 'meter'"
       :aria-label="unlimited ? undefined : (label ?? 'Storage')"
@@ -109,7 +109,7 @@ const tone = computed(() => {
           }"
         />
       </template>
-      <template v-if="!unlimited || referencedBytes > 0">
+      <template v-if="!unlimited || used + referencedBytes > 0">
         <span
           class="absolute inset-y-0 left-0 transition-all"
           :class="referencedPct > 0 ? 'rounded-l-full' : 'rounded-full'"
