@@ -94,7 +94,10 @@ describe('the realm node table', () => {
     expect(header('Location')).toContain('@min-[40rem]:table-cell')
     expect(header('Activity')).toContain('@min-[32rem]:table-cell')
     for (const always of ['Node', 'Stored', 'CPU', 'State']) expect(header(always)).not.toContain('hidden')
-    expect(String(element(mounted.root, (node) => node.tag === 'table').props.class)).not.toContain('min-w-max')
+    const table = element(mounted.root, (node) => node.tag === 'table')
+    expect(String(table.props.class)).toBe('data-table')
+    expect(String(element(mounted.root, (node) => node.tag === 'thead').props.class ?? '')).not.toContain('uppercase')
+    expect(header('Stored')).toContain('num')
 
     // The folded line under the name says what the hidden columns would.
     const name = element(mounted.root, (node) => node.tag === 'td' && content(node).includes('Giessen storage 3'))

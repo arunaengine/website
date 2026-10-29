@@ -115,18 +115,18 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
     </div>
 
     <div v-else class="overflow-x-auto" :class="compact ? '' : 'surface'">
-      <table class="w-full text-left text-xs">
-        <thead class="border-b border-border text-muted-foreground">
+      <table class="data-table">
+        <thead>
           <tr>
-            <th class="px-4 py-2 font-medium">Group</th>
-            <th class="px-4 py-2 font-medium">Storage</th>
-            <th class="px-4 py-2 font-medium">Objects</th>
-            <th class="px-4 py-2 font-medium">Buckets</th>
-            <th class="px-4 py-2 font-medium">Datasets</th>
-            <th class="px-4 py-2 font-medium">Runs</th>
+            <th class="px-4">Group</th>
+            <th class="px-4">Storage</th>
+            <th class="num px-4">Objects</th>
+            <th class="num px-4">Buckets</th>
+            <th class="num px-4">Datasets</th>
+            <th class="num px-4">Runs</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-border">
+        <tbody>
           <tr v-for="entry in sortedEntries()" :key="entry.groupId">
             <td class="px-4 py-2.5">
               <div class="flex items-center gap-2">
@@ -148,7 +148,7 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
             </td>
             <template v-else>
               <td class="w-[42%] px-4 py-2.5"><GroupStorage :entry="entry" /></td>
-              <td v-for="count in counts(entry)" :key="count.key" class="px-4 py-2.5 tabular-nums">{{ count.value }}</td>
+              <td v-for="count in counts(entry)" :key="count.key" class="num px-4 py-2.5">{{ count.value }}</td>
             </template>
           </tr>
         </tbody>

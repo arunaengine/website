@@ -73,16 +73,16 @@ const open = (row: Row) => void router.push({ name: 'node', params: { nodeId: ro
       <Input v-model="query" placeholder="Find a node" aria-label="Find a node" class="h-8 max-w-xs text-xs" />
     </div>
     <div class="overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead class="text-[11px] uppercase tracking-wider text-muted-foreground">
+      <table class="data-table">
+        <thead>
           <tr>
-            <th class="px-3 py-2 pl-4 text-left font-semibold">Node</th>
-            <th class="hidden px-3 py-2 text-left font-semibold @min-[40rem]:table-cell">Location</th>
-            <th class="hidden px-3 py-2 text-left font-semibold @min-[48rem]:table-cell">Role</th>
-            <th class="px-3 py-2 text-left font-semibold">Stored</th>
-            <th class="px-3 py-2 text-left font-semibold">CPU</th>
-            <th class="hidden px-3 py-2 text-left font-semibold @min-[32rem]:table-cell">Activity</th>
-            <th class="px-3 py-2 pr-4 text-right font-semibold">State</th>
+            <th class="px-3 py-2 pl-4">Node</th>
+            <th class="hidden px-3 py-2 @min-[40rem]:table-cell">Location</th>
+            <th class="hidden px-3 py-2 @min-[48rem]:table-cell">Role</th>
+            <th class="num px-3 py-2">Stored</th>
+            <th class="num px-3 py-2">CPU</th>
+            <th class="hidden px-3 py-2 @min-[32rem]:table-cell">Activity</th>
+            <th class="px-3 py-2 pr-4 text-right">State</th>
           </tr>
         </thead>
         <tbody>
@@ -109,8 +109,8 @@ const open = (row: Row) => void router.push({ name: 'node', params: { nodeId: ro
               </span>
             </td>
             <td class="hidden whitespace-nowrap px-3 py-2.5 text-xs text-muted-foreground @min-[48rem]:table-cell">{{ roleLabel[row.node.kind] }}</td>
-            <td class="whitespace-nowrap px-3 py-2.5 text-xs tabular-nums text-foreground">{{ row.node.info ? formatBytes(row.node.info.utilization.storage_bytes_used) : '' }}</td>
-            <td class="whitespace-nowrap px-3 py-2.5 text-xs tabular-nums">
+            <td class="num whitespace-nowrap px-3 py-2.5 text-foreground">{{ row.node.info ? formatBytes(row.node.info.utilization.storage_bytes_used) : '' }}</td>
+            <td class="num whitespace-nowrap px-3 py-2.5">
               <span v-if="cpu(row.node) !== null" class="inline-flex items-center gap-2" :title="`1-minute load at ${cpu(row.node)}% of the CPU cores`">
                 <span class="hidden h-1.5 w-8 overflow-hidden rounded-full bg-muted @min-[40rem]:inline-block">
                   <span

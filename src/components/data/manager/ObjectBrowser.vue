@@ -752,7 +752,7 @@ async function onDrop(event: DragEvent) {
             <col v-if="mixedOrigins" class="w-40 @max-[960px]:w-0" />
             <col class="w-[132px]" />
           </colgroup>
-          <thead class="text-[11px] uppercase tracking-wider text-muted-foreground @max-[600px]:hidden">
+          <thead class="text-xs text-muted-foreground @max-[600px]:hidden">
             <SelectionBar v-if="selectedCount" :manager="manager" :span="columns - 1" @action="onBarAction" />
             <tr v-else class="border-b border-border">
               <th class="p-0">
