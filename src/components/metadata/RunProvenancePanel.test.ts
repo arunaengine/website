@@ -26,7 +26,12 @@ const RunProvenancePanel = compileClientComponent(new URL('./RunProvenancePanel.
     useUserDirectory: () => ({ resolveUsers: vi.fn(), cachedUser: () => null }),
   },
   '@/composables/useS3': { useS3: () => ({ endpoint: ref('https://s3.test') }) },
-  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => (id === 'node-2' ? 'Giessen' : id) }) },
+  '@/composables/useRealmNodes': {
+    useRealmNodes: () => ({
+      displayName: (id: string) => (id === 'node-2' ? 'Giessen' : id),
+      nodes: ref([{ nodeId: 'device-1', info: { labels: { name: 'laptop' } } }]),
+    }),
+  },
   '@/lib/config': { featureEnabled: () => false },
   '@/lib/tes': Tes,
   '@/lib/crate/dataIdentity': DataIdentity,
@@ -108,7 +113,7 @@ const stored = (bucket: string, key: string, size: string, extra: Record<string,
 describe('RunProvenancePanel grouped files', () => {
   it('collapses a database and a crowded results folder into one row each', async () => {
     const inputs = [
-      stored('laptop', 'genomes/genome.fasta', '4900000', { device: 'device-1', name: '/work/in/genome.fasta' }),
+      stored('laptop', 'my-genome/genome.fasta', '4900000', { device: 'device-1', name: 'work/in/genome.fasta' }),
       ...Array.from({ length: 66 }, (_, index) => stored('bakta-db', `db/part-${index}.dmnd`, '1000', { partOf: [DATABASE, RELEASE] })),
     ]
     const outputs = Array.from({ length: 13 }, (_, index) => stored('laptop', `results/bakta/genome-${index}.tsv`, '100'))
@@ -116,8 +121,8 @@ describe('RunProvenancePanel grouped files', () => {
     const text = content(mounted.root)
 
     expect(text).toContain('genome.fasta')
-    expect(text).not.toContain('/work/in/')
-    expect(text).toContain('from device-1')
+    expect(text).not.toContain('work/in/')
+    expect(text).toContain('from laptop')
     expect(text).toContain('Bakta database (light)')
     expect(text).toContain('release 6.0 light, 66 files')
     expect(text).toContain('DOI 10.5281/zenodo.14916843')
@@ -129,6 +134,14 @@ describe('RunProvenancePanel grouped files', () => {
     ;(toggle.props.onClick as () => void)()
     await VueRuntime.nextTick()
     expect(content(mounted.root)).toContain('part-3.dmnd1000 B')
+    mounted.app.unmount()
+  })
+
+  it('names a device without a name of its own in plain words', async () => {
+    const inputs = [stored('laptop', 'my-genome/genome.fasta', '4900000', { device: 'device-9', name: 'work/in/genome.fasta' })]
+    const mounted = await mountApp(RunProvenancePanel, { props: { run: { inputs, outputs: [] } } })
+
+    expect(content(mounted.root)).toContain('from a device')
     mounted.app.unmount()
   })
 })

@@ -24,7 +24,7 @@ const userDir = useUserDirectory()
 const s3 = useS3()
 const tesEnabled = computed(() => featureEnabled('tes'))
 const { shown } = usePortalFeatures()
-const { displayName } = useRealmNodes()
+const { displayName, nodes: realmNodes } = useRealmNodes()
 
 // The agent Person carries a `{ulid}@{realm}` identifier; resolve it to a
 // display name through the shared user directory, short id as the fallback.
@@ -137,8 +137,14 @@ const savedTo = computed(() => {
   return links.every((link) => link.kind === 's3' && link.bucketId === first.bucketId && link.prefix === first.prefix) ? first : null
 })
 
+// The name a device was enrolled with, if the realm lists one.
+function deviceName(nodeId: string): string {
+  const labels = realmNodes.value.find((node) => node.nodeId === nodeId)?.info?.labels ?? {}
+  return labels['name'] || labels['display_name'] || labels['device'] || ''
+}
+
 function inputNote(row: FileRow): string {
-  if (row.device) return `from ${displayName(row.device)}`
+  if (row.device) return `from ${deviceName(row.device) || 'a device'}`
   const group = groupFiles([row], s3.endpoint.value)[0]
   if (group?.database || group?.release) return partNote(group, false)
   const legacy = [row.version ? `release ${row.version}` : '', row.identifier ? `DOI ${row.identifier}` : ''].filter(Boolean).join(', ')
@@ -156,11 +162,11 @@ function toggle(key: string) {
 
 type ListRow = { kind: 'file'; key: string; row: FileRow; label: string; nested: boolean } | { kind: 'group'; key: string; group: FileGroup }
 
-// A container path reads by its file name; a grouped file by its path below the shared folder.
+// A file reads by its name without the path; a grouped file by its path below the shared folder.
 function fileLabel(file: RunCrateFileRef, group?: FileGroup): string {
   const key = parseDataIdentity(file, s3.endpoint.value).s3?.key
   if (group && key?.startsWith(group.folder)) return key.slice(group.folder.length)
-  return file.name.startsWith('/') ? file.name.split('/').filter(Boolean).pop() ?? file.name : file.name
+  return file.name.split('/').filter(Boolean).pop() ?? file.name
 }
 
 function listRows(files: RunCrateFileRef[]): ListRow[] {
