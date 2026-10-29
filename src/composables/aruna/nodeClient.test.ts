@@ -83,4 +83,3 @@ describe('requests to another node on a fresh load', () => {
     expect(outcome).toBe('AbortError')
   })
 })
-
