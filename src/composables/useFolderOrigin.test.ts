@@ -112,4 +112,19 @@ describe('folder origin', () => {
     await settle()
     expect(getFileOrigin).toHaveBeenCalledTimes(2)
   })
+
+  it('keeps the origin of a newer version out of the listed one', async () => {
+    getFileOrigin.mockReset().mockImplementation(async () => job('2026-10-29T10:05:00Z'))
+    const listed = new Date('2026-10-29T10:00:00.400Z')
+    const files = ref([{ key: 'over.tsv', etag: 'x', lastModified: listed }])
+    const origin = useFolderOrigin(ref('pinned'), ref(null), files)
+    await settle()
+    expect(origin.byKey.value.has('over.tsv')).toBe(false)
+
+    // The listed version itself, its time in whole seconds.
+    getFileOrigin.mockImplementation(async () => job('2026-10-29T10:00:00Z'))
+    files.value = [{ key: 'over.tsv', etag: 'x', lastModified: listed }]
+    await settle()
+    expect(origin.byKey.value.get('over.tsv')?.time).toBe('2026-10-29T10:00:00Z')
+  })
 })

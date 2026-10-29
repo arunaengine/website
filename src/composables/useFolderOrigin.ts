@@ -25,6 +25,14 @@ let epochSeen: number | null = null
 
 type Listed = { key: string; etag?: string; lastModified?: Date }
 
+// The listing names no version, so the answer must be of the version listed: its creation time
+// is the listed modification time, to the second. An overwrite in between is left unknown.
+function sameVersion(file: Listed, answer: OriginResponse | null): boolean {
+  if (!answer || !file.lastModified) return true
+  const created = Date.parse(answer.created_at)
+  return Number.isNaN(created) || Math.floor(created / 1000) === Math.floor(file.lastModified.getTime() / 1000)
+}
+
 export function useFolderOrigin(bucket: Ref<string>, nodeId: Ref<string | null>, files: Ref<Listed[]>) {
   const { getFileOrigin, getRun, sessionEpoch } = useAruna()
   const { getTask } = useTes()
@@ -70,7 +78,7 @@ export function useFolderOrigin(bucket: Ref<string>, nodeId: Ref<string | null>,
           flight = getFileOrigin(asked.bucket, { key: file.key }, controller.signal, asked.nodeId)
             .catch(() => null)
             .then((answer) => {
-              if (controller.signal.aborted || epoch !== sessionEpoch.value) return
+              if (controller.signal.aborted || epoch !== sessionEpoch.value || !sameVersion(file, answer)) return
               origins.value = new Map(origins.value).set(key, answer)
               if (answer?.origin?.kind === 'job') void readRun(answer.origin.run_id, epoch)
             })
