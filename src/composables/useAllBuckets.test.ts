@@ -19,6 +19,8 @@ vi.mock('@/composables/useAruna', async () => {
   }
 })
 
+vi.mock('@/composables/useRealmNodes', () => ({ useRealmNodes: () => ({ isTarget: (id: string) => id !== 'device-1' }) }))
+
 const { BUCKET_PAGE, useAllBuckets } = await import('./useAllBuckets')
 const { userInfo } = await import('@/composables/aruna/state')
 const { setAuthToken } = await import('@/composables/aruna/session')
@@ -61,6 +63,14 @@ describe('all-nodes bucket list', () => {
   afterEach(() => {
     vi.useRealTimers()
     scopes.splice(0).forEach((scope) => scope.stop())
+  })
+
+  it('leaves out the buckets a device answers for', async () => {
+    searchBuckets.mockResolvedValue(answer([hit('results', 'g1', 'n2'), hit('laptop-notes', 'g1', 'device-1')]))
+    const { list } = start()
+    await settle()
+
+    expect(list.hits.value.map((entry) => entry.bucket)).toEqual(['results'])
   })
 
   it('lists the group buckets of every node and counts nodes that did not answer', async () => {

@@ -3,6 +3,7 @@
 import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
 import { nodeInfo } from '@/composables/aruna/state'
 import { useAruna } from '@/composables/useAruna'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { ApiError, type BucketSearchHit } from '@/lib/api'
 import { mergeSets } from '@/lib/distribution'
 import { isHiddenBucket } from '@/lib/workspaces'
@@ -14,6 +15,7 @@ const TYPING_MS = 250
 
 export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled: Ref<boolean>) {
   const { apiBaseUrl, currentUser, searchBuckets, sessionEpoch } = useAruna()
+  const { isTarget } = useRealmNodes()
   const found = ref<BucketSearchHit[]>([])
   // A distributed bucket is one row however many of its nodes answered.
   const hits = computed(() => mergeSets(found.value, (id) => id === nodeInfo.value?.node.peer_id))
@@ -62,9 +64,10 @@ export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled:
         cursor: after ?? undefined,
       })
       if (id !== seq) return
-      // Older nodes ignore the group filter, so it is applied here as well.
+      // Older nodes ignore the group filter, so it is applied here as well; a device's buckets
+      // are its owner's, not a place in the realm.
       const page = response.hits.filter(
-        (hit) => hit.group_id === groupId.value && !isHiddenBucket(hit.bucket),
+        (hit) => hit.group_id === groupId.value && !isHiddenBucket(hit.bucket) && isTarget(hit.node_id),
       )
       found.value = after ? [...found.value, ...page] : page
       cursor = response.next_cursor ?? null
