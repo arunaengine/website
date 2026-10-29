@@ -70,4 +70,3 @@ describe('run state and duration', () => {
     expect(runClaimedIds(run)).toEqual(expect.arrayContaining(['#bucket-metadata-0123', 'https://w3id.org/aruna/rel']))
   })
 })
-

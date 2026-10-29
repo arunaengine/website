@@ -187,4 +187,3 @@ describe('provenance view', () => {
     expect(text.split('Database release')).toHaveLength(2)
   })
 })
-

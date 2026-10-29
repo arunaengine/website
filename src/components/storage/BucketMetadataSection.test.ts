@@ -116,4 +116,3 @@ describe('bucket metadata links', () => {
     expect(anchors(root)).toContainEqual({ href: 'https://doi.org/10.5281/zenodo.14916843', text: 'Open' })
   })
 })
-

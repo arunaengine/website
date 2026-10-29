@@ -70,4 +70,3 @@ describe('release preparation', () => {
     expect([url.searchParams.get('object_id'), url.searchParams.get('here')]).toEqual([objectId, 'true'])
   })
 })
-

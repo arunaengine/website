@@ -145,4 +145,3 @@ describe('RunProvenancePanel grouped files', () => {
     mounted.app.unmount()
   })
 })
-
