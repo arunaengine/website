@@ -42,8 +42,8 @@ describe('Data view session affordances', () => {
     expect(managerBrowser).toContain(':change-reason="folderReason(folder.prefix)"')
     expect(managerBrowser).toContain('This session cannot delete this object.')
     expect(managerBrowser).toContain('This session cannot delete this entire folder.')
-    expect(uploadPanel).toContain(':disabled="!canWriteCurrentPrefix"')
-    expect(uploadPanel).toContain('Uploads are unavailable for')
+    // A drop on the file table is the one upload outside Add data, and it is guarded the same way.
+    expect(managerBrowser).toContain('if (!canWriteCurrentPrefix.value || !bucket.value) return')
     expect(managerBrowser).toContain('This session is read-only')
   })
 

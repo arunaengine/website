@@ -69,7 +69,6 @@ const {
   requiredNodeId,
   requiredNodeName,
   sessionWarning,
-  keyTail,
   openSelectedContext,
   bucketNodeChoice,
   recentNodes,
@@ -215,7 +214,7 @@ const headerTitle = computed(() => (notebooksView.value ? 'Notebooks' : route.na
 const headerDescription = computed(() =>
   notebooksView.value
     ? 'Pick a notebook to open, or create one in the folder you are browsing.'
-    : `Browse buckets and objects through the node's S3 interface, signed in your browser.`,
+    : '',
 )
 // The Add data browser may open another node or group; the view takes its
 // own session back once the dialog closes.
@@ -317,13 +316,6 @@ async function createFolder() {
           <span v-else class="text-muted-foreground">No group</span>
           <span class="hidden lg:inline">on</span>
           <NodePicker :model-value="bucketNodeChoice" :recent="recentNodes" @update:model-value="pickNode" />
-          <span
-            v-if="contextReady"
-            class="flex shrink-0 items-center gap-1 font-mono text-[11px]"
-            :title="`Temporary session ${s3.activeKey.value?.accessKeyId} for group ${activeGroupId} on node ${requiredNodeId}`"
-          >
-            <KeyRound class="h-3 w-3" /> …{{ keyTail }}
-          </span>
         </span>
       </template>
       <template #actions>
