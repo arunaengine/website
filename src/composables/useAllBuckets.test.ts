@@ -19,7 +19,9 @@ vi.mock('@/composables/useAruna', async () => {
   }
 })
 
-vi.mock('@/composables/useRealmNodes', () => ({ useRealmNodes: () => ({ isTarget: (id: string) => id !== 'device-1' }) }))
+// The realm names a node's kind once its list arrives; device-1 is a device.
+const deviceKnown = ref(true)
+vi.mock('@/composables/useRealmNodes', () => ({ useRealmNodes: () => ({ isTarget: (id: string) => !deviceKnown.value || id !== 'device-1' }) }))
 
 const { BUCKET_PAGE, useAllBuckets } = await import('./useAllBuckets')
 const { userInfo } = await import('@/composables/aruna/state')
@@ -63,6 +65,17 @@ describe('all-nodes bucket list', () => {
   afterEach(() => {
     vi.useRealTimers()
     scopes.splice(0).forEach((scope) => scope.stop())
+  })
+
+  it('leaves out a device bucket once the realm names the device, after the answer came', async () => {
+    deviceKnown.value = false
+    searchBuckets.mockResolvedValue(answer([hit('results', 'g1', 'n2'), hit('laptop-notes', 'g1', 'device-1')]))
+    const { list } = start()
+    await settle()
+    expect(list.hits.value.map((entry) => entry.bucket)).toEqual(['results', 'laptop-notes'])
+
+    deviceKnown.value = true
+    expect(list.hits.value.map((entry) => entry.bucket)).toEqual(['results'])
   })
 
   it('leaves out the buckets a device answers for', async () => {
