@@ -33,7 +33,7 @@ const { myGroups, searchBuckets, sessionEpoch } = useAruna()
 const deviceKeys = useDeviceKeys()
 const { shown } = usePortalFeatures()
 const { status, state: nodeState, refresh, deviceClient } = useDeviceStatus()
-const { folders, listState: foldersState, ensureLoaded: ensureFolders, load: loadFolders } = useSyncedFolders()
+const { folders, listState: foldersState, load: loadFolders } = useSyncedFolders()
 const { all: transfers, load: loadTransfers, state: transfersState } = useDeviceTransfers()
 const { compute, state: computeState, load: loadCompute } = useDeviceCompute()
 const control = useNodeControl()
@@ -154,8 +154,8 @@ onMounted(async () => {
   const reading = refresh()
   // Only a first visit waits for the node's address; later visits read at once.
   if (!deviceClient.value) await reading
-  // Running counts change all the time, so they are read again on every visit.
-  await Promise.all([ensureFolders(), loadTransfers(), loadCompute()])
+  // Counts change all the time, also by folders linked outside this window, so each visit reads them.
+  await Promise.all([loadFolders(), loadTransfers(), loadCompute()])
 })
 </script>
 

@@ -24,6 +24,7 @@ const credentials = ref<Array<{ access_key_id: string; status: string }>>([])
 const keysState = ref('ready')
 const startHidden = ref(false)
 const loadCompute = vi.fn(async () => undefined)
+const loadFolders = vi.fn(async () => undefined)
 const refreshStatus = vi.fn(async (): Promise<void> => undefined)
 const deviceClient = ref<{ baseUrl: string; token: string } | null>(null)
 const myGroups = ref([{ id: 'g1', name: 'Lab group' }])
@@ -127,7 +128,7 @@ const HomeCards = compileClientComponent(new URL('./HomeCards.vue', import.meta.
       folders,
       listState: foldersState,
       ensureLoaded: vi.fn(async () => undefined),
-      load: vi.fn(async () => undefined),
+      load: loadFolders,
     }),
   },
   '@/lib/activityGroups': ActivityGroups,
@@ -162,6 +163,7 @@ beforeEach(() => {
   keysState.value = 'ready'
   startHidden.value = false
   loadCompute.mockClear()
+  loadFolders.mockClear()
   refreshStatus.mockReset().mockResolvedValue(undefined)
   deviceClient.value = null
   myGroups.value = [{ id: 'g1', name: 'Lab group' }]
@@ -307,12 +309,14 @@ describe('desktop home cards', () => {
     mounted.app.unmount()
   })
 
-  it('reads the running count again on every visit', async () => {
+  it('reads the running count and the linked folders again on every visit', async () => {
     compute.value = enabledCompute()
     for (const visit of [1, 2]) {
       const mounted = await mountApp(HomeCards)
       await flush()
       expect(loadCompute).toHaveBeenCalledTimes(visit)
+      // A folder linked through the device API since the last read counts at once.
+      expect(loadFolders).toHaveBeenCalledTimes(visit)
       mounted.app.unmount()
     }
   })
