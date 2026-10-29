@@ -128,12 +128,10 @@ const painted = useFirstPaint(
 // Opening the dashboard reads again. The view is mounted fresh on every visit,
 // so a skip here left the node panel and the totals showing the last visit's
 // numbers until the 15s poll landed or someone pressed Refresh.
-function watchDashboard(next: [number, number], previous?: [number, number]) {
-  if (refreshing.value) epochOnly &&= next[0] === previous?.[0]
+watch([dashboardRevision, sessionEpoch], ([revision], previous) => {
+  if (refreshing.value) epochOnly &&= revision === previous?.[0]
   void refreshDashboard()
-}
-
-watch([dashboardRevision, sessionEpoch], watchDashboard, { immediate: true })
+}, { immediate: true })
 
 // Node heartbeats and usage republish without bumping the SSE revision; poll
 // the light info endpoints so the realm nodes panel stays current, and read the
