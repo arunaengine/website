@@ -143,8 +143,9 @@ const covered = computed(
     .filter((copy) => copy.state === 'present' || copy.state === 'pending')
     .map((copy) => copy.node_id)),
 )
+// A copy goes to a place of the realm, never to a device.
 const replicaTargets = computed(() =>
-  realmNodes.nodes.value
+  realmNodes.targets.value
     .filter((node) => !covered.value.has(node.nodeId))
     .map((node) => ({ value: node.nodeId, label: node.reachable ? node.label : `${node.label} (unreachable)` })),
 )

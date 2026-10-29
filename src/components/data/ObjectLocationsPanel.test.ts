@@ -1,4 +1,4 @@
-import { defineComponent, h, ref } from 'vue'
+import { computed, defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Api from '@/lib/api'
@@ -24,7 +24,7 @@ const DocsLinkStub = defineComponent({
 const getBlobLocations = vi.fn()
 const replicateBlob = vi.fn()
 const sourceEncrypted = ref<boolean | null>(null)
-const realmNodes = ref<Array<{ nodeId: string; label: string; reachable: boolean }>>([])
+const realmNodes = ref<Array<{ nodeId: string; label: string; reachable: boolean; kind?: string }>>([])
 const SelectStub = defineComponent({
   props: { options: { type: Array, default: () => [] } },
   emits: ['update:modelValue'],
@@ -63,7 +63,11 @@ const panel = compileClientComponent(new URL('./ObjectLocationsPanel.vue', impor
   },
   '@/composables/useEncryptedSource': { useEncryptedSource: () => sourceEncrypted },
   '@/composables/useRealmNodes': {
-    useRealmNodes: () => ({ displayName: (id: string) => `Node ${id}`, nodes: realmNodes }),
+    useRealmNodes: () => ({
+      displayName: (id: string) => `Node ${id}`,
+      nodes: realmNodes,
+      targets: computed(() => realmNodes.value.filter((node) => node.kind !== 'user')),
+    }),
   },
   '@/lib/api': Api,
   '@/lib/bucketEncryption': Wording,
@@ -181,6 +185,14 @@ describe('object locations panel', () => {
       node_id: 'node-b',
       plaintext: true,
     })
+  })
+
+  it('offers no device as a place for a copy', async () => {
+    realmNodes.value = [{ nodeId: 'node-b', label: 'Node B', reachable: true }, { nodeId: 'laptop', label: 'Laptop', reachable: true, kind: 'user' }]
+    const root = await mount([copy()])
+
+    expect(content(root)).toContain('Node B')
+    expect(content(root)).not.toContain('Laptop')
   })
 
   it('explains why a copy of an encrypted bucket was refused', async () => {
