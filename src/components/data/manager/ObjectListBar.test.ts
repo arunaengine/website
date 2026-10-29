@@ -47,8 +47,9 @@ function manager() {
   }
 }
 
-async function mount(wholeBucket = false) {
+async function mount(wholeBucket = false, listShow = 'all') {
   const state = manager()
+  state.listShow.value = listShow
   const text = ref('')
   const events: string[] = []
   const bucket = ref(wholeBucket)
@@ -106,6 +107,12 @@ describe('the one search box of the file list', () => {
     ;(input().props.onKeydown as (event: KeyboardEvent) => void)({ key: 'Escape' } as KeyboardEvent)
     ;(element(mounted.root, (node) => node.props['aria-label'] === 'Clear filter').props.onClick as () => void)()
     expect(events).toEqual(['back', 'back'])
+    mounted.app.unmount()
+  })
+
+  it('marks changed filters once, on the filter icon, without a second dot', async () => {
+    const { mounted } = await mount(false, 'files')
+    expect(nodes(mounted.root).some((node) => String(node.props.class ?? '').includes('rounded-full bg-primary'))).toBe(false)
     mounted.app.unmount()
   })
 })

@@ -127,11 +127,6 @@ function onEscape() {
             <ListFilter class="h-4 w-4" :class="changed ? 'text-primary' : ''" />
           </Button>
         </DropdownMenuTrigger>
-        <span
-          v-if="changed"
-          class="pointer-events-none absolute right-1 top-1 size-1.5 rounded-full bg-primary"
-          aria-hidden="true"
-        />
       </span>
       <DropdownMenuContent side="right" align="start">
         <DropdownMenuLabel>Show</DropdownMenuLabel>
