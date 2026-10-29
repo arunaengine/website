@@ -128,7 +128,7 @@ const nodeBuckets = computed(() => {
 // Matches in other groups for the same query, below this group's list.
 const search = useBucketSearch(bucketNameFilter)
 const otherHits = computed(() =>
-  search.hits.value.filter((hit) => hit.group_id !== selectedGroupId.value && !isHiddenBucket(hit.bucket)),
+  search.hits.value.filter((hit) => hit.group_id !== selectedGroupId.value && !isHiddenBucket(hit.bucket) && realmNodes.isTarget(hit.node_id)),
 )
 // Hover text of a row; a row without a node is on this node.
 function rowNode(nodeId: string | null): string {

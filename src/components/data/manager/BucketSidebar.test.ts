@@ -170,6 +170,8 @@ const sidebarModules = {
           : null,
       displayName: (id: string | null) => (id ? `name-${id}` : 'this node'),
       isLocalNode: (id: string | null) => !id || id === 'home',
+      // The laptop is a device, never a place to pick.
+      isTarget: (id: string | null) => id !== 'laptop',
       localNodeId: ref('home'),
     }),
   },
@@ -711,6 +713,7 @@ describe('Bucket sidebar node choice', () => {
       { arn: 'a', bucket: 'results', node_id: 'node-2', group_id: 'g1' },
       { arn: 'b', bucket: 'shared-reads', node_id: 'home', group_id: 'g2', group_name: 'Lab' },
       { arn: 'c', bucket: 'ws-scratch', node_id: 'home', group_id: 'g2' },
+      { arn: 'd', bucket: 'laptop-notes', node_id: 'laptop', group_id: 'g2' },
     ]
     const state = manager()
     const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
@@ -719,6 +722,7 @@ describe('Bucket sidebar node choice', () => {
     expect(text).toContain('Other groups')
     expect(text).toContain('shared-reads')
     expect(text).not.toContain('ws-scratch')
+    expect(text).not.toContain('laptop-notes')
     await click(element(root, (node) => node.props['aria-label'] === 'Open shared-reads'))
     expect(state.openSearchHit).toHaveBeenCalledWith(otherSearch.value[1])
     otherSearch.value = []
