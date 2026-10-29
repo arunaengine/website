@@ -466,7 +466,7 @@
 
 /* Table headers read in sentence case and at 12 px at least, whatever a table sets. Unlayered,
    so it wins over the uppercase and tracking utilities older tables still carry. */
-thead th {
+thead :is(th, th *) {
   text-transform: none;
   letter-spacing: normal;
 }
