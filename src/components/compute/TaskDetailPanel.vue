@@ -31,6 +31,7 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import { useRefresh } from '@/composables/useRefresh'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
+import { resolveObjectUrl } from '@/composables/s3/endpoints'
 import { downloadCrateJson } from '@/lib/crateImport'
 import { getLocalRunCrate, requireDevice } from '@/lib/deviceApi'
 import { deleteErrorMessage, formatJobProgress, type JobStatusResponse } from '@/lib/jobs'
@@ -533,7 +534,9 @@ const outputRange = computed(() => {
 async function recordOfOutput(): Promise<{ document_id: string } | null> {
   const output = crateOutput.value
   if (!output) return null
-  const origin = await getFileOrigin(output.bucket, { key: output.key, version_id: output.version_id })
+  // The node owning the version answers its origin; another node may not hold it.
+  const owner = output.endpoint_url ? resolveObjectUrl(`${output.endpoint_url.replace(/\/+$/, '')}/${output.bucket}/${output.key}`) : null
+  const origin = await getFileOrigin(output.bucket, { key: output.key, version_id: output.version_id }, undefined, owner?.nodeId)
   if (origin.origin?.kind !== 'job') return null
   const run = await getRun(origin.origin.run_id)
   return run.run_crate ? { document_id: run.run_crate } : null

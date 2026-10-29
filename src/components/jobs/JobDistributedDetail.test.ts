@@ -250,6 +250,8 @@ const family: JobFamilyResponse = {
   },
 }
 
+const getFileOrigin = vi.fn(async (..._args: unknown[]) => ({ origin: { kind: 'job', run_id: 'node-job-1' } }))
+
 function taskPanel(
   getTask: unknown,
   getJob: unknown,
@@ -287,6 +289,9 @@ function taskPanel(
     '@/components/compute/TaskHeader.vue': moduleDefault(PassThroughStub),
     '@/components/compute/SaveRunDialog.vue': moduleDefault(PassThroughStub),
     '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ deviceClient: { value: null } }) },
+    '@/composables/s3/endpoints': {
+      resolveObjectUrl: (url: string) => (url.startsWith('https://owner.node.test/') ? { bucket: 'reads', key: 'out/count.txt', nodeId: 'owner-node' } : null),
+    },
     '@/lib/crateImport': { downloadCrateJson: () => undefined },
     '@/lib/deviceApi': { getLocalRunCrate: async () => null, requireDevice: () => ({}) },
     '@/components/assistant/AskAiButton.vue': moduleDefault(PassThroughStub),
@@ -306,7 +311,7 @@ function taskPanel(
         apiBaseUrl: ref('https://node.test/api/v1'),
         metadataAtPath,
         downloadProvenanceCrate: vi.fn(),
-        getFileOrigin: vi.fn(async () => ({ origin: { kind: 'job', run_id: 'node-job-1' } })),
+        getFileOrigin,
         getRun: vi.fn(async (runId: string) => ({ run_id: runId, run_crate: runId === 'node-job-1' ? 'record-1' : null })),
       }),
     },
@@ -1091,6 +1096,23 @@ describe('distributed job detail components', () => {
 
     expect(lookup).toHaveBeenCalledWith('runs/run')
     expect(content(mounted.root)).toMatch(/Run record: Open\s+Export as crate/)
+    mounted.app.unmount()
+    wake.mockRestore()
+    followSpy.mockRestore()
+  })
+
+  it('asks the node owning an output for the run it names', async () => {
+    const wake = vi.spyOn(Poll, 'onWake').mockImplementation(() => () => {})
+    const followSpy = vi.spyOn(Poll, 'follow').mockImplementation(() => () => {})
+    const base = { id: 'run', state: 'COMPLETE', executors: [{ image: 'alpine', command: ['sh'] }], inputs: [], outputs: [], logs: [], tags: {} }
+    const output = { bucket: 'reads', key: 'out/count.txt', version_id: 'v1', execution_id: 'exec-2', size: 1, endpoint_url: 'https://owner.node.test/' }
+    const getJob = vi.fn(async () => ({ family: { ...family, outputs: [output] } }))
+    getFileOrigin.mockClear()
+    const mounted = await mount(taskPanel(vi.fn(async () => base), getJob), { taskId: 'run', open: true })
+    await flushPanel()
+
+    expect(getFileOrigin).toHaveBeenCalledWith('reads', { key: 'out/count.txt', version_id: 'v1' }, undefined, 'owner-node')
+    expect(content(mounted.root)).toMatch(/Run record: Open/)
     mounted.app.unmount()
     wake.mockRestore()
     followSpy.mockRestore()

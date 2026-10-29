@@ -104,9 +104,9 @@ export function getBucketLinks(bucket: string, query: BucketLinksQuery, signal?:
   return requestLinks(bucket, query, nodeClient(nodeId), signal)
 }
 
-/** Where one file version of a bucket on this node came from. */
-export function getFileOrigin(bucket: string, query: { key: string; version_id?: string }, signal?: AbortSignal): Promise<OriginResponse> {
-  return requestOrigin(bucket, query, refreshContext().client, signal)
+/** Where one file version of a bucket on one node came from, this one unless named. */
+export function getFileOrigin(bucket: string, query: { key: string; version_id?: string }, signal?: AbortSignal, nodeId?: string | null): Promise<OriginResponse> {
+  return requestOrigin(bucket, query, nodeId ? nodeClient(nodeId) : refreshContext().client, signal)
 }
 
 /** The origin of an exact version id, read on the node that holds it. */
