@@ -21,7 +21,6 @@
     /* Link / accent foreground. Solid action buttons use brand royal directly. */
     --primary: 223 59% 49%; /* #335DC6 royal blue */
     --quota-stored: #3a62c8;
-    --quota-referenced: #3e9a7c;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 220 25% 95%; /* #F0F2F6 raised */
@@ -67,7 +66,6 @@
 
     --primary: 215 63% 57%; /* #4E86D7 tagline blue: links/accents */
     --quota-stored: #5b7fdb;
-    --quota-referenced: #4fae8e;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 240 9% 13%; /* #1E1E24 */

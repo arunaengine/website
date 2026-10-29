@@ -4,8 +4,6 @@
 // figure a lower bound instead of a smaller number.
 import { computed, watch } from 'vue'
 import Notice from '@/components/ui/Notice.vue'
-import QuotaBar from '@/components/ui/QuotaBar.vue'
-import QuotaLegend from '@/components/ui/QuotaLegend.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useMyGroupsUsage } from '@/composables/useMyGroupsUsage'
 import { countText } from '@/composables/useBucketCount'
@@ -71,8 +69,7 @@ const runs = computed(() => {
             <span class="ml-3 font-display text-2xl font-semibold text-aruna-navy">{{ lowerBound(referencedLower, formatBytes(sum.referenced)) }}</span>
             <span class="text-xs text-muted-foreground">referenced</span>
           </div>
-          <QuotaBar class="mt-2" :used="sum.stored" :quota="null" :referenced="sum.referenced" :show-labels="false" :legend="false" />
-          <QuotaLegend class="mt-1" quota />
+          <p class="text-xs text-muted-foreground">Stored counts against quotas. Referenced data stays at its source.</p>
         </div>
         <div class="surface flex flex-col gap-1.5 p-4">
           <span class="text-xs font-medium uppercase tracking-wider text-muted-foreground">Objects</span>

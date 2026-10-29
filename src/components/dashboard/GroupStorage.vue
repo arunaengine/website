@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// One group's storage: the bar with its quota line, then used, share of the quota and referenced.
+// One group's storage: the bar against its quota, if it has one, then used, share and referenced.
 import QuotaBar from '@/components/ui/QuotaBar.vue'
 import type { GroupUsageEntry } from '@/composables/useMyGroupsUsage'
 import { formatBytes } from '@/lib/utils'
@@ -22,7 +22,6 @@ function quotaPercent(): number {
       :referenced="entry.referencedBytes ?? 0"
       :warn="entry.quota?.warning"
       :show-labels="false"
-      :legend="false"
     />
     <div class="mt-1.5 flex flex-wrap items-baseline gap-x-3 text-[11px] tabular-nums">
       <span v-if="entry.quota?.quota_bytes != null">

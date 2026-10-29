@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import { formatBytes } from '@/lib/utils'
 import { QUOTA_BAR_COLORS } from '@/lib/quota'
-import QuotaLegend from '@/components/ui/QuotaLegend.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -12,8 +11,7 @@ const props = withDefaults(
     // Enforced hard cap (quota x grace). Renders the hatched grace zone
     // between quota and ceiling; ignored when quota is unlimited.
     ceiling?: number | null
-    // Referenced bytes (not quota-counted). Rendered as a second segment
-    // appended after the counted fill; never affects warn/over state.
+    // Referenced bytes stay at their source: named in the labels, never drawn in the bar.
     referenced?: number
     // Server-computed warn flag (GroupQuotaStatus.warning). When provided it
     // replaces the legacy 75/90% tone heuristic.
@@ -21,10 +19,9 @@ const props = withDefaults(
     color?: string
     compact?: boolean
     showLabels?: boolean
-    legend?: boolean
     label?: string
   }>(),
-  { showLabels: true, legend: true, color: QUOTA_BAR_COLORS.counted, referenced: 0 },
+  { showLabels: true, color: QUOTA_BAR_COLORS.counted, referenced: 0 },
 )
 
 const unlimited = computed(() => props.quota == null)
@@ -33,21 +30,12 @@ const ceilingBytes = computed(() =>
   props.ceiling != null && props.quota != null && props.ceiling >= props.quota ? props.ceiling : null,
 )
 const referencedBytes = computed(() => Math.max(0, props.referenced ?? 0))
-// The track spans the hard cap (or quota when no cap) and stretches when
-// usage plus referenced footprint overflows so the overflow stays visible
-// instead of silently clamping.
-const span = computed(() =>
-  Math.max(ceilingBytes.value ?? props.quota ?? 0, props.used + referencedBytes.value, 1),
-)
+// The track spans the hard cap (or quota when no cap) and stretches when usage overflows, so
+// the overflow stays visible instead of silently clamping.
+const span = computed(() => Math.max(ceilingBytes.value ?? props.quota ?? 0, props.used, 1))
 // Label keeps % of quota (same meaning as before).
 const pctOfQuota = computed(() => (!props.quota ? 0 : (props.used / props.quota) * 100))
 const usedPct = computed(() => Math.min(100, (props.used / span.value) * 100))
-// Referenced segment starts right after the counted fill; the quota/ceiling
-// ticks stay anchored at their byte positions so referenced visibly extends
-// past quota without consuming it.
-const referencedPct = computed(() =>
-  Math.min(100 - usedPct.value, (referencedBytes.value / span.value) * 100),
-)
 const quotaPct = computed(() => (props.quota == null ? 0 : (props.quota / span.value) * 100))
 const ceilingPct = computed(() =>
   ceilingBytes.value == null ? null : (ceilingBytes.value / span.value) * 100,
@@ -84,64 +72,44 @@ const tone = computed(() => {
         <span v-if="referencedBytes > 0" class="text-muted-foreground">{{ formatBytes(referencedBytes) }} referenced</span>
       </span>
     </div>
+    <!-- Only a quota gives the bar a meaning; without one the values above say it all. -->
     <div
-      :class="[
-        'relative w-full rounded-full bg-muted',
-        compact ? 'h-1' : 'h-2',
-        unlimited && used + referencedBytes === 0 ? 'opacity-60' : '',
-      ]"
-      :role="unlimited ? undefined : 'meter'"
-      :aria-label="unlimited ? undefined : (label ?? 'Storage')"
-      :aria-valuenow="unlimited ? undefined : used"
-      :aria-valuemin="unlimited ? undefined : 0"
-      :aria-valuemax="unlimited ? undefined : (ceilingBytes ?? quota ?? undefined)"
+      v-if="!unlimited"
+      :class="['relative w-full rounded-full bg-muted', compact ? 'h-1' : 'h-2']"
+      role="meter"
+      :aria-label="label ?? 'Storage'"
+      :aria-valuenow="used"
+      :aria-valuemin="0"
+      :aria-valuemax="ceilingBytes ?? quota ?? undefined"
     >
-      <template v-if="!unlimited">
-        <!-- Grace zone (hatched) sits under the fill. -->
-        <span
-          v-if="ceilingPct != null && ceilingPct > quotaPct"
-          class="absolute inset-y-0"
-          :class="ceilingPct >= 100 ? 'rounded-r-full' : ''"
-          :style="{
-            left: `${quotaPct}%`,
-            width: `${ceilingPct - quotaPct}%`,
-            backgroundImage:
-              'repeating-linear-gradient(45deg, rgba(51,93,198,0.35) 0 2px, transparent 2px 5px)',
-          }"
-        />
-      </template>
-      <template v-if="!unlimited || used + referencedBytes > 0">
-        <span
-          class="absolute inset-y-0 left-0 rounded-full transition-all"
-          :style="{ width: `${usedPct}%`, backgroundColor: tone }"
-        />
-        <!-- Referenced segment: appended after the counted fill, never
-             consuming quota (ticks stay at their byte positions). -->
-        <span
-          v-if="referencedPct > 0"
-          class="absolute inset-y-0 rounded-full transition-all"
-          :style="{
-            left: usedPct > 0 ? `calc(${usedPct}% + 2px)` : '0%',
-            width: usedPct > 0 ? `calc(${referencedPct}% - 2px)` : `${referencedPct}%`,
-            backgroundColor: QUOTA_BAR_COLORS.referenced,
-          }"
-        />
-      </template>
-      <template v-if="!unlimited">
-        <!-- Quota marker. -->
-        <span
-          v-if="quotaPct < 100"
-          class="absolute -inset-y-[3px] w-0.5 bg-foreground/50"
-          :style="{ left: `${quotaPct}%` }"
-        />
-        <!-- Ceiling marker, only visible once usage overflowed past the cap. -->
-        <span
-          v-if="ceilingPct != null && ceilingPct < 100"
-          class="absolute inset-y-0 w-px bg-rose-600/70"
-          :style="{ left: `${ceilingPct}%` }"
-        />
-      </template>
+      <!-- Grace zone (hatched) sits under the fill. -->
+      <span
+        v-if="ceilingPct != null && ceilingPct > quotaPct"
+        class="absolute inset-y-0"
+        :class="ceilingPct >= 100 ? 'rounded-r-full' : ''"
+        :style="{
+          left: `${quotaPct}%`,
+          width: `${ceilingPct - quotaPct}%`,
+          backgroundImage:
+            'repeating-linear-gradient(45deg, rgba(51,93,198,0.35) 0 2px, transparent 2px 5px)',
+        }"
+      />
+      <span
+        class="absolute inset-y-0 left-0 rounded-full transition-all"
+        :style="{ width: `${usedPct}%`, backgroundColor: tone }"
+      />
+      <!-- Quota marker. -->
+      <span
+        v-if="quotaPct < 100"
+        class="absolute -inset-y-[3px] w-0.5 bg-foreground/50"
+        :style="{ left: `${quotaPct}%` }"
+      />
+      <!-- Ceiling marker, only visible once usage overflowed past the cap. -->
+      <span
+        v-if="ceilingPct != null && ceilingPct < 100"
+        class="absolute inset-y-0 w-px bg-rose-600/70"
+        :style="{ left: `${ceilingPct}%` }"
+      />
     </div>
-    <QuotaLegend v-if="legend && !compact && referencedBytes > 0" :quota="!unlimited" :tone="tone" />
   </div>
 </template>

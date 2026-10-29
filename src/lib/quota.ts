@@ -78,7 +78,6 @@ export function assessQuota(
 // bar never scatter hex literals; stored and referenced follow the theme (main.css).
 export const QUOTA_BAR_COLORS = {
   counted: 'var(--quota-stored)',
-  referenced: 'var(--quota-referenced)',
   warn: '#335DC6',
   danger: '#DC2626',
 } as const

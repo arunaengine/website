@@ -80,7 +80,7 @@ describe('personal statistics tiles', () => {
     const text = await renderedText()
 
     expect(text).toContain(`Storage ${formatBytes(3 * 2048)} stored ${formatBytes(3 * 1024)} referenced`)
-    expect(text).toContain('Stored, counts against quotas')
+    expect(text).toContain('Stored counts against quotas. Referenced data stays at its source.')
     expect(text).toContain('Objects 12 in 3 buckets')
     expect(text).toContain('Datasets 6 and 4 process runs')
     expect(text).not.toContain('at least')
