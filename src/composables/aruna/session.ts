@@ -1,7 +1,7 @@
 import { apiRequest, defaultApiBaseUrl, setSessionGate, type RealmInfoResponse } from '@/lib/api'
 import { ownerNodeAllowed } from '@/lib/federation/transfer'
 import { errorMessage } from '@/lib/utils'
-import { loadMetadata, resetRecentOrderProbe } from './catalog'
+import { loadMetadata } from './catalog'
 import { bootstrapGate, closeGate, openGate, pendingGate } from './restoreGate'
 import { loadAuthenticated } from './identity'
 import { loadInfo } from './realm'
@@ -193,6 +193,4 @@ export function setApiBaseUrl(url: string, options: { keepToken?: boolean } = {}
   clearIdentityState(true)
   loading.value = false
   bootstrapped.value = false
-  // A different node has to be probed for recency ordering again.
-  resetRecentOrderProbe()
 }

@@ -9,7 +9,6 @@ import {
 import {
   listCatalogPage,
   listGroupMetadata,
-  listRecentMetadata,
   loadMetadata,
   metadataAtPath,
   refreshProfiles,
@@ -172,7 +171,6 @@ import {
 export { readableIri } from '@/lib/identifiers'
 export { colorFor, initials } from './aruna/format'
 export { publicProfileIri, profileReferenceIri } from './aruna/profileIri'
-export { isRecencyOrdered, walkRecentPages, type RecentWalk } from './aruna/catalog'
 export { isUnsupportedEndpoint } from './aruna/connectors'
 export { CrateNotReadyError } from './aruna/crates'
 export {
@@ -255,7 +253,6 @@ export function useAruna() {
     deleteMetadataDocument,
     listCatalogPage,
     listGroupMetadata,
-    listRecentMetadata,
     toggleFavourite,
     updateUserProfile,
     setRealmQuota,
