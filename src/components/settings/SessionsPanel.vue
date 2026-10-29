@@ -25,7 +25,13 @@ watch(currentUser, (user) => {
   void load()
 }, { immediate: true })
 
-const rows = computed(() => [...sessions.value].sort((a, b) => Number(b.current) - Number(a.current)))
+// This browser first, then the newest; the list opens with the newest ten.
+const SHOWN = 10
+const all = ref(false)
+const sorted = computed(() =>
+  [...sessions.value].sort((a, b) => Number(b.current) - Number(a.current) || b.created_at.localeCompare(a.created_at)),
+)
+const rows = computed(() => (all.value ? sorted.value : sorted.value.slice(0, SHOWN)))
 
 function expired(session: UserSession): boolean {
   return new Date(session.expires_at).getTime() <= Date.now()
@@ -128,6 +134,9 @@ async function confirmRevoke(session: UserSession) {
             </tr>
           </tbody>
         </table>
+      </div>
+      <div v-if="sorted.length > SHOWN" class="border-t border-border px-5 py-2">
+        <Button variant="ghost" size="sm" @click="all = !all">{{ all ? 'Show the newest 10' : `Show all ${sorted.length}` }}</Button>
       </div>
     </template>
   </section>

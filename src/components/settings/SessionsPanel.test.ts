@@ -70,6 +70,21 @@ describe('SessionsPanel', () => {
     expect(text).toContain('active')
   })
 
+  it('shows this browser and the newest ten first, the rest on request', async () => {
+    sessions.value = Array.from({ length: 13 }, (_, index) =>
+      session({ session_id: `s${index}`, label: `Session ${index}`, created_at: new Date(Date.UTC(2026, 9, 1 + index)).toISOString() }))
+    sessions.value[0] = { ...sessions.value[0], current: true }
+    const { root } = await mountApp(SessionsPanel)
+
+    const text = content(root)
+    expect(text).toContain('Session 0')
+    expect(text).toContain('Session 12')
+    expect(text).toContain('Session 4')
+    expect(text).not.toContain('Session 3 ')
+    await click(button(root, 'Show all 13'))
+    expect(content(root)).toContain('Session 3 ')
+  })
+
   it('marks a revoked session and offers no revoke action for it', async () => {
     sessions.value = [session({ revoked: true })]
     const { root } = await mountApp(SessionsPanel)
