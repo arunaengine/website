@@ -75,10 +75,10 @@ export function assessQuota(
 }
 
 // Single source of truth for the quota bar segment tones so callers and the
-// bar never scatter hex literals.
+// bar never scatter hex literals; stored and referenced follow the theme (main.css).
 export const QUOTA_BAR_COLORS = {
-  counted: '#08216C',
-  referenced: '#55C4DE',
+  counted: 'var(--quota-stored)',
+  referenced: 'var(--quota-referenced)',
   warn: '#335DC6',
   danger: '#DC2626',
 } as const

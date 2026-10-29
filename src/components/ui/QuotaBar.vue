@@ -86,8 +86,8 @@ const tone = computed(() => {
     </div>
     <div
       :class="[
-        'relative w-full overflow-hidden rounded-full bg-muted',
-        compact ? 'h-1' : 'h-1.5',
+        'relative w-full rounded-full bg-muted',
+        compact ? 'h-1' : 'h-2',
         unlimited && used + referencedBytes === 0 ? 'opacity-60' : '',
       ]"
       :role="unlimited ? undefined : 'meter'"
@@ -101,6 +101,7 @@ const tone = computed(() => {
         <span
           v-if="ceilingPct != null && ceilingPct > quotaPct"
           class="absolute inset-y-0"
+          :class="ceilingPct >= 100 ? 'rounded-r-full' : ''"
           :style="{
             left: `${quotaPct}%`,
             width: `${ceilingPct - quotaPct}%`,
@@ -111,18 +112,17 @@ const tone = computed(() => {
       </template>
       <template v-if="!unlimited || used + referencedBytes > 0">
         <span
-          class="absolute inset-y-0 left-0 transition-all"
-          :class="referencedPct > 0 ? 'rounded-l-full' : 'rounded-full'"
+          class="absolute inset-y-0 left-0 rounded-full transition-all"
           :style="{ width: `${usedPct}%`, backgroundColor: tone }"
         />
         <!-- Referenced segment: appended after the counted fill, never
              consuming quota (ticks stay at their byte positions). -->
         <span
           v-if="referencedPct > 0"
-          class="absolute inset-y-0 rounded-r-full transition-all"
+          class="absolute inset-y-0 rounded-full transition-all"
           :style="{
-            left: `${usedPct}%`,
-            width: `${referencedPct}%`,
+            left: usedPct > 0 ? `calc(${usedPct}% + 2px)` : '0%',
+            width: usedPct > 0 ? `calc(${referencedPct}% - 2px)` : `${referencedPct}%`,
             backgroundColor: QUOTA_BAR_COLORS.referenced,
           }"
         />
@@ -131,7 +131,7 @@ const tone = computed(() => {
         <!-- Quota marker. -->
         <span
           v-if="quotaPct < 100"
-          class="absolute inset-y-0 w-0.5 bg-foreground/50"
+          class="absolute -inset-y-[3px] w-0.5 bg-foreground/50"
           :style="{ left: `${quotaPct}%` }"
         />
         <!-- Ceiling marker, only visible once usage overflowed past the cap. -->
