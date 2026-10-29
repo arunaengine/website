@@ -20,6 +20,15 @@ describe('MetadataView', () => {
     expect(source).toContain("watch(routeTab, (value) => value === 'graph' && (developersOpen.value = true), { immediate: true })")
   })
 
+  it('keeps the people and context of a run record in the developer section', () => {
+    const overview = source.slice(source.indexOf('<RunProvenancePanel'), source.indexOf('<details'))
+    const developers = source.slice(source.indexOf('<details'))
+    expect(overview).toContain('<template v-if="!runProvenance">\n            <PeopleSection')
+    expect(developers).toContain('<template v-if="runProvenance">\n              <PeopleSection')
+    expect(developers).toContain('<ContextSection')
+    expect(overview).toContain('<DetailsSection')
+  })
+
   it('shows the dataset id once, in the developer section with a copy button', () => {
     expect(source.match(/\{\{ detailId \}\}/g)).toHaveLength(1)
     expect(source).toContain('<CopyButton :value="detailId" label="Copy the dataset id" />')

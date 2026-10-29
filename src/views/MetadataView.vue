@@ -334,19 +334,22 @@ function jumpTo(entityId: string) {
             @jump="jumpEntity"
           />
 
-          <PeopleSection
-            :people="presentation.people"
-            :organizations="presentation.organizations"
-            :highlight-id="highlightId"
-            @jump="jumpEntity"
-          />
+          <!-- A run record's people and context entities are technical; they wait in "For developers". -->
+          <template v-if="!runProvenance">
+            <PeopleSection
+              :people="presentation.people"
+              :organizations="presentation.organizations"
+              :highlight-id="highlightId"
+              @jump="jumpEntity"
+            />
 
-          <ContextSection
-            :entities="presentation.entities"
-            :comments="presentation.comments"
-            :highlight-id="highlightId"
-            @jump="jumpEntity"
-          />
+            <ContextSection
+              :entities="presentation.entities"
+              :comments="presentation.comments"
+              :highlight-id="highlightId"
+              @jump="jumpEntity"
+            />
+          </template>
 
           <SubcratesSection
             v-if="subcrateIris.size"
@@ -401,6 +404,20 @@ function jumpTo(entityId: string) {
               :can-write="canWrite"
               @changed="(value: StorageLocation) => (changedStorage = value)"
             />
+            <template v-if="runProvenance">
+              <PeopleSection
+                :people="presentation.people"
+                :organizations="presentation.organizations"
+                :highlight-id="highlightId"
+                @jump="jumpEntity"
+              />
+              <ContextSection
+                :entities="presentation.entities"
+                :comments="presentation.comments"
+                :highlight-id="highlightId"
+                @jump="jumpEntity"
+              />
+            </template>
             <DatasetGraph v-if="developersOpen" :state="state" @open="openInfo" />
             <CrateImportExport
               ref="crateSection"
