@@ -67,6 +67,9 @@ const recentRunList = ref<unknown[]>([])
 const runningRuns = ref({ count: 0, atLeast: false })
 const runsState = ref('ready')
 const loadRuns = vi.fn(async () => undefined)
+// The caller's group counts, which split datasets from runs; the group cards read the same state.
+const groupsAggregate = ref<{ datasets: number | null; processRuns: number | null }>({ datasets: null, processRuns: null })
+const groupsUsageStub = { useMyGroupsUsage: () => ({ aggregate: groupsAggregate }) }
 const recentRunsStub = { useRecentRuns: () => ({ runs: recentRunList, running: runningRuns, state: runsState, load: loadRuns }) }
 const setScope = vi.fn(async () => undefined)
 const refresh = vi.fn(async () => undefined)
@@ -194,6 +197,7 @@ beforeAll(async () => {
   vi.doMock('@/components/dashboard/NodeCards.vue', () => ({ default: NodeCardsStub }))
   vi.doMock('@/composables/useNodeNames', () => nodeNamesStub)
   vi.doMock('@/composables/useRecentRuns', () => recentRunsStub)
+  vi.doMock('@/composables/useMyGroupsUsage', () => groupsUsageStub)
   vi.doMock('@/components/dashboard/FederationPanel.vue', () => ({ default: MapStub }))
   vi.doMock('@/components/dashboard/NodeTable.vue', () => ({ default: TableStub }))
   vi.doMock('@/components/dashboard/NodeGeoMap.vue', () => ({ default: GeoMapStub }))
@@ -271,6 +275,7 @@ beforeAll(async () => {
     '@/components/dashboard/NodeCards.vue': moduleDefault(NodeCardsStub),
     '@/composables/useNodeNames': nodeNamesStub,
     '@/composables/useRecentRuns': recentRunsStub,
+    '@/composables/useMyGroupsUsage': groupsUsageStub,
     '@/components/dashboard/FederationPanel.vue': moduleDefault(MapStub),
     '@/components/dashboard/NodeTable.vue': moduleDefault(TableStub),
     '@/components/dashboard/NodeGeoMap.vue': moduleDefault(GeoMapStub),
@@ -303,6 +308,7 @@ beforeEach(() => {
     nodes: [],
   }
   usageInfo.value = null
+  groupsAggregate.value = { datasets: null, processRuns: null }
   loading.value = false
   bootstrapped.value = true
   sessionEpoch.value = 0
@@ -372,7 +378,8 @@ describe('guest dashboard truth', () => {
 
     const text = await renderedText()
 
-    expect(text).toContain('Work 23 datasets')
+    // The public count covers every record kind, runs too, so it names no datasets.
+    expect(text).toContain('Work 23 records')
     expect(text).toContain('Realm 4 nodes')
     expect(text).toContain('Sign in')
     // Storage and data are figures of a signed-in session.
@@ -457,6 +464,9 @@ describe('authenticated dashboard scope', () => {
     scope.value = 'realm'
     databaseState.value = 'ready'
     databaseRows.value = [{}, {}]
+    groupsAggregate.value = { datasets: 0, processRuns: 4 }
+    runningRuns.value = { count: 0, atLeast: false }
+    runsState.value = 'ready'
 
     const text = await renderedText()
 
@@ -465,7 +475,9 @@ describe('authenticated dashboard scope', () => {
     // The database list holds only what this caller may read, so it is no realm total.
     expect(text).toContain('Data 11 objects 3 buckets')
     expect(text).not.toContain('database')
-    expect(text).toContain('Work 9 datasets')
+    // The realm's 9 records are 4 runs and no dataset, counted as the group card counts them.
+    expect(text).toContain('Work 4 runs 0 running, 0 datasets')
+    expect(text).not.toContain('9 datasets')
     expect(text).toContain('group quota cards')
     expect(text).not.toContain('my stats cards')
   })
@@ -476,15 +488,16 @@ describe('authenticated dashboard scope', () => {
 
     const mounted = await mountApp(DashboardClient)
     expect(content(mounted.root)).toContain('my stats cards')
-    expect(content(mounted.root)).not.toContain('9 datasets')
+    expect(content(mounted.root)).not.toContain('2 runs')
 
     await click(button(mounted.root, 'show realm'))
     expect(setScope).toHaveBeenCalledWith('realm')
 
     // The composable flips `scope` optimistically; the view follows it.
+    groupsAggregate.value = { datasets: 1, processRuns: 2 }
     scope.value = 'realm'
     await flush()
-    expect(content(mounted.root)).toContain('9 datasets')
+    expect(content(mounted.root)).toContain('2 runs')
     expect(content(mounted.root)).not.toContain('my stats cards')
     mounted.app.unmount()
     vi.unstubAllGlobals()

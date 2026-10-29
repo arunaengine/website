@@ -22,6 +22,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { useMyGroupsUsage } from '@/composables/useMyGroupsUsage'
 import { useRecentRuns } from '@/composables/useRecentRuns'
 import { useDatabases } from '@/composables/useDatabases'
 import { computerName } from '@/composables/useRealmNodes'
@@ -221,9 +222,6 @@ const replication = computed(() => {
   return factor === null ? 'Replication on all eligible nodes' : factor === undefined ? null : `Replication ×${factor}`
 })
 
-// Realm-wide total of live datasets, not a per-caller figure. The loaded
-// catalog is a paged subset, so it must never stand in as the realm total.
-const realmDocuments = computed(() => usageInfo.value?.metadata_documents ?? null)
 const publicOverview = computed(() => realmInfo.value?.public_overview)
 
 // Realm-wide totals the same /system/usage response carries; the top-level
@@ -238,8 +236,10 @@ const realmDataLine = computed(() => {
   const buckets = realmBuckets.value ?? { count: totals.buckets, exact: true }
   return `${countText(buckets, formatCount)} ${plural(buckets.exact ? buckets.count : 2, 'bucket', 'buckets')}`
 })
-// A guest sees the public counts; unknown stays unknown, never zero.
-const realmDatasets = computed(() => (currentUser.value ? realmDocuments.value : publicOverview.value?.live_datasets) ?? null)
+// The realm counts every record kind at once; only the groups count datasets apart from runs, so
+// a signed-in Work cell counts them as the group card does. A guest sees the public record count.
+const groupsUsage = useMyGroupsUsage().aggregate
+const guestRecords = computed(() => publicOverview.value?.live_datasets ?? null)
 const realmNodesText = computed(() => {
   if (infraNodes.value.length) return { count: onlineNodes.value, word: 'online' }
   const configured = publicOverview.value?.nodes_configured
@@ -331,15 +331,23 @@ const pageDescription = computed(() =>
                 {{ realmDataLine }}
               </OverviewCell>
             </template>
-            <OverviewCell label="Work" :class="currentUser ? '' : 'sm:col-span-1 lg:col-span-3'">
-              <template v-if="realmDatasets !== null" #value>
-                <RouterLink :to="{ name: 'datasets' }" class="hover:underline"><b>{{ formatCount(realmDatasets) }}</b></RouterLink>
-                {{ plural(realmDatasets, 'dataset', 'datasets') }}
+            <OverviewCell v-if="currentUser" label="Work">
+              <template v-if="groupsUsage.processRuns != null" #value>
+                <RouterLink :to="{ name: 'compute' }" class="hover:underline"><b>{{ formatCount(groupsUsage.processRuns) }}</b></RouterLink>
+                {{ plural(groupsUsage.processRuns, 'run', 'runs') }}
               </template>
               <template v-else #value>Unknown</template>
-              <template v-if="currentUser && recentRuns.state.value === 'ready'">
-                {{ recentRuns.running.value.atLeast ? 'at least ' : '' }}{{ formatCount(recentRuns.running.value.count) }} running
+              {{ [
+                recentRuns.state.value === 'ready' ? `${recentRuns.running.value.atLeast ? 'at least ' : ''}${formatCount(recentRuns.running.value.count)} running` : '',
+                groupsUsage.datasets != null ? `${formatCount(groupsUsage.datasets)} ${plural(groupsUsage.datasets, 'dataset', 'datasets')}` : '',
+              ].filter(Boolean).join(', ') }}
+            </OverviewCell>
+            <OverviewCell v-else label="Work" class="sm:col-span-1 lg:col-span-3">
+              <template v-if="guestRecords !== null" #value>
+                <RouterLink :to="{ name: 'datasets' }" class="hover:underline"><b>{{ formatCount(guestRecords) }}</b></RouterLink>
+                {{ plural(guestRecords, 'record', 'records') }}
               </template>
+              <template v-else #value>Unknown</template>
             </OverviewCell>
           </template>
           <OverviewCell v-if="currentUser" label="Activity">
