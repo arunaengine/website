@@ -14,7 +14,8 @@ import { isMulti } from '@/lib/distribution'
 import type { DeleteRequest, DeletionResult } from '@/lib/deletion/request'
 import { Trash2 } from '@lucide/vue'
 
-const props = defineProps<{ bucket: string; nodeId: string | null; groupId: string | null }>()
+// `bare`: inside a section that already names it, without its own card and title.
+const props = defineProps<{ bucket: string; nodeId: string | null; groupId: string | null; bare?: boolean }>()
 
 const router = useRouter()
 const s3 = useS3()
@@ -44,10 +45,12 @@ async function onCompleted(result: DeletionResult) {
 </script>
 
 <template>
-  <section class="surface">
+  <section :class="bare ? 'border-t border-border' : 'surface'">
     <header class="flex items-center gap-2 border-b border-border px-5 py-4">
-      <Trash2 class="size-4 text-primary" />
-      <h2 class="font-display text-sm font-semibold text-aruna-navy">Delete bucket</h2>
+      <template v-if="!bare">
+        <Trash2 class="size-4 text-primary" />
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">Delete bucket</h2>
+      </template>
       <Button
         variant="outline"
         size="sm"

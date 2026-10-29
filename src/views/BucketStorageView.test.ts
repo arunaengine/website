@@ -3,6 +3,7 @@ import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as Distribution from '@/lib/distribution'
 import * as GroupAdmin from '@/lib/groupAdmin'
+import * as Utils from '@/lib/utils'
 import type { GroupDetailResponse } from '@/lib/api'
 import { compileClientComponent, content, flush, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 
@@ -35,14 +36,15 @@ const setView = ref<unknown>(null)
 const setState = ref('ordinary')
 const setError = ref<string | null>(null)
 const group = ref<GroupDetailResponse>(groupDetail(false))
+const usage = ref({ logical_bytes: 2048, objects: 52, versions: 60, delete_markers: 0, open_multipart_uploads: 0, complete: true })
 
 const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
 const Slotted = (tag: string) =>
   defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()) })
 const PageHeaderStub = defineComponent({
-  props: { title: String },
+  props: { title: String, description: String },
   setup: (props, { slots }) => () =>
-    h('header', [h('h1', props.title), slots.breadcrumbs?.(), slots.actions?.()]),
+    h('header', [h('h1', props.title), h('p', props.description), slots.breadcrumbs?.(), slots.actions?.()]),
 })
 const TabsStub = defineComponent({
   props: { modelValue: String },
@@ -98,13 +100,16 @@ const view = compileClientComponent(new URL('./BucketStorageView.vue', import.me
   '@/components/storage/BucketComplianceSection.vue': moduleDefault(Marker('compliance on this node')),
   '@/components/storage/BucketEncryptionTab.vue': moduleDefault(Marker('encryption state')),
   '@/components/storage/BucketPolicySection.vue': moduleDefault(Marker('where copies may be stored')),
-  '@/components/storage/StorageOverviewTab.vue': moduleDefault(Marker('overview details')),
+  '@/components/storage/BucketCheckSection.vue': moduleDefault(Marker('check files')),
+  '@/components/storage/BucketLinkNote.vue': moduleDefault(Marker('linked folder')),
+  '@/lib/utils': Utils,
   '@/components/storage/TransfersTab.vue': moduleDefault(Marker('transfer rows')),
   '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: (key: string) => !hiddenFeatures.has(key) }) },
   '@/composables/useAruna': {
     useAruna: () => ({
       currentUser: ref({ id: 'u-1' }),
       getGroup: () => Promise.resolve(group.value),
+      getBucketUsage: () => Promise.resolve(usage.value),
       isRealmAdmin,
     }),
   },
@@ -158,9 +163,9 @@ describe('bucket storage page', () => {
   it('keeps the policy tabs from a reader', async () => {
     const root = await render()
 
-    expect(content(root)).toContain('Settings for reef-survey')
+    expect(content(root)).toContain('reef-survey')
     expect(tabs(root)).toEqual(['overview', 'access', 'encryption', 'transfers'])
-    expect(content(root)).toContain('overview details')
+    expect(content(root)).toContain('bucket metadata')
   })
 
   it('opens the tab named in the query', async () => {
@@ -172,14 +177,14 @@ describe('bucket storage page', () => {
   it('falls back to the overview when the query names a tab this viewer lacks', async () => {
     const root = await render({ query: { tab: 'placement' } })
 
-    expect(content(root)).toContain('overview details')
+    expect(content(root)).toContain('bucket metadata')
     expect(content(root)).not.toContain('where copies may be stored')
   })
 
   it('offers the backend and placement tabs to a group admin', async () => {
     const root = await render({ admin: true, query: { tab: 'placement' } })
 
-    expect(tabs(root)).toEqual(['overview', 'backend', 'placement', 'access', 'encryption', 'transfers'])
+    expect(tabs(root)).toEqual(['overview', 'storage', 'access', 'encryption', 'transfers'])
     expect(content(root)).toContain('where copies may be stored')
     expect(content(root)).toContain('compliance on this node')
   })
@@ -196,14 +201,14 @@ describe('bucket storage page', () => {
   it('offers a realm admin placement but not the group routing rules', async () => {
     const root = await render({ realmAdmin: true, query: { tab: 'placement' } })
 
-    expect(tabs(root)).toEqual(['overview', 'placement', 'access', 'encryption', 'transfers'])
+    expect(tabs(root)).toEqual(['overview', 'storage', 'access', 'encryption', 'transfers'])
     expect(content(root)).toContain('where copies may be stored')
   })
 
   it('names every section the way the settings page calls it', async () => {
     const root = await render({ admin: true })
 
-    expect(tabLabels(root)).toEqual(['Overview', 'Storage backend', 'Placement', 'Access', 'Encryption', 'Transfers'])
+    expect(tabLabels(root)).toEqual(['Overview', 'Storage', 'Access', 'Encryption', 'Sources and transfers'])
   })
 
   it('ends the overview with the bucket deletion and opens the access tab', async () => {
@@ -214,7 +219,7 @@ describe('bucket storage page', () => {
   it('keeps the settings tabs for a bucket hosted elsewhere, since its node answers for them', async () => {
     const root = await render({ admin: true, realmAdmin: true, query: { node: 'node-far', tab: 'transfers' } })
 
-    expect(tabs(root)).toEqual(['overview', 'backend', 'placement', 'access', 'encryption', 'transfers'])
+    expect(tabs(root)).toEqual(['overview', 'storage', 'access', 'encryption', 'transfers'])
     expect(content(root)).toContain('transfer rows')
   })
 
@@ -249,5 +254,22 @@ describe('bucket storage page', () => {
 
   it('keeps an ordinary bucket without the nodes tab', async () => {
     expect(tabs(await render())).not.toContain('nodes')
+  })
+
+  it('sums the bucket up in one line and names markers only when there are any', async () => {
+    usage.value = { ...usage.value, delete_markers: 0 }
+    expect(content(await render())).toContain('2 KB stored, 52 files, on Node B')
+    usage.value = { ...usage.value, delete_markers: 3 }
+    expect(content(await render())).toContain('52 files, 3 delete markers, on Node B')
+    usage.value = { ...usage.value, delete_markers: 0 }
+  })
+
+  it('keeps the file check under Storage and the sources with the transfers', async () => {
+    const storage = await render({ admin: true, query: { tab: 'storage' } })
+    expect(content(storage)).toContain('check files')
+    expect(content(storage)).toContain('backend rules')
+    const transfers = content(await render({ query: { tab: 'transfers' } }))
+    expect(transfers).toContain('sources of files')
+    expect(transfers).toContain('transfer rows')
   })
 })

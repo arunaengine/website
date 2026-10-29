@@ -1,14 +1,11 @@
 <script setup lang="ts">
-// One settings page per bucket: what it holds, where its data goes and where
-// it already is. Policy tabs are gated by what the node will let this viewer
-// write; the overview and the sync list are readable by anyone who reads the
-// bucket, and every observed line names the node it came from.
+// One settings page per bucket: a summary line, the description and releases, where its data
+// goes (Storage), who may read it, its encryption and how files got in. Policy parts are gated
+// by what the node will let this viewer write.
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
-import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
-import DocsLink from '@/components/ui/DocsLink.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
@@ -16,6 +13,8 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import BucketAccessTab from '@/components/storage/BucketAccessTab.vue'
 import BucketBackendTab from '@/components/storage/BucketBackendTab.vue'
+import BucketCheckSection from '@/components/storage/BucketCheckSection.vue'
+import BucketLinkNote from '@/components/storage/BucketLinkNote.vue'
 import BucketComplianceSection from '@/components/storage/BucketComplianceSection.vue'
 import BucketDeleteSection from '@/components/storage/BucketDeleteSection.vue'
 import AccessTab from '@/components/distributed/AccessTab.vue'
@@ -30,7 +29,6 @@ import LinkedDatasets from '@/components/data/LinkedDatasets.vue'
 import BucketMetadataSection from '@/components/storage/BucketMetadataSection.vue'
 import CopiesOfBucket from '@/components/storage/CopiesOfBucket.vue'
 import FileSources from '@/components/storage/FileSources.vue'
-import StorageOverviewTab from '@/components/storage/StorageOverviewTab.vue'
 import TransfersTab from '@/components/storage/TransfersTab.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useBucketDistribution } from '@/composables/useBucketDistribution'
@@ -42,11 +40,12 @@ import { mockEnabled } from '@/lib/distributedMock'
 import { mockBucket } from '@/lib/distributedMockData'
 import { isMulti } from '@/lib/distribution'
 import { isGroupAdmin } from '@/lib/groupAdmin'
-import type { GroupDetailResponse } from '@/lib/api'
+import type { BucketUsageResponse, GroupDetailResponse } from '@/lib/api'
+import { formatBytes, formatNumber } from '@/lib/utils'
 import { ChevronLeft } from '@lucide/vue'
 
 const route = useRoute()
-const { currentUser, getGroup, isRealmAdmin } = useAruna()
+const { currentUser, getGroup, getBucketUsage, isRealmAdmin } = useAruna()
 const { shown } = usePortalFeatures()
 const { activeContext } = useS3()
 const realmNodes = useRealmNodes()
@@ -102,21 +101,48 @@ const placementNodes = computed<(string | null)[]>(() => {
 // A hidden feature loses its tab trigger only; a deep link still opens the tab.
 const placementTrigger = computed(() => placementVisible.value && shown('placement'))
 
-const TAB_IDS = ['overview', 'nodes', 'backend', 'placement', 'access', 'encryption', 'transfers']
+// Storage holds the backend rules, placement and the file check; old links to their tabs land there.
+const storageVisible = computed(() => backendVisible.value || placementVisible.value)
+const TAB_IDS = ['overview', 'nodes', 'storage', 'backend', 'placement', 'access', 'encryption', 'transfers']
 const routeTab = useRouteTab(TAB_IDS, 'overview')
 const tab = computed({
   get() {
-    const value = routeTab.value
+    const value = routeTab.value === 'backend' || routeTab.value === 'placement' ? 'storage' : routeTab.value
     if (example.value && !['overview', 'nodes', 'transfers', 'access'].includes(value)) return 'overview'
     if (value === 'nodes' && !nodesTab.value) return 'overview'
-    if (value === 'backend' && !backendVisible.value) return 'overview'
-    if (value === 'placement' && !placementVisible.value) return 'overview'
+    if (value === 'storage' && !storageVisible.value) return 'overview'
     if (value === 'access' && !groupId.value && !example.value) return 'overview'
     return value
   },
   set(next: string) {
     routeTab.value = next
   },
+})
+
+// The summary line: size, files and the nodes; delete markers and open uploads only when there are any.
+const usage = ref<BucketUsageResponse | null>(null)
+watch([bucket, nodeId], async ([name, node]) => {
+  usage.value = null
+  if (example.value || !name) return
+  const counted = await getBucketUsage(name, node).catch(() => null)
+  if (name === bucket.value && node === nodeId.value) usage.value = counted
+}, { immediate: true })
+const plural = (count: number, one: string, many: string) => `${formatNumber(count)} ${count === 1 ? one : many}`
+const summary = computed(() => {
+  const held = usage.value
+  const parts: string[] = []
+  if (held) {
+    const lower = held.complete ? '' : 'at least '
+    parts.push(`${lower}${formatBytes(held.logical_bytes)} stored`)
+    if (held.referenced_bytes) parts.push(`${lower}${formatBytes(held.referenced_bytes)} referenced`)
+    parts.push(`${lower}${plural(held.objects, 'file', 'files')}`)
+    if (held.delete_markers) parts.push(plural(held.delete_markers, 'delete marker', 'delete markers'))
+    if (held.open_multipart_uploads) parts.push(plural(held.open_multipart_uploads, 'open multipart upload', 'open multipart uploads'))
+  }
+  const where = memberNodes.value.length ? memberNodes.value : [nodeId.value]
+  const names = where.map((id) => realmNodes.displayName(id))
+  parts.push(`on ${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]}`)
+  return parts.join(', ')
 })
 
 const browserLink = computed(() => ({
@@ -131,19 +157,14 @@ const browserLink = computed(() => ({
 
 <template>
   <div>
-    <PageHeader :title="`Settings for ${bucket}`" :docs="{ topic: 'where-data-lives', section: 'Buckets' }">
-      <template #description>
-        What this bucket holds, where new uploads go, which rules apply, and what this node can see.
-        <DocsLink icon topic="where-data-lives" class="ml-0.5" />
-      </template>
+    <PageHeader :title="bucket" :description="summary" :docs="{ topic: 'where-data-lives', section: 'Buckets' }">
       <template #breadcrumbs>
-        <span>·</span>
+        <span>/</span>
         <RouterLink :to="browserLink" class="hover:underline">Data</RouterLink>
-        <span>·</span>
+        <span>/</span>
         <span class="font-mono">{{ bucket }}</span>
-        <Badge v-if="nodeId" variant="outline" size="sm" :title="nodeId">
-          on {{ realmNodes.displayName(nodeId) }}
-        </Badge>
+        <span>/</span>
+        <span>Settings</span>
       </template>
       <template #actions>
         <Button variant="outline" size="sm" as-child>
@@ -157,53 +178,53 @@ const browserLink = computed(() => ({
         <TabsList aria-label="Bucket settings sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger v-if="nodesTab" value="nodes">Nodes</TabsTrigger>
-          <TabsTrigger v-if="backendVisible && !example" value="backend">Storage backend</TabsTrigger>
-          <TabsTrigger v-if="placementTrigger && !example" value="placement">Placement</TabsTrigger>
+          <TabsTrigger v-if="(backendVisible || placementTrigger) && !example" value="storage">Storage</TabsTrigger>
           <TabsTrigger v-if="groupId || example" value="access">Access</TabsTrigger>
           <TabsTrigger v-if="!example" value="encryption">Encryption</TabsTrigger>
-          <TabsTrigger value="transfers">Transfers</TabsTrigger>
+          <TabsTrigger value="transfers">Sources and transfers</TabsTrigger>
         </TabsList>
       </div>
 
       <TabsContent value="overview" class="mt-0 space-y-5">
         <DistributionOverview v-if="example" :bucket="example" />
-        <StorageOverviewTab v-else :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
+        <BucketLinkNote v-else-if="!nodeId" :bucket="bucket" :group-id="groupId" />
         <DistributionOverview v-if="live" :bucket="live" />
-        <FileSources v-if="example" :bucket="bucket" />
-        <BucketSources v-else :bucket="bucket" :nodes="ownerNodes" :group-id="groupId" />
-        <LinkedDatasets v-if="!example" heading="Linked by datasets" card :target="{ bucket, key: '', folder: true, node: nodeId }" />
         <BucketMetadataSection v-if="!example" :bucket="bucket" :node-id="nodeId" :can-admin="canAdminGroup" />
+        <LinkedDatasets v-if="!example" heading="Linked by datasets" card quiet-empty :target="{ bucket, key: '', folder: true, node: nodeId }" />
         <Notice v-if="!example && distribution.error.value" tone="error">
           How this bucket is stored could not be read: {{ distribution.error.value }}
         </Notice>
-        <SetDeleteSection v-if="live" :bucket="live" :admin="canAdminGroup" @changed="distribution.reload" />
         <!-- A bucket still loading or unreadable is not taken for an ordinary one. -->
-        <BucketDeleteSection v-else-if="nodeId || distribution.state.value === 'ordinary'" :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
+        <details v-if="live || nodeId || distribution.state.value === 'ordinary'" class="surface">
+          <summary class="cursor-pointer px-5 py-4 text-sm font-semibold text-destructive">Delete bucket</summary>
+          <SetDeleteSection v-if="live" bare :bucket="live" :admin="canAdminGroup" @changed="distribution.reload" />
+          <BucketDeleteSection v-else bare :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
+        </details>
       </TabsContent>
 
       <TabsContent v-if="nodes && nodesTab" value="nodes" class="mt-0">
         <BucketNodesTab :bucket="nodes" :admin="canAdminGroup" :busy="distribution.state.value === 'loading'" @reload="distribution.reload" />
       </TabsContent>
 
-      <TabsContent v-if="backendVisible" value="backend" class="mt-0">
-        <BucketBackendTab :bucket="bucket" :group-id="groupId" :node-id="nodeId" :members="memberNodes" />
-      </TabsContent>
-
-      <TabsContent v-if="placementVisible" value="placement" class="mt-0 space-y-5">
-        <BucketPolicySection
-          :bucket="bucket"
-          :group-id="groupId"
-          :group-name="group?.display_name ?? null"
-          :can-publish-for-group="canAdminGroup"
-          :can-publish-for-realm="isRealmAdmin && !canAdminGroup"
-          :nodes="placementNodes"
-        />
-        <BucketComplianceSection
-          :bucket="bucket"
-          :node-id="nodeId"
-          :can-apply="canAdminGroup || isRealmAdmin"
-          blocked-reason="Only group admins of this bucket and realm admins may apply the rules."
-        />
+      <TabsContent v-if="storageVisible" value="storage" class="mt-0 space-y-5">
+        <BucketBackendTab v-if="backendVisible" :bucket="bucket" :group-id="groupId" :node-id="nodeId" :members="memberNodes" />
+        <template v-if="placementVisible">
+          <BucketPolicySection
+            :bucket="bucket"
+            :group-id="groupId"
+            :group-name="group?.display_name ?? null"
+            :can-publish-for-group="canAdminGroup"
+            :can-publish-for-realm="isRealmAdmin && !canAdminGroup"
+            :nodes="placementNodes"
+          />
+          <BucketComplianceSection
+            :bucket="bucket"
+            :node-id="nodeId"
+            :can-apply="canAdminGroup || isRealmAdmin"
+            blocked-reason="Only group admins of this bucket and realm admins may apply the rules."
+          />
+        </template>
+        <BucketCheckSection v-if="canAdminGroup" :bucket="bucket" :node-id="nodeId" />
       </TabsContent>
 
       <TabsContent v-if="groupId || example" value="access" class="mt-0 space-y-5">
@@ -216,7 +237,9 @@ const browserLink = computed(() => ({
         <BucketEncryptionTab :bucket="bucket" :node-id="nodeId" :group-id="groupId" />
       </TabsContent>
 
-      <TabsContent value="transfers" class="mt-0">
+      <TabsContent value="transfers" class="mt-0 space-y-5">
+        <FileSources v-if="example" :bucket="bucket" />
+        <BucketSources v-else :bucket="bucket" :nodes="ownerNodes" :group-id="groupId" />
         <CopiesOfBucket v-if="example" :bucket="bucket" />
         <TransfersTab v-else :bucket="bucket" :node-id="nodeId" :owner-nodes="ownerNodes" :group-id="groupId" />
       </TabsContent>

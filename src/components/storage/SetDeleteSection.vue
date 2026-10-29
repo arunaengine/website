@@ -8,17 +8,20 @@ import Button from '@/components/ui/Button.vue'
 import type { DistributedBucket } from '@/lib/distribution'
 import { Trash2 } from '@lucide/vue'
 
-defineProps<{ bucket: DistributedBucket; admin: boolean }>()
+// `bare`: inside a section that already names it, without its own card and title.
+defineProps<{ bucket: DistributedBucket; admin: boolean; bare?: boolean }>()
 const emit = defineEmits<{ (e: 'changed'): void }>()
 
 const open = ref(false)
 </script>
 
 <template>
-  <section class="surface">
+  <section :class="bare ? 'border-t border-border' : 'surface'">
     <header class="flex items-center gap-2 border-b border-border px-5 py-4">
-      <Trash2 class="size-4 text-primary" />
-      <h2 class="font-display text-sm font-semibold text-aruna-navy">Delete bucket</h2>
+      <template v-if="!bare">
+        <Trash2 class="size-4 text-primary" />
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">Delete bucket</h2>
+      </template>
       <Button
         v-if="admin && !bucket.live?.deletion"
         variant="destructive"
