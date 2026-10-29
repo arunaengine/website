@@ -58,9 +58,10 @@ const ANY = '*'
 // The node id label duplicates the "One node" mode, so it is not a filter.
 const NODE_LABEL_KEY = 'aruna-engine.org/node'
 
-const nodes = computed(() => realmInfo.value?.nodes ?? [])
+// Placement chooses among the realm's nodes; a device never holds the group's data.
+const nodes = computed(() => (realmInfo.value?.nodes ?? []).filter((node) => node.kind !== 'user'))
 const nodeOptions = computed(() =>
-  realmNodes.nodes.value.map((node) => ({ value: node.nodeId, label: node.label })),
+  realmNodes.nodes.value.filter((node) => node.kind !== 'user').map((node) => ({ value: node.nodeId, label: node.label })),
 )
 const locations = computed(() => knownLocations(nodes.value))
 const executors = computed(() => advertisedExecutors(nodes.value))

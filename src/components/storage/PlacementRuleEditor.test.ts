@@ -100,7 +100,7 @@ const editor = compileClientComponent(new URL('./PlacementRuleEditor.vue', impor
   '@/composables/useAruna': { useAruna: () => ({ realmInfo: computed(() => ({ nodes: realmNodes.value })) }) },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
-      nodes: computed(() => realmNodes.value.map((entry) => ({ nodeId: entry.node_id, label: entry.node_id }))),
+      nodes: computed(() => realmNodes.value.map((entry) => ({ nodeId: entry.node_id, kind: entry.kind, label: entry.node_id }))),
     }),
   },
   '@/composables/usePlacementPolicies': { usePlacementPolicies: () => ({ createPlacementPolicy }) },
@@ -200,6 +200,14 @@ describe('placement rule editor', () => {
 
     expect(content(root)).toContain('Matches 1 of 2 nodes.')
     expect(content(root)).toContain('This policy admits 1 of 2 nodes right now.')
+  })
+
+  it('counts and offers no device', async () => {
+    realmNodes.value = [...TWO_NODES, { ...node('laptop', 'eu-west', ['docker']), kind: 'user' }]
+    const root = await render()
+
+    expect(content(root)).toContain('Matches 0 of 2 nodes.')
+    expect(content(root)).not.toContain('laptop')
   })
 
   it('starts a card over when its mode switches', async () => {
