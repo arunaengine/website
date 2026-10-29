@@ -59,7 +59,7 @@ const tone = computed(() => {
   <div class="flex w-full flex-col gap-1.5">
     <div
       v-if="showLabels"
-      class="flex items-center justify-between text-[11px]"
+      class="flex items-center justify-between text-xs"
     >
       <span class="font-medium text-muted-foreground">{{ label ?? 'Storage' }}</span>
       <span class="flex flex-wrap items-baseline justify-end gap-x-3 tabular-nums text-foreground/80">

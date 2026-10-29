@@ -53,11 +53,11 @@ function go(page: number) {
       <ChevronLeft class="h-3.5 w-3.5" />
     </button>
     <template v-for="(entry, index) in buttons" :key="index">
-      <span v-if="entry === null" class="px-1 text-[11px] text-muted-foreground">…</span>
+      <span v-if="entry === null" class="px-1 text-xs text-muted-foreground">…</span>
       <button
         v-else
         type="button"
-        class="h-7 min-w-7 rounded-md border px-2 text-[11px] tabular-nums transition-colors disabled:cursor-not-allowed"
+        class="h-7 min-w-7 rounded-md border px-2 text-xs tabular-nums transition-colors disabled:cursor-not-allowed"
         :class="entry === page
           ? 'border-primary/50 bg-primary/10 font-medium text-primary'
           : 'border-border bg-background text-foreground/70 hover:bg-muted disabled:opacity-40'"

@@ -37,7 +37,7 @@ const style = computed(() => {
   <span
     :class="
       cn(
-        'inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide',
+        'inline-flex items-center rounded-md border px-1.5 py-0.5 text-xs font-medium',
         style,
         $props.class,
       )

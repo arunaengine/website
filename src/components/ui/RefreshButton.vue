@@ -41,7 +41,7 @@ const buttonSize = computed<ButtonVariants['size']>(() => {
   return props.size === 'default' ? 'default' : 'sm'
 })
 const buttonClasses = computed(() =>
-  cn(compact.value && (props.srLabel ? 'h-6 w-6' : 'h-6 px-1.5 text-[10px]'), props.class),
+  cn(compact.value && (props.srLabel ? 'h-6 w-6' : 'h-6 px-1.5 text-xs'), props.class),
 )
 </script>
 

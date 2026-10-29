@@ -22,7 +22,7 @@ defineProps<{
     "
   >
     <div class="flex items-center justify-between">
-      <span class="text-xs font-medium uppercase tracking-wider text-muted-foreground">{{ label }}</span>
+      <span class="type-label">{{ label }}</span>
       <component :is="icon" v-if="icon" class="h-4 w-4 text-muted-foreground/80" />
     </div>
     <div class="font-display text-2xl font-semibold text-aruna-navy">

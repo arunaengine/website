@@ -100,7 +100,7 @@ const format = new Intl.NumberFormat('en', { maximumFractionDigits: 2 })
 
     <div v-else>
       <div class="flex gap-2">
-        <div class="flex w-14 shrink-0 flex-col justify-between py-0.5 text-right text-[10px] tabular-nums text-muted-foreground">
+        <div class="flex w-14 shrink-0 flex-col justify-between py-0.5 text-right text-xs tabular-nums text-muted-foreground">
           <span>{{ format.format(maxValue) }}</span>
           <span>0</span>
         </div>
@@ -149,11 +149,11 @@ const format = new Intl.NumberFormat('en', { maximumFractionDigits: 2 })
           </div>
         </div>
       </div>
-      <div class="mt-1 flex justify-between pl-16 text-[10px] text-muted-foreground">
+      <div class="mt-1 flex justify-between pl-16 text-xs text-muted-foreground">
         <span>{{ labels[0] ?? '' }}</span>
         <span v-if="labels.length > 1">{{ labels[labels.length - 1] }}</span>
       </div>
-      <ul v-if="series.length > 1" class="mt-2 flex flex-wrap gap-x-3 gap-y-1 pl-16 text-[11px]">
+      <ul v-if="series.length > 1" class="mt-2 flex flex-wrap gap-x-3 gap-y-1 pl-16 text-xs">
         <li v-for="(entry, index) in series" :key="entry.name" class="flex items-center gap-1.5 text-muted-foreground">
           <span class="inline-block h-2 w-2 rounded-sm" :style="{ backgroundColor: colour(index) }" />
           {{ entry.name }}

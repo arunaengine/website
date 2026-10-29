@@ -49,7 +49,7 @@ describe('node label', () => {
     const label = element(root, (node) => node.props.title === KNOWN_ID)
 
     expect(content(label).trim()).toBe('Alpha')
-    expect(String(label.props.class)).toContain('text-[11px]')
+    expect(String(label.props.class)).toContain('text-xs')
     expect(String(label.props.class)).not.toContain('hash')
   })
 

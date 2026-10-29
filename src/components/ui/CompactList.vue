@@ -78,7 +78,7 @@ function showMore() {
             class="font-medium text-primary hover:underline"
           >{{ item.text }}</RouterLink>
           <span v-else>{{ item.text }}</span>
-          <span v-if="item.detail" class="ml-1 font-mono text-[10px] text-muted-foreground">{{ item.detail }}</span>
+          <span v-if="item.detail" class="ml-1 font-mono text-xs text-muted-foreground">{{ item.detail }}</span>
         </li>
       </ul>
       <p v-if="hidden > 0" class="flex items-center gap-2 text-muted-foreground">

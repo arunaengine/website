@@ -13,15 +13,14 @@ const { nodeById, displayName } = useRealmNodes()
 
 // A realm node is worth naming; anything else stays an honest short id.
 const known = computed(() => Boolean(nodeById(props.nodeId)))
-const sizeClass = computed(() => (props.size === 'sm' ? 'text-[11px]' : 'text-xs'))
 </script>
 
 <template>
   <span v-if="nodeId" class="inline-flex min-w-0 items-center gap-1">
-    <span v-if="known" class="truncate" :class="sizeClass" :title="nodeById(nodeId)?.title ?? nodeId">
+    <span v-if="known" class="truncate text-xs" :title="nodeById(nodeId)?.title ?? nodeId">
       {{ displayName(nodeId) }}
     </span>
-    <span v-else class="hash truncate" :class="sizeClass" :title="nodeId">
+    <span v-else class="hash truncate text-xs" :title="nodeId">
       {{ truncateMiddle(nodeId, 8, 6) }}
     </span>
     <CopyButton v-if="copy" :value="nodeId" label="Copy node id" />
