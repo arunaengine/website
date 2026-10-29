@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { formatBytes } from '@/lib/utils'
 import { QUOTA_BAR_COLORS } from '@/lib/quota'
+import QuotaLegend from '@/components/ui/QuotaLegend.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -20,9 +21,10 @@ const props = withDefaults(
     color?: string
     compact?: boolean
     showLabels?: boolean
+    legend?: boolean
     label?: string
   }>(),
-  { showLabels: true, color: QUOTA_BAR_COLORS.counted, referenced: 0 },
+  { showLabels: true, legend: true, color: QUOTA_BAR_COLORS.counted, referenced: 0 },
 )
 
 const unlimited = computed(() => props.quota == null)
@@ -72,16 +74,14 @@ const tone = computed(() => {
       class="flex items-center justify-between text-[11px]"
     >
       <span class="font-medium text-muted-foreground">{{ label ?? 'Storage' }}</span>
-      <span v-if="unlimited" class="tabular-nums text-foreground/80">
-        {{ formatBytes(used) }} <span class="text-muted-foreground">· unlimited</span>
-        <span v-if="referencedBytes > 0" class="text-muted-foreground">· {{ formatBytes(referencedBytes) }} referenced (not counted)</span>
-      </span>
-      <span v-else class="tabular-nums text-foreground/80">
-        {{ formatBytes(used) }} <span class="text-muted-foreground">of</span>
-        {{ formatBytes(quota ?? 0) }}
-        <span v-if="ceilingBytes != null && ceilingBytes !== quota" class="text-muted-foreground">· cap {{ formatBytes(ceilingBytes) }}</span>
-        <span class="ml-1 text-muted-foreground">({{ pctOfQuota.toFixed(0) }}%)</span>
-        <span v-if="referencedBytes > 0" class="text-muted-foreground">· {{ formatBytes(referencedBytes) }} referenced (not counted)</span>
+      <span class="flex flex-wrap items-baseline justify-end gap-x-3 tabular-nums text-foreground/80">
+        <span v-if="unlimited">{{ formatBytes(used) }} <span class="text-muted-foreground">stored, no quota</span></span>
+        <template v-else>
+          <span>{{ formatBytes(used) }} <span class="text-muted-foreground">of {{ formatBytes(quota ?? 0) }}</span></span>
+          <span v-if="ceilingBytes != null && ceilingBytes !== quota" class="text-muted-foreground">cap {{ formatBytes(ceilingBytes) }}</span>
+          <span class="text-muted-foreground">{{ pctOfQuota.toFixed(0) }}%</span>
+        </template>
+        <span v-if="referencedBytes > 0" class="text-muted-foreground">{{ formatBytes(referencedBytes) }} referenced</span>
       </span>
     </div>
     <div
@@ -105,7 +105,7 @@ const tone = computed(() => {
             left: `${quotaPct}%`,
             width: `${ceilingPct - quotaPct}%`,
             backgroundImage:
-              'repeating-linear-gradient(45deg, rgba(217,119,6,0.35) 0 2px, transparent 2px 5px)',
+              'repeating-linear-gradient(45deg, rgba(51,93,198,0.35) 0 2px, transparent 2px 5px)',
           }"
         />
       </template>
@@ -124,15 +124,14 @@ const tone = computed(() => {
             left: `${usedPct}%`,
             width: `${referencedPct}%`,
             backgroundColor: QUOTA_BAR_COLORS.referenced,
-            opacity: 0.7,
           }"
         />
       </template>
       <template v-if="!unlimited">
         <!-- Quota marker. -->
         <span
-          v-if="ceilingPct != null"
-          class="absolute inset-y-0 w-px bg-foreground/40"
+          v-if="quotaPct < 100"
+          class="absolute inset-y-0 w-0.5 bg-foreground/50"
           :style="{ left: `${quotaPct}%` }"
         />
         <!-- Ceiling marker, only visible once usage overflowed past the cap. -->
@@ -143,21 +142,6 @@ const tone = computed(() => {
         />
       </template>
     </div>
-    <div
-      v-if="!compact && referencedBytes > 0"
-      class="flex items-center gap-3 text-[10px] text-muted-foreground"
-    >
-      <span class="inline-flex items-center gap-1">
-        <span class="h-1.5 w-1.5 rounded-full" :style="{ backgroundColor: tone }" />
-        counted
-      </span>
-      <span class="inline-flex items-center gap-1">
-        <span
-          class="h-1.5 w-1.5 rounded-full"
-          :style="{ backgroundColor: QUOTA_BAR_COLORS.referenced, opacity: 0.7 }"
-        />
-        referenced
-      </span>
-    </div>
+    <QuotaLegend v-if="legend && !compact && referencedBytes > 0" :quota="!unlimited" :tone="tone" />
   </div>
 </template>

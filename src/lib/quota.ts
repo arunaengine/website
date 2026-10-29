@@ -77,21 +77,21 @@ export function assessQuota(
 // Single source of truth for the quota bar segment tones so callers and the
 // bar never scatter hex literals.
 export const QUOTA_BAR_COLORS = {
-  counted: '#335DC6',
-  referenced: '#24A9E6',
-  warn: '#D97706',
+  counted: '#08216C',
+  referenced: '#55C4DE',
+  warn: '#335DC6',
   danger: '#DC2626',
 } as const
 
 // One badge vocabulary for every quota surface.
 export const QUOTA_STATE_BADGES: Record<
   QuotaState,
-  { label: string; variant: 'outline' | 'warn' | 'destructive' } | null
+  { label: string; variant: 'outline' | 'royal' | 'destructive' } | null
 > = {
   'no-policy': null,
-  unlimited: { label: 'unlimited', variant: 'outline' },
+  unlimited: { label: 'Unlimited', variant: 'outline' },
   ok: null,
-  warning: { label: 'near quota', variant: 'warn' },
-  'over-quota': { label: 'in grace', variant: 'warn' },
-  'over-ceiling': { label: 'writes blocked', variant: 'destructive' },
+  warning: { label: 'Near quota', variant: 'royal' },
+  'over-quota': { label: 'Over quota', variant: 'royal' },
+  'over-ceiling': { label: 'Writes blocked', variant: 'destructive' },
 }
