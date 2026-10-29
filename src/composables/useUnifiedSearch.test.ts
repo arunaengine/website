@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import { useUnifiedSearch } from './useUnifiedSearch'
 
 const mocks = vi.hoisted(() => ({ searchUnified: vi.fn(), searchObjects: vi.fn() }))
@@ -195,5 +195,29 @@ describe('unified document coverage', () => {
     mocks.searchObjects.mockResolvedValue({ hits: [{ kind: 'object', issuer_node_id: 'node-a', group_id: 'group-a', bucket: 'raw-data', key: 'rare.txt' }], next_cursor: null, coverage })
     search.retry()
     await vi.waitFor(() => expect(search.objects.value.map((object) => object.key)).toEqual(['rare.txt']))
+  })
+
+  it('schedules no search for a change while it is not active', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('window', globalThis)
+    try {
+      mocks.searchUnified.mockResolvedValue({})
+      const query = ref('one')
+      const active = ref(false)
+      useUnifiedSearch(query, { types: ['documents'], active })
+      query.value = 'two'
+      await nextTick()
+      vi.advanceTimersByTime(5_000)
+      expect(mocks.searchUnified).not.toHaveBeenCalled()
+
+      active.value = true
+      query.value = 'three'
+      await nextTick()
+      vi.advanceTimersByTime(5_000)
+      expect(mocks.searchUnified).toHaveBeenCalledOnce()
+    } finally {
+      vi.unstubAllGlobals()
+      vi.useRealTimers()
+    }
   })
 })

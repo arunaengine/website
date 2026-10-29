@@ -46,6 +46,8 @@ export interface UnifiedSearchConfig {
   conformsTo?: Ref<string | null>
   includeObjects?: boolean
   objectMode?: Ref<ObjectSearchMode>
+  /** Changes schedule a search only while this is true; `retry` runs it later. */
+  active?: Ref<boolean>
 }
 
 export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig = {}) {
@@ -342,14 +344,14 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     cursorQuery = ''
     reset()
     const term = query.value.trim()
-    if (term.length < UNIFIED_MIN_CHARS) return
+    if (term.length < UNIFIED_MIN_CHARS || config.active?.value === false) return
     timer = window.setTimeout(() => {
       timer = undefined
       void runSearch(term)
     }, UNIFIED_DEBOUNCE_MS)
   })
 
-  if (query.value.trim().length >= UNIFIED_MIN_CHARS) void runSearch(query.value.trim())
+  if (query.value.trim().length >= UNIFIED_MIN_CHARS && config.active?.value !== false) void runSearch(query.value.trim())
 
   onBeforeUnmount(() => {
     window.clearTimeout(timer)

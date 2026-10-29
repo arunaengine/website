@@ -93,7 +93,7 @@ const {
   complete: quickComplete,
   retry: retrySearch,
   cancel: cancelSearch,
-} = useUnifiedSearch(q, { limit: 5, includeObjects: true, objectMode: objectSearchMode })
+} = useUnifiedSearch(q, { limit: 5, includeObjects: true, objectMode: objectSearchMode, active: showResults })
 
 function objectParentPrefix(key: string): string | undefined {
   const separator = key.lastIndexOf('/')

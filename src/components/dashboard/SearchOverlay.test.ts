@@ -41,6 +41,7 @@ const mediaQuery = vi.fn(() => narrow)
 const routerPush = vi.fn()
 const route = VueRuntime.reactive({ fullPath: '/' })
 let configuredObjectMode: Ref<string> | undefined
+let configuredActive: Ref<boolean> | undefined
 const search = {
   documents: ref<Array<Record<string, unknown>>>([]),
   buckets: ref<Array<Record<string, unknown>>>([]),
@@ -140,8 +141,9 @@ const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.me
   '@/composables/useSearchSettings': { useSearchSettings: () => ({ objectSearchMode }) },
   '@/composables/useUnifiedSearch': {
     OBJECT_SEARCH_MODE_LABELS,
-    useUnifiedSearch: (_query: unknown, config: { objectMode?: Ref<string> }) => {
+    useUnifiedSearch: (_query: unknown, config: { objectMode?: Ref<string>; active?: Ref<boolean> }) => {
       configuredObjectMode = config.objectMode
+      configuredActive = config.active
       return search
     },
   },
@@ -552,6 +554,19 @@ describe('narrow TopBar search panel', () => {
     await callHandler(input.props.onFocus, {})
     await flush()
     expect(search.retry).toHaveBeenCalledOnce()
+    mounted.app.unmount()
+  })
+
+  it('lets the search schedule only while its results show', async () => {
+    narrow.value = false
+    const mounted = await mount()
+    const input = element(mounted.root, (node) => node.tag === 'input')
+    await callHandler(input.props.onFocus, {})
+    await inputValue(input, 'sample')
+    expect(configuredActive?.value).toBe(true)
+
+    await keydown(input, 'Escape')
+    expect(configuredActive?.value).toBe(false)
     mounted.app.unmount()
   })
 
