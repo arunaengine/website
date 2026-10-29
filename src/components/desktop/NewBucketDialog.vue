@@ -22,10 +22,10 @@ import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { activeGroupId } from '@/composables/useGroupSelection'
 import { computerName, THIS_COMPUTER, useRealmNodes, type RealmNodeDisplay } from '@/composables/useRealmNodes'
 import { s3ErrorMessage, useS3 } from '@/composables/useS3'
-import { ApiError, apiRequest, type InfoResponse } from '@/lib/api'
+import { ApiError } from '@/lib/api'
 import type { BindSource } from '@/lib/bindSource'
 import { bucketNameProblem } from '@/lib/bucketName'
-import { defaultPlace, freeSpace, placeName, placeTitle } from '@/lib/bucketPlace'
+import { defaultPlace, placeName, placeTitle, readFreeSpace } from '@/lib/bucketPlace'
 import { createRealmBucket, requireDevice } from '@/lib/deviceApi'
 import { desktopContext } from '@/lib/desktop'
 import { errorMessage, formatBytes } from '@/lib/utils'
@@ -101,11 +101,8 @@ async function loadFree() {
   free.value = new Map()
   await Promise.all(
     places.value.map(async (entry) => {
-      const base = entry.isLocal ? apiBaseUrl.value : entry.apiBase
-      const info = base
-        ? await apiRequest<InfoResponse>('/system/info', {}, { baseUrl: base }).catch(() => null)
-        : null
-      if (run === freeRun) free.value = new Map(free.value).set(entry.nodeId, freeSpace(info))
+      const bytes = await readFreeSpace(entry.isLocal ? apiBaseUrl.value : entry.apiBase)
+      if (run === freeRun) free.value = new Map(free.value).set(entry.nodeId, bytes)
     }),
   )
 }

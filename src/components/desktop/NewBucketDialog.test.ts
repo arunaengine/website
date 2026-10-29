@@ -105,7 +105,11 @@ const NewBucketDialog = compileClientComponent(new URL('./NewBucketDialog.vue', 
   '@/lib/api': { ApiError, apiRequest },
   '@/lib/deviceApi': { createRealmBucket, requireDevice: (client: unknown) => client },
   '@/lib/bucketName': BucketName,
-  '@/lib/bucketPlace': BucketPlace,
+  '@/lib/bucketPlace': {
+    ...BucketPlace,
+    readFreeSpace: async (base: string | null) =>
+      BucketPlace.freeSpace(base ? await apiRequest('/system/info', {}, { baseUrl: base }).catch(() => null) : null),
+  },
   '@/lib/desktop': { desktopContext: () => ({ realmUrl: 'https://aruna.example' }) },
   '@/lib/utils': Utils,
   '@/lib/workspaces': Workspaces,

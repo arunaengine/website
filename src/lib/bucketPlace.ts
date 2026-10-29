@@ -2,7 +2,7 @@
 // device, or a realm node. Kind and id go to a tooltip.
 import { kindLabel } from '@/components/nodes/node-display'
 import type { RealmNodeDisplay } from '@/composables/useRealmNodes'
-import type { InfoResponse } from '@/lib/api'
+import { apiRequest, type InfoResponse } from '@/lib/api'
 import { truncateMiddle } from '@/lib/utils'
 
 type PlaceNode = Pick<RealmNodeDisplay, 'nodeId' | 'kind' | 'label' | 'isLocal' | 'location'>
@@ -46,4 +46,10 @@ export function freeSpace(info: Pick<InfoResponse, 'services'> | null): number |
     total = (total ?? 0) + Math.max(0, backend.quota_bytes - backend.used_bytes)
   }
   return total
+}
+
+/** The space left on the node at this API base, from its /system/info; null when unknown. */
+export async function readFreeSpace(base: string | null | undefined): Promise<number | null> {
+  const info = base ? await apiRequest<InfoResponse>('/system/info', {}, { baseUrl: base }).catch(() => null) : null
+  return freeSpace(info)
 }
