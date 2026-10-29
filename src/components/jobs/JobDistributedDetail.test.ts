@@ -306,6 +306,8 @@ function taskPanel(
         apiBaseUrl: ref('https://node.test/api/v1'),
         metadataAtPath,
         downloadProvenanceCrate: vi.fn(),
+        getFileOrigin: vi.fn(async () => ({ origin: { kind: 'job', run_id: 'node-job-1' } })),
+        getRun: vi.fn(async (runId: string) => ({ run_id: runId, run_crate: runId === 'node-job-1' ? 'record-1' : null })),
       }),
     },
     '@/composables/useS3': {
@@ -1077,16 +1079,17 @@ describe('distributed job detail components', () => {
     followSpy.mockRestore()
   })
 
-  it('finds the run record under the execution that gave the result and offers its crate', async () => {
+  it('finds the run record through the run its output names and offers its crate', async () => {
     const wake = vi.spyOn(Poll, 'onWake').mockImplementation(() => () => {})
     const followSpy = vi.spyOn(Poll, 'follow').mockImplementation(() => () => {})
     const base = { id: 'run', state: 'COMPLETE', executors: [{ image: 'alpine', command: ['sh'] }], inputs: [], outputs: [], logs: [], tags: {} }
-    const lookup = vi.fn(async (path: string) => (path === 'runs/exec-2' ? { document_id: 'record-1' } : null))
-    const getJob = vi.fn(async () => ({ family: { ...family, canonical_execution_id: 'exec-2' } }))
+    const lookup = vi.fn(async () => null)
+    const output = { bucket: 'reads', key: 'out/count.txt', version_id: 'v1', execution_id: 'exec-2', size: 1 }
+    const getJob = vi.fn(async () => ({ family: { ...family, outputs: [output] } }))
     const mounted = await mount(taskPanel(vi.fn(async () => base), getJob, vi.fn(), lookup), { taskId: 'run', open: true })
     await flushPanel()
 
-    expect(lookup).toHaveBeenCalledWith('runs/exec-2')
+    expect(lookup).toHaveBeenCalledWith('runs/run')
     expect(content(mounted.root)).toMatch(/Run record: Open\s+Export as crate/)
     mounted.app.unmount()
     wake.mockRestore()

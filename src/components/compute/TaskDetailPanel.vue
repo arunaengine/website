@@ -33,7 +33,6 @@ import { useRefresh } from '@/composables/useRefresh'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { downloadCrateJson } from '@/lib/crateImport'
 import { getLocalRunCrate, requireDevice } from '@/lib/deviceApi'
-import type { MetadataDocumentListItem } from '@/lib/api'
 import { deleteErrorMessage, formatJobProgress, type JobStatusResponse } from '@/lib/jobs'
 import { POLL_IDLE_MS, follow, onWake } from '@/lib/poll'
 import {
@@ -65,14 +64,14 @@ const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'canceled')
 const router = useRouter()
 const { getTask, cancelTask, busy } = useTes()
 const { getJob: getNativeJob, deleteJob } = useJobs()
-const { myGroups, apiBaseUrl, metadataAtPath, downloadProvenanceCrate } = useAruna()
+const { myGroups, apiBaseUrl, metadataAtPath, downloadProvenanceCrate, getFileOrigin, getRun } = useAruna()
 const { displayName } = useRealmNodes()
 const s3 = useS3()
 
 const task = ref<TesTask | null>(null)
 const nativeJob = ref<JobStatusResponse | null>(null)
 const nativeDetailUnavailable = ref(false)
-const runCrate = ref<MetadataDocumentListItem | null>(null)
+const runCrate = ref<{ document_id: string } | null>(null)
 const runCrateLoading = ref(false)
 let crateTask: string | null = null
 const loadState = ref<'idle' | 'loading' | 'ready' | 'error' | 'unsupported'>('idle')
@@ -83,8 +82,12 @@ const now = ref(Date.now())
 let nativeRequestId = 0
 
 const nativeFamily = computed(() => nativeJob.value?.family ?? null)
-// The run record is written under the execution that gave the result, which a re-planned run moves.
-const crateJob = computed(() => nativeFamily.value?.canonical_execution_id ?? props.taskId)
+// The node that ran the work writes the run record under its own job; an output's origin names it.
+const crateOutput = computed(() => nativeFamily.value?.outputs.find((output) => output.version_id) ?? null)
+const crateJob = computed(() => {
+  const output = crateOutput.value
+  return output ? `${props.taskId}:${output.bucket}/${output.key}@${output.version_id}` : props.taskId
+})
 
 async function loadNativeJob(jobId: string, requestId: number) {
   try {
@@ -526,15 +529,23 @@ const outputRange = computed(() => {
   return `${span}${total} output${total === 1 ? '' : 's'}, ${capturedCount.value} captured`
 })
 
-// ── Run dataset (targeted lookup at runs/{execution}) ────────────────────────
+// ── Run dataset (at runs/{taskId}, else through the run an output names) ─────
+async function recordOfOutput(): Promise<{ document_id: string } | null> {
+  const output = crateOutput.value
+  if (!output) return null
+  const origin = await getFileOrigin(output.bucket, { key: output.key, version_id: output.version_id })
+  if (origin.origin?.kind !== 'job') return null
+  const run = await getRun(origin.origin.run_id)
+  return run.run_crate ? { document_id: run.run_crate } : null
+}
+
 async function findRunCrate() {
   const id = crateJob.value
   if (runCrateLoading.value && crateTask === id) return
   crateTask = id
   runCrateLoading.value = true
   try {
-    let crate = await metadataAtPath(`runs/${id}`)
-    if (!crate && id !== props.taskId) crate = await metadataAtPath(`runs/${props.taskId}`)
+    const crate = (await metadataAtPath(`runs/${props.taskId}`)) ?? (await recordOfOutput())
     if (crateTask === id) runCrate.value = crate
   } catch {
     // The crate is written when the run completes; a failed lookup just keeps
@@ -545,7 +556,7 @@ async function findRunCrate() {
   }
 }
 
-// A finished run, or one whose result moved to another execution, may have its record now.
+// A finished run, or one whose output just became known, may have its record now.
 watch([crateJob, () => isTerminalTesState(task.value?.state)], ([job, done], [previousJob, wasDone]) => {
   if (props.open && !runCrate.value && (job !== previousJob || (done && !wasDone))) void findRunCrate()
 })
