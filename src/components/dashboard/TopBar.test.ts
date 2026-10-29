@@ -171,6 +171,9 @@ describe('desktop chrome', () => {
     expect(html).toContain('datasets')
     expect(html).toContain('bell')
     expect(watchNode).toHaveBeenCalled()
+    // The plate marks the state with an icon, no dot before the label.
+    expect(nodes(mounted.root).some((node) => node.props['data-tone'] === 'done' && String(node.props.class).includes('text-status-ok'))).toBe(true)
+    expect(nodes(mounted.root).some((node) => node.props['aria-label'] === 'online')).toBe(false)
     mounted.app.unmount()
   })
 

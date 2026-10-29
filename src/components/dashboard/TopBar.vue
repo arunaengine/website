@@ -12,7 +12,7 @@ import ContextSwitcher from '@/components/layout/ContextSwitcher.vue'
 import NotificationBell from '@/components/dashboard/NotificationBell.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
 import SearchOverlay from '@/components/dashboard/SearchOverlay.vue'
-import { ChevronDown, MessageSquare, Plus, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw } from '@lucide/vue'
+import { ChevronDown, CircleCheck, CircleX, LoaderCircle, MessageSquare, Plus, TriangleAlert, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw } from '@lucide/vue'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useRealm } from '@/composables/useRealm'
@@ -48,6 +48,13 @@ const signingIn = computed(() => stage.value === 'redirecting')
 const nodeTone = computed(() =>
   nodeState.value === 'starting' ? ('progress' as const) : statusTone(nodeState.value),
 )
+
+const nodeMark = computed(() => {
+  if (nodeTone.value === 'done') return { icon: CircleCheck, color: 'text-status-ok' }
+  if (nodeTone.value === 'progress') return { icon: LoaderCircle, color: 'text-status-running motion-safe:animate-spin' }
+  if (nodeTone.value === 'failed') return { icon: CircleX, color: 'text-status-failed' }
+  return { icon: TriangleAlert, color: 'text-status-warn' }
+})
 
 function ensureProviders() {
   void import('@/composables/useAssistantChat').then(({ useAssistantChat }) => useAssistantChat().ensureProviders())
@@ -90,8 +97,9 @@ async function handleSignOut() {
         class="flex h-9 min-w-0 shrink items-center gap-2 rounded-md border border-border/70 bg-card px-2.5 transition-colors hover:border-border hover:bg-muted"
         :title="`This computer: ${nodeLabel}`"
       >
-        <StatusDot :tone="nodeTone" :label="nodeLabel" class="size-1.5" />
-        <span class="text-[12px] font-medium leading-none text-foreground">{{ nodeLabel }}</span>
+        <!-- A state icon, never a dot before the label: a check when fine. -->
+        <component :is="nodeMark.icon" class="size-3.5 shrink-0" :class="nodeMark.color" :data-tone="nodeTone" aria-hidden="true" />
+        <span class="text-xs font-medium leading-none text-foreground">{{ nodeLabel }}</span>
       </RouterLink>
       <ContextSwitcher />
 
