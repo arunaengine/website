@@ -304,7 +304,8 @@ const pageDescription = computed(() =>
               <b>{{ formatCount(realmNodesText.count) }}</b> {{ plural(realmNodesText.count, 'node', 'nodes') }} {{ realmNodesText.word }}
             </template>
             <template v-else #value>Unknown</template>
-            {{ replication ? `${replication} ` : '' }}
+            <!-- The line break before the link is the space between them. -->
+            {{ replication ?? '' }}
             <RouterLink :to="{ name: 'status' }" class="text-primary hover:underline">Status</RouterLink>
           </OverviewCell>
         </div>

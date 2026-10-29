@@ -533,7 +533,7 @@ describe('desktop home', () => {
     const mounted = await mountApp(DashboardClient)
     await flush()
 
-    expect(content(mounted.root)).toContain('Replication ×3 Status')
+    expect(content(mounted.root).replace(/\s+/g, ' ')).toContain('Replication ×3 Status')
     mounted.app.unmount()
   })
 
