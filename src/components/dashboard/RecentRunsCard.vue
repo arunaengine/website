@@ -42,41 +42,22 @@ function stateClass(run: RecentRun): string {
     <p v-if="state === 'loading' || state === 'idle'" class="px-5 pb-4 text-xs text-muted-foreground">Reading your runs…</p>
     <p v-else-if="state === 'failed'" class="px-5 pb-4 text-xs text-muted-foreground">Your runs could not be read right now.</p>
     <p v-else-if="!shown.length" class="px-5 pb-4 text-xs text-muted-foreground">No runs yet.</p>
-    <!-- Fixed widths for the short columns give the run name all the room left. -->
-    <table v-else class="w-full table-fixed text-sm">
-      <colgroup>
-        <col />
-        <col class="w-[4.5rem]" />
-        <col class="w-24" />
-        <col class="w-[5.5rem]" />
-      </colgroup>
-      <thead class="text-[11px] uppercase tracking-wider text-muted-foreground">
-        <tr>
-          <th class="py-2 pl-5 pr-2 text-left font-semibold">Run</th>
-          <th class="px-2 py-2 text-left font-semibold">Took</th>
-          <th class="px-2 py-2 text-left font-semibold">Where</th>
-          <th class="py-2 pl-2 pr-5 text-left font-semibold">State</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="run in shown" :key="run.task.id" class="border-t border-border">
-          <td class="py-2.5 pl-5 pr-2">
-            <RouterLink
-              v-if="run.task.id"
-              :to="{ name: 'task', params: { taskId: run.task.id } }"
-              class="block truncate text-foreground hover:underline"
-              :title="run.task.name || 'Untitled run'"
-            >{{ run.task.name || 'Untitled run' }}</RouterLink>
-          </td>
-          <td class="truncate px-2 py-2.5 text-xs tabular-nums text-muted-foreground">{{ took(run) }}</td>
-          <td class="px-2 py-2.5 text-xs">
-            <RouterLink v-if="where(run)" :to="{ name: 'node', params: { nodeId: where(run)! } }" class="block truncate text-muted-foreground hover:underline" :title="displayName(where(run))">
-              {{ displayName(where(run)) }}
-            </RouterLink>
-          </td>
-          <td class="truncate py-2.5 pl-2 pr-5 text-xs" :class="stateClass(run)">{{ TES_STATE_META[run.task.state ?? 'UNKNOWN'].label.toLowerCase() }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <!-- The name has the row to itself, two lines at most; what it took and where go below. -->
+    <ul v-else class="divide-y divide-border border-t border-border">
+      <li v-for="run in shown" :key="run.task.id" class="flex items-start justify-between gap-3 px-5 py-2.5">
+        <div class="min-w-0">
+          <RouterLink
+            v-if="run.task.id"
+            :to="{ name: 'task', params: { taskId: run.task.id } }"
+            class="line-clamp-2 break-words text-sm text-foreground hover:underline"
+            :title="run.task.name || 'Untitled run'"
+          >{{ run.task.name || 'Untitled run' }}</RouterLink>
+          <p class="mt-0.5 truncate text-xs tabular-nums text-muted-foreground">
+            {{ took(run) }}<template v-if="took(run) && where(run)">, </template><RouterLink v-if="where(run)" :to="{ name: 'node', params: { nodeId: where(run)! } }" class="hover:underline">{{ displayName(where(run)) }}</RouterLink>
+          </p>
+        </div>
+        <span class="shrink-0 text-xs" :class="stateClass(run)">{{ TES_STATE_META[run.task.state ?? 'UNKNOWN'].label.toLowerCase() }}</span>
+      </li>
+    </ul>
   </section>
 </template>

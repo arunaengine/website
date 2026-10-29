@@ -30,10 +30,10 @@ describe('recent runs', () => {
   it('lists at most five runs with what they took, where and their state as one word, each a link', async () => {
     const runs = Array.from({ length: 7 }, (_, index) => run(`t${index}`, `Annotate genome ${index}`, index === 1 ? 'EXECUTOR_ERROR' : 'COMPLETE', index ? 'store-1' : null))
     const mounted = await mountApp(RecentRunsCard, { props: { runs, state: 'ready' } })
-    const rows = nodes(mounted.root).filter((node) => node.tag === 'tr').slice(1)
+    const rows = nodes(mounted.root).filter((node) => node.tag === 'li')
 
     expect(rows).toHaveLength(5)
-    expect(content(rows[0])).toBe('Annotate genome 021m 00sGiessen managementcompleted')
+    expect(content(rows[0]).replace(/\s+/g, '')).toBe('Annotategenome021m00s,Giessenmanagementcompleted')
     expect(content(rows[1])).toContain('failed')
     const name = element(rows[0], (node) => node.tag === 'a' && content(node).includes('Annotate genome 0'))
     expect(JSON.parse(String(name.props['data-to']))).toEqual({ name: 'task', params: { taskId: 't0' } })
@@ -51,14 +51,17 @@ describe('recent runs', () => {
     }
   })
 
-  it('gives the run name the width the fixed short columns leave, with the full name on hover', async () => {
+  it('gives the run name its own line, two at most, with what it took and where below', async () => {
     const mounted = await mountApp(RecentRunsCard, { props: { runs: [run('t1', 'Annotate my genome with Bakta', 'COMPLETE', 'store-1')], state: 'ready' } })
-    const table = element(mounted.root, (node) => node.tag === 'table')
-    expect(String(table.props.class)).toContain('table-fixed')
-    const cols = nodes(table).filter((node) => node.tag === 'col').map((node) => node.props.class ?? '')
-    expect(cols).toEqual(['', 'w-[4.5rem]', 'w-24', 'w-[5.5rem]'])
     const name = element(mounted.root, (node) => node.tag === 'a' && content(node) === 'Annotate my genome with Bakta')
+    expect(String(name.props.class)).toContain('line-clamp-2')
     expect(name.props.title).toBe('Annotate my genome with Bakta')
+    const below = name.parent!.children.find((node) => node.tag === 'p')!
+    expect(content(below).replace(/\s+/g, ' ').trim()).toBe('21m 00s, Giessen storage 1')
+    // The state is one colored word at the right, outside the name's block.
+    const row = element(mounted.root, (node) => node.tag === 'li')
+    expect(content(row.children.at(-1)!)).toBe('completed')
+    expect(nodes(mounted.root).some((node) => node.tag === 'table')).toBe(false)
     mounted.app.unmount()
   })
 })
