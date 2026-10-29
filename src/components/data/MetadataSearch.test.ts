@@ -134,7 +134,7 @@ describe('bucket metadata search', () => {
     searchObjects.mockImplementation(async (_q: string, options: { match: string; cursor?: string }) => {
       if (options.match === 'metadata') return { hits: [], next_cursor: options.cursor ? null : 'd2', coverage: { complete: true } }
       nameAnswers += 1
-      if (nameAnswers < 3) throw new Error('down')
+      if (nameAnswers < 2) throw new Error('down')
       return { hits: [named], next_cursor: null, coverage: { complete: true } }
     })
     const { root } = await mountApp(component, { props: { bucket: 'ncbi', nodeId: null } })
@@ -142,14 +142,15 @@ describe('bucket metadata search', () => {
     await flush()
     const more = () => (element(root, (node) => node.tag === 'button' && content(node) === 'Show more').props.onClick as () => void)()
 
-    // The empty details page with a cursor was followed at once, asking for the names again.
-    expect(searchObjects).toHaveBeenCalledWith('hello', { bucket: 'ncbi', match: 'metadata', limit: 50, cursor: 'd2' })
-    expect(searchObjects).toHaveBeenLastCalledWith('hello', { bucket: 'ncbi', match: 'substring', limit: 50, cursor: undefined })
+    // The empty details page with a cursor was followed at once, without asking the failed names again.
+    expect(searchObjects).toHaveBeenLastCalledWith('hello', { bucket: 'ncbi', match: 'metadata', limit: 50, cursor: 'd2' })
+    expect(nameAnswers).toBe(1)
     expect(content(root)).toContain('The name search failed')
     expect(content(root)).not.toContain('Nothing matches.')
 
     more()
     await flush()
+    expect(searchObjects).toHaveBeenLastCalledWith('hello', { bucket: 'ncbi', match: 'substring', limit: 50, cursor: undefined })
     expect(content(root)).toContain('reads/hello.txt')
     expect(content(root)).not.toContain('The name search failed')
     expect(content(root)).not.toContain('Show more')

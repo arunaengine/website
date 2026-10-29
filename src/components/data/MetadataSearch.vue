@@ -74,8 +74,9 @@ async function search(more = false) {
   busy.value = true
   failure.value = null
   try {
-    for (let next = more; ; next = true) {
-      const added = await step(next, run)
+    // A failed name page is asked again on Show more, not on each automatic page.
+    for (let next = more, first = true; ; next = true, first = false) {
+      const added = await step(next, run, first || !nameFailed.value)
       if (added === null) return
       if (added > 0 || (!cursor.value && (nameFailed.value || !nameCursor.value))) break
     }
@@ -92,7 +93,7 @@ onBeforeUnmount(() => {
 })
 
 /** One page of each search; the number of new hits, or null once a newer search took over. */
-async function step(more: boolean, run: number): Promise<number | null> {
+async function step(more: boolean, run: number, askNames: boolean): Promise<number | null> {
   const before = more ? (hits.value?.length ?? 0) : 0
   // Plain words also match file names; each search pages on its own cursor.
   const words = more ? nameWords.value : chips.value.length ? '' : typed.value.trim()
@@ -100,7 +101,7 @@ async function step(more: boolean, run: number): Promise<number | null> {
   const namesCursor = more ? nameCursor.value : null
   const [page, named] = await Promise.all([
     !more || detailsCursor ? searchObjects(query.value, { bucket: props.bucket, match: 'metadata', limit: 50, cursor: detailsCursor ?? undefined }) : null,
-    words.length >= 2 && (!more || namesCursor !== null)
+    askNames && words.length >= 2 && (!more || namesCursor !== null)
       ? searchObjects(words, { bucket: props.bucket, match: 'substring', limit: 50, cursor: namesCursor || undefined }).catch(() => 'failed' as const)
       : null,
   ])
