@@ -304,6 +304,27 @@ function field(root: Parameters<typeof content>[0]) {
 }
 
 
+describe('Bucket sidebar in the picker sheet', () => {
+  it('drops its card and header, shows the scope line, the pin hint and a wide New bucket', async () => {
+    nodeChoice.value = null
+    allBuckets.hits.value = [{ bucket: 'laptop', node_id: 'node-2', group_id: 'g1' }]
+    const onNewBucket = vi.fn()
+    const Host = defineComponent(() => () => h(BucketSidebar, { manager: manager(), sheet: true, onNewBucket }, { scope: () => 'Buckets of demo on All nodes' }))
+    const { root } = await mountApp(Host)
+    await flush()
+    const text = content(root)
+
+    expect(text).not.toContain('Buckets 1')
+    expect(text).toContain('Buckets of demo on All nodes')
+    expect(text).toContain('Press and hold a bucket to pin it.')
+    expect(nodes(root).some((node) => String(node.props.class ?? '').includes('surface'))).toBe(false)
+    expect(String(element(root, (node) => node.props.role === 'listbox').props.class)).not.toContain('max-h-')
+    await click(button(root, 'New bucket'))
+    expect(onNewBucket).toHaveBeenCalledOnce()
+    allBuckets.hits.value = []
+  })
+})
+
 describe('Bucket sidebar new bucket', () => {
   it('asks for the New bucket dialog from the header instead of a name field', async () => {
     const onNewBucket = vi.fn()

@@ -11,6 +11,8 @@ import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import Notice from '@/components/ui/Notice.vue'
+import Sheet from '@/components/ui/Sheet.vue'
+import SheetContent from '@/components/ui/SheetContent.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import DataViewSkeleton from '@/components/data/DataViewSkeleton.vue'
 import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
@@ -41,9 +43,10 @@ import type { BindSource } from '@/lib/bindSource'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
 import type { PublicTarget } from '@/lib/publicAccess'
 import { computed, ref, watch } from 'vue'
+import { useElementSize } from '@vueuse/core'
 import { RouterLink } from 'vue-router'
 import type { ObjectSearchHit } from '@/lib/api'
-import { KeyRound, LogIn, ShieldAlert } from '@lucide/vue'
+import { ChevronDown, KeyRound, LogIn, ShieldAlert } from '@lucide/vue'
 
 const { bootstrapped, currentUser, myGroups } = useAruna()
 const s3 = useS3()
@@ -97,6 +100,22 @@ const {
   refreshSpinning,
   onRefresh,
 } = manager
+
+// The content width sets the layout, as the app's sidebar takes its part of the window. Below
+// 960 px the title picks the bucket and the list opens in a sheet; below 600 px it is a phone.
+const root = ref<HTMLElement | null>(null)
+const { width: viewWidth } = useElementSize(root)
+const narrow = computed(() => viewWidth.value > 0 && viewWidth.value < 960)
+const phone = computed(() => viewWidth.value > 0 && viewWidth.value < 600)
+const pickerOpen = ref(false)
+watch(narrow, (value) => {
+  if (!value) pickerOpen.value = false
+})
+watch([bucket, remoteNodeId], () => (pickerOpen.value = false))
+function newBucketFromPicker() {
+  pickerOpen.value = false
+  newBucketOpen.value = true
+}
 
 providePageContext(() => ({
   kind: 'data manager',
@@ -207,6 +226,8 @@ const mockOnly = computed(
       Boolean(contextError.value && !contextReady.value) ||
       (!groupsLoading.value && !hasGroups.value)),
 )
+// The picker stands in for the list wherever the list itself would show.
+const listReachable = computed(() => Boolean(currentUser.value && s3.connectedEndpoint.value) && !mockOnly.value)
 const newNotebookOpen = ref(false)
 // The notebooks entry is this same view with notebooks highlighted.
 const notebooksView = computed(() => route.name === 'notebooks' || route.query.notebooks === '1')
@@ -279,7 +300,7 @@ async function createFolder() {
 
 <template>
   <!-- The content width, not the window, sets the layout: the app's sidebar takes its part. -->
-  <div class="@container">
+  <div ref="root" class="@container">
     <PageHeader
       :title="headerTitle"
       :description="headerDescription"
@@ -288,7 +309,18 @@ async function createFolder() {
       <template #title>
         <!-- A narrow screen puts the node below the name instead of cutting the name short. -->
         <span class="flex min-w-0 flex-wrap items-baseline gap-x-2">
-          <span class="max-w-full truncate" :title="headerTitle">{{ headerTitle }}</span>
+          <button
+            v-if="narrow && listReachable"
+            type="button"
+            class="inline-flex max-w-full items-center gap-1.5 hover:text-primary"
+            aria-haspopup="dialog"
+            :aria-label="`${headerTitle}, switch bucket`"
+            @click="pickerOpen = true"
+          >
+            <span class="truncate">{{ headerTitle }}</span>
+            <ChevronDown class="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          </button>
+          <span v-else class="max-w-full truncate" :title="headerTitle">{{ headerTitle }}</span>
           <span
             v-if="route.name === 'bucket' && !notebooksView && requiredNodeId"
             class="max-w-full truncate text-sm font-normal text-muted-foreground"
@@ -301,11 +333,11 @@ async function createFolder() {
       <template #description>
         {{ headerDescription }}
         <span
-          v-if="currentUser && s3.connectedEndpoint.value"
+          v-if="currentUser && s3.connectedEndpoint.value && !narrow"
           class="mt-2 flex min-w-0 items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground"
         >
           <!-- The group is the top bar's context; here it only stays visible. -->
-          <span class="hidden lg:inline">Showing buckets of</span>
+          <span>Showing buckets of</span>
           <RouterLink
             v-if="selectedGroupId"
             :to="{ name: 'group', params: { id: selectedGroupId } }"
@@ -315,12 +347,12 @@ async function createFolder() {
             {{ selectedGroupName }}
           </RouterLink>
           <span v-else class="text-muted-foreground">No group</span>
-          <span class="hidden lg:inline">on</span>
+          <span>on</span>
           <NodePicker :model-value="bucketNodeChoice" :recent="recentNodes" @update:model-value="pickNode" />
         </span>
       </template>
       <template #actions>
-        <RefreshButton v-if="contextReady" :busy="refreshSpinning" @click="onRefresh" />
+        <RefreshButton v-if="contextReady" :busy="refreshSpinning" :sr-label="phone ? 'Refresh' : undefined" @click="onRefresh" />
       </template>
     </PageHeader>
 
@@ -402,13 +434,13 @@ async function createFolder() {
       <!-- Opening the session and loading its data share one placeholder. -->
       <DataViewSkeleton v-else-if="contextBusy || !viewReady" />
 
-      <!-- The desktop's bucket rows carry a node and a link column, so its list is wider. -->
-      <section v-else class="grid gap-6" :class="desktop ? 'lg:grid-cols-[300px_minmax(0,1fr)]' : 'lg:grid-cols-[260px_minmax(0,1fr)]'">
-        <Notice v-if="sessionWarning" tone="warning" class="lg:col-span-2">
+      <section v-else class="grid gap-4" :class="narrow ? '' : 'grid-cols-[300px_minmax(0,1fr)]'">
+        <Notice v-if="sessionWarning" tone="warning" :class="narrow ? '' : 'col-span-2'">
           {{ sessionWarning }}
         </Notice>
 
         <BucketSidebar
+          v-if="!narrow"
           :manager="manager"
           @sync-computer="openBindDialog"
           @new-bucket="newBucketOpen = true"
@@ -433,6 +465,22 @@ async function createFolder() {
         </div>
       </section>
     </div>
+
+    <Sheet :open="pickerOpen" @update:open="(value: boolean) => (pickerOpen = value)">
+      <SheetContent side="bottom" class="max-h-[85dvh] rounded-t-2xl p-0">
+        <DialogTitle class="px-4 pb-1 pt-4 text-base">Switch bucket</DialogTitle>
+        <DialogDescription class="sr-only">Pick a bucket to open, or create one.</DialogDescription>
+        <BucketSidebar sheet :manager="manager" @sync-computer="openBindDialog" @new-bucket="newBucketFromPicker">
+          <template #scope>
+            Buckets of
+            <RouterLink v-if="selectedGroupId" :to="{ name: 'group', params: { id: selectedGroupId } }" class="font-medium text-foreground hover:underline">{{ selectedGroupName }}</RouterLink>
+            <span v-else>no group</span>
+            on
+            <NodePicker :model-value="bucketNodeChoice" :recent="recentNodes" @update:model-value="pickNode" />
+          </template>
+        </BucketSidebar>
+      </SheetContent>
+    </Sheet>
 
     <AddDataDialog
       v-model:open="addDataOpen"

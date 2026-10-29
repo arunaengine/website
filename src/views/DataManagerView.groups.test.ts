@@ -28,7 +28,9 @@ describe('Data view group selection', () => {
 
   it('shows the group without a second picker', () => {
     expect(template).toContain('Showing buckets of')
-    expect(template).toContain('<span class="hidden lg:inline">on</span>')
+    // Below 960 px the line moves into the bucket picker's sheet, so only one shows at a time.
+    expect(template).toContain('v-if="currentUser && s3.connectedEndpoint.value && !narrow"')
+    expect(template).toContain('<span>on</span>')
     expect(template.indexOf('<NodePicker')).toBeLessThan(template.indexOf('</PageHeader>'))
     expect(template).toContain('Switch the group in the top bar')
     expect(template).not.toContain('groupOptions')

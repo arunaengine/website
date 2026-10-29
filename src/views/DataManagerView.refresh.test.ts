@@ -3,14 +3,19 @@ import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as BucketName from '@/lib/bucketName'
 import * as BucketPlace from '@/lib/bucketPlace'
-import { compileClientComponent, element, moduleDefault, mountApp, type HostNode } from '@/test/clientRender'
+import { click, compileClientComponent, content, element, flush, moduleDefault, mountApp, nodes, type HostNode } from '@/test/clientRender'
 
 // Every child is a named placeholder; the listeners the view passes land on it.
 const stub = (name: string) =>
   moduleDefault(defineComponent({ name, setup: () => () => h('div', { 'data-stub': name }) }))
 
+// The view's own width, as the element size reader would measure it.
+const viewWidth = ref(0)
+// These render their slots, so the title, the sheet and what they hold are visible.
+const slotted = (name: string) =>
+  moduleDefault(defineComponent({ name, inheritAttrs: false, setup: (_, { attrs, slots }) => () => h('div', { ...attrs, 'data-stub': name }, Object.values(slots).map((slot) => slot?.())) }))
+
 const children = [
-  'dashboard/PageHeader',
   'ui/Button',
   'ui/RefreshButton',
   'ui/Input',
@@ -53,6 +58,10 @@ const DataManagerView = compileClientComponent(new URL('./DataManagerView.vue', 
   ...Object.fromEntries(
     children.map((path) => [`@/components/${path}.vue`, stub(path.split('/').pop() ?? path)]),
   ),
+  '@/components/dashboard/PageHeader.vue': slotted('PageHeader'),
+  '@/components/ui/Sheet.vue': moduleDefault(defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h('div', { ...attrs, 'data-stub': 'Sheet' }, attrs.open ? slots.default?.() : []) })),
+  '@/components/ui/SheetContent.vue': slotted('SheetContent'),
+  '@vueuse/core': { useElementSize: () => ({ width: viewWidth, height: ref(0) }) },
   '@/composables/useAruna': {
     useAruna: () => ({ bootstrapped: booted, currentUser: user, myGroups: ref([]) }),
   },
@@ -155,5 +164,68 @@ describe('Data view search hits', () => {
       query: { prefix: 'ui-list', group: 'g1', object: 'ui-list/check.txt' },
     })
     expect(known.navigateTo).toHaveBeenCalledWith('ui-list')
+  })
+})
+
+describe('Data view width', () => {
+  async function open(width: number) {
+    manager = fakeManager(null)
+    const known = manager as Record<string, unknown>
+    known.bucket = ref('laptop')
+    known.route = { name: 'bucket', query: {} }
+    Object.assign(known, { hasGroups: ref(true), groupsLoading: ref(false), viewReady: ref(true), contextBusy: ref(false), contextReady: ref(true) })
+    user.value = { id: 'u1' }
+    booted.value = true
+    endpoint.value = 'https://s3.test'
+    viewWidth.value = width
+    const mounted = await mountApp(DataManagerView)
+    const lists = () => nodes(mounted.root).filter((node) => node.props['data-stub'] === 'BucketSidebar')
+    const sheet = () => element(mounted.root, (node) => node.props['data-stub'] === 'Sheet')
+    const picker = () => nodes(mounted.root).find((node) => node.tag === 'button' && node.props['aria-label'] === 'laptop, switch bucket')
+    const done = () => {
+      mounted.app.unmount()
+      user.value = null
+      booted.value = false
+      endpoint.value = null
+      viewWidth.value = 0
+    }
+    return { root: mounted.root, lists, sheet, picker, done }
+  }
+
+  it('shows the list beside the files and the scope line under the title on a wide view', async () => {
+    const view = await open(1130)
+    expect(view.lists()).toHaveLength(1)
+    expect(view.lists()[0].props.sheet).toBeUndefined()
+    expect(view.picker()).toBeUndefined()
+    expect(content(view.root)).toContain('Showing buckets of')
+    expect(view.sheet().props.open).toBe(false)
+    view.done()
+  })
+
+  it('makes the title the bucket picker below 960 px and opens the list in a sheet', async () => {
+    const view = await open(800)
+    expect(content(view.root)).not.toContain('Showing buckets of')
+    expect(view.lists().filter((list) => list.props.sheet === undefined)).toHaveLength(0)
+
+    await click(view.picker()!)
+    expect(view.sheet().props.open).toBe(true)
+    const inSheet = view.lists().filter((list) => list.props.sheet !== undefined)
+    expect(inSheet).toHaveLength(1)
+    // A new bucket from the sheet closes it and opens the dialog.
+    await (inSheet[0].props.onNewBucket as () => Promise<void>)()
+    await flush()
+    expect(view.sheet().props.open).toBe(false)
+    expect(element(view.root, (node) => node.props['data-stub'] === 'NewBucketDialog').props.open).toBe(true)
+    view.done()
+  })
+
+  it('closes the picker once a bucket opens, and keeps only the refresh icon on a phone', async () => {
+    const view = await open(390)
+    await click(view.picker()!)
+    ;(manager as Record<string, { value: string }>).bucket.value = 'other'
+    await flush()
+    expect(view.sheet().props.open).toBe(false)
+    expect(element(view.root, (node) => node.props['data-stub'] === 'RefreshButton').props['sr-label']).toBe('Refresh')
+    view.done()
   })
 })
