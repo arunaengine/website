@@ -706,6 +706,39 @@ describe('object browser pages', () => {
   })
 })
 
+describe('object browser order', () => {
+  const big = { ...listedObject, key: 'raw/a-big.fastq', name: 'a-big.fastq', size: 9000, lastModified: new Date('2026-01-01T00:00:00Z') }
+  const names = (root: HostNode) =>
+    nodes(element(root, (node) => node.tag === 'tbody')).filter((node) => node.tag === 'button' && node.props.title?.toString().endsWith('.fastq')).map((node) => content(node))
+
+  it('sorts by a column header and turns the order on a second click', async () => {
+    const objects = ref([listedObject, big])
+    const root = await render({ objects, visibleObjects: objects })
+    expect(names(root)).toEqual(['a-big.fastq', 'reads.fastq'])
+    const header = (label: string) => element(root, (node) => node.tag === 'th' && content(node).trim() === label)
+
+    await click(element(header('Size'), (node) => node.tag === 'button'))
+    expect(header('Size').props['aria-sort']).toBe('descending')
+    expect(names(root)).toEqual(['a-big.fastq', 'reads.fastq'])
+    await click(element(header('Size'), (node) => node.tag === 'button'))
+    expect(names(root)).toEqual(['reads.fastq', 'a-big.fastq'])
+    await click(element(header('Name'), (node) => node.tag === 'button'))
+    expect(header('Name').props['aria-sort']).toBe('ascending')
+  })
+
+  it('names the order on a phone and changes it from one menu', async () => {
+    const objects = ref([listedObject, big])
+    const root = await render({ objects, visibleObjects: objects })
+    const sortButton = () => element(root, (node) => String(node.props['aria-label'] ?? '').startsWith('Sort: '))
+    expect(content(sortButton()).trim()).toBe('Name A to Z')
+    expect(String(sortButton().parent!.parent!.parent!.props.class)).toContain('hidden px-3 pb-1.5 @max-[600px]:flex')
+
+    await click(element(root, (node) => node.props.role === 'menuitemradio' && content(node).trim() === 'Newest first'))
+    expect(content(sortButton()).trim()).toBe('Newest first')
+    expect(names(root)).toEqual(['reads.fastq', 'a-big.fastq'])
+  })
+})
+
 describe('object browser filtered pages', () => {
   it('keeps Next when the kind filter hides the whole page', async () => {
     const nextPage = vi.fn()

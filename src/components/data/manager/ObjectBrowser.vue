@@ -10,6 +10,10 @@ import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
+import DropdownMenu from '@/components/ui/DropdownMenu.vue'
+import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
+import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
+import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import ObjectListBar from '@/components/data/manager/ObjectListBar.vue'
 import MetadataSearch from '@/components/data/MetadataSearch.vue'
@@ -55,6 +59,8 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   ArrowLeftRight,
+  ArrowUpDown,
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -426,6 +432,17 @@ const sort = ref<ListSort>({ key: 'name', descending: false })
 function sortBy(key: SortKey) {
   sort.value = { key, descending: sort.value.key === key ? !sort.value.descending : key !== 'name' }
 }
+// A phone has no column header, so one button names the order and changes it.
+const SORTS: { label: string; sort: ListSort }[] = [
+  { label: 'Name A to Z', sort: { key: 'name', descending: false } },
+  { label: 'Name Z to A', sort: { key: 'name', descending: true } },
+  { label: 'Largest first', sort: { key: 'size', descending: true } },
+  { label: 'Smallest first', sort: { key: 'size', descending: false } },
+  { label: 'Newest first', sort: { key: 'modified', descending: true } },
+  { label: 'Oldest first', sort: { key: 'modified', descending: false } },
+]
+const sameSort = (left: ListSort, right: ListSort) => left.key === right.key && left.descending === right.descending
+const sortLabel = computed(() => SORTS.find((option) => sameSort(option.sort, sort.value))?.label ?? 'Sort')
 const ariaSort = (key: SortKey) => (sort.value.key === key ? (sort.value.descending ? 'descending' : 'ascending') : undefined)
 const folderRows = computed(() =>
   sortRows(visibleFolders.value, { key: 'name', descending: sort.value.key === 'name' && sort.value.descending }, (folder) => folder))
@@ -683,6 +700,19 @@ async function onDrop(event: DragEvent) {
         <Notice v-else-if="listStale" tone="warning" class="rounded-none border-x-0 border-t-0">
           Some folders are shown from a copy and may be out of date.
         </Notice>
+        <div class="hidden px-3 pb-1.5 @max-[600px]:flex">
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button variant="outline" size="sm" :aria-label="`Sort: ${sortLabel}`"><ArrowUpDown class="h-3.5 w-3.5" /> {{ sortLabel }} <ChevronDown class="h-3.5 w-3.5" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem v-for="option in SORTS" :key="option.label" role="menuitemradio" :aria-checked="sameSort(option.sort, sort)" class="pl-8" @click="sort = option.sort">
+                <span class="absolute left-2 flex h-3.5 w-3.5 items-center justify-center"><Check v-if="sameSort(option.sort, sort)" class="h-3.5 w-3.5" /></span>
+                {{ option.label }}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         <!-- Fixed column widths: a column hidden on a narrow view keeps the actions in their place.
              On a phone the rows become a list with the size and date on a second line. -->
         <table class="w-full table-fixed text-sm @max-[600px]:block">
