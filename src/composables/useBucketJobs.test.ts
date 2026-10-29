@@ -15,8 +15,13 @@ vi.mock('@/composables/useAruna', () => ({
   isUnsupportedEndpoint: (err: { status?: number }) => err?.status === 404,
   useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('t'), sessionEpoch: epoch }),
 }))
+// Another node's address may wait for the realm on a fresh load.
+const address = vi.hoisted(() => ({ known: Promise.resolve() }))
 vi.mock('@/composables/aruna/state', () => ({
-  nodeClientReady: async (node: string) => ({ baseUrl: `https://${node}`, token: 't' }),
+  nodeClientReady: async (node: string) => {
+    await address.known
+    return { baseUrl: `https://${node}`, token: 't' }
+  },
 }))
 vi.mock('@/lib/api', () => ({
   listStorageBuckets: (...args: unknown[]) => listStorageBuckets(...args),
@@ -162,6 +167,21 @@ describe('useBucketJobs', () => {
     listStorageBuckets.mockResolvedValue({ buckets: [listed('genes')], next: null })
     await vi.advanceTimersByTimeAsync(3000)
     expect(jobs.value.size).toBe(0)
+    scope.stop()
+  })
+
+  it('asks another node nothing for the old group once its address resolves late', async () => {
+    let name!: () => void
+    address.known = new Promise((resolve) => (name = resolve))
+    const { scope, groupId } = setup('g1', ['n2'])
+    await settle()
+    groupId.value = 'g2'
+    await settle()
+    name()
+    await settle()
+
+    expect(listStorageBuckets.mock.calls.filter(([group, , client]) => group === 'g1' && (client as { baseUrl: string }).baseUrl === 'https://n2')).toEqual([])
+    address.known = Promise.resolve()
     scope.stop()
   })
 

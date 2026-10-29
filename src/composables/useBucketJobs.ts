@@ -56,7 +56,10 @@ export function useBucketJobs(groupId: Ref<string>, listed: Ref<unknown>, others
     try {
       let after: string | null = null
       for (;;) {
-        const page = await listStorageBuckets(groupId.value, { limit: PAGE, after }, await nodeClientReady(node))
+        const client = await nodeClientReady(node)
+        // Another group or session took over while the node's address resolved.
+        if (id !== generation) return
+        const page = await listStorageBuckets(groupId.value, { limit: PAGE, after }, client)
         if (id !== generation) return
         for (const entry of page.buckets) if (entry.job) found.set(`${node}/${entry.bucket}`, entry.job)
         if (!page.next) break
