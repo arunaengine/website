@@ -43,7 +43,8 @@ const DETAILS_STEP = 1
 const HANDOFF_STEP = 2
 const WATCH_STEP = 3
 
-defineProps<{ step: number }>()
+// `closes`: leaving the first step closes the wizard, so the button reads Cancel.
+defineProps<{ step: number; closes?: boolean }>()
 const emit = defineEmits<{
   (e: 'update:step', v: number): void
   (e: 'back'): void
@@ -201,8 +202,7 @@ const stages = computed(() => watchStages(watchState.value))
             <label class="text-xs font-medium text-foreground" for="device-name">Device name</label>
             <Input id="device-name" v-model="deviceName" placeholder="work-laptop" class="mt-1" />
             <p class="mt-1 text-[11px] text-muted-foreground">
-              Used for the headless snippet's <code class="font-mono">ARUNA_NODE_LABELS=device=…</code>; Aruna Desktop
-              asks for its own name.
+              The name this device shows in Aruna. Aruna Desktop asks for its own name.
             </p>
           </div>
           <div>
@@ -220,7 +220,7 @@ const stages = computed(() => watchStages(watchState.value))
           <ManagementNodeGate :portals="portals" />
         </section>
         <div class="flex flex-wrap justify-between gap-2">
-          <Button variant="outline" @click="emit('back')"><ArrowLeft class="h-4 w-4" /> Back</Button>
+          <Button variant="outline" @click="emit('back')"><ArrowLeft v-if="!closes" class="h-4 w-4" /> {{ closes ? 'Cancel' : 'Back' }}</Button>
           <Button v-if="minted" variant="outline" @click="emit('update:step', HANDOFF_STEP)">
             Back to the hand-off <ArrowRight class="h-4 w-4" />
           </Button>

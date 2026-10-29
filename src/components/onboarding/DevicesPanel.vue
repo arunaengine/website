@@ -116,6 +116,7 @@ const rows = computed<SecretRow[]>(() =>
       </div>
       <DeviceLane
         v-model:step="deviceStep"
+        closes
         @back="closeAdd"
         @restart="restart"
         @changed="loadDevices"

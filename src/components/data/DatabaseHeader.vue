@@ -3,8 +3,9 @@
 import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
+import ExternalLink from '@/components/ui/ExternalLink.vue'
 import { useDatabases } from '@/composables/useDatabases'
-import { cn } from '@/lib/utils'
+import { cn, isHttpUrl } from '@/lib/utils'
 
 const props = defineProps<{
   bucket: string
@@ -20,7 +21,7 @@ onMounted(() => databases.ensure())
 const entry = computed(() => databases.find(props.bucket, props.nodeId, props.setId))
 const title = computed(() => entry.value?.title || '')
 const description = computed(() => entry.value?.metadata.description ?? '')
-const facts = computed(() => [entry.value?.metadata.license, entry.value?.public ? 'Public' : ''].filter(Boolean).join(' · '))
+const license = computed(() => entry.value?.metadata.license ?? '')
 </script>
 
 <template>
@@ -28,7 +29,10 @@ const facts = computed(() => [entry.value?.metadata.license, entry.value?.public
     <div class="min-w-0 flex-1">
       <p class="text-sm font-medium text-foreground">{{ title || 'Database' }}</p>
       <p v-if="description" class="text-sm text-muted-foreground">{{ description }}</p>
-      <p v-if="facts" class="text-xs text-muted-foreground">{{ facts }}</p>
+      <p v-if="license || entry.public" class="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+        <span v-if="license">License: <ExternalLink v-if="isHttpUrl(license)" :href="license" label="open the license" /><template v-else>{{ license }}</template></span>
+        <span v-if="entry.public">Public</span>
+      </p>
     </div>
     <Button v-if="entry.datasetId" size="sm" variant="outline" as-child>
       <RouterLink :to="{ name: 'dataset', params: { id: entry.datasetId } }">Open the dataset</RouterLink>

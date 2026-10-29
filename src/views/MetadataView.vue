@@ -53,7 +53,9 @@ import { errorMessage, truncateMiddle } from '@/lib/utils'
 import { ArrowLeft, Code2 } from '@lucide/vue'
 
 const router = useRouter()
-const { currentUser, saving, deleteMetadataDocument, fullCrates, sessionEpoch } = useAruna()
+const { currentUser, saving, deleteMetadataDocument, fullCrates, sessionEpoch, myGroups } = useAruna()
+// The breadcrumb names a group the reader belongs to; another group keeps its short id.
+const groupLabel = (id: string) => myGroups.value.find((group) => group.id === id)?.name ?? truncateMiddle(id)
 const { shown } = usePortalFeatures()
 
 const state = useDatasetView()
@@ -195,11 +197,10 @@ function jumpTo(entityId: string) {
     >
       <template #breadcrumbs>
         <template v-if="current?.realmId || fetchedSummary?.group_id">
-          <span>·</span>
           <Badge
             variant="outline"
             :title="current?.realmId || fetchedSummary?.group_id"
-          >Group: {{ truncateMiddle(current?.realmId || fetchedSummary?.group_id || '') }}</Badge>
+          >Group: {{ groupLabel(current?.realmId || fetchedSummary?.group_id || '') }}</Badge>
         </template>
       </template>
       <template #actions>

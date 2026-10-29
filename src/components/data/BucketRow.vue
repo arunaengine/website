@@ -106,7 +106,7 @@ function onClick() {
             class="h-3 w-3 shrink-0 text-amber-500"
             aria-label="Degraded: writes to part of this bucket are refused"
           />
-          <Network v-if="nodeCount" class="h-3 w-3 shrink-0 text-primary/60" :aria-label="`Stored on ${nodeCount} nodes`" />
+          <Network v-if="nodeCount" class="h-3 w-3 shrink-0 text-primary/60" :aria-label="`Stored on ${nodeCount} ${nodeCount === 1 ? 'node' : 'nodes'}`" />
           <span v-if="place" class="w-20 truncate text-[11px] text-muted-foreground" :title="placeTitle ?? undefined">{{ place }}</span>
         </span>
       </button>
@@ -139,7 +139,7 @@ function onClick() {
           class="h-3 w-3 shrink-0 text-amber-500"
           aria-label="Degraded: writes to part of this bucket are refused"
         />
-        <Network v-if="nodeCount" class="h-3 w-3 shrink-0 text-primary/60" :aria-label="`Stored on ${nodeCount} nodes`" />
+        <Network v-if="nodeCount" class="h-3 w-3 shrink-0 text-primary/60" :aria-label="`Stored on ${nodeCount} ${nodeCount === 1 ? 'node' : 'nodes'}`" />
         <span v-if="place" class="w-20 truncate text-[11px] text-muted-foreground" :title="placeTitle ?? undefined">{{ place }}</span>
       </span>
     </button>
