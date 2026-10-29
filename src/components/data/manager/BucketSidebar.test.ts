@@ -901,4 +901,24 @@ describe('database buckets in the list', () => {
     databaseRows.value = []
     allBuckets.hits.value = []
   })
+
+  it('keeps pins of a device and pins not matching the searched name out of the list', async () => {
+    nodeChoice.value = null
+    allBuckets.needsName.value = false
+    allBuckets.hits.value = [{ bucket: 'reads-2026', node_id: 'home', group_id: 'g1' }]
+    const state = manager()
+    state.bucketNameFilter.value = 'reads'
+    state.shortcuts.pinned.value = [
+      { bucket: 'reads-old', nodeId: null },
+      { bucket: 'reads-laptop', nodeId: 'laptop' },
+      { bucket: 'images', nodeId: null },
+    ]
+    const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
+    await flush()
+    const order = nodes(root).filter((node) => String(node.props['aria-label']).startsWith('Open ')).map((node) => content(node))
+
+    expect(order).toEqual(['reads-old', 'reads-2026'])
+    allBuckets.hits.value = []
+  })
 })
+

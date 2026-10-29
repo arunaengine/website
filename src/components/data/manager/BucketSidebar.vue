@@ -170,7 +170,11 @@ const allRows = computed<AllRow[]>(() => {
     if (hit) used.add(hit)
     return [{ key: `${nodeId ?? ''}/${entry.bucket}`, bucket: entry.bucket, nodeId, hit, pinned }]
   }
-  const pins = shortcuts.pinned.value.filter((entry) => !isFolderBucket(entry.bucket)).flatMap((entry) => take(entry, true))
+  // A pin passes the same checks as a listed row: no device, and the name being searched.
+  const term = bucketNameFilter.value.trim().toLowerCase()
+  const shownPin = (entry: BucketShortcut) =>
+    !isFolderBucket(entry.bucket) && realmNodes.isTarget(entry.nodeId) && entry.bucket.toLowerCase().includes(term)
+  const pins = shortcuts.pinned.value.filter(shownPin).flatMap((entry) => take(entry, true))
   const recents = shortcuts.recent.value.filter((entry) => (entry.groupId ?? '') === selectedGroupId.value).flatMap((entry) => take(entry, false))
   const rest = hits.filter((hit) => !used.has(hit)).map((hit) => ({ key: `${hit.node_id}/${hit.bucket}`, bucket: hit.bucket, nodeId: shortcutNode(hit), hit, pinned: false }))
   return [...pins, ...recents, ...rest]
