@@ -87,6 +87,17 @@ function choices(nodes: RealmNodeInfo[]): HTMLElement {
   return list
 }
 
+// Places within about a kilometre are one town: the view zooms in to city level, not the region.
+const CLOSE_METRES = 1000
+function spreadMetres(points: { lat: number; lon: number }[]): number {
+  const lats = points.map((point) => point.lat)
+  const lons = points.map((point) => point.lon)
+  const rad = Math.PI / 180
+  const dLat = (Math.max(...lats) - Math.min(...lats)) * rad
+  const dLon = (Math.max(...lons) - Math.min(...lons)) * rad * Math.cos(((Math.max(...lats) + Math.min(...lats)) / 2) * rad)
+  return 6_371_000 * Math.hypot(dLat, dLon)
+}
+
 const placed = new Map<string, L.CircleMarker>()
 // The marker's own click handler, so a redraw removes it and not the popup's.
 const selects = new Map<L.CircleMarker, () => void>()
@@ -131,7 +142,10 @@ function draw() {
   })
   // A heartbeat keeps the reader's zoom and pan; new or moved places are fitted again.
   const shown = [...keys].sort().join(';')
-  if (places.length && shown !== fitted) map.fitBounds(L.latLngBounds(places.map((place) => [place.lat, place.lon])), { padding: [24, 24], maxZoom: 11 })
+  if (places.length && shown !== fitted) {
+    const maxZoom = spreadMetres(places) <= CLOSE_METRES ? 14 : 11
+    map.fitBounds(L.latLngBounds(places.map((place) => [place.lat, place.lon])), { padding: [24, 24], maxZoom })
+  }
   fitted = shown
 }
 

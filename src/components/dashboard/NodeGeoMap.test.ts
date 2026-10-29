@@ -8,7 +8,7 @@ import type { RealmNodeInfo } from '@/lib/api'
 
 // Just enough Leaflet to watch what the map does with tiles, markers and the view.
 type Handler = (event: { tile: unknown }) => void
-const leaflet = vi.hoisted(() => ({ markers: [] as FakeMarker[], fits: 0, cleared: 0, layer: null as null | { handlers: Map<string, Handler[]>; createTile: (coords: unknown, done: () => void) => unknown } }))
+const leaflet = vi.hoisted(() => ({ markers: [] as FakeMarker[], fits: 0, lastFit: null as null | { maxZoom: number }, cleared: 0, layer: null as null | { handlers: Map<string, Handler[]>; createTile: (coords: unknown, done: () => void) => unknown } }))
 class FakeMarker {
   tooltip: unknown = null
   popup: unknown = null
@@ -45,7 +45,7 @@ const L = {
         addTo() { leaflet.layer = this as never; return this }
       },
   },
-  map: () => ({ setView: () => {}, fitBounds: () => void leaflet.fits++, remove: () => {} }),
+  map: () => ({ setView: () => {}, fitBounds: (_bounds: unknown, options: { maxZoom: number }) => { leaflet.fits++; leaflet.lastFit = options }, remove: () => {} }),
   layerGroup: () => ({ addTo() { return this }, addLayer: () => {}, removeLayer: () => {}, clearLayers: () => void leaflet.cleared++ }),
   circleMarker: (at: number[], style: Record<string, unknown>) => {
     const marker = new FakeMarker(at, style)
@@ -163,5 +163,14 @@ describe('node map', () => {
     expect(shared.clicks).toEqual([shared.openPopup])
     expect(single.clicks).toHaveLength(1)
     expect(single.clicks[0]).not.toBe(single.openPopup)
+  })
+
+  it('zooms to city level when every place is within a kilometre, and to the region otherwise', async () => {
+    const near = (id: string, lat: number, lon: number) => ({ ...node(id, lat), coordinates: { lat, lon } }) as RealmNodeInfo
+    await mount([near('a', 50.5841, 8.6784), near('b', 50.5841, 8.6784), near('c', 50.5880, 8.6800)])
+    expect(leaflet.lastFit?.maxZoom).toBe(14)
+
+    await mount([near('a', 50.5841, 8.6784), near('d', 50.8021, 8.7667)])
+    expect(leaflet.lastFit?.maxZoom).toBe(11)
   })
 })
