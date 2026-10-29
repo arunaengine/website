@@ -9,6 +9,8 @@ const searchObjects = vi.fn(async () => ({ hits: [hit], next_cursor: null, cover
 
 const component = compileClientComponent(new URL('./MetadataSearch.vue', import.meta.url), {
   vue: VueRuntime,
+  // Searching while typing waits for a pause; here the pause is over at once.
+  '@vueuse/core': { watchDebounced: (source: never, callback: never) => VueRuntime.watch(source, callback) },
   '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => h('i')) }),
   '@/components/ui/Button.vue': moduleDefault(defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()) })),
   '@/composables/useAruna': { useAruna: () => ({ searchObjects, sessionEpoch: ref(1) }) },
@@ -68,5 +70,20 @@ describe('bucket metadata search', () => {
     await flush()
     expect(content(root)).toContain('assembly_level = Complete Genome')
     expect(searchObjects).toHaveBeenLastCalledWith('assembly_level="Complete Genome"', expect.objectContaining({ match: 'metadata' }))
+  })
+
+  it('finds file names while typing and keeps one hit per file', async () => {
+    const file = { key: 'reads/ui-hello.txt', bucket: 'ncbi', issuer_node_id: 'n1', group_id: 'g1' }
+    searchObjects.mockReset()
+    searchObjects.mockImplementation(async (_q: string, options: { match: string }) =>
+      ({ hits: options.match === 'substring' ? [file] : [file, hit], next_cursor: null, coverage: { complete: true } }) as never)
+    const { root } = await mountApp(component, { props: { bucket: 'ncbi', nodeId: null } })
+    ;(element(root, (node) => node.tag === 'input').props['onUpdate:modelValue'] as (value: string) => void)('hello')
+    await flush()
+
+    expect(searchObjects).toHaveBeenCalledWith('hello', { bucket: 'ncbi', match: 'substring', limit: 50 })
+    expect(searchObjects).toHaveBeenCalledWith('hello', expect.objectContaining({ match: 'metadata' }))
+    expect(content(root).split('reads/ui-hello.txt')).toHaveLength(2)
+    expect(content(root)).toContain('GCF_')
   })
 })

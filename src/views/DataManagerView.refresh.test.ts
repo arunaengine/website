@@ -42,6 +42,9 @@ const children = [
 ]
 
 let manager: Record<string, unknown> = {}
+const user = ref<unknown>(null)
+const booted = ref(false)
+const endpoint = ref<string | null>(null)
 
 const DataManagerView = compileClientComponent(new URL('./DataManagerView.vue', import.meta.url), {
   vue: VueRuntime,
@@ -51,14 +54,14 @@ const DataManagerView = compileClientComponent(new URL('./DataManagerView.vue', 
     children.map((path) => [`@/components/${path}.vue`, stub(path.split('/').pop() ?? path)]),
   ),
   '@/composables/useAruna': {
-    useAruna: () => ({ bootstrapped: ref(false), currentUser: ref(null), myGroups: ref([]) }),
+    useAruna: () => ({ bootstrapped: booted, currentUser: user, myGroups: ref([]) }),
   },
   '@/composables/useDataManager': { useDataManager: () => manager },
   '@/composables/useBucketDistribution': {
     useBucketDistribution: () => ({ view: ref(null), state: ref('unavailable') }),
   },
   '@/composables/usePageContext': { providePageContext: () => {} },
-  '@/composables/useS3': { useS3: () => ({ connectedEndpoint: ref(null) }), s3ErrorMessage: String },
+  '@/composables/useS3': { useS3: () => ({ connectedEndpoint: endpoint }), s3ErrorMessage: String },
   '@/lib/bucketName': BucketName,
   '@/lib/desktop': { isDesktop: () => true },
   '@/lib/distributedMock': { mockEnabled: () => false },
@@ -119,5 +122,37 @@ describe('Data view after a folder link', () => {
 
     expect(shown.bucketList.refresh).toHaveBeenCalled()
     expect(shown.allBuckets.reload).not.toHaveBeenCalled()
+  })
+})
+
+describe('Data view search hits', () => {
+  it('opens a found file with its details and a found folder as the folder', async () => {
+    manager = fakeManager(null)
+    const known = manager as Record<string, unknown>
+    known.bucket = ref('reads')
+    known.remoteNodeId = ref(null)
+    known.realmNodes = { isLocalNode: (id: string) => id === 'n1' }
+    known.navigateTo = vi.fn()
+    Object.assign(known, { hasGroups: ref(true), groupsLoading: ref(false), viewReady: ref(true), contextBusy: ref(false) })
+    user.value = { id: 'u1' }
+    booted.value = true
+    endpoint.value = 'https://s3.test'
+    const { root, app } = await mountApp(DataManagerView)
+    const open = element(root, (node: HostNode) => node.props['data-stub'] === 'MetadataSearch').props.onOpen as (hit: unknown) => void
+
+    open({ key: 'ui-list/check.txt', bucket: 'reads', issuer_node_id: 'n1', group_id: 'g1' })
+    open({ key: 'ui-list/', bucket: 'reads', issuer_node_id: 'n1', group_id: 'g1' })
+    app.unmount()
+    user.value = null
+    booted.value = false
+    endpoint.value = null
+
+    const push = (known.router as { push: ReturnType<typeof vi.fn> }).push
+    expect(push).toHaveBeenCalledWith({
+      name: 'bucket',
+      params: { bucketId: 'reads' },
+      query: { prefix: 'ui-list', group: 'g1', object: 'ui-list/check.txt' },
+    })
+    expect(known.navigateTo).toHaveBeenCalledWith('ui-list')
   })
 })

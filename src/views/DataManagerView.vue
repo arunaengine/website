@@ -145,14 +145,17 @@ watch(newBucketOpen, (open) => {
 })
 
 // A found folder opens itself; a found file opens the folder that holds it, on the hit's node.
+// A folder hit opens the folder; a file hit opens its folder with the file's details.
 function openFound(hit: ObjectSearchHit) {
-  const folder = hit.key.endsWith('/') ? hit.key.slice(0, -1) : hit.key.split('/').slice(0, -1).join('/')
+  const isFolder = hit.key.endsWith('/')
+  const folder = isFolder ? hit.key.slice(0, -1) : hit.key.split('/').slice(0, -1).join('/')
   const here = remoteNodeId.value ? hit.issuer_node_id === remoteNodeId.value : realmNodes.isLocalNode(hit.issuer_node_id)
-  if (here) return manager.navigateTo(folder)
+  if (here && isFolder) return manager.navigateTo(folder)
+  const node = here ? remoteNodeId.value : realmNodes.isLocalNode(hit.issuer_node_id) ? null : hit.issuer_node_id
   void router.push({
     name: 'bucket',
     params: { bucketId: hit.bucket },
-    query: { ...(folder ? { prefix: folder } : {}), ...(realmNodes.isLocalNode(hit.issuer_node_id) ? {} : { node: hit.issuer_node_id }), group: hit.group_id },
+    query: { ...(folder ? { prefix: folder } : {}), ...(node ? { node } : {}), group: hit.group_id, ...(isFolder ? {} : { object: hit.key }) },
   })
 }
 

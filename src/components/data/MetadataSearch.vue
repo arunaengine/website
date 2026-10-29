@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// One box that searches the stored details of a bucket's files and folders: words match search
-// columns, `column=value` matches a filter column exactly and becomes a chip.
+// One box that searches a bucket's files and folders: words match file names and search columns,
+// `column=value` matches a filter column exactly and becomes a chip.
 import { computed, ref, watch } from 'vue'
+import { watchDebounced } from '@vueuse/core'
 import Button from '@/components/ui/Button.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -61,9 +62,16 @@ async function search(more = false) {
   busy.value = true
   failure.value = null
   try {
-    const page = await searchObjects(query.value, { bucket: props.bucket, match: 'metadata', limit: 50, cursor: more ? cursor.value ?? undefined : undefined })
+    // Plain words also match file names; the details search pages on its own.
+    const words = chips.value.length ? '' : typed.value.trim()
+    const [page, named] = await Promise.all([
+      searchObjects(query.value, { bucket: props.bucket, match: 'metadata', limit: 50, cursor: more ? cursor.value ?? undefined : undefined }),
+      !more && words.length >= 2 ? searchObjects(words, { bucket: props.bucket, match: 'substring', limit: 50 }).catch(() => null) : null,
+    ])
     if (run !== runs) return
-    hits.value = more ? [...(hits.value ?? []), ...page.hits] : page.hits
+    const found = [...(more ? hits.value ?? [] : named?.hits ?? []), ...page.hits]
+    const seen = new Set<string>()
+    hits.value = found.filter((hit) => !seen.has(`${hit.issuer_node_id}/${hit.key}`) && Boolean(seen.add(`${hit.issuer_node_id}/${hit.key}`)))
     cursor.value = page.next_cursor ?? null
     complete.value = page.coverage.complete
   } catch (cause) {
@@ -72,6 +80,11 @@ async function search(more = false) {
     if (run === runs) busy.value = false
   }
 }
+
+// Words search while typing; a `column=value` waits for Enter or a space.
+watchDebounced(typed, (text) => {
+  if (!text.includes('=') && !quoteOpen() && text.trim().length >= 2) void search()
+}, { debounce: 400 })
 
 function drop(index: number) {
   chips.value = chips.value.filter((_, at) => at !== index)
@@ -90,12 +103,12 @@ function drop(index: number) {
       <input
         v-model="typed"
         class="min-w-[8rem] flex-1 bg-transparent py-1 text-sm outline-none"
-        placeholder="Search file details"
+        placeholder="Search names and details"
         aria-label="Search file details"
         @keydown.space="takeChips"
       />
     </form>
-    <p class="text-[11px] text-muted-foreground">Type words, or column=value for an exact match.</p>
+    <p class="text-[11px] text-muted-foreground">Finds file names and imported details in the whole bucket. Use column=value for an exact match.</p>
     <p v-if="failure" class="text-xs text-destructive">{{ failure }}</p>
     <ul v-if="hits?.length" class="divide-y divide-border rounded-md border border-border text-xs">
       <li v-for="hit in hits" :key="`${hit.issuer_node_id}/${hit.key}`">
