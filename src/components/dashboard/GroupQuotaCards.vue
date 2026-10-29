@@ -18,7 +18,8 @@ import { QUOTA_STATE_BADGES } from '@/lib/quota'
 const { entries, membershipKey, refresh, retry } = useMyGroupsUsage()
 const reach = useReachableUsage()
 const view = useViewMode('dashboard-groups')
-const props = defineProps<{ refreshRevision: number }>()
+/** `compact`: a column of the landing view's bottom row, one card wide and without nested surfaces. */
+const props = defineProps<{ refreshRevision: number; compact?: boolean }>()
 
 // Only states that need attention get a badge; an unlimited group shows "no quota" in its line.
 function badgeFor(entry: GroupUsageEntry) {
@@ -83,8 +84,8 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
       @retry="refresh"
     />
 
-    <div v-if="view === 'cards'" class="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
-      <div v-for="entry in sortedEntries()" :key="entry.groupId" class="surface p-4">
+    <div v-if="view === 'cards'" class="grid gap-3.5" :class="compact ? '' : 'sm:grid-cols-2 xl:grid-cols-3'">
+      <div v-for="entry in sortedEntries()" :key="entry.groupId" :class="compact ? 'rounded-md border border-border p-3' : 'surface p-4'">
         <div class="flex items-center justify-between gap-2">
           <RouterLink
             :to="{ name: 'group', params: { id: entry.groupId } }"
@@ -113,7 +114,7 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
       </div>
     </div>
 
-    <div v-else class="surface overflow-x-auto">
+    <div v-else class="overflow-x-auto" :class="compact ? '' : 'surface'">
       <table class="w-full text-left text-xs">
         <thead class="border-b border-border text-muted-foreground">
           <tr>

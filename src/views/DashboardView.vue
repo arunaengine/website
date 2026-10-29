@@ -7,6 +7,8 @@ import GroupQuotaCards from '@/components/dashboard/GroupQuotaCards.vue'
 import MyStatsCards from '@/components/dashboard/MyStatsCards.vue'
 import FederationPanel from '@/components/dashboard/FederationPanel.vue'
 import NodeTable from '@/components/dashboard/NodeTable.vue'
+import RecentDatasetsCard from '@/components/dashboard/RecentDatasetsCard.vue'
+import RecentRunsCard from '@/components/dashboard/RecentRunsCard.vue'
 import OverviewCell from '@/components/dashboard/OverviewCell.vue'
 import WebStart from '@/components/dashboard/WebStart.vue'
 import SignInPanel from '@/components/auth/SignInPanel.vue'
@@ -384,7 +386,14 @@ const pageDescription = computed(() =>
         </div>
       </section>
 
-      <GroupQuotaCards v-if="currentUser && myGroups.length" :refresh-revision="cardsRevision" />
+      <!-- The bottom row: groups, the latest runs and the latest datasets, side by side when wide. -->
+      <div v-if="currentUser" class="grid gap-5 lg:grid-cols-3">
+        <div v-if="myGroups.length" class="surface px-5 pb-4">
+          <GroupQuotaCards compact :refresh-revision="cardsRevision" />
+        </div>
+        <RecentRunsCard v-if="recentRuns.state.value !== 'off'" :runs="recentRuns.runs.value" :state="recentRuns.state.value" />
+        <RecentDatasetsCard :refresh-revision="quotaRevision" />
+      </div>
       </template>
     </div>
 

@@ -48,6 +48,8 @@ const MapStub = defineComponent({
         h('span', ` ${node.node_id} beat ${node.info?.utilization?.heartbeat_at_ms} `)),
     ]),
 })
+const RunsCardStub = defineComponent({ props: { runs: Array, state: String }, setup: (props) => () => h('div', `recent runs ${props.state} ${props.runs?.length}`) })
+const DatasetsCardStub = defineComponent({ props: { refreshRevision: Number }, setup: () => () => h('div', 'recent datasets') })
 const GeoMapStub = defineComponent({
   props: { nodes: { type: Array, default: () => [] } },
   setup: (props) => () => h('div', `osm map ${(props.nodes as Array<{ node_id: string }>).map((node) => node.node_id).join(' ')}`),
@@ -195,6 +197,8 @@ beforeAll(async () => {
   vi.doMock('@/components/dashboard/FederationPanel.vue', () => ({ default: MapStub }))
   vi.doMock('@/components/dashboard/NodeTable.vue', () => ({ default: TableStub }))
   vi.doMock('@/components/dashboard/NodeGeoMap.vue', () => ({ default: GeoMapStub }))
+  vi.doMock('@/components/dashboard/RecentRunsCard.vue', () => ({ default: RunsCardStub }))
+  vi.doMock('@/components/dashboard/RecentDatasetsCard.vue', () => ({ default: DatasetsCardStub }))
   vi.doMock('@/components/dashboard/WebStart.vue', () => ({ default: WebStartStub }))
   vi.doMock('@/composables/useRealmNodes', () => realmNodesStub)
   vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: SkeletonStub }))
@@ -270,6 +274,8 @@ beforeAll(async () => {
     '@/components/dashboard/FederationPanel.vue': moduleDefault(MapStub),
     '@/components/dashboard/NodeTable.vue': moduleDefault(TableStub),
     '@/components/dashboard/NodeGeoMap.vue': moduleDefault(GeoMapStub),
+    '@/components/dashboard/RecentRunsCard.vue': moduleDefault(RunsCardStub),
+    '@/components/dashboard/RecentDatasetsCard.vue': moduleDefault(DatasetsCardStub),
     '@/lib/nodePlaces': NodePlaces,
     '@/components/dashboard/WebStart.vue': moduleDefault(WebStartStub),
     '@/composables/useRealmNodes': realmNodesStub,
@@ -429,9 +435,21 @@ describe('authenticated dashboard scope', () => {
     expect(text).toContain('map compact=true')
     expect(text).toMatch(/row node-a\s+row node-b/)
     // The old sections and the boxes the sidebar already offers are gone.
-    for (const gone of ['My statistics', 'Realm statistics', 'Replica-inclusive placement records held', 'Recent datasets', 'Open Data']) {
+    for (const gone of ['My statistics', 'Realm statistics', 'Replica-inclusive placement records held', 'Open Data']) {
       expect(text).not.toContain(gone)
     }
+  })
+
+  it('ends with groups, recent runs and recent datasets side by side, and no runs card without compute', async () => {
+    signedInRealm()
+    const text = await renderedText()
+    const groups = text.indexOf('group quota cards')
+    expect(groups).toBeGreaterThan(text.indexOf('Realm 1 of 2'))
+    expect(text.indexOf('recent runs ready 0')).toBeGreaterThan(groups)
+    expect(text.indexOf('recent datasets')).toBeGreaterThan(text.indexOf('recent runs'))
+
+    runsState.value = 'off'
+    expect(await renderedText()).not.toContain('recent runs')
   })
 
   it('shows the realm figures in the same cells when the account stored that scope', async () => {
