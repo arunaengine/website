@@ -1,35 +1,53 @@
 <script setup lang="ts">
+import DropdownMenu from '@/components/ui/DropdownMenu.vue'
+import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
+import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
+import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import { computed } from 'vue'
-import { ChevronRight, Home } from '@lucide/vue'
+import { Folder, Home } from '@lucide/vue'
 
-// Single line: long names truncate instead of wrapping.
+// The bucket, then the open folder's path. A deep path shows the parent and the open folder;
+// the "…" menu holds the folders between. Long names truncate instead of wrapping.
 const props = defineProps<{ path: string; bucket: string; singleLine?: boolean }>()
 const emit = defineEmits<{
   (e: 'navigate', path: string): void
 }>()
 
 const parts = computed(() => (props.path ? props.path.split('/') : []))
+const crumbs = computed(() => parts.value.map((name, index) => ({ name, path: parts.value.slice(0, index + 1).join('/') })))
+const hidden = computed(() => crumbs.value.slice(0, -2))
+const shown = computed(() => crumbs.value.slice(-2))
 </script>
 
 <template>
-  <nav class="flex min-w-0 items-center gap-1 text-sm text-muted-foreground" :class="singleLine ? 'flex-nowrap' : 'flex-wrap'">
+  <nav aria-label="Folder path" class="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground" :class="singleLine ? 'flex-nowrap' : 'flex-wrap'">
     <button
-      class="inline-flex min-w-0 items-center gap-1.5 rounded px-1.5 py-0.5 hover:bg-muted hover:text-foreground"
+      type="button"
+      class="inline-flex min-w-0 shrink items-center gap-1.5 text-primary hover:underline"
       :title="bucket"
       @click="emit('navigate', '')"
     >
       <Home class="h-3.5 w-3.5 shrink-0" />
-      <span class="truncate font-medium">{{ bucket }}</span>
+      <span class="truncate">{{ bucket }}</span>
     </button>
-    <template v-for="(p, idx) in parts" :key="idx">
-      <ChevronRight class="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-      <button
-        class="truncate rounded px-1.5 py-0.5 hover:bg-muted hover:text-foreground"
-        :class="idx === parts.length - 1 ? 'font-medium text-foreground' : ''"
-        :title="p"
-        @click="emit('navigate', parts.slice(0, idx + 1).join('/'))"
-      >
-        {{ p }}
+    <template v-if="hidden.length">
+      <span aria-hidden="true">/</span>
+      <DropdownMenu>
+        <DropdownMenuTrigger as-child>
+          <button type="button" class="shrink-0 px-0.5 text-primary hover:underline" :title="hidden.map((crumb) => crumb.name).join(' / ')" aria-label="Show the folders between">…</button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem v-for="crumb in hidden" :key="crumb.path" @click="emit('navigate', crumb.path)">
+            <Folder class="h-3.5 w-3.5 text-primary" /> {{ crumb.name }}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </template>
+    <template v-for="(crumb, index) in shown" :key="crumb.path">
+      <span aria-hidden="true">/</span>
+      <span v-if="index === shown.length - 1" class="truncate text-foreground" aria-current="page" :title="crumb.name">{{ crumb.name }}</span>
+      <button v-else type="button" class="min-w-0 truncate text-primary hover:underline" :title="crumb.name" @click="emit('navigate', crumb.path)">
+        {{ crumb.name }}
       </button>
     </template>
   </nav>
