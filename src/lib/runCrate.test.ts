@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseRunCrate } from './runCrate'
+import { parseRunCrate, runDuration, runState } from './runCrate'
 
 const RUN = 'https://w3id.org/aruna/01RUNRECORD'
 const crate = {
@@ -35,5 +35,15 @@ describe('run crate', () => {
 
     expect(run.site).toBeUndefined()
     expect(run.cpuCores).toBeUndefined()
+  })
+})
+
+describe('run state and duration', () => {
+  it('words the end state and the time a run took', () => {
+    const run = { inputs: [], outputs: [], actionStatus: 'CompletedActionStatus', startTime: '2026-10-28T10:00:00Z', endTime: '2026-10-28T10:04:12Z' }
+    expect(runState(run)).toBe('succeeded')
+    expect(runDuration(run)).toBe('4m 12s')
+    expect(runDuration({ ...run, endTime: 'later' })).toBe('')
+    expect(runState({ inputs: [], outputs: [] })).toBeNull()
   })
 })
