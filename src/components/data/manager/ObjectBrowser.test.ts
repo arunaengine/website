@@ -850,4 +850,18 @@ describe('the one search box', () => {
     await enter()
     expect(content(root)).toContain('whole bucket reef coli')
   })
+
+  it('leaves the search on a click of the breadcrumb of the folder already open', async () => {
+    const { root, manager, box, type, enter } = await setup()
+    await type('reads')
+    await enter()
+    // Clicking the current folder changes no prefix; the search must end all the same.
+    ;(element(root, (node) => node.tag === 'nav' && typeof node.props.onNavigate === 'function').props.onNavigate as (path: string) => void)('')
+    await flush()
+
+    expect(manager.navigateTo).toHaveBeenCalledWith('')
+    expect(content(root)).not.toContain('whole bucket')
+    expect(element(root, (node) => node.tag === 'table')).toBeTruthy()
+    expect(box().props.modelValue).toBe('')
+  })
 })

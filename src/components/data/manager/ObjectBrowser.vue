@@ -345,6 +345,11 @@ function backToFolder() {
   searchText.value = ''
   nameFilter.value = ''
 }
+// A breadcrumb leaves the bucket search, also the one of the folder already open.
+function openCrumb(path: string) {
+  backToFolder()
+  navigateTo(path)
+}
 function openHit(hit: ObjectSearchHit) {
   backToFolder()
   emit('open-hit', hit)
@@ -422,7 +427,7 @@ async function onDrop(event: DragEvent) {
       <!-- On a narrow screen the actions move below the path instead of squeezing it. -->
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div class="flex min-w-[10rem] flex-1 items-center gap-2">
-          <Breadcrumbs :bucket="bucket" :path="prefix" single-line @navigate="navigateTo" />
+          <Breadcrumbs :bucket="bucket" :path="prefix" single-line @navigate="openCrumb" />
           <Badge v-if="lockedOnNode" :variant="stateVariant('locked')" size="sm" class="shrink-0">
             <Lock class="mr-0.5 h-3 w-3" aria-hidden="true" /> Locked on the node
           </Badge>
