@@ -67,6 +67,7 @@ const DeviceRow = compileClientComponent(new URL('./DeviceRow.vue', import.meta.
   '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ status, refresh: refreshStatus, deviceClient }) },
   '@/composables/useDeviceTransfers': { useDeviceTransfers: () => ({ all: transfers, state: transfersState, load: vi.fn(async () => undefined) }) },
   '@/composables/useSyncedFolders': { useSyncedFolders: () => ({ folders, listState: foldersState, load: loadFolders }) },
+  '@/composables/useRealmNodes': { THIS_COMPUTER: 'This computer' },
   '@/lib/deviceApi': DeviceApi,
   '@/lib/formatCount': FormatCount,
   '@/lib/nodePill': NodePill,
@@ -101,6 +102,12 @@ describe('device row', () => {
     expect(text).not.toContain('Running')
     await click(button(mounted.root, 'Link a folder'))
     expect(content(mounted.root)).toContain('bind-dialog-open')
+    mounted.app.unmount()
+  })
+
+  it('gives a computer without its own name no badge that says the same', async () => {
+    const mounted = await mountApp(DeviceRow, { props: { name: 'This computer' } })
+    expect(content(mounted.root).match(/this computer/gi)).toHaveLength(1)
     mounted.app.unmount()
   })
 

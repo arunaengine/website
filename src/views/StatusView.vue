@@ -24,6 +24,7 @@ import { errorMessage, formatBytes, formatNumber, relativeTime, truncateMiddle }
 import type { RealmNodeInfo } from '@/lib/api'
 import type { RealmView } from '@/composables/aruna/realm'
 import { isDesktop } from '@/lib/desktop'
+import { computerName } from '@/composables/useRealmNodes'
 import { Boxes, ChevronRight, Globe2, HardDrive, Laptop, MapPin, MapPinned } from '@lucide/vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { useFirstPaint } from '@/composables/useFirstPaint'
@@ -211,8 +212,7 @@ const computer = computed(() => {
   const info = nodeInfo.value
   if (!desktop || !info?.connections) return null
   const id = info.node.peer_id
-  const labels = panelDevices.value.find((node) => node.node_id === id)?.info?.labels ?? {}
-  const name = labels['name'] || labels['display_name'] || labels['device'] || 'This computer'
+  const name = computerName(panelDevices.value.find((node) => node.node_id === id))
   const peers = info.connections.filter((peer) => peer.status === 'connected').map((peer) => peer.peer_id)
   return { id, name, peers }
 })

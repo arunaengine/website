@@ -70,6 +70,10 @@ const realmNode = (nodeId: string, label: string, extra: Record<string, unknown>
   ...extra,
 })
 
+// The realm record of this computer; a named one shows its name with a "this computer" badge.
+let deviceInfo: unknown = null
+const { computerName, THIS_COMPUTER } = await import('@/composables/useRealmNodes')
+
 const NewBucketDialog = compileClientComponent(new URL('./NewBucketDialog.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': icons,
@@ -84,9 +88,11 @@ const NewBucketDialog = compileClientComponent(new URL('./NewBucketDialog.vue', 
   '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ deviceClient: ref(device) }) },
   '@/composables/useGroupSelection': { activeGroupId },
   '@/composables/useRealmNodes': {
+    computerName,
+    THIS_COMPUTER,
     useRealmNodes: () => ({
       nodes: ref([
-        { ...realmNode('device', 'device 12D3…', { kind: 'user', isLocal: true, location: null }) },
+        { ...realmNode('device', 'device 12D3…', { kind: 'user', isLocal: true, location: null, info: deviceInfo as never }) },
         realmNode('node-0', 'node-0 · Giessen', { reachable: false }),
         realmNode('node-1', 'node-1 · Giessen'),
       ]),
@@ -250,6 +256,17 @@ describe('the place table of New bucket', () => {
     expect(cells('node-1 · Giessen').slice(1, 3)).toEqual(['node-1 default', 'Giessen'])
     expect(cells('This computer').slice(1, 3)).toEqual(['This computer', 'Not set'])
     mounted.app.unmount()
+  })
+
+  it('names this computer by its enrolled name with a badge, and its location column stays a location', async () => {
+    deviceInfo = { labels: { device: 'Microbiology laptop' } }
+    const mounted = await mountApp(NewBucketDialog, { props: { open: true } })
+    const row = element(mounted.root, (node) => node.tag === 'tr' && nodes(node).some((child) => child.props['aria-label'] === 'This computer'))
+    const cells = row.children.filter((child) => child.tag === 'td').map((cell) => content(cell).trim())
+
+    expect(cells.slice(1, 3)).toEqual(['Microbiology laptop this computer', 'Not set'])
+    mounted.app.unmount()
+    deviceInfo = null
   })
 })
 

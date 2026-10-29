@@ -19,7 +19,7 @@ beforeAll(async () => {
   }))
   vi.doMock('@vueuse/core', () => ({ useNow: () => ref(new Date(0)) }))
   vi.doMock('@/components/ui/Badge.vue', () => ({ default: BadgeStub }))
-  vi.doMock('@/composables/useRealmNodes', () => ({ useRealmNodes: () => realmNodes }))
+  vi.doMock('@/composables/useRealmNodes', () => ({ useRealmNodes: () => realmNodes, THIS_COMPUTER: 'This computer' }))
   vi.doMock('@/lib/desktop', async () => ({
     ...(await vi.importActual<typeof import('@/lib/desktop')>('@/lib/desktop')),
     isDesktop: () => desktop,
@@ -142,6 +142,14 @@ describe('this computer', () => {
     expect(html).toContain('This computer shows its own.')
     expect(html).toContain('aria-label="Realm node topology. This computer, Test-laptop!, is connected."')
     expect(html).toContain('1 enrolled, 1 active')
+  })
+
+  it('does not repeat "This computer" under a computer without its own name', async () => {
+    const connected = await render({ id: laptop.id, name: 'This computer', peers: ['aaaa-mgmt-1111'] })
+    expect(connected.match(/>\s*This computer\s*<\/text>/g)).toHaveLength(1)
+
+    const away = await render({ id: laptop.id, name: 'This computer', peers: [] })
+    expect(away).toMatch(/>\s*Not connected\s*<\/text>/)
   })
 
   it('dims it without lines when not connected', async () => {

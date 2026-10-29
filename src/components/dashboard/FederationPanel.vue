@@ -8,7 +8,7 @@ import LabelChip from '@/components/ui/LabelChip.vue'
 import NodesHealth from '@/components/dashboard/NodesHealth.vue'
 import type { RealmNodeInfo } from '@/lib/api'
 import { connectionLabel, connectionVariant, kindLabel, kindVariant } from '@/components/nodes/node-display'
-import { useRealmNodes } from '@/composables/useRealmNodes'
+import { THIS_COMPUTER, useRealmNodes } from '@/composables/useRealmNodes'
 import { isDesktop } from '@/lib/desktop'
 import { relativeTime, truncateMiddle } from '@/lib/utils'
 import { Laptop } from '@lucide/vue'
@@ -120,7 +120,10 @@ const computer = computed(() => {
     })
   const chars = Array.from(props.computer.name)
   const shortName = chars.length > PC_NAME_MAX ? `${chars.slice(0, PC_NAME_MAX - 1).join('')}…` : props.computer.name
-  return { id: props.computer.id, name: props.computer.name, shortName, lines, connected: lines.length > 0 }
+  const connected = lines.length > 0
+  // Under its own name it is "This computer"; without one, the name already says so.
+  const caption = [props.computer.name === THIS_COMPUTER ? '' : 'This computer', connected ? '' : 'not connected'].filter(Boolean).join(', ')
+  return { id: props.computer.id, name: props.computer.name, shortName, lines, connected, caption: caption.charAt(0).toUpperCase() + caption.slice(1) }
 })
 
 const topologyLabel = computed(() => {
@@ -455,7 +458,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
                 {{ computer.shortName }}
               </text>
               <text :x="PC_X" :y="PC_Y + PC_RING + 25" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="hsl(var(--muted-foreground))">
-                {{ computer.connected ? 'This computer' : 'This computer, not connected' }}
+                {{ computer.caption }}
               </text>
             </g>
           </svg>

@@ -20,7 +20,7 @@ import GroupSelect from '@/components/groups/GroupSelect.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { activeGroupId } from '@/composables/useGroupSelection'
-import { useRealmNodes, type RealmNodeDisplay } from '@/composables/useRealmNodes'
+import { computerName, THIS_COMPUTER, useRealmNodes, type RealmNodeDisplay } from '@/composables/useRealmNodes'
 import { s3ErrorMessage, useS3 } from '@/composables/useS3'
 import { ApiError, apiRequest, type InfoResponse } from '@/lib/api'
 import type { BindSource } from '@/lib/bindSource'
@@ -78,10 +78,6 @@ const canCreate = computed(
 
 function blocked(entry: RealmNodeDisplay | null): boolean {
   return Boolean(props.forLink && entry?.kind === 'user')
-}
-
-function deviceName(entry: RealmNodeDisplay): string {
-  return entry.info?.labels?.name || entry.info?.labels?.display_name || 'Not set'
 }
 
 function freeLabel(id: string): string {
@@ -260,12 +256,13 @@ async function submit() {
                   <td class="px-3 py-2" :title="placeTitle(entry)">
                     <span class="flex items-center gap-2 text-foreground">
                       <component :is="entry.kind === 'user' ? Laptop : Server" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      {{ entry.kind === 'user' ? 'This computer' : (entry.name ?? entry.label) }}
+                      {{ entry.kind === 'user' ? computerName(entry) : (entry.name ?? entry.label) }}
+                      <Badge v-if="entry.kind === 'user' && computerName(entry) !== THIS_COMPUTER" variant="secondary" size="sm">this computer</Badge>
                       <Badge v-if="entry.nodeId === suggested" variant="outline" size="sm">default</Badge>
                     </span>
                   </td>
                   <td class="px-3 py-2 text-muted-foreground">
-                    {{ entry.kind === 'user' ? deviceName(entry) : (entry.location ?? 'Not set') }}
+                    {{ entry.location ?? 'Not set' }}
                   </td>
                   <td class="px-3 py-2 text-muted-foreground">{{ freeLabel(entry.nodeId) }}</td>
                   <td class="px-3 py-2 text-muted-foreground">{{ note(entry) }}</td>
