@@ -65,7 +65,7 @@ const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'canceled')
 const router = useRouter()
 const { getTask, cancelTask, busy } = useTes()
 const { getJob: getNativeJob, deleteJob } = useJobs()
-const { myGroups, apiBaseUrl, metadataAtPath } = useAruna()
+const { myGroups, apiBaseUrl, metadataAtPath, downloadProvenanceCrate } = useAruna()
 const { displayName } = useRealmNodes()
 const s3 = useS3()
 
@@ -83,6 +83,8 @@ const now = ref(Date.now())
 let nativeRequestId = 0
 
 const nativeFamily = computed(() => nativeJob.value?.family ?? null)
+// The run record is written under the execution that gave the result, which a re-planned run moves.
+const crateJob = computed(() => nativeFamily.value?.canonical_execution_id ?? props.taskId)
 
 async function loadNativeJob(jobId: string, requestId: number) {
   try {
@@ -519,14 +521,15 @@ const outputRange = computed(() => {
   return `${span}${total} output${total === 1 ? '' : 's'}, ${capturedCount.value} captured`
 })
 
-// ── Run dataset (targeted lookup at runs/{taskId}) ───────────────────────────
+// ── Run dataset (targeted lookup at runs/{execution}) ────────────────────────
 async function findRunCrate() {
-  const id = props.taskId
+  const id = crateJob.value
   if (runCrateLoading.value && crateTask === id) return
   crateTask = id
   runCrateLoading.value = true
   try {
-    const crate = await metadataAtPath(`runs/${id}`)
+    let crate = await metadataAtPath(`runs/${id}`)
+    if (!crate && id !== props.taskId) crate = await metadataAtPath(`runs/${props.taskId}`)
     if (crateTask === id) runCrate.value = crate
   } catch {
     // The crate is written when the run completes; a failed lookup just keeps
@@ -534,6 +537,33 @@ async function findRunCrate() {
     if (crateTask === id) runCrate.value = null
   } finally {
     if (crateTask === id) runCrateLoading.value = false
+  }
+}
+
+// A finished run, or one whose result moved to another execution, may have its record now.
+watch([crateJob, () => isTerminalTesState(task.value?.state)], ([job, done], [previousJob, wasDone]) => {
+  if (props.open && !runCrate.value && (job !== previousJob || (done && !wasDone))) void findRunCrate()
+})
+
+const exporting = ref(false)
+const exportError = ref<string | null>(null)
+async function exportCrate() {
+  if (!runCrate.value) return
+  exporting.value = true
+  exportError.value = null
+  try {
+    const blob = await downloadProvenanceCrate({ dataset: runCrate.value.document_id })
+    const anchor = document.createElement('a')
+    anchor.href = URL.createObjectURL(blob)
+    anchor.download = `run-${props.taskId}.zip`
+    document.body.append(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(anchor.href)
+  } catch (cause) {
+    exportError.value = errorMessage(cause)
+  } finally {
+    exporting.value = false
   }
 }
 
@@ -848,17 +878,25 @@ async function confirmDelete() {
           <p v-else class="text-xs text-muted-foreground">No files captured for this run.</p>
 
           <div class="flex flex-wrap items-center gap-2 text-xs">
-            <span class="text-muted-foreground">Run dataset:</span>
-            <RouterLink v-if="runCrate" class="inline-flex items-center gap-1.5 text-primary hover:underline" :to="{ name: 'dataset', params: { id: runCrate.document_id } }">
-              <FileText class="h-3.5 w-3.5" /> Open
-            </RouterLink>
+            <span class="text-muted-foreground">Run record:</span>
+            <template v-if="runCrate">
+              <RouterLink class="inline-flex items-center gap-1.5 text-primary hover:underline" :to="{ name: 'dataset', params: { id: runCrate.document_id } }">
+                <FileText class="h-3.5 w-3.5" /> Open
+              </RouterLink>
+              <Button variant="outline" size="sm" :disabled="exporting" @click="exportCrate">
+                <Download class="h-3.5 w-3.5" /> {{ exporting ? 'Exporting…' : 'Export as crate' }}
+              </Button>
+              <span v-if="exportError" class="text-destructive">{{ exportError }}</span>
+            </template>
             <template v-else-if="localRecordJob">
               <Button variant="outline" size="sm" @click="downloadRunRecord"><Download class="h-3.5 w-3.5" /> Run record</Button>
               <span class="text-muted-foreground">The run record stays on this computer until you publish the run.</span>
               <span v-if="recordError" class="text-destructive">{{ recordError }}</span>
             </template>
             <span v-else-if="sessionRuntime(task?.tags) !== null" class="text-muted-foreground">none, a notebook session keeps its report instead</span>
-            <span v-else class="text-muted-foreground">written once the run completes</span>
+            <span v-else-if="runCrateLoading" class="text-muted-foreground">looking for it</span>
+            <span v-else-if="active" class="text-muted-foreground">written once the run completes</span>
+            <span v-else class="text-muted-foreground">not written yet, Refresh checks again</span>
           </div>
         </section>
 
