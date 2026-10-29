@@ -2,12 +2,14 @@
 // The portal's switch for a small set of choices: a bordered box holding one
 // small button per option, the picked one filled. The option labels name what
 // each shows, so the control needs no caption of its own.
+import type { Component } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import { cn } from '@/lib/utils'
 
 export interface ToggleOption {
   value: string
   label: string
+  icon?: Component
 }
 
 const props = withDefaults(
@@ -35,6 +37,7 @@ function select(value: string) {
       :aria-pressed="modelValue === option.value"
       @click="select(option.value)"
     >
+      <component :is="option.icon" v-if="option.icon" class="h-3.5 w-3.5" />
       {{ option.label }}
     </Button>
   </div>
