@@ -1,14 +1,17 @@
 <script setup lang="ts">
-// The latest datasets, newest first from the registry. A node that cannot order by recency falls back
-// to the loaded catalog window; a failed refresh keeps the list shown.
+// The latest datasets, newest first from the registry. Run records have their own card, so they are
+// left out; a wider window keeps five datasets to show. A node that cannot order by recency falls
+// back to the loaded catalog window; a failed refresh keeps the list shown.
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { MetadataDoc } from '@/data/types'
 import { useAruna } from '@/composables/useAruna'
+import { datasetPurposeOf } from '@/lib/datasetPurpose'
 import { relativeTime } from '@/lib/utils'
 
 const props = withDefaults(defineProps<{ refreshRevision?: number }>(), { refreshRevision: 0 })
 const SHOWN = 5
+const READ = 25
 
 const { metadata, listRecentMetadata, sessionEpoch } = useAruna()
 const recent = ref<MetadataDoc[] | null>(null)
@@ -18,7 +21,7 @@ let round = 0
 async function load() {
   const mine = ++round
   const epoch = sessionEpoch.value
-  const answer = await listRecentMetadata().catch(() => null)
+  const answer = await listRecentMetadata(READ).catch(() => null)
   if (mine !== round || epoch !== sessionEpoch.value) return
   if (answer || !settled.value) recent.value = answer
   settled.value = true
@@ -30,7 +33,9 @@ watch(sessionEpoch, () => {
 }, { flush: 'sync' })
 
 const shown = computed(() =>
-  (recent.value ?? [...metadata.value].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))).slice(0, SHOWN),
+  (recent.value ?? [...metadata.value].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
+    .filter((doc) => datasetPurposeOf(doc) !== 'process-run')
+    .slice(0, SHOWN),
 )
 </script>
 
@@ -41,7 +46,10 @@ const shown = computed(() =>
       <RouterLink :to="{ name: 'datasets' }" class="text-xs font-medium text-primary hover:underline">All datasets</RouterLink>
     </header>
     <p v-if="!settled" class="px-5 pb-4 text-xs text-muted-foreground">Reading the latest datasets…</p>
-    <p v-else-if="!shown.length" class="px-5 pb-4 text-xs text-muted-foreground">No datasets you can see yet.</p>
+    <div v-else-if="!shown.length" class="flex items-center justify-between gap-3 px-5 pb-4 text-xs text-muted-foreground">
+      <span>No datasets you can see yet.</span>
+      <RouterLink :to="{ name: 'dataset-new' }" class="font-medium text-primary hover:underline">Create dataset</RouterLink>
+    </div>
     <ul v-else class="divide-y divide-border border-t border-border">
       <li v-for="doc in shown" :key="doc.ulid">
         <RouterLink :to="{ name: 'dataset', params: { id: doc.ulid } }" class="flex items-center justify-between gap-3 px-5 py-2.5 hover:bg-muted/40">

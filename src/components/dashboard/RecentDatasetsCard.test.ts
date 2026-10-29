@@ -1,6 +1,8 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import * as DatasetPurpose from '@/lib/datasetPurpose'
+import { PROCESS_RUN_PROFILE_URI } from '@/lib/profiles/builtinProfiles'
 import { compileClientComponent, content, element, flush, mountApp, nodes } from '@/test/clientRender'
 
 const metadata = ref<unknown[]>([])
@@ -11,9 +13,11 @@ const RecentDatasetsCard = compileClientComponent(new URL('./RecentDatasetsCard.
   'vue-router': { RouterLink: LinkStub },
   '@/composables/useAruna': { useAruna: () => ({ metadata, listRecentMetadata, sessionEpoch: ref(1) }) },
   '@/lib/utils': { relativeTime: (value: string) => `at ${value}` },
+  '@/lib/datasetPurpose': DatasetPurpose,
 })
 
-const doc = (ulid: string, title: string, updatedAt: string) => ({ ulid, title, updatedAt })
+const doc = (ulid: string, title: string, updatedAt: string) => ({ ulid, title, updatedAt, type: 'Dataset', conformsToIds: [] as string[] })
+const run = (ulid: string, title: string) => ({ ...doc(ulid, title, '2026-10-29'), conformsToIds: [PROCESS_RUN_PROFILE_URI] })
 
 describe('recent datasets', () => {
   it('lists the newest datasets from the registry, each opening the dataset', async () => {
@@ -38,5 +42,23 @@ describe('recent datasets', () => {
     expect(content(mounted.root).indexOf('New one')).toBeLessThan(content(mounted.root).indexOf('Old one'))
     mounted.app.unmount()
     metadata.value = []
+  })
+
+  it('leaves run records to the runs card and offers to create a dataset when none remain', async () => {
+    listRecentMetadata.mockClear().mockResolvedValueOnce([run('r1', 'Annotate my genome with Bakta'), doc('d1', 'Reef census', '2026-10-28')])
+    const mixed = await mountApp(RecentDatasetsCard)
+    await flush()
+    expect(listRecentMetadata).toHaveBeenCalledWith(25)
+    expect(content(mixed.root)).toContain('Reef census')
+    expect(content(mixed.root)).not.toContain('Annotate my genome')
+    mixed.app.unmount()
+
+    listRecentMetadata.mockResolvedValueOnce([run('r1', 'Annotate my genome with Bakta'), run('r2', 'Align my genome')])
+    const runsOnly = await mountApp(RecentDatasetsCard)
+    await flush()
+    expect(content(runsOnly.root)).toContain('No datasets you can see yet.')
+    const create = element(runsOnly.root, (node) => node.tag === 'a' && content(node) === 'Create dataset')
+    expect(JSON.parse(String(create.props['data-to']))).toEqual({ name: 'dataset-new' })
+    runsOnly.app.unmount()
   })
 })
