@@ -1,16 +1,18 @@
 <script setup lang="ts">
 // The whole-bucket search behind the file list's one box: words match file names and search
 // columns, `column=value` matches a filter column exactly and becomes a chip. The list bar owns the
-// text; this view searches with it and shows the results in place of the folder.
+// text; this view searches with it and shows the results in place of the folder. The files of one
+// record folder, such as an assembly, are one row named by their kept metadata.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import Button from '@/components/ui/Button.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import type { ObjectSearchHit } from '@/lib/api'
+import { groupFiles, groupHits, groupTitle, type SearchRow } from '@/lib/searchGroups'
 import { searchQuery, searchTerms } from '@/lib/tableImport'
 import { errorMessage } from '@/lib/utils'
-import { Search, X } from '@lucide/vue'
+import { ChevronRight, Search, X } from '@lucide/vue'
 
 /** `nodeId` is the node of the open bucket; null for the connected node. */
 const props = defineProps<{ bucket: string; nodeId: string | null }>()
@@ -40,6 +42,8 @@ const nameFailed = ref(false)
 const complete = ref(true)
 const failure = ref<string | null>(null)
 const busy = ref(false)
+// The groups opened to their files; they stay open while more pages load.
+const opened = ref(new Set<string>())
 let runs = 0
 let unmounted = false
 
@@ -56,6 +60,7 @@ watch(() => [props.bucket, props.nodeId, sessionEpoch.value], () => {
   complete.value = true
   failure.value = null
   busy.value = false
+  opened.value = new Set()
 })
 
 const query = computed(() => searchQuery(searchTerms(typed.value).words, chips.value))
@@ -117,6 +122,7 @@ async function step(more: boolean, run: number, askNames: boolean): Promise<numb
   ])
   if (run !== runs) return null
   const names = named === 'failed' ? null : named
+  if (!more) opened.value = new Set()
   const found = [...(more ? hits.value ?? [] : []), ...(names?.hits ?? []), ...(page?.hits ?? [])]
   const seen = new Set<string>()
   hits.value = found.filter((hit) => !seen.has(`${hit.issuer_node_id}/${hit.key}`) && Boolean(seen.add(`${hit.issuer_node_id}/${hit.key}`)))
@@ -150,6 +156,25 @@ watch(typed, (text) => {
   if (!text.includes('=') && !quoteOpen() && text.trim().length >= 2) void searchSoon()
 }, { flush: 'sync' })
 
+type Group = Extract<SearchRow, { kind: 'group' }>
+const rows = computed(() => groupHits(hits.value ?? []))
+const morePages = computed(() => Boolean(cursor.value) || nameCursor.value !== null)
+// "GCF_000005845.2, Complete Genome, 22 files"; a page still to come makes the count a lower bound.
+function groupLine(group: Group): string {
+  const count = groupFiles(group).length
+  const files = `${count}${morePages.value ? '+' : ''} ${count === 1 && !morePages.value ? 'file' : 'files'}`
+  return [group.metadata.assembly_accession, group.metadata.assembly_level, files].filter(Boolean).join(', ')
+}
+// The folder opens through its own hit when the search found it, else through one made of it.
+function openFolder(group: Group) {
+  emit('open', group.hits.find((entry) => entry.key === `${group.folder}/`) ?? { ...group.hits[0], key: `${group.folder}/` })
+}
+function toggle(group: Group) {
+  const next = new Set(opened.value)
+  if (!next.delete(group.key)) next.add(group.key)
+  opened.value = next
+}
+
 function drop(index: number) {
   chips.value = chips.value.filter((_, at) => at !== index)
   const searched = hits.value !== null || busy.value
@@ -171,10 +196,38 @@ function drop(index: number) {
     </div>
     <p v-if="failure" class="text-xs text-destructive">{{ failure }}</p>
     <ul v-if="hits?.length" class="divide-y divide-border rounded-md border border-border text-xs">
-      <li v-for="hit in hits" :key="`${hit.issuer_node_id}/${hit.key}`">
-        <button type="button" class="w-full truncate px-3 py-1.5 text-left font-mono text-primary hover:bg-accent" @click="emit('open', hit)">
-          {{ hit.key }}<span v-if="elsewhere(hit)" class="ml-2 font-sans text-muted-foreground">on {{ displayName(hit.issuer_node_id) }}</span>
+      <li v-for="row in rows" :key="row.key">
+        <button v-if="row.kind === 'hit'" type="button" class="w-full truncate px-3 py-1.5 text-left font-mono text-primary hover:bg-accent" @click="emit('open', row.hit)">
+          {{ row.hit.key }}<span v-if="elsewhere(row.hit)" class="ml-2 font-sans text-muted-foreground">on {{ displayName(row.hit.issuer_node_id) }}</span>
         </button>
+        <template v-else>
+          <div class="flex items-start gap-1.5 px-2 py-1.5">
+            <button
+              type="button"
+              class="mt-0.5 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              :aria-expanded="opened.has(row.key)"
+              :aria-label="`${opened.has(row.key) ? 'Hide' : 'Show'} the files of ${groupTitle(row)}`"
+              @click="toggle(row)"
+            >
+              <ChevronRight class="h-3.5 w-3.5 transition-transform" :class="opened.has(row.key) ? 'rotate-90' : ''" />
+            </button>
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-sm text-foreground" :title="groupTitle(row)">{{ groupTitle(row) }}</p>
+              <p class="flex min-w-0 flex-wrap gap-x-1 text-[11px] text-muted-foreground">
+                <span>{{ groupLine(row) }},</span>
+                <button type="button" class="min-w-0 truncate font-mono text-primary hover:underline" :title="`Open ${row.folder}/`" @click="openFolder(row)">{{ row.folder }}/</button>
+                <span v-if="elsewhere(row.hits[0])">on {{ displayName(row.nodeId) }}</span>
+              </p>
+            </div>
+          </div>
+          <ul v-if="opened.has(row.key)" class="border-t border-border/70 pb-1 pl-8">
+            <li v-for="file in groupFiles(row)" :key="file.key">
+              <button type="button" class="w-full truncate px-2 py-1 text-left font-mono text-primary hover:bg-accent" :title="file.key" @click="emit('open', file)">
+                {{ file.key.slice(row.folder.length + 1) }}
+              </button>
+            </li>
+          </ul>
+        </template>
       </li>
     </ul>
     <p v-else-if="hits && !busy && complete && !nameFailed" class="text-xs text-muted-foreground">Nothing matches.</p>

@@ -1,8 +1,9 @@
 import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import * as SearchGroups from '@/lib/searchGroups'
 import * as TableImport from '@/lib/tableImport'
-import { compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
+import { click, compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
 
 const hit = { key: 'GCF_000005845.2_ASM584v2/', bucket: 'ncbi', issuer_node_id: 'n2', group_id: 'g1' }
 const searchObjects = vi.fn(async (_q: string, _options: { match: string }) => ({ hits: [hit] as unknown[], next_cursor: null as string | null, coverage: { complete: true } }))
@@ -22,6 +23,7 @@ const view = compileClientComponent(new URL('./MetadataSearch.vue', import.meta.
   '@/components/ui/Button.vue': moduleDefault(defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()) })),
   '@/composables/useAruna': { useAruna: () => ({ searchObjects, sessionEpoch: ref(1) }) },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => `node ${id}`, isLocalNode: (id: string) => id === 'n1' }) },
+  '@/lib/searchGroups': SearchGroups,
   '@/lib/tableImport': TableImport,
   '@/lib/utils': { errorMessage: (cause: unknown) => String(cause) },
 })
@@ -312,5 +314,68 @@ describe('bucket metadata search', () => {
     ;(element(root, (node) => node.tag === 'button' && content(node).includes('Back to folder')).props.onClick as () => void)()
     expect(back).toHaveBeenCalledOnce()
     expect(content(root)).not.toContain('Finds file names')
+  })
+})
+
+describe('bucket search results by record folder', () => {
+  const ECOLI = { organism_name: 'Escherichia coli str. K-12 substr. MG1655', infraspecific_name: 'strain=K-12 substr. MG1655', assembly_accession: 'GCF_000005845.2', assembly_level: 'Complete Genome' }
+  const FOLDER = 'GCF_000005845.2_ASM584v2'
+  const found = (key: string, metadata?: Record<string, string>) => ({ key, bucket: 'ncbi', issuer_node_id: 'n1', group_id: 'g1', ...(metadata ? { metadata } : {}) })
+  async function open() {
+    const opened: unknown[] = []
+    const mounted = await mountApp(component, { props: { bucket: 'ncbi', nodeId: null, onOpen: (hit: unknown) => opened.push(hit) } })
+    ;(element(mounted.root, (node) => node.tag === 'input').props['onUpdate:modelValue'] as (value: string) => void)('coli species_taxid=562')
+    await flush()
+    ;(element(mounted.root, (node) => node.tag === 'form').props.onSubmit as (event: Event) => void)({ preventDefault: () => {} } as Event)
+    await flush()
+    return { ...mounted, opened }
+  }
+
+  it('shows one row per assembly, named by organism, with accession, level and files, and the folder as a link', async () => {
+    searchObjects.mockImplementation(async (_q, options) => (options.match === 'metadata'
+      ? { hits: [found(`${FOLDER}/`, ECOLI), found(`${FOLDER}/${FOLDER}_genomic.fna.gz`, ECOLI), found(`${FOLDER}/${FOLDER}_ani_report.txt`, ECOLI), found('plain.txt')], next_cursor: null, coverage: { complete: true } }
+      : { hits: [], next_cursor: null, coverage: { complete: true } }))
+    const { root, app, opened } = await open()
+    const text = content(root)
+
+    expect(text).toContain('Escherichia coli str. K-12 substr. MG1655')
+    expect(text).toContain('GCF_000005845.2, Complete Genome, 2 files,')
+    expect(text).not.toContain(`${FOLDER}_genomic.fna.gz`)
+    expect(text).toContain('plain.txt')
+
+    await click(element(root, (node) => node.tag === 'button' && content(node) === `${FOLDER}/`))
+    expect(opened).toEqual([found(`${FOLDER}/`, ECOLI)])
+
+    const chevron = element(root, (node) => node.props['aria-expanded'] !== undefined)
+    expect(chevron.props['aria-expanded']).toBe(false)
+    await click(chevron)
+    expect(element(root, (node) => node.props['aria-expanded'] !== undefined).props['aria-expanded']).toBe(true)
+    await click(element(root, (node) => node.tag === 'button' && content(node).trim() === `${FOLDER}_ani_report.txt`))
+    expect(opened.at(-1)).toEqual(found(`${FOLDER}/${FOLDER}_ani_report.txt`, ECOLI))
+    app.unmount()
+    searchObjects.mockReset().mockImplementation(async () => ({ hits: [hit] as unknown[], next_cursor: null, coverage: { complete: true } }))
+  })
+
+  it('appends a later page to its group, keeps it open and counts a lower bound while more may follow', async () => {
+    searchObjects.mockImplementation(async (_q, options) => {
+      if (options.match !== 'metadata') return { hits: [], next_cursor: null, coverage: { complete: true } }
+      const cursor = (options as { cursor?: string }).cursor
+      return cursor
+        ? { hits: [found(`${FOLDER}/${FOLDER}_genomic.gff.gz`, ECOLI), found('GCF_9/GCF_9_genomic.fna.gz', { organism_name: 'Escherichia coli O157:H7' })], next_cursor: null, coverage: { complete: true } }
+        : { hits: [found(`${FOLDER}/${FOLDER}_genomic.fna.gz`, ECOLI)], next_cursor: 'c2', coverage: { complete: true } }
+    })
+    const { root, app } = await open()
+    expect(content(root)).toContain('Complete Genome, 1+ files,')
+    await click(element(root, (node) => node.props['aria-expanded'] !== undefined))
+
+    await click(element(root, (node) => node.tag === 'button' && content(node).includes('Show more')))
+    await flush()
+    const text = content(root)
+    expect(text).toContain('Complete Genome, 2 files,')
+    expect(text.indexOf('Escherichia coli str. K-12')).toBeLessThan(text.indexOf('Escherichia coli O157:H7'))
+    // The open group stayed open and shows the appended file.
+    expect(text).toContain(`${FOLDER}_genomic.gff.gz`)
+    app.unmount()
+    searchObjects.mockReset().mockImplementation(async () => ({ hits: [hit] as unknown[], next_cursor: null, coverage: { complete: true } }))
   })
 })
