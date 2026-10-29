@@ -18,6 +18,19 @@ const emit = defineEmits<{ 'update:open': [value: boolean] }>()
 const saved = useSavedRuns()
 const picker = ref<HTMLInputElement | null>(null)
 const failure = ref<string | null>(null)
+// One short line says what the last action did.
+const done = ref<string | null>(null)
+const runsWord = (count: number) => `${count} ${count === 1 ? 'run' : 'runs'}`
+
+function remove(id: string, name: string) {
+  saved.remove(id)
+  done.value = `Removed ${name}.`
+}
+
+function exportAll() {
+  saved.exportFile()
+  done.value = `Exported ${runsWord(saved.runs.value.length)} to my-runs.json.`
+}
 
 async function chosen(event: Event) {
   const input = event.target as HTMLInputElement
@@ -25,8 +38,11 @@ async function chosen(event: Event) {
   input.value = ''
   if (!file) return
   failure.value = null
+  done.value = null
+  const before = saved.runs.value.length
   try {
     await saved.importFile(file)
+    done.value = `Imported ${runsWord(Math.max(0, saved.runs.value.length - before))}.`
   } catch (cause) {
     failure.value = errorMessage(cause)
   }
@@ -46,13 +62,14 @@ async function chosen(event: Event) {
             <span class="block truncate font-medium text-foreground">{{ run.name }}</span>
             <span v-if="askedFor(run).length" class="block text-xs text-muted-foreground">Asks for: {{ askedFor(run).join(', ') }}</span>
           </span>
-          <Button size="sm" variant="ghost" class="text-destructive hover:text-destructive" @click="saved.remove(run.id)">Remove</Button>
+          <Button size="sm" variant="ghost" class="text-destructive hover:text-destructive" @click="remove(run.id, run.name)">Remove</Button>
         </li>
       </ul>
       <p v-else class="text-sm text-muted-foreground">No saved runs yet. Use "Save as my run" on a run.</p>
       <Notice v-if="failure || saved.failure.value" tone="error">{{ failure || saved.failure.value }}</Notice>
+      <p v-else-if="done" role="status" class="text-xs text-muted-foreground">{{ done }}</p>
       <div class="flex gap-2">
-        <Button variant="outline" size="sm" :disabled="!saved.runs.value.length" @click="saved.exportFile()">Export as file</Button>
+        <Button variant="outline" size="sm" :disabled="!saved.runs.value.length" @click="exportAll">Export as file</Button>
         <Button variant="outline" size="sm" @click="picker?.click()">Import a file</Button>
         <input ref="picker" type="file" accept="application/json,.json" class="hidden" @change="chosen" />
       </div>

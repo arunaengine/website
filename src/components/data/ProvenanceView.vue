@@ -78,9 +78,11 @@ const more = computed(() => hasPending(graph))
 // The export is assembled by the node and saved as one file.
 const exporting = ref(false)
 const exportError = ref<string | null>(null)
+const exported = ref(false)
 async function exportCrate() {
   exporting.value = true
   exportError.value = null
+  exported.value = false
   try {
     const start = props.start.kind === 'file' ? { version: props.start.id } : { dataset: props.start.documentId }
     const blob = await downloadProvenanceCrate(start)
@@ -91,6 +93,7 @@ async function exportCrate() {
     anchor.click()
     anchor.remove()
     URL.revokeObjectURL(anchor.href)
+    exported.value = true
   } catch (cause) {
     exportError.value = apiErrorMessage(cause)
   } finally {
@@ -184,6 +187,7 @@ const Branch: ReturnType<typeof defineComponent> = defineComponent({
       <button type="button" class="text-primary hover:underline" @click="stop">Stop</button>
     </div>
     <Notice v-if="exportError" tone="error">{{ exportError }}</Notice>
+    <p v-else-if="exported" role="status" class="text-xs text-muted-foreground">Saved as provenance.zip.</p>
 
     <div class="overflow-x-auto py-2">
       <div class="flex flex-col gap-3.5">

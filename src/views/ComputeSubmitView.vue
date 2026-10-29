@@ -90,6 +90,7 @@ const resourcesCard = ref<InstanceType<typeof ResourcesCard> | null>(null)
 const placementCard = ref<InstanceType<typeof PlacementCard> | null>(null)
 const requestOpen = ref(false)
 const saveOpen = ref(false)
+const savedRun = ref(false)
 // A new script is stored only when the run starts, so a saved run could not find it yet.
 const saveBlocked = computed(() =>
   hasScript.value && !reuseSelectedScript.value ? 'The script is stored when the run starts. Start the run once, then save it from its details.' : null,
@@ -202,6 +203,7 @@ async function run() {
     <PageHeader eyebrow="Compute" title="New run" :docs="{ topic: 'compute-run', section: 'One page, six sections' }">
       <template #actions>
         <AskAiButton size="default" prompt="Help me set up this run." subject="the run form" />
+        <span v-if="savedRun" role="status" class="self-center text-xs text-muted-foreground">Saved to My runs.</span>
         <Button variant="outline" size="default" @click="saveOpen = true">Save as my run</Button>
         <Button variant="outline" size="default" as-child>
           <RouterLink :to="{ name: 'compute' }"><ArrowLeft class="h-4 w-4" /> Back to Compute</RouterLink>
@@ -252,6 +254,6 @@ async function run() {
     <TesDataRefDialog v-model:open="inputDialogOpen" mode="input" :mount-default="inputMountDefault" @add="addInputEntry" />
     <CreateCredentialDialog v-model:open="credentialDialogOpen" />
     <ScriptPickerDialog />
-    <SaveRunDialog v-model:open="saveOpen" :task="task" :blocked="saveBlocked" />
+    <SaveRunDialog v-model:open="saveOpen" :task="task" :blocked="saveBlocked" @saved="savedRun = true" />
   </div>
 </template>
