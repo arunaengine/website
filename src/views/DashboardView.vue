@@ -5,6 +5,7 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import DashboardScopeToggle from '@/components/dashboard/DashboardScopeToggle.vue'
 import GroupQuotaCards from '@/components/dashboard/GroupQuotaCards.vue'
 import MyStatsCards from '@/components/dashboard/MyStatsCards.vue'
+import NodeCards from '@/components/dashboard/NodeCards.vue'
 import OverviewCell from '@/components/dashboard/OverviewCell.vue'
 import SignInPanel from '@/components/auth/SignInPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -16,6 +17,8 @@ import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useDatabases } from '@/composables/useDatabases'
+import { useNodeImports } from '@/composables/useNodeImports'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useOnboarding } from '@/composables/useOnboarding'
 import { startTour } from '@/composables/useTour'
@@ -85,6 +88,7 @@ async function refreshDashboard() {
     } while (refreshQueued)
   } finally {
     refreshing.value = false
+    loadImports()
     if (cardsShown) {
       quotaRevision.value++
       cardsRevision.value++
@@ -162,6 +166,19 @@ const computer = computed(() => {
 })
 
 const onlineNodes = computed(() => infraNodes.value.filter((node) => node.present).length)
+
+// Import jobs explain a busy node; they are read with the dashboard's own rounds, never faster.
+const nodeImports = useNodeImports()
+const { isLocalNode } = useRealmNodes()
+const infraIds = computed(() => infraNodes.value.map((node) => node.node_id))
+function loadImports() {
+  if (currentUser.value && infraIds.value.length) void nodeImports.load(infraIds.value, isLocalNode)
+}
+watch(() => infraIds.value.join(), loadImports)
+const importsLine = computed(() => {
+  const { running, atLeast } = nodeImports.total.value
+  return running ? `Imports running: ${atLeast ? 'at least ' : ''}${formatCount(running)} ${running === 1 ? 'job' : 'jobs'}` : null
+})
 const replication = computed(() => {
   const factor = realmInfo.value?.metadata_replication.default_replication_factor
   return factor === null ? 'Replication on all eligible nodes' : factor === undefined ? null : `Replication ×${factor}`
@@ -284,6 +301,7 @@ const pageDescription = computed(() =>
       <section class="surface overflow-hidden" aria-labelledby="overview-heading">
         <header class="flex flex-wrap items-center justify-between gap-3 px-5 pt-4">
           <h2 id="overview-heading" class="font-display text-[15px] font-semibold text-foreground">Overview</h2>
+          <span v-if="importsLine" class="mr-auto text-xs text-muted-foreground">{{ importsLine }}</span>
           <DashboardScopeToggle v-if="currentUser" :model-value="scope" @update:model-value="setScope" />
         </header>
         <div class="mt-3 grid gap-px border-t border-border bg-border sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr]">
@@ -323,6 +341,9 @@ const pageDescription = computed(() =>
             <template v-if="replication">{{ replication }} </template>
             <RouterLink :to="{ name: 'status' }" class="text-primary hover:underline">Status</RouterLink>
           </OverviewCell>
+        </div>
+        <div v-if="currentUser && infraNodes.length" class="border-t border-border px-5 py-4">
+          <NodeCards :nodes="infraNodes" :devices="deviceNodes" :imports="nodeImports.imports.value" />
         </div>
       </section>
 

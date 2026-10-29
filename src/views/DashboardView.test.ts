@@ -57,6 +57,22 @@ const OverviewCellStub = defineComponent({
 // The realm's database list; its count shows once the list was read.
 const databaseRows = ref<unknown[]>([])
 const databaseState = ref('idle')
+// Renders what it was handed, so the view's own node/device split is testable.
+const NodeCardsStub = defineComponent({
+  props: { nodes: { type: Array, default: () => [] }, devices: { type: Array, default: () => [] } },
+  setup: (props) => () =>
+    h('div', [
+      ...(props.nodes as Array<{ node_id: string; info?: { utilization?: { heartbeat_at_ms?: number } } }>).map((node) =>
+        h('span', ` ${node.node_id} beat ${node.info?.utilization?.heartbeat_at_ms} `),
+      ),
+      h('em', `${props.devices.length} devices`),
+    ]),
+})
+// Running imports by node, as the composable reads them.
+const importsTotal = ref({ running: 0, atLeast: false })
+const loadImports = vi.fn(async () => undefined)
+const importsStub = { useNodeImports: () => ({ imports: ref(new Map()), total: importsTotal, load: loadImports }) }
+const realmNodesStub = { useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'own-device' }) }
 const databasesStub = { useDatabases: () => ({ rows: databaseRows, state: databaseState, complete: ref(true), ensure: () => {} }) }
 const GroupQuotaCardsStub = defineComponent({
   props: { refreshRevision: Number },
@@ -147,6 +163,9 @@ beforeAll(async () => {
   vi.doMock('@/components/dashboard/DashboardScopeToggle.vue', () => ({ default: ScopeToggleStub }))
   vi.doMock('@/components/dashboard/OverviewCell.vue', () => ({ default: OverviewCellStub }))
   vi.doMock('@/composables/useDatabases', () => databasesStub)
+  vi.doMock('@/components/dashboard/NodeCards.vue', () => ({ default: NodeCardsStub }))
+  vi.doMock('@/composables/useNodeImports', () => importsStub)
+  vi.doMock('@/composables/useRealmNodes', () => realmNodesStub)
   vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: SkeletonStub }))
   DashboardView = (await import('./DashboardView.vue')).default
   const FirstPaint = await vi.importActual<typeof import('@/composables/useFirstPaint')>('@/composables/useFirstPaint')
@@ -217,6 +236,9 @@ beforeAll(async () => {
     '@/components/auth/SignInPanel.vue': moduleDefault(EmptyStub),
     '@/components/dashboard/OverviewCell.vue': moduleDefault(OverviewCellStub),
     '@/composables/useDatabases': databasesStub,
+    '@/components/dashboard/NodeCards.vue': moduleDefault(NodeCardsStub),
+    '@/composables/useNodeImports': importsStub,
+    '@/composables/useRealmNodes': realmNodesStub,
     '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
     '@/components/ui/EmptyState.vue': moduleDefault(EmptyStub),
     '@/components/desktop/HomeCards.vue': moduleDefault(HomeCardsStub),
@@ -258,6 +280,8 @@ beforeEach(() => {
   loadRealmView.mockResolvedValue(null)
   databaseRows.value = []
   databaseState.value = 'idle'
+  importsTotal.value = { running: 0, atLeast: false }
+  loadImports.mockClear()
   signIn.mockClear()
 })
 
@@ -532,6 +556,89 @@ describe('desktop home', () => {
     expect(content(mounted.root)).not.toContain('desktop-home-cards')
     expect(content(mounted.root)).toContain('Live data from the local Aruna API.')
     mounted.app.unmount()
+  })
+})
+
+describe('realm nodes in the overview', () => {
+  const beat = (node_id: string, kind: string, heartbeat_at_ms: number) => ({ node_id, kind, present: true, info: { utilization: { heartbeat_at_ms } } })
+
+  beforeEach(() => {
+    currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
+    nodeInfo.value = { node: { peer_id: 'own-device' } }
+    // The device's own view: stale heartbeats and itself as the serving node.
+    realmInfo.value = {
+      metadata_replication: { default_replication_factor: null },
+      nodes: [beat('mgmt-node', 'management', 1000), beat('own-device', 'user', 1000)],
+    }
+  })
+
+  it('lists the realm nodes from a realm node in the desktop, devices apart', async () => {
+    desktopMode.value = true
+    loadRealmView.mockResolvedValue({
+      info: { node: { peer_id: 'mgmt-node' } },
+      realm: { nodes: [beat('mgmt-node', 'management', 9000), beat('server-node', 'server', 8000), beat('own-device', 'user', 7000)] },
+    })
+    const mounted = await mountApp(DashboardClient)
+    await flush()
+    const text = content(mounted.root)
+
+    expect(text).toContain('mgmt-node beat 9000')
+    expect(text).toContain('server-node beat 8000')
+    expect(text).toContain('1 devices')
+    expect(text).not.toContain('beat 1000')
+    mounted.app.unmount()
+  })
+
+  it('keeps a slow answer that lands after periodic refreshes', async () => {
+    desktopMode.value = true
+    let answer: (view: unknown) => void = () => undefined
+    loadRealmView.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
+    loadRealmView.mockImplementation(() => new Promise(() => undefined))
+    const mounted = await mountApp(DashboardClient)
+    await flush()
+    // Each periodic read replaces the realm info with a fresh object of the same realm.
+    realmInfo.value = { ...realmInfo.value }
+    await flush()
+    realmInfo.value = { ...realmInfo.value }
+    await flush()
+
+    answer({ info: { node: { peer_id: 'mgmt-node' } }, realm: { nodes: [beat('mgmt-node', 'management', 9000)] } })
+    await flush()
+
+    expect(loadRealmView).toHaveBeenCalledTimes(3)
+    expect(content(mounted.root)).toContain('mgmt-node beat 9000')
+    mounted.app.unmount()
+  })
+
+  it('keeps the device view when no realm node answers, and the browser on its own node', async () => {
+    desktopMode.value = true
+    const desktop = await mountApp(DashboardClient)
+    await flush()
+    expect(loadRealmView).toHaveBeenCalled()
+    expect(content(desktop.root)).toContain('mgmt-node beat 1000')
+    desktop.app.unmount()
+
+    loadRealmView.mockClear()
+    desktopMode.value = false
+    const web = await mountApp(DashboardClient)
+    await flush()
+    expect(loadRealmView).not.toHaveBeenCalled()
+    expect(content(web.root)).toContain('mgmt-node beat 1000')
+    web.app.unmount()
+  })
+
+  it('reads the imports of the realm nodes with each round and names them in the header', async () => {
+    vi.stubGlobal('window', {})
+    const mounted = await mountApp(DashboardClient)
+    await flush()
+    expect(loadImports).toHaveBeenCalledWith(['mgmt-node'], expect.any(Function))
+    expect(content(mounted.root)).not.toContain('Imports running')
+
+    importsTotal.value = { running: 16, atLeast: false }
+    await flush()
+    expect(content(mounted.root)).toContain('OverviewImports running: 16 jobs')
+    mounted.app.unmount()
+    vi.unstubAllGlobals()
   })
 })
 
