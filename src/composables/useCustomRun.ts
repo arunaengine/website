@@ -437,6 +437,10 @@ function createStore(deps: CustomRunDeps) {
       keyTouched: false,
     })
   }
+  // A destination nobody edited follows the run name.
+  watch(runKey, () => {
+    for (const row of outputRows.value) if (!row.keyTouched) row.key = defaultOutputKey(row.path)
+  })
   function addOutputRow() {
     addCapture(`${activeWorkdir.value}/out/result.txt`)
   }

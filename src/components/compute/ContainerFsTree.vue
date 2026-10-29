@@ -151,7 +151,8 @@ const model = computed(() => {
         index,
         raw: entry.basePath,
         secondary: `s3://${entry.bucket}/${entry.prefix}`,
-        files: entry.files.map((file) => file.name),
+        // A whole-folder input is listed by the node later, so its file count is not known here.
+        files: entry.directory ? undefined : entry.files.map((file) => file.name),
       })
     } else {
       place(entry.path, { kind: 'in', dir: false, index, raw: entry.path, secondary: entry.url })
@@ -476,7 +477,7 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
           >
             <ArrowDownToLine v-if="marker.kind === 'in'" class="h-2.5 w-2.5" />
             <ArrowUpFromLine v-else-if="marker.kind === 'out'" class="h-2.5 w-2.5" />
-            {{ MARKER_LABEL[marker.kind] }}<template v-if="marker.files"> · {{ marker.files.length }}</template>
+            {{ MARKER_LABEL[marker.kind] }}<template v-if="marker.files"> {{ marker.files.length }}</template>
           </Badge>
           <template v-if="outMarkerOf(row)">
             <span

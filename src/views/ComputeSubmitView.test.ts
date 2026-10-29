@@ -484,6 +484,19 @@ describe('run page', () => {
     mounted.app.unmount()
   })
 
+  it('lets an unedited destination key follow the run name', async () => {
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
+    await click(button(mounted.root, 'Add output'))
+    const key = () => (input(mounted.root, 'aria-label', 'Destination key') as unknown as { value: string }).value
+    expect(key()).toBe('quickruns/run/result.txt')
+
+    await typeValue(input(mounted.root, 'placeholder', 'align-and-count'), 'count reads')
+    await flush()
+
+    expect(key()).toBe('quickruns/count-reads/result.txt')
+    mounted.app.unmount()
+  })
+
   it('starts a saved run with only its asked input open', async () => {
     useSavedRuns().save({
       id: 'r1', name: 'Align', savedAt: '2026-10-28T10:00:00Z',
