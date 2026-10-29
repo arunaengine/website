@@ -124,6 +124,17 @@ export function useRealmNodes() {
     return nodeById(nodeId)?.label ?? truncateMiddle(nodeId, 8, 6)
   }
 
+  // A device is a person's own computer, never a place to pick for data or runs; inside the
+  // desktop app the device it runs on is offered as "This computer".
+  const offered = (node: RealmNodeDisplay) => node.kind !== 'user' || (desktop && node.isLocal)
+  const targets = computed(() => nodes.value.filter(offered))
+
+  /** Whether a node may be offered as a place; a node the realm does not list is not hidden. */
+  function isTarget(nodeId: string | null | undefined): boolean {
+    const node = nodeById(nodeId)
+    return !node || offered(node)
+  }
+
   function isLocalNode(nodeId: string | null | undefined): boolean {
     if (!nodeId) return true
     return nodeById(nodeId)?.isLocal ?? nodeId === localNodeId.value
@@ -131,6 +142,8 @@ export function useRealmNodes() {
 
   return {
     nodes,
+    targets,
+    isTarget,
     localNodeId,
     nodeById,
     displayName,

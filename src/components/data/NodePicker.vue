@@ -16,7 +16,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ (e: 'update:modelValue', value: string | null): void }>()
 
-const { nodes, displayName, nodeById } = useRealmNodes()
+const { targets, displayName, nodeById } = useRealmNodes()
 const open = ref(false)
 const filter = ref('')
 // A short list needs no filter field.
@@ -29,7 +29,7 @@ const ordered = computed(() => {
     const index = recent.indexOf(node.nodeId)
     return index < 0 ? recent.length : index
   }
-  return [...nodes.value].sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label))
+  return [...targets.value].sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label))
 })
 const shown = computed(() => {
   const term = filter.value.trim().toLowerCase()
@@ -64,7 +64,7 @@ function choose(nodeId: string | null) {
     </button>
     <template #content>
       <Input
-        v-if="nodes.length >= FILTER_FROM"
+        v-if="targets.length >= FILTER_FROM"
         v-model="filter"
         placeholder="Find a node"
         aria-label="Find a node"

@@ -35,7 +35,9 @@ const NodePicker = compileClientComponent(new URL('./NodePicker.vue', import.met
   '@/components/ui/StatusDot.vue': moduleDefault(Empty),
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
-      nodes: realm,
+      // A device stays in the realm's node list but is no place to pick.
+      nodes: ref([...realm.value, node('device-1', { kind: 'user' })]),
+      targets: realm,
       displayName: (id: string) => id,
       nodeById: (id: string) => realm.value.find((entry) => entry.nodeId === id) ?? null,
     }),
@@ -53,6 +55,7 @@ describe('Node picker', () => {
     const { root } = await mountApp(NodePicker, { props: { modelValue: null, recent: ['node-5', 'node-3'] } })
 
     expect(options(root).slice(0, 4)).toEqual(['node-1', 'node-5', 'node-3', 'node-4'])
+    expect(options(root)).not.toContain('device-1')
     expect(content(root)).toContain('home')
     expect(content(root)).toContain('not reachable')
   })

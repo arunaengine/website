@@ -5,9 +5,10 @@ import type { RealmNodeInfo } from '@/lib/api'
 const desktop = vi.hoisted(() => ({ on: true }))
 const realmInfo = ref<{ nodes: RealmNodeInfo[] } | null>(null)
 const identity = ref<{ nodeId: string; realm: string } | null>(null)
+const nodeInfo = ref<{ node: { peer_id: string } } | null>(null)
 
 vi.mock('@/lib/desktop', () => ({ isDesktop: () => desktop.on }))
-vi.mock('./useAruna', () => ({ useAruna: () => ({ nodeInfo: ref(null), realmInfo }) }))
+vi.mock('./useAruna', () => ({ useAruna: () => ({ nodeInfo, realmInfo }) }))
 vi.mock('./useDeviceStatus', () => ({ useDeviceStatus: () => ({ identity }) }))
 
 const { useRealmNodes } = await import('./useRealmNodes')
@@ -32,6 +33,7 @@ function node(id: string, kind: RealmNodeInfo['kind'], labels: Record<string, st
 
 beforeEach(() => {
   desktop.on = true
+  nodeInfo.value = null
   identity.value = { nodeId: 'device0001aaaa', realm: 'r' }
   realmInfo.value = {
     nodes: [
@@ -63,5 +65,28 @@ describe('place names in the desktop', () => {
     expect(displayName('node1aaaa0001')).toBe('node-1')
     expect(displayName('device0001aaaa')).toMatch(/^device /)
     expect(nodeById('node1aaaa0001')?.title).toBe('node1aaaa0001')
+  })
+})
+
+describe('places to pick', () => {
+  it('offers no device on the web', () => {
+    desktop.on = false
+    nodeInfo.value = { node: { peer_id: 'node1aaaa0001' } }
+    const { targets, isTarget } = useRealmNodes()
+
+    expect(targets.value.map((node) => node.nodeId)).toEqual(['node1aaaa0001', 'node2bbbb0002'])
+    expect([isTarget('device0001aaaa'), isTarget('node2bbbb0002'), isTarget('unknown')]).toEqual([false, true, true])
+  })
+
+  it('offers this computer in the desktop app, never another device', () => {
+    nodeInfo.value = { node: { peer_id: 'device0001aaaa' } }
+    const { targets, isTarget } = useRealmNodes()
+
+    expect(targets.value.map((node) => [node.nodeId, node.label])).toEqual([
+      ['node1aaaa0001', 'node-1, Giessen'],
+      ['node2bbbb0002', 'node2bbbb0002.example.org, Heidelberg'],
+      ['device0001aaaa', 'This computer'],
+    ])
+    expect(isTarget('device0002bbbb')).toBe(false)
   })
 })
