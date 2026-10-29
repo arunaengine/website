@@ -125,7 +125,8 @@ async function findUses() {
   }
 }
 
-const BOX = 'rounded-[10px] border border-border px-3 py-2.5 text-xs'
+// Seven columns of 128 px boxes and 20 px arrows fit beside the open sidebar at 1440 px.
+const BOX = 'rounded-[10px] border border-border px-2.5 py-2 text-xs'
 const MUTED = 'border-dashed bg-muted/50'
 
 function boxView(item: Box, repeat = false): VNode {
@@ -199,11 +200,11 @@ const Branch: ReturnType<typeof defineComponent> = defineComponent({
       const view = node.ids.length > 1 ? foldView(node) : boxView(item, node.repeat)
       const children = node.sources.length
         ? [
-            h('div', { class: 'flex w-6 flex-none justify-center text-muted-foreground', 'aria-hidden': 'true' }, [h(ArrowLeft, { class: 'h-4 w-4' })]),
+            h('div', { class: 'flex w-5 flex-none justify-center text-muted-foreground', 'aria-hidden': 'true' }, [h(ArrowLeft, { class: 'h-4 w-4' })]),
             h('div', { class: 'flex flex-col gap-2.5' }, node.sources.map((source) => h(Branch, { node: source, key: source.key }))),
           ]
         : []
-      return h('div', { class: 'flex items-center' }, [h('div', { class: 'w-36 flex-none' }, [view]), ...children])
+      return h('div', { class: 'flex items-center' }, [h('div', { class: 'w-32 flex-none' }, [view]), ...children])
     }
   },
 })
