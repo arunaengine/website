@@ -73,7 +73,9 @@ describe('devices panel', () => {
     ]
     const rendered = await text()
 
-    expect(rendered).toContain('offline')
+    // Without a realm record its contact is not known, which is not the same as offline.
+    expect(rendered).toContain('unknown')
+    expect(rendered).not.toContain('offline')
     expect(rendered).toContain('pending')
     expect(rendered).toContain('Remove')
   })
@@ -106,6 +108,21 @@ describe('devices panel', () => {
     expect(rendered).toContain('Name Status Last seen')
     expect(rendered).toContain('Microbiology laptop 73ea340a online 2m ago')
     expect(rendered).toContain('enr-9abc pending unknown')
+  })
+
+  it('reads a device the realm has seen as online, and one without contact as unknown', async () => {
+    realmInfo.value = {
+      nodes: [
+        { node_id: 'seen1234abcd', connection_status: 'seen', present: false, last_seen_ms: Date.now() - 300_000 },
+        { node_id: 'quiet234abcd', connection_status: 'unknown', present: false },
+      ],
+    }
+    devices.value = [device({ id: 'seen1234abcd', node_id: 'seen1234abcd' }), device({ id: 'quiet234abcd', node_id: 'quiet234abcd' })]
+    const rendered = await text()
+
+    expect(rendered).toContain('seen1234 online 5m ago')
+    expect(rendered).toContain('quiet234 unknown unknown')
+    expect(rendered).not.toContain('offline')
   })
 
   it('says the realm caps nothing when it does not', async () => {

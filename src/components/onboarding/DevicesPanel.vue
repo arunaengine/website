@@ -77,8 +77,9 @@ interface DeviceRow {
 const rows = computed<DeviceRow[]>(() =>
   devices.value.map((device) => {
     const node = (realmInfo.value?.nodes ?? []).find((entry) => entry.node_id === device.node_id)
-    const online = node?.connection_status === 'connected'
-    const status = device.status === 'enrolled' ? (online ? 'online' : 'offline') : device.status
+    // User nodes report recent contact as `seen`, and no status says offline, so the rest is unknown.
+    const online = node?.connection_status === 'connected' || node?.connection_status === 'seen'
+    const status = device.status === 'enrolled' ? (online ? 'online' : 'unknown') : device.status
     const variant: Variant = status === 'online' ? 'success' : status === 'claimed' ? 'sky' : status === 'pending' ? 'outline' : 'secondary'
     const seen = node?.last_seen_ms ? relativeTime(new Date(node.last_seen_ms).toISOString()) : online ? 'just now' : ''
     return { id: device.id, name: node?.info?.labels?.['device'] || null, shortId: (device.node_id ?? device.id).slice(0, 8), status, variant, lastSeen: seen }
