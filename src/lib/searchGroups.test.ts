@@ -44,4 +44,17 @@ describe('whole-bucket search groups', () => {
     const [bare] = groupHits([hit('C/c1', { assembly_level: 'Contig' })])
     expect(groupTitle(bare as never)).toBe('C')
   })
+
+  it('appends only the rest of a strain whose first word ends the organism name', () => {
+    const [sakai] = groupHits([hit('D/', { organism_name: 'Escherichia coli O157:H7 str. Sakai', infraspecific_name: 'strain=Sakai substr. RIMD 0509952' })])
+    expect(groupTitle(sakai as never)).toBe('Escherichia coli O157:H7 str. Sakai substr. RIMD 0509952')
+    const [same] = groupHits([hit('E/', { organism_name: 'Escherichia coli O157:H7 str. EDL933', infraspecific_name: 'strain=EDL933' })])
+    expect(groupTitle(same as never)).toBe('Escherichia coli O157:H7 str. EDL933')
+  })
+
+  it('counts no file for a group of only the folder entry', () => {
+    const [folder] = groupHits([hit('D/', { organism_name: 'Escherichia coli O157:H7 str. Sakai' })])
+    expect(folder.kind).toBe('group')
+    expect(groupFiles(folder as never)).toEqual([])
+  })
 })

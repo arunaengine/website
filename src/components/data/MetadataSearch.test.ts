@@ -356,6 +356,22 @@ describe('bucket search results by record folder', () => {
     searchObjects.mockReset().mockImplementation(async () => ({ hits: [hit] as unknown[], next_cursor: null, coverage: { complete: true } }))
   })
 
+  it('names no file count for an assembly found only by its folder entry', async () => {
+    const SAKAI = { organism_name: 'Escherichia coli O157:H7 str. Sakai', infraspecific_name: 'strain=Sakai substr. RIMD 0509952', assembly_accession: 'GCF_000008865.2', assembly_level: 'Complete Genome' }
+    searchObjects.mockImplementation(async (_q, options) => (options.match === 'metadata'
+      ? { hits: [found('GCF_000008865.2_ASM886v2/', SAKAI)], next_cursor: null, coverage: { complete: true } }
+      : { hits: [], next_cursor: null, coverage: { complete: true } }))
+    const { root, app } = await open()
+    const text = content(root)
+
+    expect(text).toContain('Escherichia coli O157:H7 str. Sakai substr. RIMD 0509952')
+    expect(text).not.toContain('Sakai Sakai')
+    expect(text).toContain('GCF_000008865.2, Complete Genome,GCF_000008865.2_ASM886v2/')
+    expect(text).not.toContain('0 files')
+    app.unmount()
+    searchObjects.mockReset().mockImplementation(async () => ({ hits: [hit] as unknown[], next_cursor: null, coverage: { complete: true } }))
+  })
+
   it('appends a later page to its group, keeps it open and counts a lower bound while more may follow', async () => {
     searchObjects.mockImplementation(async (_q, options) => {
       if (options.match !== 'metadata') return { hits: [], next_cursor: null, coverage: { complete: true } }

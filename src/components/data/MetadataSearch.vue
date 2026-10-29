@@ -160,9 +160,10 @@ type Group = Extract<SearchRow, { kind: 'group' }>
 const rows = computed(() => groupHits(hits.value ?? []))
 const morePages = computed(() => Boolean(cursor.value) || nameCursor.value !== null)
 // "GCF_000005845.2, Complete Genome, 22 files"; a page still to come makes the count a lower bound.
+// A group of only the folder's own entry names no count: the folder link says what it is.
 function groupLine(group: Group): string {
   const count = groupFiles(group).length
-  const files = `${count}${morePages.value ? '+' : ''} ${count === 1 && !morePages.value ? 'file' : 'files'}`
+  const files = count ? `${count}${morePages.value ? '+' : ''} ${count === 1 && !morePages.value ? 'file' : 'files'}` : ''
   return [group.metadata.assembly_accession, group.metadata.assembly_level, files].filter(Boolean).join(', ')
 }
 // The folder opens through its own hit when the search found it, else through one made of it.

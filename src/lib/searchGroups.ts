@@ -33,12 +33,19 @@ export function groupHits(hits: readonly ObjectSearchHit[]): SearchRow[] {
   return rows
 }
 
-/** "Escherichia coli str. K-12 substr. MG1655"; the strain is added only when the name lacks it. */
+/**
+ * "Escherichia coli str. K-12 substr. MG1655": the strain is added only where the name lacks it,
+ * and a name that ends with the strain's first word gets only the rest ("str. Sakai" + "Sakai
+ * substr. RIMD 0509952" reads "str. Sakai substr. RIMD 0509952").
+ */
 export function groupTitle(group: Extract<SearchRow, { kind: 'group' }>): string {
   const organism = group.metadata.organism_name?.trim()
   if (!organism) return group.folder
   const strain = group.metadata.infraspecific_name?.replace(/^[a-z_]+=/i, '').trim()
-  return strain && !organism.includes(strain) ? `${organism} ${strain}` : organism
+  if (!strain || organism.includes(strain)) return organism
+  const [first, ...rest] = strain.split(/\s+/)
+  if (organism.split(/\s+/).at(-1) === first) return rest.length ? `${organism} ${rest.join(' ')}` : organism
+  return `${organism} ${strain}`
 }
 
 /** The group's files: the folder's own entry is not one of them. */
