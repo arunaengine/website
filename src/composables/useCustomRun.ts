@@ -145,7 +145,9 @@ function baseNameOf(path: string): string {
   return normalizedOutputKey(path).split('/').filter(Boolean).pop() ?? ''
 }
 function createStore(deps: CustomRunDeps) {
-  const { runTarget, s3, myGroups, currentUser, nodes, getTask, dataView, realmName } = deps
+  const { runTarget, s3, myGroups, currentUser, getTask, dataView, realmName } = deps
+  // A realm run never executes on a device; this computer has its own local run.
+  const nodes = computed(() => deps.nodes.value.filter((node) => node.kind !== 'user'))
   const savedRuns = useSavedRuns()
   const router = useRouter()
   const route = useRoute()
