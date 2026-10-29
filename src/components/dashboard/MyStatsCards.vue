@@ -15,9 +15,13 @@ import { distinctCount } from '@/lib/distribution'
 import { formatCount } from '@/lib/formatCount'
 import { formatBytes } from '@/lib/utils'
 
-const props = withDefaults(defineProps<{ refreshRevision?: number }>(), { refreshRevision: 0 })
+/** `running`: the visible runs that run right now; null while they are not known. */
+const props = withDefaults(defineProps<{ refreshRevision?: number; running?: { count: number; atLeast: boolean } | null }>(), {
+  refreshRevision: 0,
+  running: null,
+})
 
-const { aggregate, membershipKey, load } = useMyGroupsUsage()
+const { aggregate, entries, membershipKey, load } = useMyGroupsUsage()
 const reach = useReachableUsage()
 const { myGroups } = useAruna()
 const databases = useDatabases()
@@ -73,10 +77,22 @@ const databaseText = computed(() => {
   return `${lowerBound(!databases.complete.value, formatCount(count))} ${plural(count, 'database', 'databases')}`
 })
 
+// The groups' quotas: a sum when every group has one, "no quota" when none has; mixed says nothing.
+const quotaText = computed(() => {
+  const quotas = entries.value.map((entry) => entry.quota?.quota_bytes ?? null)
+  if (!quotas.length || entries.value.some((entry) => entry.status !== 'ready')) return ''
+  if (quotas.every((quota) => quota === null)) return ', no quota'
+  if (quotas.every((quota) => quota !== null)) return ` of ${formatBytes(quotas.reduce<number>((total, quota) => total + (quota ?? 0), 0))}`
+  return ''
+})
+
 const datasets = computed(() => (aggregate.value.datasets == null ? 'Unknown' : formatCount(aggregate.value.datasets)))
-const runs = computed(() => {
-  const value = aggregate.value.processRuns
-  return value == null ? 'Runs unknown' : `${formatCount(value)} ${plural(value, 'run', 'runs')}`
+const runCount = computed(() => (aggregate.value.processRuns == null ? 'Unknown' : formatCount(aggregate.value.processRuns)))
+// Below the runs: how many run right now, and the datasets.
+const workLine = computed(() => {
+  const running = props.running ? `${props.running.atLeast ? 'at least ' : ''}${formatCount(props.running.count)} running` : null
+  const datasetCount = aggregate.value.datasets
+  return [running, `${datasets.value} ${datasetCount === 1 ? 'dataset' : 'datasets'}`].filter(Boolean).join(', ')
 })
 </script>
 
@@ -90,7 +106,7 @@ const runs = computed(() => {
     <template v-else>
       <OverviewCell label="Storage">
         <template #value>
-          <b>{{ lowerBound(atLeast, formatBytes(sum.stored)) }}</b> stored
+          <b>{{ lowerBound(atLeast, formatBytes(sum.stored)) }}</b> stored{{ quotaText }}
           <b class="ml-2">{{ lowerBound(referencedLower, formatBytes(sum.referenced)) }}</b> referenced
         </template>
         Stored counts against quotas. Referenced data stays at its source.
@@ -102,8 +118,8 @@ const runs = computed(() => {
     </template>
     <div v-if="aggregate.pending" class="bg-card px-5 py-4"><Skeleton class="h-16" /></div>
     <OverviewCell v-else label="Work">
-      <template #value><b>{{ datasets }}</b> {{ aggregate.datasets === 1 ? 'dataset' : 'datasets' }}</template>
-      {{ runs }}
+      <template #value><b>{{ runCount }}</b> {{ aggregate.processRuns === 1 ? 'run' : 'runs' }}</template>
+      {{ workLine }}
     </OverviewCell>
 
     <div v-if="loaded && (notes.length || aggregate.failed.length)" class="order-last space-y-2 bg-card px-5 py-3 sm:col-span-2 lg:col-span-4">

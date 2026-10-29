@@ -36,6 +36,31 @@ const DeviceRowStub = defineComponent({ props: { name: String, nodeId: String },
 const isRealmAdmin = ref(false)
 const renameNode = vi.fn(async () => undefined)
 const nodeNamesStub = { useNodeNames: () => ({ renameNode }) }
+// The map and the node table render what they were handed.
+const MapStub = defineComponent({
+  props: { nodes: { type: Array, default: () => [] }, compact: Boolean, computer: Object },
+  emits: ['select'],
+  setup: (props) => () =>
+    h('div', [
+      `map compact=${props.compact}`,
+      ...(props.nodes as Array<{ node_id: string; info?: { utilization?: { heartbeat_at_ms?: number } } }>).map((node) =>
+        h('span', ` ${node.node_id} beat ${node.info?.utilization?.heartbeat_at_ms} `)),
+    ]),
+})
+const TableStub = defineComponent({
+  props: { nodes: { type: Array, default: () => [] }, computer: Object },
+  setup: (props) => () =>
+    h('table', [
+      props.computer ? `first ${(props.computer as { node_id: string }).node_id} ` : '',
+      ...(props.nodes as Array<{ node_id: string }>).map((node) => `row ${node.node_id} `),
+    ]),
+})
+// The visible runs, as the landing view reads them.
+const recentRunList = ref<unknown[]>([])
+const runningRuns = ref({ count: 0, atLeast: false })
+const runsState = ref('ready')
+const loadRuns = vi.fn(async () => undefined)
+const recentRunsStub = { useRecentRuns: () => ({ runs: recentRunList, running: runningRuns, state: runsState, load: loadRuns }) }
 const setScope = vi.fn(async () => undefined)
 const refresh = vi.fn(async () => undefined)
 let servedEpoch = -1
@@ -161,6 +186,9 @@ beforeAll(async () => {
   vi.doMock('@/composables/useDatabases', () => databasesStub)
   vi.doMock('@/components/dashboard/NodeCards.vue', () => ({ default: NodeCardsStub }))
   vi.doMock('@/composables/useNodeNames', () => nodeNamesStub)
+  vi.doMock('@/composables/useRecentRuns', () => recentRunsStub)
+  vi.doMock('@/components/dashboard/FederationPanel.vue', () => ({ default: MapStub }))
+  vi.doMock('@/components/dashboard/NodeTable.vue', () => ({ default: TableStub }))
   vi.doMock('@/components/dashboard/WebStart.vue', () => ({ default: WebStartStub }))
   vi.doMock('@/composables/useRealmNodes', () => realmNodesStub)
   vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: SkeletonStub }))
@@ -232,6 +260,9 @@ beforeAll(async () => {
     '@/composables/useDatabases': databasesStub,
     '@/components/dashboard/NodeCards.vue': moduleDefault(NodeCardsStub),
     '@/composables/useNodeNames': nodeNamesStub,
+    '@/composables/useRecentRuns': recentRunsStub,
+    '@/components/dashboard/FederationPanel.vue': moduleDefault(MapStub),
+    '@/components/dashboard/NodeTable.vue': moduleDefault(TableStub),
     '@/components/dashboard/WebStart.vue': moduleDefault(WebStartStub),
     '@/composables/useRealmNodes': realmNodesStub,
     '@/components/nodes/node-display': NodeDisplay,
@@ -275,6 +306,10 @@ beforeEach(() => {
   databaseState.value = 'idle'
   reloadDatabases.mockClear()
   isRealmAdmin.value = false
+  recentRunList.value = []
+  runningRuns.value = { count: 0, atLeast: false }
+  runsState.value = 'ready'
+  loadRuns.mockClear()
   signIn.mockClear()
 })
 
@@ -370,18 +405,21 @@ describe('authenticated dashboard scope', () => {
     }
   }
 
-  it('shows my figures in the Overview by default, the realm cell and then the groups', async () => {
+  it('shows my figures and the activity in the Overview, then the realm card and the groups', async () => {
     signedInRealm()
 
     const text = await renderedText()
     const overview = text.indexOf('Overview')
+    const realmCard = text.indexOf('Realm 1 of 2 nodes online')
 
     expect(overview).toBeGreaterThanOrEqual(0)
     expect(text.indexOf('my stats cards')).toBeGreaterThan(overview)
-    expect(text.indexOf('Realm 1 node online')).toBeGreaterThan(text.indexOf('my stats cards'))
-    expect(text.indexOf('group quota cards')).toBeGreaterThan(text.indexOf('Realm 1 node online'))
+    expect(text.indexOf('Activity')).toBeGreaterThan(text.indexOf('my stats cards'))
+    expect(realmCard).toBeGreaterThan(text.indexOf('Activity'))
+    expect(text.indexOf('group quota cards')).toBeGreaterThan(realmCard)
     expect(text).toContain('scope toggle personal')
-    expect(text).toContain('Replication on all eligible nodes Status')
+    expect(text).toContain('map compact=true')
+    expect(text).toMatch(/row node-a\s+row node-b/)
     // The old sections and the boxes the sidebar already offers are gone.
     for (const gone of ['My statistics', 'Realm statistics', 'Replica-inclusive placement records held', 'Recent datasets', 'Open Data']) {
       expect(text).not.toContain(gone)
@@ -439,7 +477,10 @@ describe('authenticated dashboard scope', () => {
 
     const text = await renderedText()
 
-    expect(text).toContain('Realm 1 node online')
+    // The device is counted apart and never listed among the realm nodes.
+    expect(text).toMatch(/Realm 1 of 1 node online\s*, replication on all eligible nodes, 1 device Status/)
+    expect(text).toContain('row server-node')
+    expect(text).not.toContain('row owned-device')
   })
 })
 
@@ -491,7 +532,9 @@ describe('desktop home', () => {
     await flush()
 
     expect(content(mounted.root)).toContain('device row Microbiology laptop')
-    expect(content(mounted.root).indexOf('device row')).toBeGreaterThan(content(mounted.root).indexOf('Realm'))
+    expect(content(mounted.root).indexOf('device row')).toBeGreaterThan(content(mounted.root).indexOf('Activity'))
+    // The realm table lists this computer first.
+    expect(content(mounted.root)).toContain('first own-device')
     mounted.app.unmount()
   })
 
@@ -523,17 +566,17 @@ describe('desktop home', () => {
     const mounted = await mountApp(DashboardClient)
     await flush()
 
-    expect(content(mounted.root)).toContain('device row Lab laptop')
-    expect(content(mounted.root)).not.toContain('own-device')
+    expect(content(mounted.root)).toContain('device row Lab laptop Realm')
     mounted.app.unmount()
   })
 
-  it('keeps a space between the replication and the Status link', async () => {
+  it('keeps a space between the realm facts and the Status link', async () => {
     currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
+    realmInfo.value = { metadata_replication: { default_replication_factor: 3 }, nodes: [{ node_id: 'n1', kind: 'server', present: true }] }
     const mounted = await mountApp(DashboardClient)
     await flush()
 
-    expect(content(mounted.root).replace(/\s+/g, ' ')).toContain('Replication ×3 Status')
+    expect(content(mounted.root).replace(/\s+/g, ' ')).toContain('1 of 1 node online, replication ×3 Status')
     mounted.app.unmount()
   })
 
@@ -575,7 +618,7 @@ describe('realm nodes in the overview', () => {
 
     expect(text).toContain('mgmt-node beat 9000')
     expect(text).toContain('server-node beat 8000')
-    expect(text).toContain('1 devices')
+    expect(text).toContain('1 device Status')
     expect(text).not.toContain('beat 1000')
     mounted.app.unmount()
   })
@@ -618,20 +661,7 @@ describe('realm nodes in the overview', () => {
     web.app.unmount()
   })
 
-  it('lets a realm admin rename nodes from the cards, nobody else', async () => {
-    let mounted = await mountApp(DashboardClient)
-    await flush()
-    expect(content(mounted.root)).not.toContain('renamable')
-    mounted.app.unmount()
-
-    isRealmAdmin.value = true
-    mounted = await mountApp(DashboardClient)
-    await flush()
-    expect(content(mounted.root)).toContain('renamable')
-    mounted.app.unmount()
-  })
-
-  it('sums the imports the realm snapshot reports in the header, and drops them with a new snapshot', async () => {
+  it('sums the imports the realm snapshot reports in the activity cell, and drops them with a new snapshot', async () => {
     desktopMode.value = true
     // The device's own copy has no heartbeats; the realm node's snapshot counts the imports.
     loadRealmView.mockResolvedValue({
@@ -643,7 +673,7 @@ describe('realm nodes in the overview', () => {
     })
     let mounted = await mountApp(DashboardClient)
     await flush()
-    expect(content(mounted.root)).toContain('OverviewImports running: 16 jobs')
+    expect(content(mounted.root)).toContain('Activity16 imports running on')
     mounted.app.unmount()
 
     // One node has no heartbeat count: the known imports are a lower bound.
@@ -656,7 +686,7 @@ describe('realm nodes in the overview', () => {
     })
     mounted = await mountApp(DashboardClient)
     await flush()
-    expect(content(mounted.root)).toContain('OverviewImports running: at least 2 jobs')
+    expect(content(mounted.root)).toContain('Activityat least 2 imports running on')
 
     // Another session reads its own snapshot; the old counts never linger.
     loadRealmView.mockResolvedValue(null)
@@ -664,7 +694,7 @@ describe('realm nodes in the overview', () => {
     realmInfo.value = { metadata_replication: { default_replication_factor: null }, nodes: [beat('mgmt-node', 'management', 1000)] }
     await flush()
     await flush()
-    expect(content(mounted.root)).not.toContain('Imports running')
+    expect(content(mounted.root)).toContain('Activitynone')
     mounted.app.unmount()
   })
 })

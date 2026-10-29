@@ -15,6 +15,8 @@ const props = defineProps<{
   localPeerId?: string
   /** This computer in the desktop: its node id, name and the realm nodes it is connected to now. */
   computer?: { id: string; name: string; peers: string[] } | null
+  /** The landing view's small map: no heading or footnote, rings by state, arcs for imports. */
+  compact?: boolean
 }>()
 
 // The page decides what a chosen node opens, so choosing the same node again works too.
@@ -198,10 +200,17 @@ function loadPermille(node: RealmNodeInfo): number {
 }
 
 function hasLoad(node: RealmNodeInfo): boolean {
-  return loadPermille(node) > 0
+  return props.compact ? (node.info?.utilization.imports_running ?? 0) > 0 : loadPermille(node) > 0
+}
+
+// The small map colors a ring by the node's state; the full one by its kind.
+function ringStroke(node: RealmNodeInfo, fallback: string): string {
+  if (!props.compact) return fallback
+  return node.present ? '#10b981' : 'hsl(var(--muted-foreground))'
 }
 
 function loadColor(node: RealmNodeInfo): string {
+  if (props.compact) return '#55C4DE'
   const permille = loadPermille(node)
   if (permille >= 800) return 'hsl(var(--destructive))'
   if (permille >= 500) return '#f59e0b'
@@ -209,6 +218,8 @@ function loadColor(node: RealmNodeInfo): string {
 }
 
 function loadArc(cx: number, cy: number, permille: number): string {
+  // An import shows as a steady three-quarter arc on the small map.
+  if (props.compact) permille = 750
   const endDeg = Math.min(permille / 1000, 0.9999) * 360
   const rad = (deg: number) => (deg - 90) * (Math.PI / 180)
   const sx = cx + ARC_R * Math.cos(rad(0))
@@ -221,14 +232,14 @@ function loadArc(cx: number, cy: number, permille: number): string {
 
 <template>
   <section>
-    <h2 class="mb-3.5 font-display text-[15px] font-semibold text-foreground/85">Node map</h2>
+    <h2 v-if="!compact" class="mb-3.5 font-display text-[15px] font-semibold text-foreground/85">Node map</h2>
 
-    <div class="surface overflow-hidden rounded-xl p-0">
+    <div :class="compact ? '' : 'surface overflow-hidden rounded-xl p-0'">
       <EmptyState v-if="!nodes.length" class="m-5" title="This realm has no nodes yet." />
 
       <template v-else>
         <!-- Topology: a single SVG so connections truly terminate at nodes -->
-        <div class="border-b border-border/60 bg-background">
+        <div :class="compact ? 'mx-auto max-w-[420px]' : 'border-b border-border/60 bg-background'">
           <svg
             :viewBox="`0 0 ${VW} ${VH}`"
             preserveAspectRatio="xMidYMid meet"
@@ -314,7 +325,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
               role="link"
               tabindex="0"
               :opacity="nodeOpacity(p.node)"
-              :aria-label="`View ${nodeName(p.node)} on the status page`"
+              :aria-label="`Open ${nodeName(p.node)}`"
               @click="openNode(p.node.node_id)"
               @keydown.enter="openNode(p.node.node_id)"
             >
@@ -329,7 +340,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
                 :stroke="kindStroke[p.node.kind]"
                 stroke-width="1"
               />
-              <circle :cx="p.cx" :cy="p.cy" :r="RING" fill="hsl(var(--card))" :stroke="kindStroke[p.node.kind]" stroke-width="1.5" />
+              <circle :cx="p.cx" :cy="p.cy" :r="RING" fill="hsl(var(--card))" :stroke="ringStroke(p.node, kindStroke[p.node.kind])" stroke-width="1.5" />
               <path
                 v-if="hasLoad(p.node)"
                 :d="loadArc(p.cx, p.cy, loadPermille(p.node))"
@@ -359,13 +370,13 @@ function loadArc(cx: number, cy: number, permille: number): string {
               class="fed-node cursor-pointer focus:outline-none"
               role="link"
               tabindex="0"
-              :aria-label="`View ${nodeName(hub)} on the status page`"
+              :aria-label="`Open ${nodeName(hub)}`"
               @click="openNode(hub.node_id)"
               @keydown.enter="openNode(hub.node_id)"
             >
               <title>{{ nodeTitle(hub) }}, {{ hubName ?? 'this node' }}</title>
               <circle :cx="CX" :cy="CY" :r="RING + 10" fill="url(#fed-glow-hub)" />
-              <circle :cx="CX" :cy="CY" :r="RING + 2" fill="hsl(var(--card))" stroke="#55C4DE" stroke-width="1.5" />
+              <circle :cx="CX" :cy="CY" :r="RING + 2" fill="hsl(var(--card))" :stroke="ringStroke(hub, '#55C4DE')" stroke-width="1.5" />
               <path
                 v-if="hasLoad(hub)"
                 :d="loadArc(CX, CY, loadPermille(hub))"
@@ -421,7 +432,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
               </text>
             </g>
           </svg>
-          <p v-if="edges.length || computer" class="border-t border-border/60 px-5 py-2 text-[11px] text-muted-foreground">
+          <p v-if="!compact && (edges.length || computer)" class="border-t border-border/60 px-5 py-2 text-[11px] text-muted-foreground">
             <template v-if="hubName">
               Connections as seen by {{ hubName }}.
               <template v-if="computer">

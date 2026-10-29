@@ -5,7 +5,8 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import DashboardScopeToggle from '@/components/dashboard/DashboardScopeToggle.vue'
 import GroupQuotaCards from '@/components/dashboard/GroupQuotaCards.vue'
 import MyStatsCards from '@/components/dashboard/MyStatsCards.vue'
-import NodeCards from '@/components/dashboard/NodeCards.vue'
+import FederationPanel from '@/components/dashboard/FederationPanel.vue'
+import NodeTable from '@/components/dashboard/NodeTable.vue'
 import OverviewCell from '@/components/dashboard/OverviewCell.vue'
 import WebStart from '@/components/dashboard/WebStart.vue'
 import SignInPanel from '@/components/auth/SignInPanel.vue'
@@ -13,13 +14,13 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import type { RealmView } from '@/composables/aruna/realm'
 import type { RealmNodeInfo } from '@/lib/api'
-import { givenName } from '@/components/nodes/node-display'
+import { givenName, nodeName } from '@/components/nodes/node-display'
 import { ArrowRight, Plus } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
-import { useNodeNames } from '@/composables/useNodeNames'
+import { useRecentRuns } from '@/composables/useRecentRuns'
 import { useDatabases } from '@/composables/useDatabases'
 import { computerName } from '@/composables/useRealmNodes'
 import { useDashboardScope } from '@/composables/useDashboardScope'
@@ -45,8 +46,7 @@ const DeviceRow = defineAsyncComponent({
 const desktop = isDesktop()
 
 const router = useRouter()
-const { currentUser, myGroups, nodeInfo, realmInfo, usageInfo, loading, bootstrapped, sessionEpoch, refresh, refreshedEpoch, loadInfo, loadRealmView, isRealmAdmin } = useAruna()
-const { renameNode } = useNodeNames()
+const { currentUser, myGroups, nodeInfo, realmInfo, usageInfo, loading, bootstrapped, sessionEpoch, refresh, refreshedEpoch, loadInfo, loadRealmView } = useAruna()
 const { authPending } = useAuth()
 const { dashboardRevision } = useNotifications()
 const { scope, setScope } = useDashboardScope()
@@ -92,6 +92,7 @@ async function refreshDashboard() {
     } while (refreshQueued)
   } finally {
     refreshing.value = false
+    if (currentUser.value) void recentRuns.load()
     if (cardsShown) {
       quotaRevision.value++
       cardsRevision.value++
@@ -173,14 +174,37 @@ const renameId = computed(() => {
 
 const onlineNodes = computed(() => infraNodes.value.filter((node) => node.present).length)
 
-// Imports explain a busy node; each node's heartbeat counts them in the realm snapshot the cards show.
-// A node without a heartbeat count adds nothing known, so the sum is then a lower bound.
-const importsLine = computed(() => {
+// Imports explain a busy node; each node's heartbeat counts them in the realm snapshot. A node
+// without a heartbeat count adds nothing known, so the sum is then a lower bound.
+const activity = computed(() => {
   const counts = infraNodes.value.map((node) => node.info?.utilization?.imports_running)
-  const running = counts.reduce<number>((sum, count) => sum + (count ?? 0), 0)
-  const atLeast = counts.some((count) => count === undefined) ? 'at least ' : ''
-  return running ? `Imports running: ${atLeast}${formatCount(running)} ${running === 1 ? 'job' : 'jobs'}` : null
+  return {
+    running: counts.reduce<number>((sum, count) => sum + (count ?? 0), 0),
+    atLeast: counts.some((count) => count === undefined),
+    nodes: infraNodes.value.filter((node) => (node.info?.utilization?.imports_running ?? 0) > 0),
+  }
 })
+const listed = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`)
+
+// The visible runs, newest first: the Work cell counts the running ones.
+const recentRuns = useRecentRuns()
+// After the online count: replication and devices, plain.
+const realmFacts = computed(() => {
+  const devices = deviceNodes.value.length
+  return [replication.value?.toLowerCase(), devices ? `${formatCount(devices)} ${plural(devices, 'device', 'devices')}` : null]
+    .filter(Boolean)
+    .map((fact) => `, ${fact}`)
+    .join('')
+})
+// This computer on the map, in the desktop: the realm nodes it is connected to now.
+const mapComputer = computed(() => {
+  const info = nodeInfo.value
+  if (!desktop || !info?.connections) return null
+  const peers = info.connections.filter((peer) => peer.status === 'connected').map((peer) => peer.peer_id)
+  return { id: info.node.peer_id, name: deviceName.value, peers }
+})
+const openNode = (nodeId: string) => void router.push({ name: 'node', params: { nodeId } })
+
 const replication = computed(() => {
   const factor = realmInfo.value?.metadata_replication.default_replication_factor
   return factor === null ? 'Replication on all eligible nodes' : factor === undefined ? null : `Replication ×${factor}`
@@ -267,12 +291,11 @@ const pageDescription = computed(() =>
       <section class="surface overflow-hidden" aria-labelledby="overview-heading">
         <header class="flex flex-wrap items-center justify-between gap-3 px-5 pt-4">
           <h2 id="overview-heading" class="font-display text-[15px] font-semibold text-foreground">Overview</h2>
-          <span v-if="importsLine" class="mr-auto text-xs text-muted-foreground">{{ importsLine }}</span>
           <DashboardScopeToggle v-if="currentUser" :model-value="scope" @update:model-value="setScope" />
         </header>
         <div class="mt-3 grid gap-px border-t border-border bg-border sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr]">
           <template v-if="currentUser && scope === 'personal'">
-            <MyStatsCards v-if="myGroups.length" :refresh-revision="quotaRevision" />
+            <MyStatsCards v-if="myGroups.length" :refresh-revision="quotaRevision" :running="recentRuns.state.value === 'ready' ? recentRuns.running.value : null" />
             <div v-else class="bg-card px-5 py-4 lg:col-span-3"><EmptyState compact title="You do not belong to any groups yet." /></div>
           </template>
           <template v-else-if="!bootstrapped">
@@ -297,9 +320,20 @@ const pageDescription = computed(() =>
             <OverviewCell label="Work" :class="currentUser ? '' : 'sm:col-span-1 lg:col-span-3'">
               <template v-if="realmDatasets !== null" #value><b>{{ formatCount(realmDatasets) }}</b> {{ plural(realmDatasets, 'dataset', 'datasets') }}</template>
               <template v-else #value>Unknown</template>
+              <template v-if="currentUser && recentRuns.state.value === 'ready'">
+                {{ recentRuns.running.value.atLeast ? 'at least ' : '' }}{{ formatCount(recentRuns.running.value.count) }} running
+              </template>
             </OverviewCell>
           </template>
-          <OverviewCell label="Realm">
+          <OverviewCell v-if="currentUser" label="Activity">
+            <template v-if="activity.running" #value>
+              <b>{{ activity.atLeast ? 'at least ' : '' }}{{ formatCount(activity.running) }}</b> {{ activity.running === 1 ? 'import' : 'imports' }} running
+            </template>
+            <template v-else #value>none</template>
+            <template v-if="activity.nodes.length">on {{ listed(activity.nodes.map(nodeName)) }}</template>
+            <template v-else-if="activity.atLeast">Not every node reports its imports.</template>
+          </OverviewCell>
+          <OverviewCell v-else label="Realm">
             <template v-if="realmNodesText" #value>
               <b>{{ formatCount(realmNodesText.count) }}</b> {{ plural(realmNodesText.count, 'node', 'nodes') }} {{ realmNodesText.word }}
             </template>
@@ -309,15 +343,35 @@ const pageDescription = computed(() =>
             <RouterLink :to="{ name: 'status' }" class="text-primary hover:underline">Status</RouterLink>
           </OverviewCell>
         </div>
-        <div v-if="currentUser && infraNodes.length" class="border-t border-border px-5 py-4">
-          <NodeCards :nodes="infraNodes" :devices="deviceNodes" :rename="isRealmAdmin ? renameNode : undefined" />
-        </div>
         <DeviceRow
           v-if="desktop && currentUser"
           :name="deviceName"
           :node-id="renameId"
           :value="deviceRecord?.display_name ?? null"
         />
+      </section>
+
+      <!-- The realm's nodes: the map on the left, the table on the right; both open a node's page. -->
+      <section v-if="currentUser && (infraNodes.length || deviceRecord)" class="surface overflow-hidden" aria-labelledby="realm-heading">
+        <header class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+          <h2 id="realm-heading" class="font-display text-[15px] font-semibold text-foreground">Realm</h2>
+          <p class="text-xs text-muted-foreground">
+            <span class="text-emerald-600 dark:text-emerald-400">{{ formatCount(onlineNodes) }} of {{ formatCount(infraNodes.length) }} {{ plural(infraNodes.length, 'node', 'nodes') }} online</span>{{ realmFacts }}
+            <RouterLink :to="{ name: 'status' }" class="text-primary hover:underline">Status</RouterLink>
+          </p>
+        </header>
+        <div class="grid divide-y divide-border lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
+          <div class="p-4">
+            <FederationPanel
+              compact
+              :nodes="infraNodes"
+              :local-peer-id="(realmView?.info ?? nodeInfo)?.node.peer_id"
+              :computer="mapComputer"
+              @select="openNode"
+            />
+          </div>
+          <NodeTable :nodes="infraNodes" :computer="desktop ? deviceRecord : null" />
+        </div>
       </section>
 
       <GroupQuotaCards v-if="currentUser && myGroups.length" :refresh-revision="cardsRevision" />

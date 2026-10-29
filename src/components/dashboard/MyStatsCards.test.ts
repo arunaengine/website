@@ -53,8 +53,8 @@ const hit = (bucket: string, node: string, group: string, set?: string) => ({ ar
 const listing = (hits: ReturnType<typeof hit>[]) => ({ hits, nodes_queried: 2, nodes_failed: 0, failed_nodes: [] })
 const bucketUsage = (stored: number, referenced: number | null, objects: number) => ({ logical_bytes: stored, referenced_bytes: referenced, objects, complete: true })
 
-async function renderedText(): Promise<string> {
-  const html = await renderToString(createSSRApp(MyStatsCards))
+async function renderedText(props: Record<string, unknown> = {}): Promise<string> {
+  const html = await renderToString(createSSRApp(MyStatsCards, props))
   return html
     .replace(/<[^>]+>/g, ' ')
     .replace(/&amp;/g, '&')
@@ -89,10 +89,10 @@ describe('personal statistics tiles', () => {
 
     const text = await renderedText()
 
-    expect(text).toContain(`Storage ${formatBytes(3 * 2048)} stored ${formatBytes(3 * 1024)} referenced`)
+    expect(text).toContain(`Storage ${formatBytes(3 * 2048)} stored of ${formatBytes(2 * 10_000)} ${formatBytes(3 * 1024)} referenced`)
     expect(text).toContain('Stored counts against quotas. Referenced data stays at its source.')
     expect(text).toContain('Data 12 objects 3 buckets')
-    expect(text).toContain('Work 6 datasets 4 runs')
+    expect(text).toContain('Work 4 runs 6 datasets')
     expect(text).not.toContain('at least')
   })
 
@@ -107,7 +107,7 @@ describe('personal statistics tiles', () => {
     const text = await renderedText()
 
     expect(text).toContain('1 object 1 bucket ')
-    expect(text).toMatch(/Work 0 datasets 1 run$/)
+    expect(text).toMatch(/Work 1 run 0 datasets$/)
   })
 
   it('shows a lower bound when a bucket could not be read', async () => {
@@ -123,7 +123,7 @@ describe('personal statistics tiles', () => {
 
     const text = await renderedText()
 
-    expect(text).toContain('Storage at least 10 B stored at least 0 B referenced')
+    expect(text).toContain(`Storage at least 10 B stored of ${formatBytes(10_000)} at least 0 B referenced`)
     expect(text).toContain('could not be read, so it is not counted')
     expect(text).toContain('1 bucket does not report referenced data')
   })
@@ -152,7 +152,7 @@ describe('personal statistics tiles', () => {
 
     const text = await renderedText()
 
-    expect(text).toMatch(/Work Unknown datasets Runs unknown/)
+    expect(text).toMatch(/Work Unknown runs Unknown datasets/)
     expect(text).toContain('Totals stay unknown while the storage of Ocean lab cannot be read.')
     expect(text).not.toMatch(/Work 0/)
   })
@@ -169,5 +169,18 @@ describe('personal statistics tiles', () => {
 
     databases.state.value = 'ready'
     expect(await renderedText()).toContain('2 buckets, 1 database')
+  })
+
+  it('says no quota when no group has one, and how many visible runs run now', async () => {
+    aruna.myGroups.value = [{ id: 'free-1', name: 'Alpha' }]
+    aruna.getGroupUsage.mockResolvedValue(usage({ quota: { quota_bytes: null, ceiling_bytes: null, warn_threshold_percent: 80, warning: false } }))
+    aruna.searchBuckets.mockResolvedValue(listing([hit('a', 'n1', 'free-1')]))
+    aruna.getBucketUsage.mockResolvedValue(bucketUsage(10, 0, 1))
+    await loadMyGroupsUsage()
+    await useReachableUsage().load()
+
+    expect(await renderedText()).toContain('10 B stored, no quota')
+    expect(await renderedText({ running: { count: 2, atLeast: false } })).toContain('Work 2 runs 2 running, 3 datasets')
+    expect(await renderedText({ running: { count: 0, atLeast: true } })).toContain('at least 0 running')
   })
 })
