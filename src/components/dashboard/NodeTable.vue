@@ -29,6 +29,7 @@ const page = ref(1)
 interface Row {
   node: RealmNodeInfo
   name: string
+  place: string | null
   location: string | null
   here: boolean
 }
@@ -36,14 +37,19 @@ const location = (node: RealmNodeInfo) => {
   const value = node.info?.labels?.[LOCATION_AFFINITY_KEY] || node.placement?.location || ''
   return value && value !== 'default' ? value : null
 }
+// The node's place first; its location label or placement location after, unless the same.
 const rows = computed<Row[]>(() => [
-  ...(props.computer ? [{ node: props.computer, name: computerName(props.computer), location: null, here: true }] : []),
-  ...props.nodes.map((node) => ({ node, name: nodeName(node), location: location(node), here: false })),
+  ...(props.computer ? [{ node: props.computer, name: computerName(props.computer), place: null, location: null, here: true }] : []),
+  ...props.nodes.map((node) => {
+    const place = node.place?.trim() || null
+    const at = location(node)
+    return { node, name: nodeName(node), place, location: at && at !== place ? at : null, here: false }
+  }),
 ])
 const shown = computed(() => {
   const term = query.value.trim().toLowerCase()
   if (!term) return rows.value
-  return rows.value.filter((row) => [row.name, row.location ?? '', roleLabel[row.node.kind]].some((text) => text.toLowerCase().includes(term)))
+  return rows.value.filter((row) => [row.name, row.place ?? '', row.location ?? '', roleLabel[row.node.kind]].some((text) => text.toLowerCase().includes(term)))
 })
 const pageCount = computed(() => Math.max(1, Math.ceil(shown.value.length / PAGE_SIZE)))
 const pageRows = computed(() => shown.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE))
@@ -91,7 +97,10 @@ const open = (row: Row) => void router.push({ name: 'node', params: { nodeId: ro
             </td>
             <td class="px-4 py-2.5 text-xs">
               <span v-if="row.here" class="text-muted-foreground">this computer</span>
-              <Badge v-else-if="row.location" variant="outline" size="sm">{{ row.location }}</Badge>
+              <span v-else class="inline-flex items-center gap-1.5">
+                <span v-if="row.place" class="text-foreground">{{ row.place }}</span>
+                <Badge v-if="row.location" variant="outline" size="sm">{{ row.location }}</Badge>
+              </span>
             </td>
             <td class="px-4 py-2.5 text-xs text-muted-foreground">{{ roleLabel[row.node.kind] }}</td>
             <td class="px-4 py-2.5 text-xs tabular-nums text-foreground">{{ row.node.info ? formatBytes(row.node.info.utilization.storage_bytes_used) : '' }}</td>

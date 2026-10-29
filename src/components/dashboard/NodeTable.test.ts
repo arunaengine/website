@@ -69,6 +69,20 @@ describe('the realm node table', () => {
     mounted.app.unmount()
   })
 
+  it('names the place first, then a location label that says more, never "default"', async () => {
+    const mounted = await mountApp(NodeTable, { props: { nodes: [
+      realmNode(1, { place: 'Giessen', placement: { location: 'default', weight: 100, full: false, draining: false } }),
+      realmNode(2, { place: 'Giessen', placement: { location: 'rack-b', weight: 1, full: false, draining: false } }),
+      realmNode(3, { place: 'Giessen', placement: { location: 'Giessen', weight: 1, full: false, draining: false } }),
+    ] } })
+    const cell = (name: string) => content(element(mounted.root, (node) => node.tag === 'tr' && content(node).includes(name)).children[1]).trim()
+
+    expect(cell('Giessen storage 1')).toBe('Giessen')
+    expect(cell('Giessen storage 2')).toBe('Giessenrack-b')
+    expect(cell('Giessen storage 3')).toBe('Giessen')
+    mounted.app.unmount()
+  })
+
   it('puts this computer first and opens a node page from its row', async () => {
     const computer = realmNode(9, { node_id: 'laptop', kind: 'user', display_name: 'Microbiology laptop', connection_status: 'seen', present: false })
     const mounted = await mountApp(NodeTable, { props: { nodes: many(3), computer } })
