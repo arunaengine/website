@@ -268,6 +268,7 @@ export function fakeManager(overrides: Record<string, unknown> = {}) {
     listError: ref(null),
     listAuthError: ref(false),
     isEmpty: computed(() => false),
+    listedOnce: ref(true),
     loadObjects: vi.fn(),
     navigateTo: vi.fn(),
     openFolder: vi.fn(),

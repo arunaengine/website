@@ -118,6 +118,7 @@ const {
   listAuthError,
   listStale,
   isEmpty,
+  listedOnce,
   loadObjects,
   navigateTo,
   openFolder,
@@ -740,7 +741,7 @@ async function onDrop(event: DragEvent) {
               </td>
             </tr>
             </template>
-            <tr v-if="listLoading && !visibleFolders.length && !visibleObjects.length && !deletedRows.length">
+            <tr v-if="(listLoading || (!listedOnce && !listError)) && !visibleFolders.length && !visibleObjects.length && !deletedRows.length">
               <td colspan="5" class="px-4 py-10">
                 <Spinner show-label label="Loading objects…" class="justify-center" />
               </td>

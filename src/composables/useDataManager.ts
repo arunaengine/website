@@ -329,9 +329,11 @@ export function useDataManager() {
   // First load, a switched group and a deep link to another node all open their
   // session here; no button stands between the selection and the buckets.
   watch(
-    [selectedGroupId, requiredNodeId, currentUser, contextReady, contextBusy, contextHold],
-    () => {
+    [selectedGroupId, requiredNodeId, currentUser, contextReady, contextBusy, contextHold, () => realmInfo.value?.nodes?.length ?? 0],
+    (next, previous) => {
       if (contextHold.value) return
+      // A fresh load reads the realm without the token first, so a node named later is tried again.
+      if (previous && next[6] !== previous[6]) failedContextKey = null
       const open = shouldOpenContext({
         signedIn: Boolean(currentUser.value),
         groupId: selectedGroupId.value,
@@ -1443,8 +1445,10 @@ export function useDataManager() {
     if (request.kind === 'folder' || donePrefixes.length) void references.reload()
   }
 
+  // Only a finished listing can say a folder is empty; one that has not run yet is unknown.
   const isEmpty = computed(
     () =>
+      listedOnce.value &&
       !listLoading.value &&
       !listError.value &&
       !visibleFolders.value.length &&
@@ -1554,6 +1558,7 @@ export function useDataManager() {
     listStale,
     listedKeys,
     isEmpty,
+    listedOnce,
     loadObjects,
     onListingReset,
     selectedObjectKeys,
