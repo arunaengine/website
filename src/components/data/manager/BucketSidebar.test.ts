@@ -151,7 +151,10 @@ const sidebarModules = {
   '@/components/data/manager/DatabaseRows.vue': moduleDefault(Empty),
   '@/components/data/BucketStorageDialog.vue': moduleDefault(Empty),
   '@/components/data/BucketCreateResults.vue': moduleDefault(Empty),
-  '@/components/ui/OptionToggle.vue': moduleDefault(Empty),
+  '@/components/ui/DropdownMenu.vue': moduleDefault(Passthrough),
+  '@/components/ui/DropdownMenuContent.vue': moduleDefault(Passthrough),
+  '@/components/ui/DropdownMenuItem.vue': moduleDefault(Passthrough),
+  '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Passthrough),
   '@/lib/distributedMockData': { exampleBuckets: () => [] },
   '@/lib/distributedMock': { mockEnabled: () => false, defaultPlacement: () => ({}), placementLabel: () => '' },
   '@/composables/useBucketSearch': {
@@ -184,11 +187,10 @@ const RealSearchSidebar = compileClientComponent(new URL('./BucketSidebar.vue', 
   '@/composables/useBucketSearch': RealSearch,
 })
 
-// The database view: the toggle can be switched and the database rows offer their own openers.
+// The database view: the database rows offer their own openers.
 const openDatabase = vi.fn()
 const DatabaseSidebar = compileClientComponent(new URL('./BucketSidebar.vue', import.meta.url), {
   ...sidebarModules,
-  '@/components/ui/OptionToggle.vue': moduleDefault(defineComponent({ inheritAttrs: false, setup: (_, { attrs }) => () => h('div', { ...attrs, role: 'radiogroup' }) })),
   '@/components/data/manager/DatabaseRows.vue': moduleDefault(defineComponent({
     props: { highlighted: Number },
     setup: (props, { expose }) => {
@@ -260,6 +262,11 @@ function withBucket(nodeId: string | null = null) {
   const state = manager()
   state.sidebarBuckets = ref([{ bucket: 'reef-survey', nodeId, pinned: false }]) as never
   return state
+}
+
+// Picks a choice of the bucket filter menu.
+async function filter(root: Parameters<typeof content>[0], label: string) {
+  await click(element(root, (node) => node.props.role === 'menuitemradio' && content(node).trim() === label))
 }
 
 function trash(root: Parameters<typeof content>[0]) {
@@ -816,8 +823,7 @@ describe('Bucket sidebar search keys', () => {
     openDatabase.mockReset()
     const state = withBucket()
     const { root } = await mountApp(DatabaseSidebar, { props: { manager: state } })
-    ;(element(root, (node) => node.props.role === 'radiogroup').props['onUpdate:modelValue'] as (value: string) => void)('database')
-    await flush()
+    await filter(root, 'Only databases')
     const field = element(root, (node) => node.props['aria-label'] === 'Find a bucket')
 
     await key(field, 'ArrowDown')
@@ -900,6 +906,61 @@ describe('database buckets in the list', () => {
     expect(marks(one.root, 'row-subtitle')).toEqual(['reef-survey: Reef survey'])
     databaseRows.value = []
     allBuckets.hits.value = []
+  })
+
+  it('filters by kind from a menu beside the search, with no kind switch', async () => {
+    const { root } = await mountApp(DatabaseSidebar, { props: { manager: withBucket() } })
+    const trigger = () => element(root, (node) => node.tag === 'button' && String(node.props['aria-label']).startsWith('Filter buckets'))
+    const checked = () => nodes(root).filter((node) => node.props['aria-checked'] === true).map((node) => content(node).trim())
+
+    expect(nodes(root).some((node) => node.props.role === 'radiogroup')).toBe(false)
+    expect(nodes(root).filter((node) => node.props.role === 'menuitemradio').map((node) => content(node).trim()))
+      .toEqual(['All buckets', 'Only databases', 'Hide databases'])
+    expect(checked()).toEqual(['All buckets'])
+    expect(trigger().props).toMatchObject({ 'aria-label': 'Filter buckets', variant: 'outline' })
+    expect(content(root)).toContain('reef-survey')
+
+    await filter(root, 'Only databases')
+    expect(checked()).toEqual(['Only databases'])
+    expect(trigger().props).toMatchObject({ 'aria-label': 'Filter buckets: Only databases', variant: 'default' })
+    expect(content(root)).toContain('spire database')
+    expect(content(root)).not.toContain('reef-survey')
+
+    await filter(root, 'All buckets')
+    expect(trigger().props).toMatchObject({ 'aria-label': 'Filter buckets', variant: 'outline' })
+    expect(content(root)).not.toContain('spire database')
+  })
+
+  it('hides database buckets in both lists and keeps the rest', async () => {
+    nodeChoice.value = null
+    allBuckets.needsName.value = false
+    databaseRows.value = [
+      { bucket: 'bakta-database', places: [{ bucket: 'bakta-database', nodeId: 'node-2' }], title: 'Bakta database (light)', metadata: { database: true, identifiers: [] } },
+      { bucket: 'reef-survey', places: [{ bucket: 'reef-survey', nodeId: 'home' }], title: null, metadata: { database: true, title: 'Reef survey', identifiers: [] } },
+    ]
+    allBuckets.hits.value = [
+      { bucket: 'bakta-database', node_id: 'node-2', group_id: 'g1' },
+      { bucket: 'laptop', node_id: 'node-2', group_id: 'g1' },
+    ]
+    const opened = (root: Parameters<typeof content>[0]) =>
+      nodes(root).filter((node) => String(node.props['aria-label']).startsWith('Open ')).map((node) => content(node))
+    const all = await mountApp(BucketSidebar, { props: { manager: manager() } })
+    await flush()
+    expect(opened(all.root)).toEqual(['bakta-database', 'laptop'])
+
+    await filter(all.root, 'Hide databases')
+    expect(opened(all.root)).toEqual(['laptop'])
+    expect(element(all.root, (node) => node.props['aria-label'] === 'Filter buckets: Hide databases').props.variant).toBe('default')
+
+    const state = withBucket()
+    state.sidebarBuckets.value = [{ bucket: 'reef-survey', nodeId: null, pinned: false }, { bucket: 'plain', nodeId: null, pinned: false }] as never
+    const one = await mountApp(BucketSidebar, { props: { manager: state } })
+    await pickNode()
+    await filter(one.root, 'Hide databases')
+    expect(opened(one.root)).toEqual(['plain'])
+    databaseRows.value = []
+    allBuckets.hits.value = []
+    nodeChoice.value = null
   })
 
   it('keeps pins of a device and pins not matching the searched name out of the list', async () => {

@@ -4,7 +4,10 @@ import Button from '@/components/ui/Button.vue'
 import IconButton from '@/components/ui/IconButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
-import OptionToggle from '@/components/ui/OptionToggle.vue'
+import DropdownMenu from '@/components/ui/DropdownMenu.vue'
+import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
+import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
+import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
 import { useBucketJobs } from '@/composables/useBucketJobs'
@@ -27,7 +30,7 @@ import { folderName } from '@/lib/deviceApi'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
 import { isFolderBucket, isHiddenBucket } from '@/lib/workspaces'
 import type { BucketShortcut } from '@/composables/useBucketShortcuts'
-import { Boxes, ChevronLeft, ChevronRight, FolderPlus, FolderSync, History, KeyRound, Plus, Trash2 } from '@lucide/vue'
+import { Boxes, Check, ChevronLeft, ChevronRight, FolderPlus, FolderSync, History, KeyRound, ListFilter, Plus, Trash2 } from '@lucide/vue'
 import { computed, ref, useId, watch } from 'vue'
 
 const props = defineProps<{ manager: DataManager }>()
@@ -85,13 +88,19 @@ watch(() => all.loading.value, (busy) => busy || listings.value++)
 // Where the next bucket is stored: this node unless changed.
 const storageOpen = ref(false)
 const resultsOpen = ref(false)
-// A database is a bucket with a linked dataset, so this is only a filter.
-const bucketKind = ref('buckets')
-const KINDS = [
-  { value: 'buckets', label: 'Buckets' },
-  { value: 'database', label: 'Databases' },
+// A database is a bucket with a linked dataset, so this is only a filter. Only databases lists the
+// realm's databases, so those of other readable groups show too.
+type KindFilter = 'all' | 'databases' | 'hide'
+const KINDS: { value: KindFilter; label: string }[] = [
+  { value: 'all', label: 'All buckets' },
+  { value: 'databases', label: 'Only databases' },
+  { value: 'hide', label: 'Hide databases' },
 ]
-const databaseMode = computed(() => bucketKind.value === 'database')
+const kindFilter = ref<KindFilter>('all')
+const filterLabel = computed(() =>
+  kindFilter.value === 'all' ? 'Filter buckets' : `Filter buckets: ${KINDS.find((kind) => kind.value === kindFilter.value)?.label}`)
+const databaseMode = computed(() => kindFilter.value === 'databases')
+const hideDatabases = computed(() => kindFilter.value === 'hide')
 // The example rows show even when the group has no bucket of its own.
 const examples = computed(() => (mockEnabled() ? exampleBuckets(bucketNameFilter.value) : []))
 const placement = ref(defaultPlacement())
@@ -123,12 +132,14 @@ const jobs = useBucketJobs(selectedGroupId, computed(() => [buckets.value, listi
 const jobOf = (name: string, nodeId: string | null) => jobs.value.get(nodeId && !realmNodes.isLocalNode(nodeId) ? `${nodeId}/${name}` : name)
 const nodeBuckets = computed(() => {
   const term = bucketNameFilter.value.trim().toLowerCase()
-  return term ? sidebarBuckets.value.filter((entry) => entry.bucket.toLowerCase().includes(term)) : sidebarBuckets.value
+  return sidebarBuckets.value.filter((entry) =>
+    (!term || entry.bucket.toLowerCase().includes(term)) && !(hideDatabases.value && databaseOf(entry.bucket, entry.nodeId ?? null)))
 })
 // Matches in other groups for the same query, below this group's list.
 const search = useBucketSearch(bucketNameFilter)
 const otherHits = computed(() =>
-  search.hits.value.filter((hit) => hit.group_id !== selectedGroupId.value && !isHiddenBucket(hit.bucket) && realmNodes.isTarget(hit.node_id)),
+  search.hits.value.filter((hit) => hit.group_id !== selectedGroupId.value && !isHiddenBucket(hit.bucket) && realmNodes.isTarget(hit.node_id)
+    && !(hideDatabases.value && databaseOf(hit.bucket, hit.node_id))),
 )
 // Hover text of a row; a row without a node is on this node.
 function rowNode(nodeId: string | null): string {
@@ -193,7 +204,8 @@ const allRows = computed<AllRow[]>(() => {
   const pins = shortcuts.pinned.value.filter(shownPin).flatMap((entry) => take(entry, true))
   const recents = shortcuts.recent.value.filter((entry) => (entry.groupId ?? '') === selectedGroupId.value).flatMap((entry) => take(entry, false))
   const rest = hits.filter((hit) => !used.has(hit)).map((hit) => ({ key: `${hit.node_id}/${hit.bucket}`, bucket: hit.bucket, nodeId: shortcutNode(hit), hit, pinned: false }))
-  return [...pins, ...recents, ...rest]
+  const rows = [...pins, ...recents, ...rest]
+  return hideDatabases.value ? rows.filter((row) => !databaseOf(row.bucket, row.hit?.node_id ?? row.nodeId)) : rows
 })
 // Pages of 25 rows, the pins on top of the first; the next page is read from the nodes when
 // needed. The nodes name no total, so no page count is shown.
@@ -201,7 +213,7 @@ const BUCKETS_PER_PAGE = 25
 const page = ref(1)
 // Each list starts its own count, so a Next still reading for a replaced list does nothing.
 let pageRun = 0
-watch([selectedGroupId, bucketNameFilter, bucketNodeChoice], () => {
+watch([selectedGroupId, bucketNameFilter, bucketNodeChoice, kindFilter], () => {
   pageRun++
   page.value = 1
 })
@@ -315,10 +327,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           <Badge variant="outline" size="count">{{ searchList ? all.hits.value.length : nodeBuckets.length }}</Badge>
         </div>
       </header>
-      <div class="border-b border-border px-3 py-2">
-        <OptionToggle v-model="bucketKind" :options="KINDS" aria-label="Kind of bucket" />
-      </div>
-      <div class="border-b border-border px-3 py-2">
+      <div class="flex items-center gap-2 border-b border-border px-3 py-2">
         <Input
           v-model="bucketNameFilter"
           placeholder="Find a bucket"
@@ -327,9 +336,31 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           aria-autocomplete="list"
           :aria-controls="`${listId}-group ${listId}-other`"
           :aria-expanded="openers.length > 0"
-          class="h-8 text-xs"
+          class="h-8 min-w-0 flex-1 text-xs"
           @keydown="onKeydown"
         />
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <Button :variant="kindFilter === 'all' ? 'outline' : 'default'" size="icon" class="h-8 w-8 shrink-0" :title="filterLabel" :aria-label="filterLabel">
+              <ListFilter class="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              v-for="kind in KINDS"
+              :key="kind.value"
+              role="menuitemradio"
+              :aria-checked="kindFilter === kind.value"
+              class="pl-8"
+              @click="kindFilter = kind.value"
+            >
+              <span class="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                <Check v-if="kindFilter === kind.value" class="h-3.5 w-3.5" />
+              </span>
+              {{ kind.label }}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <ul v-if="databaseMode" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
         <DatabaseRows ref="databaseRows" :filter="bucketNameFilter" :active="bucket" :highlighted="activeIndex" @open="openBucketOn" />
