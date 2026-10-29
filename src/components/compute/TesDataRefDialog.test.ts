@@ -10,6 +10,9 @@ const s3State = { endpoint: ref<string | null>('https://s3.test'), hasActiveKey:
 const V1 = '01K8W1B3D5F7H9KMQ1S3V5X7Z1'
 const V2 = '01K8W1B3D5F7H9KMQ1S3V5X7Z2'
 const listBucketObjects = vi.fn(async () => ({ bucket: 'far-db', objects: [{ key: 'db/6.0/y.tsv', version_id: V2 }], prefixes: [] }))
+const currentUser = ref<{ id: string } | null>(null)
+const myGroups = ref<Array<{ id: string; name: string }>>([])
+const searchBuckets = vi.fn(async (_q: string, _options: unknown) => ({ hits: [] as unknown[], nodes_queried: 0, nodes_failed: 0, failed_nodes: [] }))
 
 const component = compileClientComponent(new URL('./TesDataRefDialog.vue', import.meta.url), {
   vue: VueRuntime,
@@ -48,11 +51,36 @@ const component = compileClientComponent(new URL('./TesDataRefDialog.vue', impor
     ]),
   })),
   '@/composables/useS3': { useS3: () => s3State },
-  '@/composables/useAruna': { useAruna: () => ({ currentUser: ref(null), myGroups: ref([]), nodeInfo: ref({ node: { realm_id: 'realm' } }), listBucketObjects }) },
+  '@/composables/useAruna': { useAruna: () => ({ currentUser, myGroups, nodeInfo: ref({ node: { realm_id: 'realm' } }), listBucketObjects, searchBuckets }) },
+  '@/composables/useBucketCount': {
+    listBuckets: async (search: typeof searchBuckets) => ({ hits: (await search('', {})).hits, complete: true }),
+  },
+  '@/components/ui/NodeLabel.vue': moduleDefault(defineComponent({ props: { nodeId: String }, setup: (props) => () => h('span', `node ${props.nodeId}`) })),
   '@/composables/useGroupSelection': { activeGroupId: ref('') },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'n1' }) },
   '@/lib/utils': { errorMessage: (cause: unknown) => String(cause) },
   '@/lib/tes': Tes,
+})
+
+describe('TES input picker my buckets', () => {
+  it('lists my groups\' buckets on other nodes and browses one there', async () => {
+    currentUser.value = { id: 'u1' }
+    myGroups.value = [{ id: 'g1', name: 'demo' }]
+    const hit = (bucket: string, node: string, group: string) => ({ arn: '', bucket, node_id: node, group_id: group, created_at: '' })
+    searchBuckets.mockResolvedValue({ hits: [hit('here', 'n1', 'g1'), hit('far', 'n2', 'g1'), hit('foreign', 'n2', 'g9')], nodes_queried: 2, nodes_failed: 0, failed_nodes: [] })
+    const { root } = await mountApp(component, { props: { open: true, mode: 'input' } })
+    await flush()
+
+    const text = content(root)
+    expect(text).toContain('On other nodes')
+    expect(text).toContain('far')
+    expect(text).not.toContain('foreign')
+    expect(text).not.toMatch(/here\s+demo/)
+    await click(button(root, 'far'))
+    expect(content(root)).toContain('pick far n2')
+    currentUser.value = null
+    myGroups.value = []
+  })
 })
 
 describe('TES input picker databases', () => {

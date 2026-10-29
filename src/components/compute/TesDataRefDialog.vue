@@ -18,6 +18,8 @@ import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue
 import DatabasesTab from '@/components/data/add/DatabasesTab.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import RemoteObjectPicker, { type RemotePick } from '@/components/compute/RemoteObjectPicker.vue'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
+import { listBuckets } from '@/composables/useBucketCount'
 import { useS3, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { useAruna } from '@/composables/useAruna'
 import { activeGroupId } from '@/composables/useGroupSelection'
@@ -52,7 +54,7 @@ const emit = defineEmits<{
 }>()
 
 const s3 = useS3()
-const { currentUser, myGroups, listBucketObjects, nodeInfo } = useAruna()
+const { currentUser, myGroups, listBucketObjects, nodeInfo, searchBuckets } = useAruna()
 const { isLocalNode } = useRealmNodes()
 const credentialDialogOpen = ref(false)
 
@@ -73,6 +75,22 @@ function chooseDatabase(bucket: string, nodeId: string) {
 }
 
 const chooseBucket = (hit: BucketSearchHit) => chooseDatabase(hit.bucket, hit.node_id)
+
+// The own groups' buckets that no copy on this node serves; this node's are browsed above them.
+const remoteOwn = ref<BucketSearchHit[] | null>(null)
+let remoteRun = 0
+async function loadRemoteOwn() {
+  const run = ++remoteRun
+  remoteOwn.value = null
+  const groups = new Set(myGroups.value.map((group) => group.id))
+  const listing = await listBuckets(searchBuckets, undefined, () => run === remoteRun).catch(() => null)
+  if (run !== remoteRun) return
+  const hits = (listing?.hits ?? []).filter((hit) => groups.has(hit.group_id))
+  const local = new Set(hits.filter((hit) => isLocalNode(hit.node_id)).map((hit) => hit.bucket))
+  const seen = new Set<string>()
+  remoteOwn.value = hits.filter((hit) => !local.has(hit.bucket) && !seen.has(hit.bucket) && Boolean(seen.add(hit.bucket)))
+}
+const groupName = (id: string) => myGroups.value.find((group) => group.id === id)?.name ?? id
 
 function showSource(next: Source) {
   source.value = next
@@ -199,6 +217,7 @@ watch(
     mountDir.value = props.mountDefault
     pendingSelection.value = null
     showSource('buckets')
+    if (currentUser.value) void loadRemoteOwn()
     // The browser needs a session; without one the picker only offers credentials.
     if (!currentUser.value) return
     const gid = activeGroupId.value || myGroups.value[0]?.id
@@ -238,7 +257,14 @@ watch(
       </div>
       <OptionToggle :model-value="source" :options="SOURCES" aria-label="Inputs from" @update:model-value="(value: string) => showSource(value as Source)" />
       <!-- Only the own buckets are browsed through an S3 session; the others use the REST listing. -->
-      <template v-if="source === 'buckets'">
+      <template v-if="database">
+        <div class="flex items-center gap-2 text-xs">
+          <span class="min-w-0 flex-1 truncate font-mono text-foreground">{{ database.bucket }}</span>
+          <Button variant="ghost" size="sm" @click="showSource(source)">Choose another bucket</Button>
+        </div>
+        <RemoteObjectPicker :bucket="database.bucket" :node-id="database.nodeId" :busy="folderBusy" @add="addRemote" />
+      </template>
+      <template v-else-if="source === 'buckets'">
         <Notice v-if="!s3.endpoint.value" tone="warning" class="flex items-start gap-2">
           <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>This node does not advertise an S3 endpoint, so its data cannot be browsed or referenced here.</span>
@@ -251,13 +277,22 @@ watch(
           <p v-else class="flex items-center gap-2"><LogIn class="h-3.5 w-3.5" /> Sign in first to create credentials.</p>
         </div>
         <ObjectBrowserPanel v-else selectable @add="addSelection" @selection-change="pendingSelection = $event" />
-      </template>
-      <template v-else-if="database">
-        <div class="flex items-center gap-2 text-xs">
-          <span class="min-w-0 flex-1 truncate font-mono text-foreground">{{ database.bucket }}</span>
-          <Button variant="ghost" size="sm" @click="showSource(source)">Choose another bucket</Button>
+        <div v-if="remoteOwn === null || remoteOwn.length" class="space-y-1">
+          <p class="text-[11px] font-medium text-foreground">On other nodes</p>
+          <p v-if="remoteOwn === null" class="text-[11px] text-muted-foreground">Listing your buckets on the other nodes…</p>
+          <button
+            v-for="hit in remoteOwn ?? []"
+            :key="hit.bucket"
+            type="button"
+            class="flex w-full items-center gap-2 rounded-md border border-border px-3 py-1.5 text-left text-xs hover:bg-muted/40"
+            @click="chooseBucket(hit)"
+          >
+            <Database class="h-3.5 w-3.5 shrink-0 text-primary" />
+            <span class="min-w-0 flex-1 truncate font-mono text-foreground">{{ hit.bucket }}</span>
+            <span class="shrink-0 text-muted-foreground">{{ groupName(hit.group_id) }}</span>
+            <NodeLabel :node-id="hit.node_id" size="sm" class="shrink-0" />
+          </button>
         </div>
-        <RemoteObjectPicker :bucket="database.bucket" :node-id="database.nodeId" :busy="folderBusy" @add="addRemote" />
       </template>
       <DatabasesTab v-else-if="source === 'databases'" bucket="" @choose="chooseDatabase" />
       <BucketSearchBox v-else mode="picker" placeholder="Find a bucket you may read…" @select="chooseBucket" />
