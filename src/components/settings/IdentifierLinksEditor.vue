@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The identifier rules of one bucket. Try uses the server's regex engine, so what the editor shows
-// is what file details will show. Save hands the rules to the bucket metadata, which stores them.
+// is what file details will show. The rules go into the bucket metadata form and are stored with its Save.
 import { computed, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
@@ -118,7 +118,7 @@ function save(clear = false) {
 
     <Notice v-if="failure" tone="error">{{ failure }}</Notice>
     <div class="flex items-center gap-2">
-      <Button :disabled="busy || problems.length > 0" @click="save()">Save</Button>
+      <Button :disabled="busy || problems.length > 0" @click="save()">Use these rules</Button>
       <Button variant="ghost" @click="emit('close')">Cancel</Button>
       <Button v-if="parser" variant="ghost" class="ml-auto text-destructive hover:text-destructive" :disabled="busy" @click="save(true)">
         Remove all links

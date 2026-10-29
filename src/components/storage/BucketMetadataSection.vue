@@ -28,11 +28,15 @@ const state = ref<'loading' | 'ready' | 'failed'>('loading')
 const failure = ref<string | null>(null)
 const draft = ref({ database: false, title: '', license: '', page: '' })
 const editingRules = ref(false)
+// Rules picked in the editor wait for the one Save; undefined keeps the stored ones.
+const draftParser = ref<IdentifierParser | null | undefined>(undefined)
 const busy = ref(false)
+const savedNow = ref(false)
 let runs = 0
 
 function fill(metadata: BucketMetadata | null) {
   stored.value = metadata
+  draftParser.value = undefined
   const value = metadata ?? EMPTY
   draft.value = { database: value.database, title: value.title ?? '', license: value.license ?? '', page: pageText(value.identifiers) }
 }
@@ -68,14 +72,17 @@ const changed = computed(() => {
     || draft.value.title.trim() !== (value.title ?? '')
     || draft.value.license.trim() !== (value.license ?? '')
     || draft.value.page.trim() !== pageText(value.identifiers)
+    || draftParser.value !== undefined
 })
-const ruleCount = computed(() => current.value.parser?.rules.length ?? 0)
+const ruleParser = computed(() => (draftParser.value === undefined ? current.value.parser ?? null : draftParser.value))
+const ruleCount = computed(() => ruleParser.value?.rules.length ?? 0)
 
 // Fields the form does not show (description, version, dataset, other identifiers) stay as stored.
 async function store(next: BucketMetadata) {
   const run = ++runs
   const listed = current.value.database
   busy.value = true
+  savedNow.value = false
   failure.value = null
   try {
     const saved = await putBucketMetadata(props.bucket, next, props.nodeId)
@@ -83,6 +90,7 @@ async function store(next: BucketMetadata) {
     fill(saved)
     editingRules.value = false
     if (listed || saved?.database) void databases.reload()
+    savedNow.value = true
   } catch (cause) {
     if (run === runs) failure.value = apiErrorMessage(cause)
   } finally {
@@ -98,10 +106,14 @@ function save() {
     title: draft.value.title.trim() || null,
     license: draft.value.license.trim() || null,
     identifiers: withPage(value.identifiers, draft.value.page),
+    parser: ruleParser.value,
   })
 }
 
-const saveRules = (parser: IdentifierParser | null) => void store({ ...current.value, parser })
+function keepRules(parser: IdentifierParser | null) {
+  draftParser.value = parser
+  editingRules.value = false
+}
 </script>
 
 <template>
@@ -138,20 +150,22 @@ const saveRules = (parser: IdentifierParser | null) => void store({ ...current.v
             <Input id="bucket-page" v-model="draft.page" class="font-mono text-xs" placeholder="10.5281/zenodo.4247252" />
             <span class="text-muted-foreground">Identifier rules</span>
             <span>
-              {{ ruleCount }} {{ ruleCount === 1 ? 'rule' : 'rules' }} ·
-              <button type="button" class="text-primary hover:underline" @click="editingRules = !editingRules">Edit</button>
+              {{ ruleCount }} {{ ruleCount === 1 ? 'rule' : 'rules' }}
+              <button type="button" class="ml-2 text-primary hover:underline" @click="editingRules = !editingRules">Edit</button>
             </span>
           </div>
           <IdentifierLinksEditor
             v-if="editingRules"
-            :parser="current.parser ?? null"
+            :parser="ruleParser"
             :busy="busy"
-            @save="saveRules"
+            @save="keepRules"
             @close="editingRules = false"
           />
           <div class="flex items-center gap-2">
             <Button size="sm" :disabled="busy || !changed" @click="save">Save</Button>
             <Spinner v-if="busy" />
+            <span v-else-if="savedNow && !changed" role="status" class="text-[11px] text-muted-foreground">Saved.</span>
+            <span v-else-if="draftParser !== undefined" class="text-[11px] text-muted-foreground">Press Save to keep the rules.</span>
           </div>
         </template>
         <Notice v-if="failure" tone="error">{{ failure }}</Notice>

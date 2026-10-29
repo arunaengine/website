@@ -66,10 +66,10 @@ describe('identifier links editor', () => {
   it('names a broken rule and saves only a valid parser', async () => {
     const { root, saved } = await render({ rules: [{ ...Links.PRESETS[1], pattern: '(GC[AF]_\\d+)' }] })
     expect(content(root)).toContain('Rule 1: the pattern needs a part named id')
-    expect(button(root, 'Save').props.disabled).toBe(true)
+    expect(button(root, 'Use these rules').props.disabled).toBe(true)
 
     await typeValue(field(root, 'Pattern'), Links.PRESETS[1].pattern)
-    await click(button(root, 'Save'))
+    await click(button(root, 'Use these rules'))
     expect(saved).toHaveBeenCalledWith({ rules: [Links.PRESETS[1]] })
   })
 
