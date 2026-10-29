@@ -9,38 +9,50 @@ import {
   FileAudio,
   FileVideo,
   FileCode2,
-  Table,
   Binary,
+  Dna,
   File,
 } from '@lucide/vue'
-import { computed } from 'vue'
+import { computed, type Component } from 'vue'
 
+// A neutral icon by the file's kind; only folders take the site's blue. The kind is the tooltip.
 const props = defineProps<{ name: string; folder?: boolean; class?: string }>()
 
-const pick = computed(() => {
-  if (props.folder) return { icon: Folder, color: 'text-aruna-royal' }
-  const ext = props.name.split('.').pop()?.toLowerCase() ?? ''
-  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'tiff', 'bmp'].includes(ext))
-    return { icon: FileImage, color: 'text-rose-500' }
-  if (['mp4', 'mkv', 'webm', 'mov', 'avi'].includes(ext))
-    return { icon: FileVideo, color: 'text-purple-500' }
-  if (['mp3', 'wav', 'flac', 'ogg'].includes(ext))
-    return { icon: FileAudio, color: 'text-emerald-500' }
-  if (ext === 'pdf') return { icon: FileText, color: 'text-rose-600' }
-  if (['json', 'jsonld'].includes(ext)) return { icon: FileJson, color: 'text-amber-600' }
-  if (ext === 'parquet') return { icon: Table, color: 'text-aruna-sky' }
-  if (['csv', 'tsv', 'xlsx'].includes(ext))
-    return { icon: FileSpreadsheet, color: 'text-emerald-600' }
-  if (['py', 'r', 'js', 'ts', 'sh', 'rs', 'ipynb', 'fasta', 'fa'].includes(ext))
-    return { icon: FileCode2, color: 'text-indigo-500' }
-  if (['nc', 'h5', 'hdf5', 'bin'].includes(ext)) return { icon: Binary, color: 'text-aruna-indigo' }
-  if (['zip', 'tar', 'gz', 'zst', 'xz', '7z'].includes(ext))
-    return { icon: FileArchive, color: 'text-muted-foreground' }
-  if (['txt', 'md', 'log'].includes(ext)) return { icon: FileText, color: 'text-muted-foreground' }
-  return { icon: File, color: 'text-muted-foreground' }
+const KINDS: [string[], Component, string][] = [
+  [['fa', 'fasta', 'fna'], Dna, 'genome sequence'],
+  [['faa'], Dna, 'protein sequences'],
+  [['ffn', 'frn'], Dna, 'gene sequences'],
+  [['fq', 'fastq'], Dna, 'sequencing reads'],
+  [['sam', 'bam', 'cram', 'paf'], Dna, 'alignment'],
+  [['embl', 'gb', 'gbk', 'gbff'], FileText, 'EMBL or GenBank annotation'],
+  [['gff', 'gff3', 'gtf', 'bed'], FileText, 'GFF3 annotation'],
+  [['csv', 'tsv', 'xlsx', 'parquet', 'vcf'], FileSpreadsheet, 'table'],
+  [['json', 'jsonld'], FileJson, 'JSON'],
+  [['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'tiff', 'bmp'], FileImage, 'image'],
+  [['mp4', 'mkv', 'webm', 'mov', 'avi'], FileVideo, 'video'],
+  [['mp3', 'wav', 'flac', 'ogg'], FileAudio, 'audio'],
+  [['py', 'r', 'js', 'ts', 'sh', 'rs', 'ipynb'], FileCode2, 'code'],
+  [['nc', 'h5', 'hdf5', 'bin'], Binary, 'binary data'],
+  [['zip', 'tar', 'gz', 'zst', 'xz', '7z', 'bz2'], FileArchive, 'archive'],
+  [['pdf', 'txt', 'md', 'log'], FileText, 'text'],
+]
+const COMPRESSED = ['gz', 'zst', 'xz', 'bz2']
+const kindOf = (ext: string) => KINDS.find(([exts]) => exts.includes(ext))
+
+const pick = computed<{ icon: Component; kind: string; color: string }>(() => {
+  if (props.folder) return { icon: Folder, kind: 'folder', color: 'text-primary' }
+  const parts = props.name.toLowerCase().split('.').slice(1)
+  const ext = parts.at(-1) ?? ''
+  // A compressed sequence or table keeps the icon of what it holds.
+  const inner = COMPRESSED.includes(ext) && parts.length > 1 ? kindOf(parts.at(-2)!) : undefined
+  if (inner && inner[1] !== FileArchive) return { icon: inner[1], kind: `compressed ${inner[2]}`, color: 'text-muted-foreground' }
+  const found = kindOf(ext)
+  return { icon: found?.[1] ?? File, kind: found?.[2] ?? 'file', color: 'text-muted-foreground' }
 })
 </script>
 
 <template>
-  <component :is="pick.icon" :class="[pick.color, $props.class]" />
+  <span class="inline-flex shrink-0" :title="pick.kind">
+    <component :is="pick.icon" :class="[pick.color, $props.class]" aria-hidden="true" />
+  </span>
 </template>
