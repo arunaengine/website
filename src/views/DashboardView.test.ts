@@ -68,7 +68,7 @@ const runningRuns = ref({ count: 0, atLeast: false })
 const runsState = ref('ready')
 const loadRuns = vi.fn(async () => undefined)
 // The caller's group counts, which split datasets from runs; the group cards read the same state.
-const groupsAggregate = ref<{ datasets: number | null; processRuns: number | null }>({ datasets: null, processRuns: null })
+const groupsAggregate = ref<{ datasets: number | null; processRuns: number | null; pending?: boolean }>({ datasets: null, processRuns: null })
 const groupsUsageStub = { useMyGroupsUsage: () => ({ aggregate: groupsAggregate }) }
 const recentRunsStub = { useRecentRuns: () => ({ runs: recentRunList, running: runningRuns, state: runsState, load: loadRuns }) }
 const setScope = vi.fn(async () => undefined)
@@ -478,6 +478,12 @@ describe('authenticated dashboard scope', () => {
     // The realm's 9 records are 4 runs and no dataset, counted as the group card counts them.
     expect(text).toContain('Work 4 runs 0 running, 0 datasets')
     expect(text).not.toContain('9 datasets')
+
+    // While a group still loads, the cell waits instead of showing a partial sum.
+    groupsAggregate.value = { datasets: 0, processRuns: 1, pending: true }
+    const waiting = await renderedText()
+    expect(waiting).not.toContain('Work')
+    expect(waiting).not.toContain('1 run')
     expect(text).toContain('group quota cards')
     expect(text).not.toContain('my stats cards')
   })

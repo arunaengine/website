@@ -331,7 +331,9 @@ const pageDescription = computed(() =>
                 {{ realmDataLine }}
               </OverviewCell>
             </template>
-            <OverviewCell v-if="currentUser" label="Work">
+            <!-- Totals wait for every group, so a partial sum never reads as the count. -->
+            <div v-if="currentUser && groupsUsage.pending" class="bg-card px-5 py-4"><Skeleton class="h-16" /></div>
+            <OverviewCell v-else-if="currentUser" label="Work">
               <template v-if="groupsUsage.processRuns != null" #value>
                 <RouterLink :to="{ name: 'compute' }" class="hover:underline"><b>{{ formatCount(groupsUsage.processRuns) }}</b></RouterLink>
                 {{ plural(groupsUsage.processRuns, 'run', 'runs') }}
