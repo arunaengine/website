@@ -91,7 +91,7 @@ export async function listBucketObjects(
   nodeId?: string | null,
   signal?: AbortSignal,
 ): Promise<ObjectListResponse> {
-  return requestObjects(bucket, query, await nodeClientReady(nodeId), signal)
+  return requestObjects(bucket, query, await nodeClientReady(nodeId, undefined, signal), signal)
 }
 
 /** What deleting a whole bucket removes; a bucket stored on more nodes also lists the datasets that link it. */
@@ -101,12 +101,12 @@ export function getSetDeletion(bucket: string): Promise<StorageDeletionPreflight
 
 /** Datasets that link a file, a folder or the root of a bucket on one node, this one unless named. */
 export async function getBucketLinks(bucket: string, query: BucketLinksQuery, signal?: AbortSignal, nodeId?: string | null): Promise<DataLinksResponse> {
-  return requestLinks(bucket, query, await nodeClientReady(nodeId), signal)
+  return requestLinks(bucket, query, await nodeClientReady(nodeId, undefined, signal), signal)
 }
 
 /** Where one file version of a bucket on one node came from, this one unless named. */
 export async function getFileOrigin(bucket: string, query: { key: string; version_id?: string }, signal?: AbortSignal, nodeId?: string | null): Promise<OriginResponse> {
-  return requestOrigin(bucket, query, nodeId ? await nodeClientReady(nodeId) : refreshContext().client, signal)
+  return requestOrigin(bucket, query, nodeId ? await nodeClientReady(nodeId, undefined, signal) : refreshContext().client, signal)
 }
 
 /** The origin of an exact version id, read on the node that holds it. */
@@ -134,7 +134,7 @@ export function getFilePartOf(bucket: string, key: string, signal?: AbortSignal)
 
 /** The incoming syncs and storage folders of a bucket on one node, this one unless named. */
 export async function getBucketSources(bucket: string, signal?: AbortSignal, nodeId?: string | null): Promise<FileSourcesResponse> {
-  return requestSources(bucket, await nodeClientReady(nodeId), signal)
+  return requestSources(bucket, await nodeClientReady(nodeId, undefined, signal), signal)
 }
 
 /** The bucket and folder a linked part covers. */
@@ -149,7 +149,7 @@ export function getDataLinks(id: string, query: { parts_only?: boolean; after?: 
 
 /** The set a bucket on this node belongs to; 404 means an ordinary bucket. */
 export async function getBucketDistribution(bucket: string, signal?: AbortSignal, nodeId?: string | null): Promise<DistributedResponse> {
-  return requestDistribution(bucket, await nodeClientReady(nodeId), signal)
+  return requestDistribution(bucket, await nodeClientReady(nodeId, undefined, signal), signal)
 }
 
 /** Group ADMIN: creates one bucket on several nodes with this node as publisher. */

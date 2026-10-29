@@ -69,5 +69,18 @@ describe('requests to another node on a fresh load', () => {
     scope.stop()
     expect(await outcome(scoped)).toBe('AbortError')
   })
+
+  it('end a bucket read waiting for its node when the caller aborts it', async () => {
+    const { listBucketObjects } = await import('./storage')
+    state.authToken.value = 't'
+    state.sessionEpoch.value = 12
+    state.realmInfo.value = { realm_id: 'r', nodes: [] } as never
+    const controller = new AbortController()
+    const listing = listBucketObjects('reef', { prefix: 'runs/' }, 'node-2', controller.signal)
+    controller.abort()
+
+    const outcome = await Promise.race([listing.then(() => 'resolved', (error: Error) => error.name), settle().then(() => 'pending')])
+    expect(outcome).toBe('AbortError')
+  })
 })
 

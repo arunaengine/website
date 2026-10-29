@@ -25,14 +25,14 @@ async function change<T>(work: () => Promise<T>): Promise<T> {
 }
 
 export async function getBucketMetadata(bucket: string, nodeId?: string | null, signal?: AbortSignal): Promise<BucketMetadata | null> {
-  return requestMetadata(bucket, await nodeClientReady(nodeId), signal)
+  return requestMetadata(bucket, await nodeClientReady(nodeId, undefined, signal), signal)
 }
 
 export const putBucketMetadata = (bucket: string, metadata: BucketMetadata | null, nodeId?: string | null): Promise<BucketMetadata | null> =>
   change(async () => requestPutMetadata(bucket, metadata, await nodeClientReady(nodeId)))
 
 export async function listReleases(bucket: string, nodeId?: string | null, signal?: AbortSignal): Promise<ReleaseListResponse> {
-  return requestReleases(bucket, await nodeClientReady(nodeId), signal)
+  return requestReleases(bucket, await nodeClientReady(nodeId, undefined, signal), signal)
 }
 
 export const publishRelease = (bucket: string, body: PublishReleaseRequest, nodeId?: string | null): Promise<PublishReleaseResponse> =>
