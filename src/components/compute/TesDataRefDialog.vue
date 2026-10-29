@@ -54,7 +54,7 @@ const emit = defineEmits<{
 }>()
 
 const s3 = useS3()
-const { currentUser, myGroups, listBucketObjects, nodeInfo, searchBuckets } = useAruna()
+const { currentUser, myGroups, listBucketObjects, nodeInfo, searchBuckets, sessionEpoch } = useAruna()
 const { isLocalNode } = useRealmNodes()
 const credentialDialogOpen = ref(false)
 
@@ -81,15 +81,22 @@ const remoteOwn = ref<BucketSearchHit[] | null>(null)
 let remoteRun = 0
 async function loadRemoteOwn() {
   const run = ++remoteRun
+  const epoch = sessionEpoch.value
+  const current = () => run === remoteRun && epoch === sessionEpoch.value
   remoteOwn.value = null
   const groups = new Set(myGroups.value.map((group) => group.id))
-  const listing = await listBuckets(searchBuckets, undefined, () => run === remoteRun).catch(() => null)
-  if (run !== remoteRun) return
+  const listing = await listBuckets(searchBuckets, undefined, current).catch(() => null)
+  if (!current()) return
   const hits = (listing?.hits ?? []).filter((hit) => groups.has(hit.group_id))
   const local = new Set(hits.filter((hit) => isLocalNode(hit.node_id)).map((hit) => hit.bucket))
   const seen = new Set<string>()
   remoteOwn.value = hits.filter((hit) => !local.has(hit.bucket) && !seen.has(hit.bucket) && Boolean(seen.add(hit.bucket)))
 }
+watch(sessionEpoch, () => {
+  remoteRun++
+  remoteOwn.value = null
+  if (props.open && currentUser.value) void loadRemoteOwn()
+})
 const groupName = (id: string) => myGroups.value.find((group) => group.id === id)?.name ?? id
 
 function showSource(next: Source) {
@@ -277,7 +284,7 @@ watch(
           <p v-else class="flex items-center gap-2"><LogIn class="h-3.5 w-3.5" /> Sign in first to create credentials.</p>
         </div>
         <ObjectBrowserPanel v-else selectable @add="addSelection" @selection-change="pendingSelection = $event" />
-        <div v-if="remoteOwn === null || remoteOwn.length" class="space-y-1">
+        <div v-if="currentUser && (remoteOwn === null || remoteOwn.length)" class="space-y-1">
           <p class="text-[11px] font-medium text-foreground">On other nodes</p>
           <p v-if="remoteOwn === null" class="text-[11px] text-muted-foreground">Listing your buckets on the other nodes…</p>
           <button

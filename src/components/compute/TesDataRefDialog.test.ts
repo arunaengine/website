@@ -12,6 +12,7 @@ const V2 = '01K8W1B3D5F7H9KMQ1S3V5X7Z2'
 const listBucketObjects = vi.fn(async () => ({ bucket: 'far-db', objects: [{ key: 'db/6.0/y.tsv', version_id: V2 }], prefixes: [] }))
 const currentUser = ref<{ id: string } | null>(null)
 const myGroups = ref<Array<{ id: string; name: string }>>([])
+const sessionEpoch = ref(0)
 const searchBuckets = vi.fn(async (_q: string, _options: unknown) => ({ hits: [] as unknown[], nodes_queried: 0, nodes_failed: 0, failed_nodes: [] }))
 
 const component = compileClientComponent(new URL('./TesDataRefDialog.vue', import.meta.url), {
@@ -51,7 +52,7 @@ const component = compileClientComponent(new URL('./TesDataRefDialog.vue', impor
     ]),
   })),
   '@/composables/useS3': { useS3: () => s3State },
-  '@/composables/useAruna': { useAruna: () => ({ currentUser, myGroups, nodeInfo: ref({ node: { realm_id: 'realm' } }), listBucketObjects, searchBuckets }) },
+  '@/composables/useAruna': { useAruna: () => ({ currentUser, myGroups, nodeInfo: ref({ node: { realm_id: 'realm' } }), listBucketObjects, searchBuckets, sessionEpoch }) },
   '@/composables/useBucketCount': {
     listBuckets: async (search: typeof searchBuckets) => ({ hits: (await search('', {})).hits, complete: true }),
   },
@@ -78,6 +79,26 @@ describe('TES input picker my buckets', () => {
     expect(text).not.toMatch(/here\s+demo/)
     await click(button(root, 'far'))
     expect(content(root)).toContain('pick far n2')
+    currentUser.value = null
+    myGroups.value = []
+  })
+})
+
+describe('TES input picker sessions', () => {
+  it('drops a listing that answers after the account changed', async () => {
+    currentUser.value = { id: 'u1' }
+    myGroups.value = [{ id: 'g1', name: 'demo' }]
+    let answer!: (value: unknown) => void
+    searchBuckets.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve as never }))
+    const { root } = await mountApp(component, { props: { open: true, mode: 'input' } })
+    searchBuckets.mockResolvedValue({ hits: [], nodes_queried: 1, nodes_failed: 0, failed_nodes: [] })
+    myGroups.value = [{ id: 'g1', name: 'other' }]
+    sessionEpoch.value++
+    await flush()
+    answer({ hits: [{ arn: '', bucket: 'private-a', node_id: 'n2', group_id: 'g1', created_at: '' }], nodes_queried: 1, nodes_failed: 0, failed_nodes: [] })
+    await flush()
+
+    expect(content(root)).not.toContain('private-a')
     currentUser.value = null
     myGroups.value = []
   })
