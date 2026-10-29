@@ -40,7 +40,6 @@ const component = compileClientComponent(new URL('./BucketMetadataSection.vue', 
   '@/composables/useDatabases': { useDatabases: () => ({ reload: vi.fn() }) },
   '@/lib/api': { apiErrorMessage: (cause: unknown) => (cause as Error).message },
   '@/lib/databases': Databases,
-  '@lucide/vue': { Tags: Slotted('span') },
 })
 
 describe('bucket metadata', () => {
@@ -50,7 +49,7 @@ describe('bucket metadata', () => {
     const { root } = await mountApp(component, { props: { bucket: 'reads', nodeId: null, canAdmin: true } })
 
     await typeValue(element(root, (node) => node.tag === 'input' && node.props.id === 'bucket-title'), 'New title')
-    await click(button(root, 'Edit'))
+    await click(button(root, 'Add a link rule'))
     await click(button(root, 'Use these rules'))
     await flush()
 
@@ -64,5 +63,23 @@ describe('bucket metadata', () => {
     expect(aruna.putBucketMetadata).toHaveBeenCalledOnce()
     expect(aruna.putBucketMetadata.mock.calls[0][1]).toMatchObject({ title: 'New title', parser: RULES })
     expect(content(root)).toContain('Saved.')
+  })
+
+  it('stores the version and puts unsaved edits back with Discard', async () => {
+    aruna.getBucketMetadata.mockResolvedValue({ ...stored, version: '5.1' })
+    aruna.putBucketMetadata.mockReset()
+    aruna.putBucketMetadata.mockImplementation(async (_bucket: string, next: unknown) => next)
+    const { root } = await mountApp(component, { props: { bucket: 'reads', nodeId: null, canAdmin: true } })
+    const field = (id: string) => element(root, (node) => node.tag === 'input' && node.props.id === id)
+
+    expect(field('bucket-version').props.value).toBe('5.1')
+    await typeValue(field('bucket-title'), 'Draft title')
+    await click(button(root, 'Discard'))
+    expect(field('bucket-title').props.value).toBe('Old title')
+
+    await typeValue(field('bucket-version'), '6.0')
+    await click(button(root, 'Save'))
+    await flush()
+    expect(aruna.putBucketMetadata.mock.calls[0][1]).toMatchObject({ title: 'Old title', version: '6.0' })
   })
 })

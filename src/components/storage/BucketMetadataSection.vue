@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// What describes a bucket: title, license, DOI and identifier rules. "Show as database" lists it
-// with the databases. Read from the node that holds the bucket; group admins may change it.
+// What describes a bucket: title, version, license, DOI and identifier rules, saved together.
+// "Show as database" lists it with the databases. Group admins of the bucket may change it.
 import { computed, ref, watch } from 'vue'
 import IdentifierLinksEditor from '@/components/settings/IdentifierLinksEditor.vue'
 import BucketReleases from '@/components/storage/BucketReleases.vue'
@@ -14,7 +14,6 @@ import { useAruna } from '@/composables/useAruna'
 import { useDatabases } from '@/composables/useDatabases'
 import { apiErrorMessage, type BucketMetadata, type IdentifierParser } from '@/lib/api'
 import { pageText, withPage } from '@/lib/databases'
-import { Tags } from '@lucide/vue'
 
 const props = defineProps<{ bucket: string; nodeId: string | null; canAdmin: boolean }>()
 
@@ -26,7 +25,7 @@ const EMPTY: BucketMetadata = { database: false, identifiers: [] }
 const stored = ref<BucketMetadata | null>(null)
 const state = ref<'loading' | 'ready' | 'failed'>('loading')
 const failure = ref<string | null>(null)
-const draft = ref({ database: false, title: '', license: '', page: '' })
+const draft = ref({ database: false, title: '', version: '', license: '', page: '' })
 const editingRules = ref(false)
 // Rules picked in the editor wait for the one Save; undefined keeps the stored ones.
 const draftParser = ref<IdentifierParser | null | undefined>(undefined)
@@ -38,7 +37,7 @@ function fill(metadata: BucketMetadata | null) {
   stored.value = metadata
   draftParser.value = undefined
   const value = metadata ?? EMPTY
-  draft.value = { database: value.database, title: value.title ?? '', license: value.license ?? '', page: pageText(value.identifiers) }
+  draft.value = { database: value.database, title: value.title ?? '', version: value.version ?? '', license: value.license ?? '', page: pageText(value.identifiers) }
 }
 
 async function load() {
@@ -70,6 +69,7 @@ const changed = computed(() => {
   const value = current.value
   return draft.value.database !== value.database
     || draft.value.title.trim() !== (value.title ?? '')
+    || draft.value.version.trim() !== (value.version ?? '')
     || draft.value.license.trim() !== (value.license ?? '')
     || draft.value.page.trim() !== pageText(value.identifiers)
     || draftParser.value !== undefined
@@ -77,7 +77,7 @@ const changed = computed(() => {
 const ruleParser = computed(() => (draftParser.value === undefined ? current.value.parser ?? null : draftParser.value))
 const ruleCount = computed(() => ruleParser.value?.rules.length ?? 0)
 
-// Fields the form does not show (description, version, dataset, other identifiers) stay as stored.
+// Fields the form does not show (description, dataset, other identifiers) stay as stored.
 async function store(next: BucketMetadata) {
   const run = ++runs
   const listed = current.value.database
@@ -104,10 +104,16 @@ function save() {
     ...value,
     database: draft.value.database,
     title: draft.value.title.trim() || null,
+    version: draft.value.version.trim() || null,
     license: draft.value.license.trim() || null,
     identifiers: withPage(value.identifiers, draft.value.page),
     parser: ruleParser.value,
   })
+}
+
+function discard() {
+  fill(stored.value)
+  editingRules.value = false
 }
 
 function keepRules(parser: IdentifierParser | null) {
@@ -117,66 +123,65 @@ function keepRules(parser: IdentifierParser | null) {
 </script>
 
 <template>
-  <section class="surface">
-    <header class="flex flex-wrap items-center gap-2 border-b border-border px-5 py-4">
-      <Tags class="size-4 text-primary" />
-      <h2 class="font-display text-sm font-semibold text-aruna-navy">Bucket metadata</h2>
-      <Badge v-if="current.database" variant="secondary">Shown as database</Badge>
-    </header>
-    <div class="space-y-4 px-5 py-4 text-sm">
-      <Spinner v-if="state === 'loading'" show-label label="Reading the metadata…" />
-      <Notice v-else-if="state === 'failed'" tone="error">The metadata could not be read: {{ failure }}</Notice>
-      <template v-else>
-        <dl v-if="!canAdmin" class="grid grid-cols-[8rem_1fr] gap-x-4 gap-y-2">
-          <dt class="text-muted-foreground">Title</dt><dd>{{ current.title || 'None' }}</dd>
-          <dt class="text-muted-foreground">License</dt><dd>{{ current.license || 'None' }}</dd>
-          <dt class="text-muted-foreground">DOI or link</dt><dd class="font-mono text-xs">{{ pageText(current.identifiers) || 'None' }}</dd>
-          <dt class="text-muted-foreground">Identifier rules</dt><dd>{{ ruleCount }} {{ ruleCount === 1 ? 'rule' : 'rules' }}</dd>
-        </dl>
-        <template v-else>
-          <label class="flex items-center gap-3">
-            <Switch v-model:checked="draft.database" aria-label="Show as database" />
-            <span>
-              <span class="font-medium text-foreground">Show as database</span>
-              <span class="block text-xs text-muted-foreground">Lists the bucket with the databases, so runs and datasets can use it.</span>
-            </span>
-          </label>
-          <div class="grid gap-3 sm:grid-cols-[8rem_1fr] sm:items-center">
-            <label for="bucket-title" class="text-muted-foreground">Title</label>
-            <Input id="bucket-title" v-model="draft.title" />
-            <label for="bucket-license" class="text-muted-foreground">License</label>
-            <Input id="bucket-license" v-model="draft.license" placeholder="CC-BY-4.0 or a link" />
-            <label for="bucket-page" class="text-muted-foreground">DOI or link</label>
-            <Input id="bucket-page" v-model="draft.page" class="font-mono text-xs" placeholder="10.5281/zenodo.4247252" />
-            <span class="text-muted-foreground">Identifier rules</span>
-            <span>
-              {{ ruleCount }} {{ ruleCount === 1 ? 'rule' : 'rules' }}
-              <button type="button" class="ml-2 text-primary hover:underline" @click="editingRules = !editingRules">Edit</button>
-            </span>
-          </div>
-          <IdentifierLinksEditor
-            v-if="editingRules"
-            :parser="ruleParser"
-            :busy="busy"
-            @save="keepRules"
-            @close="editingRules = false"
-          />
-          <div class="flex items-center gap-2">
-            <Button size="sm" :disabled="busy || !changed" @click="save">Save</Button>
-            <Spinner v-if="busy" />
-            <span v-else-if="savedNow && !changed" role="status" class="text-[11px] text-muted-foreground">Saved.</span>
-            <span v-else-if="draftParser !== undefined" class="text-[11px] text-muted-foreground">Press Save to keep the rules.</span>
-          </div>
-        </template>
-        <Notice v-if="failure" tone="error">{{ failure }}</Notice>
-        <BucketReleases
-          v-if="current.database"
-          :bucket="bucket"
-          :node-id="nodeId"
-          :can-publish="canAdmin"
-          :page="pageText(current.identifiers)"
-        />
-      </template>
+  <section class="surface space-y-4 p-5">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="font-display text-sm font-semibold text-aruna-navy">Description</h2>
+      <label v-if="canAdmin && state === 'ready'" class="flex items-center gap-2 text-sm">
+        <Switch v-model:checked="draft.database" aria-label="Show as database" />
+        Show as database
+      </label>
+      <Badge v-else-if="current.database" variant="secondary">Shown as database</Badge>
     </div>
+    <Spinner v-if="state === 'loading'" show-label label="Reading the description…" />
+    <Notice v-else-if="state === 'failed'" tone="error">The description could not be read: {{ failure }}</Notice>
+    <template v-else>
+      <dl v-if="!canAdmin" class="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[7rem_1fr_7rem_1fr]">
+        <dt class="text-muted-foreground">Title</dt><dd>{{ current.title || 'None' }}</dd>
+        <dt class="text-muted-foreground">Version</dt><dd>{{ current.version || 'None' }}</dd>
+        <dt class="text-muted-foreground">License</dt><dd>{{ current.license || 'None' }}</dd>
+        <dt class="text-muted-foreground">DOI or link</dt><dd class="font-mono text-xs">{{ pageText(current.identifiers) || 'None' }}</dd>
+      </dl>
+      <div v-else class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[7rem_1fr_7rem_1fr] sm:items-center">
+        <label for="bucket-title" class="text-muted-foreground">Title</label>
+        <Input id="bucket-title" v-model="draft.title" />
+        <label for="bucket-version" class="text-muted-foreground">Version</label>
+        <Input id="bucket-version" v-model="draft.version" placeholder="6.0" />
+        <label for="bucket-license" class="text-muted-foreground">License</label>
+        <Input id="bucket-license" v-model="draft.license" placeholder="CC-BY-4.0 or a link" />
+        <label for="bucket-page" class="text-muted-foreground">DOI or link</label>
+        <Input id="bucket-page" v-model="draft.page" class="font-mono text-xs" placeholder="10.5281/zenodo.4247252" />
+      </div>
+      <div class="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-sm">
+        <span>
+          <span class="text-muted-foreground">Identifier links</span>
+          <span class="ml-4">{{ ruleCount ? `${ruleCount} ${ruleCount === 1 ? 'rule' : 'rules'}` : 'None yet' }}</span>
+        </span>
+        <button v-if="canAdmin && !editingRules" type="button" class="text-primary hover:underline" @click="editingRules = true">
+          {{ ruleCount ? 'Edit link rules' : 'Add a link rule' }}
+        </button>
+      </div>
+      <IdentifierLinksEditor
+        v-if="canAdmin && editingRules"
+        :parser="ruleParser"
+        :busy="busy"
+        @save="keepRules"
+        @close="editingRules = false"
+      />
+      <div v-if="canAdmin" class="flex items-center justify-end gap-2">
+        <Spinner v-if="busy" />
+        <span v-else-if="savedNow && !changed" role="status" class="text-[11px] text-muted-foreground">Saved.</span>
+        <span v-else-if="draftParser !== undefined" class="text-[11px] text-muted-foreground">Press Save to keep the rules.</span>
+        <Button variant="ghost" size="sm" :disabled="busy || !changed" @click="discard">Discard</Button>
+        <Button size="sm" :disabled="busy || !changed" @click="save">Save</Button>
+      </div>
+    </template>
+    <Notice v-if="failure && state !== 'failed'" tone="error">{{ failure }}</Notice>
   </section>
+  <BucketReleases
+    v-if="state === 'ready' && current.database"
+    :bucket="bucket"
+    :node-id="nodeId"
+    :can-publish="canAdmin"
+    :page="pageText(current.identifiers)"
+  />
 </template>
