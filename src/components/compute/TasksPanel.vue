@@ -184,6 +184,8 @@ function onDeleted() {
 const listState = ref<'idle' | 'loading' | 'ready' | 'error' | 'unsupported' | 'signed-out'>('idle')
 const listError = ref<string | null>(null)
 const nextPageToken = ref<string | undefined>(undefined)
+// The last run of the local pages; runs merged in from other nodes do not page here.
+const localLastCreated = ref<string | undefined>(undefined)
 const pagesLoaded = ref(0)
 const refreshing = ref(false)
 const lastPollError = ref<string | null>(null)
@@ -257,6 +259,7 @@ function clearNoUser() {
   initRequestId++
   tasks.value = []
   nextPageToken.value = undefined
+  localLastCreated.value = undefined
   pagesLoaded.value = 0
   otherNodes.value = { failed: [], truncated: [] }
   listError.value = null
@@ -295,6 +298,7 @@ async function fetchList({ more = false, silent = false } = {}) {
       tasks.value = [...tasks.value, ...res.tasks]
     }
     nextPageToken.value = res.next_page_token
+    localLastCreated.value = res.tasks.at(-1)?.creation_time ?? (more ? localLastCreated.value : undefined)
     pagesLoaded.value = more ? pagesLoaded.value + 1 : 1
     listState.value = 'ready'
     lastPollError.value = null
@@ -327,8 +331,8 @@ const spinning = computed(() => reloadBusy.value || refreshing.value)
 const listEmpty = computed(() => !shownTasks.value.length)
 // Pages run newest first, so a page reaching past the window ends the list.
 const moreListed = computed(() => {
-  const last = tasks.value[tasks.value.length - 1]
-  return Boolean(nextPageToken.value) && (!last || runListed({ creation_time: last.creation_time }, now.value))
+  const last = localLastCreated.value
+  return Boolean(nextPageToken.value) && (!last || runListed({ creation_time: last }, now.value))
 })
 const olderHidden = computed(() => olderCount.value > 0 || (Boolean(nextPageToken.value) && !moreListed.value))
 const shellState = computed<'loading' | 'error' | 'empty' | 'ready'>(() => {

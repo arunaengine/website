@@ -11,7 +11,14 @@ const realmNodes = ref<Array<{ name: string; isLocal: boolean; apiBase: string |
 
 const Plain = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
 const Empty = defineComponent(() => () => null)
-const ShellStub = defineComponent((_, { slots }) => () => h('div', [slots.filters?.(), slots.tools?.(), slots.default?.()]))
+// Like ListShell: the empty state shows only its title and actions, no tools.
+const ShellStub = defineComponent({
+  props: { state: String, emptyTitle: String },
+  setup: (props, { slots }) => () =>
+    props.state === 'empty'
+      ? h('div', [props.emptyTitle, slots['empty-actions']?.()])
+      : h('div', [slots.filters?.(), slots.tools?.(), slots.default?.(), slots.footer?.()]),
+})
 const FilterChips = compileClientComponent(new URL('../ui/FilterChips.vue', import.meta.url), { vue: VueRuntime })
 
 const TasksPanel = compileClientComponent(new URL('./TasksPanel.vue', import.meta.url), {
@@ -152,3 +159,20 @@ describe('runs on other nodes', () => {
     mounted.app.unmount()
   })
 })
+
+describe('local paging next to other nodes', () => {
+  it('keeps Load more for the local continuation when an old remote run sorts last', async () => {
+    desktopMode.value = false
+    realmNodes.value = [{ name: 'node-2', isLocal: false, apiBase: 'https://n2.test/api/v1' }]
+    const oldRun = { id: 'J9', name: 'old-far-run', state: 'COMPLETE', creation_time: new Date(Date.now() - 10 * 86_400_000).toISOString(), tags: { [Tes.TES_JOB_ID_TAG]: 'J9' } }
+    listTasks.mockReset().mockImplementation(async (_params: unknown, baseUrl?: string) =>
+      baseUrl ? { tasks: [oldRun] } : { tasks: [localRun], next_page_token: 'p2' })
+    const mounted = await mountApp(TasksPanel)
+    await flush()
+
+    expect(content(mounted.root)).toContain('Load more')
+    realmNodes.value = []
+    mounted.app.unmount()
+  })
+})
+
