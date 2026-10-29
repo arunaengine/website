@@ -54,7 +54,7 @@ const emit = defineEmits<{
   (e: 'sync', hit: BucketSearchHit): void
 }>()
 
-const { displayName, isLocalNode, localNodeId } = useRealmNodes()
+const { displayName, isLocalNode, isTarget, localNodeId } = useRealmNodes()
 
 // Same (node, bucket) key the Data manager builds its overview map with.
 function hitSynced(hit: BucketSearchHit): boolean {
@@ -83,6 +83,8 @@ const partial = computed(() => nodesFailed.value > 0)
 const visibleHits = computed<ListedBucket[]>(() =>
   (props.filterNodeId ? raw.value.map((hit) => ({ ...hit, nodes: [hit.node_id] })) : hits.value).filter((hit) => {
     if (isHiddenBucket(hit.bucket)) return false
+    // A device's buckets are its owner's, not a place to pick from.
+    if (!isTarget(hit.node_id)) return false
     if (props.filterNodeId && hit.node_id !== props.filterNodeId) return false
     if (props.excludeLocalBucket === hit.bucket && isLocalNode(hit.node_id)) return false
     return true

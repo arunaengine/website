@@ -55,7 +55,7 @@ const emit = defineEmits<{
 
 const s3 = useS3()
 const { currentUser, myGroups, listBucketObjects, nodeInfo, searchBuckets, sessionEpoch } = useAruna()
-const { isLocalNode } = useRealmNodes()
+const { isLocalNode, isTarget } = useRealmNodes()
 const credentialDialogOpen = ref(false)
 
 // Inputs come from a bucket of this group on this node, a database, or any other bucket the user
@@ -89,7 +89,7 @@ async function loadRemoteOwn() {
   const listing = await listBuckets(searchBuckets, undefined, current).catch(() => null)
   if (!current()) return
   remoteState.value = !listing ? 'failed' : listing.complete ? 'complete' : 'partial'
-  const hits = (listing?.hits ?? []).filter((hit) => groups.has(hit.group_id))
+  const hits = (listing?.hits ?? []).filter((hit) => groups.has(hit.group_id) && isTarget(hit.node_id))
   // One row per distributed bucket (none when this node holds a member), one per other bucket.
   const identity = (hit: BucketSearchHit) => hit.set_id ?? `${hit.node_id}/${hit.bucket}`
   const seen = new Set(hits.filter((hit) => hit.set_id && isLocalNode(hit.node_id)).map(identity))

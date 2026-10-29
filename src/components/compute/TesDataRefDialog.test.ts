@@ -61,7 +61,7 @@ const component = compileClientComponent(new URL('./TesDataRefDialog.vue', impor
   },
   '@/components/ui/NodeLabel.vue': moduleDefault(defineComponent({ props: { nodeId: String }, setup: (props) => () => h('span', `node ${props.nodeId}`) })),
   '@/composables/useGroupSelection': { activeGroupId: ref('') },
-  '@/composables/useRealmNodes': { useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'n1' }) },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'n1', isTarget: (id: string) => id !== 'device-1' }) },
   '@/lib/utils': { errorMessage: (cause: unknown) => String(cause) },
   '@/lib/tes': Tes,
 })
@@ -71,7 +71,7 @@ describe('TES input picker my buckets', () => {
     currentUser.value = { id: 'u1' }
     myGroups.value = [{ id: 'g1', name: 'demo' }]
     const hit = (bucket: string, node: string, group: string) => ({ arn: '', bucket, node_id: node, group_id: group, created_at: '' })
-    searchBuckets.mockResolvedValue({ hits: [hit('here', 'n1', 'g1'), hit('far', 'n2', 'g1'), hit('foreign', 'n2', 'g9')], nodes_queried: 2, nodes_failed: 0, failed_nodes: [] })
+    searchBuckets.mockResolvedValue({ hits: [hit('here', 'n1', 'g1'), hit('far', 'n2', 'g1'), hit('foreign', 'n2', 'g9'), hit('laptop-notes', 'device-1', 'g1')], nodes_queried: 2, nodes_failed: 0, failed_nodes: [] })
     const { root } = await mountApp(component, { props: { open: true, mode: 'input' } })
     await flush()
 
@@ -79,6 +79,7 @@ describe('TES input picker my buckets', () => {
     expect(text).toContain('On other nodes')
     expect(text).toContain('far')
     expect(text).not.toContain('foreign')
+    expect(text).not.toContain('laptop-notes')
     expect(text).not.toMatch(/here\s*demo/)
     await click(button(root, 'far'))
     expect(content(root)).toContain('pick far n2')
