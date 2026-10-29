@@ -139,24 +139,31 @@ export function nodeClient(nodeId?: string | null) {
   return { baseUrl, token: authToken.value }
 }
 
-/** `nodeClient` once the realm can name the node; a fresh load reads it first without a token. */
-export async function nodeClientReady(nodeId?: string | null) {
+/**
+ * `nodeClient` once the realm can name the node; a fresh load reads it first without a token.
+ * Fails with an AbortError when the session that asked ends while it waits.
+ */
+export async function nodeClientReady(nodeId?: string | null, epoch = sessionEpoch.value) {
+  const ended = () => epoch !== sessionEpoch.value
   const settled = () =>
     !nodeId || nodeId === nodeInfo.value?.node.peer_id || !authToken.value
     || realmReadEpoch.value === sessionEpoch.value
     || (realmInfo.value?.nodes ?? []).some((node) => node.node_id === nodeId)
-  if (!settled()) {
+  if (!settled() && !ended()) {
     await new Promise<void>((resolve) => {
-      const stop = watch(settled, (done) => done && (stop(), resolve()))
+      const stop = watch(() => settled() || ended(), (done) => done && (stop(), resolve()))
     })
   }
+  assertCurrentSession(epoch)
   return nodeClient(nodeId)
 }
 
 /** One request of this session, to the connected node unless another is named. */
 export async function request<T>(path: string, options = {}, nodeId?: string | null) {
   const context = refreshContext()
-  const response = await apiRequest<T>(path, options, nodeId ? await nodeClientReady(nodeId) : context.client)
+  const client = nodeId ? await nodeClientReady(nodeId, context.epoch) : context.client
+  assertCurrentSession(context.epoch)
+  const response = await apiRequest<T>(path, options, client)
   assertCurrentSession(context.epoch)
   return response
 }

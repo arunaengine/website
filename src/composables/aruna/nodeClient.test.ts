@@ -32,4 +32,22 @@ describe('requests to another node on a fresh load', () => {
     state.realmReadEpoch.value = 8
     await expect(answer).rejects.toThrow('The node publishes no API address.')
   })
+
+  it('drop a waiting write when the session changes, never sending it with the new token', async () => {
+    state.authToken.value = 'token-a'
+    state.sessionEpoch.value = 9
+    state.realmInfo.value = { realm_id: 'r', nodes: [] } as never
+    vi.mocked(apiRequest).mockClear()
+    const write = state.request('/data/buckets/reef/metadata', { method: 'PUT', body: '{"title":"draft of a"}' }, 'node-2')
+    const waiting = state.nodeClientReady('node-2')
+    await settle()
+
+    state.authToken.value = 'token-b'
+    state.sessionEpoch.value = 10
+    state.realmInfo.value = { realm_id: 'r', nodes: [node2] } as never
+    state.realmReadEpoch.value = 10
+    await expect(write).rejects.toMatchObject({ name: 'AbortError' })
+    await expect(waiting).rejects.toMatchObject({ name: 'AbortError' })
+    expect(apiRequest).not.toHaveBeenCalled()
+  })
 })
