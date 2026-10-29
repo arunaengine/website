@@ -572,7 +572,7 @@ describe('run page', () => {
 
     // The runtime prefills the executor and brings the script section with it.
     expect(content(mounted.root)).toContain('Python runtime')
-    expect(content(mounted.root)).toContain('ghcr.io/astral-sh/uv:python3.13-bookworm-slim')
+    expect((input(mounted.root, 'placeholder', 'ubuntu:22.04') as unknown as { value: string }).value).toBe('ghcr.io/astral-sh/uv:python3.13-bookworm-slim')
     expect(content(mounted.root)).toContain('script.py')
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()

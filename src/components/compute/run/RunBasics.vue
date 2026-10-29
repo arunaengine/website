@@ -10,7 +10,6 @@ import { injectCustomRun } from '@/composables/useCustomRun'
 const { name, description, groupId, groupOptions, hasAi, clearAi } = injectCustomRun()
 
 const complete = computed(() => groupId.value.length > 0)
-const groupName = computed(() => groupOptions.value.find((g) => g.value === groupId.value)?.label ?? '')
 </script>
 
 <template>
@@ -21,8 +20,7 @@ const groupName = computed(() => groupOptions.value.find((g) => g.value === grou
     :check-label="complete ? 'Complete' : 'Needs a group'"
   >
     <template #state>
-      <template v-if="complete">{{ name.trim() || 'unnamed' }} · {{ groupName }}</template>
-      <template v-else>Needs a group.</template>
+      <template v-if="!complete">Needs a group.</template>
     </template>
 
     <div class="grid gap-4 sm:grid-cols-[2fr_1.3fr_2.2fr]">

@@ -49,9 +49,8 @@ const MODES = [
 
 const complete = computed(() => imageValid.value && commandValid.value)
 const stateText = computed(() => {
-  if (complete.value) {
-    return `${executorMode.value === 'runtime' ? `${runtime.value.label} runtime` : 'Custom image'} · ${image.value.trim()}`
-  }
+  // The mode switch and the image field already say what a complete executor runs.
+  if (complete.value) return ''
   if (!imageValid.value && !commandValid.value) return 'Needs an image and a command.'
   return imageValid.value ? 'Needs a command.' : 'Needs an image.'
 })

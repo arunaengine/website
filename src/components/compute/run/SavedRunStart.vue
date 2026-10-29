@@ -96,8 +96,6 @@ const resultsFolder = ref('')
     </div>
 
     <p v-for="note in savedStart?.notes ?? []" :key="note" class="text-xs text-muted-foreground">{{ note }}</p>
-    <p v-if="openInputs.length" class="text-xs text-muted-foreground">Choose the open inputs, then start.</p>
-    <p class="text-xs text-muted-foreground">Provenance is recorded automatically.</p>
     <TesDataRefDialog v-model:open="dialogOpen" mode="input" :destination="destination" @add="picked" />
   </section>
 </template>
