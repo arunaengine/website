@@ -11,8 +11,6 @@ import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
 import { useBucketJobs } from '@/composables/useBucketJobs'
-import BucketCreateResults from '@/components/data/BucketCreateResults.vue'
-import BucketStorageDialog from '@/components/data/BucketStorageDialog.vue'
 import DatabaseRows from '@/components/data/manager/DatabaseRows.vue'
 import MockBucketRows from '@/components/data/manager/MockBucketRows.vue'
 import { useBucketSearch } from '@/composables/useBucketSearch'
@@ -21,12 +19,12 @@ import { useDatabases } from '@/composables/useDatabases'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import type { DataManager } from '@/composables/useDataManager'
-import type { AdmissionResponse, BucketSearchHit } from '@/lib/api'
+import type { BucketSearchHit } from '@/lib/api'
 import type { ListedBucket } from '@/lib/distribution'
 import { isDesktop } from '@/lib/desktop'
 import { formatCount } from '@/lib/formatCount'
 import type { BindSource } from '@/lib/bindSource'
-import { defaultPlacement, mockEnabled, placementLabel } from '@/lib/distributedMock'
+import { mockEnabled } from '@/lib/distributedMock'
 import { exampleBuckets } from '@/lib/distributedMockData'
 import { folderName } from '@/lib/deviceApi'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
@@ -48,7 +46,6 @@ const realmNodes = useRealmNodes()
 const {
   bucket,
   remoteNodeId,
-  requiredNodeId,
   bucketNodeChoice,
   selectedGroupId,
   bucketNameFilter,
@@ -69,14 +66,6 @@ const {
   bucketsRefreshing,
   bucketsError,
   bucketsAuthError,
-  newBucketName,
-  newBucketProblem,
-  newBucketRefusal,
-  createBucketBlocker,
-  creatingBucket,
-  createBucket,
-  createBucketError,
-  bucketList,
   requestDelete,
   bindSourceFor,
   linkedFolderFor,
@@ -87,9 +76,6 @@ const {
 const listings = ref(0)
 watch(() => all.loading.value, (busy) => busy || listings.value++)
 
-// Where the next bucket is stored: this node unless changed.
-const storageOpen = ref(false)
-const resultsOpen = ref(false)
 // A database is a bucket with a linked dataset, so this is only a filter. Only databases lists the
 // realm's databases, so those of other readable groups show too.
 type KindFilter = 'all' | 'databases' | 'hide'
@@ -105,22 +91,6 @@ const databaseMode = computed(() => kindFilter.value === 'databases')
 const hideDatabases = computed(() => kindFilter.value === 'hide')
 // The example rows show even when the group has no bucket of its own.
 const examples = computed(() => (mockEnabled() ? exampleBuckets(bucketNameFilter.value) : []))
-const placement = ref(defaultPlacement())
-
-// Several nodes show the result of each node; one node creates as before.
-function create() {
-  if (!placement.value.several) return void createBucket()
-  if (newBucketName.value.trim() && !createBucketBlocker.value && selectedGroupId.value) resultsOpen.value = true
-}
-
-// The bucket opens here only when this node is one of its nodes.
-async function created(outcome: AdmissionResponse) {
-  const name = newBucketName.value.trim()
-  newBucketName.value = ''
-  placement.value = defaultPlacement()
-  await bucketList.refresh()
-  if (outcome.members.some((member) => realmNodes.isLocalNode(member.node_id)) && name) openBucket(name)
-}
 
 const allNodes = computed(() => bucketNodeChoice.value === null)
 // An older node cannot list without a name; the open node's list stands in.
@@ -318,7 +288,6 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 const otherPartial = computed(() => search.searched.value && search.nodesFailed.value > 0)
-const createNode = computed(() => realmNodes.displayName(requiredNodeId.value))
 
 function openHit(hit: BucketSearchHit) {
   openBucketOn(hit.bucket, realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id)
@@ -359,7 +328,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         <div class="flex items-center gap-2">
           <!-- Background revalidation only: the cached list stays readable behind it. -->
           <Spinner v-if="bucketsRefreshing" label="Refreshing buckets…" />
-          <Button v-if="desktop" size="sm" data-tour="bucket-create" @click="emit('new-bucket')"><FolderPlus class="h-4 w-4" /> New bucket</Button>
+          <Button size="sm" data-tour="bucket-create" @click="emit('new-bucket')"><FolderPlus class="h-4 w-4" /> New bucket</Button>
         </div>
       </header>
       <div class="flex items-center gap-2 px-3.5 pb-1">
@@ -604,37 +573,6 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           </li>
         </ul>
       </div>
-      <footer v-if="!desktop" class="space-y-2 border-t border-border p-3">
-        <div class="flex gap-2">
-          <Input
-            v-model="newBucketName"
-            data-tour="bucket-create"
-            placeholder="new-bucket-name"
-            class="h-8 font-mono text-xs"
-            :invalid="newBucketProblem ? 'error' : undefined"
-            aria-label="New bucket name"
-            @keyup.enter="create"
-          />
-          <Button variant="outline" size="sm" aria-label="Create bucket" :title="`Creates the bucket on ${placement.several ? `${placement.members.length} nodes` : createNode}`" :disabled="creatingBucket || !newBucketName.trim() || Boolean(createBucketBlocker)" @click="create">
-            <FolderPlus class="h-4 w-4" />
-          </Button>
-        </div>
-        <button type="button" class="block text-left text-xs text-muted-foreground hover:text-foreground" @click="storageOpen = true">
-          Stored on: {{ placementLabel(placement) }} <span class="underline">Change</span>
-        </button>
-        <p v-if="createBucketError" class="text-xs text-destructive">{{ createBucketError }}</p>
-        <p v-else-if="newBucketProblem" class="text-xs text-destructive">{{ newBucketProblem }}</p>
-        <p v-else-if="newBucketRefusal" class="text-xs text-muted-foreground">{{ newBucketRefusal }}</p>
-      </footer>
     </div>
-    <BucketStorageDialog v-model:open="storageOpen" v-model="placement" />
-    <BucketCreateResults
-      v-if="selectedGroupId"
-      v-model:open="resultsOpen"
-      :name="newBucketName.trim()"
-      :group-id="selectedGroupId"
-      :placement="placement"
-      @created="created"
-    />
   </aside>
 </template>

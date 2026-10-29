@@ -26,6 +26,7 @@ const children = [
   'data/DataViewSkeleton',
   'desktop/BindFolderDialog',
   'desktop/NewBucketDialog',
+  'data/CreateBucketDialog',
   'data/manager/BucketSidebar',
   'data/NodePicker',
   'data/DeleteDialog',

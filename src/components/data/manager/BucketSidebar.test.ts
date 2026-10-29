@@ -13,7 +13,7 @@ import {
   nodes,
   typeValue,
 } from '@/test/clientRender'
-import { BUCKET_NAME_REQUIREMENT, bucketNameProblem } from '@/lib/bucketName'
+import { bucketNameProblem } from '@/lib/bucketName'
 import * as Workspaces from '@/lib/workspaces'
 import * as BucketPlace from '@/lib/bucketPlace'
 import * as DeviceApi from '@/lib/deviceApi'
@@ -303,35 +303,15 @@ function field(root: Parameters<typeof content>[0]) {
   return element(root, (node) => node.props['aria-label'] === 'New bucket name')
 }
 
-function createButton(root: Parameters<typeof content>[0]) {
-  return element(root, (node) => node.tag === 'button' && node.props['aria-label'] === 'Create bucket')
-}
 
-describe('Bucket sidebar naming', () => {
-  it('shows no hint before anything is typed', async () => {
-    const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
-    expect(content(root)).not.toContain(BUCKET_NAME_REQUIREMENT)
-  })
+describe('Bucket sidebar new bucket', () => {
+  it('asks for the New bucket dialog from the header instead of a name field', async () => {
+    const onNewBucket = vi.fn()
+    const { root } = await mountApp(BucketSidebar, { props: { manager: manager(), onNewBucket } })
 
-  it('names the broken rule and disables creation for b1', async () => {
-    const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
-
-    await typeValue(field(root), 'b1')
-
-    expect(content(root)).toContain('Bucket names must contain at least 3 characters.')
-    expect(field(root).props.invalid).toBe('error')
-    expect(createButton(root).props.disabled).toBe(true)
-  })
-
-  it('accepts a name the node accepts', async () => {
-    const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
-
-    await typeValue(field(root), 'reef-survey-2026')
-
-    expect(content(root)).not.toContain(BUCKET_NAME_REQUIREMENT)
-    expect(content(root)).not.toContain('Bucket names')
-    expect(field(root).props.invalid).toBeUndefined()
-    expect(createButton(root).props.disabled).toBe(false)
+    expect(() => field(root)).toThrow()
+    await click(button(root, 'New bucket'))
+    expect(onNewBucket).toHaveBeenCalled()
   })
 })
 
@@ -716,7 +696,7 @@ describe('Bucket sidebar node choice', () => {
     allBuckets.hits.value = []
   })
 
-  it('lists one node after picking it and names it in the create button title', async () => {
+  it('lists one node after picking it', async () => {
     const state = withBucket()
     state.requiredNodeId.value = 'node-2'
     const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
@@ -728,7 +708,6 @@ describe('Bucket sidebar node choice', () => {
     // One node's rows leave its name to the header.
     expect(places(root)).toEqual([])
     expect(content(root)).not.toContain('results')
-    expect(createButton(root).props.title).toBe('Creates the bucket on name-node-2')
   })
 
   it('lists matches of other groups below the list and opens them', async () => {

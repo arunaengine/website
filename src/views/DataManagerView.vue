@@ -15,6 +15,7 @@ import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import DataViewSkeleton from '@/components/data/DataViewSkeleton.vue'
 import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
 import NewBucketDialog from '@/components/desktop/NewBucketDialog.vue'
+import CreateBucketDialog from '@/components/data/CreateBucketDialog.vue'
 import BucketSidebar from '@/components/data/manager/BucketSidebar.vue'
 import NodePicker from '@/components/data/NodePicker.vue'
 import DeleteDialog from '@/components/data/DeleteDialog.vue'
@@ -136,7 +137,7 @@ function openBindDialog(source: BindSource & { newBucket?: boolean }) {
   bindOpen.value = true
 }
 
-// New bucket in the desktop: it opens once made, or goes on to the link dialog.
+// New bucket: it opens once made; in the desktop it may go on to the link dialog.
 const newBucketOpen = ref(false)
 watch(newBucketOpen, (open) => {
   contextHold.value = open
@@ -467,6 +468,13 @@ async function createFolder() {
       :group-id="selectedGroupId"
       @created="onBucketCreated"
       @link="(target: BindSource) => openBindDialog({ ...target, newBucket: true })"
+    />
+    <CreateBucketDialog
+      v-else
+      v-model:open="newBucketOpen"
+      :group-id="selectedGroupId"
+      :node-id="requiredNodeId"
+      @created="onBucketCreated"
     />
 
     <PublicAccessDialog
