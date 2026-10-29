@@ -41,7 +41,7 @@ const HomeCards = defineAsyncComponent({
 const desktop = isDesktop()
 
 const router = useRouter()
-const { currentUser, metadata, myGroups, realm, nodeInfo, realmInfo, usageInfo, loading, bootstrapped, sessionEpoch, refresh, loadInfo, loadRealmView, listRecentMetadata } = useAruna()
+const { currentUser, metadata, myGroups, realm, nodeInfo, realmInfo, usageInfo, loading, bootstrapped, sessionEpoch, refresh, refreshedEpoch, loadInfo, loadRealmView, listRecentMetadata } = useAruna()
 const { authPending } = useAuth()
 const { dashboardRevision } = useNotifications()
 const { scope, setScope } = useDashboardScope()
@@ -58,6 +58,10 @@ const recentDocs = ref<MetadataDoc[] | null>(null)
 const recentSettled = ref(false)
 let recentGeneration = 0
 let refreshQueued = false
+// A round queued only by a session change, which the running round may have loaded already.
+let epochOnly = true
+// The first round loads what the cards load on their own, so it does not ask them again.
+let cardsShown = false
 // On the desktop the API base is the device node, which sees no live heartbeats and no
 // connections between realm nodes, so the nodes panel reads them from a realm node.
 const realmView = ref<RealmView | null>(null)
@@ -89,14 +93,22 @@ async function refreshDashboard() {
   }
   refreshing.value = true
   try {
+    let again = false
     do {
+      // A session the running round already loaded needs only its recent datasets again.
+      const loaded = again && epochOnly && refreshedEpoch() === sessionEpoch.value
       refreshQueued = false
-      await Promise.all([refresh(), loadRecent()])
+      epochOnly = true
+      again = true
+      await Promise.all([loaded ? undefined : refresh(), loadRecent()])
     } while (refreshQueued)
   } finally {
     refreshing.value = false
-    quotaRevision.value++
-    cardsRevision.value++
+    if (cardsShown) {
+      quotaRevision.value++
+      cardsRevision.value++
+    }
+    cardsShown = true
   }
 }
 
@@ -116,7 +128,8 @@ const painted = useFirstPaint(
 // Opening the dashboard reads again. The view is mounted fresh on every visit,
 // so a skip here left the node panel and the totals showing the last visit's
 // numbers until the 15s poll landed or someone pressed Refresh.
-function watchDashboard() {
+function watchDashboard(next: [number, number], previous?: [number, number]) {
+  if (refreshing.value) epochOnly &&= next[0] === previous?.[0]
   void refreshDashboard()
 }
 

@@ -32,6 +32,7 @@ const desktopMode = ref(false)
 const HomeCardsStub = defineComponent(() => () => h('div', 'desktop-home-cards'))
 const setScope = vi.fn(async () => undefined)
 const refresh = vi.fn(async () => undefined)
+let servedEpoch = -1
 const loadInfo = vi.fn(async () => undefined)
 const loadRealmView = vi.fn(async (): Promise<unknown> => null)
 const listRecentMetadata = vi.fn(async () => [])
@@ -187,6 +188,7 @@ beforeAll(async () => {
         bootstrapped,
         sessionEpoch,
         refresh,
+        refreshedEpoch: () => servedEpoch,
         loadInfo,
         loadRealmView,
         listRecentMetadata,
@@ -677,6 +679,31 @@ describe('dashboard refresh', () => {
   })
 
   afterEach(() => vi.unstubAllGlobals())
+
+  it('loads a session once when it changes during the first round and leaves the cards to themselves', async () => {
+    let finish!: () => void
+    refresh.mockImplementationOnce(() => new Promise<undefined>((resolve) => (finish = () => resolve(undefined))))
+    const mounted = await mountApp(DashboardClient)
+    sessionEpoch.value++
+    await flush()
+    servedEpoch = sessionEpoch.value
+    finish()
+    await flush()
+    const revision = (name: string) => Number(content(mounted.root).match(new RegExp(`${name} (\\d+)`))?.[1])
+
+    expect(refresh).toHaveBeenCalledOnce()
+    expect(listRecentMetadata).toHaveBeenCalledTimes(2)
+    expect([revision('group quota cards'), revision('my stats cards')]).toEqual([0, 0])
+    servedEpoch = -1
+
+    dashboardRevision.value++
+    await flush()
+    await flush()
+    expect(refresh).toHaveBeenCalledTimes(2)
+    expect(revision('group quota cards')).toBe(1)
+    mounted.app.unmount()
+    servedEpoch = -1
+  })
 
   it('keeps the recent datasets in place while a revision bump reads them again', async () => {
     listRecentMetadata.mockResolvedValueOnce([doc('d1', 'Coral survey')])

@@ -31,6 +31,9 @@ import {
 } from './state'
 
 let refreshInFlight: { epoch: number; promise: Promise<void> } | null = null
+// The last session a refresh loaded in full, so a caller can skip a round that would repeat it.
+let loadedEpoch = -1
+export const refreshedEpoch = () => loadedEpoch
 // The live token the desktop shell moved to `baseUrl`, with the realm info trusted while it was live.
 let carried: { token: string; realm: RealmInfoResponse; baseUrl: string } | null = null
 
@@ -76,6 +79,7 @@ async function refreshForContext(context: ReturnType<typeof refreshContext>): Pr
     if (context.epoch === sessionEpoch.value) {
       loading.value = false
       bootstrapped.value = true
+      loadedEpoch = context.epoch
     }
   }
 }

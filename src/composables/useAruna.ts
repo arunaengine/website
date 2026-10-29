@@ -75,7 +75,7 @@ import {
   searchUnified,
   runSparql,
 } from './aruna/search'
-import { refresh, setApiBaseUrl, setAuthToken } from './aruna/session'
+import { refresh, refreshedEpoch, setApiBaseUrl, setAuthToken } from './aruna/session'
 import {
   createStagingJob,
   getStagingJob,
@@ -229,6 +229,7 @@ export function useAruna() {
     profileValidationStatuses: readonly(profileValidationStatuses),
     profileValidationCapabilities: readonly(profileValidationCapabilities),
     refresh,
+    refreshedEpoch,
     loadAuthenticated,
     loadInfo,
     getNodeInfo,
