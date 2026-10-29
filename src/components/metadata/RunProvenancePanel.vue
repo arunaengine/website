@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import Badge from '@/components/ui/Badge.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import Notice from '@/components/ui/Notice.vue'
-import { stateVariant } from '@/lib/stateBadge'
 import { useAruna } from '@/composables/useAruna'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { useS3 } from '@/composables/useS3'
 import { featureEnabled } from '@/lib/config'
@@ -14,8 +13,8 @@ import { drsDownloadHref, drsObjectHref, isDrsReference } from '@/lib/tes'
 import { parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { isArunaUserId } from '@/lib/identifiers'
 import type { RunCrateFileRef, RunCrateModel } from '@/lib/runCrate'
-import { formatBytes, isHttpUrl, relativeTime, shortUserId, truncateMiddle } from '@/lib/utils'
-import { Cpu, Download, ExternalLink as ExternalLinkIcon, FileInput, FileOutput, HardDrive, Play, Terminal } from '@lucide/vue'
+import { formatBytes, isHttpUrl, shortUserId, truncateMiddle } from '@/lib/utils'
+import { Download, ExternalLink as ExternalLinkIcon } from '@lucide/vue'
 
 const props = defineProps<{ run: RunCrateModel }>()
 
@@ -24,13 +23,7 @@ const userDir = useUserDirectory()
 const s3 = useS3()
 const tesEnabled = computed(() => featureEnabled('tes'))
 const { shown } = usePortalFeatures()
-
-const status = computed(() => {
-  const s = props.run.actionStatus
-  if (s === 'CompletedActionStatus') return 'succeeded'
-  if (s === 'FailedActionStatus') return 'failed'
-  return s || null
-})
+const { displayName } = useRealmNodes()
 
 // The agent Person carries a `{ulid}@{realm}` identifier; resolve it to a
 // display name through the shared user directory, short id as the fallback.
@@ -69,26 +62,31 @@ const containerLabel = computed(() => {
   return container.tag ? `${repository}:${container.tag}` : repository
 })
 
-function parsedMs(iso: string | undefined): number | null {
-  if (!iso) return null
-  const ms = Date.parse(iso)
-  return Number.isFinite(ms) ? ms : null
-}
-
-// Malformed timestamps render verbatim instead of "NaNs ago".
-function timeLabel(iso: string): string {
-  return parsedMs(iso) === null ? iso : relativeTime(iso)
-}
-
-const duration = computed(() => {
-  const start = parsedMs(props.run.startTime)
-  const end = parsedMs(props.run.endTime)
-  if (start === null || end === null || end < start) return ''
-  const sec = Math.round((end - start) / 1000)
-  if (sec < 60) return `${sec}s`
-  const min = Math.floor(sec / 60)
-  if (min < 60) return `${min}m ${sec % 60}s`
-  return `${Math.floor(min / 60)}h ${min % 60}m`
+// What ran, one row per fact the crate gives; nothing is filled in.
+const ranRows = computed(() => {
+  const run = props.run
+  const rows: { key: string; label: string; value: string; mono?: boolean }[] = []
+  const tool = [instrumentLabel.value, run.instrument?.version && !run.instrument.version.startsWith('sha256:') ? run.instrument.version : '']
+    .filter(Boolean)
+    .join(' ')
+  if (tool) rows.push({ key: 'tool', label: 'Tool', value: tool })
+  if (containerLabel.value) rows.push({ key: 'image', label: 'Image', value: containerLabel.value, mono: true })
+  if (run.command) rows.push({ key: 'command', label: 'Command', value: run.command, mono: true })
+  const site = run.site
+  if (site) {
+    const where = [site.nodeId ? displayName(site.nodeId) : '', site.kind ?? ''].filter(Boolean).join(', ')
+    rows.push({ key: 'where', label: 'Where', value: [where, site.reason ?? ''].filter(Boolean).join('. ') })
+  }
+  const memory = Number(run.ramBytes)
+  const resources = [run.cpuCores ? `${run.cpuCores} CPU` : '', Number.isFinite(memory) && memory > 0 ? `${formatBytes(memory)} memory` : '']
+    .filter(Boolean)
+    .join(', ')
+  if (resources) rows.push({ key: 'resources', label: 'Resources', value: resources })
+  return rows
+})
+const startedAt = computed(() => {
+  const ms = props.run.startTime ? Date.parse(props.run.startTime) : NaN
+  return Number.isFinite(ms) ? new Date(ms).toLocaleString() : props.run.startTime ?? ''
 })
 
 // Same link forms TaskDetailPanel resolves for TES outputs, plus any
@@ -131,141 +129,85 @@ function toRow(ref: RunCrateFileRef): FileRow {
 const inputRows = computed(() => props.run.inputs.map(toRow))
 const outputRows = computed(() => props.run.outputs.map(toRow))
 
-const flow = computed(() => [
-  {
-    key: 'inputs',
-    label: 'Input files',
-    icon: FileInput,
-    rows: inputRows.value,
-    empty: 'No declared inputs.',
-  },
-  {
-    key: 'outputs',
-    label: 'Output files',
-    icon: FileOutput,
-    rows: outputRows.value,
-    empty: 'No outputs were captured.',
-  },
-])
+// One folder all results went to, for the "Saved to" line; null when they are spread out.
+const savedTo = computed(() => {
+  const links = outputRows.value.map((row) => row.link)
+  const first = links[0]
+  if (!first || first.kind !== 's3') return null
+  return links.every((link) => link.kind === 's3' && link.bucketId === first.bucketId && link.prefix === first.prefix) ? first : null
+})
+
+function inputNote(row: FileRow): string {
+  return [row.version ? `release ${row.version}` : '', row.identifier ? `DOI ${row.identifier}` : ''].filter(Boolean).join(', ')
+}
 </script>
 
 <template>
-  <section class="surface overflow-hidden" aria-label="Run provenance">
-    <div class="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3.5 text-sm font-medium text-foreground">
-      <Play class="h-4 w-4 text-primary" /> {{ run.actionName || run.name || 'Process run' }}
-      <Badge v-if="status" :variant="stateVariant(status)" size="sm" class="uppercase">{{ status }}</Badge>
-      <RouterLink
-        v-if="tesEnabled && run.runId && shown('compute')"
-        class="ml-auto inline-flex items-center gap-1.5 text-xs font-normal text-primary hover:underline"
-        :to="{ name: 'task', params: { taskId: run.runId } }"
-      >
-        <Cpu class="h-3.5 w-3.5" /> Open the run
-      </RouterLink>
-    </div>
-
-    <dl class="grid gap-3 px-5 py-4 sm:grid-cols-2 lg:grid-cols-4">
-      <div v-if="run.runId" class="min-w-0">
-        <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Run ID</dt>
-        <dd class="mt-1 font-mono text-[11px] text-foreground" :title="run.runId">{{ truncateMiddle(run.runId, 18, 10) }}</dd>
-      </div>
-      <div v-if="agentLabel" class="min-w-0">
-        <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Run by</dt>
-        <dd class="mt-1 break-all text-sm" :title="run.agent?.identifier || run.agent?.id">
+  <div class="space-y-4" aria-label="Run record">
+    <Notice v-if="run.error" tone="error">{{ run.error }}</Notice>
+    <div class="grid gap-4 lg:grid-cols-2">
+      <section v-for="stage in [{ key: 'inputs', label: 'Inputs', rows: inputRows, empty: 'No declared inputs.' }, { key: 'outputs', label: 'Results', rows: outputRows, empty: 'No results were captured.' }]" :key="stage.key" class="surface p-5">
+        <h2 class="mb-3 font-display text-sm font-semibold text-aruna-navy">{{ stage.label }}</h2>
+        <p v-if="!stage.rows.length" class="text-xs text-muted-foreground">{{ stage.empty }}</p>
+        <table v-else class="w-full text-left text-xs">
+          <tbody class="divide-y divide-border">
+            <tr v-for="row in stage.rows" :key="row.id">
+              <td class="py-2 pr-4 font-medium">
+                <RouterLink
+                  v-if="row.link.kind === 's3'"
+                  class="break-all text-primary hover:underline"
+                  :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }"
+                  :title="row.id"
+                >{{ row.name }}</RouterLink>
+                <span v-else-if="row.link.kind === 'drs'" class="inline-flex items-center gap-1.5">
+                  <a class="inline-flex items-center gap-1 break-all text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.name, 24, 12) }} <ExternalLinkIcon class="h-3 w-3" /></a>
+                  <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" :aria-label="`Download ${row.name}`"><Download class="h-3.5 w-3.5" /></a>
+                </span>
+                <span v-else class="break-all" :title="row.id">{{ row.name }}</span>
+              </td>
+              <td v-if="stage.key === 'inputs'" class="py-2 pr-4 text-muted-foreground">{{ inputNote(row) }}</td>
+              <td class="whitespace-nowrap py-2 text-right tabular-nums text-muted-foreground">{{ row.size }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-if="stage.key === 'outputs' && savedTo" class="mt-3 text-xs text-muted-foreground">
+          Saved to
           <RouterLink
-            v-if="agentLink.kind === 'user'"
-            class="text-primary hover:underline"
-            :to="{ name: 'user', params: { id: agentLink.id } }"
-          >
-            {{ agentLabel }}
-          </RouterLink>
-          <ExternalLink v-else-if="agentLink.kind === 'external'" :href="agentLink.href" :label="agentLabel" />
-          <span v-else class="text-foreground">{{ agentLabel }}</span>
-        </dd>
-      </div>
-      <div v-if="run.workspaceBucket" class="min-w-0">
-        <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Workspace</dt>
-        <dd class="mt-1">
-          <RouterLink
-            class="inline-flex max-w-full items-center gap-1 break-all font-mono text-[11px] text-primary hover:underline"
-            :to="{ name: 'bucket', params: { bucketId: run.workspaceBucket } }"
-          >
-            <HardDrive class="h-3 w-3 shrink-0" /> {{ run.workspaceBucket }}
-          </RouterLink>
-        </dd>
-      </div>
-      <div v-if="run.startTime">
-        <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Started</dt>
-        <dd class="mt-1 text-sm text-foreground" :title="run.startTime">{{ timeLabel(run.startTime) }}</dd>
-      </div>
-      <div v-if="run.endTime">
-        <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Finished</dt>
-        <dd class="mt-1 text-sm text-foreground" :title="run.endTime">{{ timeLabel(run.endTime) }}</dd>
-      </div>
-      <div v-if="duration">
-        <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Duration</dt>
-        <dd class="mt-1 text-sm text-foreground">{{ duration }}</dd>
-      </div>
-    </dl>
-
-    <Notice v-if="run.error" tone="error" class="mx-5 mb-4">{{ run.error }}</Notice>
-
-    <div class="space-y-4 border-t border-border px-5 py-4">
-      <template v-for="(stage, i) in flow" :key="stage.key">
-        <!-- Executor sits between inputs and outputs, mirroring the data flow. -->
-        <div v-if="i === 1" class="rounded-md border border-border bg-muted/30 p-3">
-          <h3 class="flex items-center gap-2 font-display text-sm font-semibold text-aruna-navy">
-            <Terminal class="h-3.5 w-3.5" /> Executor
-          </h3>
-          <dl v-if="instrumentLabel || containerLabel || run.command" class="mt-2 space-y-2 text-xs">
-            <div v-if="instrumentLabel">
-              <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Software</dt>
-              <!-- Prefer the identifier as link target: the label is often a plain
-                   name while the identifier carries the URL (e.g. a DOI or repo). -->
-              <dd class="mt-0.5 break-all text-foreground"><ExternalLink :href="run.instrument?.identifier || instrumentLabel" :label="instrumentLabel" /></dd>
-            </div>
-            <div v-if="containerLabel">
-              <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Container image</dt>
-              <dd class="mt-0.5 break-all font-mono text-[11px]">
-                <a v-if="run.container?.url" :href="run.container.url" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-primary hover:underline">
-                  {{ containerLabel }} <ExternalLinkIcon class="h-3 w-3 shrink-0" />
-                </a>
-                <span v-else class="text-foreground">{{ containerLabel }}</span>
-              </dd>
-            </div>
-            <div v-if="run.command">
-              <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Command</dt>
-              <dd class="mt-0.5 whitespace-pre-wrap break-all font-mono text-[11px] text-foreground">{{ run.command }}</dd>
-            </div>
-          </dl>
-          <p v-else class="mt-2 text-xs text-muted-foreground">No executor details recorded.</p>
-        </div>
-
-        <div>
-          <h3 class="flex items-center gap-2 font-display text-sm font-semibold text-aruna-navy">
-            <component :is="stage.icon" class="h-3.5 w-3.5" /> {{ stage.label }}
-            <span v-if="stage.rows.length" class="text-xs font-normal text-muted-foreground">{{ stage.rows.length }}</span>
-          </h3>
-          <p v-if="!stage.rows.length" class="mt-2 text-xs text-muted-foreground">{{ stage.empty }}</p>
-          <ul v-else class="mt-2 space-y-1.5">
-            <li v-for="row in stage.rows" :key="row.id" class="flex flex-wrap items-center gap-2 text-[11px]">
-              <RouterLink
-                v-if="row.link.kind === 's3'"
-                class="break-all font-mono text-primary hover:underline"
-                :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }"
-                :title="row.id"
-              >
-                {{ row.name }}
-              </RouterLink>
-              <template v-else-if="row.link.kind === 'drs'">
-                <a class="inline-flex items-center gap-1 break-all font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.name, 24, 12) }} <ExternalLinkIcon class="h-3 w-3" /></a>
-                <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" :aria-label="`Download ${row.name}`"><Download class="h-3.5 w-3.5" /></a>
-              </template>
-              <span v-else class="break-all font-mono text-muted-foreground" :title="row.id">{{ row.name }}</span>
-              <span v-if="row.size" class="text-muted-foreground">{{ row.size }}</span>
-            </li>
-          </ul>
-        </div>
-      </template>
+            class="font-mono text-primary hover:underline"
+            :to="{ name: 'bucket', params: { bucketId: savedTo.bucketId }, query: savedTo.prefix ? { prefix: savedTo.prefix } : {} }"
+          >{{ savedTo.bucketId }}/{{ savedTo.prefix ? `${savedTo.prefix}/` : '' }}</RouterLink>
+        </p>
+      </section>
     </div>
-  </section>
+    <section class="surface p-5">
+      <h2 class="mb-3 font-display text-sm font-semibold text-aruna-navy">What ran</h2>
+      <dl class="grid gap-x-8 gap-y-2 text-xs sm:grid-cols-[8rem_1fr]">
+        <template v-for="row in ranRows" :key="row.key">
+          <dt class="text-muted-foreground">{{ row.label }}</dt>
+          <dd :class="row.mono ? 'whitespace-pre-wrap break-all font-mono text-[11px]' : 'text-foreground'">
+            <ExternalLink v-if="row.key === 'tool' && run.instrument?.identifier && isHttpUrl(run.instrument.identifier)" :href="run.instrument.identifier" :label="row.value" />
+            <a v-else-if="row.key === 'image' && run.container?.url" :href="run.container.url" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-primary hover:underline">{{ row.value }} <ExternalLinkIcon class="h-3 w-3 shrink-0" /></a>
+            <template v-else>{{ row.value }}</template>
+          </dd>
+        </template>
+        <template v-if="agentLabel">
+          <dt class="text-muted-foreground">Started by</dt>
+          <dd :title="run.agent?.identifier || run.agent?.id">
+            <RouterLink v-if="agentLink.kind === 'user'" class="text-primary hover:underline" :to="{ name: 'user', params: { id: agentLink.id } }">{{ agentLabel }}</RouterLink>
+            <ExternalLink v-else-if="agentLink.kind === 'external'" :href="agentLink.href" :label="agentLabel" />
+            <span v-else>{{ agentLabel }}</span><template v-if="startedAt">, {{ startedAt }}</template>
+          </dd>
+        </template>
+        <template v-if="run.workspaceBucket">
+          <dt class="text-muted-foreground">Workspace</dt>
+          <dd><RouterLink class="font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: run.workspaceBucket } }">{{ run.workspaceBucket }}</RouterLink></dd>
+        </template>
+        <template v-if="tesEnabled && run.runId && shown('compute')">
+          <dt class="text-muted-foreground">Run</dt>
+          <dd><RouterLink class="text-primary hover:underline" :to="{ name: 'task', params: { taskId: run.runId } }">Open the run</RouterLink></dd>
+        </template>
+      </dl>
+      <p v-if="!ranRows.length && !agentLabel" class="text-xs text-muted-foreground">No details of the run were recorded.</p>
+    </section>
+  </div>
 </template>

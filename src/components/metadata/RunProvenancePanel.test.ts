@@ -1,10 +1,9 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { compileClientComponent, mountApp, moduleDefault, nodes } from '@/test/clientRender'
+import { compileClientComponent, content, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 import * as DataIdentity from '@/lib/crate/dataIdentity'
 import * as Identifiers from '@/lib/identifiers'
-import * as StateBadge from '@/lib/stateBadge'
 import * as Tes from '@/lib/tes'
 import * as Utils from '@/lib/utils'
 
@@ -20,13 +19,13 @@ const RunProvenancePanel = compileClientComponent(new URL('./RunProvenancePanel.
   '@/components/ui/Badge.vue': moduleDefault(Slot),
   '@/components/ui/ExternalLink.vue': moduleDefault(Slot),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
-  '@/lib/stateBadge': StateBadge,
   '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
   '@/composables/useAruna': { useAruna: () => ({ apiBaseUrl: ref('https://api.test') }) },
   '@/composables/useUserDirectory': {
     useUserDirectory: () => ({ resolveUsers: vi.fn(), cachedUser: () => null }),
   },
   '@/composables/useS3': { useS3: () => ({ endpoint: ref('https://s3.test') }) },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => (id === 'node-2' ? 'Giessen' : id) }) },
   '@/lib/config': { featureEnabled: () => false },
   '@/lib/tes': Tes,
   '@/lib/crate/dataIdentity': DataIdentity,
@@ -65,5 +64,29 @@ describe('RunProvenancePanel', () => {
 
   it('resolves a bare content address through DRS', async () => {
     expect((await linkOf({ id: CONTENT }))?.href).toBe(Tes.drsObjectHref('https://api.test', CONTENT))
+  })
+
+  it('shows inputs with their release, results with where they were saved, and what ran', async () => {
+    const run = {
+      inputs: [{ id: 'db', name: 'bakta-db', version: '6.0 light', identifier: '10.5281/zenodo.14916843', contentSize: '1024' }],
+      outputs: [
+        { id: 'a', name: 'genome.gff3', contentUrl: 's3://results/bakta/genome.gff3' },
+        { id: 'b', name: 'genome.tsv', contentUrl: 's3://results/bakta/genome.tsv' },
+      ],
+      command: '/bakta --db /work/in/db genome.fasta',
+      site: { nodeId: 'node-2', kind: 'kubernetes' },
+      cpuCores: '4',
+      ramBytes: String(8 * 1024 ** 3),
+    }
+    const mounted = await mountApp(RunProvenancePanel, { props: { run } })
+    const text = content(mounted.root)
+
+    expect(text).toContain('bakta-dbrelease 6.0 light, DOI 10.5281/zenodo.149168431 KB')
+    expect(text).toContain('Saved to results/bakta/')
+    expect(text).toContain('Command/bakta --db /work/in/db genome.fasta')
+    expect(text).toContain('WhereGiessen, kubernetes')
+    expect(text).toContain('Resources4 CPU, 8 GB memory')
+    expect(text).not.toContain('Started by')
+    mounted.app.unmount()
   })
 })

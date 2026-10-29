@@ -257,3 +257,22 @@ export function runClaimedIds(run: RunCrateModel): string[] {
   for (const file of [...run.inputs, ...run.outputs]) ids.push(file.id)
   return ids.filter((id): id is string => Boolean(id))
 }
+
+/** The run's end state as a state word for stateBadge, or null when the crate gives none. */
+export function runState(run: RunCrateModel): string | null {
+  if (run.actionStatus === 'CompletedActionStatus') return 'succeeded'
+  if (run.actionStatus === 'FailedActionStatus') return 'failed'
+  return run.actionStatus || null
+}
+
+/** How long the run took, such as "4m 12s"; empty when a time is missing or malformed. */
+export function runDuration(run: RunCrateModel): string {
+  const start = run.startTime ? Date.parse(run.startTime) : NaN
+  const end = run.endTime ? Date.parse(run.endTime) : NaN
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return ''
+  const sec = Math.round((end - start) / 1000)
+  if (sec < 60) return `${sec}s`
+  const min = Math.floor(sec / 60)
+  if (min < 60) return `${min}m ${sec % 60}s`
+  return `${Math.floor(min / 60)}h ${min % 60}m`
+}
