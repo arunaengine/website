@@ -4,6 +4,7 @@ import { renderToString } from '@vue/server-renderer'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, content, compileClientComponent, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
 import * as NodeDisplay from '@/components/nodes/node-display'
+import * as NodePlaces from '@/lib/nodePlaces'
 const RealmNodes = await vi.importActual<typeof import('@/composables/useRealmNodes')>('@/composables/useRealmNodes')
 
 const firstPaintMock = vi.hoisted(() => ({
@@ -46,6 +47,10 @@ const MapStub = defineComponent({
       ...(props.nodes as Array<{ node_id: string; info?: { utilization?: { heartbeat_at_ms?: number } } }>).map((node) =>
         h('span', ` ${node.node_id} beat ${node.info?.utilization?.heartbeat_at_ms} `)),
     ]),
+})
+const GeoMapStub = defineComponent({
+  props: { nodes: { type: Array, default: () => [] } },
+  setup: (props) => () => h('div', `osm map ${(props.nodes as Array<{ node_id: string }>).map((node) => node.node_id).join(' ')}`),
 })
 const TableStub = defineComponent({
   props: { nodes: { type: Array, default: () => [] }, computer: Object },
@@ -189,6 +194,7 @@ beforeAll(async () => {
   vi.doMock('@/composables/useRecentRuns', () => recentRunsStub)
   vi.doMock('@/components/dashboard/FederationPanel.vue', () => ({ default: MapStub }))
   vi.doMock('@/components/dashboard/NodeTable.vue', () => ({ default: TableStub }))
+  vi.doMock('@/components/dashboard/NodeGeoMap.vue', () => ({ default: GeoMapStub }))
   vi.doMock('@/components/dashboard/WebStart.vue', () => ({ default: WebStartStub }))
   vi.doMock('@/composables/useRealmNodes', () => realmNodesStub)
   vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: SkeletonStub }))
@@ -263,6 +269,8 @@ beforeAll(async () => {
     '@/composables/useRecentRuns': recentRunsStub,
     '@/components/dashboard/FederationPanel.vue': moduleDefault(MapStub),
     '@/components/dashboard/NodeTable.vue': moduleDefault(TableStub),
+    '@/components/dashboard/NodeGeoMap.vue': moduleDefault(GeoMapStub),
+    '@/lib/nodePlaces': NodePlaces,
     '@/components/dashboard/WebStart.vue': moduleDefault(WebStartStub),
     '@/composables/useRealmNodes': realmNodesStub,
     '@/components/nodes/node-display': NodeDisplay,
@@ -620,6 +628,24 @@ describe('realm nodes in the overview', () => {
     expect(text).toContain('server-node beat 8000')
     expect(text).toContain('1 device Status')
     expect(text).not.toContain('beat 1000')
+    mounted.app.unmount()
+  })
+
+  it('puts the nodes on an OpenStreetMap map once one carries coordinates, else shows the topology', async () => {
+    let mounted = await mountApp(DashboardClient)
+    await flush()
+    expect(content(mounted.root)).toContain('map compact=true')
+    expect(content(mounted.root)).not.toContain('osm map')
+    mounted.app.unmount()
+
+    realmInfo.value = {
+      metadata_replication: { default_replication_factor: null },
+      nodes: [{ ...beat('mgmt-node', 'management', 1000), coordinates: { lat: 50.58, lon: 8.68 } }, beat('own-device', 'user', 1000)],
+    }
+    mounted = await mountApp(DashboardClient)
+    await flush()
+    expect(content(mounted.root)).toContain('osm map mgmt-node')
+    expect(content(mounted.root)).not.toContain('map compact=true')
     mounted.app.unmount()
   })
 

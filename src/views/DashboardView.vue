@@ -23,6 +23,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useRecentRuns } from '@/composables/useRecentRuns'
 import { useDatabases } from '@/composables/useDatabases'
 import { computerName } from '@/composables/useRealmNodes'
+import { hasCoordinates } from '@/lib/nodePlaces'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useNotifications } from '@/composables/useNotifications'
 import { useRefresh } from '@/composables/useRefresh'
@@ -37,6 +38,11 @@ import { countText, useRealmBucketCount } from '@/composables/useBucketCount'
 // The desktop adds its own parts; the web build never loads them.
 const HomeCards = defineAsyncComponent({
   loader: () => import('@/components/desktop/HomeCards.vue'),
+  onError: asyncChunkError,
+})
+// The map of places loads only once a node has coordinates.
+const NodeGeoMap = defineAsyncComponent({
+  loader: () => import('@/components/dashboard/NodeGeoMap.vue'),
   onError: asyncChunkError,
 })
 const DeviceRow = defineAsyncComponent({
@@ -204,6 +210,7 @@ const mapComputer = computed(() => {
   return { id: info.node.peer_id, name: deviceName.value, peers }
 })
 const openNode = (nodeId: string) => void router.push({ name: 'node', params: { nodeId } })
+const mapNodes = computed(() => [...(desktop && deviceRecord.value ? [deviceRecord.value] : []), ...infraNodes.value])
 
 const replication = computed(() => {
   const factor = realmInfo.value?.metadata_replication.default_replication_factor
@@ -362,7 +369,10 @@ const pageDescription = computed(() =>
         </header>
         <div class="grid divide-y divide-border lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
           <div class="p-4">
+            <!-- Nodes that carry coordinates stand on a map; without any, the topology shows. -->
+            <NodeGeoMap v-if="hasCoordinates(mapNodes)" :nodes="mapNodes" @select="openNode" />
             <FederationPanel
+              v-else
               compact
               :nodes="infraNodes"
               :local-peer-id="(realmView?.info ?? nodeInfo)?.node.peer_id"
