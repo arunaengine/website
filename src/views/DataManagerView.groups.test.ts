@@ -39,7 +39,8 @@ describe('Data view group selection', () => {
 
   it('names the open bucket node in the heading and keeps Refresh on the right', () => {
     const title = template.slice(template.indexOf('<template #title>'), template.indexOf('<template #description>'))
-    expect(title).toContain('on {{ headerPlace.name }}')
+    // The node of the open bucket stays named in the heading, linked to its page.
+    expect(title).toContain(`on <RouterLink :to="{ name: 'node', params: { nodeId: requiredNodeId } }" class="text-primary hover:underline">{{ headerPlace.name }}</RouterLink>`)
     expect(title).toContain(':title="headerPlace.title"')
     const actions = template.slice(template.indexOf('<template #actions>'), template.indexOf('</PageHeader>'))
     expect(actions).toContain('<RefreshButton')

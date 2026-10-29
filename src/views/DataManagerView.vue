@@ -326,7 +326,7 @@ async function createFolder() {
             class="max-w-full truncate text-sm font-normal text-muted-foreground"
             :title="headerPlace.title"
           >
-            on {{ headerPlace.name }}
+            on <RouterLink :to="{ name: 'node', params: { nodeId: requiredNodeId } }" class="text-primary hover:underline">{{ headerPlace.name }}</RouterLink>
           </span>
         </span>
       </template>
