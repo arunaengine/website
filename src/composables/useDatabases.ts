@@ -21,7 +21,7 @@ let runs = 0
 
 export function useDatabases() {
   const { searchBuckets, sessionEpoch, authToken } = useAruna()
-  const { localNodeId } = useRealmNodes()
+  const { localNodeId, isTarget } = useRealmNodes()
 
   const rows = computed(() => (listedEpoch.value === sessionEpoch.value ? listed.value : []))
 
@@ -47,7 +47,8 @@ export function useDatabases() {
         failedNodes += answer.nodes_failed
         cursor = answer.next_cursor ?? undefined
       } while (cursor)
-      listed.value = rowsOf(hits)
+      // A device's buckets are its owner's, never a database to pick.
+      listed.value = rowsOf(hits.filter((hit) => isTarget(hit.node_id)))
       listedEpoch.value = epoch
       complete.value = failedNodes === 0
       state.value = 'ready'

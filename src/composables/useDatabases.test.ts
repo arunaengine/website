@@ -8,7 +8,7 @@ const aruna = vi.hoisted(() => ({
   searchBuckets: vi.fn(),
 }))
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
-vi.mock('@/composables/useRealmNodes', () => ({ useRealmNodes: () => ({ localNodeId: ref('n1') }) }))
+vi.mock('@/composables/useRealmNodes', () => ({ useRealmNodes: () => ({ localNodeId: ref('n1'), isTarget: (id: string) => id !== 'device-1' }) }))
 
 const { useDatabases } = await import('@/composables/useDatabases')
 
@@ -32,6 +32,16 @@ describe('databases', () => {
     aruna.sessionEpoch.value += 1
     aruna.authToken.value = 'token'
     aruna.searchBuckets.mockReset()
+  })
+
+  it('lists no database a device answers for', async () => {
+    aruna.searchBuckets.mockResolvedValueOnce(page([view('lab'), { ...view('laptop-db'), node_id: 'device-1' }]))
+    const { databases, scope } = start()
+    databases.ensure()
+    await vi.waitFor(() => expect(databases.state.value).toBe('ready'))
+
+    expect(databases.rows.value.map((row) => row.bucket)).toEqual(['lab'])
+    scope.stop()
   })
 
   it('reads every page up to the end and finds the database of a bucket', async () => {
