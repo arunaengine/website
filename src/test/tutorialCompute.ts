@@ -120,6 +120,7 @@ const arunaModule = {
     authToken: ref('tutorial-token'),
     currentUser,
     myGroups: ref([]),
+    sessionEpoch: ref(1),
     metadataAtPath: async () => null,
     realm: ref({ id: 'realm-id', name: 'Test realm', shortName: 'Test realm' }),
     userInfo: ref(null),
