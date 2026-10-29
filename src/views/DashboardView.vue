@@ -3,21 +3,19 @@ import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import DashboardScopeToggle from '@/components/dashboard/DashboardScopeToggle.vue'
-import FederationPanel from '@/components/dashboard/FederationPanel.vue'
 import GroupQuotaCards from '@/components/dashboard/GroupQuotaCards.vue'
 import MyStatsCards from '@/components/dashboard/MyStatsCards.vue'
-import ProfileChip from '@/components/metadata/ProfileChip.vue'
+import OverviewCell from '@/components/dashboard/OverviewCell.vue'
 import SignInPanel from '@/components/auth/SignInPanel.vue'
-import StatCard from '@/components/ui/StatCard.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import type { MetadataDoc } from '@/data/types'
 import type { RealmView } from '@/composables/aruna/realm'
-import { ArrowRight, BookOpen, Boxes, Database, FileJson2, Files, FolderOpen, Plus, Activity, Users } from '@lucide/vue'
+import { ArrowRight, BookOpen, Plus } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { useDatabases } from '@/composables/useDatabases'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useOnboarding } from '@/composables/useOnboarding'
 import { startTour } from '@/composables/useTour'
@@ -30,7 +28,7 @@ import { featureEnabled } from '@/lib/config'
 import { isDesktop } from '@/lib/desktop'
 import { POLL_SLOW_MS, follow, onWake } from '@/lib/poll'
 import { formatCount } from '@/lib/formatCount'
-import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
+import { formatBytes } from '@/lib/utils'
 import { countText, useRealmBucketCount } from '@/composables/useBucketCount'
 
 // The desktop adds its own cards; the web build never loads them.
@@ -41,7 +39,7 @@ const HomeCards = defineAsyncComponent({
 const desktop = isDesktop()
 
 const router = useRouter()
-const { currentUser, metadata, myGroups, realm, nodeInfo, realmInfo, usageInfo, loading, bootstrapped, sessionEpoch, refresh, refreshedEpoch, loadInfo, loadRealmView, listRecentMetadata } = useAruna()
+const { currentUser, myGroups, nodeInfo, realmInfo, usageInfo, loading, bootstrapped, sessionEpoch, refresh, refreshedEpoch, loadInfo, loadRealmView } = useAruna()
 const { authPending } = useAuth()
 const { dashboardRevision } = useNotifications()
 const { scope, setScope } = useDashboardScope()
@@ -54,9 +52,6 @@ const refreshing = ref(false)
 const quotaRevision = ref(0)
 // The info poll reads the cheap group figures again, never every bucket.
 const cardsRevision = ref(0)
-const recentDocs = ref<MetadataDoc[] | null>(null)
-const recentSettled = ref(false)
-let recentGeneration = 0
 let refreshQueued = false
 // A round queued only by a session change, which the running round may have loaded already.
 let epochOnly = true
@@ -68,23 +63,9 @@ const realmView = ref<RealmView | null>(null)
 let realmViewGeneration = 0
 
 watch(sessionEpoch, () => {
-  recentGeneration++
-  recentSettled.value = false
   realmViewGeneration++
   realmView.value = null
 }, { flush: 'sync' })
-
-// Null keeps the tile on the window-derived list, so a node that cannot order
-// by recency degrades to the old behaviour instead of an empty panel. A refresh
-// replaces the shown list in place; a failed one keeps it.
-async function loadRecent() {
-  const epoch = sessionEpoch.value
-  const generation = ++recentGeneration
-  const recent = await listRecentMetadata().catch(() => null)
-  if (epoch !== sessionEpoch.value || generation !== recentGeneration) return
-  if (recent || !recentSettled.value) recentDocs.value = recent
-  recentSettled.value = true
-}
 
 async function refreshDashboard() {
   if (refreshing.value) {
@@ -95,12 +76,12 @@ async function refreshDashboard() {
   try {
     let again = false
     do {
-      // A session the running round already loaded needs only its recent datasets again.
+      // A session the running round already loaded needs no second round.
       const loaded = again && epochOnly && refreshedEpoch() === sessionEpoch.value
       refreshQueued = false
       epochOnly = true
       again = true
-      await Promise.all([loaded ? undefined : refresh(), loadRecent()])
+      if (!loaded) await refresh()
     } while (refreshQueued)
   } finally {
     refreshing.value = false
@@ -181,14 +162,9 @@ const computer = computed(() => {
 })
 
 const onlineNodes = computed(() => infraNodes.value.filter((node) => node.present).length)
-
-// Honest realm figure: the sum of datasets each node reports holding (replicas
-// included), shown only once at least one node publishes the count.
-const docsHeld = computed(() => {
-  const reporting = infraNodes.value.filter((node) => node.info?.utilization.documents_held !== undefined)
-  if (!reporting.length) return null
-  const total = reporting.reduce((sum, node) => sum + (node.info?.utilization.documents_held ?? 0), 0)
-  return { total, nodes: reporting.length, totalNodes: infraNodes.value.length }
+const replication = computed(() => {
+  const factor = realmInfo.value?.metadata_replication.default_replication_factor
+  return factor === null ? 'Replication on all eligible nodes' : factor === undefined ? null : `Replication ×${factor}`
 })
 
 // Realm-wide total of live datasets, not a per-caller figure. The loaded
@@ -200,66 +176,27 @@ const publicOverview = computed(() => realmInfo.value?.public_overview)
 // counters next to them belong to this node and live on the Status page.
 const realmTotals = computed(() => usageInfo.value?.realm ?? null)
 const realmBuckets = useRealmBucketCount(realmTotals)
-const realmData = computed(() => {
-  const stored = realmTotals.value?.logical_bytes ?? 0
-  const referenced = realmTotals.value?.referenced_bytes ?? 0
-  const total = stored + referenced
-  return { stored, referenced, total, storedPercent: total > 0 ? (stored / total) * 100 : 0 }
+const plural = (count: number, one: string, many: string) => (count === 1 ? one : many)
+const databases = useDatabases()
+databases.ensure()
+const realmDataLine = computed(() => {
+  const totals = realmTotals.value
+  if (!totals) return ''
+  const buckets = realmBuckets.value ?? { count: totals.buckets, exact: true }
+  const parts = [`${countText(buckets, formatCount)} ${plural(buckets.exact ? buckets.count : 2, 'bucket', 'buckets')}`]
+  if (databases.state.value === 'ready') {
+    const count = databases.rows.value.length
+    parts.push(`${databases.complete.value ? '' : 'at least '}${formatCount(count)} ${plural(count, 'database', 'databases')}`)
+  }
+  return parts.join(', ')
 })
-
-function publicCount(value: number | null | undefined): string {
-  return value == null ? 'Unknown' : formatCount(value)
-}
-
-const stats = computed(() =>
-  currentUser.value
-    ? [
-        {
-          label: 'Realm datasets',
-          value: realmDocuments.value === null ? 'Unknown' : formatCount(realmDocuments.value),
-          icon: FileJson2,
-          tone: 'bg-aruna-royal/15 text-aruna-royal dark:text-aruna-tagline',
-        },
-        {
-          label: 'Realm groups',
-          value: publicCount(publicOverview.value?.groups),
-          icon: Users,
-          tone: 'bg-aruna-aqua/15 text-aruna-aqua',
-        },
-        {
-          label: 'Nodes online',
-          value: `${onlineNodes.value} / ${infraNodes.value.length}`,
-          icon: Activity,
-          tone: 'bg-aruna-tagline/15 text-aruna-tagline',
-        },
-      ]
-    : [
-        {
-          label: 'Live datasets',
-          value: publicCount(publicOverview.value?.live_datasets),
-          icon: FileJson2,
-          tone: 'bg-aruna-royal/15 text-aruna-royal dark:text-aruna-tagline',
-        },
-        {
-          label: 'Realm groups',
-          value: publicCount(publicOverview.value?.groups),
-          icon: Users,
-          tone: 'bg-aruna-aqua/15 text-aruna-aqua',
-        },
-        {
-          label: 'Configured nodes',
-          value: publicCount(publicOverview.value?.nodes_configured),
-          icon: Activity,
-          tone: 'bg-aruna-tagline/15 text-aruna-tagline',
-        },
-      ],
-)
-
-const recentMetadata = computed(
-  () =>
-    recentDocs.value ??
-    [...metadata.value].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5),
-)
+// A guest sees the public counts; unknown stays unknown, never zero.
+const realmDatasets = computed(() => (currentUser.value ? realmDocuments.value : publicOverview.value?.live_datasets) ?? null)
+const realmNodesText = computed(() => {
+  if (infraNodes.value.length) return { count: onlineNodes.value, word: 'online' }
+  const configured = publicOverview.value?.nodes_configured
+  return configured == null ? null : { count: configured, word: '' }
+})
 
 // While a stored session restores, keep the copy neutral instead of flashing
 // the guest greeting and its sign-in hint.
@@ -302,24 +239,8 @@ const pageDescription = computed(() =>
     <div class="container space-y-5 py-6">
       <div v-if="!painted" class="space-y-5" aria-busy="true">
         <span class="sr-only">Loading dashboard</span>
-        <section class="space-y-3.5">
-          <header class="space-y-2">
-            <Skeleton class="h-5 w-36" />
-            <Skeleton class="h-3 w-24" />
-          </header>
-          <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-            <Skeleton v-for="n in 6" :key="n" class="h-[108px]" />
-          </div>
-        </section>
-        <section class="space-y-3.5">
-          <Skeleton class="h-5 w-24" />
-          <Skeleton class="h-28 w-full" />
-        </section>
+        <Skeleton class="h-44 w-full" />
         <Skeleton class="h-40 w-full" />
-        <section class="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-          <Skeleton class="h-64 w-full" />
-          <Skeleton class="h-44 w-full" />
-        </section>
       </div>
 
       <template v-else>
@@ -359,151 +280,53 @@ const pageDescription = computed(() =>
 
       <HomeCards v-if="desktop && currentUser" />
 
-      <!-- One statistics section at a time; the stored scope decides which. -->
-      <section v-if="currentUser && scope === 'personal'" aria-labelledby="my-statistics-heading" class="space-y-3.5">
-        <header class="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 id="my-statistics-heading" class="font-display text-[15px] font-semibold text-foreground/85">My statistics</h2>
-            <p class="mt-0.5 text-xs text-muted-foreground">Everything in your groups, on every node.</p>
-          </div>
-          <DashboardScopeToggle :model-value="scope" @update:model-value="setScope" />
-        </header>
-
-        <template v-if="myGroups.length">
-          <MyStatsCards :refresh-revision="quotaRevision" />
-          <GroupQuotaCards :refresh-revision="cardsRevision" />
-        </template>
-        <EmptyState v-else compact title="You do not belong to any groups yet." />
-      </section>
-
-      <section v-else aria-labelledby="realm-statistics-heading" class="space-y-3.5">
-        <header class="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 id="realm-statistics-heading" class="font-display text-[15px] font-semibold text-foreground/85">Realm statistics</h2>
-            <p class="mt-0.5 text-xs text-muted-foreground">{{ realm.name }}</p>
-          </div>
+      <!-- One card for the figures: the stored scope decides whose, the realm cell is the same for both. -->
+      <section class="surface overflow-hidden" aria-labelledby="overview-heading">
+        <header class="flex flex-wrap items-center justify-between gap-3 px-5 pt-4">
+          <h2 id="overview-heading" class="font-display text-[15px] font-semibold text-foreground">Overview</h2>
           <DashboardScopeToggle v-if="currentUser" :model-value="scope" @update:model-value="setScope" />
         </header>
-
-        <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-          <template v-if="!bootstrapped">
-            <Skeleton v-for="n in 3" :key="n" class="h-16" />
+        <div class="mt-3 grid gap-px border-t border-border bg-border sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr]">
+          <template v-if="currentUser && scope === 'personal'">
+            <MyStatsCards v-if="myGroups.length" :refresh-revision="quotaRevision" />
+            <div v-else class="bg-card px-5 py-4 lg:col-span-3"><EmptyState compact title="You do not belong to any groups yet." /></div>
+          </template>
+          <template v-else-if="!bootstrapped">
+            <div v-for="n in 3" :key="n" class="bg-card px-5 py-4"><Skeleton class="h-16" /></div>
           </template>
           <template v-else>
-            <div v-for="stat in stats" :key="stat.label" class="surface flex items-center gap-3.5 px-4 py-4">
-              <div :class="['grid h-9 w-9 shrink-0 place-items-center rounded-lg', stat.tone]">
-                <component :is="stat.icon" class="h-[17px] w-[17px]" />
-              </div>
-              <div class="min-w-0">
-                <div class="truncate font-display text-xl font-bold leading-tight text-foreground">{{ stat.value }}</div>
-                <div class="mt-0.5 truncate text-[11px] text-muted-foreground">{{ stat.label }}</div>
-              </div>
-            </div>
+            <template v-if="currentUser">
+              <OverviewCell label="Storage">
+                <template v-if="realmTotals" #value>
+                  <b>{{ formatBytes(realmTotals.logical_bytes) }}</b> stored
+                  <b class="ml-2">{{ formatBytes(realmTotals.referenced_bytes) }}</b> referenced
+                </template>
+                <template v-else #value>Unknown</template>
+                Stored counts against quotas. Referenced data stays at its source.
+              </OverviewCell>
+              <OverviewCell label="Data">
+                <template v-if="realmTotals" #value><b>{{ formatCount(realmTotals.objects) }}</b> {{ plural(realmTotals.objects, 'object', 'objects') }}</template>
+                <template v-else #value>Unknown</template>
+                {{ realmDataLine }}
+              </OverviewCell>
+            </template>
+            <OverviewCell label="Work" :class="currentUser ? '' : 'sm:col-span-1 lg:col-span-3'">
+              <template v-if="realmDatasets !== null" #value><b>{{ formatCount(realmDatasets) }}</b> {{ plural(realmDatasets, 'dataset', 'datasets') }}</template>
+              <template v-else #value>Unknown</template>
+            </OverviewCell>
           </template>
-        </div>
-
-        <div v-if="currentUser && (!bootstrapped || realmTotals)" class="grid gap-3.5 sm:grid-cols-3">
-          <template v-if="realmTotals">
-            <StatCard
-              label="Objects"
-              :value="formatNumber(realmTotals.objects)"
-              :icon="Files"
-              hint="Data objects across the realm"
-            />
-            <StatCard label="Total data" :value="formatBytes(realmData.total)" :icon="Database">
-              <div v-if="realmData.total > 0" class="flex h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <div class="bg-primary" :style="{ width: `${realmData.storedPercent}%` }" />
-                <div class="bg-primary/30" :style="{ width: `${100 - realmData.storedPercent}%` }" />
-              </div>
-              <div class="text-xs text-muted-foreground">
-                <span class="font-medium text-foreground">{{ formatBytes(realmData.stored) }} stored</span>,
-                {{ formatBytes(realmData.referenced) }} referenced
-              </div>
-              <div v-if="realmData.referenced > 0" class="text-xs text-muted-foreground">
-                Referenced files stay at their source and don't count toward quotas.
-              </div>
-            </StatCard>
-            <StatCard
-              label="Buckets"
-              :value="realmBuckets ? countText(realmBuckets, formatNumber) : formatNumber(realmTotals.buckets)"
-              :icon="FolderOpen"
-              hint="Realm-wide; a bucket stored on several nodes counts once"
-            />
-          </template>
-          <template v-else>
-            <Skeleton v-for="n in 3" :key="n" class="h-[108px]" />
-          </template>
-        </div>
-
-        <div v-if="currentUser && docsHeld" class="surface flex flex-wrap items-center justify-between gap-4 p-5">
-          <div>
-            <h3 class="font-display text-sm font-semibold text-aruna-navy">Replica-inclusive placement records held</h3>
-            <p class="mt-1 text-xs text-muted-foreground">Dataset placement records held by reporting nodes. Replicas are included.</p>
-          </div>
-          <div class="text-right">
-            <div class="font-display text-xl font-bold text-foreground">{{ formatNumber(docsHeld.total) }}</div>
-            <div class="mt-0.5 text-[11px] text-muted-foreground">{{ docsHeld.nodes }} of {{ docsHeld.totalNodes }} nodes reporting</div>
-          </div>
+          <OverviewCell label="Realm">
+            <template v-if="realmNodesText" #value>
+              <b>{{ formatCount(realmNodesText.count) }}</b> {{ plural(realmNodesText.count, 'node', 'nodes') }} {{ realmNodesText.word }}
+            </template>
+            <template v-else #value>Unknown</template>
+            <template v-if="replication">{{ replication }} </template>
+            <RouterLink :to="{ name: 'status' }" class="text-primary hover:underline">Status</RouterLink>
+          </OverviewCell>
         </div>
       </section>
 
-      <section v-if="currentUser" aria-label="Realm nodes" class="space-y-3.5">
-        <FederationPanel
-          :nodes="infraNodes"
-          :devices="deviceNodes"
-          :replication-factor="realmInfo?.metadata_replication.default_replication_factor"
-          :local-peer-id="(realmView?.info ?? nodeInfo)?.node.peer_id"
-          :computer="computer"
-        />
-      </section>
-
-      <section class="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-        <div class="surface overflow-hidden">
-          <header class="flex items-center justify-between border-b border-border px-5 py-4">
-            <div class="flex items-center gap-2">
-              <FileJson2 class="h-4 w-4 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">Recent datasets</h2>
-            </div>
-            <RouterLink :to="{ name: 'datasets' }" class="text-xs font-medium text-primary hover:underline">Datasets</RouterLink>
-          </header>
-          <ul v-if="!recentSettled" class="divide-y divide-border">
-            <li v-for="n in 4" :key="n" class="px-5 py-3.5">
-              <Skeleton class="h-4 w-2/3" />
-              <Skeleton class="mt-2 h-3 w-1/2" />
-            </li>
-          </ul>
-          <ul v-else class="divide-y divide-border">
-            <li v-for="doc in recentMetadata" :key="doc.ulid">
-              <RouterLink :to="{ name: 'dataset', params: { id: doc.ulid } }" class="block px-5 py-3 hover:bg-muted/40">
-                <div class="flex items-center justify-between gap-3">
-                  <span class="truncate text-sm font-medium text-foreground">{{ doc.title }}</span>
-                  <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime(doc.updatedAt) }}</span>
-                </div>
-                <p class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{{ doc.description || doc.ulid }}</p>
-                <div class="mt-1.5">
-                  <ProfileChip :doc="doc" />
-                </div>
-              </RouterLink>
-            </li>
-            <li v-if="!recentMetadata.length" class="px-5 py-6">
-              <EmptyState compact title="No visible datasets yet." />
-            </li>
-          </ul>
-        </div>
-
-        <div class="space-y-5">
-          <section class="surface p-5">
-            <div class="flex items-center gap-2">
-              <Boxes class="h-4 w-4 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">Buckets</h2>
-            </div>
-            <p class="mt-2 text-xs text-muted-foreground">
-              Browse buckets, upload objects and mint credentials in Data. The same buckets are served by the node's S3 API, so any S3 client works too.
-            </p>
-            <RouterLink to="/app/buckets" class="mt-3 inline-flex text-xs font-medium text-primary hover:underline">Open Data</RouterLink>
-          </section>
-        </div>
-      </section>
+      <GroupQuotaCards v-if="currentUser && myGroups.length" :refresh-revision="cardsRevision" />
       </template>
     </div>
 

@@ -12,6 +12,14 @@ const aruna = vi.hoisted(() => ({
   getBucketUsage: vi.fn(),
 }))
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
+// The realm's database list, by owning group.
+const databases = vi.hoisted(() => ({
+  rows: { value: [] as Array<{ ownerGroup: string }> },
+  state: { value: 'idle' },
+  complete: { value: true },
+  ensure: () => {},
+}))
+vi.mock('@/composables/useDatabases', () => ({ useDatabases: () => databases }))
 
 const { loadMyGroupsUsage } = await import('@/composables/useMyGroupsUsage')
 const { useReachableUsage } = await import('@/composables/useReachableUsage')
@@ -60,6 +68,8 @@ beforeEach(() => {
   aruna.getBucketUsage.mockReset()
   aruna.searchBuckets.mockReset()
   aruna.sessionEpoch.value++
+  databases.rows.value = []
+  databases.state.value = 'idle'
 })
 
 describe('personal statistics tiles', () => {
@@ -81,8 +91,8 @@ describe('personal statistics tiles', () => {
 
     expect(text).toContain(`Storage ${formatBytes(3 * 2048)} stored ${formatBytes(3 * 1024)} referenced`)
     expect(text).toContain('Stored counts against quotas. Referenced data stays at its source.')
-    expect(text).toContain('Objects 12 in 3 buckets')
-    expect(text).toContain('Datasets 6 and 4 process runs')
+    expect(text).toContain('Data 12 objects 3 buckets')
+    expect(text).toContain('Work 6 datasets 4 runs')
     expect(text).not.toContain('at least')
   })
 
@@ -96,8 +106,8 @@ describe('personal statistics tiles', () => {
 
     const text = await renderedText()
 
-    expect(text).toContain('in 1 bucket ')
-    expect(text).toMatch(/Datasets 0 and 1 process run$/)
+    expect(text).toContain('1 object 1 bucket ')
+    expect(text).toMatch(/Work 0 datasets 1 run$/)
   })
 
   it('shows a lower bound when a bucket could not be read', async () => {
@@ -142,8 +152,22 @@ describe('personal statistics tiles', () => {
 
     const text = await renderedText()
 
-    expect(text).toMatch(/Datasets Unknown Process runs unknown/)
+    expect(text).toMatch(/Work Unknown datasets Runs unknown/)
     expect(text).toContain('Totals stay unknown while the storage of Ocean lab cannot be read.')
-    expect(text).not.toMatch(/Datasets 0/)
+    expect(text).not.toMatch(/Work 0/)
+  })
+
+  it('counts the databases of my groups once the database list was read', async () => {
+    aruna.myGroups.value = [{ id: 'db-1', name: 'Alpha' }]
+    aruna.getGroupUsage.mockResolvedValue(usage({ realm: { buckets: 2, distinct_buckets: 2, objects: 5, logical_bytes: 1_000, referenced_bytes: 1 } }))
+    aruna.searchBuckets.mockResolvedValue(listing([hit('a', 'n1', 'db-1'), hit('b', 'n1', 'db-1')]))
+    aruna.getBucketUsage.mockResolvedValue(bucketUsage(10, 0, 1))
+    await loadMyGroupsUsage()
+    await useReachableUsage().load()
+    databases.rows.value = [{ ownerGroup: 'db-1' }, { ownerGroup: 'other' }]
+    expect(await renderedText()).not.toContain('database')
+
+    databases.state.value = 'ready'
+    expect(await renderedText()).toContain('2 buckets, 1 database')
   })
 })

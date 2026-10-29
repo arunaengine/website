@@ -1,10 +1,13 @@
 <script setup lang="ts">
-// Personal tiles over every group the caller belongs to. Storage and objects come from the
+// The Overview cells over every group the caller belongs to. Storage and objects come from the
 // buckets themselves, so a distributed bucket counts once; a part that was not read makes the
 // figure a lower bound instead of a smaller number.
 import { computed, watch } from 'vue'
 import Notice from '@/components/ui/Notice.vue'
+import OverviewCell from '@/components/dashboard/OverviewCell.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import { useAruna } from '@/composables/useAruna'
+import { useDatabases } from '@/composables/useDatabases'
 import { useMyGroupsUsage } from '@/composables/useMyGroupsUsage'
 import { countText } from '@/composables/useBucketCount'
 import { useReachableUsage } from '@/composables/useReachableUsage'
@@ -16,6 +19,9 @@ const props = withDefaults(defineProps<{ refreshRevision?: number }>(), { refres
 
 const { aggregate, membershipKey, load } = useMyGroupsUsage()
 const reach = useReachableUsage()
+const { myGroups } = useAruna()
+const databases = useDatabases()
+databases.ensure()
 
 // A dashboard refresh reads every bucket again; a membership change reads what is new.
 watch(membershipKey, () => {
@@ -36,69 +42,77 @@ const lowerBound = (lower: boolean, text: string) => `${lower ? 'at least ' : ''
 
 const plural = (count: number, one: string, many: string) => (count === 1 ? one : many)
 
+// Why a figure is a lower bound or unknown, in short sentences under the cells.
+const notes = computed(() => {
+  const total = sum.value
+  return [
+    total.unread ? `The usage of ${total.unread} ${plural(total.unread, 'bucket', 'buckets')} could not be read, so it is not counted.` : '',
+    total.referencedUnknown
+      ? `${total.referencedUnknown} ${plural(total.referencedUnknown, 'bucket does', 'buckets do')} not report referenced data, so the referenced size is unknown there.`
+      : '',
+    total.partial ? 'Some buckets are still being counted, so their numbers are lower bounds.' : '',
+    missing.value.length ? `Buckets of ${missing.value.join(', ')} may be missing: a node did not answer or the list was too long.` : '',
+    failed.value.length ? `The buckets of ${failed.value.join(', ')} could not be listed.` : '',
+  ].filter(Boolean)
+})
+
 // Group totals count a bucket stored on several nodes once per node; the listed buckets correct that.
 const buckets = computed(() => {
   const total = aggregate.value.buckets
-  if (total == null) return 'in an unknown number of buckets'
+  if (total == null) return 'Buckets unknown'
   const counted = aggregate.value.bucketsDistinct
     ? { count: total, exact: true }
     : distinctCount(total, reach.copies.value, reach.total.value.buckets, reach.listedAll.value)
-  return `in ${countText(counted, formatCount)} ${plural(counted.exact ? counted.count : 2, 'bucket', 'buckets')}`
+  return `${countText(counted, formatCount)} ${plural(counted.exact ? counted.count : 2, 'bucket', 'buckets')}`
+})
+// The databases of my groups, once the realm's database list was read.
+const databaseText = computed(() => {
+  if (databases.state.value !== 'ready') return null
+  const mine = new Set(myGroups.value.map((group) => group.id))
+  const count = databases.rows.value.filter((row) => mine.has(row.ownerGroup)).length
+  return `${lowerBound(!databases.complete.value, formatCount(count))} ${plural(count, 'database', 'databases')}`
 })
 
 const datasets = computed(() => (aggregate.value.datasets == null ? 'Unknown' : formatCount(aggregate.value.datasets)))
 const runs = computed(() => {
   const value = aggregate.value.processRuns
-  return value == null ? 'Process runs unknown' : `and ${formatCount(value)} ${plural(value, 'process run', 'process runs')}`
+  return value == null ? 'Runs unknown' : `${formatCount(value)} ${plural(value, 'run', 'runs')}`
 })
 </script>
 
 <template>
-  <div class="space-y-3.5">
-    <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-      <template v-if="!loaded">
-        <Skeleton class="h-[108px] sm:col-span-2" />
-        <Skeleton class="h-[108px]" />
-      </template>
-      <template v-else>
-        <div class="surface flex flex-col gap-1.5 p-4 sm:col-span-2">
-          <span class="text-xs font-medium uppercase tracking-wider text-muted-foreground">Storage</span>
-          <div class="flex flex-wrap items-baseline gap-x-2">
-            <span class="font-display text-2xl font-semibold text-aruna-navy">{{ lowerBound(atLeast, formatBytes(sum.stored)) }}</span>
-            <span class="text-xs text-muted-foreground">stored</span>
-            <span class="ml-3 font-display text-2xl font-semibold text-aruna-navy">{{ lowerBound(referencedLower, formatBytes(sum.referenced)) }}</span>
-            <span class="text-xs text-muted-foreground">referenced</span>
-          </div>
-          <p class="text-xs text-muted-foreground">Stored counts against quotas. Referenced data stays at its source.</p>
-        </div>
-        <div class="surface flex flex-col gap-1.5 p-4">
-          <span class="text-xs font-medium uppercase tracking-wider text-muted-foreground">Objects</span>
-          <span class="font-display text-2xl font-semibold text-aruna-navy">{{ lowerBound(atLeast, formatCount(sum.objects)) }}</span>
-          <span class="text-xs text-muted-foreground">{{ buckets }}</span>
-        </div>
-      </template>
-      <Skeleton v-if="aggregate.pending" class="h-[108px]" />
-      <div v-else class="surface flex flex-col gap-1.5 p-4">
-        <span class="text-xs font-medium uppercase tracking-wider text-muted-foreground">Datasets</span>
-        <span class="font-display text-2xl font-semibold text-aruna-navy">{{ datasets }}</span>
-        <span class="text-xs text-muted-foreground">{{ runs }}</span>
-      </div>
-    </div>
+  <!-- Cells of the Overview grid; the notes run below its row. -->
+  <div class="contents">
+    <template v-if="!loaded">
+      <div class="bg-card px-5 py-4"><Skeleton class="h-16" /></div>
+      <div class="bg-card px-5 py-4"><Skeleton class="h-16" /></div>
+    </template>
+    <template v-else>
+      <OverviewCell label="Storage">
+        <template #value>
+          <b>{{ lowerBound(atLeast, formatBytes(sum.stored)) }}</b> stored
+          <b class="ml-2">{{ lowerBound(referencedLower, formatBytes(sum.referenced)) }}</b> referenced
+        </template>
+        Stored counts against quotas. Referenced data stays at its source.
+      </OverviewCell>
+      <OverviewCell label="Data">
+        <template #value><b>{{ lowerBound(atLeast, formatCount(sum.objects)) }}</b> {{ plural(sum.objects, 'object', 'objects') }}</template>
+        {{ [buckets, databaseText].filter(Boolean).join(', ') }}
+      </OverviewCell>
+    </template>
+    <div v-if="aggregate.pending" class="bg-card px-5 py-4"><Skeleton class="h-16" /></div>
+    <OverviewCell v-else label="Work">
+      <template #value><b>{{ datasets }}</b> {{ aggregate.datasets === 1 ? 'dataset' : 'datasets' }}</template>
+      {{ runs }}
+    </OverviewCell>
 
-    <ul v-if="loaded" class="space-y-1 text-xs text-muted-foreground">
-      <li v-if="sum.unread">
-        The usage of {{ sum.unread }} {{ plural(sum.unread, 'bucket', 'buckets') }} could not be read, so it is not counted.
-      </li>
-      <li v-if="sum.referencedUnknown">
-        {{ sum.referencedUnknown }} {{ plural(sum.referencedUnknown, 'bucket does', 'buckets do') }} not report
-        referenced data, so the referenced size is unknown there.
-      </li>
-      <li v-if="sum.partial">Some buckets are still being counted, so their numbers are lower bounds.</li>
-      <li v-if="missing.length">Buckets of {{ missing.join(', ') }} may be missing: a node did not answer or the list was too long.</li>
-      <li v-if="failed.length">The buckets of {{ failed.join(', ') }} could not be listed.</li>
-    </ul>
-    <Notice v-if="aggregate.failed.length" tone="warning">
-      Totals stay unknown while the storage of {{ aggregate.failed.join(', ') }} cannot be read.
-    </Notice>
+    <div v-if="loaded && (notes.length || aggregate.failed.length)" class="order-last space-y-2 bg-card px-5 py-3 sm:col-span-2 lg:col-span-4">
+      <ul v-if="notes.length" class="space-y-1 text-xs text-muted-foreground">
+        <li v-for="note in notes" :key="note">{{ note }}</li>
+      </ul>
+      <Notice v-if="aggregate.failed.length" tone="warning">
+        Totals stay unknown while the storage of {{ aggregate.failed.join(', ') }} cannot be read.
+      </Notice>
+    </div>
   </div>
 </template>

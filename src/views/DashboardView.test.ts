@@ -35,7 +35,6 @@ const refresh = vi.fn(async () => undefined)
 let servedEpoch = -1
 const loadInfo = vi.fn(async () => undefined)
 const loadRealmView = vi.fn(async (): Promise<unknown> => null)
-const listRecentMetadata = vi.fn(async () => [])
 const signIn = vi.fn(async () => undefined)
 const isNewUser = ref(false)
 const dismissOnboarding = vi.fn(async () => undefined)
@@ -50,14 +49,15 @@ const PageHeaderStub = defineComponent({
   },
 })
 const RouterLinkStub = defineComponent((_, { attrs, slots }) => () => h('a', attrs, slots.default?.()))
-const StatCardStub = defineComponent({
-  props: { label: String, value: [String, Number], hint: String },
-  setup(props, { slots }) {
-    return () =>
-      h('div', [h('strong', String(props.value)), h('span', props.label), props.hint ? h('small', props.hint) : null, slots.default?.()])
-  },
-})
 const SkeletonStub = defineComponent(() => () => h('span', 'loading'))
+const OverviewCellStub = defineComponent({
+  props: { label: String },
+  setup: (props, { slots }) => () => h('div', [h('span', props.label), slots.value?.(), slots.default?.()]),
+})
+// The realm's database list; its count shows once the list was read.
+const databaseRows = ref<unknown[]>([])
+const databaseState = ref('idle')
+const databasesStub = { useDatabases: () => ({ rows: databaseRows, state: databaseState, complete: ref(true), ensure: () => {} }) }
 const GroupQuotaCardsStub = defineComponent({
   props: { refreshRevision: Number },
   setup: (props) => () => h('div', `group quota cards ${props.refreshRevision}`),
@@ -83,19 +83,6 @@ const ScopeToggleStub = defineComponent({
       `scope toggle ${props.modelValue}`,
       h('button', { onClick: () => emit('update:modelValue', 'personal') }, 'show personal'),
       h('button', { onClick: () => emit('update:modelValue', 'realm') }, 'show realm'),
-    ]),
-})
-// Renders what it was handed, so the view's own node/device split is testable.
-const FederationPanelStub = defineComponent({
-  props: { nodes: { type: Array, default: () => [] }, devices: { type: Array, default: () => [] }, localPeerId: String },
-  setup: (props) => () =>
-    h('div', [
-      'federation panel',
-      h('b', ` hub ${props.localPeerId} `),
-      ...(props.nodes as Array<{ node_id: string; info?: { utilization?: { heartbeat_at_ms?: number } } }>).map((node) =>
-        h('span', ` ${node.node_id} beat ${node.info?.utilization?.heartbeat_at_ms} `),
-      ),
-      h('em', `${props.devices.length} devices`),
     ]),
 })
 const EmptyStub = defineComponent(() => () => null)
@@ -128,7 +115,6 @@ beforeAll(async () => {
       refresh,
       loadInfo,
       loadRealmView,
-      listRecentMetadata,
     }),
   }))
   vi.doMock('@/composables/useAuth', () => ({
@@ -155,13 +141,12 @@ beforeAll(async () => {
   }))
   vi.doMock('@/components/ui/Button.vue', () => ({ default: ButtonStub }))
   vi.doMock('@/components/dashboard/PageHeader.vue', () => ({ default: PageHeaderStub }))
-  vi.doMock('@/components/dashboard/FederationPanel.vue', () => ({ default: FederationPanelStub }))
   vi.doMock('@/components/dashboard/GroupQuotaCards.vue', () => ({ default: GroupQuotaCardsStub }))
   vi.doMock('@/components/dashboard/MyStatsCards.vue', () => ({ default: MyStatsCardsStub }))
   vi.doMock('@/composables/useBucketCount', () => bucketCountStub)
   vi.doMock('@/components/dashboard/DashboardScopeToggle.vue', () => ({ default: ScopeToggleStub }))
-  vi.doMock('@/components/metadata/ProfileChip.vue', () => ({ default: EmptyStub }))
-  vi.doMock('@/components/ui/StatCard.vue', () => ({ default: StatCardStub }))
+  vi.doMock('@/components/dashboard/OverviewCell.vue', () => ({ default: OverviewCellStub }))
+  vi.doMock('@/composables/useDatabases', () => databasesStub)
   vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: SkeletonStub }))
   DashboardView = (await import('./DashboardView.vue')).default
   const FirstPaint = await vi.importActual<typeof import('@/composables/useFirstPaint')>('@/composables/useFirstPaint')
@@ -191,7 +176,6 @@ beforeAll(async () => {
         refreshedEpoch: () => servedEpoch,
         loadInfo,
         loadRealmView,
-        listRecentMetadata,
       }),
     },
     '@/composables/useAuth': { useAuth: () => ({ authPending }) },
@@ -226,14 +210,13 @@ beforeAll(async () => {
     '@/components/ui/Button.vue': moduleDefault(ButtonStub),
     '@/components/ui/RefreshButton.vue': moduleDefault(RefreshButtonStub),
     '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
-    '@/components/dashboard/FederationPanel.vue': moduleDefault(FederationPanelStub),
     '@/components/dashboard/GroupQuotaCards.vue': moduleDefault(GroupQuotaCardsStub),
     '@/components/dashboard/MyStatsCards.vue': moduleDefault(MyStatsCardsStub),
     '@/composables/useBucketCount': bucketCountStub,
     '@/components/dashboard/DashboardScopeToggle.vue': moduleDefault(ScopeToggleStub),
-    '@/components/metadata/ProfileChip.vue': moduleDefault(EmptyStub),
     '@/components/auth/SignInPanel.vue': moduleDefault(EmptyStub),
-    '@/components/ui/StatCard.vue': moduleDefault(StatCardStub),
+    '@/components/dashboard/OverviewCell.vue': moduleDefault(OverviewCellStub),
+    '@/composables/useDatabases': databasesStub,
     '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
     '@/components/ui/EmptyState.vue': moduleDefault(EmptyStub),
     '@/components/desktop/HomeCards.vue': moduleDefault(HomeCardsStub),
@@ -273,7 +256,8 @@ beforeEach(() => {
   loadInfo.mockClear()
   loadRealmView.mockReset()
   loadRealmView.mockResolvedValue(null)
-  listRecentMetadata.mockClear()
+  databaseRows.value = []
+  databaseState.value = 'idle'
   signIn.mockClear()
 })
 
@@ -298,7 +282,7 @@ describe('guest dashboard truth', () => {
     const text = content(mounted.root)
 
     expect(text).toContain('Loading dashboard')
-    expect(text).not.toContain('Realm statistics')
+    expect(text).not.toContain('Overview')
     mounted.app.unmount()
     vi.unstubAllGlobals()
   })
@@ -308,29 +292,7 @@ describe('guest dashboard truth', () => {
     // numbers of the previous visit until the slow poll lands.
     await renderedText()
 
-    expect(listRecentMetadata).toHaveBeenCalledOnce()
     expect(refresh).toHaveBeenCalledOnce()
-  })
-
-  it('renders the dashboard while the recency window settles', async () => {
-    vi.stubGlobal('window', {})
-    let resolveRecent!: (value: never[]) => void
-    const pendingRecent = new Promise<never[]>((resolve) => {
-      resolveRecent = resolve
-    })
-    listRecentMetadata.mockImplementationOnce(() => pendingRecent)
-
-    const mounted = await mountApp(DashboardClient)
-    expect(content(mounted.root)).not.toContain('Loading dashboard')
-    expect(content(mounted.root)).toContain('Realm statistics')
-    expect(content(mounted.root)).toContain('Recent datasets')
-
-    resolveRecent([])
-    await flush()
-
-    expect(content(mounted.root)).toContain('Realm statistics')
-    mounted.app.unmount()
-    vi.unstubAllGlobals()
   })
 
   it('renders the three public_overview counts instead of guest-filtered zeros', async () => {
@@ -344,27 +306,24 @@ describe('guest dashboard truth', () => {
 
     const text = await renderedText()
 
-    expect(text).toMatch(/23 Live datasets/)
-    expect(text).toMatch(/8 Realm groups/)
-    expect(text).toMatch(/4 Configured nodes/)
-    expect(text).toContain('Gaia realm')
-    expect(text).toContain('Shared science data')
+    expect(text).toContain('Work 23 datasets')
+    expect(text).toContain('Realm 4 nodes')
     expect(text).toContain('Sign in')
+    // Storage and data are figures of a signed-in session.
+    expect(text).not.toContain('Storage')
     expect(text).not.toContain('Loaded profiles')
     expect(text).not.toContain('Nodes online')
     expect(text).not.toContain('0 / 0')
     expect(text).not.toContain('My statistics')
     expect(text).not.toContain('my stats cards')
     expect(text).not.toContain('scope toggle')
-    expect(text).not.toContain('federation panel')
   })
 
   it('renders absent public counts as unknown rather than zero', async () => {
     const text = await renderedText()
 
-    expect(text).toMatch(/Unknown Live datasets/)
-    expect(text).toMatch(/Unknown Realm groups/)
-    expect(text).toMatch(/Unknown Configured nodes/)
+    expect(text).toContain('Work Unknown')
+    expect(text).toContain('Realm Unknown')
     expect(text).toContain('Public counts are unavailable from this node')
     expect(text).not.toContain('0 / 0')
   })
@@ -388,40 +347,44 @@ describe('authenticated dashboard scope', () => {
       metadata_replication: { default_replication_factor: null },
       public_overview: { live_datasets: 9, groups: 8, nodes_configured: 2 },
       nodes: [
-        { node_id: 'node-a', info: { utilization: { documents_held: 6 } } },
+        { node_id: 'node-a', present: true, info: { utilization: { documents_held: 6 } } },
         { node_id: 'node-b', info: { utilization: {} } },
       ],
     }
   }
 
-  it('shows My statistics alone by default, then the nodes panel', async () => {
+  it('shows my figures in the Overview by default, the realm cell and then the groups', async () => {
     signedInRealm()
 
     const text = await renderedText()
-    const personalIndex = text.indexOf('My statistics')
+    const overview = text.indexOf('Overview')
 
-    expect(personalIndex).toBeGreaterThanOrEqual(0)
-    expect(text.indexOf('my stats cards')).toBeGreaterThan(personalIndex)
-    expect(text.indexOf('group quota cards')).toBeGreaterThan(personalIndex)
-    expect(text.indexOf('federation panel')).toBeGreaterThan(personalIndex)
+    expect(overview).toBeGreaterThanOrEqual(0)
+    expect(text.indexOf('my stats cards')).toBeGreaterThan(overview)
+    expect(text.indexOf('Realm 1 node online')).toBeGreaterThan(text.indexOf('my stats cards'))
+    expect(text.indexOf('group quota cards')).toBeGreaterThan(text.indexOf('Realm 1 node online'))
     expect(text).toContain('scope toggle personal')
-    expect(text).not.toContain('Realm statistics')
-    expect(text).not.toContain('Replica-inclusive placement records held')
+    expect(text).toContain('Replication on all eligible nodes Status')
+    // The old sections and the boxes the sidebar already offers are gone.
+    for (const gone of ['My statistics', 'Realm statistics', 'Replica-inclusive placement records held', 'Recent datasets', 'Open Data']) {
+      expect(text).not.toContain(gone)
+    }
   })
 
-  it('shows the realm section alone when the account stored that scope', async () => {
+  it('shows the realm figures in the same cells when the account stored that scope', async () => {
     signedInRealm()
     scope.value = 'realm'
+    databaseState.value = 'ready'
+    databaseRows.value = [{}, {}]
 
     const text = await renderedText()
 
-    expect(text).toContain('Realm statistics')
     expect(text).toContain('scope toggle realm')
-    expect(text).toContain('Replica-inclusive placement records held')
-    expect(text).toContain('1 of 2 nodes reporting')
-    expect(text).not.toContain('My statistics')
+    expect(text).toContain('Storage 2 KB stored 64 B referenced')
+    expect(text).toContain('Data 11 objects 3 buckets, 2 databases')
+    expect(text).toContain('Work 9 datasets')
+    expect(text).toContain('group quota cards')
     expect(text).not.toContain('my stats cards')
-    expect(text).not.toContain('group quota cards')
   })
 
   it('switches the section through the stored scope', async () => {
@@ -430,7 +393,7 @@ describe('authenticated dashboard scope', () => {
 
     const mounted = await mountApp(DashboardClient)
     expect(content(mounted.root)).toContain('my stats cards')
-    expect(content(mounted.root)).not.toContain('Realm statistics')
+    expect(content(mounted.root)).not.toContain('9 datasets')
 
     await click(button(mounted.root, 'show realm'))
     expect(setScope).toHaveBeenCalledWith('realm')
@@ -438,33 +401,13 @@ describe('authenticated dashboard scope', () => {
     // The composable flips `scope` optimistically; the view follows it.
     scope.value = 'realm'
     await flush()
-    expect(content(mounted.root)).toContain('Realm statistics')
+    expect(content(mounted.root)).toContain('9 datasets')
     expect(content(mounted.root)).not.toContain('my stats cards')
     mounted.app.unmount()
     vi.unstubAllGlobals()
   })
 
-  it('keeps the realm section to realm-wide figures only', async () => {
-    signedInRealm()
-    scope.value = 'realm'
-
-    const text = await renderedText()
-
-    expect(text).toMatch(/9 Realm datasets/)
-    expect(text).toMatch(/8 Realm groups/)
-    expect(text).toMatch(/11 Objects/)
-    expect(text).toMatch(/2.1 KB Total data/)
-    expect(text).toMatch(/2 KB stored\s*,\s*64 B referenced/)
-    expect(text).toContain("Referenced files stay at their source and don't count toward quotas.")
-    expect(text).toMatch(/3 Buckets/)
-    // Node-local counters and the client-window tile moved out of the section.
-    expect(text).not.toContain('Loaded profiles')
-    expect(text).not.toContain('physical blob locations')
-    expect(text).not.toContain('Aggregate blob storage on this node')
-    expect(text).not.toContain('Node-reported total')
-  })
-
-  it('keeps devices out of node health and counts them apart', async () => {
+  it('counts realm nodes without the devices', async () => {
     currentUser.value = { id: 'user-id', name: 'Ada Lovelace' }
     scope.value = 'realm'
     realmInfo.value = {
@@ -477,10 +420,7 @@ describe('authenticated dashboard scope', () => {
 
     const text = await renderedText()
 
-    expect(text).toContain('server-node')
-    expect(text).not.toContain('owned-device')
-    expect(text).toContain('1 devices')
-    expect(text).toMatch(/1 \/ 1 Nodes online/)
+    expect(text).toContain('Realm 1 node online')
   })
 })
 
@@ -595,83 +535,7 @@ describe('desktop home', () => {
   })
 })
 
-describe('desktop realm nodes panel', () => {
-  const beat = (node_id: string, kind: string, heartbeat_at_ms: number) => ({ node_id, kind, info: { utilization: { heartbeat_at_ms } } })
-
-  beforeEach(() => {
-    currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
-    nodeInfo.value = { node: { peer_id: 'own-device' } }
-    // The device's own view: stale heartbeats and itself as the serving node.
-    realmInfo.value = {
-      metadata_replication: { default_replication_factor: null },
-      nodes: [beat('mgmt-node', 'management', 1000), beat('own-device', 'user', 1000)],
-    }
-  })
-
-  it('reads the panel from a realm node and makes it the hub', async () => {
-    desktopMode.value = true
-    loadRealmView.mockResolvedValue({
-      info: { node: { peer_id: 'mgmt-node' } },
-      realm: { nodes: [beat('mgmt-node', 'management', 9000), beat('server-node', 'server', 8000), beat('own-device', 'user', 7000)] },
-    })
-    const mounted = await mountApp(DashboardClient)
-    await flush()
-    const text = content(mounted.root)
-
-    expect(text).toContain('hub mgmt-node')
-    expect(text).toContain('mgmt-node beat 9000')
-    expect(text).toContain('server-node beat 8000')
-    expect(text).toContain('1 devices')
-    expect(text).not.toContain('beat 1000')
-    mounted.app.unmount()
-  })
-
-  it('keeps a slow answer that lands after periodic refreshes', async () => {
-    desktopMode.value = true
-    let answer: (view: unknown) => void = () => undefined
-    loadRealmView.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
-    loadRealmView.mockImplementation(() => new Promise(() => undefined))
-    const mounted = await mountApp(DashboardClient)
-    await flush()
-    // Each periodic read replaces the realm info with a fresh object of the same realm.
-    realmInfo.value = { ...realmInfo.value }
-    await flush()
-    realmInfo.value = { ...realmInfo.value }
-    await flush()
-
-    answer({ info: { node: { peer_id: 'mgmt-node' } }, realm: { nodes: [beat('mgmt-node', 'management', 9000)] } })
-    await flush()
-
-    expect(loadRealmView).toHaveBeenCalledTimes(3)
-    expect(content(mounted.root)).toContain('hub mgmt-node')
-    expect(content(mounted.root)).toContain('mgmt-node beat 9000')
-    mounted.app.unmount()
-  })
-
-  it('keeps the device view when no realm node answers', async () => {
-    desktopMode.value = true
-    const mounted = await mountApp(DashboardClient)
-    await flush()
-
-    expect(loadRealmView).toHaveBeenCalled()
-    expect(content(mounted.root)).toContain('hub own-device')
-    expect(content(mounted.root)).toContain('mgmt-node beat 1000')
-    mounted.app.unmount()
-  })
-
-  it('leaves the browser portal on the node serving it', async () => {
-    const mounted = await mountApp(DashboardClient)
-    await flush()
-
-    expect(loadRealmView).not.toHaveBeenCalled()
-    expect(content(mounted.root)).toContain('hub own-device')
-    mounted.app.unmount()
-  })
-})
-
 describe('dashboard refresh', () => {
-  const doc = (ulid: string, title: string) => ({ ulid, title, description: '', updatedAt: '2026-10-27' }) as never
-
   beforeEach(() => {
     vi.stubGlobal('window', {})
     currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
@@ -692,7 +556,6 @@ describe('dashboard refresh', () => {
     const revision = (name: string) => Number(content(mounted.root).match(new RegExp(`${name} (\\d+)`))?.[1])
 
     expect(refresh).toHaveBeenCalledOnce()
-    expect(listRecentMetadata).toHaveBeenCalledTimes(2)
     expect([revision('group quota cards'), revision('my stats cards')]).toEqual([0, 0])
     servedEpoch = -1
 
@@ -703,28 +566,6 @@ describe('dashboard refresh', () => {
     expect(revision('group quota cards')).toBe(1)
     mounted.app.unmount()
     servedEpoch = -1
-  })
-
-  it('keeps the recent datasets in place while a revision bump reads them again', async () => {
-    listRecentMetadata.mockResolvedValueOnce([doc('d1', 'Coral survey')])
-    const mounted = await mountApp(DashboardClient)
-    await flush()
-    const shown = content(mounted.root)
-    expect(shown).toContain('Coral survey')
-
-    let answer!: (docs: never[]) => void
-    listRecentMetadata.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
-    dashboardRevision.value++
-    await flush()
-    const during = content(mounted.root)
-    expect(during).toContain('Coral survey')
-    expect(during.split('loading').length).toBe(shown.split('loading').length)
-
-    answer([doc('d2', 'Reef census')])
-    await flush()
-    expect(content(mounted.root)).toContain('Reef census')
-    expect(content(mounted.root)).not.toContain('Coral survey')
-    mounted.app.unmount()
   })
 
   it('reads the group quota figures again on the info poll, never every bucket', async () => {
