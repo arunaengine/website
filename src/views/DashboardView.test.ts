@@ -73,7 +73,8 @@ const realmNodesStub = {
   useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'own-device' }),
   computerName: (node?: { info?: { labels?: Record<string, string> } }) => node?.info?.labels?.device || 'This computer',
 }
-const databasesStub = { useDatabases: () => ({ rows: databaseRows, state: databaseState, complete: ref(true), ensure: () => {} }) }
+const reloadDatabases = vi.fn(async () => undefined)
+const databasesStub = { useDatabases: () => ({ rows: databaseRows, state: databaseState, complete: ref(true), ensure: () => {}, reload: reloadDatabases }) }
 const GroupQuotaCardsStub = defineComponent({
   props: { refreshRevision: Number },
   setup: (props) => () => h('div', `group quota cards ${props.refreshRevision}`),
@@ -269,6 +270,7 @@ beforeEach(() => {
   databaseState.value = 'idle'
   importsTotal.value = { running: 0, atLeast: false }
   loadImports.mockClear()
+  reloadDatabases.mockClear()
   signIn.mockClear()
 })
 
@@ -615,6 +617,18 @@ describe('dashboard refresh', () => {
     expect(revision('group quota cards')).toBe(1)
     mounted.app.unmount()
     servedEpoch = -1
+  })
+
+  it('reads the shared database list again with each refresh, so a newly joined group counts', async () => {
+    const mounted = await mountApp(DashboardClient)
+    await flush()
+    expect(reloadDatabases).toHaveBeenCalledOnce()
+
+    dashboardRevision.value++
+    await flush()
+    await flush()
+    expect(reloadDatabases).toHaveBeenCalledTimes(2)
+    mounted.app.unmount()
   })
 
   it('reads the group quota figures again on the info poll, never every bucket', async () => {

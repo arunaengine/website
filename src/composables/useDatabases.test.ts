@@ -44,6 +44,24 @@ describe('databases', () => {
     scope.stop()
   })
 
+  it('keeps the listed rows ready while a reload of the same session reads again', async () => {
+    aruna.searchBuckets.mockResolvedValueOnce(page([view('lab')]))
+    const { databases, scope } = start()
+    databases.ensure()
+    await vi.waitFor(() => expect(databases.state.value).toBe('ready'))
+
+    let answer: (value: unknown) => void = () => {}
+    aruna.searchBuckets.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const reading = databases.reload()
+    expect(databases.state.value).toBe('ready')
+    expect(databases.rows.value.map((row) => row.bucket)).toEqual(['lab'])
+
+    answer(page([view('lab'), view('spire')]))
+    await reading
+    expect(databases.rows.value.map((row) => row.bucket)).toEqual(['lab', 'spire'])
+    scope.stop()
+  })
+
   it('reads every page up to the end and finds the database of a bucket', async () => {
     aruna.searchBuckets.mockResolvedValueOnce(page([view('lab')], 'c1'))
     aruna.searchBuckets.mockResolvedValueOnce(page([view('spire')]))

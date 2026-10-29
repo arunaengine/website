@@ -34,7 +34,8 @@ export function useDatabases() {
       state.value = 'idle'
       return
     }
-    state.value = 'loading'
+    // A reread of this session keeps the listed rows ready until the new answer lands.
+    if (state.value !== 'ready' || listedEpoch.value !== epoch) state.value = 'loading'
     error.value = null
     const hits: BucketSearchHit[] = []
     let cursor: string | undefined

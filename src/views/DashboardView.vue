@@ -17,6 +17,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { useDatabases } from '@/composables/useDatabases'
 import { useNodeImports } from '@/composables/useNodeImports'
 import { computerName, useRealmNodes } from '@/composables/useRealmNodes'
 import { useDashboardScope } from '@/composables/useDashboardScope'
@@ -65,11 +66,16 @@ watch(sessionEpoch, () => {
   realmView.value = null
 }, { flush: 'sync' })
 
+// The database list is shared for the session; a dashboard refresh reads it once more, so a group
+// joined since then counts its databases too.
+const databases = useDatabases()
+
 async function refreshDashboard() {
   if (refreshing.value) {
     refreshQueued = true
     return
   }
+  if (currentUser.value) void databases.reload()
   refreshing.value = true
   try {
     let again = false
