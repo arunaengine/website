@@ -105,7 +105,11 @@ const bucketLink = (hit: BucketSearchHit) => ({
 
 <template>
   <div>
-    <PageHeader :title="name" :description="node ? [roleLabel[node.kind], location].filter(Boolean).join(', ') : ''">
+    <PageHeader
+      :title="name"
+      :description="node ? [roleLabel[node.kind], location].filter(Boolean).join(', ') : ''"
+      :docs="{ topic: 'realm-nodes-groups', section: 'Nodes and the realm' }"
+    >
       <template v-if="node && rename" #actions>
         <NodeNameEdit :name="name" :value="node.display_name" :save="rename"><span class="sr-only">{{ name }}</span></NodeNameEdit>
       </template>
