@@ -58,6 +58,8 @@ describe('saved runs', () => {
     expect(askedFor(run('a'))).toEqual(['genome.fna', 'results folder'])
     const finished = { ...run('a').task, id: 't1', state: 'COMPLETE' as const, logs: [], creation_time: 'x' }
     expect(Object.keys(savedTask(finished)).sort()).toEqual(['executors', 'inputs', 'name'])
+    const keyed = savedTask({ ...finished, tags: { 'aruna-engine.org/idempotency-key': 'k1', project: 'reef' } })
+    expect(keyed.tags).toEqual({ project: 'reef' })
   })
 
   it('never keeps secret-looking values, also from an imported file', () => {

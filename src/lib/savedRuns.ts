@@ -1,7 +1,7 @@
 // "My runs": runs a person saved to start again, kept only in this browser or desktop app.
 // A saved run is the run request as it was, plus which inputs and whether the results folder
 // are asked again each time. A file export carries them to another computer.
-import type { TesTask } from '@/lib/tes'
+import { TES_IDEMPOTENCY_TAG, type TesTask } from '@/lib/tes'
 
 export interface SavedRun {
   id: string
@@ -24,9 +24,16 @@ const SECRET_MARKERS = ['TOKEN', 'SECRET', 'KEY', 'PASS', 'CREDENTIAL', 'AUTH', 
 /** A variable whose value is never saved and is asked again at each start. */
 export const isSecretName = (name: string) => SECRET_MARKERS.some((marker) => name.toUpperCase().includes(marker))
 
-/** The run request without what only a finished run has and without secret-looking values. */
+/**
+ * The run request without what only a finished run has, without secret-looking values and
+ * without the idempotency key, so each start gets a fresh one.
+ */
 export function savedTask(task: TesTask): TesTask {
   const { id: _id, state: _state, logs: _logs, creation_time: _created, ...rest } = task
+  if (rest.tags && TES_IDEMPOTENCY_TAG in rest.tags) {
+    const { [TES_IDEMPOTENCY_TAG]: _key, ...tags } = rest.tags
+    rest.tags = tags
+  }
   const executors = rest.executors.map((executor) => ({
     ...executor,
     ...(executor.env
