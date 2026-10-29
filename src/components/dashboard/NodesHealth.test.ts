@@ -25,6 +25,7 @@ const ChipStub = defineComponent({
 const NodesHealth = compileClientComponent(new URL('./NodesHealth.vue', import.meta.url), {
   vue: VueRuntime,
   '@vueuse/core': { useNow: () => ref(new Date(0)) },
+  '@lucide/vue': { HeartPulse: SpanStub },
   '@/components/ui/Badge.vue': moduleDefault(SpanStub),
   '@/components/ui/LabelChip.vue': moduleDefault(ChipStub),
   '@/components/ui/NodeLabel.vue': moduleDefault(SpanStub),

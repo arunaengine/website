@@ -23,8 +23,8 @@ describe('dashboard scope toggle', () => {
   it('presses the shown scope and offers the other without a caption', async () => {
     const { root } = await mountApp(toggle, { props: { modelValue: 'personal' } })
 
-    expect(button(root, 'My statistics').props['aria-pressed']).toBe(true)
-    expect(button(root, 'Realm statistics').props['aria-pressed']).toBe(false)
+    expect(button(root, 'My groups').props['aria-pressed']).toBe(true)
+    expect(button(root, 'Whole realm').props['aria-pressed']).toBe(false)
     expect(content(root)).not.toContain('Lead with')
   })
 
@@ -32,10 +32,10 @@ describe('dashboard scope toggle', () => {
     const update = vi.fn()
     const { root } = await mountApp(toggle, { props: { modelValue: 'personal', 'onUpdate:modelValue': update } })
 
-    await click(button(root, 'My statistics'))
+    await click(button(root, 'My groups'))
     expect(update).not.toHaveBeenCalled()
 
-    await click(button(root, 'Realm statistics'))
+    await click(button(root, 'Whole realm'))
     expect(update).toHaveBeenCalledWith('realm')
   })
 })

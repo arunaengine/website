@@ -6,7 +6,6 @@ import DashboardScopeToggle from '@/components/dashboard/DashboardScopeToggle.vu
 import FederationPanel from '@/components/dashboard/FederationPanel.vue'
 import GroupQuotaCards from '@/components/dashboard/GroupQuotaCards.vue'
 import MyStatsCards from '@/components/dashboard/MyStatsCards.vue'
-import ReachableData from '@/components/dashboard/ReachableData.vue'
 import ProfileChip from '@/components/metadata/ProfileChip.vue'
 import SignInPanel from '@/components/auth/SignInPanel.vue'
 import StatCard from '@/components/ui/StatCard.vue'
@@ -354,14 +353,15 @@ const pageDescription = computed(() =>
         <header class="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 id="my-statistics-heading" class="font-display text-[15px] font-semibold text-foreground/85">My statistics</h2>
-            <p class="mt-0.5 text-xs text-muted-foreground">Aggregated across the groups you belong to.</p>
+            <p class="mt-0.5 text-xs text-muted-foreground">Everything in your groups, on every node.</p>
           </div>
           <DashboardScopeToggle :model-value="scope" @update:model-value="setScope" />
         </header>
 
-        <MyStatsCards />
-        <ReachableData v-if="myGroups.length" :refresh-revision="quotaRevision" />
-        <GroupQuotaCards v-if="myGroups.length" :refresh-revision="cardsRevision" />
+        <template v-if="myGroups.length">
+          <MyStatsCards :refresh-revision="quotaRevision" />
+          <GroupQuotaCards :refresh-revision="cardsRevision" />
+        </template>
         <EmptyState v-else compact title="You do not belong to any groups yet." />
       </section>
 

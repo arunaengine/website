@@ -474,7 +474,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
         <div class="flex flex-wrap items-center gap-2 border-b border-border/60 px-5 py-3">
           <span class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Kinds</span>
           <Badge v-for="[kind, count] in kindCounts" :key="kind" :variant="kindVariant[kind]" size="sm">
-            {{ kindLabel[kind] }} · {{ count }}
+            {{ kindLabel[kind] }} {{ count }}
           </Badge>
         </div>
         <div class="flex flex-wrap items-center gap-2 border-b border-border/60 px-5 py-3">

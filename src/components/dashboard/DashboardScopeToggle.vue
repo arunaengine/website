@@ -7,8 +7,8 @@ defineProps<{ modelValue: DashboardScope }>()
 const emit = defineEmits<{ (e: 'update:modelValue', value: DashboardScope): void }>()
 
 const OPTIONS = [
-  { value: 'personal', label: 'My statistics' },
-  { value: 'realm', label: 'Realm statistics' },
+  { value: 'personal', label: 'My groups' },
+  { value: 'realm', label: 'Whole realm' },
 ]
 </script>
 

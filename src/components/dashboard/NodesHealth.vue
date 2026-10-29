@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useNow } from '@vueuse/core'
+import { HeartPulse } from '@lucide/vue'
 import Badge from '@/components/ui/Badge.vue'
 import LabelChip from '@/components/ui/LabelChip.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
@@ -115,20 +116,19 @@ function labelChips(node: RealmNodeInfo): string[] {
                 v-if="node.info.utilization.documents_held !== undefined"
                 title="Datasets this node holds by placement shard"
               >
-                · {{ formatNumber(node.info.utilization.documents_held) }} datasets
+                {{ formatNumber(node.info.utilization.documents_held) }} {{ node.info.utilization.documents_held === 1 ? 'dataset' : 'datasets' }}
               </span>
               <span
                 v-if="node.info.utilization.load_permille !== undefined"
                 class="inline-flex items-center gap-1"
                 :title="`1-minute load average at ${loadPercent(node)}% of CPU cores (1000‰ = one runnable process per core)`"
               >
-                ·
                 <span class="inline-block h-1.5 w-8 overflow-hidden rounded-full bg-muted">
                   <span class="block h-full rounded-full" :class="loadFill(node)" :style="{ width: loadWidth(node) }" />
                 </span>
                 <span :class="loadTextTone(node)">{{ loadPercent(node) }}%</span>
               </span>
-              <span v-if="heartbeat(node)" class="ml-auto" title="Last heartbeat">♥ {{ heartbeat(node) }}</span>
+              <span v-if="heartbeat(node)" class="ml-auto" title="Last heartbeat"><HeartPulse class="mr-1 inline h-3 w-3" />{{ heartbeat(node) }}</span>
             </div>
           </template>
           <p v-else class="text-[11px] text-muted-foreground">No published info yet.</p>

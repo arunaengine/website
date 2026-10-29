@@ -13,12 +13,6 @@ const aruna = vi.hoisted(() => ({
 }))
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
 
-const notifications = vi.hoisted(() => ({
-  available: { value: true },
-  unreadCount: { value: 3 },
-}))
-vi.mock('@/composables/useNotifications', () => ({ useNotifications: () => notifications }))
-
 const { loadMyGroupsUsage } = await import('@/composables/useMyGroupsUsage')
 const { useReachableUsage } = await import('@/composables/useReachableUsage')
 const MyStatsCards = (await import('./MyStatsCards.vue')).default
@@ -47,6 +41,10 @@ function usage(overrides: Partial<UsageResponse> = {}): UsageResponse {
   }
 }
 
+const hit = (bucket: string, node: string, group: string, set?: string) => ({ arn: '', bucket, node_id: node, group_id: group, created_at: '', set_id: set })
+const listing = (hits: ReturnType<typeof hit>[]) => ({ hits, nodes_queried: 2, nodes_failed: 0, failed_nodes: [] })
+const bucketUsage = (stored: number, referenced: number | null, objects: number) => ({ logical_bytes: stored, referenced_bytes: referenced, objects, complete: true })
+
 async function renderedText(): Promise<string> {
   const html = await renderToString(createSSRApp(MyStatsCards))
   return html
@@ -59,43 +57,65 @@ async function renderedText(): Promise<string> {
 
 beforeEach(() => {
   aruna.getGroupUsage.mockReset()
-  notifications.available.value = true
-  notifications.unreadCount.value = 3
+  aruna.getBucketUsage.mockReset()
+  aruna.searchBuckets.mockReset()
+  aruna.sessionEpoch.value++
 })
 
 describe('personal statistics tiles', () => {
-  it('sums the usage of every membership', async () => {
+  it('shows storage, objects and datasets with each distributed bucket once', async () => {
     aruna.myGroups.value = [
       { id: 'sum-1', name: 'Alpha' },
       { id: 'sum-2', name: 'Beta' },
     ]
     aruna.getGroupUsage.mockResolvedValue(usage())
     // Each group total counts 2 buckets; Alpha's two are the copies of one distributed bucket.
-    const hit = (bucket: string, node: string, group: string, set?: string) => ({ arn: '', bucket, node_id: node, group_id: group, created_at: '', set_id: set })
-    aruna.searchBuckets.mockImplementation(async (_q: string, options: { groupId: string }) => ({
-      hits: options.groupId === 'sum-1' ? [hit('shared', 'n1', 'sum-1', 's1'), hit('shared', 'n2', 'sum-1', 's1')] : [hit('a', 'n1', 'sum-2'), hit('b', 'n1', 'sum-2')],
-      nodes_queried: 2, nodes_failed: 0, failed_nodes: [],
-    }))
-    aruna.getBucketUsage.mockRejectedValue(new Error('not needed here'))
+    aruna.searchBuckets.mockImplementation(async (_q: string, options: { groupId: string }) =>
+      listing(options.groupId === 'sum-1' ? [hit('shared', 'n1', 'sum-1', 's1'), hit('shared', 'n2', 'sum-1', 's1')] : [hit('a', 'n1', 'sum-2'), hit('b', 'n1', 'sum-2')]),
+    )
+    aruna.getBucketUsage.mockResolvedValue(bucketUsage(2048, 1024, 4))
     await loadMyGroupsUsage()
     await useReachableUsage().load()
 
     const text = await renderedText()
 
-    expect(text).toMatch(/Datasets 6/)
-    expect(text).toMatch(/Storage used 2 KB/)
-    expect(text).toMatch(/Buckets 3/)
-    expect(text).toMatch(/Objects 10/)
-    expect(text).toMatch(/Groups 2/)
-    expect(text).toMatch(/Unread notifications 3/)
+    expect(text).toContain(`Storage ${formatBytes(3 * 2048)} stored ${formatBytes(3 * 1024)} referenced`)
+    expect(text).toContain('Stored, counts against quotas')
+    expect(text).toContain('Objects 12 in 3 buckets')
+    expect(text).toContain('Datasets 6 and 4 process runs')
+    expect(text).not.toContain('at least')
   })
 
-  it('shows the node\'s count with each distributed bucket once as exact', async () => {
-    aruna.myGroups.value = [{ id: 'distinct-1', name: 'Alpha' }]
-    aruna.getGroupUsage.mockResolvedValue(usage({ realm: { buckets: 5, distinct_buckets: 3, objects: 5, logical_bytes: 1_000, referenced_bytes: 1 } }))
+  it('uses the singular for one bucket and one process run', async () => {
+    aruna.myGroups.value = [{ id: 'one-1', name: 'Alpha' }]
+    aruna.getGroupUsage.mockResolvedValue(usage({ dataset_count: 0, process_run_count: 1, realm: { buckets: 1, distinct_buckets: 1, objects: 5, logical_bytes: 1_000, referenced_bytes: 1 } }))
+    aruna.searchBuckets.mockResolvedValue(listing([hit('a', 'n1', 'one-1')]))
+    aruna.getBucketUsage.mockResolvedValue(bucketUsage(10, 0, 1))
     await loadMyGroupsUsage()
+    await useReachableUsage().load()
 
-    expect(await renderedText()).toMatch(/Buckets 3 /)
+    const text = await renderedText()
+
+    expect(text).toContain('in 1 bucket ')
+    expect(text).toMatch(/Datasets 0 and 1 process run$/)
+  })
+
+  it('shows a lower bound when a bucket could not be read', async () => {
+    aruna.myGroups.value = [{ id: 'lower-1', name: 'Alpha' }]
+    aruna.getGroupUsage.mockResolvedValue(usage())
+    aruna.searchBuckets.mockResolvedValue(listing([hit('a', 'n1', 'lower-1'), hit('b', 'n1', 'lower-1')]))
+    aruna.getBucketUsage.mockImplementation(async (bucket: string) => {
+      if (bucket === 'b') throw new Error('node unreachable')
+      return bucketUsage(10, null, 1)
+    })
+    await loadMyGroupsUsage()
+    await useReachableUsage().load()
+
+    const text = await renderedText()
+
+    expect(text).toContain('Storage at least 10 B stored at least 0 B referenced')
+    expect(text).toContain('could not be read, so it is not counted')
+    expect(text).toContain('1 bucket does not report referenced data')
   })
 
   it('never reports physical storage, which has no group dimension', async () => {
@@ -107,7 +127,6 @@ describe('personal statistics tiles', () => {
 
     expect(text).not.toContain('physical')
     expect(text).not.toContain(formatBytes(90_000))
-    expect(text).toContain('Counted against your group quotas')
   })
 
   it('answers unknown, never zero, when a group could not be read', async () => {
@@ -123,37 +142,8 @@ describe('personal statistics tiles', () => {
 
     const text = await renderedText()
 
-    expect(text).toMatch(/Datasets Unknown/)
-    expect(text).toMatch(/Storage used Unknown/)
+    expect(text).toMatch(/Datasets Unknown Process runs unknown/)
     expect(text).toContain('Totals stay unknown while the storage of Ocean lab cannot be read.')
-    expect(text).not.toMatch(/Storage used 0 B/)
-  })
-
-  it('badges the worst quota state across the memberships', async () => {
-    aruna.myGroups.value = [
-      { id: 'worst-1', name: 'Alpha' },
-      { id: 'worst-2', name: 'Beta' },
-    ]
-    aruna.getGroupUsage.mockImplementation(async (groupId) =>
-      groupId === 'worst-2'
-        ? usage({ realm: { buckets: 1, objects: 1, logical_bytes: 30_000, referenced_bytes: 0 } })
-        : usage(),
-    )
-    await loadMyGroupsUsage()
-
-    const text = await renderedText()
-
-    expect(text).toContain('writes blocked')
-  })
-
-  it('leaves the notification tile out where the node serves no notifications', async () => {
-    aruna.myGroups.value = [{ id: 'bell-1', name: 'Alpha' }]
-    aruna.getGroupUsage.mockResolvedValue(usage())
-    notifications.available.value = false
-    await loadMyGroupsUsage()
-
-    const text = await renderedText()
-
-    expect(text).not.toContain('Unread notifications')
+    expect(text).not.toMatch(/Datasets 0/)
   })
 })

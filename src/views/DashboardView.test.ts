@@ -62,10 +62,9 @@ const GroupQuotaCardsStub = defineComponent({
   setup: (props) => () => h('div', `group quota cards ${props.refreshRevision}`),
 })
 let pollInfo: () => unknown = () => undefined
-const MyStatsCardsStub = defineComponent(() => () => h('div', 'my stats cards'))
-const ReachableStub = defineComponent({
+const MyStatsCardsStub = defineComponent({
   props: { refreshRevision: Number },
-  setup: (props) => () => h('div', `reachable data ${props.refreshRevision}`),
+  setup: (props) => () => h('div', `my stats cards ${props.refreshRevision}`),
 })
 // The node total stands as the exact count; the correction itself is tested with the count rule.
 const bucketCountStub = {
@@ -158,7 +157,6 @@ beforeAll(async () => {
   vi.doMock('@/components/dashboard/FederationPanel.vue', () => ({ default: FederationPanelStub }))
   vi.doMock('@/components/dashboard/GroupQuotaCards.vue', () => ({ default: GroupQuotaCardsStub }))
   vi.doMock('@/components/dashboard/MyStatsCards.vue', () => ({ default: MyStatsCardsStub }))
-  vi.doMock('@/components/dashboard/ReachableData.vue', () => ({ default: ReachableStub }))
   vi.doMock('@/composables/useBucketCount', () => bucketCountStub)
   vi.doMock('@/components/dashboard/DashboardScopeToggle.vue', () => ({ default: ScopeToggleStub }))
   vi.doMock('@/components/metadata/ProfileChip.vue', () => ({ default: EmptyStub }))
@@ -229,7 +227,6 @@ beforeAll(async () => {
     '@/components/dashboard/FederationPanel.vue': moduleDefault(FederationPanelStub),
     '@/components/dashboard/GroupQuotaCards.vue': moduleDefault(GroupQuotaCardsStub),
     '@/components/dashboard/MyStatsCards.vue': moduleDefault(MyStatsCardsStub),
-    '@/components/dashboard/ReachableData.vue': moduleDefault(ReachableStub),
     '@/composables/useBucketCount': bucketCountStub,
     '@/components/dashboard/DashboardScopeToggle.vue': moduleDefault(ScopeToggleStub),
     '@/components/metadata/ProfileChip.vue': moduleDefault(EmptyStub),
@@ -707,7 +704,7 @@ describe('dashboard refresh', () => {
     const mounted = await mountApp(DashboardClient)
     await flush()
     const revision = (name: string) => Number(content(mounted.root).match(new RegExp(`${name} (\\d+)`))?.[1])
-    const [cards, reachable] = [revision('group quota cards'), revision('reachable data')]
+    const [cards, reachable] = [revision('group quota cards'), revision('my stats cards')]
     expect([cards, reachable].every(Number.isInteger)).toBe(true)
 
     await pollInfo()
@@ -715,7 +712,7 @@ describe('dashboard refresh', () => {
 
     expect(loadInfo).toHaveBeenCalled()
     expect(revision('group quota cards')).toBe(cards + 1)
-    expect(revision('reachable data')).toBe(reachable)
+    expect(revision('my stats cards')).toBe(reachable)
     mounted.app.unmount()
   })
 })

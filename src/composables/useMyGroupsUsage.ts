@@ -31,6 +31,7 @@ export interface MyGroupsAggregate {
   groups: number
   /** Null means "Unknown": a group's usage failed or its count is unreported. */
   datasets: number | null
+  processRuns: number | null
   buckets: number | null
   /** Every group's bucket count counts each distributed bucket once. */
   bucketsDistinct: boolean
@@ -170,6 +171,7 @@ export function aggregateGroupUsage(list: readonly GroupUsageEntry[]): MyGroupsA
   return {
     groups: list.length,
     datasets: sum((entry) => entry.datasetCount),
+    processRuns: sum((entry) => entry.processRunCount),
     buckets: sum((entry) => entry.buckets),
     bucketsDistinct: ready.length > 0 && ready.every((entry) => entry.bucketsDistinct),
     objects: sum((entry) => entry.objects),
