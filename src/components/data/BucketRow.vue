@@ -3,7 +3,7 @@ import BucketJobLabel from '@/components/storage/BucketJobLabel.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import type { BucketJob } from '@/lib/api'
-import { ArrowLeftRight, Boxes, FolderSync, Network, Pin, Server, TriangleAlert } from '@lucide/vue'
+import { ArrowLeftRight, Boxes, Database, FolderSync, Network, Pin, Server, TriangleAlert } from '@lucide/vue'
 import { RouterLink } from 'vue-router'
 
 // One shared row for every bucket list surface (sidebar pins/locals, recently
@@ -29,6 +29,8 @@ const props = withDefaults(
     highlighted?: boolean
     /** Small muted second line (e.g. the owning group of a search hit). */
     subtitle?: string | null
+    /** The bucket is a database; it shows the database icon. */
+    database?: boolean
     /** Render as a combobox option (role/aria-selected). */
     option?: boolean
     /** Open on mousedown so combobox rows beat the input blur. */
@@ -52,6 +54,7 @@ const props = withDefaults(
     active: false,
     highlighted: false,
     subtitle: null,
+    database: false,
     option: false,
     openOnMousedown: false,
     pinnable: true,
@@ -89,7 +92,7 @@ function onClick() {
         @mousedown="onMousedown"
         @click="onClick"
       >
-        <Boxes class="h-3.5 w-3.5 shrink-0 text-primary" />
+        <component :is="database ? Database : Boxes" class="h-3.5 w-3.5 shrink-0 text-primary" />
         <span class="min-w-0 flex-1">
           <span class="block truncate">{{ bucket }}</span>
           <span v-if="subtitle" class="block truncate text-[10px] font-normal text-muted-foreground">{{ subtitle }}</span>
@@ -122,7 +125,7 @@ function onClick() {
       @mousedown="onMousedown"
       @click="onClick"
     >
-      <Boxes class="h-3.5 w-3.5 shrink-0 text-primary" />
+      <component :is="database ? Database : Boxes" class="h-3.5 w-3.5 shrink-0 text-primary" />
       <span class="min-w-0 flex-1">
         <span class="block truncate">{{ bucket }}</span>
         <span v-if="subtitle" class="block truncate text-[10px] font-normal text-muted-foreground">{{ subtitle }}</span>

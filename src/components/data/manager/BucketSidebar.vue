@@ -13,6 +13,7 @@ import BucketStorageDialog from '@/components/data/BucketStorageDialog.vue'
 import DatabaseRows from '@/components/data/manager/DatabaseRows.vue'
 import MockBucketRows from '@/components/data/manager/MockBucketRows.vue'
 import { useBucketSearch } from '@/composables/useBucketSearch'
+import { useDatabases } from '@/composables/useDatabases'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import type { DataManager } from '@/composables/useDataManager'
@@ -143,6 +144,16 @@ function hitActive(hit: ListedBucket): boolean {
   return hit.bucket === bucket.value && (hit.set_id ? hit.nodes.some(opened) : opened(hit.node_id))
 }
 const spread = (hit: ListedBucket) => (hit.set_id ? hit.nodes.length : 0)
+
+// A database bucket shows the database icon and its title; the realm's database list names it
+// by bucket and the node that holds it.
+const databases = useDatabases()
+databases.ensure()
+function databaseOf(name: string, nodeId: string | null): { title: string } | null {
+  const node = nodeId ?? realmNodes.localNodeId.value
+  const row = databases.rows.value.find((entry) => entry.bucket === name && entry.places.some((place) => place.nodeId === node))
+  return row ? { title: row.title ?? row.metadata.title ?? name } : null
+}
 
 // All nodes rows: pins first, then this group's recently browsed buckets, then the rest. A row's
 // node is named only when it is not this node, as the pins are keyed.
@@ -298,6 +309,8 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
             <BucketRow
               v-if="row.hit"
               :bucket="row.bucket"
+              :database="Boolean(databaseOf(row.bucket, row.hit.node_id))"
+              :subtitle="databaseOf(row.bucket, row.hit.node_id)?.title ?? null"
               :pinned="row.pinned"
               option
               :highlighted="index === activeIndex"
@@ -320,6 +333,8 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               v-else
               :bucket="row.bucket"
               :node-id="row.nodeId"
+              :database="Boolean(databaseOf(row.bucket, row.nodeId))"
+              :subtitle="databaseOf(row.bucket, row.nodeId)?.title ?? null"
               pinned
               option
               :highlighted="index === activeIndex"
@@ -367,6 +382,8 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               <BucketRow
                 :bucket="entry.bucket"
                 option
+                :database="Boolean(databaseOf(entry.bucket, entry.nodeId ?? null))"
+                :subtitle="databaseOf(entry.bucket, entry.nodeId ?? null)?.title ?? null"
                 :highlighted="index === activeIndex"
                 :node-id="entry.nodeId"
                 :pinned="entry.pinned"

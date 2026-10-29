@@ -38,6 +38,8 @@ const requestDelete = vi.fn()
 const showNode = vi.fn()
 const reload = vi.fn()
 const loadMore = vi.fn()
+// The realm's databases, by bucket and the node that holds them.
+const databaseRows = ref<unknown[]>([])
 let canDelete = true
 const desktopMode = { on: false }
 
@@ -76,6 +78,8 @@ const RowStub = defineComponent({
     linkedTo: { type: String, default: undefined },
     pinnable: { type: Boolean, default: true },
     pinned: Boolean,
+    database: Boolean,
+    subtitle: { type: String, default: null },
   },
   emits: ['open', 'toggle-pin'],
   setup: (props, { slots, emit }) => () =>
@@ -86,6 +90,8 @@ const RowStub = defineComponent({
         props.bucket,
       ),
       h('span', { role: 'tooltip' }, slots.tooltip?.()),
+      props.database ? h('i', { 'data-testid': 'database-icon' }, `${props.bucket} is a database`) : null,
+      props.subtitle ? h('small', { 'data-testid': 'row-subtitle' }, `${props.bucket}: ${props.subtitle}`) : null,
       props.pinnable ? h('button', { 'aria-label': `${props.pinned ? 'Unpin' : 'Pin'} ${props.bucket}`, onClick: () => emit('toggle-pin') }) : null,
       props.job ? h('em', { 'data-testid': 'row-job' }, `${props.bucket}: ${(props.job as { kind: string }).kind}`) : null,
       props.place ? h('small', { 'data-testid': 'row-place', title: props.placeTitle }, `${props.bucket}: ${props.place}`) : null,
@@ -155,6 +161,7 @@ const sidebarModules = {
   '@/lib/bucketPlace': BucketPlace,
   '@/lib/deviceApi': DeviceApi,
   '@/lib/desktop': { isDesktop: () => desktopMode.on },
+  '@/composables/useDatabases': { useDatabases: () => ({ rows: databaseRows, ensure: () => {} }) },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
       nodeById: (id: string | null) =>
@@ -863,3 +870,32 @@ describe('All nodes list order and pins', () => {
     allBuckets.hits.value = []
   })
 })
+
+describe('database buckets in the list', () => {
+  it('marks a database with its icon and title in both lists', async () => {
+    nodeChoice.value = null
+    allBuckets.needsName.value = false
+    databaseRows.value = [
+      { bucket: 'bakta-database', places: [{ bucket: 'bakta-database', nodeId: 'node-2' }], title: 'Bakta database (light)', metadata: { database: true, identifiers: [] } },
+      { bucket: 'reef-survey', places: [{ bucket: 'reef-survey', nodeId: 'home' }], title: null, metadata: { database: true, title: 'Reef survey', identifiers: [] } },
+    ]
+    allBuckets.hits.value = [
+      { bucket: 'bakta-database', node_id: 'node-2', group_id: 'g1' },
+      { bucket: 'laptop', node_id: 'node-2', group_id: 'g1' },
+    ]
+    const all = await mountApp(BucketSidebar, { props: { manager: manager() } })
+    await flush()
+    const marks = (root: Parameters<typeof content>[0], id: string) =>
+      nodes(root).filter((node) => node.props['data-testid'] === id).map((node) => content(node))
+
+    expect(marks(all.root, 'database-icon')).toEqual(['bakta-database is a database'])
+    expect(marks(all.root, 'row-subtitle')).toEqual(['bakta-database: Bakta database (light)'])
+
+    const one = await mountApp(BucketSidebar, { props: { manager: withBucket() } })
+    await pickNode()
+    expect(marks(one.root, 'row-subtitle')).toEqual(['reef-survey: Reef survey'])
+    databaseRows.value = []
+    allBuckets.hits.value = []
+  })
+})
+
