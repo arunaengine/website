@@ -150,6 +150,8 @@ export function startDataset(graph: Graph, title: string, documentId: string, cr
   const inputs = new Set(actions.flatMap((action) => values(action.object)).filter((id) => !results.has(id)))
   const action = actions.find((node) => values(node.result).length)
   const run = action ? seedRun(graph, action, crate) : null
+  // The run hangs from the dataset on its own, so its inputs show even when no result can be read.
+  if (run) add(graph, root.id, run)
   for (const part of dataParts(crate)) {
     if (run && inputs.has(part.id)) continue
     if (part.exact) root.pending.push({ kind: 'version', id: part.exact, name: part.name, digest: part.id, role: 'File' })
@@ -332,6 +334,7 @@ export interface DrawnNode {
 export function drawnChain(graph: Graph): DrawnNode[] {
   const drawn = new Set<string>()
   const walk = (ids: string[], trail: string[]): DrawnNode[] => {
+    const before = new Set(drawn)
     const groups = new Map<string, string[]>()
     for (const id of ids) {
       const item = graph.boxes[id]
@@ -341,7 +344,12 @@ export function drawnChain(graph: Graph): DrawnNode[] {
       const key = item.kind === 'file' && from ? `${item.role}\n${from}` : `box:${id}`
       groups.set(key, [...(groups.get(key) ?? []), id])
     }
-    return [...groups.values()].map((members) => {
+    // Runs follow the files beside them, so a file's chain through a run is drawn first, and a box
+    // that an earlier sibling's chain drew is left out here.
+    const isRun = (members: string[]) => graph.boxes[members[0]!]!.kind === 'run'
+    const ordered = [...groups.values()].sort((a, b) => Number(isRun(a)) - Number(isRun(b)))
+    return ordered.flatMap((members) => {
+      if (members.every((id) => drawn.has(id) && !before.has(id))) return []
       const repeat = members.every((id) => drawn.has(id))
       for (const id of members) drawn.add(id)
       const first = graph.boxes[members[0]!]!

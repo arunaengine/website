@@ -131,10 +131,49 @@ describe('provenance graph', () => {
     const graph = emptyGraph()
     startDataset(graph, 'Bakta run', 'd1', record)
 
-    expect(graph.boxes['dataset:d1']!.from).toEqual(['#out'])
+    expect(graph.boxes['dataset:d1']!.from).toEqual(['run:01JOB', '#out'])
     expect(graph.boxes['#out']!.from).toEqual(['run:01JOB'])
+    expect(drawnChain(graph)[0]!.sources.map((node) => node.ids)).toEqual([['#out']])
     expect(graph.boxes['run:01JOB']!.pending).toEqual([{ kind: 'version', id: arn('genome.fasta', V1), name: 'genome.fasta', digest: '#in', role: 'Input file' }])
     expect(graph.seen['run:01JOB']).toBe('run:01JOB')
+  })
+
+  it('shows a run record\'s run and inputs when its result\'s origin is refused', async () => {
+    const record = {
+      '@graph': [
+        { '@id': '#run-01JOB', '@type': 'CreateAction', name: 'Bakta', object: [{ '@id': '#in' }], result: [{ '@id': '#out' }] },
+        { '@id': '#in', '@type': 'MediaObject', name: 'genome.fasta', contentUrl: [arn('genome.fasta', V1)] },
+        { '@id': '#out', '@type': 'MediaObject', name: 'genome.gff3', contentUrl: [arn('genome.gff3', V2)] },
+      ],
+    }
+    const read = readers({
+      [arn('genome.fasta', V1)]: origin({ origin: { kind: 'upload', node_id: 'n1' } }),
+      [arn('genome.gff3', V2)]: new ApiError(403, 'forbidden'),
+    })
+    const graph = emptyGraph()
+    startDataset(graph, 'Bakta run', 'd1', record)
+    await expandAll(graph, read, () => false)
+
+    const [root] = drawnChain(graph)
+    const run = root!.sources.find((node) => node.ids[0] === 'run:01JOB')!
+    expect(run.sources.map((node) => graph.boxes[node.ids[0]!]!.title)).toEqual(['genome.fasta'])
+    expect(hasPending(graph)).toBe(false)
+  })
+
+  it('draws a run reached through a result once, under the result', () => {
+    const graph = emptyGraph()
+    const put = (id: string, kind: Box['kind'], from: string[] = []) => {
+      graph.boxes[id] = { id, kind, role: kind, title: id, identifiers: [], from, pending: [] }
+    }
+    put('dataset', 'file', ['run', 'result'])
+    put('result', 'file', ['run'])
+    put('run', 'run', ['input'])
+    put('input', 'file')
+    graph.roots = ['dataset']
+
+    const [root] = drawnChain(graph)
+    expect(root!.sources.map((node) => node.ids)).toEqual([['result']])
+    expect(root!.sources[0]!.sources[0]!.sources[0]!.ids).toEqual(['input'])
   })
 
   it('titles a file by the last part of its path and keeps the path', () => {
