@@ -7,6 +7,7 @@ import { click, compileClientComponent, content, element, flush, moduleDefault, 
 
 const desktopMode = ref(true)
 const listTasks = vi.fn()
+const realmNodes = ref<Array<{ name: string; isLocal: boolean; apiBase: string | null }>>([])
 
 const Plain = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
 const Empty = defineComponent(() => () => null)
@@ -44,6 +45,7 @@ const TasksPanel = compileClientComponent(new URL('./TasksPanel.vue', import.met
   '@/composables/useJobs': { useJobs: () => ({ deleteJob: vi.fn() }) },
   '@/composables/useNow': { useNow: () => ref(Date.now()) },
   '@/composables/useRefresh': { useRefresh: (run: () => unknown) => ({ busy: ref(false), refresh: run }) },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ nodes: realmNodes }) },
   '@/composables/useFirstPaint': { useFirstPaint: (ready: () => boolean) => computed(ready) },
   '@/lib/utils': Utils,
   '@/lib/poll': { follow: () => () => {}, onWake: () => () => {} },
@@ -120,6 +122,33 @@ describe('the run list on the web', () => {
     expect(text).not.toContain('Everywhere')
     expect(text).toContain('qc-sample42')
     expect(text).toContain('assemble-run-17')
+    mounted.app.unmount()
+  })
+})
+
+describe('runs on other nodes', () => {
+  it('merges the runs other nodes own and names a node it could not read', async () => {
+    desktopMode.value = false
+    realmNodes.value = [
+      { name: 'node-1', isLocal: true, apiBase: 'https://n1.test/api/v1' },
+      { name: 'node-2', isLocal: false, apiBase: 'https://n2.test/api/v1' },
+      { name: 'node-3', isLocal: false, apiBase: 'https://n3.test/api/v1' },
+    ]
+    const farRun = { id: 'J3', name: 'far-run', state: 'COMPLETE', creation_time: created, tags: { [Tes.TES_JOB_ID_TAG]: 'J3' } }
+    listTasks.mockReset().mockImplementation(async (_params: unknown, baseUrl?: string) => {
+      if (baseUrl === 'https://n3.test/api/v1') throw new Error('down')
+      return baseUrl ? { tasks: [farRun, localRun], next_page_token: 'more' } : { tasks: [localRun] }
+    })
+    const mounted = await mountApp(TasksPanel)
+    await flush()
+    const text = content(mounted.root)
+
+    expect(listTasks).toHaveBeenCalledWith({ view: 'BASIC', page_size: 50 }, 'https://n2.test/api/v1')
+    expect(rows(mounted.root).filter((row) => row.includes('qc-sample42'))).toHaveLength(1)
+    expect(rows(mounted.root).join(' ')).toContain('far-run')
+    expect(text).toContain('Runs on node-3 could not be read.')
+    expect(text).toContain('Only the newest 50 runs of node-2 are shown.')
+    realmNodes.value = []
     mounted.app.unmount()
   })
 })

@@ -32,9 +32,9 @@ export function isTesUnsupported(err: unknown): boolean {
 
 // Sibling composable to useAruna: it does not export its raw request() helper,
 // but it does export the apiBaseUrl/authToken refs, so we build the same client.
-function request<T>(path: string, options = {}) {
+function request<T>(path: string, options = {}, baseUrl?: string) {
   const { apiBaseUrl, authToken } = useAruna()
-  return apiRequest<T>(path, options, { baseUrl: apiBaseUrl.value, token: authToken.value })
+  return apiRequest<T>(path, options, { baseUrl: baseUrl ?? apiBaseUrl.value, token: authToken.value })
 }
 
 // GET /ga4gh/tes/v1/service-info (api/src/routes/tes.rs service_info).
@@ -56,7 +56,8 @@ export interface ListTasksParams {
 // GET /ga4gh/tes/v1/tasks (api/src/routes/tes.rs list_tasks). page_size caps at
 // 512 (default 256). The backend supports repeated tag_key/tag_value pairs;
 // apiRequest sends scalar query values and the UI needs only the group pair.
-async function listTasks(params: ListTasksParams): Promise<TesListTasksResponse> {
+// `baseUrl` names another node's API, which lists the runs that node owns.
+async function listTasks(params: ListTasksParams, baseUrl?: string): Promise<TesListTasksResponse> {
   assertEnabled()
   return request<TesListTasksResponse>('/ga4gh/tes/v1/tasks', {
     query: {
@@ -68,7 +69,7 @@ async function listTasks(params: ListTasksParams): Promise<TesListTasksResponse>
       page_token: params.page_token,
       view: params.view,
     },
-  })
+  }, baseUrl)
 }
 
 // GET /ga4gh/tes/v1/tasks/{id} (api/src/routes/tes.rs get_task). stdout/stderr

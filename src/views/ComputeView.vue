@@ -54,7 +54,7 @@ function setTab(next: string) {
   <div>
     <PageHeader
       :title="pageTitle"
-      :description="desktop ? 'Your runs, on this computer or in the realm.' : 'The runs you start on this node, and the system jobs it produces.'"
+      :description="desktop ? 'Your runs, on this computer or in the realm.' : 'The runs you started on any node, and the system jobs of this node.'"
       :docs="{ topic: 'compute-run', section: 'Follow the run' }"
     >
       <!-- One Run entry point; the menu explains the two ways to start one. -->

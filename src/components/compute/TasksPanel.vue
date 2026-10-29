@@ -22,6 +22,7 @@ import { useJobs } from '@/composables/useJobs'
 import { useNow } from '@/composables/useNow'
 import { useRefresh } from '@/composables/useRefresh'
 import { useFirstPaint } from '@/composables/useFirstPaint'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { errorMessage, formatDuration, formatResourceGb, relativeTime, truncateMiddle } from '@/lib/utils'
 import { follow, onWake } from '@/lib/poll'
 import { deleteErrorMessage } from '@/lib/jobs'
@@ -186,6 +187,14 @@ const nextPageToken = ref<string | undefined>(undefined)
 const pagesLoaded = ref(0)
 const refreshing = ref(false)
 const lastPollError = ref<string | null>(null)
+// Each node lists only the runs it owns, so the first page also reads the other nodes.
+const { nodes: realmNodes } = useRealmNodes()
+const otherNodes = ref<{ failed: string[]; truncated: string[] }>({ failed: [], truncated: [] })
+function otherNodeTasks() {
+  const others = desktop ? [] : realmNodes.value.filter((node) => !node.isLocal && node.apiBase)
+  return Promise.all(others.map((node) =>
+    listTasks({ view: 'BASIC', page_size: 50 }, node.apiBase!).then((page) => ({ node, page }), () => ({ node, page: null }))))
+}
 // Stale responses are dropped via a request id (ObjectBrowserPanel pattern).
 let listRequestId = 0
 
@@ -249,6 +258,7 @@ function clearNoUser() {
   tasks.value = []
   nextPageToken.value = undefined
   pagesLoaded.value = 0
+  otherNodes.value = { failed: [], truncated: [] }
   listError.value = null
   lastPollError.value = null
   listState.value = authPending.value ? 'loading' : 'signed-out'
@@ -263,13 +273,27 @@ async function fetchList({ more = false, silent = false } = {}) {
   if (!silent) refreshing.value = true
   if (!more && !silent && !tasks.value.length) listState.value = 'loading'
   try {
-    const res = await listTasks({
-      view: 'BASIC',
-      page_size: 50,
-      page_token: more ? nextPageToken.value : undefined,
-    })
+    const [res, others] = await Promise.all([
+      listTasks({
+        view: 'BASIC',
+        page_size: 50,
+        page_token: more ? nextPageToken.value : undefined,
+      }),
+      more ? null : otherNodeTasks(),
+    ])
     if (requestId !== listRequestId) return
-    tasks.value = more ? [...tasks.value, ...res.tasks] : res.tasks
+    if (others) {
+      otherNodes.value = {
+        failed: others.filter((entry) => !entry.page).map((entry) => entry.node.name ?? entry.node.nodeId),
+        truncated: others.filter((entry) => entry.page?.next_page_token).map((entry) => entry.node.name ?? entry.node.nodeId),
+      }
+      const seen = new Set<string>()
+      tasks.value = [...res.tasks, ...others.flatMap((entry) => entry.page?.tasks ?? [])]
+        .filter((task) => !seen.has(task.id ?? '') && Boolean(seen.add(task.id ?? '')))
+        .sort((a, b) => (b.creation_time ?? '').localeCompare(a.creation_time ?? ''))
+    } else {
+      tasks.value = [...tasks.value, ...res.tasks]
+    }
     nextPageToken.value = res.next_page_token
     pagesLoaded.value = more ? pagesLoaded.value + 1 : 1
     listState.value = 'ready'
@@ -328,7 +352,7 @@ const painted = useFirstPaint(() =>
 
 const emptyTitle = computed(() => {
   if (listState.value === 'unsupported') return 'Runs cannot be listed until this node accepts them.'
-  if (listState.value === 'signed-out') return 'Sign in to see the runs you started on this node.'
+  if (listState.value === 'signed-out') return 'Sign in to see the runs you started.'
   return olderHidden.value ? 'No runs in the last 48 hours' : 'No runs yet'
 })
 const emptyDescription = computed(() => {
@@ -391,7 +415,7 @@ onUnmounted(() => {
 <template>
   <div class="space-y-4">
     <p class="text-xs text-muted-foreground">
-      Runs are the work <span class="font-medium text-foreground">you start</span> on this node; begin with a script template, or describe your own container.
+      Runs are the work <span class="font-medium text-foreground">you start</span>, listed from every node; begin with a script template, or describe your own container.
     </p>
 
     <ListSkeleton v-if="!painted" header :rows="5" label="Loading runs" />
@@ -430,6 +454,8 @@ onUnmounted(() => {
         </div>
       </template>
       <template #tools>
+        <span v-if="otherNodes.failed.length" class="text-[11px] text-destructive">Runs on {{ otherNodes.failed.join(', ') }} could not be read.</span>
+        <span v-if="otherNodes.truncated.length" class="text-[11px] text-muted-foreground">Only the newest 50 runs of {{ otherNodes.truncated.join(', ') }} are shown.</span>
         <span v-if="deleteError" class="text-[11px] text-destructive">{{ deleteError }}</span>
         <span v-if="lastPollError" class="text-[11px] text-muted-foreground" :title="lastPollError">Refresh failed, retrying.</span>
         <RefreshButton :busy="spinning" sr-label="Refresh runs" @click="onReload" />
