@@ -1,8 +1,9 @@
 <script setup lang="ts">
-// Page-header actions for one dataset: keep it offline, favourite it, watch it,
-// move it in or out as a crate, edit or delete it.
+// Page-header actions for one dataset: keep it offline, favourite and watch it, export it as a
+// crate, edit it; the other transfers and Delete wait in the More menu.
 import { computed, ref } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
+import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import Button from '@/components/ui/Button.vue'
 import Switch from '@/components/ui/Switch.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
@@ -19,7 +20,7 @@ import type { DatasetViewState } from '@/composables/useDatasetView'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { downloadCrateJson } from '@/lib/crateImport'
 import { errorMessage } from '@/lib/utils'
-import { ArrowDownUp, ArrowLeft, ChevronDown, Code2, FileArchive, FileJson2, Pencil, Send, Star, Trash2, Upload } from '@lucide/vue'
+import { Code2, Download, Ellipsis, FileArchive, FileJson2, Pencil, Send, Star, Trash2, Upload } from '@lucide/vue'
 
 const props = defineProps<{ state: DatasetViewState }>()
 const emit = defineEmits<{
@@ -45,9 +46,32 @@ const {
 } = props.state
 
 const router = useRouter()
-const { currentUser, toggleFavourite } = useAruna()
+const { currentUser, toggleFavourite, downloadProvenanceCrate } = useAruna()
 const { jobsEnabled } = useJobs()
 const { shown } = usePortalFeatures()
+
+const askPrompt = computed(() =>
+  current.value ? `Summarize the dataset "${current.value.title}" (${current.value.ulid}): its files, license, and how it was made.` : '')
+
+// The crate with its provenance, assembled by the node and saved as one file.
+const exporting = ref(false)
+async function exportCrate() {
+  exporting.value = true
+  try {
+    const blob = await downloadProvenanceCrate({ dataset: detailId.value })
+    const anchor = document.createElement('a')
+    anchor.href = URL.createObjectURL(blob)
+    anchor.download = `${detailId.value}.zip`
+    document.body.append(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(anchor.href)
+  } catch (err) {
+    reportGlobalError(errorMessage(err))
+  } finally {
+    exporting.value = false
+  }
+}
 
 const isFav = computed(() => Boolean(currentUser.value?.favouriteMetadataIds?.includes(detailId.value)))
 const favBusy = ref(false)
@@ -83,9 +107,10 @@ async function toggleFav() {
     size="icon"
     :disabled="favBusy"
     :aria-label="isFav ? 'Remove from favourites' : 'Add to favourites'"
+    :title="isFav ? 'Remove from favourites' : 'Add to favourites'"
     @click="toggleFav"
   >
-    <Star class="h-4 w-4" :class="isFav ? 'text-amber-500' : ''" :fill="isFav ? 'currentColor' : 'none'" />
+    <Star class="h-4 w-4" :class="isFav ? 'text-aruna-royal dark:text-aruna-aqua' : ''" :fill="isFav ? 'currentColor' : 'none'" />
   </Button>
   <WatchButton
     v-if="docState === 'found'"
@@ -94,13 +119,16 @@ async function toggleFav() {
     :group-id="current?.realmId ?? null"
     :resource-label="currentPath"
   />
-  <!-- One entry point for every transfer; each entry names what it moves,
-       so "the description" and "the whole dataset" stay apart. -->
+  <AskAiButton v-if="current" :prompt="askPrompt" :subject="`dataset ${current.ulid}`" icon-only />
+  <Button v-if="docState === 'found' && currentUser" :disabled="exporting" @click="exportCrate">
+    <Download class="h-4 w-4" /> {{ exporting ? 'Exporting…' : 'Export as crate' }}
+  </Button>
+  <Button v-if="current && canWrite" variant="outline" @click="router.push({ name: 'dataset-edit', params: { id: detailId } })"><Pencil class="h-4 w-4" /> Edit</Button>
+  <!-- The other transfers, the raw crate and Delete, each named by what it moves. -->
   <DropdownMenu v-if="docState === 'found'">
     <DropdownMenuTrigger as-child>
-      <Button variant="outline">
-        <ArrowDownUp class="h-4 w-4" /> Import / export
-        <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
+      <Button variant="outline" size="icon" aria-label="More" title="More">
+        <Ellipsis class="h-4 w-4" />
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" class="w-80 p-1.5">
@@ -113,7 +141,7 @@ async function toggleFav() {
         <FileJson2 class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
         <span class="min-w-0">
           <span class="block text-sm font-medium text-foreground">Metadata file only</span>
-          <span class="block text-xs leading-relaxed text-muted-foreground">Downloads ro-crate-metadata.json, the description on its own, without any data files.</span>
+          <span class="block text-xs leading-relaxed text-muted-foreground">Downloads ro-crate-metadata.json without any data files.</span>
         </span>
       </DropdownMenuItem>
       <DropdownMenuItem
@@ -124,7 +152,7 @@ async function toggleFav() {
         <FileArchive class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
         <span class="min-w-0">
           <span class="block text-sm font-medium text-foreground">Whole dataset as a zip archive</span>
-          <span class="block text-xs leading-relaxed text-muted-foreground">Packages the metadata together with the data files it references. Prepared in the background.</span>
+          <span class="block text-xs leading-relaxed text-muted-foreground">The metadata with the data files it references, prepared in the background.</span>
         </span>
       </DropdownMenuItem>
       <DropdownMenuItem
@@ -135,39 +163,31 @@ async function toggleFav() {
         <Send class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
         <span class="min-w-0">
           <span class="block text-sm font-medium text-foreground">Publish to repository</span>
-          <span class="block text-xs leading-relaxed text-muted-foreground">Deposits the dataset in a repository such as Zenodo, once or as a link that follows every change.</span>
+          <span class="block text-xs leading-relaxed text-muted-foreground">Deposits the dataset in a repository such as Zenodo.</span>
         </span>
       </DropdownMenuItem>
       <template v-if="canWrite">
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Import</DropdownMenuLabel>
-        <DropdownMenuItem
-          class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5"
-          @click="emit('import')"
-        >
+        <DropdownMenuItem class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5" @click="emit('import')">
           <Upload class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
           <span class="min-w-0">
             <span class="block text-sm font-medium text-foreground">Replace this dataset from a file</span>
-            <span class="block text-xs leading-relaxed text-muted-foreground">Overwrites this dataset with an uploaded ro-crate-metadata.json, previewed first.</span>
+            <span class="block text-xs leading-relaxed text-muted-foreground">Overwrites it with an uploaded ro-crate-metadata.json, previewed first.</span>
           </span>
         </DropdownMenuItem>
       </template>
       <DropdownMenuSeparator />
-      <DropdownMenuItem
-        class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5"
-        @click="emit('raw')"
-      >
+      <DropdownMenuItem class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5" @click="emit('raw')">
         <Code2 class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-        <span class="min-w-0">
-          <span class="block text-sm font-medium text-foreground">View raw JSON-LD</span>
-          <span class="block text-xs leading-relaxed text-muted-foreground">Jumps to the raw RO-Crate JSON at the bottom of the page and expands it.</span>
-        </span>
+        <span class="block text-sm font-medium text-foreground">View raw JSON-LD</span>
       </DropdownMenuItem>
+      <template v-if="current && canWrite">
+        <DropdownMenuSeparator />
+        <DropdownMenuItem class="cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-destructive" @click="emit('delete')">
+          <Trash2 class="h-4 w-4 shrink-0" /> Delete dataset
+        </DropdownMenuItem>
+      </template>
     </DropdownMenuContent>
   </DropdownMenu>
-  <Button v-if="current && canWrite" variant="outline" @click="router.push({ name: 'dataset-edit', params: { id: detailId } })"><Pencil class="h-4 w-4" /> Edit</Button>
-  <Button v-if="current && canWrite" variant="outline" class="text-destructive hover:text-destructive" @click="emit('delete')"><Trash2 class="h-4 w-4" /> Delete</Button>
-  <Button variant="outline" as-child>
-    <RouterLink :to="{ name: 'datasets' }"><ArrowLeft class="h-4 w-4" /> Datasets</RouterLink>
-  </Button>
 </template>
