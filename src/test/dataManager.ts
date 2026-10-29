@@ -63,6 +63,13 @@ export const MenuItemStub = defineComponent({
     h('button', { ...attrs, role: attrs.role ?? 'menuitem', disabled: props.disabled }, slots.default?.()),
 })
 
+/** The file origins the browser under test reads for the open page. */
+export const folderOrigin = {
+  byKey: ref(new Map<string, { key: string; label: string; to: unknown; time: string }>()),
+  shared: ref<{ key: string; label: string; to: unknown; time: string } | null>(null),
+  mixed: ref(false),
+}
+
 /** The usage the browser under test reads for the open bucket. */
 export const bucketUsage = { value: ref<{ objects: number } | null>(null) }
 
@@ -237,6 +244,7 @@ export function objectBrowser(): Component {
       '@/components/data/manager/RowMenu.vue': moduleDefault(rowMenu()),
       '@/components/data/manager/SelectionBar.vue': moduleDefault(selectionBar()),
       '@/components/data/manager/SearchHint.vue': moduleDefault(SearchHintStub),
+      '@/composables/useFolderOrigin': { useFolderOrigin: () => folderOrigin },
       '@/composables/useBucketUsage': { useBucketUsage: () => bucketUsage.value, usageText: (usage: { objects: number }) => `${usage.objects} files stored` },
       '@/lib/sync': { parseArunaArn: (arn: string) => ({ nodeId: arn.split(':')[3] ?? null }) },
       '@/components/data/manager/TransferDialog.vue': moduleDefault(Slotted('aside')),

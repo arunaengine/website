@@ -32,6 +32,7 @@ import type { BindSource } from '@/lib/bindSource'
 import { folderName } from '@/lib/deviceApi'
 import { useBrokenFiles } from '@/composables/useBrokenFiles'
 import { useBucketUsage, usageText } from '@/composables/useBucketUsage'
+import { useFolderOrigin } from '@/composables/useFolderOrigin'
 import { useLockedBucket } from '@/composables/useLockedBucket'
 import { useProviderBucket } from '@/composables/useProviderBucket'
 import type { DataManager } from '@/composables/useDataManager'
@@ -68,6 +69,7 @@ import {
   Download,
   Eye,
   FolderPlus,
+  FlaskConical,
   FolderSync,
   Globe,
   KeyRound,
@@ -178,6 +180,8 @@ const {
 } = props.manager
 
 const usage = useBucketUsage(bucket, remoteNodeId)
+const { byKey: originOf, shared: sharedOrigin, mixed: mixedOrigins } = useFolderOrigin(bucket, remoteNodeId, visibleObjects)
+const columns = computed(() => (mixedOrigins.value ? 6 : 5))
 // The other nodes this bucket syncs with, each named once.
 const syncPartners = computed(() => {
   const own = remoteNodeId.value ?? realmNodes.localNodeId.value
@@ -660,6 +664,13 @@ async function onDrop(event: DragEvent) {
           </div>
         </div>
         <SearchHint v-if="hinting" :text="searchText" :folder="hintFolder" :bucket="bucket" class="mx-4 mb-2 hidden shadow-none @max-[600px]:block" />
+        <p v-if="sharedOrigin && !wholeBucket && !remoteBlocked" class="flex min-w-0 items-center gap-1.5 px-4 pb-2.5 text-sm text-muted-foreground">
+          <FlaskConical class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span class="truncate">{{ relativeTime(sharedOrigin.time) }} by
+            <RouterLink v-if="sharedOrigin.to" :to="sharedOrigin.to" class="text-primary hover:underline">{{ sharedOrigin.label }}</RouterLink>
+            <template v-else>{{ sharedOrigin.label }}</template>
+          </span>
+        </p>
         <MetadataSearch
           v-if="wholeBucket"
           ref="bucketSearch"
@@ -721,10 +732,11 @@ async function onDrop(event: DragEvent) {
             <col />
             <col class="w-24" />
             <col class="w-24 @max-[960px]:w-0" />
+            <col v-if="mixedOrigins" class="w-40 @max-[960px]:w-0" />
             <col class="w-[132px]" />
           </colgroup>
           <thead class="text-[11px] uppercase tracking-wider text-muted-foreground @max-[600px]:hidden">
-            <SelectionBar v-if="selectedCount" :manager="manager" @action="onBarAction" />
+            <SelectionBar v-if="selectedCount" :manager="manager" :span="columns - 1" @action="onBarAction" />
             <tr v-else class="border-b border-border">
               <th class="p-0">
                 <label class="flex h-11 w-11 items-center justify-center">
@@ -754,6 +766,7 @@ async function onDrop(event: DragEvent) {
                   Modified <ChevronDown v-if="sort.key === 'modified'" class="h-3 w-3" :class="sort.descending ? 'rotate-180' : ''" />
                 </button>
               </th>
+              <th v-if="mixedOrigins" class="overflow-hidden px-3 py-2 text-left font-medium @max-[960px]:p-0"><span class="@max-[960px]:hidden">Origin</span></th>
               <th class="p-0"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
@@ -800,6 +813,7 @@ async function onDrop(event: DragEvent) {
               </td>
               <td class="@max-[600px]:hidden"></td>
               <td class="@max-[600px]:hidden"></td>
+              <td v-if="mixedOrigins" class="@max-[600px]:hidden"></td>
               <td class="px-2 @max-[600px]:block">
                 <div class="flex items-center justify-end gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100 [@media(hover:none)]:opacity-100 @max-[600px]:opacity-100">
                   <RowMenu
@@ -879,6 +893,12 @@ async function onDrop(event: DragEvent) {
               <td class="overflow-hidden whitespace-nowrap px-3 py-2 text-muted-foreground @max-[960px]:p-0 @max-[600px]:hidden">
                 <span class="@max-[960px]:hidden">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '' }}</span>
               </td>
+              <td v-if="mixedOrigins" class="overflow-hidden whitespace-nowrap px-3 py-2 text-muted-foreground @max-[960px]:p-0 @max-[600px]:hidden">
+                <span v-if="originOf.get(object.key)" class="block truncate @max-[960px]:hidden">
+                  <RouterLink v-if="originOf.get(object.key)!.to" :to="originOf.get(object.key)!.to!" class="text-primary hover:underline" @click.stop>{{ originOf.get(object.key)!.label }}</RouterLink>
+                  <template v-else>{{ originOf.get(object.key)!.label }}</template>
+                </span>
+              </td>
               <td class="px-2 @max-[600px]:block">
                 <div class="flex items-center justify-end gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100 [@media(hover:none)]:opacity-100 @max-[600px]:opacity-100">
                   <IconButton label="Preview" variant="outline" class="@max-[600px]:hidden" @click.stop="openDetails(object, 'preview')"><Eye class="size-3.5" /></IconButton>
@@ -910,6 +930,7 @@ async function onDrop(event: DragEvent) {
               <td class="overflow-hidden whitespace-nowrap px-3 py-2 @max-[960px]:p-0 @max-[600px]:hidden">
                 <span class="@max-[960px]:hidden">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '' }}</span>
               </td>
+              <td v-if="mixedOrigins" class="@max-[600px]:hidden"></td>
               <td class="px-2 @max-[600px]:block">
                 <div class="flex items-center justify-end gap-1">
                   <Spinner v-if="restoringKey === object.key" label="Restoring the object" />
@@ -929,12 +950,12 @@ async function onDrop(event: DragEvent) {
             </tr>
             </template>
             <tr v-if="(listLoading || (!listedOnce && !listError)) && !visibleFolders.length && !visibleObjects.length && !deletedRows.length" class="@max-[600px]:block">
-              <td colspan="5" class="px-4 py-10 @max-[600px]:block">
+              <td :colspan="columns" class="px-4 py-10 @max-[600px]:block">
                 <Spinner show-label label="Loading objects…" class="justify-center" />
               </td>
             </tr>
             <tr v-else-if="isEmpty" class="@max-[600px]:block">
-              <td colspan="5" class="px-4 py-10 text-center text-xs text-muted-foreground @max-[600px]:block">
+              <td :colspan="columns" class="px-4 py-10 text-center text-xs text-muted-foreground @max-[600px]:block">
                 <template v-if="nameFilter">No names here start with "{{ nameFilter }}".</template>
                 <template v-else-if="nextToken || folders.length || objects.length">No matches on this page.</template>
                 <template v-else>{{ canWriteCurrentPrefix ? 'This folder is empty. Drop files here or use Upload.' : 'This folder is empty. This session is read-only here.' }}</template>

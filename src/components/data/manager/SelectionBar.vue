@@ -12,7 +12,8 @@ import { formatCount } from '@/lib/formatCount'
 import { actionBlocker, type SelectionAction } from '@/lib/objectListing'
 import { Copy, Download, FolderInput, Globe, Link2, Share2, Trash2, X } from '@lucide/vue'
 
-const props = defineProps<{ manager: DataManager; bottom?: boolean }>()
+// `span`: the table columns after the checkbox, which the actions cover.
+const props = withDefaults(defineProps<{ manager: DataManager; bottom?: boolean; span?: number }>(), { span: 4 })
 const emit = defineEmits<{ (e: 'action', action: SelectionAction): void }>()
 
 const {
@@ -50,7 +51,7 @@ const MOVES = [
         />
       </label>
     </th>
-    <th colspan="4" class="px-3 py-1.5 text-left font-normal">
+    <th :colspan="span" class="px-3 py-1.5 text-left font-normal">
       <div class="flex min-w-0 items-center gap-1.5">
         <span class="mr-1.5 whitespace-nowrap font-medium">{{ formatCount(selectedCount) }} selected</span>
         <IconButton label="Download" variant="outline" size="icon" class="h-8 w-auto px-2.5" :disabled-reason="blocker('download')" @click="emit('action', 'download')">

@@ -15,6 +15,7 @@ import {
   brokenFiles,
   bucketSearches,
   bucketUsage,
+  folderOrigin,
   debounceHold,
   desktopMode,
   fakeManager,
@@ -703,6 +704,40 @@ describe('object browser pages', () => {
     expect(action(last, 'Next page').props.disabled).toBe(true)
     await click(action(last, 'Previous page'))
     expect(previousPage).toHaveBeenCalled()
+  })
+})
+
+describe('object browser file origins', () => {
+  const run = { key: 'job:r1', label: 'Annotate my genome with Bakta', to: { name: 'task', params: { taskId: 't1' } }, time: new Date(Date.now() - 2 * 3600_000).toISOString() }
+  afterEach(() => {
+    folderOrigin.shared.value = null
+    folderOrigin.mixed.value = false
+    folderOrigin.byKey.value = new Map()
+  })
+
+  it('names one shared origin once above the list, with the run linked', async () => {
+    folderOrigin.shared.value = run
+    const root = await render()
+    const line = element(root, (node) => node.tag === 'p' && content(node).includes('by'))
+
+    expect(content(line).replace(/\s+/g, ' ').trim()).toBe('2h ago by Annotate my genome with Bakta')
+    expect(element(line, (node) => node.tag === 'a').props.to).toEqual(run.to)
+    expect(nodes(root).some((node) => node.tag === 'th' && content(node).includes('Origin'))).toBe(false)
+  })
+
+  it('adds an Origin column when the files came from different places, and keeps the actions last', async () => {
+    folderOrigin.mixed.value = true
+    folderOrigin.byKey.value = new Map([[listedObject.key, { ...run, key: 'upload', label: 'an upload', to: null }]])
+    const root = await render({ folders: ref([listedFolder]) })
+    const header = element(root, (node) => node.tag === 'thead')
+    const row = element(root, (node) => node.tag === 'tr' && content(node).includes('reads.fastq'))
+
+    expect(nodes(header).filter((node) => node.tag === 'th')).toHaveLength(6)
+    expect(nodes(element(root, (node) => node.tag === 'colgroup')).filter((node) => node.tag === 'col')).toHaveLength(6)
+    expect(row.children.filter((node) => node.tag === 'td')).toHaveLength(6)
+    expect(content(row.children.filter((node) => node.tag === 'td')[4])).toContain('an upload')
+    const folderRow = element(root, (node) => node.tag === 'tr' && content(node).includes('genomes/'))
+    expect(folderRow.children.filter((node) => node.tag === 'td')).toHaveLength(6)
   })
 })
 
