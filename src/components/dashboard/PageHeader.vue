@@ -1,30 +1,53 @@
 <script setup lang="ts">
+// The top of every page: a breadcrumb (realm, section, then the page's own crumbs), the title, one
+// subtitle line, and the actions at the right. Refresh and the manual are icon buttons there.
+import { computed, provide } from 'vue'
+import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
+import { ChevronRight, Globe } from '@lucide/vue'
 import DocsLink from '@/components/ui/DocsLink.vue'
-import RealmBadge from '@/components/ui/RealmBadge.vue'
+import { IN_PAGE_HEADER } from '@/components/ui/pageHeader'
+import { navEntries, navItemActive, type NavItem } from '@/components/layout/nav'
 import { useRealm } from '@/composables/useRealm'
+import { isDesktop } from '@/lib/desktop'
 import { cn } from '@/lib/utils'
 
-// `eyebrow` names which surface the page belongs to: the portal, or the
-// computer Aruna Desktop runs on.
-withDefaults(
+export interface Crumb {
+  label: string
+  to?: RouteLocationRaw
+}
+
+// `eyebrow` names the section the page belongs to when the navigation does not; `crumbs` follow it.
+const props = withDefaults(
   defineProps<{
     title: string
     description?: string
     eyebrow?: string
+    crumbs?: Crumb[]
     class?: string
     /** The manual page this surface belongs to. */
     docs?: { topic: string; section?: string; label?: string }
   }>(),
-  { eyebrow: 'Portal' },
+  { description: undefined, eyebrow: undefined, crumbs: () => [], class: undefined, docs: undefined },
 )
 
-const { realm } = useRealm()
+provide(IN_PAGE_HEADER, true)
+
+const { realmDisplayName, realmId } = useRealm()
+const route = useRoute()
+const section = computed<Crumb | null>(() => {
+  if (props.eyebrow) return { label: props.eyebrow }
+  const path = route?.path ?? ''
+  const item = navEntries({ desktop: isDesktop(), isRealmAdmin: true, canInspectUsers: true })
+    .find((entry): entry is NavItem => !('separator' in entry) && navItemActive(entry, path))
+  return item ? { label: item.label, to: item.to } : null
+})
+const trail = computed(() => [...(section.value ? [section.value] : []), ...props.crumbs])
 </script>
 
 <template>
   <header
     :class="
-      cn('relative overflow-hidden border-b border-border/80 bg-background/70 backdrop-blur', $props.class)
+      cn('relative overflow-hidden border-b border-border-subtle bg-background/70 backdrop-blur', $props.class)
     "
   >
     <!-- The landing hero's grid and wash, dimmed to a page accent. -->
@@ -33,27 +56,29 @@ const { realm } = useRealm()
       class="grid-faint pointer-events-none absolute inset-0 opacity-60 [mask-image:radial-gradient(ellipse_at_50%_0%,black_20%,transparent_75%)]"
     />
     <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0 opacity-60" />
-    <div class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-aruna-aqua/60 to-transparent" />
-    <div class="container relative flex flex-col gap-3 pb-5 pt-6">
-      <div class="flex items-center gap-3 text-[11px] text-muted-foreground">
-        <span class="eyebrow">{{ eyebrow }}</span>
-        <RealmBadge :realm="realm" />
-        <slot name="breadcrumbs" />
-        <template v-if="docs">
-          <DocsLink :topic="docs.topic" :section="docs.section" label="Read the docs" />
+    <div class="container relative flex flex-col gap-2 pb-6 pt-6">
+      <nav aria-label="Breadcrumb" class="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] leading-[18px] text-muted-foreground">
+        <Globe class="size-3.5 shrink-0" aria-hidden="true" />
+        <span class="truncate" :title="realmId">{{ realmDisplayName }}</span>
+        <template v-for="(crumb, index) in trail" :key="`${index}:${crumb.label}`">
+          <ChevronRight class="size-3.5 shrink-0" aria-hidden="true" />
+          <RouterLink v-if="crumb.to && index < trail.length - 1" :to="crumb.to" class="truncate hover:text-foreground hover:underline">{{ crumb.label }}</RouterLink>
+          <span v-else class="truncate" :class="index === trail.length - 1 ? 'text-foreground/90' : ''">{{ crumb.label }}</span>
         </template>
-      </div>
+        <span v-if="$slots.breadcrumbs" class="ml-1 inline-flex flex-wrap items-center gap-1.5"><slot name="breadcrumbs" /></span>
+      </nav>
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="min-w-0">
-          <h1 class="font-display text-2xl font-semibold tracking-tight text-aruna-navy md:text-[28px]">
+          <h1 class="type-page-title">
             <slot name="title">{{ title }}</slot>
           </h1>
-          <p v-if="description || $slots.description" class="mt-1 max-w-2xl text-sm text-muted-foreground">
+          <p v-if="description || $slots.description" class="mt-1 max-w-2xl text-sm leading-5 text-muted-foreground">
             <slot name="description">{{ description }}</slot>
           </p>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
+        <div v-if="$slots.actions || docs" class="flex flex-wrap items-center gap-2">
           <slot name="actions" />
+          <DocsLink v-if="docs" :topic="docs.topic" :section="docs.section" :label="docs.label ?? 'Read the docs'" button />
         </div>
       </div>
     </div>

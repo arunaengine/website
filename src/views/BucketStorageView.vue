@@ -159,15 +159,12 @@ const browserLink = computed(() => ({
 
 <template>
   <div>
-    <PageHeader :title="bucket" :description="summary" :docs="{ topic: 'where-data-lives', section: 'Buckets' }">
-      <template #breadcrumbs>
-        <span>/</span>
-        <RouterLink :to="browserLink" class="hover:underline">Data</RouterLink>
-        <span>/</span>
-        <span class="font-mono">{{ bucket }}</span>
-        <span>/</span>
-        <span>Settings</span>
-      </template>
+    <PageHeader
+      :title="bucket"
+      :description="summary"
+      :crumbs="[{ label: bucket, to: browserLink }, { label: 'Settings' }]"
+      :docs="{ topic: 'where-data-lives', section: 'Buckets' }"
+    >
       <template #actions>
         <Button variant="outline" size="sm" as-child>
           <RouterLink :to="browserLink"><ChevronLeft class="size-3.5" /> Back to the files</RouterLink>

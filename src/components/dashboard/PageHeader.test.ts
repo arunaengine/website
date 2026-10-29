@@ -55,35 +55,40 @@ describe('page header docs links', () => {
     }
   })
 
-  it('renders the docs link in the eyebrow row', async () => {
+  it('names realm, section and crumbs in a breadcrumb, and puts the docs icon button with the actions', async () => {
     vi.doMock('vue-router', () => ({
       RouterLink: defineComponent({
-        props: { to: { type: Object, required: true } },
+        props: { to: { type: [Object, String], required: true } },
         setup: (props, { slots, attrs }) => () => h('a', { href: JSON.stringify(props.to), ...attrs }, slots.default?.()),
       }),
+      useRoute: () => ({ path: '/app/buckets/reef/storage' }),
     }))
-    vi.doMock('@/composables/useRealm', () => ({ useRealm: () => ({ realm: ref({ id: 'r', name: 'Realm' }) }) }))
-    vi.doMock('@/components/ui/RealmBadge.vue', () => ({ default: defineComponent(() => () => h('span', 'realm')) }))
+    vi.doMock('@/composables/useRealm', () => ({ useRealm: () => ({ realmDisplayName: ref('Aruna_v3_Demo_Realm'), realmId: ref('k3V9xQ2m') }) }))
     const PageHeader = (await import('./PageHeader.vue')).default
 
     const html = await renderToString(
       createSSRApp({
         render: () =>
-          h(PageHeader, { title: 'Status', docs: { topic: 'realm-nodes-groups', section: 'Nodes and the realm' } }),
+          h(PageHeader, { title: 'Settings', crumbs: [{ label: 'reef', to: { name: 'bucket' } }, { label: 'Settings' }], docs: { topic: 'realm-nodes-groups', section: 'Nodes and the realm' } }),
       }),
     )
-    expect(html).toContain('realm-nodes-groups')
+    const nav = html.slice(html.indexOf('<nav'), html.indexOf('</nav>'))
+    expect(nav.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()).toBe('Aruna_v3_Demo_Realm Data reef Settings')
+    expect(html).toContain('lucide-globe')
+    expect(html).toContain('title="k3V9xQ2m"')
+    expect(html).not.toContain('Portal')
+    expect(html).toContain('class="type-page-title"')
+    // The docs link is a 36 px icon button whose label is its name and tooltip.
     expect(html).toContain('#nodes-and-the-realm')
-    expect(html).toContain('Read the docs')
-    expect(html).not.toContain('Learn about')
-    expect(html).not.toContain('ml-auto')
-    expect(html).toContain('lucide-book-open')
+    expect(html).toContain('aria-label="Read the docs"')
+    expect(html).toContain('size-9')
+    expect(html.replace(/<[^>]+>/g, ' ')).not.toContain('Read the docs')
 
-    const bare = await renderToString(createSSRApp({ render: () => h(PageHeader, { title: 'Docs' }) }))
+    const bare = await renderToString(createSSRApp({ render: () => h(PageHeader, { title: 'Docs', eyebrow: 'Manual' }) }))
     expect(bare).not.toContain('Read the docs')
+    expect(bare.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')).toContain('Aruna_v3_Demo_Realm Manual')
 
     vi.doUnmock('vue-router')
     vi.doUnmock('@/composables/useRealm')
-    vi.doUnmock('@/components/ui/RealmBadge.vue')
   })
 })

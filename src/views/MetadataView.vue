@@ -233,16 +233,9 @@ function jumpTo(entityId: string) {
   <div>
     <PageHeader
       :title="current ? current.title : fetchedSummary ? fetchedSummary.document_path : 'Dataset'"
+      :crumbs="current ? [{ label: KINDS[purpose] }] : []"
       :docs="{ topic: 'datasets', section: 'The bundle is an RO-Crate' }"
     >
-      <template #breadcrumbs>
-        <span>/</span>
-        <RouterLink :to="{ name: 'datasets' }" class="hover:underline">Datasets</RouterLink>
-        <template v-if="current">
-          <span>/</span>
-          <span>{{ KINDS[purpose] }}</span>
-        </template>
-      </template>
       <template #title>
         <span class="inline-flex flex-wrap items-center gap-2">
           {{ current ? current.title : fetchedSummary ? fetchedSummary.document_path : 'Dataset' }}
