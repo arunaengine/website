@@ -136,7 +136,11 @@ databases.ensure()
 function databaseOf(name: string, nodeId: string | null): { title: string } | null {
   const node = nodeId ?? realmNodes.localNodeId.value
   const row = databases.rows.value.find((entry) => entry.bucket === name && entry.places.some((place) => place.nodeId === node))
-  return row ? { title: row.title ?? row.metadata.title ?? name } : null
+  if (!row) return null
+  // The description line names the version too, unless the title already does.
+  const title = row.title ?? row.metadata.title ?? name
+  const version = row.metadata.version?.trim()
+  return { title: version && !title.includes(version) ? `${title} ${version}` : title }
 }
 
 // All nodes rows: pins first, then this group's recently browsed buckets, then the rest. A row's

@@ -971,6 +971,9 @@ describe('database buckets in the list', () => {
 
     expect(marks(all.root, 'database-icon')).toEqual(['bakta-database is a database'])
     expect(marks(all.root, 'row-subtitle')).toEqual(['bakta-database: Bakta database (light)'])
+    databaseRows.value = [{ ...(databaseRows.value[0] as object), metadata: { database: true, version: '6.0', identifiers: [] } }, databaseRows.value[1]]
+    await flush()
+    expect(marks(all.root, 'row-subtitle')).toEqual(['bakta-database: Bakta database (light) 6.0'])
 
     const one = await mountApp(BucketSidebar, { props: { manager: withBucket() } })
     await pickNode()
