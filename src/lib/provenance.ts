@@ -20,6 +20,8 @@ export interface Box {
   role: string
   title: string
   detail?: string
+  /** The full name of a file whose title shows only its last part. */
+  path?: string
   identifiers: OriginIdentifier[]
   /** A run's crate document, a source link or a database's dataset. */
   link?: { label: string; document?: string; url?: string }
@@ -50,6 +52,12 @@ function box(id: string, kind: BoxKind, role: string, title: string, extra: Part
   return { id, kind, role, title, identifiers: [], from: [], pending: [], ...extra }
 }
 
+/** A file's box titled by the last part of its name, such as a container path. */
+function fileNamed(id: string, kind: BoxKind, role: string, name: string, extra: Partial<Box> = {}): Box {
+  const last = name.replace(/\/+$/, '').split('/').pop() || name
+  return box(id, kind, role, last, last === name ? extra : { ...extra, path: name })
+}
+
 /** The last part of a key in a versioned id, or a short form of any other id. */
 export function shortName(id: string): string {
   const arn = /s3\/[^/]+\/(.+)@[0-9A-Z]{26}$/.exec(id)
@@ -76,7 +84,7 @@ function add(graph: Graph, parent: string | null, child: Box): string {
 
 /** A file's box, with its database and source added at once and its other links waiting. */
 function fileBox(graph: Graph, parent: string | null, id: string, asked: string, role: string, name: string, origin: OriginResponse) {
-  const file = box(id, 'file', role, name, { detail: new Date(origin.created_at).toLocaleDateString() })
+  const file = fileNamed(id, 'file', role, name, { detail: new Date(origin.created_at).toLocaleDateString() })
   const kind = origin.origin?.kind
   if (origin.origin?.kind === 'copy') file.pending.push({ kind: 'version', id: origin.origin.from, role: 'Copied from' })
   if (origin.origin?.kind === 'job') file.pending.push({ kind: 'run', runId: origin.origin.run_id })
@@ -146,7 +154,7 @@ export function startDataset(graph: Graph, title: string, documentId: string, cr
     if (run && inputs.has(part.id)) continue
     if (part.exact) root.pending.push({ kind: 'version', id: part.exact, name: part.name, digest: part.id, role: 'File' })
     else {
-      const file = add(graph, root.id, box(part.id, 'unversioned', 'File', part.name, { detail: 'No exact version recorded' }))
+      const file = add(graph, root.id, fileNamed(part.id, 'unversioned', 'File', part.name, { detail: 'No exact version recorded' }))
       if (run && results.has(part.id)) add(graph, file, run)
     }
   }
@@ -163,7 +171,7 @@ function seedRun(graph: Graph, action: Record<string, unknown>, crate: unknown):
   graph.seen[id] = id
   for (const input of runInputs(crate).parts) {
     if (input.exact) graph.boxes[id].pending.push({ kind: 'version', id: input.exact, name: input.name, digest: input.id, role: 'Input file' })
-    else add(graph, id, box(input.id, 'unversioned', 'Input file', input.name, { detail: 'No exact version recorded' }))
+    else add(graph, id, fileNamed(input.id, 'unversioned', 'Input file', input.name, { detail: 'No exact version recorded' }))
   }
   return graph.boxes[id]
 }
@@ -251,7 +259,7 @@ async function follow(graph: Graph, boxId: string, hop: Hop, readers: Readers, c
     add(graph, boxId, created)
     for (const input of parts) {
       if (input.exact) created.pending.push({ kind: 'version', id: input.exact, name: input.name, digest: input.id, role: 'Input file' })
-      else add(graph, id, box(input.id, 'unversioned', 'Input file', input.name, { detail: 'No exact version recorded' }))
+      else add(graph, id, fileNamed(input.id, 'unversioned', 'Input file', input.name, { detail: 'No exact version recorded' }))
     }
   } catch (cause) {
     if (!current()) return

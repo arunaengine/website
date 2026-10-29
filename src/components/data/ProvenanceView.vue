@@ -134,7 +134,7 @@ function boxView(item: Box, repeat = false): VNode {
   const root = graph.roots.includes(item.id)
   const lines: VNode[] = [
     h('div', { class: 'mb-0.5 text-[10px] uppercase tracking-wider text-muted-foreground' }, item.role),
-    h('p', { class: 'break-words [overflow-wrap:anywhere] font-medium' }, item.title),
+    h('p', { class: 'break-words [overflow-wrap:anywhere] font-medium', title: item.path }, item.title),
   ]
   if (item.detail) lines.push(h('p', { class: item.kind === 'hidden' ? 'font-mono text-muted-foreground' : 'text-muted-foreground' }, item.detail))
   if (repeat && item.from.length) lines.push(h('p', { class: 'text-muted-foreground' }, 'Where it came from is shown above.'))
@@ -178,7 +178,7 @@ function foldView(node: DrawnNode): VNode {
     h('button', { type: 'button', class: 'mt-1 text-primary hover:underline', 'aria-expanded': open, onClick: toggle }, open ? 'Hide the files' : 'Show the files'),
   ]
   if (node.repeat) lines.push(h('p', { class: 'text-muted-foreground' }, 'Where these came from is shown above.'))
-  if (open) lines.push(h('ul', { class: 'mt-1 max-h-40 space-y-0.5 overflow-y-auto text-muted-foreground' }, items.map((item) => h('li', { key: item.id, class: 'break-words [overflow-wrap:anywhere]' }, item.title))))
+  if (open) lines.push(h('ul', { class: 'mt-1 max-h-40 space-y-0.5 overflow-y-auto text-muted-foreground' }, items.map((item) => h('li', { key: item.id, class: 'break-words [overflow-wrap:anywhere]' }, item.path ?? item.title))))
   if (items.some((item) => item.pending.length)) {
     const expandAllOf = async () => {
       const current = fenced()

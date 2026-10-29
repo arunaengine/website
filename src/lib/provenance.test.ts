@@ -137,6 +137,13 @@ describe('provenance graph', () => {
     expect(graph.seen['run:01JOB']).toBe('run:01JOB')
   })
 
+  it('titles a file by the last part of its path and keeps the path', () => {
+    const graph = emptyGraph()
+    startFile(graph, arn('genome.fasta', V1), 'work/in/genome.fasta', origin({}))
+
+    expect(graph.boxes[arn('genome.fasta', V1)]).toMatchObject({ title: 'genome.fasta', path: 'work/in/genome.fasta' })
+  })
+
   it('reads stored file parts, whose links come in any order', () => {
     const stored = { '@graph': [{ '@id': '#a', '@type': 'MediaObject', name: 'a', contentUrl: [arn('a', V1), 's3://lab/a'] }] }
     expect(dataParts(stored)).toEqual([{ id: '#a', name: 'a', exact: arn('a', V1) }])

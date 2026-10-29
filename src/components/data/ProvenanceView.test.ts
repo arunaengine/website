@@ -128,7 +128,7 @@ describe('provenance view', () => {
     const tarball = 'https://w3id.org/aruna/data/arn:aruna:r:n2:s3/bakta-db/db-light.tar.xz@01K8W1B3D5F7H9KMQ1S3V5X7Z8'
     aruna.getRun.mockImplementation(async (runId: string) => ({ run_id: runId, run_crate: runId }))
     aruna.fetchRoCrateRaw.mockImplementation(async (doc: string) => doc === 'r1'
-      ? { '@graph': [{ '@id': '#run', '@type': 'CreateAction', name: 'Bakta', object: [{ '@id': 'genome' }, ...files.map((file) => ({ '@id': file['@id'] }))] }, { '@id': 'genome', '@type': 'File', name: 'genome.fasta', contentUrl: ['s3://laptop/genome.fasta', genome] }, ...files] }
+      ? { '@graph': [{ '@id': '#run', '@type': 'CreateAction', name: 'Bakta', object: [{ '@id': 'genome' }, ...files.map((file) => ({ '@id': file['@id'] }))] }, { '@id': 'genome', '@type': 'File', name: 'work/in/genome.fasta', contentUrl: ['s3://laptop/genome.fasta', genome] }, ...files] }
       : { '@graph': [{ '@id': '#prep', '@type': 'CreateAction', name: 'Prepare Bakta DB 6.0 light', object: [{ '@id': 'tar' }] }, { '@id': 'tar', '@type': 'File', name: 'db-light.tar.xz', contentUrl: ['s3://bakta-db/db-light.tar.xz', tarball] }] })
     aruna.getVersionOrigin.mockImplementation(async (id: string) => {
       if (id === genome) return origin({ origin: { kind: 'upload' } as never })
@@ -146,6 +146,8 @@ describe('provenance view', () => {
 
     expect(text).toContain('66 files of Bakta database (light) 6.0 light')
     expect(text).toContain('genome.fasta')
+    expect(text).not.toContain('work/in/genome.fasta')
+    expect(nodes(root).some((node) => node.props.title === 'work/in/genome.fasta')).toBe(true)
     expect(text.split('Database release')).toHaveLength(2)
     expect(text.split('Prepare Bakta DB 6.0 light')).toHaveLength(2)
     expect(text).toContain('zenodo.org')
