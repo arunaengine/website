@@ -143,6 +143,16 @@ describe('devices panel', () => {
     expect(html.match(/aria-label="Rename /g)).toHaveLength(1)
   })
 
+  it('gives an unnamed enrolled device a name for people, not just its id', async () => {
+    realmInfo.value = { nodes: [{ node_id: '73ea340a1234', kind: 'user', connection_status: 'seen' }] }
+    devices.value = [device({ id: '73ea340a1234', node_id: '73ea340a1234' }), device({ id: '5b1c9d2e7777', node_id: '5b1c9d2e7777' })]
+    const rendered = await text()
+
+    expect(rendered).toContain('Device 73ea340a online')
+    // Not listed by the realm yet: still a device, never a bare id.
+    expect(rendered).toContain('Device 5b1c9d2e unknown')
+  })
+
   it('says the realm caps nothing when it does not', async () => {
     devices.value = [device()]
     expect(await text()).toContain('1 enrolled')

@@ -15,7 +15,7 @@ import { useRefresh } from '@/composables/useRefresh'
 import { Plus, X } from '@lucide/vue'
 import type { UserDevice } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
-import { givenName } from '@/components/nodes/node-display'
+import { nodeName } from '@/components/nodes/node-display'
 import NodeNameEdit from '@/components/nodes/NodeNameEdit.vue'
 import { useNodeNames } from '@/composables/useNodeNames'
 
@@ -90,7 +90,9 @@ const rows = computed<DeviceRow[]>(() =>
     const variant: Variant = status === 'online' ? 'success' : status === 'claimed' ? 'sky' : status === 'pending' ? 'outline' : 'secondary'
     const seen = node?.last_seen_ms ? relativeTime(new Date(node.last_seen_ms).toISOString()) : online ? 'just now' : ''
     const nodeId = device.status === 'enrolled' ? device.node_id : null
-    return { id: device.id, nodeId, name: node ? givenName(node) : null, value: node?.display_name ?? null, shortId: (device.node_id ?? device.id).slice(0, 8), status, variant, lastSeen: seen }
+    // An enrolled device always has a name for people; an enrollment in flight goes by its code id.
+    const name = device.status === 'enrolled' ? (node ? nodeName(node) : 'Device') : null
+    return { id: device.id, nodeId, name, value: node?.display_name ?? null, shortId: (device.node_id ?? device.id).slice(0, 8), status, variant, lastSeen: seen }
   }),
 )
 const confirming = ref('')
