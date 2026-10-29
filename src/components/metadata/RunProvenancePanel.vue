@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -12,9 +12,10 @@ import { featureEnabled } from '@/lib/config'
 import { drsDownloadHref, drsObjectHref, isDrsReference } from '@/lib/tes'
 import { parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { isArunaUserId } from '@/lib/identifiers'
+import { groupFiles, type FileGroup } from '@/lib/fileGroups'
 import type { RunCrateFileRef, RunCrateModel } from '@/lib/runCrate'
 import { formatBytes, isHttpUrl, shortUserId, truncateMiddle } from '@/lib/utils'
-import { Download, ExternalLink as ExternalLinkIcon } from '@lucide/vue'
+import { ChevronRight, Download, ExternalLink as ExternalLinkIcon } from '@lucide/vue'
 
 const props = defineProps<{ run: RunCrateModel }>()
 
@@ -126,7 +127,6 @@ function toRow(ref: RunCrateFileRef): FileRow {
   return { ...ref, link: resolveRef(ref), size }
 }
 
-const inputRows = computed(() => props.run.inputs.map(toRow))
 const outputRows = computed(() => props.run.outputs.map(toRow))
 
 // One folder all results went to, for the "Saved to" line; null when they are spread out.
@@ -138,7 +138,71 @@ const savedTo = computed(() => {
 })
 
 function inputNote(row: FileRow): string {
-  return [row.version ? `release ${row.version}` : '', row.identifier ? `DOI ${row.identifier}` : ''].filter(Boolean).join(', ')
+  if (row.device) return `from ${displayName(row.device)}`
+  const group = groupFiles([row], s3.endpoint.value)[0]
+  if (group?.database || group?.release) return partNote(group, false)
+  const legacy = [row.version ? `release ${row.version}` : '', row.identifier ? `DOI ${row.identifier}` : ''].filter(Boolean).join(', ')
+  if (legacy) return legacy
+  return group?.bucket ? [group.bucket, group.nodeId ? `on ${displayName(group.nodeId)}` : ''].filter(Boolean).join(' ') : ''
+}
+
+// One row per database or crowded folder, opened to its files on request.
+const opened = ref(new Set<string>())
+function toggle(key: string) {
+  const next = new Set(opened.value)
+  if (!next.delete(key)) next.add(key)
+  opened.value = next
+}
+
+type ListRow = { kind: 'file'; key: string; row: FileRow; label: string; nested: boolean } | { kind: 'group'; key: string; group: FileGroup }
+
+// A container path reads by its file name; a grouped file by its path below the shared folder.
+function fileLabel(file: RunCrateFileRef, group?: FileGroup): string {
+  const key = parseDataIdentity(file, s3.endpoint.value).s3?.key
+  if (group && key?.startsWith(group.folder)) return key.slice(group.folder.length)
+  return file.name.startsWith('/') ? file.name.split('/').filter(Boolean).pop() ?? file.name : file.name
+}
+
+function listRows(files: RunCrateFileRef[]): ListRow[] {
+  return groupFiles(files, s3.endpoint.value).flatMap((group): ListRow[] => {
+    const only = group.files.length === 1 ? group.files[0] : undefined
+    if (only) return [{ kind: 'file', key: group.key, row: toRow(only), label: fileLabel(only), nested: false }]
+    const files = opened.value.has(group.key)
+      ? group.files.map((file) => ({ kind: 'file' as const, key: `${group.key}:${file.id}`, row: toRow(file), label: fileLabel(file, group), nested: true }))
+      : []
+    return [{ kind: 'group', key: group.key, group }, ...files]
+  })
+}
+const inputList = computed(() => listRows(props.run.inputs))
+const outputList = computed(() => listRows(props.run.outputs))
+
+function groupTitle(group: FileGroup): string {
+  const name = group.database?.name ?? group.release?.name
+  return name ?? `${group.files.length} files in ${group.bucket ?? ''}/${group.folder}`
+}
+
+function partNote(group: FileGroup, count: boolean): string {
+  const version = group.release?.version ?? group.database?.version
+  const name = group.database && !count ? group.database.name : ''
+  return [name, version ? `release ${version}` : '', count ? `${group.files.length} files` : ''].filter(Boolean).join(', ')
+}
+
+function groupNote(group: FileGroup): string {
+  if (group.database || group.release) return partNote(group, true)
+  return group.nodeId ? `on ${displayName(group.nodeId)}` : ''
+}
+
+// DOI links read as "DOI 10.5281/...", other links by their address.
+function groupLinks(group: FileGroup): { href: string; label: string }[] {
+  const links = [...new Set([...(group.database?.links ?? []), ...(group.release?.links ?? [])])].filter(isHttpUrl)
+  return links.map((href) => {
+    const doi = /^https?:\/\/(?:dx\.)?doi\.org\/(.+)$/i.exec(href)
+    return { href, label: doi ? `DOI ${doi[1]}` : href.replace(/^https?:\/\//, '') }
+  })
+}
+
+function groupSize(group: FileGroup): string {
+  return `${group.bytes.complete ? '' : 'at least '}${formatBytes(group.bytes.total)}`
 }
 </script>
 
@@ -146,27 +210,48 @@ function inputNote(row: FileRow): string {
   <div class="space-y-4" aria-label="Run record">
     <Notice v-if="run.error" tone="error">{{ run.error }}</Notice>
     <div class="grid gap-4 lg:grid-cols-2">
-      <section v-for="stage in [{ key: 'inputs', label: 'Inputs', rows: inputRows, empty: 'No declared inputs.' }, { key: 'outputs', label: 'Results', rows: outputRows, empty: 'No results were captured.' }]" :key="stage.key" class="surface p-5">
+      <section v-for="stage in [{ key: 'inputs', label: 'Inputs', list: inputList, empty: 'No declared inputs.' }, { key: 'outputs', label: 'Results', list: outputList, empty: 'No results were captured.' }]" :key="stage.key" class="surface p-5">
         <h2 class="mb-3 font-display text-sm font-semibold text-aruna-navy">{{ stage.label }}</h2>
-        <p v-if="!stage.rows.length" class="text-xs text-muted-foreground">{{ stage.empty }}</p>
+        <p v-if="!stage.list.length" class="text-xs text-muted-foreground">{{ stage.empty }}</p>
         <table v-else class="w-full text-left text-xs">
           <tbody class="divide-y divide-border">
-            <tr v-for="row in stage.rows" :key="row.id">
-              <td class="py-2 pr-4 font-medium">
-                <RouterLink
-                  v-if="row.link.kind === 's3'"
-                  class="break-all text-primary hover:underline"
-                  :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }"
-                  :title="row.id"
-                >{{ row.name }}</RouterLink>
-                <span v-else-if="row.link.kind === 'drs'" class="inline-flex items-center gap-1.5">
-                  <a class="inline-flex items-center gap-1 break-all text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.name, 24, 12) }} <ExternalLinkIcon class="h-3 w-3" /></a>
-                  <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" :aria-label="`Download ${row.name}`"><Download class="h-3.5 w-3.5" /></a>
-                </span>
-                <span v-else class="break-all" :title="row.id">{{ row.name }}</span>
-              </td>
-              <td v-if="stage.key === 'inputs'" class="py-2 pr-4 text-muted-foreground">{{ inputNote(row) }}</td>
-              <td class="whitespace-nowrap py-2 text-right tabular-nums text-muted-foreground">{{ row.size }}</td>
+            <tr v-for="entry in stage.list" :key="entry.key">
+              <template v-if="entry.kind === 'group'">
+                <td class="py-2 pr-4 font-medium">
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 text-left text-foreground hover:text-primary"
+                    :aria-expanded="opened.has(entry.key)"
+                    @click="toggle(entry.key)"
+                  >
+                    <ChevronRight class="h-3.5 w-3.5 shrink-0 transition-transform" :class="opened.has(entry.key) ? 'rotate-90' : ''" />
+                    {{ groupTitle(entry.group) }}
+                  </button>
+                </td>
+                <td v-if="stage.key === 'inputs'" class="py-2 pr-4 text-muted-foreground">
+                  {{ groupNote(entry.group) }}<template v-for="link in groupLinks(entry.group)" :key="link.href">, <ExternalLink :href="link.href" :label="link.label" /></template>
+                </td>
+                <td class="whitespace-nowrap py-2 text-right tabular-nums text-muted-foreground">
+                  {{ groupSize(entry.group) }}
+                </td>
+              </template>
+              <template v-else>
+                <td class="py-2 pr-4 font-medium" :class="entry.nested ? 'pl-5' : ''">
+                  <RouterLink
+                    v-if="entry.row.link.kind === 's3'"
+                    class="break-all text-primary hover:underline"
+                    :to="{ name: 'bucket', params: { bucketId: entry.row.link.bucketId }, query: entry.row.link.prefix ? { prefix: entry.row.link.prefix } : {} }"
+                    :title="entry.row.id"
+                  >{{ entry.label }}</RouterLink>
+                  <span v-else-if="entry.row.link.kind === 'drs'" class="inline-flex items-center gap-1.5">
+                    <a class="inline-flex items-center gap-1 break-all text-primary hover:underline" :href="entry.row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(entry.label, 24, 12) }} <ExternalLinkIcon class="h-3 w-3" /></a>
+                    <a class="text-muted-foreground hover:text-foreground" :href="entry.row.link.download" target="_blank" rel="noopener noreferrer" :aria-label="`Download ${entry.row.name}`"><Download class="h-3.5 w-3.5" /></a>
+                  </span>
+                  <span v-else class="break-all" :title="entry.row.id">{{ entry.label }}</span>
+                </td>
+                <td v-if="stage.key === 'inputs'" class="py-2 pr-4 text-muted-foreground">{{ entry.nested ? '' : inputNote(entry.row) }}</td>
+                <td class="whitespace-nowrap py-2 text-right tabular-nums text-muted-foreground">{{ entry.row.size }}</td>
+              </template>
             </tr>
           </tbody>
         </table>
