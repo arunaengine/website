@@ -101,6 +101,27 @@ function lockedBucket(...args: unknown[]) {
 let compiled: Component | null = null
 let compiledBar: Component | null = null
 let compiledMenu: Component | null = null
+let compiledSelection: Component | null = null
+
+/** The actions for the ticked rows, compiled so the browser tests can act on a selection. */
+export function selectionBar(): Component {
+  compiledSelection ??= compileClientComponent(
+    new URL('../components/data/manager/SelectionBar.vue', import.meta.url),
+    {
+      vue: VueRuntime,
+      '@lucide/vue': new Proxy({}, { get: () => IconStub }),
+      '@/lib/formatCount': FormatCount,
+      '@/lib/objectListing': ObjectListing,
+      '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+      '@/components/ui/DropdownMenu.vue': moduleDefault(Slotted('div')),
+      '@/components/ui/DropdownMenuContent.vue': moduleDefault(Slotted('div')),
+      '@/components/ui/DropdownMenuItem.vue': moduleDefault(MenuItemStub),
+      '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Slotted('span')),
+      '@/components/ui/IconButton.vue': moduleDefault(IconButtonStub),
+    },
+  )
+  return compiledSelection
+}
 
 /** The row menu with its items rendered inline, so a test can pick one. */
 export function rowMenu(): Component {
@@ -201,6 +222,7 @@ export function objectBrowser(): Component {
       '@/components/data/manager/ObjectListBar.vue': moduleDefault(objectListBar()),
       '@/components/data/MetadataSearch.vue': moduleDefault(BucketSearchStub),
       '@/components/data/manager/RowMenu.vue': moduleDefault(rowMenu()),
+      '@/components/data/manager/SelectionBar.vue': moduleDefault(selectionBar()),
       '@/components/data/manager/TransferDialog.vue': moduleDefault(Slotted('aside')),
       '@/components/watches/WatchButton.vue': moduleDefault(Slotted('button')),
       '@/components/storage/KeyedReadNotice.vue': moduleDefault(Slotted('aside')),

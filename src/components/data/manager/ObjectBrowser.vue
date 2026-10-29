@@ -14,6 +14,7 @@ import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import ObjectListBar from '@/components/data/manager/ObjectListBar.vue'
 import MetadataSearch from '@/components/data/MetadataSearch.vue'
 import RowMenu from '@/components/data/manager/RowMenu.vue'
+import SelectionBar from '@/components/data/manager/SelectionBar.vue'
 import TransferDialog from '@/components/data/manager/TransferDialog.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import KeyedReadNotice from '@/components/storage/KeyedReadNotice.vue'
@@ -377,6 +378,7 @@ async function downloadSelected() {
 function onBarAction(action: SelectionAction) {
   if (action === 'download') void downloadSelected()
   else if (action === 'access') emit('public-access', publicTargets())
+  else if (action === 'share') void share([...selectedPrefixes.value, ...selectedObjectKeys.value])
   else if (action === 'delete') deleteSelection()
   else openTransfer(action, selectedSources())
 }
@@ -601,7 +603,7 @@ async function onDrop(event: DragEvent) {
 
       <div
         data-tour="bucket-dropzone"
-        class="surface overflow-hidden"
+        class="surface overflow-clip"
         :class="dragActive ? 'ring-2 ring-primary ring-offset-2' : ''"
         @dragover.prevent="dragActive = canWriteCurrentPrefix"
         @dragleave="dragActive = false"
@@ -611,7 +613,6 @@ async function onDrop(event: DragEvent) {
           v-model:text="searchText"
           :manager="manager"
           :whole-bucket="wholeBucket"
-          @action="onBarAction"
           @search-bucket="searchBucket"
           @back="backToFolder"
         />
@@ -666,7 +667,8 @@ async function onDrop(event: DragEvent) {
             <col class="w-[132px]" />
           </colgroup>
           <thead class="text-[11px] uppercase tracking-wider text-muted-foreground @max-[600px]:hidden">
-            <tr class="border-b border-border">
+            <SelectionBar v-if="selectedCount" :manager="manager" @action="onBarAction" />
+            <tr v-else class="border-b border-border">
               <th class="p-0">
                 <label class="flex h-11 w-11 items-center justify-center">
                   <input
@@ -902,6 +904,7 @@ async function onDrop(event: DragEvent) {
             </IconButton>
           </div>
         </div>
+        <SelectionBar v-if="selectedCount" bottom :manager="manager" class="hidden @max-[600px]:block" @action="onBarAction" />
         </template>
         <button
           v-if="!wholeBucket && searchText.trim().length >= 2"

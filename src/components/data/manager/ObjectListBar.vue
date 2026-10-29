@@ -1,8 +1,6 @@
 <script setup lang="ts">
-// The bar on top of the object list: the one search box and the filter menu on
-// the left, the actions for the ticked rows on the right. Typing filters this
-// folder; Enter, or any `column=value`, searches the whole bucket. Its height is fixed,
-// so ticking a row never moves the list; narrow screens scroll it sideways.
+// The one search box and the filter menu of the file list. Typing filters this folder; Enter
+// searches the whole bucket, where a `column=value` matches a metadata column.
 import Button from '@/components/ui/Button.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
@@ -10,29 +8,21 @@ import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import DropdownMenuLabel from '@/components/ui/DropdownMenuLabel.vue'
 import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
-import IconButton from '@/components/ui/IconButton.vue'
 import Input from '@/components/ui/Input.vue'
 import type { DataManager } from '@/composables/useDataManager'
-import { actionBlocker, filtersChanged, type ListingShow, type SelectionAction } from '@/lib/objectListing'
+import { filtersChanged, type ListingShow } from '@/lib/objectListing'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, watch } from 'vue'
 import {
   Check,
-  Copy,
-  Download,
-  FolderInput,
-  Globe,
   ListFilter,
-  PencilLine,
   Search,
-  Trash2,
   X,
 } from '@lucide/vue'
 
 /** `wholeBucket`: the box drives the whole-bucket search, so the folder filter rests. */
 const props = defineProps<{ manager: DataManager; wholeBucket?: boolean }>()
 const emit = defineEmits<{
-  (e: 'action', action: SelectionAction): void
   (e: 'search-bucket'): void
   (e: 'back'): void
 }>()
@@ -45,11 +35,6 @@ const {
   showDeleted,
   setShowDeleted,
   remoteNodeId,
-  activeGroupId,
-  selectedObjectKeys,
-  selectedPrefixes,
-  selectedCount,
-  clearSelection,
 } = props.manager
 
 const SHOW_OPTIONS: { value: ListingShow; label: string }[] = [
@@ -58,21 +43,7 @@ const SHOW_OPTIONS: { value: ListingShow; label: string }[] = [
   { value: 'folders', label: 'Folders only' },
 ]
 
-const ACTIONS = [
-  { id: 'download', label: 'Download', icon: Download },
-  { id: 'move', label: 'Move to', icon: FolderInput },
-  { id: 'copy', label: 'Copy to', icon: Copy },
-  { id: 'rename', label: 'Rename', icon: PencilLine },
-  { id: 'access', label: 'Access', icon: Globe },
-  { id: 'delete', label: 'Delete', icon: Trash2 },
-] as const
-
-const actions = computed(() => ACTIONS.filter((action) => action.id !== 'access' || activeGroupId.value))
 const changed = computed(() => filtersChanged({ show: listShow.value, includeDeleted: showDeleted.value }))
-
-function blocker(action: SelectionAction): string | null {
-  return actionBlocker(action, selectedObjectKeys.value.size, selectedPrefixes.value.size)
-}
 
 // Typing waits for a pause before the folder is listed again; a `column=value` never filters it.
 let applied = nameFilter.value
@@ -164,25 +135,5 @@ function onEscape() {
         <DropdownMenuItem class="pl-8" :disabled="!changed" @click="resetFilters">Reset filters</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-    <span class="flex-1" />
-    <span class="flex w-28 shrink-0 items-center justify-end gap-1" :class="selectedCount ? '' : 'invisible'">
-      <span class="text-muted-foreground">{{ selectedCount }} selected</span>
-      <IconButton label="Clear selection" class="text-muted-foreground" @click="clearSelection">
-        <X class="size-3.5" />
-      </IconButton>
-    </span>
-    <span class="h-5 w-px shrink-0 bg-border" aria-hidden="true" />
-    <div class="flex shrink-0 items-center gap-1">
-      <IconButton
-        v-for="action in actions"
-        :key="action.id"
-        :label="action.label"
-        :disabled-reason="blocker(action.id)"
-        :class="action.id === 'delete' ? 'text-destructive hover:text-destructive' : undefined"
-        @click="emit('action', action.id)"
-      >
-        <component :is="action.icon" class="size-3.5" />
-      </IconButton>
-    </div>
   </div>
 </template>

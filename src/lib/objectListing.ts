@@ -63,7 +63,7 @@ export function fileRows<O extends { key: string }>(objects: O[], deleted: Delet
 
 export type RowAction = 'open' | 'details' | 'preview' | 'download' | 'rename' | 'move' | 'copy' | 'share' | 'access' | 'delete' | 'purge'
 
-export type SelectionAction = 'download' | 'move' | 'copy' | 'rename' | 'access' | 'delete'
+export type SelectionAction = 'download' | 'move' | 'copy' | 'rename' | 'share' | 'access' | 'delete'
 
 /** Why a list bar action is unavailable for the ticked files and folders, or null. */
 export function actionBlocker(action: SelectionAction, files: number, folders: number): string | null {

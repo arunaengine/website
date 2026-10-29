@@ -448,24 +448,39 @@ describe('object browser selection', () => {
     expect(box.props.title).toContain('cannot delete this entire folder')
   })
 
-  it('keeps every list bar action disabled while nothing is ticked', async () => {
+  it('shows the column header until a row is ticked, then the selection actions in its place', async () => {
     const root = await render({ folders: ref([listedFolder]) })
-
-    for (const label of ['Download', 'Move to', 'Copy to', 'Rename', 'Access', 'Delete']) {
-      expect(action(root, label).props.disabled).toBe(true)
-    }
-  })
-
-  it('renames only one ticked entry and downloads only ticked files', async () => {
-    const root = await render({ folders: ref([listedFolder]) })
+    const header = () => element(root, (node) => node.tag === 'thead')
+    expect(content(header())).toContain('Name')
+    expect(() => action(header(), 'Delete')).toThrow()
 
     await tick(checkbox(root, 'Select genomes'), true)
-    expect(action(root, 'Rename').props.disabled).toBe(false)
-    expect(action(root, 'Download').props.disabled).toBe(true)
-
+    expect(content(header())).not.toContain('Name')
+    expect(content(header())).toContain('1 selected')
+    for (const label of ['Download', 'Copy to', 'Move to', 'Share', 'Delete']) expect(() => action(header(), label)).not.toThrow()
+    // Folders alone cannot be downloaded; a ticked file allows it.
+    expect(action(header(), 'Download').props.disabled).toBe(true)
     await tick(checkbox(root, `Select ${listedObject.name}`), true)
-    expect(action(root, 'Rename').props.disabled).toBe(true)
-    expect(action(root, 'Download').props.disabled).toBe(false)
+    expect(action(header(), 'Download').props.disabled).toBe(false)
+  })
+
+  it('keeps one select-all box, partly ticked while only some rows are', async () => {
+    const root = await render({ folders: ref([listedFolder]), someListedSelected: ref(true), allListedSelected: ref(false), selectedCount: ref(1) })
+    const header = element(root, (node) => node.tag === 'thead')
+    const all = nodes(header).filter((node) => node.tag === 'input' && node.props['aria-label'] === 'Select all listed folders and files')
+    expect(all).toHaveLength(1)
+    expect(all[0].props.indeterminate).toBe(true)
+  })
+
+  it('offers the selection as a bar at the bottom of the list on a phone', async () => {
+    const root = await render()
+    await tick(checkbox(root, `Select ${listedObject.name}`), true)
+    const bar = element(root, (node) => node.props['aria-label'] === 'Selected files')
+
+    expect(String(bar.props.class)).toContain('hidden @max-[600px]:block')
+    expect(String(bar.props.class)).toContain('sticky bottom-0')
+    expect(content(bar).replace(/\s+/g, ' ')).toMatch(/Download Copy Move Share .*Delete/)
+    expect(String(element(root, (node) => node.tag === 'thead').props.class)).toContain('@max-[600px]:hidden')
   })
 
   it('downloads the ticked files from the list bar', async () => {
@@ -546,21 +561,40 @@ describe('object browser selection', () => {
 
     await tick(checkbox(root, `Select ${listedObject.name}`), true)
     await tick(checkbox(root, `Select ${listedFolder.name}`), true)
-    await click(action(root, 'Access'))
+    await click(element(root, (node) => node.props.role === 'menuitem' && content(node).trim() === 'Make public'))
     expect(publicAccess).toHaveBeenLastCalledWith([
       { kind: 'folder', bucket: 'reef', key: listedFolder.prefix },
       { kind: 'file', bucket: 'reef', key: listedObject.key },
     ])
   })
 
-  it('clears the ticks from the list bar', async () => {
+  it('clears the ticks and brings the column header back', async () => {
     const root = await render()
 
     await tick(checkbox(root, `Select ${listedObject.name}`), true)
-    await click(action(root, 'Clear selection'))
+    await click(button(element(root, (node) => node.tag === 'thead'), 'Clear'))
 
-    expect(content(root)).toContain('0 selected')
-    expect(action(root, 'Delete').props.disabled).toBe(true)
+    expect(content(root)).not.toContain('selected')
+    expect(content(element(root, (node) => node.tag === 'thead'))).toContain('Name')
+  })
+
+  it('copies the links of the ticked entries from Share', async () => {
+    const writeText = vi.fn(async () => undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    vi.stubGlobal('window', { location: { origin: 'https://portal.example' } })
+    const resolve = vi.fn(() => ({ href: '/data/reef' }))
+    try {
+      const root = await render({ router: { push, resolve }, folders: ref([listedFolder]) })
+      await tick(checkbox(root, 'Select genomes'), true)
+      await tick(checkbox(root, `Select ${listedObject.name}`), true)
+      await click(element(element(root, (node) => node.tag === 'thead'), (node) => node.props.role === 'menuitem' && content(node).trim() === 'Copy links'))
+
+      expect(resolve).toHaveBeenCalledTimes(2)
+      expect(writeText).toHaveBeenCalledWith('https://portal.example/data/reef\nhttps://portal.example/data/reef')
+      expect(content(root)).toContain('2 links copied')
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('lets the list bar fit a narrow screen', async () => {
