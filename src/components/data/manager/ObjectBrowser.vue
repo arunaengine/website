@@ -445,7 +445,7 @@ async function onDrop(event: DragEvent) {
                   <p class="text-sm font-semibold text-foreground">Referenced data</p>
                   <p class="mt-0.5 text-xs text-muted-foreground">
                     {{ referenceStats.count }} object{{ referenceStats.count === 1 ? '' : 's' }} in this
-                    bucket point{{ referenceStats.count === 1 ? 's' : '' }} at data held elsewhere ·
+                    bucket point{{ referenceStats.count === 1 ? 's' : '' }} at data held elsewhere,
                     {{ formatBytes(referenceStats.bytes) }} in total.
                   </p>
                 </div>
@@ -478,7 +478,7 @@ async function onDrop(event: DragEvent) {
                       </span>
                     </span>
                     <span class="shrink-0 font-mono text-muted-foreground">
-                      {{ group.count }} · {{ formatBytes(group.bytes) }}
+                      {{ group.count }}, {{ formatBytes(group.bytes) }}
                     </span>
                   </li>
                 </ul>

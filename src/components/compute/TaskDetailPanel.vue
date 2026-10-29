@@ -205,7 +205,7 @@ const resourceSummary = computed(() => {
   if (r.ram_gb != null) parts.push(`${formatResourceGb(r.ram_gb)} RAM`)
   if (r.disk_gb != null) parts.push(`${formatResourceGb(r.disk_gb)} disk`)
   if (r.preemptible) parts.push('preemptible')
-  return parts.join(' · ')
+  return parts.join(', ')
 })
 
 const constraintList = computed(() =>
