@@ -211,10 +211,16 @@ const syncPartners = computed(() => {
     parseArunaArn(direction === 'outgoing' ? relationship.target : relationship.source)?.nodeId ?? null)
   return [...new Set(ids)].filter((id): id is string => Boolean(id) && id !== own).map((id) => ({ id, name: realmNodes.displayName(id) }))
 })
-// A failed or paused sync says so; otherwise the newest sync time of the bucket.
+// Up to date only once every sync is enabled, has synced and waits for no key; else what holds it.
 const syncProblem = computed(() => {
-  const states = syncsForKey('').map(({ relationship }) => relationship.state)
-  return states.includes('failed') ? 'Sync failed' : states.includes('paused') ? 'Sync paused' : null
+  const relationships = syncsForKey('').map(({ relationship }) => relationship)
+  const states = relationships.map((relationship) => relationship.state)
+  if (states.includes('failed')) return 'Sync failed'
+  if (states.includes('paused')) return 'Sync paused'
+  const other = relationships.find((relationship) => relationship.state !== 'enabled')
+  if (other) return `Sync ${other.state}`
+  if (relationships.some((relationship) => relationship.status?.awaiting_key)) return 'Waiting for an unlock'
+  return relationships.some((relationship) => !relationship.status?.last_synced_at) ? 'Not synced yet' : null
 })
 const lastSync = computed(() =>
   syncsForKey('').map(({ relationship }) => relationship.status?.last_synced_at ?? '').filter(Boolean).sort().at(-1) ?? null)

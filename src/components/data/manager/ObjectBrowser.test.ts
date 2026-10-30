@@ -341,7 +341,7 @@ describe('object browser link a local folder', () => {
 
   it('names the file count and size of the bucket and the nodes it syncs with', async () => {
     bucketUsage.value.value = { objects: 16 }
-    const relationship = { source: 'arn:aruna:realm:self:s3/reef', target: 'arn:aruna:realm:laptop-1:s3/reef' }
+    const relationship = { source: 'arn:aruna:realm:self:s3/reef', target: 'arn:aruna:realm:laptop-1:s3/reef', state: 'enabled', status: { last_synced_at: '2026-01-01T00:00:00Z' } }
     try {
       const root = await render({ syncsForKey: () => [{ relationship, direction: 'outgoing' }] })
       const text = content(root)
@@ -353,6 +353,16 @@ describe('object browser link a local folder', () => {
     } finally {
       bucketUsage.value.value = null
     }
+  })
+
+  it('says up to date only once the sync has finished and waits for nothing', async () => {
+    const base = { source: 'arn:aruna:realm:self:s3/reef', target: 'arn:aruna:realm:laptop-1:s3/reef', state: 'enabled' }
+    const shown = async (relationship: object) => content(await render({ syncsForKey: () => [{ relationship, direction: 'outgoing' }] }))
+
+    expect(await shown({ ...base, status: {} })).toContain('Not synced yet')
+    expect(await shown({ ...base, status: { last_synced_at: '2026-01-01T00:00:00Z', awaiting_key: 2 } })).toContain('Waiting for an unlock')
+    expect(await shown({ ...base, state: 'detached', status: { last_synced_at: '2026-01-01T00:00:00Z' } })).toContain('Sync detached')
+    expect(await shown({ ...base, status: {} })).not.toContain('Up to date')
   })
 
   it('shows no count while the usage is unknown, never a zero', async () => {
