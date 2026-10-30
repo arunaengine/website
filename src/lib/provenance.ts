@@ -352,13 +352,16 @@ export function drawnChain(graph: Graph): DrawnNode[] {
       // A box already on this path is not drawn again, so a cycle ends.
       if (!item || trail.includes(id)) continue
       const from = [...item.from].sort().join('\n')
-      const key = item.kind === 'file' && from ? `${item.role}\n${from}` : `box:${id}`
+      const leaf = (item.kind === 'file' || item.kind === 'unversioned') && !from
+      const key = item.kind === 'file' && from ? `${item.role}\n${from}` : leaf ? `leaf:${item.kind}\n${item.role}` : `box:${id}`
       groups.set(key, [...(groups.get(key) ?? []), id])
     }
+    // Files with no sources fold only when there are many of them.
+    const folds = [...groups].flatMap(([key, members]) => (key.startsWith('leaf:') && members.length <= 3 ? members.map((id) => [id]) : [members]))
     // Runs follow the files beside them, so a file's chain through a run is drawn first, and a box
     // that an earlier sibling's chain drew is left out here.
     const isRun = (members: string[]) => graph.boxes[members[0]!]!.kind === 'run'
-    const ordered = [...groups.values()].sort((a, b) => Number(isRun(a)) - Number(isRun(b)))
+    const ordered = folds.sort((a, b) => Number(isRun(a)) - Number(isRun(b)))
     return ordered.flatMap((members) => {
       if (members.every((id) => drawn.has(id) && !before.has(id))) return []
       const repeat = members.every((id) => drawn.has(id))
@@ -368,6 +371,53 @@ export function drawnChain(graph: Graph): DrawnNode[] {
     })
   }
   return walk(graph.roots, [])
+}
+
+/** A run record's chain: result files that came only from its run fold into the record's card. */
+export function intoRecord(graph: Graph, chain: DrawnNode[]): DrawnNode[] {
+  return chain.map((root) => {
+    const start = graph.boxes[root.ids[0]!]
+    const run = start?.id.startsWith('dataset:') ? start.from.find((id) => graph.boxes[id]?.kind === 'run') : undefined
+    if (!run) return root
+    const result = (node: DrawnNode) => node.ids.every((id) => graph.boxes[id]?.from.join() === run)
+    const sources = root.sources.flatMap((node) => (result(node) ? node.sources : [node]))
+    const runs = sources.filter((node) => node.ids[0] === run)
+    const kept = runs.find((node) => !node.repeat) ?? runs[0]
+    return { ...root, sources: sources.filter((node) => node.ids[0] !== run || node === kept) }
+  })
+}
+
+/** A card of the chain in columns: sources at the left, the start in the last column. */
+export interface ChainCard {
+  /** Unique per card, also for a box drawn twice. */
+  id: string
+  node: DrawnNode
+  column: number
+  /** A card with sources sits halfway between its first and last source, so a row may be a half. */
+  row: number
+  /** The card this one leads into. */
+  into: string | null
+  /** Whether its sources are drawn. */
+  open: boolean
+}
+
+/** Places the drawn chain in columns; `direct` keeps the start, its runs and their inputs only. */
+export function chainColumns(graph: Graph, chain: DrawnNode[], direct: boolean) {
+  const isRun = (node: DrawnNode) => graph.boxes[node.ids[0]!]?.kind === 'run'
+  const placed: (Omit<ChainCard, 'column'> & { depth: number })[] = []
+  let next = 0
+  const place = (node: DrawnNode, depth: number, into: string | null, underRun: boolean): number => {
+    const id = `${into ?? ''}>${node.key}`
+    const open = !direct || (!underRun && (depth === 0 || isRun(node)))
+    const rows = (open ? node.sources : []).map((source) => place(source, depth + 1, id, underRun || isRun(node)))
+    const row = rows.length ? (rows[0]! + rows[rows.length - 1]!) / 2 : next++
+    placed.push({ id, node, depth, row, into, open })
+    return row
+  }
+  for (const root of chain) place(root, 0, null, false)
+  const deepest = Math.max(0, ...placed.map((card) => card.depth))
+  const cards: ChainCard[] = placed.map(({ depth, ...card }) => ({ ...card, column: deepest - depth }))
+  return { cards, columns: deepest + 1, rows: Math.max(1, next) }
 }
 
 /** Whether any box still has links to read. */

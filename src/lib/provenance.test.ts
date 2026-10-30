@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError, type OriginResponse } from '@/lib/api'
-import { bucketOf, dataParts, drawnChain, emptyGraph, expand, expandAll, hasPending, runInputs, runRecordDetail, startDataset, startFile, type Box, type Readers } from './provenance'
+import { bucketOf, chainColumns, dataParts, drawnChain, emptyGraph, expand, expandAll, hasPending, intoRecord, runInputs, runRecordDetail, startDataset, startFile, type Box, type Readers } from './provenance'
 
 const bakrep = { database: true, title: 'BakRep', dataset: 'd1', identifiers: [] }
 
@@ -325,3 +325,54 @@ describe('drawn chain', () => {
     expect(other!.sources[0]).toMatchObject({ ids: ['run:bakta'], repeat: true, sources: [] })
   })
 })
+
+describe('chain columns', () => {
+  const put = (graph: ReturnType<typeof emptyGraph>, id: string, kind: Box['kind'], from: string[] = []) => {
+    graph.boxes[id] = { id, kind, role: kind, title: id, identifiers: [], from, pending: [] }
+  }
+
+  it('folds a run record\'s results into the record, which then comes from the run', () => {
+    const graph = emptyGraph()
+    const results = Array.from({ length: 12 }, (_, index) => `out-${index}`)
+    put(graph, 'dataset:d1', 'file', ['run:r1', ...results])
+    for (const id of results) put(graph, id, 'unversioned', ['run:r1'])
+    put(graph, 'run:r1', 'run', ['genome', 'db'])
+    put(graph, 'genome', 'file')
+    put(graph, 'db', 'file', ['release:6'])
+    put(graph, 'release:6', 'database', ['source:zenodo'])
+    put(graph, 'source:zenodo', 'source')
+    graph.roots = ['dataset:d1']
+
+    const [record] = intoRecord(graph, drawnChain(graph))
+    expect(record!.sources.map((node) => [node.ids, node.repeat])).toEqual([[['run:r1'], false]])
+
+    const full = chainColumns(graph, [record!], false)
+    const place = (id: string) => full.cards.find((card) => card.node.ids[0] === id)
+    expect(full.columns).toBe(5)
+    expect(full.rows).toBe(2)
+    expect(place('dataset:d1')).toMatchObject({ column: 4, row: 0.5, into: null })
+    expect(place('run:r1')).toMatchObject({ column: 3, row: 0.5 })
+    expect(place('genome')).toMatchObject({ column: 2, row: 0 })
+    expect(place('source:zenodo')).toMatchObject({ column: 0, row: 1, into: place('release:6')!.id })
+
+    const direct = chainColumns(graph, [record!], true)
+    expect(direct.cards.map((card) => card.node.ids[0])).toEqual(['genome', 'db', 'run:r1', 'dataset:d1'])
+    expect(direct.cards.find((card) => card.node.ids[0] === 'db')).toMatchObject({ column: 0, open: false })
+  })
+
+  it('folds many files without sources into one card, a few stay apart', () => {
+    const graph = emptyGraph()
+    const parts = Array.from({ length: 40 }, (_, index) => `part-${index}`)
+    put(graph, 'dataset:d2', 'file', parts)
+    for (const id of parts) put(graph, id, 'unversioned')
+    put(graph, 'run:r2', 'run', ['a', 'b'])
+    put(graph, 'a', 'file')
+    put(graph, 'b', 'file')
+    graph.roots = ['dataset:d2', 'run:r2']
+
+    const [dataset, run] = drawnChain(graph)
+    expect(dataset!.sources.map((node) => node.ids.length)).toEqual([40])
+    expect(run!.sources.map((node) => node.ids)).toEqual([['a'], ['b']])
+  })
+})
+
