@@ -76,6 +76,8 @@ describe('page header docs links', () => {
     expect(nav.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()).toBe('Aruna_v3_Demo_Realm Data reef Settings')
     expect(html).toContain('lucide-globe')
     expect(html).toContain('title="k3V9xQ2m"')
+    // The realm name leads back to the dashboard.
+    expect(nav).toContain(`href="${JSON.stringify({ name: 'dashboard' }).replace(/"/g, '&quot;')}"`)
     expect(html).not.toContain('Portal')
     expect(html).toContain('class="type-page-title"')
     // The docs link is a 36 px icon button whose label is its name and tooltip.

@@ -59,7 +59,7 @@ const trail = computed(() => [...(section.value ? [section.value] : []), ...prop
     <div class="w-full px-4 sm:px-6 relative flex flex-col gap-2 pb-6 pt-6">
       <nav aria-label="Breadcrumb" class="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] leading-[18px] text-muted-foreground">
         <Globe class="size-3.5 shrink-0" aria-hidden="true" />
-        <span class="truncate" :title="realmId">{{ realmDisplayName }}</span>
+        <RouterLink :to="{ name: 'dashboard' }" class="truncate hover:text-foreground hover:underline" :title="realmId">{{ realmDisplayName }}</RouterLink>
         <template v-for="(crumb, index) in trail" :key="`${index}:${crumb.label}`">
           <ChevronRight class="size-3.5 shrink-0" aria-hidden="true" />
           <RouterLink v-if="crumb.to && index < trail.length - 1" :to="crumb.to" class="truncate hover:text-foreground hover:underline">{{ crumb.label }}</RouterLink>
