@@ -835,7 +835,8 @@ describe('object browser names', () => {
 })
 
 describe('object browser run filter', () => {
-  const run = { key: 'job:r1', label: 'Annotate my genome with Bakta', to: { name: 'task', params: { taskId: 't1' } }, time: '2026-02-01T00:00:00Z' }
+  type Origin = { key: string; label: string; to: { name: string; params: { taskId: string } } | null; time: string }
+  const run: Origin = { key: 'job:r1', label: 'Annotate my genome with Bakta', to: { name: 'task', params: { taskId: 't1' } }, time: '2026-02-01T00:00:00Z' }
   const other = { ...listedObject, key: 'raw/notes.txt', name: 'notes.txt' }
   afterEach(() => (folderOrigin.byKey.value = new Map()))
 
