@@ -6,8 +6,10 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
+import ListPager from '@/components/ui/ListPager.vue'
 import { useAruna } from '@/composables/useAruna'
 import type { DatasetViewState } from '@/composables/useDatasetView'
+import { usePagedList } from '@/composables/usePagedList'
 import { crateGraph, crateRootId, stringProp } from '@/lib/dataEntities'
 import { documentIdFromIri, isDocumentId } from '@/lib/graphIri'
 import { isHttpUrl } from '@/lib/utils'
@@ -74,6 +76,8 @@ const relatedDocs = computed<RelatedDocRow[]>(() => {
   return rows
 })
 
+const { page, pageSize, shown, total, paged } = usePagedList(relatedDocs)
+
 watch(relatedDocs, (rows) => {
   for (const row of rows) {
     if (row.documentId && !relatedPaths.value[row.documentId]) void ensureRelatedPath(row.documentId)
@@ -84,11 +88,11 @@ watch(relatedDocs, (rows) => {
 <template>
   <section v-if="relatedDocs.length" class="surface overflow-hidden">
     <div class="flex items-center gap-2 border-b border-border px-5 py-3.5 text-sm font-medium text-foreground">
-      <Link2 class="h-4 w-4 text-primary" /> Related resources
+      <Link2 class="h-4 w-4 text-primary" /> Links
       <span class="text-xs font-normal text-muted-foreground">{{ relatedDocs.length }}</span>
     </div>
     <ul class="divide-y divide-border">
-      <li v-for="row in relatedDocs" :key="row.iri" class="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
+      <li v-for="row in shown" :key="row.iri" class="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
         <RouterLink
           v-if="row.documentId"
           :to="{ name: 'dataset', params: { id: row.documentId } }"
@@ -108,5 +112,6 @@ watch(relatedDocs, (rows) => {
         <Badge variant="outline" size="sm" class="shrink-0 uppercase">{{ row.documentId ? 'in portal' : 'external' }}</Badge>
       </li>
     </ul>
+    <ListPager v-if="paged" v-model:page="page" v-model:page-size="pageSize" :total="total" class="border-t border-border" />
   </section>
 </template>
