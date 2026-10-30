@@ -41,7 +41,7 @@ describe('bucket chooser', () => {
 
     expect(text).toContain('laptop 16 files, 69.7 MB, on name-n2')
     // A database leads with its title, then the same facts as any bucket.
-    expect(text).toContain('refseq NCBI RefSeq genomes, on name-n2')
+    expect(text).toContain('refseq NCBI RefSeq genomes, spread over 2 nodes')
     expect(html).toContain(JSON.stringify({ name: 'bucket', params: { bucketId: 'laptop' }, query: { node: 'n2', group: 'g1' } }).replaceAll('"', '&quot;'))
     expect(ensure).toHaveBeenCalledWith([{ bucket: 'laptop', nodeId: 'n2' }, { bucket: 'refseq', nodeId: 'n2' }])
   })
