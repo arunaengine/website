@@ -79,17 +79,21 @@ const chooseBucket = (hit: BucketSearchHit) => chooseDatabase(hit.bucket, hit.no
 // The own groups' buckets that no copy on this node serves; this node's are browsed above them.
 const remoteOwn = ref<BucketSearchHit[] | null>(null)
 const remoteState = ref<'complete' | 'partial' | 'failed'>('complete')
+// False once the listing shows this node holds none of my buckets: the picker then opens on the others.
+const localHeld = ref<boolean | null>(null)
 let remoteRun = 0
 async function loadRemoteOwn() {
   const run = ++remoteRun
   const epoch = sessionEpoch.value
   const current = () => run === remoteRun && epoch === sessionEpoch.value
   remoteOwn.value = null
+  localHeld.value = null
   const groups = new Set(myGroups.value.map((group) => group.id))
   const listing = await listBuckets(searchBuckets, undefined, current).catch(() => null)
   if (!current()) return
   remoteState.value = !listing ? 'failed' : listing.complete ? 'complete' : 'partial'
   const hits = (listing?.hits ?? []).filter((hit) => groups.has(hit.group_id) && isTarget(hit.node_id))
+  localHeld.value = listing && listing.complete ? hits.some((hit) => isLocalNode(hit.node_id)) : null
   // One row per distributed bucket (none when this node holds a member), one per other bucket.
   const identity = (hit: BucketSearchHit) => hit.set_id ?? `${hit.node_id}/${hit.bucket}`
   const seen = new Set(hits.filter((hit) => hit.set_id && isLocalNode(hit.node_id)).map(identity))
@@ -98,6 +102,7 @@ async function loadRemoteOwn() {
 watch(sessionEpoch, () => {
   remoteRun++
   remoteOwn.value = null
+  localHeld.value = null
   if (props.open && currentUser.value) void loadRemoteOwn()
 })
 const groupName = (id: string) => myGroups.value.find((group) => group.id === id)?.name ?? id
@@ -275,7 +280,8 @@ watch(
         <RemoteObjectPicker :bucket="database.bucket" :node-id="database.nodeId" :busy="folderBusy" @add="addRemote" />
       </template>
       <template v-else-if="source === 'buckets'">
-        <Notice v-if="!s3.endpoint.value" tone="warning" class="flex items-start gap-2">
+        <template v-if="localHeld === false && remoteOwn?.length" />
+        <Notice v-else-if="!s3.endpoint.value" tone="warning" class="flex items-start gap-2">
           <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>This node does not advertise an S3 endpoint, so its data cannot be browsed or referenced here.</span>
         </Notice>
@@ -288,7 +294,7 @@ watch(
         </div>
         <ObjectBrowserPanel v-else selectable @add="addSelection" @selection-change="pendingSelection = $event" />
         <div v-if="currentUser && (remoteOwn === null || remoteOwn.length || remoteState !== 'complete')" class="space-y-1">
-          <p class="text-[11px] font-medium text-foreground">On other nodes</p>
+          <p class="text-[11px] font-medium text-foreground">{{ localHeld === false ? 'Your buckets' : 'On other nodes' }}</p>
           <p v-if="remoteOwn === null" class="text-[11px] text-muted-foreground">Listing your buckets on the other nodes…</p>
           <button
             v-for="hit in remoteOwn ?? []"

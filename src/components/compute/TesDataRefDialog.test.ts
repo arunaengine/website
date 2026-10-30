@@ -88,6 +88,25 @@ describe('TES input picker my buckets', () => {
   })
 })
 
+describe('TES input picker on a node without my buckets', () => {
+  it('lists my buckets of every node in place of an empty browser', async () => {
+    currentUser.value = { id: 'u1' }
+    myGroups.value = [{ id: 'g1', name: 'demo' }]
+    const hit = (bucket: string, node: string) => ({ arn: '', bucket, node_id: node, group_id: 'g1', created_at: '' })
+    searchBuckets.mockResolvedValue({ hits: [hit('laptop', 'n2'), hit('refs', 'n3')], nodes_queried: 3, nodes_failed: 0, failed_nodes: [] })
+    const { root } = await mountApp(component, { props: { open: true, mode: 'input' } })
+    await flush()
+
+    const text = content(root)
+    expect(text).not.toContain('browser any')
+    expect(text).toContain('Your buckets')
+    expect(text).toMatch(/laptop\s*demo\s*node n2/)
+    expect(text).toMatch(/refs\s*demo\s*node n3/)
+    currentUser.value = null
+    myGroups.value = []
+  })
+})
+
 describe('TES input picker remote identity', () => {
   it('merges distributed buckets by set and keeps ordinary buckets per node', async () => {
     currentUser.value = { id: 'u1' }
