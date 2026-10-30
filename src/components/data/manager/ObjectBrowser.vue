@@ -762,7 +762,8 @@ async function onDrop(event: DragEvent) {
         </div>
         <p v-else-if="sharedOrigin && !wholeBucket && !remoteBlocked" class="flex min-w-0 items-center gap-1.5 px-4 pb-2.5 text-sm text-muted-foreground @max-[600px]:px-3">
           <FlaskConical class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span class="truncate">{{ relativeTime(sharedOrigin.time) }} by
+          <span v-if="sharedOrigin.verb" class="truncate">{{ sharedOrigin.verb }} {{ relativeTime(sharedOrigin.time) }}</span>
+          <span v-else class="truncate">{{ relativeTime(sharedOrigin.time) }} by
             <RouterLink v-if="sharedOrigin.to" :to="sharedOrigin.to" class="text-primary hover:underline">{{ sharedOrigin.label }}</RouterLink>
             <template v-else>{{ sharedOrigin.label }}</template>
           </span>

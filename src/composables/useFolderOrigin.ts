@@ -16,6 +16,8 @@ export interface FileOrigin {
   label: string
   to: RouteLocationRaw | null
   time: string
+  /** How a file without a run came, for a line such as "Uploaded 17h ago". */
+  verb?: string
 }
 
 const MAX_FILES = 50
@@ -123,7 +125,7 @@ export function useFolderOrigin(bucket: Ref<string>, nodeId: Ref<string | null>,
     const origin = answer?.origin
     if (!answer || !origin) return null
     const time = answer.created_at
-    if (answer.hop) return { key: `sync:${answer.hop.relationship_id}`, label: 'a sync', to: null, time }
+    if (answer.hop) return { key: `sync:${answer.hop.relationship_id}`, label: 'a sync', to: null, time, verb: 'Synced' }
     if (origin.kind === 'job') {
       const run = runs.value.get(origin.run_id)
       // The run record tells most about the files; the run itself when no record is written.
@@ -131,7 +133,8 @@ export function useFolderOrigin(bucket: Ref<string>, nodeId: Ref<string | null>,
       return { key: `job:${origin.run_id}`, label: run?.name ?? 'a run', to, time }
     }
     const LABELS = { upload: 'an upload', source: 'an import', copy: 'a copy', storage: 'a storage folder' } as const
-    return { key: origin.kind, label: LABELS[origin.kind], to: null, time }
+    const VERBS = { upload: 'Uploaded', source: 'Imported', copy: 'Copied', storage: 'Read from a storage folder' } as const
+    return { key: origin.kind, label: LABELS[origin.kind], to: null, time, verb: VERBS[origin.kind] }
   }
 
   const byKey = computed(() => {

@@ -64,6 +64,7 @@ describe('folder origin', () => {
     expect(origin.shared.value).toBeNull()
     expect(origin.mixed.value).toBe(true)
     expect(origin.byKey.value.get('c.tsv')?.label).toBe('an upload')
+    expect(origin.byKey.value.get('c.tsv')?.verb).toBe('Uploaded')
   })
 
   it('asks nothing for a page of more than 50 files', async () => {
