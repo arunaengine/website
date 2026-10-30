@@ -26,6 +26,12 @@ export const Slotted = (tag: string) =>
     setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()),
   })
 
+// A section heading with its title, count and actions.
+export const HeadingStub = defineComponent({
+  props: { title: String, count: String },
+  setup: (props, { slots }) => () => h('div', [h('h2', [props.title, props.count ? ` ${props.count}` : '']), slots.actions?.()]),
+})
+
 export const ButtonStub = defineComponent({
   inheritAttrs: false,
   props: { variant: String, size: String, disabled: Boolean, title: String, asChild: Boolean },
@@ -229,6 +235,7 @@ export function objectBrowser(): Component {
       '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
       '@/components/ui/Popover.vue': moduleDefault(Slotted('div')),
       '@/components/ui/RefreshButton.vue': moduleDefault(Slotted('button')),
+      '@/components/ui/SectionHeading.vue': moduleDefault(HeadingStub),
       '@/components/ui/Select.vue': moduleDefault(SelectStub),
       '@/components/ui/Spinner.vue': moduleDefault(Slotted('i')),
       '@/components/ui/Switch.vue': moduleDefault(Slotted('span')),

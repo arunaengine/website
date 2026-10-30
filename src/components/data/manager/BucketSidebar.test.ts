@@ -19,6 +19,7 @@ import * as BucketPlace from '@/lib/bucketPlace'
 import * as DeviceApi from '@/lib/deviceApi'
 import { bindSource } from '@/lib/bindSource'
 import * as FormatCount from '@/lib/formatCount'
+import { HeadingStub } from '@/test/dataManager'
 
 const aruna = vi.hoisted(() => ({ authToken: { value: 'token' }, searchBuckets: vi.fn() }))
 const listJobs = vi.hoisted(() => vi.fn())
@@ -162,6 +163,8 @@ const sidebarModules = {
   '@/components/data/manager/DatabaseRows.vue': moduleDefault(Empty),
   '@/components/data/BucketStorageDialog.vue': moduleDefault(Empty),
   '@/components/data/BucketCreateResults.vue': moduleDefault(Empty),
+  '@/components/ui/SectionHeading.vue': moduleDefault(HeadingStub),
+  '@/components/ui/DialogTitle.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenu.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuContent.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuItem.vue': moduleDefault(Passthrough),
@@ -307,17 +310,15 @@ function field(root: Parameters<typeof content>[0]) {
 
 
 describe('Bucket sidebar in the picker sheet', () => {
-  it('drops its card and header, shows the scope line, the pin hint and a wide New bucket', async () => {
+  it('drops its card, heads the sheet with the count and New bucket, and keeps the pin hint', async () => {
     nodeChoice.value = null
     allBuckets.hits.value = [{ bucket: 'laptop', node_id: 'node-2', group_id: 'g1' }]
     const onNewBucket = vi.fn()
-    const Host = defineComponent(() => () => h(BucketSidebar, { manager: manager(), sheet: true, onNewBucket }, { scope: () => 'Buckets of demo on All nodes' }))
-    const { root } = await mountApp(Host)
+    const { root } = await mountApp(BucketSidebar, { props: { manager: manager(), sheet: true, onNewBucket } })
     await flush()
     const text = content(root)
 
-    expect(text).not.toContain('Buckets 1')
-    expect(text).toContain('Buckets of demo on All nodes')
+    expect(text).toContain('Buckets 1')
     expect(text).toContain('Press and hold a bucket to pin it.')
     expect(nodes(root).some((node) => String(node.props.class ?? '').includes('surface'))).toBe(false)
     expect(String(element(root, (node) => node.props.role === 'listbox').props.class)).not.toContain('max-h-')

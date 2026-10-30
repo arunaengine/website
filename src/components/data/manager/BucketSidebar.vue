@@ -9,6 +9,8 @@ import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
 import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
 import { useBucketJobs } from '@/composables/useBucketJobs'
 import DatabaseRows from '@/components/data/manager/DatabaseRows.vue'
@@ -262,7 +264,8 @@ watch(
 )
 // Arrow keys move through the shown rows of this group, then of other groups.
 const listId = `bucket-results-${useId()}`
-const listClass = computed(() => (props.sheet ? 'pb-1' : 'max-h-[420px] overflow-y-auto pb-1'))
+const listClass = 'pb-1'
+const bucketCount = computed(() => formatCount(searchList.value ? all.hits.value.length : nodeBuckets.value.length))
 const databaseRows = ref<{ openers: (() => void)[] } | null>(null)
 const groupOpeners = computed<(() => void)[]>(() => {
   if (databaseMode.value) return databaseRows.value?.openers ?? []
@@ -325,19 +328,22 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
 </script>
 
 <template>
-  <aside class="space-y-3">
-    <div :class="sheet ? '' : 'surface overflow-hidden'" :aria-busy="bucketsRefreshing">
-      <header v-if="!sheet" class="flex items-center justify-between gap-2 px-3.5 pb-2 pt-3">
-        <h2 class="text-sm font-semibold text-foreground">
-          Buckets <span class="font-normal tabular-nums text-muted-foreground">{{ formatCount(searchList ? all.hits.value.length : nodeBuckets.length) }}</span>
-        </h2>
-        <div class="flex items-center gap-2">
-          <!-- Background revalidation only: the cached list stays readable behind it. -->
-          <Spinner v-if="bucketsRefreshing" label="Refreshing buckets…" />
-          <Button size="sm" data-tour="bucket-create" @click="emit('new-bucket')"><FolderPlus class="h-4 w-4" /> New bucket</Button>
-        </div>
-      </header>
-      <div class="flex items-center gap-2 px-3.5 pb-1">
+  <aside :class="sheet ? '' : 'flex h-full min-w-0 flex-col'">
+    <SectionHeading v-if="!sheet" title="Buckets" :icon="Boxes" :count="bucketCount">
+      <template #actions>
+        <!-- Background revalidation only: the cached list stays readable behind it. -->
+        <Spinner v-if="bucketsRefreshing" label="Refreshing buckets…" />
+        <Button size="sm" data-tour="bucket-create" @click="emit('new-bucket')"><FolderPlus class="h-4 w-4" /> New bucket</Button>
+      </template>
+    </SectionHeading>
+    <div v-else class="flex min-h-9 items-center justify-between gap-2 pb-1 pl-4 pr-16 pt-4">
+      <DialogTitle class="type-section-title">Buckets <span class="text-sm font-normal tabular-nums text-muted-foreground">{{ bucketCount }}</span></DialogTitle>
+      <Button size="sm" data-tour="bucket-create" @click="emit('new-bucket')"><FolderPlus class="h-4 w-4" /> New bucket</Button>
+    </div>
+    <!-- As tall as the files beside it; the list scrolls inside under the filter. -->
+    <div :class="sheet ? '' : 'relative min-h-[24rem] flex-1'">
+    <div :class="sheet ? '' : 'surface scrollbar-thin overflow-y-auto lg:absolute lg:inset-0'" :aria-busy="bucketsRefreshing">
+      <div class="sticky top-0 z-10 flex items-center gap-2 bg-card px-3.5 pb-1 pt-3" :class="sheet ? 'bg-background' : ''">
         <Input
           v-model="bucketNameFilter"
           placeholder="Find a bucket"
@@ -372,7 +378,6 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <p v-if="$slots.scope" class="flex min-w-0 flex-wrap items-center gap-x-1 px-3.5 pb-1 pt-1.5 text-xs text-muted-foreground"><slot name="scope" /></p>
       <ul v-if="databaseMode" :id="`${listId}-group`" role="listbox" :class="listClass">
         <DatabaseRows ref="databaseRows" :filter="bucketNameFilter" :active="bucket" :highlighted="activeIndex" @open="openBucketOn" />
       </ul>
@@ -381,7 +386,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         <p v-else-if="all.error.value" class="px-3 py-3 text-xs text-destructive">{{ all.error.value }}</p>
         <ul v-else-if="allRows.length || examples.length" :id="`${listId}-group`" role="listbox" :class="listClass">
           <template v-for="section in allSections" :key="section.label">
-            <li v-if="section.label" role="presentation" class="px-3.5 pb-1 pt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{{ section.label }}</li>
+            <li v-if="section.label" role="presentation" class="px-3.5 pb-1 pt-3 text-xs font-medium text-muted-foreground">{{ section.label }}</li>
             <li v-for="row in section.rows" :key="row.key" role="presentation">
               <BucketRow
                 v-if="row.hit"
@@ -454,7 +459,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           <p v-if="bucketsError" class="border-b border-border/70 px-3 py-2 text-xs text-destructive">{{ bucketsError }}</p>
           <ul v-if="nodeBuckets.length || examples.length" :id="`${listId}-group`" role="listbox" :class="listClass">
             <template v-for="section in nodeSections" :key="section.label">
-              <li v-if="section.label" role="presentation" class="px-3.5 pb-1 pt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{{ section.label }}</li>
+              <li v-if="section.label" role="presentation" class="px-3.5 pb-1 pt-3 text-xs font-medium text-muted-foreground">{{ section.label }}</li>
               <li
                 v-for="entry in section.rows"
                 :key="`${entry.nodeId ?? 'local'}/${entry.bucket}`"
@@ -584,10 +589,10 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           </li>
         </ul>
       </div>
-      <footer v-if="sheet" class="space-y-2 px-3.5 pb-4 pt-2">
+      <footer v-if="sheet" class="px-3.5 pb-4 pt-2">
         <p class="text-xs text-muted-foreground">Press and hold a bucket to pin it.</p>
-        <Button class="w-full" data-tour="bucket-create" @click="emit('new-bucket')"><FolderPlus class="h-4 w-4" /> New bucket</Button>
       </footer>
+    </div>
     </div>
   </aside>
 </template>

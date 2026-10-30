@@ -4,7 +4,7 @@ import Popover from '@/components/ui/Popover.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import type { BucketJob } from '@/lib/api'
-import { Database, Network, Package, Pin, RefreshCw, Server, TriangleAlert } from '@lucide/vue'
+import { Database, FolderSync, Network, Package, Pin, Server, TriangleAlert } from '@lucide/vue'
 import { computed, ref, type Component } from 'vue'
 import { RouterLink } from 'vue-router'
 
@@ -95,11 +95,11 @@ interface Mark {
 const marks = computed<Mark[]>(() => {
   const list: Mark[] = []
   if (props.linkedTo) {
-    list.push({ id: 'sync', icon: RefreshCw, tooltip: 'Synced with this computer', heading: 'Synced with this computer', links: [], note: `Folder ${props.linkedTo}` })
+    list.push({ id: 'sync', icon: FolderSync, tooltip: 'Synced with this computer', heading: 'Synced with this computer', links: [], note: `Folder ${props.linkedTo}` })
   } else if (props.synced) {
     const partners = props.syncedWith.map((id) => realmNodes.displayName(id))
     const tooltip = partners.length ? `Synced with ${names(partners)}` : 'Synced with another bucket'
-    list.push({ id: 'sync', icon: RefreshCw, tooltip, heading: 'Synced with', links: props.syncedWith, note: partners.length ? undefined : 'Another bucket on the same node' })
+    list.push({ id: 'sync', icon: FolderSync, tooltip, heading: 'Synced with', links: props.syncedWith, note: partners.length ? undefined : 'Another bucket on the same node' })
   }
   if (props.nodes.length) {
     list.push({ id: 'spread', icon: Network, tooltip: `Spread over ${names(props.nodes.map((id) => realmNodes.displayName(id)))}`, heading: 'Spread over', links: props.nodes })
@@ -187,7 +187,13 @@ function onClick() {
     </div>
     <div class="relative flex shrink-0 items-center gap-0.5">
       <Popover v-for="mark in marks" :key="mark.id" :tooltip="mark.tooltip" align="end">
-        <button type="button" class="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" :aria-label="mark.tooltip" @mousedown.prevent>
+        <button
+          type="button"
+          class="inline-flex h-6 w-6 items-center justify-center rounded-md hover:bg-muted"
+          :class="mark.id === 'sync' ? 'text-aruna-navy dark:text-aruna-aqua' : 'text-muted-foreground hover:text-foreground'"
+          :aria-label="mark.tooltip"
+          @mousedown.prevent
+        >
           <component :is="mark.icon" class="h-3.5 w-3.5" aria-hidden="true" />
         </button>
         <template #content>

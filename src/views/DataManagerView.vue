@@ -453,7 +453,7 @@ async function createFolder() {
       <!-- Opening the session and loading its data share one placeholder. -->
       <DataViewSkeleton v-else-if="contextBusy || !viewReady" />
 
-      <section v-else class="grid gap-4" :class="narrow ? '' : 'grid-cols-[300px_minmax(0,1fr)]'">
+      <section v-else class="grid gap-x-6 gap-y-8" :class="narrow ? '' : 'grid-cols-[300px_minmax(0,1fr)] 2xl:grid-cols-[340px_minmax(0,1fr)]'">
         <Notice v-if="sessionWarning" tone="warning" :class="narrow ? '' : 'col-span-2'">
           {{ sessionWarning }}
         </Notice>
@@ -465,29 +465,28 @@ async function createFolder() {
           @new-bucket="newBucketOpen = true"
         />
 
-        <div class="min-w-0 space-y-4">
-          <DistributionBanner v-if="storedBucket" :bucket="storedBucket" />
-          <DatabaseHeader v-if="bucket && !exampleBucket" :bucket="bucket" :node-id="remoteNodeId" :set-id="bucketSetId" />
-          <ObjectBrowser
-            :manager="manager"
-            :notebooks="notebooksView"
-            @add-data="addDataOpen = true"
-            @new-folder="openNewFolder"
-            @new-notebook="newNotebookOpen = true"
-            @sync-to-computer="openBindDialog"
-            @public-access="openPublicAccess"
-            @new-bucket="newBucketOpen = true"
-            @open-hit="openFound"
-          >
-            <UploadPanel :manager="manager" />
-          </ObjectBrowser>
-        </div>
+        <ObjectBrowser
+          :manager="manager"
+          :notebooks="notebooksView"
+          @add-data="addDataOpen = true"
+          @new-folder="openNewFolder"
+          @new-notebook="newNotebookOpen = true"
+          @sync-to-computer="openBindDialog"
+          @public-access="openPublicAccess"
+          @new-bucket="newBucketOpen = true"
+          @open-hit="openFound"
+        >
+          <template #header>
+            <DistributionBanner v-if="storedBucket" :bucket="storedBucket" />
+            <DatabaseHeader v-if="bucket && !exampleBucket" :bucket="bucket" :node-id="remoteNodeId" :set-id="bucketSetId" />
+          </template>
+          <UploadPanel :manager="manager" />
+        </ObjectBrowser>
       </section>
     </div>
 
     <Sheet :open="pickerOpen" @update:open="(value: boolean) => (pickerOpen = value)">
       <SheetContent side="bottom" class="max-h-[85dvh] rounded-t-2xl p-0">
-        <DialogTitle class="px-4 pb-1 pt-4 text-base">Switch bucket</DialogTitle>
         <DialogDescription class="sr-only">Pick a bucket to open, or create one.</DialogDescription>
         <BucketSidebar sheet :manager="manager" @sync-computer="openBindDialog" @new-bucket="newBucketFromPicker" />
       </SheetContent>

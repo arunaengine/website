@@ -266,7 +266,8 @@ describe('object browser toolbar', () => {
     const root = await render()
     const settings = action(root, 'Bucket settings')
 
-    expect(content(settings).trim()).toBe('Settings')
+    // The count names the syncs and policies the settings hold, instead of a dot.
+    expect(content(settings).trim()).toMatch(/^Settings\d*$/)
     expect(element(settings, (node) => node.tag === 'span').props.class).toBe('@max-[600px]:sr-only')
     await bubbleClick(settings)
 

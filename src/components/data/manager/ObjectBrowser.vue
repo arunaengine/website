@@ -6,6 +6,7 @@ import IconButton from '@/components/ui/IconButton.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Popover from '@/components/ui/Popover.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
@@ -68,6 +69,7 @@ import {
   CloudOff,
   Download,
   Eye,
+  FolderOpen,
   FolderPlus,
   FlaskConical,
   FolderSync,
@@ -521,6 +523,26 @@ async function onDrop(event: DragEvent) {
     <EmptyState v-if="!bucket" title="Select a bucket to browse its objects." />
 
     <template v-else>
+      <SectionHeading title="Files" :icon="FolderOpen">
+        <template #actions>
+          <WatchButton
+            surface="bucket"
+            :path-prefix="watchPathPrefix"
+            :group-id="activeGroupId"
+            :resource-label="`${bucket}/${s3Prefix}`"
+            bell
+            :label-class="toolbarLabel"
+          />
+          <!-- The count of syncs and placement policies; the settings page names them. -->
+          <span v-if="showStorageButton" data-tour="bucket-settings" class="inline-flex">
+            <Button variant="outline" size="sm" aria-label="Bucket settings" title="Bucket settings" @click="openBucketSettings">
+              <Settings class="h-4 w-4" /><span :class="toolbarLabel">Settings</span>
+              <span v-if="storageCount" class="tabular-nums text-muted-foreground">{{ storageCount }}</span>
+            </Button>
+          </span>
+        </template>
+      </SectionHeading>
+      <slot name="header" />
       <div v-if="deletedLoading || (showDeleted && deletedTruncated)" class="flex flex-wrap items-center gap-x-3 gap-y-1">
         <Spinner v-if="deletedLoading" label="Loading deleted objects" />
         <p v-if="showDeleted && deletedTruncated" class="text-xs text-muted-foreground">
@@ -632,27 +654,6 @@ async function onDrop(event: DragEvent) {
                 </div>
               </template>
             </Popover>
-          </div>
-          <div class="ml-auto flex shrink-0 items-center gap-1.5">
-            <WatchButton
-              surface="bucket"
-              :path-prefix="watchPathPrefix"
-              :group-id="activeGroupId"
-              :resource-label="`${bucket}/${s3Prefix}`"
-              bell
-              :label-class="toolbarLabel"
-            />
-            <!-- A dot instead of a count: the settings page names what it holds. -->
-            <span v-if="showStorageButton" data-tour="bucket-settings" class="relative inline-flex">
-              <Button variant="outline" size="sm" aria-label="Bucket settings" title="Bucket settings" @click="openBucketSettings">
-                <Settings class="h-4 w-4" /><span :class="toolbarLabel">Settings</span>
-              </Button>
-              <span
-                v-if="storageCount"
-                class="pointer-events-none absolute right-1 top-1 size-1.5 rounded-full bg-primary"
-                aria-hidden="true"
-              />
-            </span>
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pb-2 pt-2.5 @max-[600px]:px-3">
