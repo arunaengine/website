@@ -126,17 +126,12 @@ describe('SessionsPanel', () => {
     expect(signOut).not.toHaveBeenCalled()
   })
 
-  it('signs out when the revoked session is this browser', async () => {
-    // Revoking the bearer this page authenticates with must end the sign-in.
+  it('offers no revoke on this browser, which signs out from the account menu', async () => {
     sessions.value = [session({ current: true })]
-    revoke.mockResolvedValueOnce(true)
     const { root } = await mountApp(SessionsPanel)
 
-    await click(button(root, 'Revoke'))
-    expect(content(root)).toContain('This signs you out here.')
-    await click(button(root, 'Revoke'))
-
-    expect(signOut).toHaveBeenCalledOnce()
+    expect(content(root)).toContain('this browser')
+    expect(nodes(root).some((node) => node.tag === 'button' && content(node).includes('Revoke'))).toBe(false)
   })
 
   it('stops signing out the others once another token is applied', async () => {

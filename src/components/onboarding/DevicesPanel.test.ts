@@ -74,7 +74,7 @@ describe('devices panel', () => {
     const rendered = await text()
 
     // Without a realm record its contact is not known, which is not the same as offline.
-    expect(rendered).toContain('unknown')
+    expect(rendered).toContain('Unknown')
     expect(rendered).not.toContain('offline')
     expect(rendered).toContain('Pending')
     expect(rendered).toContain('Remove')
@@ -86,7 +86,7 @@ describe('devices panel', () => {
     devices.value = [device(), device({ id: 'enr-1', node_id: null, enrollment_id: 'enr-1', status: 'pending' })]
     deviceLimit.value = 3
 
-    expect(await text()).toContain('2 of 3 devices')
+    expect(await text()).toContain('Your devices 2 of 3')
   })
 
   it('shows but does not count expired enrollments', async () => {
@@ -95,7 +95,7 @@ describe('devices panel', () => {
 
     const rendered = await text()
     expect(rendered).toContain('Expired')
-    expect(rendered).toContain('1 of 2 devices')
+    expect(rendered).toContain('Your devices 1 of 2')
   })
 
   it('names a device by its label and shows when it was last seen', async () => {
@@ -106,8 +106,9 @@ describe('devices panel', () => {
     const rendered = await text()
 
     expect(rendered).toContain('Name Status Last seen')
-    expect(rendered).toContain('Microbiology laptop 73ea340a Online 2m ago')
-    expect(rendered).toContain('enr-9abc Pending unknown')
+    expect(rendered).toContain('Microbiology laptop Online 2m ago')
+    expect(rendered).not.toContain('73ea340a')
+    expect(rendered).toContain('enr-9abc Pending -')
   })
 
   it('reads a device the realm has seen as online, and one without contact as unknown', async () => {
@@ -120,8 +121,8 @@ describe('devices panel', () => {
     devices.value = [device({ id: 'seen1234abcd', node_id: 'seen1234abcd' }), device({ id: 'quiet234abcd', node_id: 'quiet234abcd' })]
     const rendered = await text()
 
-    expect(rendered).toContain('seen1234 Online 5m ago')
-    expect(rendered).toContain('quiet234 Unknown unknown')
+    expect(rendered).toContain('Online 5m ago')
+    expect(rendered).toContain('Unknown -')
     expect(rendered).not.toContain('offline')
   })
 
@@ -130,7 +131,7 @@ describe('devices panel', () => {
     devices.value = [device({ id: '73ea340a1234', node_id: '73ea340a1234' })]
     const rendered = await text()
 
-    expect(rendered).toContain('Lab laptop 73ea340a Online')
+    expect(rendered).toContain('Lab laptop Online')
     expect(rendered).not.toContain('Microbiology laptop')
   })
 
@@ -148,14 +149,14 @@ describe('devices panel', () => {
     devices.value = [device({ id: '73ea340a1234', node_id: '73ea340a1234' }), device({ id: '5b1c9d2e7777', node_id: '5b1c9d2e7777' })]
     const rendered = await text()
 
-    expect(rendered).toContain('Device 73ea340a Online')
+    expect(rendered).toContain('Device Online')
     // Not listed by the realm yet: still a device, never a bare id.
-    expect(rendered).toContain('Device 5b1c9d2e Unknown')
+    expect(rendered).toContain('Device Unknown')
   })
 
   it('says the realm caps nothing when it does not', async () => {
     devices.value = [device()]
-    expect(await text()).toContain('1 enrolled')
+    expect(await text()).toContain('Your devices 1 Add a device')
   })
 
   it('states what removing a device costs before it is removed', () => {

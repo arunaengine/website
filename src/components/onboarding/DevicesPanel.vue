@@ -7,20 +7,21 @@ import { RouterLink } from 'vue-router'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 import StatusMark from '@/components/ui/StatusMark.vue'
 import Button from '@/components/ui/Button.vue'
-import RefreshButton from '@/components/ui/RefreshButton.vue'
+import InfoHint from '@/components/ui/InfoHint.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import DeviceLane from '@/components/onboarding/DeviceLane.vue'
 import WizardSteps from '@/components/onboarding/WizardSteps.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceEnrollment } from '@/composables/useDeviceEnrollment'
-import { useRefresh } from '@/composables/useRefresh'
-import { Laptop, Plus, X } from '@lucide/vue'
+import { Laptop, Plus, Trash2, X } from '@lucide/vue'
 import type { UserDevice } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
 import { isDesktop } from '@/lib/desktop'
 import { nodeName } from '@/components/nodes/node-display'
 import NodeNameEdit from '@/components/nodes/NodeNameEdit.vue'
 import { useNodeNames } from '@/composables/useNodeNames'
+
+const props = defineProps<{ refreshRevision?: number }>()
 
 const DEVICE_STEPS = ['Device', 'Hand off', 'Watch it join']
 const FIRST_STEP = 1
@@ -35,8 +36,6 @@ const { devices, devicesError, busyIds, deviceCount, deviceLimit, loadingDevices
 
 const adding = ref(false)
 const deviceStep = ref(FIRST_STEP)
-const { busy: refreshBusy, refresh: onRefresh } = useRefresh(loadDevices)
-const spinning = computed(() => refreshBusy.value || loadingDevices.value)
 
 // The session restores asynchronously, so load once it has a user rather than
 // firing an anonymous request at mount.
@@ -50,6 +49,11 @@ watch(
   },
   { immediate: true },
 )
+
+// The page header's refresh reads the list again.
+watch(() => props.refreshRevision, () => {
+  if (currentUser.value) void loadDevices()
+})
 
 function openAdd() {
   deviceStep.value = FIRST_STEP
@@ -68,9 +72,7 @@ function restart() {
 }
 
 const capLabel = computed(() =>
-  deviceLimit.value == null
-    ? `${deviceCount.value} enrolled`
-    : `${deviceCount.value} of ${deviceLimit.value} devices`,
+  deviceLimit.value == null ? `${deviceCount.value}` : `${deviceCount.value} of ${deviceLimit.value}`,
 )
 
 // An enrolled device is a realm member addressed by its node id; the others are an enrollment
@@ -82,6 +84,7 @@ interface DeviceRow {
   name: string | null
   value: string | null
   shortId: string
+  fullId: string
   status: string
   lastSeen: string
 }
@@ -96,7 +99,7 @@ const rows = computed<DeviceRow[]>(() =>
     const nodeId = device.status === 'enrolled' ? device.node_id : null
     // An enrolled device always has a name for people; an enrollment in flight goes by its code id.
     const name = device.status === 'enrolled' ? (node ? nodeName(node) : 'Device') : null
-    return { id: device.id, nodeId, name, value: node?.display_name ?? null, shortId: (device.node_id ?? device.id).slice(0, 8), status, lastSeen: seen }
+    return { id: device.id, nodeId, name, value: node?.display_name ?? null, shortId: (device.node_id ?? device.id).slice(0, 8), fullId: device.node_id ?? device.id, status, lastSeen: seen }
   }),
 )
 const confirming = ref('')
@@ -108,10 +111,8 @@ function remove(id: string) {
 
 <template>
   <section aria-labelledby="devices-heading">
-    <SectionHeading id="devices-heading" title="Your devices" :icon="Laptop" :level="3" info="Computers that run Aruna Desktop under your account.">
+    <SectionHeading id="devices-heading" title="Your devices" :icon="Laptop" :level="3" :count="currentUser && !loadingDevices ? capLabel : undefined" info="Computers that run Aruna Desktop under your account.">
       <template #actions>
-        <span class="text-xs tabular-nums text-muted-foreground">{{ capLabel }}</span>
-        <RefreshButton :busy="spinning" sr-label="Refresh devices" @click="onRefresh" />
         <Button v-if="!adding" variant="outline" size="sm" :disabled="!currentUser" @click="openAdd">
           <Plus class="h-3.5 w-3.5" /> Add a device
         </Button>
@@ -154,26 +155,28 @@ function remove(id: string) {
                 <!-- The owner names an enrolled device; an enrollment in flight has no node to name yet. -->
                 <NodeNameEdit v-if="row.nodeId" :name="row.name ?? row.shortId" :value="row.value" :save="(name) => renameDevice(row.nodeId!, name)">
                   <RouterLink v-if="row.name" :to="deviceLink(row.nodeId)" class="text-foreground hover:underline">{{ row.name }}</RouterLink>
-                  <span class="font-mono text-[11px] text-muted-foreground" :class="row.name ? 'ml-1.5' : ''">{{ row.shortId }}</span>
+                  <span v-else class="font-mono text-[11px] text-muted-foreground">{{ row.shortId }}</span>
+                  <InfoHint v-if="row.name" :label="row.fullId" name="Device id" class="ml-1" />
                 </NodeNameEdit>
-                <template v-else>
+                <span v-else class="inline-flex items-center gap-1">
                   <span v-if="row.name" class="text-foreground">{{ row.name }}</span>
-                  <span class="font-mono text-[11px] text-muted-foreground" :class="row.name ? 'ml-1.5' : ''">{{ row.shortId }}</span>
-                </template>
+                  <span v-else class="font-mono text-[11px] text-muted-foreground">{{ row.shortId }}</span>
+                  <InfoHint v-if="row.name" :label="row.fullId" name="Device id" />
+                </span>
               </td>
               <td class="py-2.5 pr-4">
                 <span v-if="row.status === 'online'" class="inline-flex items-center gap-1.5"><StatusMark label="Online" size="sm" />Online</span>
                 <span v-else class="text-muted-foreground">{{ row.status.charAt(0).toUpperCase() + row.status.slice(1) }}</span>
               </td>
-              <td class="py-2.5 pr-4 text-[11px] text-muted-foreground">{{ row.lastSeen || 'unknown' }}</td>
+              <td class="py-2.5 pr-4 text-muted-foreground">{{ row.lastSeen || '-' }}</td>
               <td class="py-2.5 text-right">
                 <div v-if="confirming === row.id" class="flex items-center justify-end gap-2">
                   <span class="text-[11px] text-muted-foreground">{{ row.status === 'pending' ? 'Its code stops working.' : 'It has to be enrolled again.' }}</span>
-                  <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="busyIds.has(row.id)" @click="remove(row.id)">Remove</Button>
+                  <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="busyIds.has(row.id)" @click="remove(row.id)"><Trash2 class="h-3.5 w-3.5" /> Remove</Button>
                   <Button variant="ghost" size="sm" @click="confirming = ''">Cancel</Button>
                 </div>
-                <Button v-else variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="busyIds.has(row.id)" @click="confirming = row.id">
-                  {{ busyIds.has(row.id) ? 'Removing…' : 'Remove' }}
+                <Button v-else variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="busyIds.has(row.id)" @click="confirming = row.id">
+                  <Trash2 class="h-3.5 w-3.5" /> {{ busyIds.has(row.id) ? 'Removing…' : 'Remove' }}
                 </Button>
               </td>
             </tr>

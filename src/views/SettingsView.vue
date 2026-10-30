@@ -100,7 +100,12 @@ const tab = computed({
   set: (next: string) => (routeTab.value = next),
 })
 
-const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
+// One refresh in the header reads the page and every panel's list again.
+const panelRevision = ref(0)
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(() => {
+  panelRevision.value++
+  return refresh()
+})
 const apiBaseDraft = ref(apiBaseUrl.value)
 const tokenDraft = ref(authToken.value)
 watch(authToken, (token) => (tokenDraft.value = token))
@@ -291,10 +296,10 @@ const createGroupOpen = ref(false)
           </div>
         </section>
 
-        <SessionsPanel />
+        <SessionsPanel :refresh-revision="panelRevision" />
 
         <!-- The desktop lists every long-lived key above, with the place it works. -->
-        <S3SessionsPanel :keys="shown('s3-keys') && !desktop" />
+        <S3SessionsPanel :keys="shown('s3-keys') && !desktop" :refresh-revision="panelRevision" />
         <!-- API address, bearer token, identity and the API reference, folded away. -->
         <details class="surface overflow-hidden">
           <summary class="cursor-pointer px-5 py-3.5">
@@ -361,7 +366,7 @@ const createGroupOpen = ref(false)
       </TabsContent>
 
       <TabsContent value="devices" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-8 py-6">
-        <DevicesPanel />
+        <DevicesPanel :refresh-revision="panelRevision" />
       </TabsContent>
 
       <TabsContent value="profile" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-8 py-6">

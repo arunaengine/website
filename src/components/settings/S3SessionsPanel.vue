@@ -5,7 +5,6 @@ import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
-import RefreshButton from '@/components/ui/RefreshButton.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
@@ -17,11 +16,11 @@ import {
 } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
 import { RouterLink } from 'vue-router'
-import { Eye, EyeOff, KeyRound, Plus } from '@lucide/vue'
+import { Ban, Eye, EyeOff, KeyRound, Plus } from '@lucide/vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 
 /** `keys`: also list and create the long-lived keys (the desktop lists them elsewhere). */
-const props = withDefaults(defineProps<{ keys?: boolean }>(), { keys: true })
+const props = withDefaults(defineProps<{ keys?: boolean; refreshRevision?: number }>(), { keys: true, refreshRevision: 0 })
 
 const { apiBaseUrl, authToken, currentUser, myGroups, discoverableGroups, credentials, revokeS3Credential } = useAruna()
 
@@ -57,6 +56,11 @@ watch(currentUser, (user) => {
   loadedOnce = true
   void load()
 }, { immediate: true })
+
+// The page header's refresh reads the list again.
+watch(() => props.refreshRevision, () => {
+  if (currentUser.value) void load()
+})
 
 const groupNames = computed(() => {
   const names = new Map<string, string>()
@@ -114,7 +118,6 @@ async function revoke(row: KeyRow) {
         <Button v-if="inactiveCount" variant="outline" size="sm" @click="showInactive = !showInactive">
           <component :is="showInactive ? EyeOff : Eye" class="h-3.5 w-3.5" /> {{ showInactive ? 'Hide inactive' : `Show inactive (${inactiveCount})` }}
         </Button>
-        <RefreshButton :busy="loading" sr-label="Refresh S3 access keys" @click="load" />
         <Button v-if="keys" variant="outline" size="sm" :disabled="!currentUser" @click="createOpen = true"><Plus class="h-3.5 w-3.5" /> Create key</Button>
       </template>
     </SectionHeading>
@@ -146,17 +149,17 @@ async function revoke(row: KeyRow) {
                 <Badge v-if="row.status !== 'active'" size="sm" :variant="row.status === 'revoked' ? 'destructive' : 'secondary'" class="ml-1.5">{{ row.status }}</Badge>
               </td>
               <td class="px-5 py-2.5 text-[11px]" :class="expired(row.expires) ? 'text-destructive' : 'text-muted-foreground'">
-                {{ !row.expires ? 'unknown' : expired(row.expires) ? `expired ${relativeTime(row.expires)}` : relativeTime(row.expires) }}
+                {{ !row.expires ? '-' : expired(row.expires) ? `expired ${relativeTime(row.expires)}` : relativeTime(row.expires) }}
               </td>
               <td class="px-5 py-2.5 text-right">
                 <Button
                   v-if="row.status === 'active'"
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   class="text-destructive hover:text-destructive"
                   :disabled="busyIds.includes(row.id)"
                   @click="revoke(row)"
-                >Revoke</Button>
+                ><Ban class="h-3.5 w-3.5" /> Revoke</Button>
               </td>
             </tr>
             <tr v-if="!rows.length">

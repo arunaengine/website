@@ -2,10 +2,9 @@
 // Every bearer this account holds, listed by the session it is bound to.
 // Revoking the session this browser is using ends the sign-in as well.
 import { computed, ref, watch } from 'vue'
-import { LogIn } from '@lucide/vue'
+import { Ban, LogIn } from '@lucide/vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Button from '@/components/ui/Button.vue'
-import RefreshButton from '@/components/ui/RefreshButton.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
@@ -13,6 +12,7 @@ import { useUserSessions } from '@/composables/useUserSessions'
 import { SESSION_KIND_LABELS, type UserSession } from '@/lib/api'
 import { formatDateTime, relativeTime } from '@/lib/utils'
 
+const props = defineProps<{ refreshRevision?: number }>()
 const { currentUser, sessionEpoch } = useAruna()
 const { signOut } = useAuth()
 const { sessions, listed, loading, error, busyIds, load, revoke } = useUserSessions()
@@ -23,6 +23,11 @@ const confirming = ref('')
 watch([currentUser, sessionEpoch], ([user], before) => {
   if (user && (!before || !listed.value)) void load()
 }, { immediate: true })
+
+// The page header's refresh reads the list again.
+watch(() => props.refreshRevision, () => {
+  if (currentUser.value) void load()
+})
 
 // This browser first, then the newest; the list opens with the newest five.
 const SHOWN = 5
@@ -67,7 +72,6 @@ async function confirmRevoke(session: UserSession) {
           </template>
           <Button v-else variant="outline" size="sm" :disabled="!listed || loading" @click="confirmingOthers = true">Sign out all others</Button>
         </template>
-        <RefreshButton :busy="loading" sr-label="Refresh sign-ins" @click="load" />
       </template>
     </SectionHeading>
     <div class="surface overflow-hidden">
@@ -102,27 +106,26 @@ async function confirmRevoke(session: UserSession) {
                 {{ session.revoked ? 'revoked' : expired(session) ? `expired ${relativeTime(session.expires_at)}` : relativeTime(session.expires_at) }}
               </td>
               <td class="px-5 py-2.5 text-right">
-                <template v-if="!session.revoked">
+                <!-- This browser signs out from the account menu, not by revoking its own row. -->
+                <template v-if="!session.revoked && !session.current">
                   <div v-if="confirming === session.session_id" class="flex items-center justify-end gap-2">
-                    <span class="text-[11px] text-muted-foreground">
-                      {{ session.current ? 'This signs you out here.' : 'Revoke this sign-in?' }}
-                    </span>
+                    <span class="text-[11px] text-muted-foreground">Revoke this sign-in?</span>
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       class="text-destructive hover:text-destructive"
                       :disabled="busyIds.includes(session.session_id)"
                       @click="confirmRevoke(session)"
-                    >Revoke</Button>
+                    ><Ban class="h-3.5 w-3.5" /> Revoke</Button>
                     <Button variant="ghost" size="sm" @click="confirming = ''">Cancel</Button>
                   </div>
                   <Button
                     v-else
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     class="text-destructive hover:text-destructive"
                     @click="confirming = session.session_id"
-                  >Revoke</Button>
+                  ><Ban class="h-3.5 w-3.5" /> Revoke</Button>
                 </template>
               </td>
             </tr>
