@@ -16,6 +16,8 @@ const props = defineProps<{
   save: (name: string | null) => Promise<void>
   /** Shows the Pencil only while the surrounding `group` is hovered or holds focus. */
   quiet?: boolean
+  /** An outline icon button, as it stands among the page header's buttons. */
+  outline?: boolean
 }>()
 
 const editing = ref(false)
@@ -54,6 +56,8 @@ async function submit() {
     <slot />
     <IconButton
       :label="`Rename ${name}`"
+      :variant="outline ? 'outline' : undefined"
+      :size="outline ? 'icon' : undefined"
       :class="quiet ? 'opacity-0 focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100' : undefined"
       @click="start"
     >

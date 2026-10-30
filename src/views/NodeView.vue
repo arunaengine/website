@@ -15,12 +15,12 @@ import IconTile from '@/components/ui/IconTile.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 import StatusMark from '@/components/ui/StatusMark.vue'
-import StatusPill from '@/components/ui/StatusPill.vue'
 import NodeDetailPanel from '@/components/nodes/NodeDetailPanel.vue'
 import NodeNameEdit from '@/components/nodes/NodeNameEdit.vue'
 import { nodeActivity, nodeName, nodeOnline } from '@/components/nodes/node-display'
 import { nodeApiBase, probeNode, type NodeProbe } from '@/components/nodes/node-probe'
 import { useAruna } from '@/composables/useAruna'
+import { useListedUsage } from '@/composables/useBucketUsage'
 import { useDatabases } from '@/composables/useDatabases'
 import { useNodeNames } from '@/composables/useNodeNames'
 import { computerName, useRealmNodes } from '@/composables/useRealmNodes'
@@ -32,7 +32,7 @@ import { formatCount } from '@/lib/formatCount'
 import { LOCATION_AFFINITY_KEY } from '@/lib/placement'
 import { isActiveTesState } from '@/lib/tes'
 import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
-import { Activity, Boxes, ChevronRight, CircleCheck, Cpu, Database, Download, HardDrive, Info, Laptop, LoaderCircle, MapPin, Package, Server, WifiOff, Workflow } from '@lucide/vue'
+import { Activity, Boxes, ChevronRight, CircleCheck, Cpu, Database, Download, HardDrive, Info, Laptop, LoaderCircle, MapPin, Package, Server, Workflow } from '@lucide/vue'
 
 const route = useRoute()
 const nodeId = computed(() => String(route.params.nodeId ?? ''))
@@ -164,7 +164,14 @@ watch([nodeId, sessionEpoch, currentUser, revision], async () => {
 }, { immediate: true })
 const databases = useDatabases()
 databases.ensure()
-const databaseOf = (hit: BucketSearchHit) => databases.find(hit.bucket, hit.node_id, hit.set_id ?? null)
+// A database by the realm's database list, as the Data view's bucket list finds it.
+const databaseOf = (hit: BucketSearchHit) => {
+  const row = databases.rows.value.find((entry) => entry.bucket === hit.bucket && entry.places.some((place) => place.nodeId === hit.node_id))
+  return row ? { title: row.title ?? row.metadata.title ?? null } : null
+}
+const usage = useListedUsage()
+const usageNode = (hit: BucketSearchHit) => (isLocalNode(hit.node_id) ? null : hit.node_id)
+watch(buckets, (hits) => usage.ensure((hits ?? []).map((hit) => ({ bucket: hit.bucket, nodeId: usageNode(hit) }))))
 const groupName = (hit: BucketSearchHit) => hit.group_name ?? myGroups.value.find((group) => group.id === hit.group_id)?.name ?? null
 const bucketLink = (hit: BucketSearchHit) => ({
   name: 'bucket',
@@ -175,12 +182,12 @@ const bucketLink = (hit: BucketSearchHit) => ({
 
 <template>
   <div>
-    <PageHeader :title="name" :docs="{ topic: 'realm-nodes-groups', section: 'Nodes and the realm' }">
+    <PageHeader :title="name" :crumbs="[{ label: name }]" :docs="{ topic: 'realm-nodes-groups', section: 'Nodes and the realm' }">
       <template v-if="node" #title>
         <span class="inline-flex flex-wrap items-center gap-2.5">
           {{ name }}
           <StatusMark v-if="nodeOnline(node)" label="Online" />
-          <StatusPill v-else state="Offline" tone="failed" :icon="WifiOff" />
+          <StatusMark v-else label="Offline" offline />
         </span>
       </template>
       <template v-if="node" #description>
@@ -196,7 +203,7 @@ const bucketLink = (hit: BucketSearchHit) => ({
           <RouterLink :to="{ name: 'status', query: { node: node.node_id } }"><Activity class="h-4 w-4" /> Open in status</RouterLink>
         </Button>
         <!-- A draft belongs to one node and one session; another node starts a fresh editor. -->
-        <NodeNameEdit v-if="node && rename" :key="`${sessionEpoch}/${node.node_id}`" :name="name" :value="node.display_name" :save="rename"><span class="sr-only">{{ name }}</span></NodeNameEdit>
+        <NodeNameEdit v-if="node && rename" :key="`${sessionEpoch}/${node.node_id}`" :name="name" :value="node.display_name" :save="rename" outline><span class="sr-only">{{ name }}</span></NodeNameEdit>
       </template>
     </PageHeader>
 
@@ -236,9 +243,8 @@ const bucketLink = (hit: BucketSearchHit) => ({
 
           <section v-if="currentUser" class="flex flex-col" aria-labelledby="node-buckets-heading">
             <SectionHeading id="node-buckets-heading" title="Buckets" :icon="Boxes" />
-            <!-- As tall as the details; a longer list scrolls inside. -->
-            <div class="surface relative min-h-48 flex-1 overflow-hidden">
-              <div class="overflow-y-auto lg:absolute lg:inset-0">
+            <div class="surface flex-1 overflow-hidden">
+              <div>
                 <p v-if="buckets === null" class="px-5 py-4 text-xs text-muted-foreground">Reading the buckets you can open…</p>
                 <p v-else-if="!buckets.length && !moreBuckets" class="px-5 py-4 text-xs text-muted-foreground">None that you can open.</p>
                 <p v-else-if="!buckets.length && unanswered" class="px-5 py-4 text-xs text-muted-foreground">Not every node answered, so its buckets may be missing.</p>
@@ -249,8 +255,8 @@ const bucketLink = (hit: BucketSearchHit) => ({
                       <IconTile :icon="databaseOf(hit) ? Database : Package" :tone="databaseOf(hit) ? 'royal' : 'muted'" size="sm" />
                       <span class="min-w-0 flex-1">
                         <span class="block truncate text-sm font-medium text-foreground">{{ hit.bucket }}</span>
-                        <span v-if="databaseOf(hit)?.title || groupName(hit)" class="block truncate text-xs text-muted-foreground">
-                          {{ [databaseOf(hit)?.title, groupName(hit)].filter(Boolean).join(', ') }}
+                        <span v-if="databaseOf(hit)?.title || usage.textOf(hit.bucket, usageNode(hit)) || groupName(hit)" class="block truncate text-xs text-muted-foreground">
+                          {{ [databaseOf(hit)?.title, usage.textOf(hit.bucket, usageNode(hit)) ?? groupName(hit)].filter(Boolean).join(', ') }}
                         </span>
                       </span>
                       <ChevronRight class="h-4 w-4 shrink-0 text-muted-foreground" />

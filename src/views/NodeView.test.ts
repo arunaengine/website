@@ -66,7 +66,6 @@ const DetailsStub = defineComponent({
 })
 const RunsStub = defineComponent({ props: { runs: Array, hideNode: Boolean }, setup: (props) => () => h('section', `runs ${(props.runs as Array<{ task: { id: string } }>).map((run) => run.task.id).join(',')} hideNode=${props.hideNode}`) })
 const MarkStub = defineComponent({ props: { label: String }, setup: (props) => () => h('i', { 'data-mark': props.label }) })
-const PillStub = defineComponent({ props: { state: String }, setup: (props) => () => h('span', { 'data-pill': props.state }, props.state) })
 const recentRuns = ref<unknown[]>([])
 const runsState = ref('ready')
 const loadRuns = vi.fn(async () => undefined)
@@ -87,7 +86,6 @@ const NodeView = compileClientComponent(new URL('./NodeView.vue', import.meta.ur
   '@/components/ui/RefreshButton.vue': moduleDefault(defineComponent((_, { attrs }) => () => h('button', attrs, 'Refresh'))),
   '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent({ props: { title: String }, setup: (props) => () => h('h2', props.title) })),
   '@/components/ui/StatusMark.vue': moduleDefault(MarkStub),
-  '@/components/ui/StatusPill.vue': moduleDefault(PillStub),
   '@/components/ui/EmptyState.vue': moduleDefault(defineComponent({ props: { title: String }, setup: (props) => () => h('p', props.title) })),
   '@/components/nodes/NodeDetailPanel.vue': moduleDefault(PanelStub),
   '@/components/nodes/NodeNameEdit.vue': moduleDefault(NameStub),
@@ -96,7 +94,12 @@ const NodeView = compileClientComponent(new URL('./NodeView.vue', import.meta.ur
   '@/composables/useAruna': {
     useAruna: () => ({ currentUser, myGroups: ref([{ id: 'g1', name: 'demo' }]), nodeInfo, usageInfo: ref(null), isRealmAdmin, searchBuckets, sessionEpoch, loadInfo }),
   },
-  '@/composables/useDatabases': { useDatabases: () => ({ ensure: () => {}, find: (bucket: string) => (bucket === 'refseq' ? { title: 'NCBI RefSeq genomes' } : undefined) }) },
+  '@/composables/useDatabases': {
+    useDatabases: () => ({ ensure: () => {}, rows: ref([{ bucket: 'refseq', title: 'NCBI RefSeq genomes', metadata: {}, places: [{ nodeId: 'store-1' }] }]) }),
+  },
+  '@/composables/useBucketUsage': {
+    useListedUsage: () => ({ ensure: () => {}, textOf: (bucket: string) => (bucket === 'refseq' ? '21 files, 1.8 GB' : null) }),
+  },
   '@/composables/useRecentRuns': { useRecentRuns: () => ({ runs: recentRuns, state: runsState, load: loadRuns }) },
   '@/composables/useRefresh': { useRefresh: (run: () => unknown) => ({ busy: ref(false), refresh: run }) },
   '@/lib/tes': { isActiveTesState: (state: string) => state === 'RUNNING' },
@@ -149,11 +152,11 @@ describe('node page', () => {
     mounted.app.unmount()
   })
 
-  it('marks an offline node with a pill and says when it was last seen', async () => {
+  it('marks an offline node with an icon and says when it was last seen', async () => {
     realm.value = { nodes: [record({ present: false })] }
     const mounted = await mountApp(NodeView)
     await flush()
-    expect(nodes(mounted.root).some((node) => node.props['data-pill'] === 'Offline')).toBe(true)
+    expect(nodes(mounted.root).some((node) => node.props['data-mark'] === 'Offline')).toBe(true)
     expect(content(mounted.root)).toContain('Last seen')
     mounted.app.unmount()
   })
@@ -179,7 +182,7 @@ describe('node page', () => {
     const mounted = await mountApp(NodeView)
     await flush()
 
-    expect(content(mounted.root)).toContain('refseqNCBI RefSeq genomes, demo')
+    expect(content(mounted.root)).toContain('refseqNCBI RefSeq genomes, 21 files, 1.8 GB')
     expect(content(mounted.root)).not.toContain('elsewhere')
     const link = element(mounted.root, (node) => node.tag === 'a' && content(node).includes('refseq'))
     expect(JSON.parse(String(link.props['data-to']))).toEqual({ name: 'bucket', params: { bucketId: 'refseq' }, query: { group: 'g1', node: 'store-1' } })
