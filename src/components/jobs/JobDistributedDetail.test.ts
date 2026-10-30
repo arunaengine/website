@@ -1504,7 +1504,7 @@ describe('the run facts', () => {
     expect(text).toContain('Resources4 CPU, 12 GB')
     expect(text).not.toContain('Completed in')
     expect(text).toContain('1.2 GB stayed, 300 MB moved')
-    expect(text).toContain('2 inputs, 1.5 GB')
+    expect(text).toContain('2 input files, 1.5 GB')
     expect(text).toContain('from node-bielefeld')
     mounted.app.unmount()
     wake.mockRestore()
