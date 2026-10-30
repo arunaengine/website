@@ -133,7 +133,7 @@ const title = computed(() => rootName.value || (mode.value === 'edit' ? 'Edit da
 const groupOptions = computed(() => groups.value.map((group) => ({ value: group.id, label: group.name })))
 const groupName = computed(() => groups.value.find((group) => group.id === draft.value.groupId)?.name ?? '')
 const visibilityText = computed(() =>
-  draft.value.visibility === 'public' ? 'Public' : 'Visible to the group')
+  draft.value.visibility === 'public' ? 'Public' : 'Group')
 const selectableProfiles = computed(() =>
   profiles.value.filter((profile) => isAssignableProfile(profile, draft.value.groupId)))
 const profileOptions = computed(() =>
@@ -762,27 +762,34 @@ async function save(anyway = false) {
       :docs="{ topic: 'first-dataset', section: 'Describe the dataset' }"
     >
       <template #description>
-        <span class="inline-flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
-          <RouterLink
-            v-if="groupName"
-            :to="{ name: 'group', params: { id: draft.groupId } }"
-            class="font-medium text-foreground hover:underline"
-            title="Group"
-          >{{ groupName }}</RouterLink>
-          <Button
-            v-else
-            variant="link"
-            size="sm"
-            class="h-auto p-0 text-sm"
-            @click="locationOpen = true"
-          >
-            Choose a group
-          </Button>
-          <span>›</span>
-          <span class="break-all font-mono text-xs">{{ locationPath }}</span>
-          <span>·</span>
-          <span>{{ visibilityText }}</span>
-          <span v-if="pathTaken" class="text-destructive">already in use</span>
+        <span class="inline-flex min-w-0 flex-wrap items-center gap-x-6 gap-y-1">
+          <span class="min-w-0">
+            <span class="text-muted-foreground">Group</span>
+            <RouterLink
+              v-if="groupName"
+              :to="{ name: 'group', params: { id: draft.groupId } }"
+              class="ml-1.5 text-primary hover:underline"
+            >{{ groupName }}</RouterLink>
+            <Button
+              v-else
+              variant="link"
+              size="sm"
+              class="ml-1.5 h-auto p-0 text-sm"
+              @click="locationOpen = true"
+            >
+              Choose a group
+            </Button>
+          </span>
+          <span class="min-w-0">
+            <span class="text-muted-foreground">Path</span>
+            <span class="ml-1.5 break-all font-mono text-xs text-foreground">{{ locationPath }}</span>
+            <span v-if="pathTaken" class="ml-1.5 text-destructive">already in use</span>
+          </span>
+          <span class="min-w-0">
+            <span class="text-muted-foreground">Visibility</span>
+            <span class="ml-1.5 text-foreground">{{ visibilityText }}</span>
+          </span>
+          <Button variant="link" size="sm" class="h-auto p-0 text-sm" @click="locationOpen = true">Change</Button>
         </span>
       </template>
       <template #actions>

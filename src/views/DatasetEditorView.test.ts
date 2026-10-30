@@ -506,7 +506,10 @@ describe('DatasetEditorView', () => {
     expect(link.props.to).toEqual({ name: 'group', params: { id: 'group-1' } })
     expect(content(link)).toBe('Research group')
     expect(content(mounted.root)).toContain('datasets/reads-2026')
-    expect(content(mounted.root)).toContain('Visible to the group')
+    expect(content(mounted.root)).toContain('VisibilityGroup')
+
+    await click(button(mounted.root, 'Change'))
+    expect(content(mounted.root)).toContain('Location create')
     mounted.app.unmount()
   })
 
