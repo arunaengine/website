@@ -503,7 +503,7 @@ async function leave() {
         <OverviewCell label="Objects" :icon="Files" tone="sky" :to="isMember ? { name: 'buckets', query: { group: group.group_id } } : undefined">
           <template #value>{{ objectCounts ? formatCount(objectCounts.total) : 'Unknown' }}</template>
           <span v-if="buckets !== null"><Package /><b>{{ bucketsComplete ? '' : 'at least ' }}{{ formatCount(bucketRows.length) }}</b> {{ bucketRows.length === 1 ? 'bucket' : 'buckets' }}</span>
-          <span v-if="objectCounts?.physicalBlobs != null"><Copy /><b>{{ formatCount(objectCounts.physicalBlobs) }}</b> {{ objectCounts.physicalBlobs === 1 ? "stored copy" : "stored copies" }}</span>
+          <span v-if="objectCounts?.physicalBlobs != null"><Copy /><b>{{ formatCount(objectCounts.physicalBlobs) }}</b> {{ objectCounts.physicalBlobs === 1 ? 'physical blob location' : 'physical blob locations' }}</span>
         </OverviewCell>
         <OverviewCell label="Datasets" :icon="FileJson2" tone="aqua" :to="{ name: 'datasets', query: { group: group.group_id } }">
           <template #value>{{ purposeCountLabel(usage.dataset_count) }}</template>

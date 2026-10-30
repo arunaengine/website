@@ -345,6 +345,7 @@ watch(
           <template #value>{{ formatBytes(usageInfo.stored_bytes ?? 0) }}</template>
           <template #unit>stored</template>
           <span><Files /><b>{{ formatNumber(usageInfo.objects) }}</b> objects</span>
+          <span v-if="usageInfo.stored_blobs != null"><Copy /><b>{{ formatNumber(usageInfo.stored_blobs) }}</b> physical blob locations</span>
           <span><Package /><b>{{ formatNumber(usageInfo.buckets) }}</b> buckets</span>
         </OverviewCell>
       </div>
