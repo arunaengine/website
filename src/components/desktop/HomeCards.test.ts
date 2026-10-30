@@ -93,7 +93,16 @@ const NewBucketStub = defineComponent({
 // The real bucket check, on the same mocked realm search.
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => ({ myGroups, searchBuckets, sessionEpoch: ref(1) }) }))
 const HasBucket = await import('@/composables/useHasBucket')
-const StartLine = compileClientComponent(new URL('../dashboard/StartLine.vue', import.meta.url), { vue: VueRuntime })
+const IconButtonStub = defineComponent({
+  props: { label: String },
+  setup: (props, { attrs }) => () => h('button', { ...attrs, 'aria-label': props.label }, props.label),
+})
+const StartLine = compileClientComponent(new URL('../dashboard/StartLine.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@lucide/vue': new Proxy({}, { get: () => Plain }),
+  '@/components/ui/IconButton.vue': moduleDefault(IconButtonStub),
+  '@/components/ui/IconTile.vue': moduleDefault(Plain),
+})
 
 const HomeCards = compileClientComponent(new URL('./HomeCards.vue', import.meta.url), {
   vue: VueRuntime,
@@ -148,7 +157,7 @@ const HomeCards = compileClientComponent(new URL('./HomeCards.vue', import.meta.
 })
 
 function line(root: HostNode): HostNode {
-  return element(root, (node) => node.props['aria-label'] === 'Getting started')
+  return element(root, (node) => node.props['aria-label'] === 'Set up this computer')
 }
 
 function link(root: HostNode, label: string): Record<string, unknown> {
@@ -178,15 +187,16 @@ beforeEach(() => {
 })
 
 describe('desktop home cards', () => {
-  it('names the next step in one line and offers its button', async () => {
+  it('names the open steps in a card and offers a button for each, the next one primary', async () => {
     const mounted = await mountApp(HomeCards)
     await flush()
 
-    expect(content(line(mounted.root))).toContain('Getting started 0 of 4 done. Next: create a bucket.')
-    expect(button(line(mounted.root), 'New bucket').props.variant).toBe('outline')
-    // Only the next step has a button; the line replaces the checklist.
-    expect(() => button(line(mounted.root), 'Link a local folder')).toThrow()
-    expect(content(mounted.root)).not.toContain('Run jobs on this computer')
+    expect(content(line(mounted.root))).toContain(
+      'Set up this computer, 0 of 4 doneNext: create a bucket, link a local folder, connect your tools (aws, rclone, Python, Nextflow) and run jobs on this computer.',
+    )
+    expect(button(line(mounted.root), 'New bucket').props.variant).toBe('default')
+    expect(button(line(mounted.root), 'Link a local folder').props.variant).toBe('outline')
+    expect(link(line(mounted.root), 'Connect your tools')).toEqual({ name: 'settings', query: { tab: 'access', create: 'key' } })
     mounted.app.unmount()
   })
 
@@ -194,7 +204,8 @@ describe('desktop home cards', () => {
     searchBuckets.mockResolvedValue({ hits: [{ bucket: 'lab' }] })
     let mounted = await mountApp(HomeCards)
     await flush()
-    expect(content(line(mounted.root))).toContain('1 of 4 done. Next: link a local folder.')
+    expect(content(line(mounted.root))).toContain('1 of 4 doneNext: link a local folder, connect')
+    expect(button(line(mounted.root), 'Link a local folder').props.variant).toBe('default')
     await click(button(line(mounted.root), 'Link a local folder'))
     expect(content(mounted.root)).toContain('bind-dialog-open')
     mounted.app.unmount()
@@ -202,47 +213,47 @@ describe('desktop home cards', () => {
     folders.value = [folder()]
     mounted = await mountApp(HomeCards)
     await flush()
-    expect(content(line(mounted.root))).toContain('2 of 4 done. Next: connect your tools (aws, rclone, Python, Nextflow).')
-    expect(link(line(mounted.root), 'Create a key')).toEqual({ name: 'settings', query: { tab: 'access', create: 'key' } })
+    expect(content(line(mounted.root))).toContain('2 of 4 doneNext: connect your tools (aws, rclone, Python, Nextflow) and run jobs on this computer.')
+    expect(link(line(mounted.root), 'Connect your tools')).toEqual({ name: 'settings', query: { tab: 'access', create: 'key' } })
     mounted.app.unmount()
 
     credentials.value = [{ access_key_id: 'AK1', status: 'active' }]
     mounted = await mountApp(HomeCards)
     await flush()
-    expect(content(line(mounted.root))).toContain('3 of 4 done. Next: run jobs on this computer.')
-    expect(link(line(mounted.root), 'Turn on')).toEqual({ name: 'device', query: { section: 'local-runs' } })
+    expect(content(line(mounted.root))).toContain('3 of 4 doneNext: run jobs on this computer.')
+    expect(link(line(mounted.root), 'Run jobs here')).toEqual({ name: 'device', query: { section: 'local-runs' } })
     mounted.app.unmount()
   })
 
-  it('drops the line once every step is done, while a list is still read, or after Hide', async () => {
+  it('drops the card once every step is done, while a list is still read, or after Not now', async () => {
     searchBuckets.mockResolvedValue({ hits: [{ bucket: 'lab' }] })
     folders.value = [folder()]
     credentials.value = [{ access_key_id: 'AK1', status: 'active' }]
     compute.value = enabledCompute()
     let mounted = await mountApp(HomeCards)
     await flush()
-    expect(content(mounted.root)).not.toContain('Getting started')
+    expect(content(mounted.root)).not.toContain('Set up this computer')
     mounted.app.unmount()
 
     folders.value = []
     keysState.value = 'loading'
     mounted = await mountApp(HomeCards)
     await flush()
-    expect(content(mounted.root)).not.toContain('Getting started')
+    expect(content(mounted.root)).not.toContain('Set up this computer')
     mounted.app.unmount()
 
     keysState.value = 'ready'
     searchBuckets.mockReturnValue(new Promise<Page>(() => undefined))
     mounted = await mountApp(HomeCards)
-    expect(content(mounted.root)).not.toContain('Getting started')
+    expect(content(mounted.root)).not.toContain('Set up this computer')
     mounted.app.unmount()
 
     searchBuckets.mockResolvedValue({ hits: [] })
     mounted = await mountApp(HomeCards)
     await flush()
-    await click(button(line(mounted.root), 'Hide'))
+    await click(element(line(mounted.root), (node) => node.props['aria-label'] === 'Not now'))
     expect(startHidden.value).toBe(true)
-    expect(content(mounted.root)).not.toContain('Getting started')
+    expect(content(mounted.root)).not.toContain('Set up this computer')
     mounted.app.unmount()
   })
 
@@ -272,7 +283,7 @@ describe('desktop home cards', () => {
     await click(button(mounted.root, 'New bucket'))
     expect(content(mounted.root)).toContain('new-bucket-open')
     await click(button(mounted.root, 'Make it'))
-    expect(content(line(mounted.root))).toContain('1 of 4 done. Next: link a local folder.')
+    expect(content(line(mounted.root))).toContain('1 of 4 doneNext: link a local folder')
 
     await click(button(mounted.root, 'Link it'))
     expect(content(mounted.root)).toContain('bind-dialog-open lab true')
