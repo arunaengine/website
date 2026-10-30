@@ -64,8 +64,8 @@ const {
 } = state
 const sparqlState = useSparqlWorkbench(documentScope)
 
-// Run records first: most records here are written by runs; datasets are bundled by hand.
-const tab = useRouteTab(['records', 'datasets'], 'records')
+// Searches and dataset links land on Datasets; a link to the run records asks for that tab.
+const tab = useRouteTab(['records', 'datasets'], 'datasets')
 const recordFilter = ref('')
 const records = computed(() => {
   const words = recordFilter.value.trim().toLowerCase().split(/\s+/).filter(Boolean)

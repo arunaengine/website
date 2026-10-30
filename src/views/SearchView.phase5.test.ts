@@ -62,8 +62,9 @@ describe('Datasets page layout', () => {
     expect(view).not.toContain('description="Browse every visible RO-Crate')
   })
 
-  it('opens on the run records tab, kept in the URL', () => {
-    expect(view).toContain("useRouteTab(['records', 'datasets'], 'records')")
+  it('opens searches on the datasets tab, run records only when asked in the URL', () => {
+    expect(view).toContain("useRouteTab(['records', 'datasets'], 'datasets')")
+    expect(read('./MetadataView.vue')).toContain("{ label: 'Run records', to: { name: 'datasets', query: { tab: 'records' } } }")
     expect(view).toContain('title="Run records"')
     expect(view).toContain('<DatasetBrowse v-else :state="state" skip-runs />')
   })
