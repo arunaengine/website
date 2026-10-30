@@ -17,6 +17,7 @@ import { useRefresh } from '@/composables/useRefresh'
 import { Laptop, Plus, X } from '@lucide/vue'
 import type { UserDevice } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
+import { isDesktop } from '@/lib/desktop'
 import { nodeName } from '@/components/nodes/node-display'
 import NodeNameEdit from '@/components/nodes/NodeNameEdit.vue'
 import { useNodeNames } from '@/composables/useNodeNames'
@@ -24,7 +25,11 @@ import { useNodeNames } from '@/composables/useNodeNames'
 const DEVICE_STEPS = ['Device', 'Hand off', 'Watch it join']
 const FIRST_STEP = 1
 
-const { currentUser, realmInfo } = useAruna()
+const { currentUser, realmInfo, nodeInfo } = useAruna()
+// In the desktop app this computer's own row opens its device page, the others their node page.
+const desktop = isDesktop()
+const deviceLink = (nodeId: string) =>
+  desktop && nodeInfo?.value?.node.peer_id === nodeId ? { name: 'device' } : { name: 'node', params: { nodeId } }
 const { devices, devicesError, busyIds, deviceCount, deviceLimit, loadingDevices, loadDevices, revoke } =
   useDeviceEnrollment()
 
@@ -148,7 +153,7 @@ function remove(id: string) {
               <td class="py-2.5 pr-4">
                 <!-- The owner names an enrolled device; an enrollment in flight has no node to name yet. -->
                 <NodeNameEdit v-if="row.nodeId" :name="row.name ?? row.shortId" :value="row.value" :save="(name) => renameDevice(row.nodeId!, name)">
-                  <RouterLink v-if="row.name" :to="{ name: 'node', params: { nodeId: row.nodeId } }" class="text-foreground hover:underline">{{ row.name }}</RouterLink>
+                  <RouterLink v-if="row.name" :to="deviceLink(row.nodeId)" class="text-foreground hover:underline">{{ row.name }}</RouterLink>
                   <span class="font-mono text-[11px] text-muted-foreground" :class="row.name ? 'ml-1.5' : ''">{{ row.shortId }}</span>
                 </NodeNameEdit>
                 <template v-else>
