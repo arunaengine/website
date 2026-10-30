@@ -38,7 +38,7 @@ const record = (overrides: Partial<RealmNodeInfo> = {}): RealmNodeInfo => ({
 
 const DialogStub = defineComponent({
   emits: ['update:open'],
-  setup: (_, { emit, slots }) => () => h('div', [h('header', slots.header?.()), slots.default?.(), h('button', { onClick: () => emit('update:open', false) }, 'Close')]),
+  setup: (_, { emit, slots }) => () => h('div', [h('header', [slots.header?.(), slots.actions?.()]), slots.default?.(), h('button', { onClick: () => emit('update:open', false) }, 'Close')]),
 })
 const LinkStub = defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()) })
 // Each editor keeps its own draft, so a new one shows as a new instance.
