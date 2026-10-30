@@ -57,7 +57,7 @@ const ProfilesView = compileClientComponent(new URL('./ProfilesView.vue', import
   'vue-router': { useRoute: () => route, useRouter: () => ({ push: routerPush }) },
   '@lucide/vue': icons,
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
-  '@/components/ui/Badge.vue': moduleDefault(Passthrough),
+  '@/components/ui/InfoHint.vue': moduleDefault(Passthrough),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Dialog.vue': moduleDefault(Passthrough),
   '@/components/ui/DialogClose.vue': moduleDefault(Passthrough),

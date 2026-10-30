@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import PageHeader from '@/components/dashboard/PageHeader.vue'
-import Badge from '@/components/ui/Badge.vue'
+import InfoHint from '@/components/ui/InfoHint.vue'
 import OverviewCell from '@/components/dashboard/OverviewCell.vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
@@ -20,14 +20,12 @@ import ExternalLink from '@/components/ui/ExternalLink.vue'
 import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { profileRulesLoadState, useAruna } from '@/composables/useAruna'
-import { ChevronDown, FileJson2, ListChecks, Pencil, Plus, Star, Lock, Download, Globe, Tag, Trash2 } from '@lucide/vue'
+import { Asterisk, ChevronDown, CircleDashed, FileJson2, Lightbulb, ListChecks, Pencil, Plus, Star, Lock, Download, Globe, Tag, Trash2 } from '@lucide/vue'
 import { GROUP_PROFILE_HINT, profileScope } from '@/lib/profiles/assignable'
 import {
-  OBLIGATION_ACCENT,
   OBLIGATION_ORDER,
   PROFILE_OBLIGATION_LABELS,
   PROFILE_VALUE_KIND_LABELS,
-  obligationBadgeVariant,
 } from '@/lib/profiles/labels'
 import { deriveEntityObligation, entityRulesToMode } from '@/lib/profiles/mode'
 import { buildProfileCrate } from '@/lib/profiles/rocrate'
@@ -194,6 +192,10 @@ const allPropertyRules = computed<ProfilePropertyRule[]>(() => {
     : profile.propertyRules
 })
 const requiredPropertyCount = computed(() => allPropertyRules.value.filter((rule) => rule.obligation === 'MUST').length)
+const recommendedPropertyCount = computed(() => allPropertyRules.value.filter((rule) => rule.obligation === 'SHOULD').length)
+const OBLIGATION_ICON = { MUST: Asterisk, SHOULD: Lightbulb, MAY: CircleDashed } as const
+// A long description reads as its first line; the whole of it is behind the hint.
+const LONG_DESCRIPTION = 120
 
 // Entity-level obligation is derived (not stored): an entity type is required /
 // recommended iff a MUST / SHOULD property references it via its entityTypes.
@@ -439,6 +441,8 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
           <OverviewCell label="Required properties" :icon="ListChecks" info="Properties this profile leaves out stay allowed unless a closed SHACL rule says otherwise.">
             <template #value>{{ requiredPropertyCount }}</template>
             <template #unit>of {{ allPropertyRules.length }}</template>
+            <span><Lightbulb /><b>{{ recommendedPropertyCount }}</b> recommended</span>
+            <span><CircleDashed /><b>{{ allPropertyRules.length - requiredPropertyCount - recommendedPropertyCount }}</b> optional</span>
           </OverviewCell>
           <!-- "Used by" needs a server-side count: the catalog is paged, so it
                cannot be counted client-side. Hidden until one is served. -->
@@ -478,31 +482,31 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
           <div v-for="entry in entityRulesWithObligation" :key="entry.rule.id" class="surface overflow-hidden">
             <header class="border-b border-border px-5 py-4">
               <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-foreground">
-                <span>This profile</span>
-                <Badge size="sm" :variant="obligationBadgeVariant(entry.obligation)" class="font-semibold uppercase tracking-wide">{{ entry.obligation }}</Badge>
-                <span>include an entity of type</span>
+                <component :is="OBLIGATION_ICON[entry.obligation]" class="size-4 text-muted-foreground" aria-hidden="true" />
                 <b class="font-semibold text-aruna-navy">{{ entityTypeLabel(entry.rule.type) }}</b>
                 <span v-if="entry.rule.label && entry.rule.label.toLowerCase() !== entityTypeLabel(entry.rule.type).toLowerCase()" class="text-muted-foreground">- {{ entry.rule.label }}</span>
                 <!-- Derived obligation is explained by the property that references this type. -->
                 <span v-if="entry.via" class="text-[11px] text-muted-foreground">via <code class="hash rounded bg-muted px-1 py-0.5 text-foreground/70">{{ entry.via.valueName }}</code></span>
               </div>
-              <p v-if="entry.rule.description" class="mt-1.5 text-xs text-muted-foreground">{{ entry.rule.description }}</p>
-              <p class="mt-1 text-[11px] text-muted-foreground">{{ PROFILE_OBLIGATION_LABELS[entry.obligation].help }}</p>
+              <p class="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                {{ PROFILE_OBLIGATION_LABELS[entry.obligation].label }} entity<template v-if="entry.rule.description">, {{ entry.rule.description }}</template>
+              </p>
             </header>
 
             <div v-if="entry.rule.propertyRules.length">
-              <div v-for="group in groupByObligation(entry.rule.propertyRules)" :key="group.obligation" class="border-l-2" :class="OBLIGATION_ACCENT[group.obligation]">
-                <div class="flex flex-wrap items-center gap-2 bg-muted/20 px-5 py-2">
-                  <Badge size="sm" :variant="obligationBadgeVariant(group.obligation)" class="font-semibold uppercase tracking-wide">{{ group.obligation }}</Badge>
-                  <span class="text-xs font-semibold text-foreground">{{ PROFILE_OBLIGATION_LABELS[group.obligation].label }}</span>
-                  <span class="text-[11px] text-muted-foreground">{{ PROFILE_OBLIGATION_LABELS[group.obligation].help }}</span>
-                </div>
+              <div v-for="group in groupByObligation(entry.rule.propertyRules)" :key="group.obligation">
+                <h4 class="flex items-center gap-2 px-5 pb-1 pt-4 text-sm font-semibold text-foreground">
+                  <component :is="OBLIGATION_ICON[group.obligation]" class="size-4 text-muted-foreground" aria-hidden="true" />
+                  {{ PROFILE_OBLIGATION_LABELS[group.obligation].label }}
+                  <span class="font-normal tabular-nums text-muted-foreground">{{ group.rules.length }}</span>
+                  <InfoHint :label="PROFILE_OBLIGATION_LABELS[group.obligation].help" :name="`About ${PROFILE_OBLIGATION_LABELS[group.obligation].label}`" />
+                </h4>
                 <ul class="divide-y divide-border/60">
                   <li v-for="rule in group.rules" :key="rule.id" class="px-5 py-3">
                     <div class="flex flex-wrap items-center gap-2">
                       <span class="text-sm font-medium text-foreground">{{ rule.label }}</span>
                       <code class="hash rounded bg-muted px-1.5 py-0.5 text-foreground/70">{{ rule.valueName }}</code>
-                      <span class="text-[10px] uppercase tracking-wide text-muted-foreground">{{ PROFILE_VALUE_KIND_LABELS[rule.kind] }}</span>
+                      <span class="text-xs text-muted-foreground">{{ PROFILE_VALUE_KIND_LABELS[rule.kind] }}</span>
                       <!-- Absolute property term URI (mode input `id`), truncated; an
                            http(s) term IRI is a link to its vocabulary definition. -->
                       <ExternalLink
@@ -513,19 +517,20 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                         :title="rule.propertyUri"
                       />
                     </div>
-                    <p v-if="rule.description" class="mt-0.5 text-[12px] text-muted-foreground">{{ rule.description }}</p>
-                    <!-- Entity-reference targets: the entity types this property points at. -->
-                    <div v-if="rule.kind === 'entity' && rule.entityTypes?.length" class="mt-1 flex flex-wrap items-center gap-1">
-                      <span v-for="type in rule.entityTypes" :key="type" class="rounded-full bg-card px-2 py-0.5 text-[10px] text-foreground/70 ring-1 ring-inset ring-border">references {{ entityTypeLabel(type) }}</span>
-                    </div>
-                    <div v-if="rule.example" class="mt-1 font-mono text-[11px] text-foreground/60">e.g. {{ rule.example }}</div>
-                    <div v-if="rule.enumOptions?.length" class="mt-1 flex flex-wrap items-center gap-1">
-                      <span class="text-[10px] text-muted-foreground">one of:</span>
-                      <span v-for="option in rule.enumOptions" :key="option" class="rounded-full bg-card px-2 py-0.5 text-[10px] text-foreground/70 ring-1 ring-inset ring-border">{{ option }}</span>
-                    </div>
-                    <div v-if="constraintSummary(rule).length" class="mt-1 flex flex-wrap gap-1.5">
-                      <span v-for="part in constraintSummary(rule)" :key="part" class="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">{{ part }}</span>
-                    </div>
+                    <p v-if="rule.description" class="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12px] text-muted-foreground">
+                      <span :class="rule.description.length > LONG_DESCRIPTION ? 'truncate' : ''">{{ rule.description }}</span>
+                      <InfoHint v-if="rule.description.length > LONG_DESCRIPTION" :label="rule.description" :name="`About ${rule.label}`" />
+                    </p>
+                    <!-- What else the profile says of the value, as one plain line. -->
+                    <p
+                      v-if="(rule.kind === 'entity' && rule.entityTypes?.length) || rule.example || rule.enumOptions?.length || constraintSummary(rule).length"
+                      class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] text-muted-foreground"
+                    >
+                      <span v-if="rule.kind === 'entity' && rule.entityTypes?.length">References {{ rule.entityTypes.map(entityTypeLabel).join(', ') }}</span>
+                      <span v-if="rule.example" class="font-mono">e.g. {{ rule.example }}</span>
+                      <span v-if="rule.enumOptions?.length">One of {{ rule.enumOptions.join(', ') }}</span>
+                      <span v-if="constraintSummary(rule).length">{{ constraintSummary(rule).join(', ').replace(/^./, (first) => first.toUpperCase()) }}</span>
+                    </p>
                   </li>
                 </ul>
               </div>
