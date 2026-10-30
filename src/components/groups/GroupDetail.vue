@@ -370,10 +370,14 @@ async function loadBuckets() {
     if (mine === bucketRound) bucketsError.value = errorMessage(err)
   }
 }
+// Members of one distributed bucket share a row; an ordinary bucket is its own on each node.
 const bucketRows = computed(() => {
   const rows = new Map<string, BucketSearchHit[]>()
-  for (const hit of buckets.value ?? []) rows.set(hit.bucket, [...(rows.get(hit.bucket) ?? []), hit])
-  return [...rows].map(([bucket, hits]) => ({ bucket, hits })).sort((a, b) => a.bucket.localeCompare(b.bucket))
+  for (const hit of buckets.value ?? []) {
+    const key = hit.set_id ? `set:${hit.set_id}` : `node:${hit.node_id}:${hit.bucket}`
+    rows.set(key, [...(rows.get(key) ?? []), hit])
+  }
+  return [...rows].map(([key, hits]) => ({ key, bucket: hits[0]!.bucket, hits })).sort((a, b) => a.bucket.localeCompare(b.bucket))
 })
 const { realm } = useRealmSnapshot()
 const { isLocalNode } = useRealmNodes()
@@ -574,7 +578,7 @@ async function leave() {
                   <p v-else-if="buckets === null" class="px-5 py-4 text-xs text-muted-foreground">Reading the group's buckets…</p>
                   <p v-else-if="!bucketRows.length" class="px-5 py-4 text-xs text-muted-foreground">{{ bucketsComplete ? 'No buckets yet.' : 'Not every node answered, so buckets may be missing.' }}</p>
                   <ul v-else class="divide-y divide-border-subtle">
-                    <li v-for="row in bucketRows" :key="row.bucket" class="flex items-center gap-3 px-5 py-3 hover:bg-muted/40">
+                    <li v-for="row in bucketRows" :key="row.key" class="flex items-center gap-3 px-5 py-3 hover:bg-muted/40">
                       <IconTile :icon="Package" tone="muted" size="sm" />
                       <span class="min-w-0 flex-1">
                         <RouterLink :to="bucketLink(row.hits[0]!)" class="block truncate text-sm font-medium text-foreground hover:underline">{{ row.bucket }}</RouterLink>

@@ -12,6 +12,7 @@ import * as Utils from '@/lib/utils'
 
 const TAB_NAMES = ['stats', 'members', 'roles', 'sources', 'storage', 'policies']
 const leaveGroup = vi.fn(async (_group: string) => undefined)
+const listBuckets = vi.fn(async (..._args: unknown[]) => ({ hits: [] as object[], complete: true }))
 const REALM = 'realm-1'
 interface Role {
   role_id: string
@@ -118,7 +119,7 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   '@/components/ui/IconTile.vue': moduleDefault(Empty),
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
   '@/components/ui/SectionHeading.vue': moduleDefault(Passthrough),
-  '@/composables/useBucketCount': { listBuckets: vi.fn(async () => ({ hits: [], complete: true })) },
+  '@/composables/useBucketCount': { listBuckets },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ isLocalNode: () => true }) },
   '@/composables/useRealmSnapshot': { useRealmSnapshot: () => ({ realm: ref(null) }) },
   '@/composables/useRecentRuns': { useRecentRuns: () => ({ runs: ref([]), state: ref('off'), load: vi.fn(async () => undefined) }) },
@@ -165,6 +166,8 @@ async function mount(initial: string, onDeleted?: () => void) {
       { path: '/app/groups/:id', name: 'group', component: Empty },
       { path: '/app/metadata/:id', name: 'dataset', component: Empty },
       { path: '/app/metadata', name: 'datasets', component: Empty },
+      { path: '/app/data/:bucketId', name: 'bucket', component: Empty },
+      { path: '/app/nodes/:nodeId', name: 'node', component: Empty },
     ],
   })
   await router.push(initial)
@@ -241,6 +244,16 @@ describe('Group tab counts', () => {
     expect(listGroupBackends).toHaveBeenCalledWith('g1')
     expect(tabText(root, 'sources')).toContain('2')
     expect(tabText(root, 'storage')).toContain('3')
+  })
+
+  it('merges only the members of one distributed bucket into a row', async () => {
+    group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [ADMIN_ROLE] }
+    const hit = (bucket: string, node_id: string, set_id?: string) => ({ arn: '', bucket, node_id, group_id: 'g1', created_at: '', set_id })
+    listBuckets.mockResolvedValueOnce({ hits: [hit('reef', 'n1'), hit('reef', 'n2'), hit('shared', 'n1', 's1'), hit('shared', 'n2', 's1')], complete: true })
+    const { root } = await mount('/app/groups/g1')
+    const opens = nodes(root).filter((node) => typeof node.props['aria-label'] === 'string' && node.props['aria-label'].startsWith('Open '))
+
+    expect(opens.map((node) => node.props['aria-label'])).toEqual(['Open reef', 'Open reef', 'Open shared'])
   })
 
   it('tells the storage tab which bucket the dataset location uses', async () => {
