@@ -147,6 +147,7 @@ const SyncItemRow = compileClientComponent(new URL('./SyncItemRow.vue', import.m
   'vue-router': RouterRuntime,
   '@lucide/vue': icons,
   '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
+  '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent((_, { slots }) => () => h('div', [slots.actions?.(), slots.default?.()]))),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/components/ui/NodeLabel.vue': moduleDefault(NodeLabelStub),
@@ -165,6 +166,7 @@ const LinkedFolders = compileClientComponent(new URL('./LinkedFolders.vue', impo
   'vue-router': RouterRuntime,
   '@lucide/vue': icons,
   '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
+  '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent((_, { slots }) => () => h('div', [slots.actions?.(), slots.default?.()]))),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/EmptyState.vue': moduleDefault(EmptyStateStub),
   '@/components/ui/Notice.vue': moduleDefault(Notice),
@@ -262,7 +264,7 @@ describe('the linked folders card', () => {
     const mounted = await mount()
 
     expect(rows(mounted.root)).toHaveLength(2)
-    expect(badge(mounted.root, '2').props['data-variant']).toBe('outline')
+    expect(content(mounted.root)).toContain('2 folders')
     expect(content(mounted.root)).not.toContain('Realm unreachable')
     mounted.app.unmount()
   })

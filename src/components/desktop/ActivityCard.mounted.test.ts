@@ -38,6 +38,7 @@ const ActivityCard = compileClientComponent(new URL('./ActivityCard.vue', import
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => Empty }),
   '@/components/ui/Badge.vue': moduleDefault(Passthrough),
+  '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent((_, { slots }) => () => h('div', [slots.actions?.(), slots.default?.()]))),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/FilterChips.vue': moduleDefault(Empty),
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),

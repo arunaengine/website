@@ -15,6 +15,7 @@ const LocalCompute = compileClientComponent(new URL('./LocalCompute.vue', import
   'vue-router': { RouterLink: Plain },
   '@lucide/vue': new Proxy({}, { get: () => Plain }),
   '@/components/ui/Badge.vue': moduleDefault(Plain),
+  '@/components/ui/StatusMark.vue': moduleDefault(Plain),
   '@/components/ui/Button.vue': moduleDefault(Plain),
   '@/components/ui/CopyButton.vue': moduleDefault(Plain),
   '@/composables/useDeviceCompute': {

@@ -3,14 +3,16 @@
 // search. Every page is read, since the search cannot filter by node.
 import { ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import Badge from '@/components/ui/Badge.vue'
+import Button from '@/components/ui/Button.vue'
+import IconTile from '@/components/ui/IconTile.vue'
+import Tooltip from '@/components/ui/Tooltip.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import type { BucketSearchHit } from '@/lib/api'
 import { isHiddenBucket } from '@/lib/workspaces'
 import { errorMessage } from '@/lib/utils'
-import { Boxes } from '@lucide/vue'
+import { Boxes, Info, Package, Plus } from '@lucide/vue'
 
 const { searchBuckets, sessionEpoch } = useAruna()
 const { identity } = useDeviceStatus()
@@ -53,21 +55,31 @@ function bucketLink(hit: BucketSearchHit) {
 </script>
 
 <template>
-  <section class="surface px-5 py-4">
-    <div class="flex items-center gap-2">
-      <Boxes class="h-4 w-4 text-primary" />
-      <h2 class="font-display text-sm font-semibold text-aruna-navy">Buckets stored here</h2>
-      <Badge v-if="hits" variant="outline" size="count">{{ hits.length }}</Badge>
+  <section class="surface overflow-hidden">
+    <div class="flex items-center gap-2 border-b border-border-subtle px-5 py-3">
+      <Boxes class="h-4 w-4 text-muted-foreground" />
+      <h3 class="text-sm font-medium text-foreground">Buckets stored here</h3>
+      <span v-if="hits" class="text-sm text-muted-foreground"><b class="font-medium text-foreground">{{ hits.length }}</b></span>
+      <Tooltip label="Only this computer keeps these. Create buckets in Data.">
+        <span class="inline-flex text-muted-foreground" tabindex="0" aria-label="Only this computer keeps these. Create buckets in Data."><Info class="size-3.5" /></span>
+      </Tooltip>
     </div>
-    <p v-if="error" class="mt-2 text-xs text-destructive">The buckets here could not be listed: {{ error }}</p>
-    <p v-else-if="!hits" class="mt-2 text-xs text-muted-foreground">Looking for buckets on this computer…</p>
-    <ul v-else-if="hits.length" class="mt-2 space-y-1 text-xs">
-      <li v-for="hit in hits" :key="`${hit.group_id}/${hit.bucket}`" class="flex items-center justify-between gap-3">
-        <RouterLink :to="bucketLink(hit)" class="truncate font-mono text-primary hover:underline">{{ hit.bucket }}</RouterLink>
-        <span class="truncate text-[11px] text-muted-foreground">{{ hit.group_name || '' }}</span>
+    <p v-if="error" class="px-5 py-3 text-xs text-destructive">The buckets here could not be listed: {{ error }}</p>
+    <p v-else-if="!hits" class="px-5 py-3 text-xs text-muted-foreground">Looking for buckets on this computer…</p>
+    <ul v-else-if="hits.length" class="divide-y divide-border-subtle">
+      <li v-for="hit in hits" :key="`${hit.group_id}/${hit.bucket}`" class="flex items-center gap-3 px-5 py-2.5">
+        <IconTile :icon="Package" tone="muted" size="sm" />
+        <span class="min-w-0 flex-1">
+          <RouterLink :to="bucketLink(hit)" class="block truncate text-sm font-medium text-foreground hover:underline">{{ hit.bucket }}</RouterLink>
+          <RouterLink v-if="hit.group_name" :to="{ name: 'group', params: { id: hit.group_id } }" class="block truncate text-xs text-muted-foreground hover:text-foreground hover:underline">{{ hit.group_name }}</RouterLink>
+        </span>
       </li>
     </ul>
-    <p v-else class="mt-2 text-xs text-muted-foreground">No bucket is stored here.</p>
-    <p class="mt-2 text-[11px] text-muted-foreground">Only this computer keeps these. Create buckets in Data.</p>
+    <div v-else class="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+      <p class="text-xs text-muted-foreground">No bucket is stored here.</p>
+      <Button variant="outline" size="sm" as-child>
+        <RouterLink :to="{ name: 'buckets', query: { create: 'bucket' } }"><Plus class="h-3.5 w-3.5" /> New bucket</RouterLink>
+      </Button>
+    </div>
   </section>
 </template>

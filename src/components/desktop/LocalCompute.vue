@@ -2,13 +2,13 @@
 // Whether this computer runs jobs, and the address workflow tools send them to.
 import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import Badge from '@/components/ui/Badge.vue'
+import StatusMark from '@/components/ui/StatusMark.vue'
 import Button from '@/components/ui/Button.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import { useDeviceCompute } from '@/composables/useDeviceCompute'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { tesAddress } from '@/lib/toolSnippets'
-import { ArrowRight, Laptop } from '@lucide/vue'
+import { Laptop, SlidersHorizontal } from '@lucide/vue'
 
 const { compute, state, load } = useDeviceCompute()
 const { status } = useDeviceStatus()
@@ -44,15 +44,13 @@ onMounted(() => void load())
           <span class="text-sm font-medium text-foreground">
             {{ compute?.enabled ? 'This computer runs jobs' : 'This computer runs no jobs' }}
           </span>
-          <Badge v-if="compute" :variant="compute.enabled ? 'success' : 'secondary'" size="sm">
-            {{ compute.enabled ? 'On' : 'Off' }}
-          </Badge>
+          <StatusMark v-if="compute?.enabled" label="On" size="sm" />
         </div>
         <p class="text-xs text-muted-foreground">{{ summary }}</p>
       </div>
-      <Button variant="ghost" size="sm" as-child>
+      <Button variant="outline" size="sm" as-child>
         <RouterLink :to="{ name: 'device', query: { section: 'local-runs' } }">
-          Change limits <ArrowRight class="h-3.5 w-3.5" />
+          <SlidersHorizontal class="h-3.5 w-3.5" /> Change limits
         </RouterLink>
       </Button>
     </div>

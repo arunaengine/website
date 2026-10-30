@@ -2,7 +2,7 @@
 // Folders and offline datasets this computer keeps in step with the realm. A
 // folder row opens its folder page.
 import { computed, onMounted, ref } from 'vue'
-import Badge from '@/components/ui/Badge.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -72,17 +72,16 @@ function toggleFolder(folder: SyncedFolder): void {
 </script>
 
 <template>
-  <section class="surface overflow-hidden">
-    <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
-      <div class="flex items-center gap-2">
-        <FolderSync class="h-4 w-4 text-primary" />
-        <h2 class="font-display text-sm font-semibold text-aruna-navy">Linked folders</h2>
-        <Badge v-if="!surface" variant="outline" size="count">{{ items.length }}</Badge>
-      </div>
-      <Button variant="outline" size="sm" @click="showBind = true">
-        <FolderPlus class="h-3.5 w-3.5" /> Link a local folder
-      </Button>
-    </header>
+  <section aria-labelledby="linked-folders-heading">
+    <SectionHeading id="linked-folders-heading" title="Linked folders" :icon="FolderSync" info="Folders on this computer kept in step with a bucket.">
+      <template #actions>
+        <span v-if="!surface" class="text-sm text-muted-foreground"><b class="font-medium text-foreground">{{ items.length }}</b> {{ items.length === 1 ? 'folder' : 'folders' }}</span>
+        <Button variant="outline" size="sm" @click="showBind = true">
+          <FolderPlus class="h-3.5 w-3.5" /> Link a local folder
+        </Button>
+      </template>
+    </SectionHeading>
+    <div class="surface overflow-hidden">
 
     <Notice v-if="state === 'ready' && !status.realmReachable" tone="warning" class="mx-5 mt-3" title="Realm unreachable">
       Your edits are kept here and go out on their own once it answers.
@@ -118,5 +117,6 @@ function toggleFolder(folder: SyncedFolder): void {
     </EmptyState>
 
     <BindFolderDialog v-model:open="showBind" @bound="loadFolders" />
+    </div>
   </section>
 </template>

@@ -3,7 +3,10 @@
 // the state of Aruna here and the settings only you control. It is also where an
 // `aruna://enroll` link lands, so the outcome is shown here.
 import { computed, nextTick, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
+import { Server, SlidersHorizontal } from '@lucide/vue'
+import Button from '@/components/ui/Button.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import ActivityCard from '@/components/desktop/ActivityCard.vue'
 import LinkedFolders from '@/components/desktop/LinkedFolders.vue'
@@ -46,24 +49,29 @@ function onEnrolled() {
     <PageHeader
       eyebrow="This computer"
       title="This computer"
-      description="Aruna runs on this computer. Your folders, what is moving, and how it runs."
       :docs="{ topic: 'realm-nodes-groups', section: 'Nodes and the realm' }"
-    />
+    >
+      <template #actions>
+        <Button v-if="status?.nodeId" variant="outline" as-child>
+          <RouterLink :to="{ name: 'node', params: { nodeId: status.nodeId } }"><Server class="h-4 w-4" /> Node page</RouterLink>
+        </Button>
+      </template>
+    </PageHeader>
 
-    <div class="w-full px-4 sm:px-6 space-y-5 py-5">
+    <div class="w-full space-y-8 px-4 py-6 sm:px-6">
       <EnrollPanel v-if="showEnroll" :invite="invite" @enrolled="onEnrolled" />
       <NodePanel />
       <LinkedFolders id="folders" />
       <ActivityCard id="activity" />
-      <div class="space-y-3.5 pt-2">
-        <h2 class="font-display text-[15px] font-semibold text-foreground/85">Settings for this computer</h2>
-        <div class="grid items-start gap-5 lg:grid-cols-2">
+      <section aria-labelledby="computer-settings-heading">
+        <SectionHeading id="computer-settings-heading" title="Settings for this computer" :icon="SlidersHorizontal" />
+        <div class="grid gap-4 lg:grid-cols-2">
           <ComputePanel id="local-runs" class="min-w-0" />
           <LocalPanel class="min-w-0" />
           <LocalBuckets class="min-w-0" />
           <WipePanel id="wipe" class="min-w-0" @wiped="refresh" />
         </div>
-      </div>
+      </section>
     </div>
   </div>
 </template>

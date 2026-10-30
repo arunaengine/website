@@ -5,6 +5,7 @@
 import { computed, onMounted, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Progress from '@/components/ui/Progress.vue'
@@ -151,13 +152,9 @@ const when = (ms: number | null): string => (ms ? relativeTime(new Date(ms).toIS
 </script>
 
 <template>
-  <section class="surface overflow-hidden">
-    <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
-      <div class="flex items-center gap-2">
-        <ArrowLeftRight class="h-4 w-4 text-primary" />
-        <h2 class="font-display text-sm font-semibold text-aruna-navy">Activity</h2>
-      </div>
-      <div class="flex flex-wrap items-center gap-2">
+  <section aria-labelledby="activity-heading">
+    <SectionHeading id="activity-heading" title="Activity" :icon="ArrowLeftRight">
+      <template #actions>
         <Button variant="outline" size="sm" :disabled="acting || !canAct" @click="pauseAll">
           <Play v-if="allPaused" class="h-3.5 w-3.5" />
           <Pause v-else class="h-3.5 w-3.5" />
@@ -166,8 +163,9 @@ const when = (ms: number | null): string => (ms ? relativeTime(new Date(ms).toIS
         <Button variant="outline" size="sm" :disabled="acting || !canSync" @click="syncNow">
           <RefreshCw class="h-3.5 w-3.5" /> Sync now
         </Button>
-      </div>
-    </header>
+      </template>
+    </SectionHeading>
+    <div class="surface overflow-hidden">
 
     <Notice v-if="actionError" tone="error" class="mx-5 mt-3">{{ actionError }}</Notice>
 
@@ -283,5 +281,6 @@ const when = (ms: number | null): string => (ms ? relativeTime(new Date(ms).toIS
         {{ expanded ? 'Show less' : `Show all ${rows.length + decided.length}` }}
       </button>
     </template>
+    </div>
   </section>
 </template>
