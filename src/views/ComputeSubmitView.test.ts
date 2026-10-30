@@ -342,6 +342,7 @@ const AdminOnboardingView = compileClientComponent(new URL('./AdminOnboardingVie
   '@lucide/vue': icons,
   ...sharedUi,
   '@/components/ui/ErrorPanel.vue': moduleDefault(GenericStub),
+  '@/components/ui/SectionHeading.vue': moduleDefault(GenericStub),
   '@/components/onboarding/KindSelectStep.vue': moduleDefault(KindSelectStub),
   '@/components/onboarding/SecretPanel.vue': moduleDefault(SecretPanelStub),
   '@/components/onboarding/CodeSnippet.vue': moduleDefault(CodeSnippetStub),
@@ -376,6 +377,7 @@ async function mount(component: Component, path?: string) {
           { path: '/app/runs', name: 'runs', component: RouteStub },
           { path: '/app/runs/:jobId', name: 'run', component: RouteStub },
           { path: '/app/admin', name: 'admin', component: RouteStub },
+          { path: '/app/status', name: 'status', component: RouteStub },
         ],
       })
     : undefined

@@ -131,6 +131,12 @@ const objectCounts = computed(() => {
   const stored = typeof value.stored_blobs === 'number' ? value.stored_blobs : null
   return { total: value.objects, physicalBlobs: stored }
 })
+// The group's own counters from its usage, never the approximate document estimate.
+const purposeCounts = computed(() => ({
+  datasets: usage.value?.dataset_count,
+  profiles: usage.value?.profile_count,
+  runs: usage.value?.process_run_count,
+}))
 function purposeCountLabel(value: number | null | undefined): string {
   return value == null ? 'Unknown' : formatNumber(value)
 }
@@ -506,11 +512,11 @@ async function leave() {
           <span v-if="objectCounts?.physicalBlobs != null"><Copy /><b>{{ formatCount(objectCounts.physicalBlobs) }}</b> {{ objectCounts.physicalBlobs === 1 ? 'physical blob location' : 'physical blob locations' }}</span>
         </OverviewCell>
         <OverviewCell label="Datasets" :icon="FileJson2" tone="aqua" :to="{ name: 'datasets', query: { group: group.group_id } }">
-          <template #value>{{ purposeCountLabel(usage.dataset_count) }}</template>
-          <span v-if="usage.profile_count != null"><ListChecks /><b>{{ formatCount(usage.profile_count) }}</b> {{ usage.profile_count === 1 ? 'profile' : 'profiles' }}</span>
+          <template #value>{{ purposeCountLabel(purposeCounts.datasets) }}</template>
+          <span v-if="purposeCounts.profiles != null"><ListChecks /><b>{{ formatCount(purposeCounts.profiles) }}</b> {{ purposeCounts.profiles === 1 ? 'profile' : 'profiles' }}</span>
         </OverviewCell>
         <OverviewCell label="Runs" :icon="Workflow" tone="ok" info="Process runs this group has recorded.">
-          <template #value>{{ purposeCountLabel(usage.process_run_count) }}</template>
+          <template #value>{{ purposeCountLabel(purposeCounts.runs) }}</template>
           <span v-if="groupRuns.length && recentRuns.state.value === 'ready'"><CircleCheck class="text-status-ok" /><b>{{ completedRuns }}/{{ groupRuns.length }}</b> recent completed</span>
         </OverviewCell>
       </div>
