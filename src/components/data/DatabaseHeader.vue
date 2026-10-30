@@ -40,6 +40,8 @@ const title = computed(() => {
 const description = computed(() => described.value?.description ?? '')
 // An SPDX id reads as its license page, so every license is a link.
 const license = computed(() => licenseUrl(described.value?.license ?? ''))
+// A license without a short name reads "License" rather than its whole address.
+const licenseLabel = computed(() => (licenseText(license.value) === license.value ? 'License' : licenseText(license.value)))
 const identifiers = computed(() => (described.value?.identifiers ?? []).map((item) => ({ ...item, url: identifierUrl(item) })))
 </script>
 
@@ -68,7 +70,7 @@ const identifiers = computed(() => (described.value?.identifiers ?? []).map((ite
     </div>
     <div v-if="license || entry?.datasetId" class="flex flex-wrap items-center gap-2">
       <Button v-if="license && isHttpUrl(license)" size="sm" variant="outline" as-child>
-        <a :href="license" target="_blank" rel="noopener noreferrer" :aria-label="`Open the license ${licenseText(license)}`"><Scale class="h-4 w-4" /> {{ licenseText(license) }} <ExternalLink class="h-3.5 w-3.5" /></a>
+        <a :href="license" target="_blank" rel="noopener noreferrer" :aria-label="`Open the license ${licenseText(license)}`"><Scale class="h-4 w-4" /> {{ licenseLabel }} <ExternalLink class="h-3.5 w-3.5" /></a>
       </Button>
       <span v-else-if="license" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Scale class="h-3.5 w-3.5" aria-hidden="true" />{{ licenseText(license) }}</span>
       <Button v-if="entry?.datasetId" size="sm" variant="outline" as-child>

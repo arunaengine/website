@@ -24,6 +24,8 @@ describe('database header', () => {
     expect(text).toContain('RefSeq assemblies')
     expect(html).toContain('aria-label="Open the license')
     expect(html).toContain('href="https://doi.org/10.1093/nar/gkv1189"')
+    expect(text).toContain(' License ')
+    expect(text).not.toContain(' https://www.ncbi.nlm.nih.gov/home/about/policies/ ')
     expect(text).toContain('Public')
     expect(html).toContain('href="https://www.ncbi.nlm.nih.gov/home/about/policies/"')
     expect(text).not.toContain('·')
