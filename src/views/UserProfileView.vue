@@ -1,20 +1,23 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Avatar from '@/components/ui/Avatar.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import Button from '@/components/ui/Button.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import IconTile from '@/components/ui/IconTile.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import { useAruna, colorFor, initials } from '@/composables/useAruna'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { shortUserId } from '@/lib/utils'
 import type { GetUserResponse } from '@/lib/api'
-import { ExternalLink, UserRound } from '@lucide/vue'
+import { Building2, ChevronRight, ExternalLink, Mail, Pencil, RefreshCw, ShieldCheck, UserRound, Users } from '@lucide/vue'
 
 const route = useRoute()
-const { currentUser, sessionEpoch } = useAruna()
+const { currentUser, sessionEpoch, apiGroups, canInspectUsers } = useAruna()
 const { resolveUser } = useUserDirectory()
 
 const userId = computed(() => (route.params.id as string) || '')
@@ -40,6 +43,20 @@ watch([userId, sessionEpoch], ([id]) => { if (id) void load(id) }, { immediate: 
 
 const attributes = computed(() => user.value?.attributes ?? {})
 const isSelf = computed(() => currentUser.value?.id === userId.value)
+const crumbs = computed(() => [
+  ...(canInspectUsers.value ? [{ label: 'Users', to: { name: 'admin-users' } }] : []),
+  { label: user.value?.name ?? 'User profile' },
+])
+// The groups whose roles name this user among those the caller can read.
+const sharedGroups = computed(() =>
+  apiGroups.value
+    .map((group) => ({
+      groupId: group.group_id,
+      name: group.display_name,
+      roles: (group.roles ?? []).filter((role) => role.assigned_users?.includes(userId.value)).map((role) => role.name),
+    }))
+    .filter((entry) => entry.roles.length > 0),
+)
 const askPrompt = computed(() =>
   user.value
     ? `Summarize the datasets and activity of "${user.value.name}" in this realm.`
@@ -49,60 +66,69 @@ const askPrompt = computed(() =>
 
 <template>
   <div>
-    <PageHeader :title="user?.name ?? 'User profile'" description="Public profile resolved from this realm's user directory." :docs="{ topic: 'portal-tour' }">
+    <PageHeader :title="user?.name ?? 'User profile'" :crumbs="crumbs" :docs="{ topic: 'portal-tour' }">
+      <template v-if="user" #title>
+        <span class="inline-flex flex-wrap items-center gap-3">
+          <Avatar :user="{ name: user.name, initials: initials(user.name), avatarColor: colorFor(user.user_id) }" size="md" />
+          {{ user.name }}
+          <span v-if="isSelf" class="text-sm font-normal text-muted-foreground">(you)</span>
+        </span>
+      </template>
+      <template v-if="user" #description>
+        <span class="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span v-if="attributes.affiliation" class="inline-flex items-center gap-1.5"><Building2 class="size-4" />{{ attributes.affiliation }}</span>
+          <a v-if="attributes.email" :href="`mailto:${attributes.email}`" class="inline-flex items-center gap-1.5 hover:text-foreground hover:underline"><Mail class="size-4" />{{ attributes.email }}</a>
+          <a
+            v-if="attributes.orcid"
+            :href="`https://orcid.org/${attributes.orcid}`"
+            target="_blank"
+            rel="noopener"
+            class="inline-flex items-center gap-1.5 hover:text-foreground hover:underline"
+          >
+            <ExternalLink class="size-4" />ORCID {{ attributes.orcid }}
+          </a>
+          <span class="inline-flex items-center gap-1.5 font-mono text-xs" :title="user.user_id">{{ shortUserId(user.user_id) }}<CopyButton :value="user.user_id" label="Copy user ID" /></span>
+        </span>
+      </template>
       <template #actions>
         <AskAiButton :prompt="askPrompt" :subject="`user ${userId}`" size="default" />
+        <Button v-if="isSelf" variant="outline" as-child>
+          <RouterLink :to="{ name: 'settings', query: { tab: 'profile' } }"><Pencil class="h-4 w-4" /> Edit profile</RouterLink>
+        </Button>
       </template>
     </PageHeader>
 
-    <div class="w-full px-4 sm:px-6 py-8">
+    <div class="w-full px-4 py-6 sm:px-6">
       <div v-if="loading" class="space-y-3">
         <Skeleton class="h-20" />
         <Skeleton class="h-32" />
       </div>
 
-      <section v-else-if="failed" class="surface mx-auto max-w-xl p-8 text-center">
-        <UserRound class="mx-auto h-8 w-8 text-muted-foreground/70" />
-        <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">User not found</h2>
-        <p class="mt-1.5 text-sm text-muted-foreground">
-          This user does not exist in your realm, or you are not signed in with an account that may resolve it.
-        </p>
-        <Button variant="outline" size="sm" class="mt-4" @click="load(userId, true)">Try again</Button>
-      </section>
+      <EmptyState v-else-if="failed" title="This user is not in your realm, or you may not look them up.">
+        <template #icon><UserRound class="size-6" /></template>
+        <Button variant="outline" size="sm" @click="load(userId, true)"><RefreshCw class="h-3.5 w-3.5" /> Try again</Button>
+      </EmptyState>
 
-      <section v-else-if="user" class="surface p-6">
-        <div class="flex items-start gap-4">
-          <Avatar :user="{ name: user.name, initials: initials(user.name), avatarColor: colorFor(user.user_id) }" size="lg" />
-          <div class="min-w-0 flex-1">
-            <h2 class="font-display text-xl font-semibold tracking-tight text-aruna-navy">
-              {{ user.name }}
-              <span v-if="isSelf" class="ml-1 text-xs font-normal text-muted-foreground">(you)</span>
-            </h2>
-            <div v-if="attributes.affiliation" class="mt-0.5 text-sm text-muted-foreground">{{ attributes.affiliation }}</div>
-            <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
-              <a v-if="attributes.email" :href="`mailto:${attributes.email}`" class="text-primary hover:underline">{{ attributes.email }}</a>
-              <a
-                v-if="attributes.orcid"
-                :href="`https://orcid.org/${attributes.orcid}`"
-                target="_blank"
-                rel="noopener"
-                class="inline-flex items-center gap-1 text-primary hover:underline"
-              >
-                ORCID {{ attributes.orcid }} <ExternalLink class="h-3 w-3" />
-              </a>
-            </div>
-          </div>
-        </div>
-
-        <div class="mt-6 rounded-md border border-border bg-muted/40 px-3 py-2">
-          <div class="text-[10px] uppercase tracking-wider text-muted-foreground">User ID</div>
-          <div class="flex items-center justify-between gap-2">
-            <span class="break-all font-mono text-[11px] text-foreground" :title="user.user_id">
-              {{ shortUserId(user.user_id) }} <span class="text-muted-foreground">· full ID via copy</span>
-            </span>
-            <CopyButton :value="user.user_id" label="Copy user ID" />
-          </div>
-        </div>
+      <section v-else-if="user" aria-labelledby="shared-groups-heading">
+        <SectionHeading id="shared-groups-heading" title="Shared groups" :icon="Users" info="Member lists are visible to members only, so this shows the groups you share." />
+        <EmptyState v-if="!sharedGroups.length" :title="isSelf ? 'You are not in a group yet.' : 'You share no groups with this user.'">
+          <template #icon><Users class="size-6" /></template>
+          <Button variant="outline" size="sm" as-child>
+            <RouterLink :to="{ name: 'groups' }"><Users class="h-3.5 w-3.5" /> Browse groups</RouterLink>
+          </Button>
+        </EmptyState>
+        <ul v-else class="surface divide-y divide-border-subtle overflow-hidden">
+          <li v-for="entry in sharedGroups" :key="entry.groupId">
+            <RouterLink :to="{ name: 'group', params: { id: entry.groupId } }" class="flex items-center gap-3 px-5 py-3 hover:bg-muted/40">
+              <IconTile :icon="Users" size="sm" />
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-sm font-medium text-foreground">{{ entry.name || entry.groupId }}</span>
+                <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><ShieldCheck class="size-3.5" />{{ entry.roles.join(', ') }}</span>
+              </span>
+              <ChevronRight class="h-4 w-4 shrink-0 text-muted-foreground" />
+            </RouterLink>
+          </li>
+        </ul>
       </section>
     </div>
   </div>
