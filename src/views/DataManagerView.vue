@@ -20,6 +20,7 @@ import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
 import NewBucketDialog from '@/components/desktop/NewBucketDialog.vue'
 import CreateBucketDialog from '@/components/data/CreateBucketDialog.vue'
 import BucketSidebar from '@/components/data/manager/BucketSidebar.vue'
+import BucketChooser from '@/components/data/manager/BucketChooser.vue'
 import NodePicker from '@/components/data/NodePicker.vue'
 import DeleteDialog from '@/components/data/DeleteDialog.vue'
 import FileDetailsDialog from '@/components/data/FileDetailsDialog.vue'
@@ -323,7 +324,7 @@ async function createFolder() {
         <!-- A narrow screen puts the node below the name instead of cutting the name short. -->
         <span class="flex min-w-0 flex-wrap items-baseline gap-x-2">
           <button
-            v-if="narrow && listReachable"
+            v-if="narrow && listReachable && bucket"
             type="button"
             class="inline-flex max-w-full items-center gap-1.5 hover:text-primary"
             aria-haspopup="dialog"
@@ -458,14 +459,17 @@ async function createFolder() {
           {{ sessionWarning }}
         </Notice>
 
+        <!-- A narrow view without an open bucket shows the list itself instead of the title picker. -->
         <BucketSidebar
-          v-if="!narrow"
+          v-if="!narrow || !bucket"
           :manager="manager"
           @sync-computer="openBindDialog"
           @new-bucket="newBucketOpen = true"
         />
 
+        <BucketChooser v-if="!bucket && !narrow" :manager="manager" />
         <ObjectBrowser
+          v-else-if="bucket"
           :manager="manager"
           :notebooks="notebooksView"
           @add-data="addDataOpen = true"

@@ -34,6 +34,7 @@ const children = [
   'desktop/NewBucketDialog',
   'data/CreateBucketDialog',
   'data/manager/BucketSidebar',
+  'data/manager/BucketChooser',
   'data/NodePicker',
   'data/DeleteDialog',
   'data/FileDetailsDialog',

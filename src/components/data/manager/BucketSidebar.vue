@@ -341,7 +341,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
       <Button size="sm" data-tour="bucket-create" @click="emit('new-bucket')"><FolderPlus class="h-4 w-4" /> New bucket</Button>
     </div>
     <!-- As tall as the files beside it; the list scrolls inside under the filter. -->
-    <div :class="sheet ? '' : 'relative min-h-[24rem] flex-1'">
+    <div :class="sheet ? '' : 'relative flex-1 lg:min-h-[24rem]'">
     <div :class="sheet ? '' : 'surface scrollbar-thin overflow-y-auto lg:absolute lg:inset-0'" :aria-busy="bucketsRefreshing">
       <div class="sticky top-0 z-10 flex items-center gap-2 bg-card px-3.5 pb-1 pt-3" :class="sheet ? 'bg-background' : ''">
         <Input
