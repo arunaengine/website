@@ -204,9 +204,12 @@ const headerTitle = computed(() => task.value?.name || truncateMiddle(props.task
 // What ran in one line: the tool and its version, then what the run says about itself.
 const headerSubtitle = computed(() => {
   const image = task.value?.executors?.[0]?.image ?? ''
-  const [name, version] = (image.split('/').pop() ?? '').split(/[:@]/)
+  // The tag names a version, a digest does not; a description naming the tool says it already.
+  const [name, version] = (image.split('/').pop() ?? '').split('@')[0]!.split(':')
+  const description = task.value?.description ?? ''
+  const tool = name && !description.includes(name) ? [name, version].filter(Boolean).join(' ') : ''
   const notebook = sessionRuntime(task.value?.tags) !== null ? 'notebook session' : ''
-  return [name && [name, version].filter(Boolean).join(' '), task.value?.description, notebook].filter(Boolean).join(', ')
+  return [tool, description, notebook].filter(Boolean).join(', ')
 })
 const askPrompt = computed(
   () => `Explain this compute run ${task.value?.id || props.taskId}: its current state, placement verdict, and outputs.`,
@@ -963,59 +966,34 @@ async function confirmDelete() {
           <p v-else class="text-xs text-muted-foreground">No placement record for this run yet.</p>
         </section>
 
-        <!-- The tutorial points at what ran and what it printed together. -->
-        <div data-tutorial="run-executors" class="space-y-6">
-          <section>
-            <h3 class="mb-2 type-card-title">Execution</h3>
-            <div class="rounded-lg border border-border-subtle">
-              <div class="flex flex-wrap items-center gap-3 px-4 py-3">
-                <Server class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <div class="min-w-0 flex-1">
-                  <p class="text-sm font-medium text-foreground">{{ attemptLine }}</p>
-                  <p class="text-xs text-muted-foreground">{{ exitLine }}</p>
-                </div>
-                <template v-for="(_, i) in task.executors" :key="i">
-                  <Button v-if="executorStdout(i) || executorStderr(i) || systemLogLines.length" variant="outline" size="sm" @click="openLog(i)">
-                    <SquareTerminal class="h-3.5 w-3.5" /> Logs<template v-if="task.executors.length > 1"> {{ i + 1 }}</template>
-                  </Button>
-                </template>
+        <section data-tutorial="run-executors">
+          <h3 class="mb-2 type-card-title">Execution</h3>
+          <div class="rounded-lg border border-border-subtle">
+            <div class="flex flex-wrap items-center gap-3 px-4 py-3">
+              <Server class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-foreground">{{ attemptLine }}</p>
+                <p class="text-xs text-muted-foreground">{{ exitLine }}</p>
               </div>
-              <div v-if="executorStdout(0) || stderrSummary(0)" class="space-y-2 border-t border-border-subtle px-4 py-3">
-                <div v-if="executorStdout(0)" class="relative">
-                  <p class="type-label">
-                    {{ executorStderr(0) ? 'stdout' : 'output' }}<span v-if="hidden(executorStdout(0))">, last {{ tail(executorStdout(0)).length }} lines</span>
-                  </p>
-                  <pre class="mt-1 overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-muted/50 p-3 font-mono text-xs leading-relaxed">{{ tail(executorStdout(0)).join('\n') }}</pre>
-                </div>
-                <p v-if="stderrSummary(0)" class="truncate font-mono text-xs text-destructive" :title="executorStderr(0)">
-                  stderr: {{ stderrSummary(0) }}
-                </p>
-              </div>
+              <template v-for="(_, i) in task.executors" :key="i">
+                <Button v-if="executorStdout(i) || executorStderr(i) || systemLogLines.length" variant="outline" size="sm" @click="openLog(i)">
+                  <SquareTerminal class="h-3.5 w-3.5" /> Logs<template v-if="task.executors.length > 1"> {{ i + 1 }}</template>
+                </Button>
+              </template>
             </div>
-          </section>
-
-          <section>
-            <h3 class="mb-2 type-card-title">What ran</h3>
-            <div class="space-y-4">
-              <DetailList v-for="(executor, i) in task.executors" :key="i" :items="executorDetails(i)">
-                <template #command>
-                  <code class="block whitespace-pre-wrap break-all rounded-md bg-muted/50 px-3 py-2 font-mono text-xs leading-relaxed">{{ executor.command.join(' ') }}</code>
-                </template>
-              </DetailList>
-              <div v-if="task.inputs?.length">
-                <p class="type-label">Inputs</p>
-                <ul class="mt-1 divide-y divide-border-subtle rounded-lg border border-border-subtle">
-                  <li v-for="(input, i) in task.inputs" :key="`${input.path}:${i}`" class="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-2.5 text-xs">
-                    <span class="min-w-0 flex-1 truncate font-mono text-foreground" :title="input.path">{{ input.path }}</span>
-                    <RouterLink v-if="inputLink(input.url)" :to="inputLink(input.url)!" class="min-w-0 truncate font-mono text-primary hover:underline" :title="input.url">{{ input.url }}</RouterLink>
-                    <span v-else-if="input.url" class="min-w-0 truncate font-mono text-muted-foreground" :title="input.url">{{ input.url }}</span>
-                    <span v-else class="text-muted-foreground">Inline content</span>
-                  </li>
-                </ul>
-        </div>
+            <div v-if="executorStdout(0) || stderrSummary(0)" class="space-y-2 border-t border-border-subtle px-4 py-3">
+              <div v-if="executorStdout(0)" class="relative">
+                <p class="type-label">
+                  {{ executorStderr(0) ? 'stdout' : 'output' }}<span v-if="hidden(executorStdout(0))">, last {{ tail(executorStdout(0)).length }} lines</span>
+                </p>
+                <pre class="mt-1 overflow-x-auto whitespace-pre rounded-md bg-muted/50 p-3 font-mono text-xs leading-relaxed">{{ tail(executorStdout(0)).join('\n') }}</pre>
+              </div>
+              <p v-if="stderrSummary(0)" class="truncate font-mono text-xs text-destructive" :title="executorStderr(0)">
+                stderr: {{ stderrSummary(0) }}
+              </p>
+            </div>
           </div>
         </section>
-        </div>
 
         <section data-tutorial="run-artifacts">
           <h3 class="mb-2 type-card-title">Results</h3>
@@ -1114,6 +1092,28 @@ async function confirmDelete() {
               </div>
             </div>
           </details>
+        </section>
+
+        <section>
+          <h3 class="mb-2 type-card-title">What ran</h3>
+          <div class="space-y-4">
+            <DetailList v-for="(executor, i) in task.executors" :key="i" :items="executorDetails(i)">
+              <template #command>
+                <code class="block whitespace-pre-wrap break-all rounded-md bg-muted/50 px-3 py-2 font-mono text-xs leading-relaxed">{{ executor.command.join(' ') }}</code>
+              </template>
+            </DetailList>
+            <div v-if="task.inputs?.length">
+              <p class="type-label">Inputs</p>
+              <ul class="mt-1 divide-y divide-border-subtle rounded-lg border border-border-subtle">
+                <li v-for="(input, i) in task.inputs" :key="`${input.path}:${i}`" class="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-2.5 text-xs">
+                  <span class="min-w-0 flex-1 truncate font-mono text-foreground" :title="input.path">{{ input.path }}</span>
+                  <RouterLink v-if="inputLink(input.url)" :to="inputLink(input.url)!" class="min-w-0 truncate font-mono text-primary hover:underline" :title="input.url">{{ input.url }}</RouterLink>
+                  <span v-else-if="input.url" class="min-w-0 truncate font-mono text-muted-foreground" :title="input.url">{{ input.url }}</span>
+                  <span v-else class="text-muted-foreground">Inline content</span>
+                </li>
+              </ul>
+            </div>
+          </div>
         </section>
 
         <details data-tutorial="run-details" class="text-sm">

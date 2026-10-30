@@ -99,9 +99,8 @@ describe('compute tutorial walkthrough', () => {
     // Past the last stage, plus a poll of the panel's own five second timer.
     await advance(RUN_STAGE_MS * 4)
 
-    const stages = content(anchor(mounted.root, 'run-executors'))
-    expect(stages).toContain('python:3.12-slim')
-    expect(stages).toContain('merged 1440 readings from 2 stations')
+    expect(content(mounted.root)).toContain('python:3.12-slim')
+    expect(content(anchor(mounted.root, 'run-executors'))).toContain('merged 1440 readings from 2 stations')
 
     const details = content(anchor(mounted.root, 'run-details'))
     expect(details).toContain('Created')
