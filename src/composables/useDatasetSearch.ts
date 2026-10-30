@@ -394,12 +394,17 @@ export function useDatasetSearch(searchBox: Ref<{ focus: () => void } | null>) {
 
   const browseSummary = computed(() => {
     const shown = hits.value.length
+    // Favourites are fetched by id, so only the server estimate reads "about".
+    const about = favouritesOnly.value ? '' : 'about '
+    const pages = pageCount.value === null ? '' : ` of ${about}${formatNumber(pageCount.value)}`
+    // Filters narrow each served page, so rows here say nothing about offsets or totals.
+    if (shown < browseSource.value.length) {
+      return `${formatNumber(shown)} ${shown === 1 ? 'dataset' : 'datasets'} on page ${formatNumber(browsePage.value)}${pages}`
+    }
     const range = pageRange(browsePage.value, BROWSE_PAGE_SIZE, shown, !hasNextPage.value)
     const noun = shown === 1 && !hasNextPage.value && browsePage.value === 1 ? 'dataset' : 'datasets'
     if (pageCount.value === null || !hasNextPage.value) return `${range} ${noun}`
-    // Favourites are fetched by id, so only the server estimate reads "about".
-    const about = favouritesOnly.value ? '' : 'about '
-    return `${range} ${noun}, page ${formatNumber(browsePage.value)} of ${about}${formatNumber(pageCount.value)}`
+    return `${range} ${noun}, page ${formatNumber(browsePage.value)}${pages}`
   })
 
   function goToPage(page: number) {
