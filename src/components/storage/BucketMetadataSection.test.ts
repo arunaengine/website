@@ -2,6 +2,7 @@ import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as Databases from '@/lib/databases'
+import * as Licenses from '@/lib/licenses'
 import { button, click, compileClientComponent, content, element, flush, mountApp, moduleDefault, typeValue } from '@/test/clientRender'
 
 const stored = { database: false, title: 'Old title', license: null, identifiers: [] }
@@ -20,6 +21,16 @@ const Field = defineComponent({
   setup: (props, { attrs, emit }) => () =>
     h('input', { ...attrs, value: props.modelValue, onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value) }),
 })
+// The license picker hands back the value it was given with the picked link.
+const LicenseStub = defineComponent({
+  props: { modelValue: Object, presets: Array },
+  emits: ['update:modelValue'],
+  setup: (props, { emit }) => () =>
+    h('select', {
+      'data-license': (props.modelValue as { value: string }).value,
+      onChange: (event: { target: { value: string } }) => emit('update:modelValue', { ...(props.modelValue as object), value: event.target.value }),
+    }, (props.presets as { value: string; label: string }[]).map((preset) => h('option', { value: preset.value }, preset.label))),
+})
 const RULES = { rules: [{ name: 'BioSample', pattern: 'SAMN\\d+', url: 'https://example.org/{0}' }] }
 const EditorStub = defineComponent({
   emits: ['save'],
@@ -28,6 +39,9 @@ const EditorStub = defineComponent({
 
 const component = compileClientComponent(new URL('./BucketMetadataSection.vue', import.meta.url), {
   vue: VueRuntime,
+  'vue-router': { RouterLink: defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()) }) },
+  '@/components/metadata/editor/ValueInput.vue': moduleDefault(LicenseStub),
+  '@/lib/crate/editor': { LICENSE_PRESETS: [{ value: 'https://creativecommons.org/licenses/by/4.0/', label: 'CC BY 4.0' }] },
   '@/components/settings/IdentifierLinksEditor.vue': moduleDefault(EditorStub),
   '@/components/storage/BucketReleases.vue': moduleDefault(Slotted('div')),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
@@ -44,8 +58,8 @@ const component = compileClientComponent(new URL('./BucketMetadataSection.vue', 
     props: { title: String, count: String, info: String },
     setup: (props, { slots }) => () => h('div', [h('h2', props.title), props.count ?? '', props.info ? h('i', { 'data-info': props.info }) : null, slots.actions?.()]),
   })),
-  '@/lib/licenses': { licenseText: (value: string) => value },
-  '@lucide/vue': { FileText: Slotted('i'), Link2: Slotted('i') },
+  '@/lib/licenses': Licenses,
+  '@lucide/vue': { FileJson2: Slotted('i'), FileText: Slotted('i'), Link2: Slotted('i') },
   '@/components/ui/Switch.vue': moduleDefault(Slotted('span')),
   '@/composables/useAruna': { useAruna: () => ({ ...aruna, sessionEpoch: ref(1) }) },
   '@/composables/useDatabases': { useDatabases: () => ({ reload: vi.fn() }) },
@@ -113,6 +127,38 @@ describe('bucket metadata links', () => {
     const linked = await mountApp(component, { props: { bucket: 'other', nodeId: null, canAdmin: false } })
     await flush()
     expect(anchors(linked.root)).toContainEqual({ href: 'https://example.org/db', text: 'https://example.org/db' })
+  })
+
+  it('shows the license as a link with its SPDX id, every identifier and the dataset record', async () => {
+    const ena = { name: 'ENA', value: 'PRJEB1234', url: 'https://www.ebi.ac.uk/ena/browser/view/PRJEB1234' }
+    aruna.getBucketMetadata.mockResolvedValue({ ...stored, license: 'CC-BY-4.0', identifiers: [doi, ena], dataset: '01M63099Q2000108CB51QQDB2P' })
+    const { root } = await mountApp(component, { props: { bucket: 'bakta-database', nodeId: null, canAdmin: false } })
+    await flush()
+
+    expect(anchors(root)).toContainEqual({ href: 'https://creativecommons.org/licenses/by/4.0/', text: 'CC BY 4.0' })
+    expect(content(root)).toContain('CC-BY-4.0')
+    expect(anchors(root)).toContainEqual({ href: ena.url, text: 'PRJEB1234' })
+    const record = element(root, (node) => node.tag === 'a' && content(node).includes('Open the dataset'))
+    expect(JSON.parse(String(record.props['data-to']))).toEqual({ name: 'dataset', params: { id: '01M63099Q2000108CB51QQDB2P' } })
+  })
+
+  it('picks the license from the presets and refuses a DOI or link it cannot read', async () => {
+    aruna.getBucketMetadata.mockResolvedValue(stored)
+    aruna.putBucketMetadata.mockReset().mockImplementation(async (_bucket: string, next: unknown) => next)
+    const { root } = await mountApp(component, { props: { bucket: 'reads', nodeId: null, canAdmin: true } })
+    await flush()
+    const picker = element(root, (node) => node.tag === 'select')
+    ;(picker.props.onChange as (event: { target: { value: string } }) => void)({ target: { value: 'https://creativecommons.org/licenses/by/4.0/' } })
+    await typeValue(element(root, (node) => node.tag === 'input' && node.props.id === 'bucket-page'), 'not a doi')
+    await flush()
+
+    expect(content(root)).toContain('Enter a DOI such as')
+    expect(button(root, 'Save').props.disabled).toBe(true)
+
+    await typeValue(element(root, (node) => node.tag === 'input' && node.props.id === 'bucket-page'), '10.5281/zenodo.14916843')
+    await click(button(root, 'Save'))
+    await flush()
+    expect(aruna.putBucketMetadata.mock.calls[0][1]).toMatchObject({ license: 'https://creativecommons.org/licenses/by/4.0/', identifiers: [doi] })
   })
 
   it('offers the saved DOI as a link next to the field of an admin', async () => {

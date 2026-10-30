@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { licenseLabelOf, licenseText, wellKnownLicense } from './licenses'
+import { licenseLabelOf, licenseText, licenseUrl, spdxId, wellKnownLicense } from './licenses'
 
 describe('wellKnownLicense', () => {
   it('maps cc licenses', () => {
@@ -53,5 +53,23 @@ describe('license text', () => {
     expect(licenseText('https://creativecommons.org/licenses/by/4.0/')).toBe('CC BY 4.0')
     expect(licenseText('MIT')).toBe('MIT')
     expect(licenseLabelOf('CC-BY-4.0')).toBe('CC BY 4.0')
+  })
+})
+
+describe('license links and SPDX ids', () => {
+  it('links an SPDX id to its license page and keeps a link as given', () => {
+    expect(licenseUrl('CC-BY-4.0')).toBe('https://creativecommons.org/licenses/by/4.0/')
+    expect(licenseUrl('CC0-1.0')).toBe('https://creativecommons.org/publicdomain/zero/1.0/')
+    expect(licenseUrl('MIT')).toBe('https://spdx.org/licenses/MIT.html')
+    expect(licenseUrl('https://example.org/terms')).toBe('https://example.org/terms')
+  })
+
+  it('names the SPDX id of the picker links, and none for other links', () => {
+    expect(spdxId('https://creativecommons.org/licenses/by-sa/4.0/')).toBe('CC-BY-SA-4.0')
+    expect(spdxId('https://creativecommons.org/publicdomain/zero/1.0/')).toBe('CC0-1.0')
+    expect(spdxId('https://spdx.org/licenses/MIT.html')).toBe('MIT')
+    expect(spdxId('https://www.apache.org/licenses/LICENSE-2.0')).toBe('Apache-2.0')
+    expect(spdxId('CC-BY-4.0')).toBe('CC-BY-4.0')
+    expect(spdxId('https://example.org/terms')).toBeNull()
   })
 })
