@@ -56,7 +56,7 @@ import {
 import { sessionRuntime } from '@/lib/notebook/submit'
 import { objectHref } from '@/lib/assistant/objectLinks'
 import { asyncChunkError } from '@/lib/chunk-recovery'
-import { errorMessage, formatBytes, formatClock, formatDateTime, formatDuration, formatResourceGb, relativeTime, truncateMiddle } from '@/lib/utils'
+import { errorMessage, formatBytes, formatClock, formatDateTime, formatDuration, formatNumber, formatResourceGb, relativeTime, truncateMiddle } from '@/lib/utils'
 import {
   ArrowLeftRight,
   Ban,
@@ -396,7 +396,8 @@ const placementInfo = computed(() => {
 const attemptLine = computed(() => {
   const count = nativeJob.value?.attempts || task.value?.logs?.length || 0
   if (!count) return 'Not started yet'
-  return executorKind.value ? `Attempt ${count} on ${executorKind.value}` : `Attempt ${count}`
+  const kind = executorKind.value
+  return kind ? `Attempt ${count} on ${kind.charAt(0).toUpperCase()}${kind.slice(1)}` : `Attempt ${count}`
 })
 const exitLine = computed(() => {
   if (exitCode.value !== undefined) return `Exit code ${exitCode.value}`
@@ -943,7 +944,7 @@ async function confirmDelete() {
             </p>
             <details v-if="placementInputs.length" class="mt-3 text-sm">
               <summary class="cursor-pointer font-medium text-foreground">
-                {{ placementInputs.length }} {{ placementInputs.length === 1 ? 'input' : 'inputs' }}, {{ formatBytes(stayedBytes + movedBytes) }}
+                {{ formatNumber(placementInputs.length) }} {{ placementInputs.length === 1 ? 'input file' : 'input files' }}, {{ formatBytes(stayedBytes + movedBytes) }}
               </summary>
               <ul class="mt-2 divide-y divide-border-subtle rounded-lg border border-border-subtle">
                 <li v-for="(input, i) in placementInputs.slice(0, INPUTS_SHOWN)" :key="`${input.destination_key}:${i}`" class="flex items-center gap-3 px-3 py-2.5">
