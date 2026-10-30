@@ -12,6 +12,9 @@ import Spinner from '@/components/ui/Spinner.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useFileOrigin, type OriginTarget } from '@/composables/useFileOrigin'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import { useTes } from '@/composables/useTes'
+import { TES_STATE_META, type TesState } from '@/lib/tes'
+import { CircleCheck, CircleX, LoaderCircle } from '@lucide/vue'
 import { s3ErrorMessage, useS3 } from '@/composables/useS3'
 import { ARUNA_CONTENT_W3ID_PREFIX, versionObjectId } from '@/lib/contentIdentity'
 import { hopFrom, originFrom, projectionRows } from '@/lib/fileOrigin'
@@ -75,6 +78,33 @@ async function download() {
     downloadError.value = s3ErrorMessage(cause)
   }
 }
+// The run that wrote the file, read once per answer: its name and state for one chip that opens
+// the run. A run that cannot be read keeps the id line below.
+const { getRun, sessionEpoch } = useAruna()
+const { getTask } = useTes()
+const run = ref<{ taskId: string; name: string; state: TesState } | null>(null)
+let runRead = 0
+watch(() => found.origin.value, async (answer) => {
+  const read = ++runRead
+  const epoch = sessionEpoch.value
+  run.value = null
+  const origin = answer?.origin
+  if (origin?.kind !== 'job') return
+  const record = await getRun(origin.run_id).catch(() => null)
+  const taskId = record?.logical_job_id
+  const task = taskId ? await getTask(taskId, 'BASIC').catch(() => null) : null
+  if (read !== runRead || epoch !== sessionEpoch.value || !taskId || !task) return
+  run.value = { taskId, name: task.name || origin.run_id, state: task.state ?? 'UNKNOWN' }
+}, { immediate: true })
+const RUNNING: TesState[] = ['QUEUED', 'INITIALIZING', 'RUNNING', 'PAUSED', 'CANCELING']
+const runMark = computed(() => {
+  const state = run.value?.state
+  if (!state || state === 'UNKNOWN') return null
+  const label = TES_STATE_META[state].label
+  if (state === 'COMPLETE') return { icon: CircleCheck, color: 'text-status-ok', label }
+  if (RUNNING.includes(state)) return { icon: LoaderCircle, color: 'text-status-running motion-safe:animate-spin', label }
+  return { icon: CircleX, color: 'text-status-failed', label }
+})
 // A version minted without a record is said so, never guessed.
 const recorded = computed(() => Boolean(origin.value || hop.value))
 </script>
@@ -86,7 +116,17 @@ const recorded = computed(() => Boolean(origin.value || hop.value))
     <p v-else-if="found.state.value === 'failed'" class="text-xs text-muted-foreground">The origin could not be read: {{ found.error.value }}</p>
     <template v-else>
       <div class="space-y-0.5 text-xs">
-        <OriginLine v-if="origin" short :origin="origin" />
+        <p v-if="run" class="flex flex-wrap items-center gap-1.5">
+          Written by
+          <RouterLink
+            :to="{ name: 'task', params: { taskId: run.taskId } }"
+            class="inline-flex items-center gap-1.5 rounded-md border border-border-subtle px-2 py-0.5 text-foreground hover:border-primary/40"
+          >
+            <component :is="runMark.icon" v-if="runMark" :class="['size-3.5 shrink-0', runMark.color]" role="img" :aria-label="runMark.label" />
+            {{ run.name }}
+          </RouterLink>
+        </p>
+        <OriginLine v-else-if="origin" short :origin="origin" />
         <OriginLine v-if="hop" short :origin="hop" />
         <p v-if="!recorded" class="text-muted-foreground">Not recorded for this version.</p>
       </div>

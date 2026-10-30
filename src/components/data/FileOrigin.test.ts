@@ -5,18 +5,24 @@ import type { OriginResponse } from '@/lib/api'
 import * as ContentIdentity from '@/lib/contentIdentity'
 import * as FileOriginLib from '@/lib/fileOrigin'
 import * as Utils from '@/lib/utils'
-import { button, click, compileClientComponent, content, mountApp, moduleDefault } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
 
 const origin = ref<OriginResponse | null>(null)
 const state = ref('ready')
 const downloadUrl = vi.fn(async () => 'https://s3.test/signed')
+const getRun = vi.fn(async (_id: string): Promise<{ logical_job_id?: string }> => ({}))
+const getTask = vi.fn(async (_id: string, _view: string) => ({ name: 'Annotate with Bakta', state: 'COMPLETE' }))
+const Icon = (name: string) => defineComponent({ inheritAttrs: false, setup: (_, { attrs }) => () => h('i', { ...attrs, 'data-icon': name }) })
 
 const Marker = (text: string) => defineComponent({ props: { globalUrl: String }, setup: (props) => () => h('section', `${text} ${props.globalUrl ?? ''}`) })
 
 const component = compileClientComponent(new URL('./FileOrigin.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/ExternalLink.vue': { __esModule: true, default: defineComponent({ props: { href: String, label: String }, setup: (props) => () => h('a', { href: props.href }, props.label) }) },
-  'vue-router': { RouterLink: defineComponent((_, { slots }) => () => h('a', slots.default?.())) },
+  'vue-router': { RouterLink: defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => h('a', { to: props.to }, slots.default?.()) }) },
+  '@lucide/vue': { CircleCheck: Icon('check'), CircleX: Icon('cross'), LoaderCircle: Icon('loader') },
+  '@/composables/useTes': { useTes: () => ({ getTask }) },
+  '@/lib/tes': { TES_STATE_META: { COMPLETE: { label: 'Complete' }, RUNNING: { label: 'Running' }, SYSTEM_ERROR: { label: 'System error' } } },
   '@/components/data/OriginLine.vue': moduleDefault(Marker('origin line')),
   '@/components/distributed/GlobalId.vue': moduleDefault(Marker('global id')),
   '@/components/data/ProvenanceView.vue': moduleDefault(
@@ -26,7 +32,7 @@ const component = compileClientComponent(new URL('./FileOrigin.vue', import.meta
   '@/components/ui/DetailDialog.vue': moduleDefault(
     defineComponent({ props: { open: Boolean }, setup: (props, { slots }) => () => (props.open ? h('dialog', [slots.header?.(), slots.default?.()]) : null) }),
   ),
-  '@/composables/useAruna': { useAruna: () => ({ realmInfo: ref({ realm_id: 'realm1' }) }) },
+  '@/composables/useAruna': { useAruna: () => ({ realmInfo: ref({ realm_id: 'realm1' }), getRun, sessionEpoch: ref(1) }) },
   '@/lib/contentIdentity': ContentIdentity,
   '@/components/ui/Spinner.vue': moduleDefault(defineComponent(() => () => h('i'))),
   '@/composables/useS3': { useS3: () => ({ downloadUrl }), s3ErrorMessage: (cause: unknown) => String(cause) },
@@ -120,5 +126,33 @@ describe('file origin provenance', () => {
     await click(button(root, 'Where it came from'))
 
     expect(content(root)).toContain('provenance https://w3id.org/aruna/data/realm1/01K8Y2')
+  })
+})
+
+describe('file origin run', () => {
+  it('names the run that wrote the file as one chip with its state, linking the run', async () => {
+    state.value = 'ready'
+    getRun.mockResolvedValueOnce({ logical_job_id: 't1' })
+    origin.value = response({ origin: { kind: 'job', run_id: 'r1' } })
+    const root = await render()
+    await flush()
+
+    const chip = element(root, (node) => node.tag === 'a' && content(node).includes('Annotate with Bakta'))
+    expect(chip.props.to).toEqual({ name: 'task', params: { taskId: 't1' } })
+    expect(element(chip, (node) => node.props['data-icon'] === 'check').props['aria-label']).toBe('Complete')
+    expect(content(root)).toContain('Written by')
+    expect(content(root)).not.toContain('origin line')
+    expect(getTask).toHaveBeenCalledWith('t1', 'BASIC')
+  })
+
+  it('keeps the run id line when the run cannot be read', async () => {
+    state.value = 'ready'
+    getRun.mockRejectedValueOnce(new Error('403'))
+    origin.value = response({ origin: { kind: 'job', run_id: 'r2' } })
+    const root = await render()
+    await flush()
+
+    expect(content(root)).toContain('origin line')
+    expect(content(root)).not.toContain('Written by')
   })
 })
