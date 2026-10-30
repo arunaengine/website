@@ -10,6 +10,7 @@ import DropdownMenuLabel from '@/components/ui/DropdownMenuLabel.vue'
 import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import Input from '@/components/ui/Input.vue'
+import Tooltip from '@/components/ui/Tooltip.vue'
 import SearchHint from '@/components/data/manager/SearchHint.vue'
 import type { DataManager } from '@/composables/useDataManager'
 import { filtersChanged, type ListingShow } from '@/lib/objectListing'
@@ -17,6 +18,7 @@ import { useDebounceFn, useElementSize } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import {
   Check,
+  Info,
   ListFilter,
   Search,
   X,
@@ -91,8 +93,7 @@ function onEscape() {
         v-model="text"
         :placeholder="placeholder"
         aria-label="Filter this folder or search the bucket"
-        class="h-8 pl-8 text-sm"
-        :class="text ? 'pr-7' : 'pr-2'"
+        class="h-8 pl-8 pr-7 text-sm"
         @keydown.esc="onEscape"
       />
       <button
@@ -104,6 +105,15 @@ function onEscape() {
       >
         <X class="h-3.5 w-3.5" />
       </button>
+      <Tooltip v-else label="Press Enter to search the whole bucket">
+        <button
+          type="button"
+          aria-label="Press Enter to search the whole bucket"
+          class="absolute right-1.5 top-1/2 inline-flex -translate-y-1/2 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+        >
+          <Info class="h-3.5 w-3.5" />
+        </button>
+      </Tooltip>
       <SearchHint v-if="hinting" :text="text" :folder="folder" :bucket="bucket" class="absolute inset-x-0 top-full z-20 mt-1 @max-[600px]:hidden" />
     </form>
     <DropdownMenu>

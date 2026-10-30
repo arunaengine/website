@@ -77,6 +77,7 @@ import {
   FlaskConical,
   FolderSync,
   Globe,
+  Info,
   KeyRound,
   Laptop,
   Link2,
@@ -204,6 +205,9 @@ const syncProblem = computed(() => {
 })
 const lastSync = computed(() =>
   syncsForKey('').map(({ relationship }) => relationship.status?.last_synced_at ?? '').filter(Boolean).sort().at(-1) ?? null)
+// Why nothing can be added here; Upload and New folder stay in place, disabled, with this hint.
+const addReason = computed(() =>
+  remoteBlocked.value ? 'This node cannot be browsed from here, so nothing can be added.' : !canWriteCurrentPrefix.value ? (writeRestrictionMessage.value ?? 'This session cannot add files here.') : null)
 const hinting = ref(false)
 const hintFolder = computed(() => prefix.value.split('/').at(-1) || bucket.value)
 
@@ -658,9 +662,6 @@ async function onDrop(event: DragEvent) {
         </p>
         <Button variant="outline" size="sm" @click="emit('new-bucket')"><Plus class="h-4 w-4" /> New bucket on a realm node</Button>
       </Notice>
-      <p v-if="writeRestrictionMessage" class="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-        {{ writeRestrictionMessage }}
-      </p>
 
       <div
         data-tour="bucket-dropzone"
@@ -690,9 +691,12 @@ async function onDrop(event: DragEvent) {
             <Button v-if="notebooks && !remoteNodeId" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" aria-label="New notebook" :title="writeRestrictionMessage ?? 'Create a notebook here'" @click="emit('new-notebook')"><NotebookPen class="h-4 w-4" /><span :class="toolbarLabel">New notebook</span></Button>
             <!-- Add data targets the connected node; another node's bucket takes files from a
                  picker, the same upload a drop on the list starts. -->
-            <Button v-if="!remoteBlocked" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix" aria-label="Upload" :title="writeRestrictionMessage ?? (remoteNodeId ? 'Upload files from this device' : 'Upload files or add data from other sources')" @click="upload"><Upload class="h-4 w-4" /><span :class="desktop ? '' : '@max-[360px]:sr-only'">Upload</span></Button>
+            <Button data-tour="bucket-add-data" size="sm" :disabled="Boolean(addReason)" aria-label="Upload" :title="addReason ?? (remoteNodeId ? 'Upload files from this device' : 'Upload files or add data from other sources')" @click="upload"><Upload class="h-4 w-4" /><span :class="desktop ? '' : '@max-[360px]:sr-only'">Upload</span></Button>
             <input ref="filePicker" type="file" multiple class="hidden" aria-hidden="true" tabindex="-1" @change="onPicked" />
-            <Button v-if="!remoteBlocked" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" aria-label="New folder" :title="writeRestrictionMessage ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /><span :class="toolbarLabel">New folder</span></Button>
+            <Button variant="outline" size="sm" :disabled="Boolean(addReason)" aria-label="New folder" :title="addReason ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /><span :class="toolbarLabel">New folder</span></Button>
+            <Tooltip v-if="addReason" :label="addReason">
+              <button type="button" class="inline-flex shrink-0 rounded-full text-muted-foreground hover:text-foreground" :aria-label="addReason"><Info class="size-4" /></button>
+            </Tooltip>
           </div>
         </div>
         <SearchHint v-if="hinting" :text="searchText" :folder="hintFolder" :bucket="bucket" class="mx-3 mb-2 hidden shadow-none @max-[600px]:block" />

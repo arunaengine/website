@@ -304,9 +304,12 @@ describe('object browser upload', () => {
     expect(target.value).toBe('')
   })
 
-  it('offers no Upload where the node cannot be browsed from here', async () => {
+  it('keeps Upload in place but disabled, with the reason, where the node cannot be browsed', async () => {
     const root = await render({ remoteNodeId: ref('store-1'), remoteBlocked: ref(true) })
-    expect(() => action(root, 'Upload')).toThrow()
+    const upload = action(root, 'Upload')
+    expect(upload.props.disabled).toBe(true)
+    expect(upload.props.title).toBe('This node cannot be browsed from here, so nothing can be added.')
+    expect(action(root, 'New folder').props.disabled).toBe(true)
   })
 })
 

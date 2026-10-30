@@ -177,6 +177,7 @@ export function objectListBar(): Component {
         },
       },
       '@/lib/objectListing': ObjectListing,
+      '@/components/ui/Tooltip.vue': moduleDefault(Slotted('span')),
       '@/components/ui/Button.vue': moduleDefault(ButtonStub),
       '@/components/ui/DropdownMenu.vue': moduleDefault(Slotted('div')),
       '@/components/ui/DropdownMenuContent.vue': moduleDefault(Slotted('div')),

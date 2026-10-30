@@ -29,6 +29,7 @@ const ObjectListBar = compileClientComponent(new URL('./ObjectListBar.vue', impo
   '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Plain),
   '@/components/ui/IconButton.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
+  '@/components/ui/Tooltip.vue': moduleDefault(Plain),
   '@/lib/objectListing': ObjectListing,
   '@/components/data/manager/SearchHint.vue': moduleDefault(SearchHint),
   '@vueuse/core': { useDebounceFn, useElementSize: () => ({ width: boxWidth }) },
