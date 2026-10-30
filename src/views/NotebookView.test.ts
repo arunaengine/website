@@ -56,7 +56,7 @@ async function render() {
     '@/lib/notebook/runtimes': Runtimes,
     '@/lib/utils': { relativeTime: () => 'now' },
   }
-  for (const path of ['ui/DialogContent', 'ui/DialogHeader', 'ui/DialogTitle', 'ui/DialogDescription', 'dashboard/PageHeader', 'ui/Notice', 'ui/Spinner', 'assistant/AskAiButton', 'compute/ComputeGates', 'notebook/NotebookFiles', 'notebook/NotebookCapture', 'notebook/NotebookSessionBar', 'jobs/JobReportPanel']) {
+  for (const path of ['ui/DialogContent', 'ui/DialogHeader', 'ui/DialogTitle', 'ui/DialogDescription', 'dashboard/PageHeader', 'ui/Notice', 'ui/Spinner', 'assistant/AskAiButton', 'compute/ComputeGates', 'notebook/NotebookFiles', 'notebook/NotebookCapture', 'notebook/NotebookSessionBar', 'jobs/JobReportPanel', 'notebook/NotebookPicker']) {
     modules[`@/components/${path}.vue`] = moduleDefault(Slotted)
   }
   modules['@/components/ui/Dialog.vue'] = moduleDefault(defineComponent({ props: ['open'], setup: (props, { slots }) => () => props.open ? h('dialog', {}, slots.default?.()) : null }))

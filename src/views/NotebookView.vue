@@ -30,6 +30,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useTes } from '@/composables/useTes'
 import { activeGroupId } from '@/composables/useGroupSelection'
 import { useNotebookLocation } from '@/composables/useNotebookLocation'
+import NotebookPicker from '@/components/notebook/NotebookPicker.vue'
 import { SESSION_RUNTIMES } from '@/lib/notebook/runtimes'
 import { errorMessage, relativeTime } from '@/lib/utils'
 import { ArrowLeft, FileText, Lock, Package, Unlock, PanelLeft, Plus, Save } from '@lucide/vue'
@@ -37,6 +38,7 @@ import { ArrowLeft, FileText, Lock, Package, Unlock, PanelLeft, Plus, Save } fro
 const route = useRoute()
 const router = useRouter()
 const savedLocation = useNotebookLocation()
+const changing = ref(false)
 const { myGroups } = useAruna()
 const { tesEnabled } = useTes()
 
@@ -99,7 +101,7 @@ onUnmounted(() => {
 })
 watch([bucket, key, notebook.scope], () => void open())
 watch(activeGroupId, (group, previous) => {
-  if (previous && group !== previous) void router.push({ name: 'notebooks', query: { browse: '1' } })
+  if (previous && group !== previous) void router.push({ name: 'compute', query: { tab: 'notebooks' } })
 })
 // Groups can load after the page did; without one the first read is refused.
 watch(myGroups, () => {
@@ -217,13 +219,10 @@ const savedLabel = computed(() => {
       </template>
       <template #actions>
         <AskAiButton prompt="Help me with this notebook." :subject="assistantSubject" />
-        <Button variant="outline" size="sm" as-child>
-          <RouterLink :to="{ name: 'notebooks', query: { browse: '1' } }">
-            <ArrowLeft class="h-4 w-4" /> Change notebook
-          </RouterLink>
-        </Button>
+        <Button variant="outline" size="sm" @click="changing = true"><ArrowLeft class="h-4 w-4" /> Change notebook</Button>
       </template>
     </PageHeader>
+    <NotebookPicker v-model:open="changing" />
 
     <ComputeGates
       :enabled="tesEnabled"
