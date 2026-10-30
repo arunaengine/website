@@ -5,10 +5,11 @@ import type { DatasetViewState } from '@/composables/useDatasetView'
 import { compileClientComponent, content, mountApp, moduleDefault } from '@/test/clientRender'
 
 const ViewStub = defineComponent({
-  props: { start: Object },
+  props: { start: Object, record: Object },
   setup: (props) => () => {
     const start = props.start as { kind: string; documentId: string; title: string }
-    return h('section', `provenance ${start.kind} ${start.documentId} ${start.title}`)
+    const files = (props.record as { files: number } | undefined)?.files
+    return h('section', `provenance ${start.kind} ${start.documentId} ${start.title}${files ? ` ${files} results` : ''}`)
   },
 })
 
@@ -28,6 +29,12 @@ describe('dataset provenance', () => {
   it('starts the provenance view at the dataset', async () => {
     const { root } = await mountApp(component, { props: { state: state(true), documentId: 'd1', title: 'Gut isolates' } })
     expect(content(root)).toContain('provenance dataset d1 Gut isolates')
+  })
+
+  it('hands a run record\'s results to the view', async () => {
+    const record = { files: 13, path: 'laptop/results/', to: null }
+    const { root } = await mountApp(component, { props: { state: state(true), documentId: 'd1', title: 'Bakta', record } })
+    expect(content(root)).toContain('provenance dataset d1 Bakta 13 results')
   })
 
   it('waits for the crate before following anything', async () => {

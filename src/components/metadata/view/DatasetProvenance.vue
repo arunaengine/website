@@ -8,8 +8,14 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import { GitBranch } from '@lucide/vue'
 import type { DatasetViewState } from '@/composables/useDatasetView'
 import type { ProvenanceStart } from '@/lib/provenance'
+import type { RouteLocationRaw } from 'vue-router'
 
-const props = defineProps<{ state: DatasetViewState; documentId: string; title: string }>()
+const props = defineProps<{
+  state: DatasetViewState
+  documentId: string
+  title: string
+  record?: { files: number; path: string; to: RouteLocationRaw | null; runId?: string; where?: string } | null
+}>()
 const { currentCrate, crateHasEntities, loadingCrate } = props.state
 
 // One start per crate, so a re-render keeps what the view has read.
@@ -23,11 +29,13 @@ const start = computed<ProvenanceStart>(() => ({
 
 <template>
   <section aria-labelledby="provenance-heading">
-    <SectionHeading id="provenance-heading" title="Where it came from" :icon="GitBranch" />
-    <div class="surface space-y-3 px-5 py-4">
-      <ProvenanceView v-if="crateHasEntities" :start="start" />
-      <Skeleton v-else-if="loadingCrate" class="h-40" />
-      <p v-else class="py-6 text-center text-sm text-muted-foreground">There is nothing to follow until the dataset's metadata has loaded.</p>
-    </div>
+    <ProvenanceView v-if="crateHasEntities" :start="start" :record="record" />
+    <template v-else>
+      <SectionHeading id="provenance-heading" title="Where it came from" :icon="GitBranch" />
+      <div class="surface px-5 py-4">
+        <Skeleton v-if="loadingCrate" class="h-40" />
+        <p v-else class="py-6 text-center text-sm text-muted-foreground">There is nothing to follow until the dataset's metadata has loaded.</p>
+      </div>
+    </template>
   </section>
 </template>

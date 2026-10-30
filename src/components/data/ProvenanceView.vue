@@ -1,30 +1,42 @@
 <script setup lang="ts">
-// Where a file or dataset came from, one link at a time with the user's own access. Nothing is
-// read until the user asks; "Show all" follows every link and can be stopped.
-import { computed, defineComponent, h, reactive, ref, watch, type PropType, type VNode } from 'vue'
-import { RouterLink } from 'vue-router'
+// Where a file or dataset came from, one link at a time with the user's own access. Opening it
+// reads the direct inputs; "Full chain" follows every link and can be stopped.
+import { computed, defineComponent, h, reactive, ref, watch, type Component, type PropType, type VNode } from 'vue'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
+import { useElementSize } from '@vueuse/core'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
-import { ArrowLeft } from '@lucide/vue'
+import OptionToggle from '@/components/ui/OptionToggle.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
+import Tooltip from '@/components/ui/Tooltip.vue'
+import { ArrowDown, CloudOff, Database, Download, EyeOff, File, FileText, Files, GitBranch, Globe, Info, MoveRight, Plus, RotateCw, Workflow } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { apiErrorMessage } from '@/lib/api'
+import { folderRoute, objectRoute } from '@/lib/crate/dataIdentity'
+import { splitName } from '@/lib/objectListing'
 import {
+  chainColumns,
   drawnChain,
   emptyGraph,
   expand,
   expandAll,
   hasPending,
+  intoRecord,
   startDataset,
   startFile,
   type Box,
-  type DrawnNode,
+  type ChainCard,
   type Graph,
   type ProvenanceStart,
   type Readers,
 } from '@/lib/provenance'
 
-const props = defineProps<{ start: ProvenanceStart }>()
+const props = defineProps<{
+  start: ProvenanceStart
+  /** A run record's results, shown as the record's own card; `where` names the run's node. */
+  record?: { files: number; path: string; to: RouteLocationRaw | null; runId?: string; where?: string } | null
+}>()
 
 const { getVersionOrigin, getRun, fetchRoCrateRaw, downloadProvenanceCrate, runSparql, sessionEpoch } = useAruna()
 
@@ -36,7 +48,9 @@ const readers: Readers = {
 
 const graph = reactive<Graph>(emptyGraph())
 const walking = ref(false)
-let stopped = false
+const mode = ref<'direct' | 'full'>('direct')
+// Each read has its number; a newer read or a stop ends the older one.
+let reading = 0
 let generation = 0
 // Where it went: runs and datasets that name the same bytes. Only stored files have a content id.
 const went = ref<{ runs: string[]; datasets: string[] } | null>(null)
@@ -53,8 +67,7 @@ watch(
   () => [props.start, sessionEpoch.value],
   () => {
     generation += 1
-    stopped = true
-    walking.value = false
+    stop()
     went.value = null
     wentState.value = 'idle'
     Object.assign(graph, emptyGraph())
@@ -64,16 +77,34 @@ watch(
   { immediate: true },
 )
 
+function read() {
+  return mode.value === 'full' ? showAll() : readDirect()
+}
+
 async function showAll() {
   const current = fenced()
-  stopped = false
+  const run = ++reading
   walking.value = true
-  await expandAll(graph, readers, () => stopped, current)
-  if (current()) walking.value = false
+  await expandAll(graph, readers, () => run !== reading, current)
+  if (run === reading) walking.value = false
+}
+
+// The open cards of the direct view; a run record's results are not read, its card counts them.
+async function readDirect() {
+  const current = fenced()
+  const run = ++reading
+  walking.value = true
+  const waiting = (item: Box | undefined) => Boolean(item?.pending.length) && item!.kind !== 'silent' && !(item!.id.startsWith('dataset:') && props.record)
+  for (;;) {
+    const next = layout.value.cards.filter((card) => card.open).flatMap((card) => card.node.ids).find((id) => waiting(graph.boxes[id]))
+    if (!next || run !== reading || !current()) break
+    await expand(graph, next, readers, current)
+  }
+  if (run === reading) walking.value = false
 }
 
 function stop() {
-  stopped = true
+  reading += 1
   walking.value = false
 }
 
@@ -125,109 +156,280 @@ async function findUses() {
   }
 }
 
-// Seven columns of 128 px boxes and 20 px arrows fit beside the open sidebar at 1440 px.
-const BOX = 'rounded-[10px] border border-border px-2.5 py-2 text-xs'
-const MUTED = 'border-dashed bg-muted/50'
+// Cards are 104 px high in rows of 120 px; a half row lets a card sit between two sources.
+const PITCH = 120
+const GAP = 48
 
-function boxView(item: Box, repeat = false): VNode {
-  const muted = item.kind === 'hidden' || item.kind === 'unversioned' || item.kind === 'silent'
-  const root = graph.roots.includes(item.id)
-  const lines: VNode[] = [
-    h('div', { class: 'mb-0.5 text-[10px] uppercase tracking-wider text-muted-foreground' }, item.role),
-    h('p', { class: 'break-words [overflow-wrap:anywhere] font-medium', title: item.path }, item.title),
-  ]
-  if (item.detail) lines.push(h('p', { class: item.kind === 'hidden' ? 'font-mono text-muted-foreground' : 'text-muted-foreground' }, item.detail))
-  if (repeat && item.from.length) lines.push(h('p', { class: 'text-muted-foreground' }, 'Where it came from is shown above.'))
-  for (const found of item.identifiers) {
-    lines.push(
-      h('p', [
-        `${found.name} `,
-        h(ExternalLink, { href: found.url, label: found.value, class: 'break-words [overflow-wrap:anywhere] font-mono' }),
-      ]),
-    )
-  }
-  if (item.link?.document) {
-    lines.push(h(RouterLink, { to: { name: 'dataset', params: { id: item.link.document } }, class: 'text-primary hover:underline' }, () => item.link?.label))
-  } else if (item.link?.url) {
-    // Words wrap at spaces; only an unbroken identifier such as a DOI breaks inside the box.
-    lines.push(h(ExternalLink, { href: item.link.url, label: item.link.label, class: 'break-words [overflow-wrap:anywhere]' }))
-  }
-  if (item.pending.length) {
-    const label = item.kind === 'silent' ? 'Try again' : 'Show where this came from'
-    lines.push(h('button', { type: 'button', class: 'mt-1 text-primary hover:underline', onClick: () => expand(graph, item.id, readers, fenced()) }, label))
-  }
-  const ring = root ? 'shadow-[0_0_0_2px_hsl(var(--primary)/0.35)]' : ''
-  return h('div', { class: [BOX, muted ? MUTED : 'bg-background', ring], 'data-box': item.id }, lines)
+const chain = computed(() => intoRecord(graph, drawnChain(graph)))
+const layout = computed(() => chainColumns(graph, chain.value, mode.value === 'direct'))
+const gridStyle = computed(() => ({
+  gridTemplateColumns: Array.from({ length: layout.value.columns }, () => 'minmax(9rem, 16rem)').join(` ${GAP}px `),
+  gridTemplateRows: `repeat(${layout.value.rows * 2}, ${PITCH / 2}px)`,
+}))
+const byId = computed(() => new Map(layout.value.cards.map((card) => [card.id, card])))
+const centre = (card: ChainCard) => card.row * PITCH + PITCH / 2
+function edgesFrom(column: number) {
+  return layout.value.cards.flatMap((card) => {
+    const target = card.column === column && card.into ? byId.value.get(card.into) : undefined
+    if (!target) return []
+    const [y1, y2] = [centre(card), centre(target)]
+    return [{ id: card.id, line: `M0 ${y1}C${GAP / 2} ${y1} ${GAP / 2} ${y2} ${GAP - 2} ${y2}`, head: `M${GAP - 7} ${y2 - 4}L${GAP - 2} ${y2}L${GAP - 7} ${y2 + 4}`, me: !target.into }]
+  })
 }
 
-// Sibling files folded into one box: how many, of which release, opened to their names.
+// Below 600 px the chain becomes a list from the sources down to the start.
+const pane = ref<HTMLElement | null>(null)
+const { width } = useElementSize(pane)
+const narrow = computed(() => width.value > 0 && width.value < 600)
+
+const VERSIONED = /arn:aruna:[^:/]+:[^:/]+:s3\/([^/]+)\/(.+)@[0-9A-HJKMNP-TV-Z]{26}$/
+// The id a box was asked by names its bucket and key; a global id names neither.
+function askedOf(id: string) {
+  return Object.entries(graph.seen).find(([, seen]) => seen === id)?.[0] ?? id
+}
+function placeOf(item: Box): RouteLocationRaw | undefined {
+  const key = VERSIONED.exec(askedOf(item.id))
+  if (key) return objectRoute(key[1]!, decodeURIComponent(key[2]!))
+  const bucket = item.kind === 'database' ? /^database:[^/]+\/(.+)$/.exec(item.id)?.[1] : undefined
+  return bucket ? folderRoute(bucket, '') : undefined
+}
+
+const ICONS: Record<Box['kind'], Component> = { file: File, unversioned: File, run: Workflow, database: Database, source: Globe, hidden: EyeOff, silent: CloudOff }
+
+interface Shown {
+  icon: Component
+  role: string
+  title: string
+  detail: string
+  mono?: boolean
+  path?: string
+  identifiers: Box['identifiers']
+  to?: RouteLocationRaw
+  href?: string
+  me: boolean
+  muted: boolean
+  fold?: { key: string; open: boolean }
+  action?: { label: string; icon: Component; run: () => void }
+}
+
+function shown(card: ChainCard): Shown {
+  const items = card.node.ids.map((id) => graph.boxes[id]).filter((item): item is Box => Boolean(item))
+  const item = items[0]!
+  const me = !card.into
+  const waiting = items.some((each) => each.pending.length)
+  const action = item.kind === 'silent'
+    ? { label: 'Try again', icon: RotateCw, run: () => expand(graph, item.id, readers, fenced()) }
+    : waiting && mode.value === 'full' && !walking.value && !(me && props.record)
+      ? { label: items.length > 1 ? 'Show where these came from' : 'Show where this came from', icon: Plus, run: () => expandEach(items) }
+      : undefined
+  const repeat = card.node.repeat && item.from.length ? (items.length > 1 ? 'Where these came from is shown elsewhere.' : 'Where it came from is shown elsewhere.') : ''
+  const base = { identifiers: [], me, muted: false, action }
+  if (me && props.record && props.start.kind === 'dataset') {
+    const files = props.record.files
+    return { ...base, icon: Files, role: 'Files', title: `${files} result ${files === 1 ? 'file' : 'files'}`, detail: props.record.path, mono: true, to: props.record.to ?? undefined }
+  }
+  if (items.length > 1) {
+    const release = item.from.map((id) => graph.boxes[id]).find((each) => each?.kind === 'database')
+    const open = openFolds.value.has(card.node.key)
+    return { ...base, icon: Files, role: item.role, title: release ? `${items.length} files of ${release.title}` : `${items.length} files`, detail: repeat, fold: { key: card.node.key, open } }
+  }
+  const document = item.link?.document
+  const run = item.kind === 'run' ? item.id.replace(/^run:/, '') : ''
+  const to = document ? { name: 'dataset', params: { id: document } } : run ? { name: 'task', params: { taskId: run } } : placeOf(item)
+  return {
+    ...base,
+    icon: me && props.start.kind === 'dataset' ? FileText : ICONS[item.kind],
+    role: item.role,
+    title: item.title,
+    detail: repeat || item.detail || (run && run === props.record?.runId ? props.record.where ?? '' : ''),
+    mono: item.kind === 'hidden',
+    path: item.path,
+    identifiers: item.identifiers,
+    to: me ? undefined : to,
+    href: document ? undefined : item.link?.url,
+    muted: item.kind === 'hidden' || item.kind === 'unversioned' || item.kind === 'silent',
+  }
+}
+
+async function expandEach(items: Box[]) {
+  const current = fenced()
+  for (const item of items) if (current()) await expand(graph, item.id, readers, current)
+}
+
+// Sibling files folded into one card list their names below the chain on request.
 const openFolds = ref(new Set<string>())
-function foldView(node: DrawnNode): VNode {
-  const items = node.ids.map((id) => graph.boxes[id]).filter((item): item is Box => Boolean(item))
-  const first = items[0]!
-  const release = first.from.map((id) => graph.boxes[id]).find((item) => item?.kind === 'database')
-  const open = openFolds.value.has(node.key)
-  const toggle = () => {
-    const next = new Set(openFolds.value)
-    if (!next.delete(node.key)) next.add(node.key)
-    openFolds.value = next
-  }
-  const lines: VNode[] = [
-    h('div', { class: 'mb-0.5 text-[10px] uppercase tracking-wider text-muted-foreground' }, first.role),
-    h('p', { class: 'font-medium' }, release ? `${items.length} files of ${release.title}` : `${items.length} files`),
-    h('button', { type: 'button', class: 'mt-1 text-primary hover:underline', 'aria-expanded': open, onClick: toggle }, open ? 'Hide the files' : 'Show the files'),
-  ]
-  if (node.repeat) lines.push(h('p', { class: 'text-muted-foreground' }, 'Where these came from is shown above.'))
-  if (open) lines.push(h('ul', { class: 'mt-1 max-h-40 space-y-0.5 overflow-y-auto text-muted-foreground' }, items.map((item) => h('li', { key: item.id, class: 'break-words [overflow-wrap:anywhere]' }, item.path ?? item.title))))
-  if (items.some((item) => item.pending.length)) {
-    const expandAllOf = async () => {
-      const current = fenced()
-      for (const item of items) if (current()) await expand(graph, item.id, readers, current)
-    }
-    lines.push(h('button', { type: 'button', class: 'mt-1 block text-primary hover:underline', onClick: expandAllOf }, 'Show where these came from'))
-  }
-  return h('div', { class: [BOX, 'bg-background'], 'data-box': node.key }, lines)
+function toggleFold(key: string) {
+  const next = new Set(openFolds.value)
+  if (!next.delete(key)) next.add(key)
+  openFolds.value = next
+}
+const foldLists = computed(() =>
+  layout.value.cards
+    .filter((card) => card.node.ids.length > 1 && openFolds.value.has(card.node.key))
+    .map((card) => ({ key: card.node.key, title: shown(card).title, names: card.node.ids.map((id) => graph.boxes[id]).map((item) => item?.path ?? item?.title ?? '') })),
+)
+
+// Words wrap at spaces; a name without spaces keeps its end, such as the file extension.
+function titleView(view: Shown): VNode {
+  if (/\s/.test(view.title)) return h('span', { class: 'line-clamp-2 break-words' }, view.title)
+  const [head, tail] = splitName(view.title)
+  return h('span', { class: 'flex min-w-0' }, [h('span', { class: 'truncate' }, head), h('span', { class: 'shrink-0 whitespace-nowrap' }, tail)])
 }
 
-// One entry, then an arrow and the entries it came from, each with their own sources.
-const Branch: ReturnType<typeof defineComponent> = defineComponent({
-  props: { node: { type: Object as PropType<DrawnNode>, required: true } },
-  setup(branch) {
+const CardView = defineComponent({
+  props: { card: { type: Object as PropType<ChainCard>, required: true } },
+  setup(cardProps) {
     return () => {
-      const node = branch.node
-      const item = graph.boxes[node.ids[0]!]
-      if (!item) return null
-      const view = node.ids.length > 1 ? foldView(node) : boxView(item, node.repeat)
-      const children = node.sources.length
-        ? [
-            h('div', { class: 'flex w-5 flex-none justify-center text-muted-foreground', 'aria-hidden': 'true' }, [h(ArrowLeft, { class: 'h-4 w-4' })]),
-            h('div', { class: 'flex flex-col gap-2.5' }, node.sources.map((source) => h(Branch, { node: source, key: source.key }))),
-          ]
-        : []
-      return h('div', { class: 'flex items-center' }, [h('div', { class: 'w-32 flex-none' }, [view]), ...children])
+      const view = shown(cardProps.card)
+      // The title carries the link; its overlay makes the whole card open what it shows.
+      const stretch = 'after:absolute after:inset-0 after:content-[""] focus-visible:outline-none'
+      const title = view.to
+        ? h(RouterLink, { to: view.to, class: stretch }, () => titleView(view))
+        : view.href
+          ? h('a', { href: view.href, target: '_blank', rel: 'noopener noreferrer', class: stretch }, titleView(view))
+          : titleView(view)
+      const detail: (VNode | string)[] = view.detail ? [h('span', { class: view.mono ? 'font-mono' : '' }, view.detail)] : []
+      for (const found of view.identifiers) {
+        detail.push(h('span', { class: 'relative z-10' }, [`${found.name} `, h(ExternalLink, { href: found.url, label: found.value, class: 'font-mono' })]))
+      }
+      if (view.fold) {
+        detail.unshift(h('button', { type: 'button', class: 'relative z-10 text-primary hover:underline', 'aria-expanded': view.fold.open, onClick: () => toggleFold(view.fold!.key) }, view.fold.open ? 'Hide the files' : 'Show the files'))
+      }
+      const head = [
+        h(view.icon, { class: ['h-3.5 w-3.5 shrink-0', view.me ? 'text-aruna-navy dark:text-aruna-aqua' : 'text-muted-foreground'], 'aria-hidden': 'true' }),
+        h('span', { class: 'truncate' }, view.role),
+      ]
+      if (view.me && props.start.kind === 'dataset') head.push(h('span', { class: 'ml-auto shrink-0 font-medium text-aruna-navy dark:text-aruna-aqua' }, 'This record'))
+      if (view.action) {
+        const action = view.action
+        head.push(h('button', { type: 'button', class: 'relative z-10 -my-1 ml-auto inline-flex shrink-0 rounded p-0.5 text-primary hover:bg-muted', title: action.label, 'aria-label': action.label, onClick: action.run }, [h(action.icon, { class: 'h-3.5 w-3.5' }), h('span', { class: 'sr-only' }, action.label)]))
+      }
+      return h('div', {
+        class: [
+          'relative flex min-w-0 flex-col justify-center rounded-lg border bg-card px-3 py-2 shadow-sm transition-colors dark:shadow-none',
+          view.me ? 'border-aruna-aqua ring-2 ring-aruna-aqua/25' : view.muted ? 'border-dashed border-border bg-muted/40' : 'border-border',
+          view.to || view.href ? 'hover:border-primary/40' : '',
+        ],
+        title: view.path,
+        'data-box': cardProps.card.node.key,
+      }, [
+        h('span', { class: 'flex items-center gap-1.5 text-[11px] text-muted-foreground' }, head),
+        h('span', { class: 'mt-0.5 text-[13px] font-medium leading-[18px] text-foreground' }, [title]),
+        detail.length ? h('span', { class: 'mt-0.5 truncate text-xs text-muted-foreground [&>*+*]:ml-2', title: view.detail || undefined }, detail) : null,
+      ])
     }
   },
 })
-const chain = computed(() => drawnChain(graph))
+
+// On a phone: each source's chain as a group, then where they join.
+const ListBranch: ReturnType<typeof defineComponent> = defineComponent({
+  props: { card: { type: Object as PropType<ChainCard>, required: true } },
+  setup(branch) {
+    return () => {
+      const card = branch.card
+      const sources = layout.value.cards.filter((each) => each.into === card.id)
+      const self = h(CardView, { card })
+      const down = h('div', { class: 'grid h-6 place-items-center text-muted-foreground', 'aria-hidden': 'true' }, [h(ArrowDown, { class: 'h-4 w-4' })])
+      if (!sources.length) return h('div', { class: 'flex flex-col' }, [self])
+      if (sources.length === 1) return h('div', { class: 'flex flex-col' }, [h(ListBranch, { card: sources[0] }), down, self])
+      const run = graph.boxes[card.node.ids[0]!]?.kind === 'run'
+      const groups = sources.map((source, index) =>
+        h('div', { key: source.id, class: 'mb-4 border-l-2 border-border pl-3' }, [
+          h('p', { class: 'mb-2 text-xs text-muted-foreground' }, `${run ? 'Input' : 'Source'} ${index + 1} of ${sources.length}`),
+          h(ListBranch, { card: source }),
+        ]),
+      )
+      const join = sources.length === 2 ? (run ? 'Both inputs go into' : 'Both go into') : run ? 'All inputs go into' : 'All go into'
+      return h('div', { class: 'flex flex-col' }, [...groups, h('p', { class: 'mb-2 flex items-center gap-1.5 text-xs text-muted-foreground' }, [h(ArrowDown, { class: 'h-3.5 w-3.5 text-aruna-aqua', 'aria-hidden': 'true' }), join]), self])
+    }
+  },
+})
+
+// Reads after every new start and every switch of the scope.
+watch(() => [props.start, sessionEpoch.value, mode.value], () => void read(), { immediate: true })
+
+const MODES = [
+  { value: 'direct', label: 'Direct inputs' },
+  { value: 'full', label: 'Full chain' },
+]
+const INFO = 'You only see what you are allowed to read.'
+const LEGEND = [
+  { icon: MoveRight, label: 'Flows from source to result' },
+  { icon: Globe, label: 'Source' },
+  { icon: File, label: 'File' },
+  { icon: Database, label: 'Database' },
+  { icon: Workflow, label: 'Run' },
+]
 </script>
 
 <template>
   <div class="space-y-4">
-    <div class="flex flex-wrap items-center gap-2">
-      <p class="min-w-0 flex-1 text-xs text-muted-foreground">You only see what you are allowed to read.</p>
-      <Button v-if="!walking" size="sm" variant="outline" :disabled="!more" @click="showAll">Show all</Button>
-      <Button size="sm" :disabled="exporting" @click="exportCrate">Export as crate</Button>
-    </div>
-    <div v-if="walking" class="flex items-center gap-2 text-xs text-muted-foreground">
-      Showing all: {{ graph.steps }} steps read
-      <button type="button" class="text-primary hover:underline" @click="stop">Stop</button>
+    <SectionHeading v-if="start.kind === 'dataset'" id="provenance-heading" title="Where it came from" :icon="GitBranch" :info="INFO">
+      <template #actions>
+        <OptionToggle v-model="mode" :options="MODES" aria-label="Graph scope" />
+        <Button size="sm" variant="outline" :disabled="exporting" @click="exportCrate"><Download class="h-4 w-4" /> Export as crate</Button>
+      </template>
+    </SectionHeading>
+    <div v-else class="flex flex-wrap items-center gap-2">
+      <Tooltip :label="INFO">
+        <button type="button" class="inline-flex rounded-full text-muted-foreground hover:text-foreground" aria-label="About where it came from"><Info class="size-4" /></button>
+      </Tooltip>
+      <OptionToggle v-model="mode" class="ml-auto" :options="MODES" aria-label="Graph scope" />
+      <Button size="sm" variant="outline" :disabled="exporting" @click="exportCrate"><Download class="h-4 w-4" /> Export as crate</Button>
     </div>
     <Notice v-if="exportError" tone="error">{{ exportError }}</Notice>
     <p v-else-if="exported" role="status" class="text-xs text-muted-foreground">Saved as provenance.zip.</p>
 
-    <div class="overflow-x-auto py-2">
-      <div class="flex flex-col gap-2.5">
-        <Branch v-for="node in chain" :key="node.key" :node="node" />
+    <div :class="start.kind === 'dataset' ? 'surface overflow-hidden' : ''">
+      <div v-if="walking || (mode === 'full' && more)" class="flex flex-wrap items-center gap-2 px-4 pt-3 text-xs text-muted-foreground">
+        <template v-if="walking">
+          Reading: {{ graph.steps }} steps read
+          <button type="button" class="text-primary hover:underline" @click="stop">Stop</button>
+        </template>
+        <template v-else>
+          Some links are not read yet.
+          <Button size="sm" variant="ghost" class="h-7 px-2" @click="showAll">Show all</Button>
+        </template>
+      </div>
+      <div ref="pane" :class="start.kind === 'dataset' ? 'p-4' : 'py-2'">
+        <div v-if="narrow" class="flex flex-col gap-4">
+          <ListBranch v-for="card in layout.cards.filter((each) => !each.into)" :key="card.id" :card="card" />
+        </div>
+        <div v-else class="overflow-x-auto">
+          <div class="grid justify-center" :style="gridStyle">
+            <svg
+              v-for="column in layout.columns - 1"
+              :key="column"
+              :width="GAP"
+              :height="layout.rows * PITCH"
+              :style="{ gridColumn: column * 2, gridRow: '1 / -1' }"
+              class="overflow-visible"
+              aria-hidden="true"
+            >
+              <g v-for="edge in edgesFrom(column - 1)" :key="edge.id" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" :class="edge.me ? 'stroke-aruna-aqua' : 'stroke-border'">
+                <path :d="edge.line" />
+                <path :d="edge.head" :class="edge.me ? '' : 'stroke-muted-foreground'" />
+              </g>
+            </svg>
+            <CardView
+              v-for="card in layout.cards"
+              :key="card.id"
+              :card="card"
+              class="my-2 h-[104px]"
+              :style="{ gridColumn: card.column * 2 + 1, gridRow: `${card.row * 2 + 1} / span 2` }"
+            />
+          </div>
+        </div>
+      </div>
+      <div v-for="fold in foldLists" :key="fold.key" class="border-t border-border-subtle px-5 py-3 text-xs">
+        <p class="mb-1 font-medium text-foreground">{{ fold.title }}</p>
+        <ul class="max-h-40 space-y-0.5 overflow-y-auto text-muted-foreground">
+          <li v-for="name in fold.names" :key="name" class="break-words [overflow-wrap:anywhere]">{{ name }}</li>
+        </ul>
+      </div>
+      <div v-if="!narrow && start.kind === 'dataset'" class="flex flex-wrap gap-x-5 gap-y-1 border-t border-border-subtle px-5 py-3 text-xs text-muted-foreground">
+        <span v-for="item in LEGEND" :key="item.label" class="inline-flex items-center gap-1.5"><component :is="item.icon" class="h-3.5 w-3.5" aria-hidden="true" />{{ item.label }}</span>
+        <span class="inline-flex items-center gap-1.5"><span class="inline-block h-2.5 w-3.5 rounded-sm border-2 border-aruna-aqua" aria-hidden="true" />This record</span>
       </div>
     </div>
 

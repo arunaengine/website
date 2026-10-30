@@ -130,6 +130,15 @@ const runResults = computed(() => {
   if (!run || !folder) return null
   return { name: 'bucket', params: { bucketId: folder.bucket }, query: { ...(folder.prefix ? { prefix: folder.prefix } : {}), ...(run.runId ? { run: run.runId } : {}) } }
 })
+// The record's own card in its provenance: its results, their folder and where the run ran.
+const runRecord = computed(() => {
+  const run = runProvenance.value
+  if (!run?.outputs.length) return null
+  const folder = resultsFolder(run, s3Endpoint.value)
+  const path = folder ? `${folder.bucket}/${folder.prefix ? `${folder.prefix}/` : ''}` : ''
+  const where = run.site?.nodeId ? displayName(run.site.nodeId) : ''
+  return { files: run.outputs.length, path, to: runResults.value, runId: run.runId, where }
+})
 
 // The page paints once the registry entry and the crate have both answered;
 // a save or a provenance poll later refreshes in place.
@@ -402,6 +411,7 @@ function jumpTo(entityId: string) {
           :state="state"
           :document-id="detailId"
           :title="current?.title || fetchedSummary?.document_path || 'Dataset'"
+          :record="runRecord"
         />
 
         <DatasetHistory v-if="tab === 'history'" :history="history" :state="state" />

@@ -20,10 +20,22 @@ const Slotted = (tag: string) =>
 const component = compileClientComponent(new URL('./ProvenanceView.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/ExternalLink.vue': { __esModule: true, default: defineComponent({ props: { href: String, label: String }, setup: (props) => () => h('a', { href: props.href }, props.label) }) },
-  '@lucide/vue': { ArrowLeft: defineComponent(() => () => h('i')) },
-  'vue-router': { RouterLink: defineComponent((_, { slots }) => () => h('a', slots.default?.())) },
+  '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => h('i')) }),
+  '@vueuse/core': { useElementSize: () => ({ width: ref(0) }) },
+  'vue-router': { RouterLink: defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => h('a', { to: props.to }, slots.default?.()) }) },
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
   '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
+  '@/components/ui/Tooltip.vue': moduleDefault(Slotted('span')),
+  '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent({ props: { title: String }, setup: (props, { slots }) => () => h('header', [props.title, slots.actions?.()]) })),
+  '@/components/ui/OptionToggle.vue': moduleDefault(
+    defineComponent({
+      props: { modelValue: String, options: Array },
+      emits: ['update:modelValue'],
+      setup: (props, { emit }) => () => h('div', (props.options as { value: string; label: string }[]).map((option) => h('button', { onClick: () => emit('update:modelValue', option.value) }, option.label))),
+    }),
+  ),
+  '@/lib/crate/dataIdentity': { folderRoute: (bucket: string) => ({ name: 'bucket', params: { bucketId: bucket } }), objectRoute: (bucket: string, key: string) => ({ name: 'bucket', params: { bucketId: bucket }, query: { object: key } }) },
+  '@/lib/objectListing': { splitName: (name: string) => [name, ''] },
   '@/composables/useAruna': { useAruna: () => aruna },
   '@/composables/useDatabases': { useDatabases: () => ({ rows: ref([]) }) },
   '@/lib/api': { apiErrorMessage: (cause: unknown) => (cause as Error).message },
@@ -56,25 +68,28 @@ describe('provenance view', () => {
     aruna.runSparql.mockReset()
   })
 
-  it('reads nothing until asked, then one link at a time', async () => {
+  it('reads the run and its direct inputs when opened, and links the run to its record', async () => {
     const root = await render()
+    await vi.waitFor(() => expect(content(root)).toContain('Not visible to you'))
     expect(content(root)).toContain('This file')
-    expect(aruna.getRun).not.toHaveBeenCalled()
-
-    await click(button(root, 'Show where this came from'))
-    await flush()
     expect(content(root)).toContain('Genome annotation')
     expect(content(root)).toContain('No exact version recorded')
-    expect(aruna.getVersionOrigin).not.toHaveBeenCalled()
-  })
-
-  it('shows all links and marks the ones the user cannot read', async () => {
-    const root = await render()
-    await click(button(root, 'Show all'))
-    await vi.waitFor(() => expect(content(root)).toContain('Not visible to you'))
-
     expect(aruna.getVersionOrigin).toHaveBeenCalledWith(INPUT)
     expect(content(root)).not.toContain('in.faa')
+    const run = nodes(root).find((node) => node.tag === 'a' && content(node).includes('Genome annotation'))
+    expect(run?.props.to).toEqual({ name: 'dataset', params: { id: 'doc1' } })
+  })
+
+  it('follows the full chain on request', async () => {
+    aruna.getVersionOrigin.mockReset().mockResolvedValue(origin({ origin: { kind: 'source' } as never, source: { url: 'https://example.org/in.faa' } as never }))
+    const root = await render()
+    await vi.waitFor(() => expect(content(root)).toContain('in.faa'))
+    expect(content(root)).not.toContain('example.org')
+
+    await click(button(root, 'Full chain'))
+    await vi.waitFor(() => expect(content(root)).toContain('example.org'))
+    const source = nodes(root).find((node) => node.tag === 'a' && node.props.href === 'https://example.org/in.faa')
+    expect(content(source!)).toContain('example.org')
   })
 
   it('exports the crate of the start version', async () => {
@@ -140,8 +155,8 @@ describe('provenance view', () => {
       })
     })
     const root = await render()
-    await click(button(root, 'Show all'))
-    await flush()
+    await click(button(root, 'Full chain'))
+    await vi.waitFor(() => expect(content(root)).toContain('zenodo.org'))
     const text = content(root)
 
     expect(text).toContain('66 files of Bakta database (light) 6.0 light')
@@ -152,12 +167,12 @@ describe('provenance view', () => {
     expect(text.split('Prepare Bakta DB 6.0 light')).toHaveLength(2)
     expect(text).toContain('zenodo.org')
     expect(text).not.toContain('/work/in/db/f3')
-    // Seven columns of 128 px boxes and 20 px arrows stay within 1110 px, the width at 1440 px.
-    expect(nodes(root).some((node) => String(node.props.class).split(' ').includes('w-32'))).toBe(true)
-    expect(nodes(root).some((node) => String(node.props.class).split(' ').includes('w-5'))).toBe(true)
+    // Sources at the left, the file in the last of six columns.
+    const column = (label: string) => nodes(root).find((node) => node.props['data-box'] && content(node).includes(label))?.props.style
+    expect(column('zenodo.org')).toMatchObject({ gridColumn: 1 })
+    expect(column('This file')).toMatchObject({ gridColumn: 11 })
     const doi = nodes(root).find((node) => node.tag === 'a' && node.props.href === 'https://doi.org/10.5281/zenodo.14916843')
-    // Words wrap at spaces; only unbroken identifiers break, never "Open the sourc" + "e".
-    expect(String(doi?.props.class)).toContain('[overflow-wrap:anywhere]')
+    expect(content(doi!)).toContain('Bakta database (light) 6.0 light')
     expect(nodes(root).some((node) => String(node.props.class).split(' ').includes('break-all'))).toBe(false)
 
     await click(button(root, 'Show the files'))
@@ -178,12 +193,35 @@ describe('provenance view', () => {
     }))
     const start = { kind: 'dataset', documentId: '01M63099Q2000108CB51QQDB2P', title: 'Bakta run', crate: { '@graph': [...dbFiles, result] } }
     const { root } = await mountApp(component, { props: { start } })
-    await click(button(root, 'Show all'))
-    await flush()
+    await click(button(root, 'Full chain'))
+    await vi.waitFor(() => expect(content(root)).toContain('Where these came from is shown elsewhere.'))
     const text = content(root)
 
     expect(text.split('2 files of Bakta database (light) 6.0 light')).toHaveLength(3)
-    expect(text).toContain('Where these came from is shown above.')
     expect(text.split('Database release')).toHaveLength(2)
+  })
+
+  it('shows a run record\'s results as the record\'s own card, linked to their folder', async () => {
+    const record = {
+      '@graph': [
+        { '@id': '#run-r1', '@type': 'CreateAction', name: 'Annotate', object: [{ '@id': 's3://lab/in.faa' }], result: [{ '@id': 's3://lab/out/a' }, { '@id': 's3://lab/out/b' }] },
+        { '@id': 's3://lab/in.faa', '@type': 'File', name: 'in.faa', contentUrl: ['s3://lab/in.faa', INPUT] },
+        { '@id': 's3://lab/out/a', '@type': 'File', name: 'a' },
+        { '@id': 's3://lab/out/b', '@type': 'File', name: 'b' },
+      ],
+    }
+    const to = { name: 'bucket', params: { bucketId: 'lab' }, query: { prefix: 'out', run: 'r1' } }
+    const props = { start: { kind: 'dataset', documentId: 'd1', title: 'Annotate', crate: record }, record: { files: 2, path: 'lab/out/', to, runId: 'r1', where: 'Giessen storage 1' } }
+    const { root } = await mountApp(component, { props })
+    await vi.waitFor(() => expect(content(root)).toContain('Not visible to you'))
+    const text = content(root)
+
+    expect(text).toContain('2 result files')
+    expect(text).toContain('This record')
+    expect(text).toContain('Giessen storage 1')
+    expect(text.split('No exact version recorded')).toHaveLength(1)
+    expect(nodes(root).find((node) => node.tag === 'a' && content(node).includes('2 result files'))?.props.to).toEqual(to)
+    expect(nodes(root).find((node) => node.tag === 'a' && content(node).includes('Annotate'))?.props.to).toEqual({ name: 'task', params: { taskId: 'r1' } })
+    expect(aruna.getVersionOrigin).toHaveBeenCalledTimes(1)
   })
 })
