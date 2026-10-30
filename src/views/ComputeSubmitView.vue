@@ -147,14 +147,16 @@ async function submitLocally(draft: TesTask): Promise<boolean> {
 const HOLDER_PAGES = 10
 
 /** Every node holding a bucket of this name, of one group when given, read to the last page. */
-async function bucketHolders(name: string, groupId?: string): Promise<string[]> {
+async function bucketHolders(name: string, groupId?: string): Promise<{ nodes: string[]; partial: boolean }> {
   const nodes = new Set<string>()
+  let partial = false
   const sets: BucketSearchHit[] = []
   let cursor: string | undefined
   let pages = 0
   do {
     if (pages++ === HOLDER_PAGES) throw new Error(`Not every node answered, so the node holding bucket ${name} is unknown. Try again.`)
     const found = await searchBuckets(name, { limit: 50, cursor, groupId })
+    if (found.nodes_failed) partial = true
     // Older nodes ignore the group filter, so it is applied here as well.
     const hits = found.hits.filter((hit) => hit.bucket === name && isTarget(hit.node_id) && (!groupId || hit.group_id === groupId))
     for (const hit of hits) nodes.add(hit.node_id)
@@ -166,7 +168,7 @@ async function bucketHolders(name: string, groupId?: string): Promise<string[]> 
     const status = await getBucketDistribution(name, undefined, isLocalNode(hit.node_id) ? null : hit.node_id)
     for (const member of status.members) if (member.state === 'ready' && isTarget(member.node_id)) nodes.add(member.node_id)
   }
-  return [...nodes]
+  return { nodes: [...nodes], partial }
 }
 
 /** Every current version below a key prefix on one node, read page by page. */
@@ -229,11 +231,17 @@ async function routeRun(draft: TesTask): Promise<{ draft: TesTask; base: string 
   const names = [...new Set([...inputs, ...outputs])]
   // Results are written to a bucket of the run's own group.
   const group = draft.tags?.[TES_GROUP_TAG]
-  const holders = new Map(await Promise.all(names.map(async (name) =>
+  const found = new Map(await Promise.all(names.map(async (name) =>
     [name, await bucketHolders(name, outputs.includes(name) ? group : undefined)] as const)))
+  const holders = new Map([...found].map(([name, entry]) => [name, entry.nodes] as const))
+  // A node that did not answer may hold what is missing, so the lookup is unknown, not empty.
+  const unavailable = (name: string) =>
+    new Error(`The bucket lookup did not reach every node, so the node holding ${name} is unknown. The run was not started; try again.`)
   const missing = names.find((name) => !holders.get(name)?.length)
-  if (missing) throw new Error(`No node holds bucket ${missing}, so the run was not started.`)
+  if (missing) throw found.get(missing)!.partial ? unavailable(missing) : new Error(`No node holds bucket ${missing}, so the run was not started.`)
   const route = runRoute(draft, holders, localNodeId.value)
+  const partial = outputs.find((name) => found.get(name)!.partial)
+  if (!route && partial) throw unavailable(partial)
   if (!route) throw new Error('No node holds every result bucket of this run, so it was not started. Choose result buckets on one node.')
   if (route.pin.length) {
     const realmId = nodeInfo.value?.node.realm_id

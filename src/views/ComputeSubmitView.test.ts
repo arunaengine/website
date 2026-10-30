@@ -603,6 +603,13 @@ describe('run page', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     await flush()
     expect(content(mounted.root)).toContain('No node holds bucket results')
+
+    // A last page some node did not answer leaves the holder unknown, not absent.
+    searchBuckets.mockImplementationOnce(async () => ({ hits: [], nodes_failed: 1, next_cursor: null }))
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    expect(content(mounted.root)).toContain('did not reach every node, so the node holding results is unknown')
     expect(createTask).not.toHaveBeenCalled()
     mounted.app.unmount()
   })
