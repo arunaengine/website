@@ -14,9 +14,9 @@ const Breadcrumbs = compileClientComponent(new URL('./Breadcrumbs.vue', import.m
   '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Slotted('span')),
 })
 
-async function mount(path: string) {
+async function mount(path: string, icon?: unknown) {
   const opened = ref<string[]>([])
-  const mounted = await mountApp(defineComponent(() => () => h(Breadcrumbs, { bucket: 'laptop', path, onNavigate: (to: string) => opened.value.push(to) })))
+  const mounted = await mountApp(defineComponent(() => () => h(Breadcrumbs, { bucket: 'laptop', path, icon, onNavigate: (to: string) => opened.value.push(to) })))
   if (mounted.errors.length) throw mounted.errors[0]
   return { root: mounted.root, opened }
 }
@@ -41,5 +41,10 @@ describe('breadcrumbs', () => {
     expect(nodes(root).some((node) => node.tag === 'menu')).toBe(false)
     expect(content(root).replace(/\s+/g, '')).toBe('laptop/bakta/final')
     expect(element(root, (node) => node.props['aria-current'] === 'page').tag).toBe('span')
+  })
+
+  it('starts with the bucket\'s own icon', async () => {
+    const { root } = await mount('', defineComponent(() => () => h('i', 'bucket icon')))
+    expect(content(element(root, (node) => node.tag === 'button'))).toContain('bucket icon')
   })
 })

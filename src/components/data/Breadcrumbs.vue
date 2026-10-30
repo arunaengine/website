@@ -3,12 +3,12 @@ import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
 import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
-import { computed } from 'vue'
+import { computed, type Component } from 'vue'
 import { Folder, Home } from '@lucide/vue'
 
 // The bucket, then the open folder's path. A deep path shows the parent and the open folder;
 // the "…" menu holds the folders between. Long names truncate instead of wrapping.
-const props = defineProps<{ path: string; bucket: string; singleLine?: boolean }>()
+const props = defineProps<{ path: string; bucket: string; singleLine?: boolean; icon?: Component }>()
 const emit = defineEmits<{
   (e: 'navigate', path: string): void
 }>()
@@ -27,7 +27,7 @@ const shown = computed(() => crumbs.value.slice(-2))
       :title="bucket"
       @click="emit('navigate', '')"
     >
-      <Home class="h-3.5 w-3.5 shrink-0" />
+      <component :is="icon ?? Home" class="h-3.5 w-3.5 shrink-0" />
       <span class="truncate">{{ bucket }}</span>
     </button>
     <template v-if="hidden.length">

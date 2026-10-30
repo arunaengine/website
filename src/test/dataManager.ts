@@ -256,6 +256,7 @@ export function objectBrowser(): Component {
       '@/components/data/manager/SelectionBar.vue': moduleDefault(selectionBar()),
       '@/components/data/manager/SearchHint.vue': moduleDefault(SearchHintStub),
       '@/composables/useFolderOrigin': { useFolderOrigin: () => folderOrigin },
+      '@/composables/useDatabases': { useDatabases: () => ({ find: () => undefined }) },
       '@/composables/useBucketUsage': { useBucketUsage: () => bucketUsage.value, usageText: (usage: { objects: number }) => `${usage.objects} files stored` },
       '@/lib/sync': { parseArunaArn: (arn: string) => ({ nodeId: arn.split(':')[3] ?? null }) },
       '@/components/data/manager/TransferDialog.vue': moduleDefault(Slotted('aside')),
