@@ -51,7 +51,7 @@ const otherFailed = ref(0)
 const otherSearch = ref<{ arn: string; bucket: string; node_id: string; group_id: string; group_name?: string }[]>([])
 // What the bucket search answered for All nodes.
 const allBuckets = {
-  hits: ref<{ bucket: string; node_id: string; group_id: string }[]>([]),
+  hits: ref<{ bucket: string; node_id: string; group_id: string; nodes?: string[] }[]>([]),
   failedNodes: ref(0),
   loading: ref(false),
   error: ref<string | null>(null),
