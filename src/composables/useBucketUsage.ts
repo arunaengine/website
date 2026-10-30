@@ -6,12 +6,16 @@ import type { BucketUsageResponse } from '@/lib/api'
 import { formatCount } from '@/lib/formatCount'
 import { formatBytes } from '@/lib/utils'
 
-/** "16 files, 50.2 MB". Bytes held elsewhere: "68,231 files", or "68,231 files referenced" when `stored`. */
-export function usageText(usage: BucketUsageResponse, stored = false): string {
-  const files = `${usage.complete ? '' : 'at least '}${formatCount(usage.objects)} ${usage.objects === 1 ? 'file' : 'files'}`
+/** "16 files, 50.2 MB stored" or "68,231 files, 38.6 TB referenced"; both sizes when neither is 0. */
+export function usageText(usage: BucketUsageResponse): string {
+  const files = `${usage.complete ? '' : 'at least '}${formatCount(usage.objects)}\u00a0${usage.objects === 1 ? 'file' : 'files'}`
+  // An older node names no referenced bytes, so none are shown rather than a zero.
   const referenced = usage.referenced_bytes ?? 0
-  if (usage.objects && referenced && referenced >= usage.logical_bytes) return stored ? `${files} referenced` : files
-  return `${files}, ${formatBytes(usage.logical_bytes)}${stored ? ' stored' : ''}`
+  const sizes = [
+    ...(usage.logical_bytes || !referenced ? [`${formatBytes(usage.logical_bytes)} stored`] : []),
+    ...(referenced ? [`${formatBytes(referenced)} referenced`] : []),
+  ]
+  return [files, ...sizes].join(', ')
 }
 
 export function useBucketUsage(bucket: Ref<string>, nodeId: Ref<string | null>) {

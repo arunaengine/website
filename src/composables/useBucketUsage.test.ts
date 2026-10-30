@@ -16,13 +16,15 @@ const usage = (extra: Partial<BucketUsageResponse> = {}): BucketUsageResponse =>
 })
 
 describe('bucket usage', () => {
-  it('names files and size, or the referenced files of a database', () => {
-    expect(usageText(usage(), true)).toBe('16 files, 50.2\u00a0MB stored')
-    expect(usageText(usage({ objects: 1 }))).toBe('1 file, 50.2\u00a0MB')
-    expect(usageText(usage({ objects: 43_882_006, logical_bytes: 10, referenced_bytes: 10 }), true)).toBe('43,882,006 files referenced')
-    // A bucket row is calmer: the files alone.
-    expect(usageText(usage({ objects: 43_882_006, logical_bytes: 10, referenced_bytes: 10 }))).toBe('43,882,006 files')
-    expect(usageText(usage({ complete: false }))).toBe('at least 16 files, 50.2\u00a0MB')
+  it('names the files with the stored and the referenced size, each only when it is not 0', () => {
+    expect(usageText(usage())).toBe('16\u00a0files, 50.2\u00a0MB stored')
+    expect(usageText(usage({ objects: 1, referenced_bytes: 0 }))).toBe('1\u00a0file, 50.2\u00a0MB stored')
+    expect(usageText(usage({ objects: 43_882_006, logical_bytes: 0, referenced_bytes: 42_450_742_909_920 })))
+      .toBe('43,882,006\u00a0files, 38.6\u00a0TB referenced')
+    expect(usageText(usage({ objects: 70, logical_bytes: 4_112_885_380, referenced_bytes: 1_344_199_496 })))
+      .toBe('70\u00a0files, 3.8\u00a0GB stored, 1.3\u00a0GB referenced')
+    expect(usageText(usage({ objects: 0, logical_bytes: 0, referenced_bytes: 0 }))).toBe('0\u00a0files, 0\u00a0B stored')
+    expect(usageText(usage({ complete: false }))).toBe('at least 16\u00a0files, 50.2\u00a0MB stored')
   })
 
   it('keeps only the answer for the bucket still open', async () => {
@@ -58,7 +60,7 @@ describe('listed bucket usage', () => {
     await Promise.resolve()
     await Promise.resolve()
     expect(asked.map((entry) => `${entry.node}/${entry.bucket}`).at(-1)).toBe('n2/e')
-    expect(listed.textOf('a', null)).toBe('2 files, 50.2\u00a0MB')
+    expect(listed.textOf('a', null)).toBe('2\u00a0files, 50.2\u00a0MB stored')
     expect(listed.textOf('b', null)).toBeNull()
     listed.ensure(entries)
     expect(asked).toHaveLength(5)

@@ -62,7 +62,7 @@ const target = (tile: Tile) => ({
             <IconTile :icon="databaseOf(tile) ? Database : Package" :tone="databaseOf(tile) ? 'royal' : 'muted'" size="sm" />
             <span class="min-w-0 flex-1">
               <span class="block truncate text-sm font-medium text-foreground">{{ tile.bucket }}</span>
-              <span class="block truncate text-xs tabular-nums text-muted-foreground">{{ lineOf(tile) }}</span>
+              <span class="block text-xs tabular-nums text-muted-foreground">{{ lineOf(tile) }}</span>
             </span>
             <ChevronRight class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           </RouterLink>

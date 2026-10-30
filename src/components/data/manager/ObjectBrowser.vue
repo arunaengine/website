@@ -627,7 +627,7 @@ async function onDrop(event: DragEvent) {
             <StatusMark label="Up to date" size="sm" />Up to date<template v-if="lastSync">, last sync {{ relativeTime(lastSync) }}</template>
           </span>
         </template>
-        <span v-if="usage" class="tabular-nums">{{ usageText(usage, true) }}</span>
+        <span v-if="usage" class="tabular-nums">{{ usageText(usage) }}</span>
         <span v-if="referencedBucket && referencedSource" class="inline-flex items-center gap-1.5"><Link2 class="h-3.5 w-3.5" aria-hidden="true" />Referenced from {{ referencedSource }}</span>
         <span v-if="activeGroupId" class="inline-flex items-center gap-1.5">
           <Users class="h-3.5 w-3.5" aria-hidden="true" />

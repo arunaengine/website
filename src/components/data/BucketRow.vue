@@ -190,7 +190,7 @@ function onClick() {
         />
       </div>
       <p v-if="subtitle" class="truncate text-xs text-muted-foreground">{{ subtitle }}</p>
-      <p v-if="facts" class="truncate text-xs tabular-nums text-muted-foreground">{{ facts }}</p>
+      <p v-if="facts" class="text-xs tabular-nums text-muted-foreground">{{ facts }}</p>
     </div>
     <div class="relative flex shrink-0 items-center gap-0.5">
       <Popover v-for="mark in marks" :key="mark.id" :tooltip="mark.tooltip" align="end">
