@@ -36,7 +36,7 @@ import { Activity, Boxes, ChevronRight, CircleCheck, Cpu, Database, Download, Ha
 
 const route = useRoute()
 const nodeId = computed(() => String(route.params.nodeId ?? ''))
-const { currentUser, myGroups, nodeInfo, usageInfo, isRealmAdmin, searchBuckets, sessionEpoch, loadInfo } = useAruna()
+const { authToken, currentUser, myGroups, nodeInfo, usageInfo, isRealmAdmin, searchBuckets, sessionEpoch, loadInfo } = useAruna()
 const { realm } = useRealmSnapshot()
 const { isLocalNode, localNodeId } = useRealmNodes()
 const { renameNode, renameDevice } = useNodeNames()
@@ -124,7 +124,7 @@ watch([nodeId, () => (node.value ? nodeApiBase(node.value) : null), isLocal, rev
     return
   }
   if (!base) return
-  const answer = await probeNode(base)
+  const answer = await probeNode(base, authToken.value)
   if (mine === probeRound) probe.value = answer
 }, { immediate: true })
 

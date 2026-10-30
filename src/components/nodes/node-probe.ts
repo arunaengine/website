@@ -18,11 +18,12 @@ export function nodeApiBase(node: RealmNodeInfo): string | null {
   return url.endsWith('/api/v1') ? url : `${url}/api/v1`
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
+async function fetchJson<T>(url: string, token?: string | null): Promise<T> {
   const controller = new AbortController()
   const timer = window.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS)
   try {
-    const response = await fetch(url, { signal: controller.signal })
+    const headers = token ? { Authorization: `Bearer ${token}` } : undefined
+    const response = await fetch(url, { signal: controller.signal, headers })
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
     return (await response.json()) as T
   } finally {
@@ -30,7 +31,8 @@ async function fetchJson<T>(url: string): Promise<T> {
   }
 }
 
-export async function probeNode(apiBase: string): Promise<NodeProbe> {
+// `token`: the signed-in session, which a node asks for before it reports its usage.
+export async function probeNode(apiBase: string, token?: string | null): Promise<NodeProbe> {
   try {
     // Only the /info request is timed: it always runs, so latency numbers stay
     // comparable across nodes with and without the usage endpoint. Two
@@ -46,8 +48,8 @@ export async function probeNode(apiBase: string): Promise<NodeProbe> {
     } catch {
       // The warm sample is best-effort; keep the cold measurement.
     }
-    // /system/usage is still rolling out; a 404 must not mark the node unreachable.
-    const usage = await fetchJson<UsageResponse>(`${apiBase}/system/usage`).catch(() => null)
+    // A node without /system/usage, or one refusing it, keeps the node reachable and hides the figure.
+    const usage = await fetchJson<UsageResponse>(`${apiBase}/system/usage`, token).catch(() => null)
     return { state: 'ok', info, usage, latencyMs }
   } catch (err) {
     const timedOut = err instanceof DOMException && err.name === 'AbortError'

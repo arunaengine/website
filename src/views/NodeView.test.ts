@@ -92,7 +92,7 @@ const NodeView = compileClientComponent(new URL('./NodeView.vue', import.meta.ur
   '@/components/nodes/node-display': NodeDisplay,
   '@/components/nodes/node-probe': { nodeApiBase: (node: RealmNodeInfo) => node.info?.urls.api ?? null, probeNode },
   '@/composables/useAruna': {
-    useAruna: () => ({ currentUser, myGroups: ref([{ id: 'g1', name: 'demo' }]), nodeInfo, usageInfo: ref(null), isRealmAdmin, searchBuckets, sessionEpoch, loadInfo }),
+    useAruna: () => ({ authToken: ref('session'), currentUser, myGroups: ref([{ id: 'g1', name: 'demo' }]), nodeInfo, usageInfo: ref(null), isRealmAdmin, searchBuckets, sessionEpoch, loadInfo }),
   },
   '@/composables/useDatabases': {
     useDatabases: () => ({ ensure: () => {}, rows: ref([{ bucket: 'refseq', title: 'NCBI RefSeq genomes', metadata: {}, places: [{ nodeId: 'store-1' }] }]) }),
