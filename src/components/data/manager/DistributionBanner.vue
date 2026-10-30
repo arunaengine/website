@@ -13,20 +13,19 @@ const props = defineProps<{ bucket: DistributedBucket }>()
 const degraded = computed(() => degradedRanges(props.bucket))
 const moving = computed(() => openTransfers(props.bucket).length)
 const left = computed(() => Boolean(props.bucket.live?.publicationsClosed) && !isDeleting(props.bucket))
-const marked = computed(() => !props.bucket.live || isDeleting(props.bucket) || Boolean(props.bucket.live?.pending) || moving.value > 0 || left.value || degraded.value.length > 0)
+const marked = computed(() => !props.bucket.live || isDeleting(props.bucket) || Boolean(props.bucket.live?.pending) || moving.value > 0 || left.value)
 </script>
 
 <template>
-  <div v-if="marked || bucket.live?.deletion" class="space-y-3">
+  <div v-if="marked || bucket.live?.deletion || degraded.length" class="space-y-3">
     <div v-if="marked" class="flex flex-wrap items-center gap-2">
       <MockNotice v-if="!bucket.live" />
       <Badge v-if="isDeleting(bucket)" variant="destructive" size="sm">Deleting</Badge>
       <Badge v-if="bucket.live?.pending" variant="warn" size="sm">Pending</Badge>
       <Badge v-if="moving" variant="outline" size="sm">{{ moving }} {{ moving === 1 ? 'range moves' : 'ranges move' }}</Badge>
       <Badge v-if="left" variant="outline" size="sm" title="This node applies no more changes of the bucket">Left</Badge>
-      <Badge v-if="degraded.length" variant="warn" size="sm">Degraded</Badge>
     </div>
     <DeletionNotice v-if="bucket.live?.deletion" :deletion="bucket.live.deletion" />
-    <DegradedNotice v-for="range in degraded" :key="range.id" :range="range" />
+    <DegradedNotice :ranges="degraded" />
   </div>
 </template>

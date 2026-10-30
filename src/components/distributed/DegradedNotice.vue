@@ -1,20 +1,21 @@
 <script setup lang="ts">
-// A range whose coordinator cannot be reached. The details are in the hover text.
+// Ranges whose coordinator cannot be reached, in one notice named by the unreachable nodes.
+import { computed } from 'vue'
 import Notice from '@/components/ui/Notice.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { stamp } from '@/lib/distributedMock'
 import type { DistributedRange } from '@/lib/distribution'
 
-defineProps<{ range: DistributedRange }>()
+const props = defineProps<{ ranges: DistributedRange[] }>()
 const { displayName } = useRealmNodes()
+const names = computed(() => [...new Set(props.ranges.map((range) => range.coordinator))].map(displayName))
+const since = computed(() => props.ranges.map((range) => range.degradedSince).filter((at): at is string => Boolean(at)).sort()[0])
+const copies = computed(() => [...new Set(props.ranges.flatMap((range) => range.replicas))].map(displayName).join(', '))
 </script>
 
 <template>
-  <div :title="`Nothing waits in a queue. Reads continue from the copies on ${range.replicas.map(displayName).join(', ') || 'no other node'}.`">
-    <Notice tone="warning" title="Degraded">
-      Writes to range {{ range.id }} are refused: {{ displayName(range.coordinator) }}
-      <template v-if="range.degradedSince">has been unreachable since {{ stamp(range.degradedSince) }}.</template>
-      <template v-else>is unreachable.</template>
-    </Notice>
-  </div>
+  <Notice v-if="ranges.length" tone="warning" :title="`Writes are paused: ${names.join(', ')} ${names.length === 1 ? 'is' : 'are'} unreachable`">
+    <template v-if="since">Since {{ stamp(since) }}. </template>
+    {{ copies ? `Reads continue from the copies on ${copies}.` : 'No other node holds a copy to read from.' }}
+  </Notice>
 </template>

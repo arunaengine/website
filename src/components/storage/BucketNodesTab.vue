@@ -28,7 +28,6 @@ const VIEWERS = [
   { value: 'member', label: 'Group member' },
 ]
 
-const NOTICED = 3
 const degraded = computed(() => degradedRanges(props.bucket))
 // A node that does not report a setting leaves its row out.
 const settings = computed(() => {
@@ -72,10 +71,7 @@ const state = computed(() => (isDeleting(props.bucket) ? 'Deleting' : props.buck
     </Notice>
     <AdmissionRetry v-if="bucket.live && unadmitted && admin" :live="bucket.live" @done="emit('reload')" />
     <TransferStatus v-if="transfers.length" :bucket="bucket" :transfers="transfers" />
-    <DegradedNotice v-for="range in degraded.slice(0, NOTICED)" :key="range.id" :range="range" />
-    <p v-if="degraded.length > NOTICED" class="text-xs text-muted-foreground">
-      {{ degraded.length - NOTICED }} more ranges are degraded.
-    </p>
+    <DegradedNotice :ranges="degraded" />
     <section class="surface">
       <header class="flex items-center gap-2 border-b border-border px-5 py-4">
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Nodes</h2>

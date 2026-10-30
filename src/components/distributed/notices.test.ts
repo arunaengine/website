@@ -18,12 +18,12 @@ describe('distributed notices', () => {
     expect(markup).toContain('fails when you have no permission on B')
   })
 
-  it('names the range, the coordinator and the copies of a degraded range', async () => {
-    const range = degradedRanges(mockBucket('bakrep')!)[0]
-    const markup = await render(DegradedNotice, { range })
-    expect(markup).toContain('range r-017')
-    expect(markup).toContain('node-3')
-    expect(markup).toContain('since 2026-10-23 08:12 UTC')
+  it('names the unreachable node and the copies of degraded ranges, never a range id', async () => {
+    const ranges = degradedRanges(mockBucket('bakrep')!)
+    const markup = await render(DegradedNotice, { ranges })
+    expect(markup).not.toContain('r-017')
+    expect(markup).toContain('Writes are paused: node-3 is unreachable')
+    expect(markup).toContain('Since 2026-10-23 08:12 UTC')
     expect(markup).toContain('copies on node-1')
   })
 })
