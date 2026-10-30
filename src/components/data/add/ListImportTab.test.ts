@@ -82,6 +82,33 @@ describe('import from a list', () => {
     expect(createStagingJob).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'samples' }), 'node-2')
   })
 
+  it('stages an uploaded list on the node it was uploaded to', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    createStagingJob.mockClear()
+    upload.mockClear()
+    let uploaded: () => void = () => {}
+    upload.mockReturnValueOnce({ promise: new Promise<void>((resolve) => (uploaded = resolve)) })
+    const node = ref('node-a')
+    const host = defineComponent({ setup: () => () => h(component, { bucket: 'samples', source, nodeId: node.value }) })
+    const { root } = await mountApp(host)
+    await click(button(root, 'Upload source'))
+    const file = new File(['sample,url\nS01,https://x.org/S01.fq\n'], 'run1.csv')
+    ;(element(root, (entry) => entry.props['aria-label'] === 'List file').props.onChange as (event: unknown) => void)({ target: { files: [file] } })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    const pressed = click(button(root, 'Start import'))
+    await flush()
+    node.value = 'node-b'
+    await flush()
+    uploaded()
+    await pressed
+    await flush()
+
+    expect(upload).toHaveBeenCalledWith('samples', 'lists/run1.csv', file, undefined, 'node-a')
+    expect(createStagingJob).toHaveBeenLastCalledWith(expect.objectContaining({ bucket: 'samples' }), 'node-a')
+  })
+
   it('waits for the preview of a new source and sends what was shown when Start was pressed', async () => {
     const csv = 'sample,url\nS01,https://x.org/S01.fq\n'
     let release: (value: Response) => void = () => {}

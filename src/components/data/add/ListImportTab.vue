@@ -196,6 +196,7 @@ async function start() {
   failure.value = null
   // What is sent is fixed now; a change while the list uploads does not mix into it.
   const listFile = from.value === 'upload' ? file.value : null
+  const nodeId = props.nodeId
   const request = {
     group_id: groupSel.value,
     connector_id: connectorSel.value,
@@ -209,8 +210,8 @@ async function start() {
     },
   }
   try {
-    if (listFile) await s3.uploadObject(props.bucket, `lists/${listFile.name}`, listFile, undefined, props.nodeId).promise
-    const answer = await createStagingJob(request, props.nodeId)
+    if (listFile) await s3.uploadObject(request.bucket, `lists/${listFile.name}`, listFile, undefined, nodeId).promise
+    const answer = await createStagingJob(request, nodeId)
     started.value = answer.job_id
     emit('started', answer.job_id)
   } catch (cause) {
