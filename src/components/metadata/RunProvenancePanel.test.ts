@@ -98,7 +98,8 @@ describe('RunProvenancePanel', () => {
       site: { nodeId: 'node-2', kind: 'kubernetes' },
       container: { name: 'bakta-rs', sha256: `2bf2${'0'.repeat(55)}f32cc` },
       cpuCores: '4',
-      ramBytes: String(8 * 1024 ** 3),
+      // TES asks for 2 GB, which the run view shows as 2 GB, not 1.9.
+      ramBytes: '2000000000',
     }
     const mounted = await mountApp(RunProvenancePanel, { props: { run } })
     const text = content(mounted.root)
@@ -111,7 +112,7 @@ describe('RunProvenancePanel', () => {
     expect(text).toContain('WhereGiessenKubernetes')
     expect(text).toContain('bakta-rs@sha256:2bf2…f32cc')
     expect(text).not.toContain('0'.repeat(55))
-    expect(text).toContain('Resources4 CPU, 8 GB memory')
+    expect(text).toContain('Resources4 CPU, 2 GB memory')
     expect(text).not.toContain('Started by')
     mounted.app.unmount()
   })

@@ -20,7 +20,7 @@ import { parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { isArunaUserId } from '@/lib/identifiers'
 import { groupFiles, type FileGroup } from '@/lib/fileGroups'
 import type { RunCrateFileRef, RunCrateModel } from '@/lib/runCrate'
-import { formatBytes, formatDateTime, isHttpUrl, shortUserId, truncateMiddle } from '@/lib/utils'
+import { formatBytes, formatDateTime, formatResourceGb, isHttpUrl, shortUserId, truncateMiddle } from '@/lib/utils'
 import { ChevronDown, ChevronRight, Database, Download, ExternalLink as ExternalLinkIcon, File as FileIcon, Files, Folder, GitBranch, LogIn, Terminal } from '@lucide/vue'
 
 // `documentId`: the record's id, named with its API address; `published`: when the record was made.
@@ -82,7 +82,7 @@ const ranItems = computed(() => {
   if (run.site) items.push({ key: 'where', label: 'Where', value: run.site.nodeId ?? '' })
   if (containerLabel.value) items.push({ key: 'image', label: 'Image', value: containerLabel.value, mono: true })
   const memory = Number(run.ramBytes)
-  const resources = [run.cpuCores ? `${run.cpuCores} CPU` : '', Number.isFinite(memory) && memory > 0 ? `${formatBytes(memory)} memory` : '']
+  const resources = [run.cpuCores ? `${run.cpuCores} CPU` : '', Number.isFinite(memory) && memory > 0 ? `${formatResourceGb(memory / 1e9)} memory` : '']
     .filter(Boolean)
     .join(', ')
   if (resources) items.push({ key: 'resources', label: 'Resources', value: resources })
