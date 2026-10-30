@@ -14,6 +14,20 @@ export function formatBytes(bytes: number, decimals = 1): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))}\u00a0${sizes[i]}`
 }
 
+// "3.5 GiB": binary units, the number kept on one line with its unit; empty for no size.
+export function formatBinary(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return ''
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB']
+  let value = bytes / 1024
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit++
+  }
+  return `${value.toFixed(1)} ${units[unit]}`
+}
+
 // A limit set in GiB reaches the portal as a GB fraction (2 GiB is
 // 2.147483648 GB); it reads back in the unit it was set in.
 export function formatResourceGb(gb: number): string {
