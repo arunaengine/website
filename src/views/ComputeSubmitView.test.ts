@@ -144,7 +144,7 @@ const DialogStub = defineComponent({
 })
 
 // Bucket holders the federated search answers; this node unless a test says otherwise.
-const searchBuckets = vi.fn(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-id' }], nodes_failed: 0 }))
+const searchBuckets = vi.fn(async (q: string, _options?: { cursor?: string }) => ({ hits: [{ bucket: q, node_id: 'node-id' }], nodes_failed: 0, next_cursor: null as string | null }))
 const useArunaModule = {
   useAruna: () => ({
     searchBuckets,
@@ -332,7 +332,8 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
       nodes: realmNodes,
       localNodeId: ref('node-id'),
       isTarget: () => true,
-      nodeById: (id: string | null) => (id === 'node-b' ? { apiBase: 'https://node-b.example.org/api/v1' } : null),
+      nodeById: (id: string | null) => (id === 'node-b' ? { apiBase: 'https://node-b.example.org/api/v1' } : id === 'node-c' ? { apiBase: null } : null),
+      displayName: (id: string) => `Node ${id}`,
     }),
   },
   '@/composables/useRealm': { useRealm: () => ({ realm: ref({ shortName: 'Realm' }) }) },
@@ -508,6 +509,46 @@ describe('run page', () => {
 
     expect(searchBuckets).toHaveBeenCalledWith('results', { limit: 50 })
     expect(createTask).toHaveBeenCalledWith(expect.anything(), 'https://node-b.example.org/api/v1')
+    mounted.app.unmount()
+  })
+
+  it('follows the bucket search to its last page before routing', async () => {
+    searchBuckets.mockImplementationOnce(async () => ({ hits: [], nodes_failed: 0, next_cursor: 'page-2' }))
+    searchBuckets.mockImplementationOnce(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-b' }], nodes_failed: 0, next_cursor: null }))
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
+    await fillValidRun(mounted.root)
+
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    expect(searchBuckets).toHaveBeenLastCalledWith('results', { limit: 50, cursor: 'page-2' })
+    expect(createTask).toHaveBeenCalledWith(expect.anything(), 'https://node-b.example.org/api/v1')
+    mounted.app.unmount()
+  })
+
+  it('starts nothing when the holder lookup fails or the holder names no address', async () => {
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
+    await fillValidRun(mounted.root)
+
+    searchBuckets.mockRejectedValueOnce(new Error('search is down'))
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    expect(content(mounted.root)).toContain('search is down')
+
+    searchBuckets.mockImplementationOnce(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-c' }], nodes_failed: 0, next_cursor: null }))
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    expect(content(mounted.root)).toContain('Node node-c holds the run\'s buckets but names no API address')
+
+    searchBuckets.mockImplementationOnce(async () => ({ hits: [], nodes_failed: 0, next_cursor: null }))
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    expect(content(mounted.root)).toContain('No node holds bucket results')
+    expect(createTask).not.toHaveBeenCalled()
     mounted.app.unmount()
   })
 

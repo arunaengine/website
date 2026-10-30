@@ -40,7 +40,7 @@ const router = useRouter()
 const { tesEnabled, busy, createTask, getTask } = useTes()
 const { currentUser, myGroups, searchBuckets } = useAruna()
 const { realm } = useRealm()
-const { nodes, nodeById, localNodeId, isTarget } = useRealmNodes()
+const { nodes, nodeById, localNodeId, isTarget, displayName } = useRealmNodes()
 // Desktop only: this computer can run the container itself.
 const runTarget = useRunTarget()
 const s3 = useS3()
@@ -141,19 +141,34 @@ async function submitLocally(draft: TesTask): Promise<boolean> {
   return true
 }
 
+// A listing that keeps a failed node in its cursor ends only once that node answered.
+const HOLDER_PAGES = 10
+
+/** Every node holding a bucket of this name, read to the last page. */
+async function bucketHolders(name: string): Promise<string[]> {
+  const nodes = new Set<string>()
+  let cursor: string | undefined
+  for (let page = 0; page < HOLDER_PAGES; page += 1) {
+    const found = await searchBuckets(name, { limit: 50, cursor })
+    for (const hit of found.hits) if (hit.bucket === name && isTarget(hit.node_id)) nodes.add(hit.node_id)
+    cursor = found.next_cursor ?? undefined
+    if (!cursor) return [...nodes]
+  }
+  throw new Error(`Not every node answered, so the node holding bucket ${name} is unknown. Try again.`)
+}
+
 /** The API of the node holding the run's buckets; undefined keeps the connected node. */
 async function holderBase(draft: TesTask): Promise<string | undefined> {
   const { inputs, outputs } = taskBuckets(draft)
-  const holders = new Map(
-    await Promise.all(
-      [...new Set([...inputs, ...outputs])].map(async (name) => {
-        const found = await searchBuckets(name, { limit: 50 }).catch(() => null)
-        const hits = (found?.hits ?? []).filter((hit) => hit.bucket === name && isTarget(hit.node_id))
-        return [name, hits.map((hit) => hit.node_id)] as const
-      }),
-    ),
-  )
-  return nodeById(holderNode(draft, holders, localNodeId.value))?.apiBase ?? undefined
+  const names = [...new Set([...inputs, ...outputs])]
+  const holders = new Map(await Promise.all(names.map(async (name) => [name, await bucketHolders(name)] as const)))
+  const missing = names.find((name) => !holders.get(name)?.length)
+  if (missing) throw new Error(`No node holds bucket ${missing}, so the run was not started.`)
+  const node = holderNode(draft, holders, localNodeId.value)
+  if (!node) return undefined
+  const base = nodeById(node)?.apiBase
+  if (!base) throw new Error(`${displayName(node)} holds the run's buckets but names no API address, so the run was not started.`)
+  return base
 }
 
 async function run() {
