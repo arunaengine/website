@@ -20,7 +20,7 @@ import { parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { isArunaUserId } from '@/lib/identifiers'
 import { groupFiles, type FileGroup } from '@/lib/fileGroups'
 import type { RunCrateFileRef, RunCrateModel } from '@/lib/runCrate'
-import { formatBytes, formatDateTime, isHttpUrl, shortUserId } from '@/lib/utils'
+import { formatBytes, formatDateTime, isHttpUrl, shortUserId, truncateMiddle } from '@/lib/utils'
 import { ChevronDown, ChevronRight, Database, Download, ExternalLink as ExternalLinkIcon, File as FileIcon, Files, Folder, GitBranch, LogIn, Terminal } from '@lucide/vue'
 
 // `documentId`: the record's id, named with its API address; `published`: when the record was made.
@@ -95,6 +95,9 @@ const ranItems = computed(() => {
   }
   return items
 })
+// Long digests and ids read shortened in the middle; the copy button and hover keep them whole.
+const shortDigest = (value: string) => value.replace(/sha256:([0-9a-f]{64})/i, (_, hex: string) => `sha256:${hex.slice(0, 4)}…${hex.slice(-5)}`)
+const executor = (kind: string) => kind.charAt(0).toUpperCase() + kind.slice(1)
 const startedAt = computed(() => {
   const ms = props.run.startTime ? Date.parse(props.run.startTime) : NaN
   return Number.isFinite(ms) ? formatDateTime(ms) : props.run.startTime ?? ''
@@ -154,8 +157,9 @@ function bytesOf(files: RunCrateFileRef[]): string {
   const sizes = files.map((file) => Number(file.contentSize))
   return files.length && sizes.every((size) => Number.isFinite(size) && size >= 0) ? formatBytes(sizes.reduce((a, b) => a + b, 0)) : ''
 }
+// A database or a folder of files counts as one input.
 const inputSummary = computed(() => {
-  const count = props.run.inputs.length
+  const count = groupFiles(props.run.inputs, s3.endpoint.value).length
   return count ? [`${count} ${count === 1 ? 'input' : 'inputs'}`, bytesOf(props.run.inputs)].filter(Boolean).join(', ') : ''
 })
 const outputBytes = computed(() => bytesOf(props.run.outputs))
@@ -329,7 +333,8 @@ function groupSize(group: FileGroup): string {
                 <p v-if="outputKinds" class="mt-0.5 text-xs text-muted-foreground">{{ outputKinds }}</p>
               </div>
             </div>
-            <ul class="divide-y divide-border-subtle border-t border-border-subtle">
+            <!-- Results in one folder are summed up above; spread ones list their folders. -->
+            <ul v-if="!savedTo" class="divide-y divide-border-subtle border-t border-border-subtle">
               <li v-for="entry in allResults ? resultRows : resultRows.slice(0, 5)" :key="entry.key">
                 <button v-if="entry.kind === 'group'" type="button" class="flex w-full items-center gap-2 px-5 py-2 text-left text-sm text-foreground hover:bg-muted/40" :aria-expanded="opened.has(entry.key)" @click="toggle(entry.key)">
                   <ChevronRight class="h-3.5 w-3.5 shrink-0 transition-transform" :class="opened.has(entry.key) ? 'rotate-90' : ''" aria-hidden="true" />
@@ -350,7 +355,7 @@ function groupSize(group: FileGroup): string {
                 </component>
               </li>
             </ul>
-            <div v-if="resultRows.length > 5 && !allResults" class="border-t border-border-subtle px-5 py-2.5">
+            <div v-if="!savedTo && resultRows.length > 5 && !allResults" class="border-t border-border-subtle px-5 py-2.5">
               <Button variant="outline" size="sm" @click="allResults = true"><ChevronDown class="h-4 w-4" /> Show all {{ run.outputs.length }} files</Button>
             </div>
           </template>
@@ -374,12 +379,12 @@ function groupSize(group: FileGroup): string {
           </template>
           <template #where>
             <RouterLink v-if="run.site?.nodeId" :to="{ name: 'node', params: { nodeId: run.site.nodeId } }" class="text-primary hover:underline">{{ displayName(run.site.nodeId) }}</RouterLink>
-            <span v-if="run.site?.kind" class="block text-xs text-muted-foreground">{{ run.site.kind }}</span>
+            <span v-if="run.site?.kind" class="block text-xs text-muted-foreground">{{ executor(run.site.kind) }}</span>
             <span v-if="run.site?.reason" class="block text-xs text-muted-foreground">{{ run.site.reason }}</span>
           </template>
           <template #image="{ item }">
             <a v-if="run.container?.url" :href="run.container.url" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-primary hover:underline">{{ item.value }} <ExternalLinkIcon class="h-3 w-3 shrink-0" /></a>
-            <template v-else>{{ item.value }}</template>
+            <span v-else class="inline-flex max-w-full items-center gap-1" :title="item.value"><span class="truncate">{{ shortDigest(item.value) }}</span><CopyButton :value="item.value" label="Copy the image" /></span>
           </template>
           <template #agent>
             <span :title="run.agent?.identifier || run.agent?.id">
@@ -393,10 +398,10 @@ function groupSize(group: FileGroup): string {
             <RouterLink class="text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: item.value } }">{{ item.value }}</RouterLink>
           </template>
           <template #record="{ item }">
-            <span class="inline-flex max-w-full items-center gap-1"><span class="truncate">{{ item.value }}</span><CopyButton :value="item.value" label="Copy the record id" /></span>
+            <span class="inline-flex max-w-full items-center gap-1"><span class="truncate" :title="item.value">{{ truncateMiddle(item.value, 8, 6) }}</span><CopyButton :value="item.value" label="Copy the record id" /></span>
           </template>
           <template #api="{ item }">
-            <span class="inline-flex max-w-full items-center gap-1"><span class="break-all">{{ item.value }}</span><CopyButton :value="item.value" label="Copy the API address" /></span>
+            <span class="inline-flex max-w-full items-center gap-1"><span class="truncate" :title="item.value">{{ item.value.replace(documentId ?? '', truncateMiddle(documentId ?? '', 8, 6)) }}</span><CopyButton :value="item.value" label="Copy the API address" /></span>
           </template>
         </DetailList>
         <div v-if="run.command">

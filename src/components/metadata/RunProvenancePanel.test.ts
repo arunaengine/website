@@ -96,6 +96,7 @@ describe('RunProvenancePanel', () => {
       ],
       command: '/bakta --db /work/in/db genome.fasta',
       site: { nodeId: 'node-2', kind: 'kubernetes' },
+      container: { name: 'bakta-rs', sha256: `2bf2${'0'.repeat(55)}f32cc` },
       cpuCores: '4',
       ramBytes: String(8 * 1024 ** 3),
     }
@@ -107,7 +108,9 @@ describe('RunProvenancePanel', () => {
     expect(text).toContain('2 files')
     expect(text).toContain('results/bakta/')
     expect(text).toContain('Command/bakta --db /work/in/db genome.fasta')
-    expect(text).toContain('WhereGiessenkubernetes')
+    expect(text).toContain('WhereGiessenKubernetes')
+    expect(text).toContain('bakta-rs@sha256:2bf2…f32cc')
+    expect(text).not.toContain('0'.repeat(55))
     expect(text).toContain('Resources4 CPU, 8 GB memory')
     expect(text).not.toContain('Started by')
     mounted.app.unmount()
@@ -159,12 +162,12 @@ describe('RunProvenancePanel grouped files', () => {
     expect(text).toContain('release 6.0 light, 66 files')
     expect(text).toContain('DOI 10.5281/zenodo.14916843')
     expect(text).toContain('64.5 KB')
-    // Results in one folder: the summary names count and folder, the list shows five, then all.
+    // A database counts as one input; results in one folder are a summary of count and folder only.
+    expect(text).toContain('2 inputs')
     expect(text).toContain('13 files')
     expect(text).toContain('laptop/results/bakta/')
-    expect(text).toContain('genome-4.tsv')
-    expect(text).not.toContain('genome-5.tsv')
-    expect(text).toContain('Show all 13 files')
+    expect(text).not.toContain('genome-0.tsv')
+    expect(text).not.toContain('Show all 13 files')
     expect(text).not.toContain('part-3.dmnd')
 
     const toggle = nodes(mounted.root).find((node) => node.tag === 'button' && content(node).includes('Bakta database'))!
