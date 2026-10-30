@@ -21,6 +21,12 @@ const component = compileClientComponent(new URL('./LinkedDatasets.vue', import.
   'vue-router': { RouterLink: defineComponent((_, { slots }) => () => h('a', slots.default?.())) },
   '@/components/ui/Button.vue': moduleDefault(defineComponent((_, { slots }) => () => h('button', slots.default?.()))),
   '@/components/ui/Spinner.vue': moduleDefault(defineComponent(() => () => h('i'))),
+  '@/components/ui/InfoHint.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (props) => () => h('i', props.label) })),
+  '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent({
+    props: { title: String, count: String, info: String },
+    setup: (props, { slots }) => () => h('div', [h('h2', props.title), props.count ?? '', props.info ? h('i', { 'data-info': props.info }) : null, slots.actions?.()]),
+  })),
+  '@lucide/vue': { Link2: defineComponent(() => () => h('i')) },
   '@/composables/useDatasetLinks': { useDatasetLinks: () => links },
 })
 

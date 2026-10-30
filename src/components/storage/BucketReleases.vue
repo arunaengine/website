@@ -6,6 +6,7 @@ import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { nodeClientReady } from '@/composables/aruna/state'
 import { useAruna } from '@/composables/useAruna'
@@ -14,7 +15,7 @@ import { ARUNA_CONTENT_W3ID_PREFIX, versionObjectId } from '@/lib/contentIdentit
 import { pageIdentifier } from '@/lib/databases'
 import { releaseKey, versionTime } from '@/lib/releases'
 import { crateGraph, crateRootId, stringProp } from '@/lib/dataEntities'
-import { Plus } from '@lucide/vue'
+import { Plus, Tag } from '@lucide/vue'
 import { formatDate } from '@/lib/utils'
 
 const props = defineProps<{ bucket: string; nodeId: string | null; canPublish: boolean; page?: string }>()
@@ -116,11 +117,13 @@ async function publish() {
 </script>
 
 <template>
-  <section class="surface space-y-3 p-5">
-    <div class="flex items-center gap-2">
-      <h2 class="font-display text-sm font-semibold text-aruna-navy">Releases</h2>
-      <Button v-if="canPublish && !publishing" size="sm" variant="outline" class="ml-auto" @click="open"><Plus class="h-3.5 w-3.5" /> Publish release</Button>
-    </div>
+  <section>
+    <SectionHeading title="Releases" :icon="Tag" :count="listed ? String(listed.releases.length) : undefined">
+      <template v-if="canPublish && !publishing" #actions>
+        <Button size="sm" variant="outline" @click="open"><Plus class="h-3.5 w-3.5" /> Publish release</Button>
+      </template>
+    </SectionHeading>
+    <div class="surface space-y-3 p-5">
     <Spinner v-if="!listed && !failure" show-label label="Reading the releases…" />
     <table v-else-if="listed?.releases.length" class="w-full text-left text-xs">
       <thead class="border-b border-border text-muted-foreground">
@@ -170,5 +173,6 @@ async function publish() {
       </div>
     </div>
     <Notice v-if="failure" tone="error">{{ failure }}</Notice>
+  </div>
   </section>
 </template>

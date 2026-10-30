@@ -4,11 +4,15 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
+import InfoHint from '@/components/ui/InfoHint.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useDatasetLinks, type LinkTarget } from '@/composables/useDatasetLinks'
+import { Link2 } from '@lucide/vue'
 
 const props = defineProps<{ heading: string; target: LinkTarget; card?: boolean; quietEmpty?: boolean; exclude?: string }>()
 
+const INCOMPLETE = 'The list may be incomplete: a node did not answer or is still indexing.'
 const target = computed(() => props.target)
 const links = useDatasetLinks(target)
 const documents = computed(() => links.documents.value.filter((document) => document.document_id !== props.exclude))
@@ -21,12 +25,12 @@ const visible = computed(() => links.state.value !== 'missing' && !(props.quietE
 </script>
 
 <template>
-  <section v-if="visible" :class="card ? 'surface' : 'space-y-2 border-t border-border pt-4'">
-    <header v-if="card" class="border-b border-border px-5 py-4">
-      <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ heading }}</h2>
-    </header>
-    <h3 v-else class="text-sm font-medium text-foreground">{{ heading }}</h3>
-    <div :class="card ? 'space-y-2 px-5 py-4' : 'space-y-2'">
+  <section v-if="visible" :class="card ? '' : 'space-y-2 border-t border-border pt-4'">
+    <SectionHeading v-if="card" :title="heading" :icon="Link2" :info="links.state.value === 'ready' && !links.complete.value ? INCOMPLETE : undefined" />
+    <h3 v-else class="flex items-center gap-1.5 text-sm font-medium text-foreground">
+      {{ heading }}<InfoHint v-if="links.state.value === 'ready' && !links.complete.value" :label="INCOMPLETE" name="The list may be incomplete" />
+    </h3>
+    <div :class="card ? 'surface space-y-2 px-5 py-4' : 'space-y-2'">
       <Spinner v-if="links.state.value === 'loading'" label="Looking for datasets" />
       <p v-else-if="links.state.value === 'failed'" class="text-xs text-muted-foreground">
         The datasets could not be read: {{ links.error.value }}
@@ -43,7 +47,6 @@ const visible = computed(() => links.state.value !== 'missing' && !(props.quietE
         </ul>
         <Button v-if="links.more.value" variant="ghost" size="sm" :disabled="links.loadingMore.value" @click="links.loadMore()">More datasets</Button>
         <p v-if="links.hidden.value" class="text-xs text-muted-foreground">Some datasets are not visible to you.</p>
-        <p v-if="!links.complete.value" class="text-xs text-muted-foreground">The list may be incomplete: a node did not answer or is still indexing.</p>
         <p v-if="links.error.value" class="text-xs text-muted-foreground">More datasets could not be read: {{ links.error.value }}</p>
       </template>
     </div>

@@ -33,6 +33,10 @@ const component = compileClientComponent(new URL('./BucketReleases.vue', import.
   '@/components/ui/Input.vue': moduleDefault(Slotted('input')),
   '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
   '@/components/ui/Spinner.vue': moduleDefault(Slotted('span')),
+  '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent({
+    props: { title: String, count: String, info: String },
+    setup: (props, { slots }) => () => h('div', [h('h2', props.title), props.count ?? '', props.info ? h('i', { 'data-info': props.info }) : null, slots.actions?.()]),
+  })),
   '@/composables/aruna/state': { nodeClientReady: async () => ({ baseUrl: 'https://node.test', token: 't' }) },
   '@/composables/useAruna': {
     useAruna: () => ({ listReleases, publishRelease: vi.fn(), sessionEpoch: ref(1), nodeInfo: ref({ node: { realm_id: 'realm', peer_id: 'node-2' } }), fetchRoCrateRaw }),
@@ -43,7 +47,7 @@ const component = compileClientComponent(new URL('./BucketReleases.vue', import.
   '@/lib/databases': { pageIdentifier: () => null },
   '@/lib/releases': Releases,
   '@/lib/utils': Utils,
-  '@lucide/vue': { Plus: Slotted('i') },
+  '@lucide/vue': { Plus: Slotted('i'), Tag: Slotted('i') },
 })
 
 describe('bucket releases', () => {

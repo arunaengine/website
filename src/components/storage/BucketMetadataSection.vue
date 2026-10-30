@@ -4,17 +4,19 @@
 import { computed, ref, watch } from 'vue'
 import IdentifierLinksEditor from '@/components/settings/IdentifierLinksEditor.vue'
 import BucketReleases from '@/components/storage/BucketReleases.vue'
-import Badge from '@/components/ui/Badge.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Switch from '@/components/ui/Switch.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDatabases } from '@/composables/useDatabases'
 import { apiErrorMessage, type BucketMetadata, type IdentifierParser } from '@/lib/api'
 import { pageIdentifier, pageText, withPage } from '@/lib/databases'
+import { licenseText } from '@/lib/licenses'
+import { FileText, Link2 } from '@lucide/vue'
 
 const props = defineProps<{ bucket: string; nodeId: string | null; canAdmin: boolean }>()
 
@@ -126,22 +128,23 @@ function keepRules(parser: IdentifierParser | null) {
 </script>
 
 <template>
-  <section class="surface space-y-4 p-5">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 class="font-display text-sm font-semibold text-aruna-navy">Description</h2>
-      <label v-if="canAdmin && state === 'ready'" class="flex items-center gap-2 text-sm">
-        <Switch v-model:checked="draft.database" aria-label="Show as database" />
-        Show as database
-      </label>
-      <Badge v-else-if="current.database" variant="secondary">Shown as database</Badge>
-    </div>
+  <section>
+    <SectionHeading title="Description" :icon="FileText">
+      <template v-if="canAdmin && state === 'ready'" #actions>
+        <label class="flex items-center gap-2 text-sm">
+          <Switch v-model:checked="draft.database" aria-label="Show as database" />
+          Show as database
+        </label>
+      </template>
+    </SectionHeading>
+    <div class="surface space-y-4 p-5">
     <Spinner v-if="state === 'loading'" show-label label="Reading the description…" />
     <Notice v-else-if="state === 'failed'" tone="error">The description could not be read: {{ failure }}</Notice>
     <template v-else>
       <dl v-if="!canAdmin" class="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[7rem_1fr_7rem_1fr]">
         <dt class="text-muted-foreground">Title</dt><dd>{{ current.title || 'None' }}</dd>
         <dt class="text-muted-foreground">Version</dt><dd>{{ current.version || 'None' }}</dd>
-        <dt class="text-muted-foreground">License</dt><dd>{{ current.license || 'None' }}</dd>
+        <dt class="text-muted-foreground">License</dt><dd>{{ current.license ? licenseText(current.license) : 'None' }}</dd>
         <dt class="text-muted-foreground">DOI or link</dt>
         <dd class="font-mono text-xs">
           <ExternalLink v-if="pageLink" :href="pageLink.url" :label="pageLink.value" />
@@ -161,14 +164,12 @@ function keepRules(parser: IdentifierParser | null) {
           <ExternalLink v-if="pageLink" :href="pageLink.url" label="Open" class="shrink-0 text-xs" :aria-label="`Open ${pageLink.value} in a new tab`" />
         </div>
       </div>
-      <div class="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-sm">
-        <span>
-          <span class="text-muted-foreground">Identifier links</span>
-          <span class="ml-4">{{ ruleCount ? `${ruleCount} ${ruleCount === 1 ? 'rule' : 'rules'}` : 'None yet' }}</span>
-        </span>
-        <button v-if="canAdmin && !editingRules" type="button" class="text-primary hover:underline" @click="editingRules = true">
-          {{ ruleCount ? 'Edit link rules' : 'Add a link rule' }}
-        </button>
+      <div class="grid items-center gap-x-6 gap-y-2 border-t border-border pt-3 text-sm sm:grid-cols-[7rem_1fr_auto]">
+        <span class="text-muted-foreground">Identifier links</span>
+        <span>{{ ruleCount ? `${ruleCount} ${ruleCount === 1 ? 'rule' : 'rules'}` : 'None yet' }}</span>
+        <Button v-if="canAdmin && !editingRules" variant="outline" size="sm" @click="editingRules = true">
+          <Link2 class="h-3.5 w-3.5" /> {{ ruleCount ? 'Edit link rules' : 'Add a link rule' }}
+        </Button>
       </div>
       <IdentifierLinksEditor
         v-if="canAdmin && editingRules"
@@ -186,6 +187,7 @@ function keepRules(parser: IdentifierParser | null) {
       </div>
     </template>
     <Notice v-if="failure && state !== 'failed'" tone="error">{{ failure }}</Notice>
+    </div>
   </section>
   <BucketReleases
     v-if="state === 'ready' && current.database"
