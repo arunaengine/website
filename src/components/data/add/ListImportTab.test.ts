@@ -60,6 +60,17 @@ describe('import from a list', () => {
     expect(body[0].table.rows.source).toBe('{url}')
   })
 
+  it('reads a supplied link as soon as it opens', async () => {
+    const fetch = vi.fn(async () => new Response('sample,url\nS01,https://x.org/S01.fq\n', { status: 200 }))
+    vi.stubGlobal('fetch', fetch)
+    const { root } = await mountApp(component, { props: { bucket: 'samples', source, link: 'https://x.org/given.csv' } })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    expect(fetch).toHaveBeenCalledWith('https://x.org/given.csv', expect.anything())
+    expect(content(root)).toContain('S01')
+  })
+
   it('waits for the preview of a new source and sends what was shown when Start was pressed', async () => {
     const csv = 'sample,url\nS01,https://x.org/S01.fq\n'
     let release: (value: Response) => void = () => {}

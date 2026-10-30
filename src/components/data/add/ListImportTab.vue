@@ -118,7 +118,8 @@ function applyUses() {
   targetTemplate.value = kind.value === 'folder' && templates ? templates.source.replace('}', '|basename}') : templates?.target ?? ''
 }
 
-watch([from, link, listBucket, listKey, file], () => void read())
+// A link handed in, such as a new referenced bucket's source, is read when the panel opens.
+watch([from, link, listBucket, listKey, file], () => void read(), { immediate: Boolean(link.value) })
 // Without a preview (typed column names) a preset applies at once and the shown columns stay current.
 watch(presetName, () => {
   if (text.value) return void read()
