@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
+import OverviewCell from '@/components/dashboard/OverviewCell.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
+import DropdownMenu from '@/components/ui/DropdownMenu.vue'
+import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
+import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
+import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import Button from '@/components/ui/Button.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
@@ -14,7 +20,7 @@ import ExternalLink from '@/components/ui/ExternalLink.vue'
 import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { profileRulesLoadState, useAruna } from '@/composables/useAruna'
-import { ListChecks, Pencil, Plus, Star, Lock, Download, Globe, Trash2 } from '@lucide/vue'
+import { ChevronDown, FileJson2, ListChecks, Pencil, Plus, Star, Lock, Download, Globe, Tag, Trash2 } from '@lucide/vue'
 import { GROUP_PROFILE_HINT, profileScope } from '@/lib/profiles/assignable'
 import {
   OBLIGATION_ACCENT,
@@ -31,7 +37,6 @@ import { cloneLiftNotes } from '@/lib/shacl/lift'
 import type { MetadataProfile } from '@/data/types'
 import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import { errorMessage } from '@/lib/utils'
-import DocsLink from '@/components/ui/DocsLink.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -301,18 +306,17 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
   <div>
     <PageHeader
       :title="route.name === 'profile' ? (selected?.name ?? selectedId) : 'Profiles'"
-      description="Profiles are ordinary RO-Crate datasets stored under profiles/."
+      :crumbs="route.name === 'profile' ? [{ label: selected?.name ?? selectedId }] : []"
       :docs="{ topic: 'profiles-conformance', section: 'Profiles define minimum requirements' }"
     >
       <template #actions>
-        <DocsLink topic="build-a-profile" label="Learn how profiles work" />
         <Button @click="openCreate" :disabled="!currentUser">
           <Plus class="h-4 w-4" /> New profile
         </Button>
       </template>
     </PageHeader>
 
-    <div v-if="!painted" class="w-full px-4 sm:px-6 grid gap-6 py-8 lg:grid-cols-[360px_1fr]">
+    <div v-if="!painted" class="w-full px-4 sm:px-6 grid gap-6 py-6 lg:grid-cols-[360px_1fr]">
       <ListSkeleton :rows="5" label="Loading profiles" />
       <div class="space-y-5">
         <SectionSkeleton :header="false" :lines="3" :tiles="3" />
@@ -320,8 +324,14 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
       </div>
     </div>
 
-    <div v-else class="w-full px-4 sm:px-6 grid gap-6 py-8 lg:grid-cols-[360px_1fr]">
-      <aside class="surface max-h-[80vh] overflow-y-auto scrollbar-thin">
+    <div v-else class="w-full px-4 sm:px-6 grid gap-6 py-6 lg:grid-cols-[360px_1fr]">
+      <aside aria-labelledby="profiles-list-heading">
+        <SectionHeading id="profiles-list-heading" title="All profiles" :icon="ListChecks" info="Profiles are RO-Crate datasets stored under profiles/.">
+          <template #actions>
+            <span class="text-sm text-muted-foreground"><b class="font-medium text-foreground">{{ visibleProfiles.length }}</b> visible</span>
+          </template>
+        </SectionHeading>
+        <div class="surface max-h-[80vh] overflow-y-auto scrollbar-thin">
         <ul v-if="visibleProfiles.length" class="divide-y divide-border">
           <li v-for="profile in visibleProfiles" :key="profile.id">
             <button
@@ -336,17 +346,20 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-1.5">
                   <span class="truncate text-sm font-medium text-foreground">{{ profile.name }}</span>
-                  <Star v-if="preferredId === profile.id" class="h-3.5 w-3.5 shrink-0 text-amber-500" fill="currentColor" />
-                  <Badge size="sm" class="shrink-0 whitespace-nowrap" :variant="profile.managed ? 'royal' : 'secondary'">{{ profileScope(profile) }}</Badge>
+                  <Star v-if="preferredId === profile.id" class="h-3.5 w-3.5 shrink-0 text-amber-500" fill="currentColor" aria-label="Your default" />
                 </div>
-                <div class="text-[11px] text-muted-foreground">{{ profile.domain }} · {{ propertyCount(profile) }} properties</div>
-                <p class="mt-1 line-clamp-2 text-[11px] text-muted-foreground/90">{{ profile.description || 'No description in RO-Crate.' }}</p>
+                <div class="flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+                  <span class="inline-flex items-center gap-1"><component :is="profile.managed ? Globe : Lock" class="size-3.5" />{{ profileScope(profile) }}</span>
+                  <span><b class="font-medium text-foreground">{{ propertyCount(profile) }}</b> properties</span>
+                </div>
+                <p v-if="profile.description" class="mt-1 line-clamp-2 text-xs text-muted-foreground/90">{{ profile.description }}</p>
               </div>
             </button>
           </li>
         </ul>
         <div v-else class="p-8 text-center text-xs text-muted-foreground">
           No visible profiles under <code>profiles/</code>.
+        </div>
         </div>
       </aside>
 
@@ -358,15 +371,13 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                 <ListChecks class="h-6 w-6" />
               </div>
               <div class="min-w-0">
-                <div class="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <span>{{ selected.domain }}</span>
-                  <span class="inline-flex items-center gap-1">
-                    <Lock v-if="!selected.managed" class="h-3 w-3" />{{ profileScope(selected) }}
-                  </span>
+                <h2 class="type-section-title">{{ selected.name }}</h2>
+                <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                  <span class="inline-flex items-center gap-1.5"><FileJson2 class="size-4" />{{ selected.domain }}</span>
+                  <span class="inline-flex items-center gap-1.5"><component :is="selected.managed ? Globe : Lock" class="size-4" />{{ profileScope(selected) }}</span>
                 </div>
-                <h2 class="mt-1 font-display text-2xl font-semibold tracking-tight text-aruna-navy">{{ selected.name }}</h2>
-                <p class="mt-1 max-w-3xl text-sm text-muted-foreground">{{ selected.description || 'No description in RO-Crate.' }}</p>
-                <p v-if="!selected.managed && !selected.builtIn" class="mt-1 max-w-3xl text-[11px] text-muted-foreground">
+                <p v-if="selected.description" class="mt-2 max-w-3xl text-sm text-muted-foreground">{{ selected.description }}</p>
+                <p v-if="!selected.managed && !selected.builtIn" class="mt-1 max-w-3xl text-xs text-muted-foreground">
                   {{ GROUP_PROFILE_HINT }}
                 </p>
               </div>
@@ -399,66 +410,46 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
               >
                 <Trash2 class="h-3.5 w-3.5" /> Delete
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                :disabled="downloadingCrate"
-                @click="downloadProfileCrate(selected)"
-                title="Full-fidelity RO-Crate profile, validation rules and form structure travel together"
-              >
-                <Download class="h-3.5 w-3.5" /> {{ downloadingCrate ? 'Preparing…' : 'Download profile RO-Crate' }}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                @click="downloadModeFile(selected)"
-                title="Mode file (Describo/Crate-O), structure only; validation rules travel in the profile RO-Crate"
-              >
-                <Download class="h-3.5 w-3.5" /> Mode file (Describo/Crate-O)
-              </Button>
-              <Button
-                v-if="selected.shapesText || selected.customShapesText"
-                variant="outline"
-                size="sm"
-                @click="downloadShapes(selected)"
-                title="SHACL shapes generated from this profile's rules (plus attached shapes, when present), usable in any SHACL validator"
-              >
-                <Download class="h-3.5 w-3.5" /> SHACL shapes
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                  <Button variant="outline" size="sm"><Download class="h-3.5 w-3.5" /> Download <ChevronDown class="h-3.5 w-3.5" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" class="w-64">
+                  <DropdownMenuItem :disabled="downloadingCrate" @click="downloadProfileCrate(selected)">
+                    <Download class="h-3.5 w-3.5" /> {{ downloadingCrate ? 'Preparing…' : 'Profile RO-Crate' }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem @click="downloadModeFile(selected)"><Download class="h-3.5 w-3.5" /> Mode file (Describo/Crate-O)</DropdownMenuItem>
+                  <DropdownMenuItem v-if="selected.shapesText || selected.customShapesText" @click="downloadShapes(selected)">
+                    <Download class="h-3.5 w-3.5" /> SHACL shapes
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button v-if="currentUser && preferredId !== selected.id" variant="outline" size="sm" :disabled="saving" @click="setPreferred(selected.id)">
                 <Star class="h-3.5 w-3.5" /> Set as my default
               </Button>
-              <Badge v-else-if="preferredId === selected.id" variant="accent" class="inline-flex items-center gap-1 px-2 py-1 text-[11px]">
-                <Star class="h-3 w-3" fill="currentColor" /> Your default
-              </Badge>
+              <span v-else-if="preferredId === selected.id" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Star class="h-3.5 w-3.5 text-amber-500" fill="currentColor" /> Your default
+              </span>
             </div>
           </div>
 
-          <div class="mt-5 grid gap-3 md:grid-cols-3">
-            <div class="surface-muted p-3">
-              <div class="text-[11px] uppercase tracking-wider text-muted-foreground">Required properties</div>
-              <div class="mt-1 font-display text-lg font-semibold text-aruna-navy">
-                {{ requiredPropertyCount }}
-                <span class="text-sm font-normal text-muted-foreground">/ {{ allPropertyRules.length }} total</span>
-              </div>
-            </div>
-            <!-- "Used by" needs a server-side count: the catalog is paged, so it
-                 cannot be counted client-side. Hidden until one is served. -->
-            <div v-if="selected.usedCount !== undefined" class="surface-muted p-3">
-              <div class="text-[11px] uppercase tracking-wider text-muted-foreground">Used by</div>
-              <div class="mt-1 font-display text-lg font-semibold text-aruna-navy">{{ selected.usedCount }} <span class="text-sm font-normal text-muted-foreground">metadata docs</span></div>
-            </div>
-            <div class="surface-muted p-3">
-              <div class="text-[11px] uppercase tracking-wider text-muted-foreground">Suggested keywords</div>
-              <div class="mt-1 flex flex-wrap gap-1">
-                <span v-for="keyword in selected.suggestedKeywords" :key="keyword" class="rounded-full bg-card px-2 py-0.5 text-[10px] text-foreground/70">#{{ keyword }}</span>
-                <span v-if="!selected.suggestedKeywords.length" class="text-xs text-muted-foreground">None</span>
-              </div>
-            </div>
-          </div>
-          <p class="mt-4 text-xs text-muted-foreground">
-            Properties omitted by this profile remain allowed unless an explicit closed or other restricting SHACL rule constrains them.
-          </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 sm:gap-4" :class="selected.usedCount !== undefined ? 'xl:grid-cols-3' : ''">
+          <OverviewCell label="Required properties" :icon="ListChecks" info="Properties this profile leaves out stay allowed unless a closed SHACL rule says otherwise.">
+            <template #value>{{ requiredPropertyCount }}</template>
+            <template #unit>of {{ allPropertyRules.length }}</template>
+          </OverviewCell>
+          <!-- "Used by" needs a server-side count: the catalog is paged, so it
+               cannot be counted client-side. Hidden until one is served. -->
+          <OverviewCell v-if="selected.usedCount !== undefined" label="Used by" :icon="FileJson2" tone="sky">
+            <template #value>{{ selected.usedCount }}</template>
+            <template #unit>datasets</template>
+          </OverviewCell>
+          <OverviewCell label="Suggested keywords" :icon="Tag" tone="aqua">
+            <template #value>{{ selected.suggestedKeywords.length }}</template>
+            <span v-for="keyword in selected.suggestedKeywords.slice(0, 6)" :key="keyword">#{{ keyword }}</span>
+          </OverviewCell>
         </div>
 
         <Spinner v-if="selectedLoadingFull" label="Preparing profile rules…" show-label class="px-1" />
