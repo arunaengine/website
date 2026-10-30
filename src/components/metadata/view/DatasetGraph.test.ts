@@ -3,6 +3,7 @@ import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
 import type { DatasetViewState } from '@/composables/useDatasetView'
+import * as DatasetGraphLib from '@/lib/datasetGraph'
 
 const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
 const GraphStub = defineComponent({
@@ -18,6 +19,8 @@ const DatasetGraph = compileClientComponent(new URL('./DatasetGraph.vue', import
   vue: VueRuntime,
   '@/components/ui/Skeleton.vue': moduleDefault(defineComponent(() => () => h('div', 'waiting'))),
   '@/components/metadata/CrateGraph.vue': moduleDefault(GraphStub),
+  '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent({ props: { title: String, info: String }, setup: (props) => () => h('h2', `${props.title} ${props.info}`) })),
+  '@/lib/datasetGraph': DatasetGraphLib,
   '@lucide/vue': new Proxy({}, { get: () => IconStub }),
 })
 
@@ -34,6 +37,7 @@ function state(options: { entities: boolean; loading?: boolean }): DatasetViewSt
     currentCrate: ref(options.entities ? crate : {}),
     crateHasEntities: ref(options.entities),
     loadingCrate: ref(options.loading ?? false),
+    detailId: ref('d1'),
   } as unknown as DatasetViewState
 }
 
