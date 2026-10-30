@@ -18,7 +18,7 @@ import LocalNodeDetails from '@/components/nodes/LocalNodeDetails.vue'
 import NodeDetailPanel from '@/components/nodes/NodeDetailPanel.vue'
 import LocationAggregates from '@/components/placement/LocationAggregates.vue'
 import SectionSkeleton from '@/components/ui/SectionSkeleton.vue'
-import { givenName, isDegradedStatus, statusProblem } from '@/components/nodes/node-display'
+import { givenName, isDegradedStatus, nodeName, statusProblem } from '@/components/nodes/node-display'
 import { nodeApiBase, probeNode, type NodeProbe } from '@/components/nodes/node-probe'
 import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
@@ -292,7 +292,7 @@ watch(
       <template #description>
         <span class="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span v-if="realm.description && realm.description !== realm.name">{{ realm.description }}</span>
-          <span v-if="localPeerId" class="inline-flex items-center gap-1.5"><Server class="size-4" />Served by <RouterLink :to="{ name: 'node', params: { nodeId: localPeerId } }" class="hover:underline"><NodeLabel :node-id="localPeerId" /></RouterLink></span>
+          <span v-if="localPeerId" class="inline-flex items-center gap-1.5"><Server class="size-4" />Served by <RouterLink :to="{ name: 'node', params: { nodeId: localPeerId } }" class="hover:underline">{{ ownRecord ? nodeName(ownRecord) : 'this node' }}</RouterLink></span>
           <span class="inline-flex items-center gap-1.5">Realm id<InfoHint :label="realm.id" name="Realm id" /><CopyButton :value="realm.id" label="Copy realm id" /></span>
           <span class="inline-flex items-center gap-1.5 tabular-nums"><Clock class="size-4" />Updated {{ lastUpdatedLabel }}</span>
         </span>
