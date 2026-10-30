@@ -204,7 +204,10 @@ async function pinInput(input: TesInput, holders: ReadonlyMap<string, readonly s
     return [{ ...input, url: pinned(file) }]
   }
   const prefix = key.endsWith('/') ? key : `${key}/`
-  const { files, stale } = await listedVersions(bucket, prefix, node)
+  const listed = await listedVersions(bucket, prefix, node)
+  const stale = listed.stale
+  // A key ending in a slash marks a folder and holds no file.
+  const files = listed.files.filter((file) => !file.key.endsWith('/'))
   // A copy that lags may miss recent files, so the folder is not taken as complete.
   if (stale) {
     throw new Error(`Part of ${bucket}/${prefix} on ${displayName(node)} is listed from a copy that may miss recent files, so the run was not started. Try again later, or pick its files.`)

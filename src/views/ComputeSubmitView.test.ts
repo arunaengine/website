@@ -783,6 +783,43 @@ describe('run page', () => {
     mounted.app.unmount()
   })
 
+  it('expands a folder of another node into its files, without folder markers', async () => {
+    const version = '01K8W1B3D5F7H9KMQ1S3V5X7Z1'
+    searchBuckets.mockImplementation(async (q: string) => ({
+      hits: [{ bucket: q, node_id: q === 'refs' ? 'node-c' : 'node-b', group_id: 'group-id' }],
+      nodes_failed: 0,
+      next_cursor: null,
+    }))
+    listBucketObjects.mockResolvedValueOnce({
+      objects: [{ key: 'db/', version_id: version }, { key: 'db/sub/', version_id: version }, { key: 'db/sub/a.tsv', version_id: version }],
+      next_cursor: null,
+    })
+    createTask.mockClear()
+    useSavedRuns().save({
+      id: 'r6', name: 'Markers', savedAt: '2026-10-30T10:00:00Z',
+      task: {
+        name: 'Markers',
+        executors: [{ image: 'alpine:3.20', command: ['ls', '/work/in/db'] }],
+        inputs: [{ name: 'db', path: '/work/in/db', url: 's3://refs/db/', type: 'DIRECTORY' }],
+        outputs: [{ url: 's3://results/markers/', path: '/work/out/', type: 'DIRECTORY' }],
+      },
+      ask: { inputs: [], results: false },
+    })
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?saved=r6')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    const [submitted] = createTask.mock.calls.at(-1) as unknown as [Tes.TesTask]
+    expect(submitted.inputs?.map((entry) => [entry.name, entry.path, entry.type])).toEqual([['sub/a.tsv', '/work/in/db/sub/a.tsv', 'FILE']])
+    searchBuckets.mockReset()
+    searchBuckets.mockImplementation(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-id', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
+    useSavedRuns().remove('r6')
+    mounted.app.unmount()
+  })
+
   it('refuses to expand a folder of another node listed from a lagging copy', async () => {
     searchBuckets.mockImplementation(async (q: string) => ({
       hits: [{ bucket: q, node_id: q === 'refs' ? 'node-c' : 'node-b', group_id: 'group-id' }],
