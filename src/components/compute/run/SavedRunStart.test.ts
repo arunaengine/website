@@ -1,6 +1,6 @@
 import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import * as Sync from '@/lib/sync'
 import * as Tes from '@/lib/tes'
 import { compileClientComponent, content, mountApp, moduleDefault, nodes } from '@/test/clientRender'
@@ -10,6 +10,12 @@ const Slotted = (tag: string) =>
 const Empty = defineComponent(() => () => null)
 const databaseRows = ref<unknown[]>([])
 let extraInputs: unknown[] = []
+let askResults = false
+const chooseResults = vi.fn()
+const SelectStub = defineComponent({
+  emits: ['update:modelValue'],
+  setup: (_, { emit }) => () => h('select', { onChange: (value: string) => emit('update:modelValue', value) }),
+})
 const IMAGE = 'harbor.computational.bio.uni-giessen.de/aruna/bakta-rs@sha256:2bf286e66203f8cd5dac0e5b08a7f75156f986330d437d6eef937a3b900f32cc'
 
 function custom() {
@@ -18,18 +24,18 @@ function custom() {
       run: {
         name: 'Bakta annotation',
         task: { executors: [{ image: IMAGE }], inputs: [{ path: '/work/in/genome.fasta' }] },
-        ask: { inputs: ['/work/in/genome.fasta'], results: false },
+        ask: { inputs: ['/work/in/genome.fasta'], results: askResults },
       },
       notes: [],
     }),
     inputs: ref([{ kind: 'folder', bucket: 'bakta-database', prefix: 'db/', name: 'db', basePath: '/work/in/db/', files: [], directory: true }, ...extraInputs]),
-    outputRows: ref([]),
+    outputRows: ref(askResults ? [{ path: '/work/out' }] : []),
     openInputs: ref([]),
     resultsChosen: ref(false),
-    bucketOptions: ref([]),
+    bucketOptions: ref(askResults ? [{ value: 'laptop', label: 'laptop' }] : []),
     envRows: ref([]),
     answerInput: () => {},
-    chooseResults: () => {},
+    chooseResults,
     editSaved: () => {},
   }
 }
@@ -38,7 +44,9 @@ const component = compileClientComponent(new URL('./SavedRunStart.vue', import.m
   vue: VueRuntime,
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
   '@/components/ui/Input.vue': moduleDefault(Empty),
-  '@/components/ui/Select.vue': moduleDefault(Empty),
+  '@/components/ui/IconTile.vue': moduleDefault(Empty),
+  '@/components/ui/SectionHeading.vue': moduleDefault(Empty),
+  '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/compute/run/ResultsHome.vue': moduleDefault(Empty),
   '@/components/compute/TesDataRefDialog.vue': moduleDefault(Empty),
   '@/composables/useCustomRun': { injectCustomRun: custom, outputDestination: () => '' },
@@ -47,25 +55,25 @@ const component = compileClientComponent(new URL('./SavedRunStart.vue', import.m
   '@/composables/useDatabases': { useDatabases: () => ({ rows: databaseRows, ensure: () => {} }) },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ localNodeId: ref('node-1') }) },
   '@/lib/savedRuns': { isSecretName: () => false },
-  '@lucide/vue': { Star: Empty },
+  '@lucide/vue': new Proxy({}, { get: () => Empty }),
 })
 
 describe('saved run start', () => {
   it('names the tool by its image name and keeps the full reference for hover', async () => {
     const { root } = await mountApp(component)
-    const subtitle = nodes(root).find((node) => node.tag === 'p' && content(node).startsWith('Saved on this computer'))!
+    const subtitle = nodes(root).find((node) => node.tag === 'p' && content(node).includes('Saved on this computer'))!
 
-    expect(content(subtitle)).toBe('Saved on this computer, bakta-rs')
+    expect(content(subtitle)).toBe('bakta-rsSaved on this computer')
     expect(subtitle.props.title).toBe(IMAGE)
   })
 
   it('labels each input by its file name with the container path in small print', async () => {
     const { root } = await mountApp(component)
     const labels = nodes(root).filter((node) => node.tag === 'p' && String(node.props.class).includes('font-medium')).map(content)
-    const paths = nodes(root).filter((node) => node.tag === 'p' && String(node.props.class).includes('text-[11px]')).map(content)
+    const paths = nodes(root).filter((node) => node.tag === 'p' && String(node.props.class).includes('font-mono')).map(content)
 
     expect(labels).toEqual(['genome.fasta', 'db'])
-    expect(paths).toEqual(['/work/in/genome.fasta', '/work/in/db'])
+    expect(paths).toEqual(['/work/in/genome.fasta', '/work/in/db', 'bakta-database/db/'])
   })
 
   it('names a fixed database input by its title and release with the bucket path in small print', async () => {
@@ -106,5 +114,16 @@ describe('saved run start', () => {
 
     expect(labels).toEqual(['genome.fasta', 'db', 'Reference genome', 'notes.txt'])
     extraInputs = []
+  })
+
+  it('answers the results question once a bucket is chosen', async () => {
+    askResults = true
+    const { root } = await mountApp(component)
+    const select = nodes(root).find((node) => node.tag === 'select')!
+    ;(select.props.onChange as (value: string) => void)('laptop')
+    await VueRuntime.nextTick()
+
+    expect(chooseResults).toHaveBeenLastCalledWith('laptop', '')
+    askResults = false
   })
 })

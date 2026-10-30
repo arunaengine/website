@@ -1,8 +1,10 @@
 <script setup lang="ts">
 // Starting a saved run: only what it asks for each time is shown, the rest stays as saved.
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
+import IconTile from '@/components/ui/IconTile.vue'
 import Input from '@/components/ui/Input.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Select from '@/components/ui/Select.vue'
 import ResultsHome from '@/components/compute/run/ResultsHome.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
@@ -12,9 +14,9 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { parseArunaArn } from '@/lib/sync'
 import { atOrBelow, entryPath, parseS3Url, type TesDataRefEntry } from '@/lib/tes'
 import { isSecretName } from '@/lib/savedRuns'
-import { Star } from '@lucide/vue'
+import { Container, Database, File as FileIcon, Folder, KeyRound, Laptop, Lock, LogIn, Package, Pencil, Star } from '@lucide/vue'
 
-const { savedStart, inputs, outputRows, openInputs, resultsChosen, bucketOptions, envRows, answerInput, chooseResults, editSaved } = injectCustomRun()
+const { savedStart, inputs, outputRows, openInputs, bucketOptions, envRows, answerInput, chooseResults, editSaved } = injectCustomRun()
 
 const run = computed(() => savedStart.value?.run ?? null)
 const image = computed(() => run.value?.task.executors[0]?.image ?? '')
@@ -66,67 +68,90 @@ function picked(entry: TesDataRefEntry) {
 
 const resultsBucket = ref('')
 const resultsFolder = ref('')
+// The bucket and folder answer the results question as soon as a bucket is chosen.
+watch([resultsBucket, resultsFolder], ([bucket, folder]) => {
+  if (bucket) chooseResults(bucket, folder)
+})
 </script>
 
 <template>
-  <section v-if="run" id="section-saved" class="surface space-y-4 p-5">
-    <header class="flex flex-wrap items-start gap-3">
-      <Star class="mt-1 h-4 w-4 text-primary" />
+  <div v-if="run" id="section-saved" class="space-y-6">
+    <div class="surface flex flex-wrap items-center gap-4 p-5">
+      <IconTile :icon="Star" tone="aqua" />
       <div class="min-w-0 flex-1">
-        <h2 class="font-display text-base font-semibold text-aruna-navy">{{ run.name }}</h2>
-        <p class="text-xs text-muted-foreground" :title="image">Saved on this computer, {{ toolName }}</p>
+        <h2 class="type-card-title break-words">{{ run.name }}</h2>
+        <p class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground" :title="image">
+          <span class="inline-flex items-center gap-1"><Container class="h-3 w-3" />{{ toolName }}</span>
+          <span class="inline-flex items-center gap-1"><Laptop class="h-3 w-3" />Saved on this computer</span>
+        </p>
       </div>
-      <Button variant="outline" size="sm" @click="editSaved">Edit saved run</Button>
-    </header>
-
-    <div id="saved-inputs" class="space-y-2">
-      <div v-for="path in asked" :key="path" class="surface-inline flex flex-wrap items-center gap-3 p-3 text-sm">
-        <div class="min-w-0 flex-1">
-          <p class="font-medium">{{ labelOf(path) }}</p>
-          <p class="truncate font-mono text-[11px] text-muted-foreground">{{ path }}</p>
-          <p v-if="pickOf(path)" class="truncate font-mono text-xs">{{ pickText(pickOf(path)!) }}</p>
-          <p v-else class="text-xs text-amber-700 dark:text-amber-300">Not chosen yet</p>
-        </div>
-        <Button size="sm" variant="outline" @click="choosing = path">{{ pickOf(path) ? 'Change' : 'Choose' }}</Button>
-      </div>
-      <div v-for="{ entry, database } in fixedRows" :key="entryPath(entry)" class="surface-inline flex flex-wrap items-center gap-3 p-3 text-sm">
-        <div v-if="database" class="min-w-0 flex-1" :title="entryPath(entry)">
-          <p class="font-medium">{{ database.title }}<template v-if="database.release">, release {{ database.release }}</template></p>
-          <p class="truncate font-mono text-[11px] text-muted-foreground">{{ pickText(entry) }}</p>
-        </div>
-        <div v-else class="min-w-0 flex-1">
-          <p class="font-medium">{{ entry.name || fileName(entryPath(entry)) }}</p>
-          <p class="truncate font-mono text-[11px] text-muted-foreground">{{ entryPath(entry) }}</p>
-          <p class="truncate font-mono text-xs">{{ pickText(entry) }}</p>
-        </div>
-        <span class="text-xs text-muted-foreground">Fixed in this run</span>
-      </div>
+      <Button variant="outline" size="sm" class="max-sm:w-8 max-sm:px-0" aria-label="Edit saved run" title="Edit saved run" @click="editSaved">
+        <Pencil class="h-3.5 w-3.5" /><span class="max-sm:sr-only">Edit saved run</span>
+      </Button>
     </div>
 
-    <div v-if="secrets.length" id="saved-secrets" class="surface-inline space-y-2 p-3 text-sm">
-      <p class="text-xs text-muted-foreground">Secret values are not saved. Enter them for this run.</p>
-      <label v-for="row in secrets" :key="row.key" class="flex items-center gap-3">
-        <span class="w-48 truncate font-mono text-xs">{{ row.key }}</span>
-        <Input v-model="row.value" type="password" class="flex-1" :aria-label="`Value of ${row.key}`" />
-      </label>
-    </div>
-
-    <div v-if="outputRows.length" id="saved-results" class="surface-inline space-y-2 p-3 text-sm">
-      <p class="text-xs text-muted-foreground">Results</p>
-      <p v-if="resultsChosen" class="truncate font-mono text-xs">{{ outputDestination(outputRows[0]) }}</p>
-      <template v-if="run.ask.results">
-        <ResultsHome @choose="chooseResults" />
-        <div class="flex flex-wrap items-end gap-2">
-          <Select v-if="bucketOptions.length" v-model="resultsBucket" :options="bucketOptions" placeholder="Bucket" class="w-44" aria-label="Results bucket" />
-          <Input v-else v-model="resultsBucket" class="w-44 font-mono" placeholder="Bucket" aria-label="Results bucket" />
-          <Input v-model="resultsFolder" class="w-56 font-mono" placeholder="Folder, such as runs/" aria-label="Results folder" />
-          <Button size="sm" variant="outline" :disabled="!resultsBucket" @click="chooseResults(resultsBucket, resultsFolder)">Use</Button>
+    <section v-if="asked.length || fixedRows.length || secrets.length">
+      <SectionHeading title="Inputs" :icon="LogIn" />
+      <div id="saved-inputs" class="surface divide-y divide-border-subtle">
+        <div v-for="path in asked" :key="path" class="flex flex-wrap items-center gap-3 px-5 py-4">
+          <IconTile :icon="FileIcon" tone="muted" size="sm" />
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium text-foreground">{{ labelOf(path) }}</p>
+            <p v-if="pickOf(path)" class="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+              <Package class="h-3 w-3 shrink-0" /><span class="truncate font-mono">{{ pickText(pickOf(path)!) }}</span>
+            </p>
+            <p v-else class="truncate font-mono text-xs text-muted-foreground">{{ path }}</p>
+          </div>
+          <Button size="sm" variant="outline" @click="choosing = path"><Folder class="h-3.5 w-3.5" /> {{ pickOf(path) ? 'Change' : 'Choose' }}</Button>
         </div>
-      </template>
-      <p v-else class="text-xs text-muted-foreground">Fixed in this run</p>
-    </div>
+        <div v-for="{ entry, database } in fixedRows" :key="entryPath(entry)" class="flex flex-wrap items-center gap-3 px-5 py-4">
+          <IconTile :icon="database ? Database : FileIcon" :tone="database ? 'royal' : 'muted'" size="sm" />
+          <div v-if="database" class="min-w-0 flex-1" :title="entryPath(entry)">
+            <p class="text-sm font-medium text-foreground">{{ database.title }}<template v-if="database.release">, release {{ database.release }}</template></p>
+            <p class="truncate font-mono text-xs text-muted-foreground">{{ pickText(entry) }}</p>
+          </div>
+          <div v-else class="min-w-0 flex-1">
+            <p class="text-sm font-medium text-foreground">{{ entry.name || fileName(entryPath(entry)) }}</p>
+            <p class="truncate font-mono text-xs text-muted-foreground">{{ entryPath(entry) }}</p>
+            <p class="truncate font-mono text-xs text-muted-foreground">{{ pickText(entry) }}</p>
+          </div>
+          <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground max-sm:basis-full max-sm:pl-11"><Lock class="h-3.5 w-3.5" />Set by the saved run</span>
+        </div>
+        <div v-for="(row, i) in secrets" :id="i === 0 ? 'saved-secrets' : undefined" :key="row.key" class="flex flex-wrap items-center gap-3 px-5 py-4">
+          <IconTile :icon="KeyRound" tone="warn" size="sm" />
+          <label class="min-w-0 flex-1">
+            <span class="block truncate font-mono text-xs text-foreground">{{ row.key }}</span>
+            <Input v-model="row.value" type="password" class="mt-1" :aria-label="`Value of ${row.key}`" placeholder="Not saved, enter it for this run" />
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="outputRows.length">
+      <SectionHeading title="Results" :icon="Folder" />
+      <div id="saved-results" class="surface space-y-4 p-5">
+        <template v-if="run.ask.results">
+          <ResultsHome @choose="chooseResults" />
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="block">
+              <span class="text-xs font-medium text-muted-foreground">Bucket</span>
+              <Select v-if="bucketOptions.length" v-model="resultsBucket" :options="bucketOptions" placeholder="Choose a bucket" class="mt-1" aria-label="Results bucket" />
+              <Input v-else v-model="resultsBucket" class="mt-1 font-mono" placeholder="Bucket" aria-label="Results bucket" />
+            </label>
+            <label class="block">
+              <span class="text-xs font-medium text-muted-foreground">Folder</span>
+              <Input v-model="resultsFolder" class="mt-1 font-mono" placeholder="Folder, such as runs/" aria-label="Results folder" />
+            </label>
+          </div>
+        </template>
+        <div v-else class="flex flex-wrap items-center gap-3">
+          <p class="min-w-0 flex-1 truncate font-mono text-xs text-foreground">{{ outputDestination(outputRows[0]) }}</p>
+          <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Lock class="h-3.5 w-3.5" />Set by the saved run</span>
+        </div>
+      </div>
+    </section>
 
     <p v-for="note in savedStart?.notes ?? []" :key="note" class="text-xs text-muted-foreground">{{ note }}</p>
     <TesDataRefDialog v-model:open="dialogOpen" mode="input" :destination="destination" @add="picked" />
-  </section>
+  </div>
 </template>
