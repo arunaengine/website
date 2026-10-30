@@ -63,7 +63,9 @@ import { parseArunaArn } from '@/lib/sync'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
+  ArrowDown,
   ArrowLeftRight,
+  ArrowUp,
   ArrowUpDown,
   Check,
   ChevronDown,
@@ -193,7 +195,8 @@ const {
 
 const usage = useBucketUsage(bucket, remoteNodeId)
 const { byKey: originOf, shared: sharedOrigin, mixed: mixedOrigins } = useFolderOrigin(bucket, remoteNodeId, visibleObjects)
-const columns = computed(() => (mixedOrigins.value ? 6 : 5))
+// The spacer column of a wide view counts too; a span over a hidden column does no harm.
+const columns = computed(() => (mixedOrigins.value ? 7 : 6))
 // The other nodes this bucket syncs with, each named once.
 const syncPartners = computed(() => {
   const own = remoteNodeId.value ?? realmNodes.localNodeId.value
@@ -483,6 +486,11 @@ const filteredRun = computed(() => [...originOf.value.values()].find((origin) =>
 function showWholeFolder() {
   const { run: _run, ...rest } = route.query
   void router.push({ query: rest })
+}
+// Inside a record folder the files repeat its name; the rest of the name says what each is.
+function shortName(name: string): string {
+  const folder = prefix.value.split('/').at(-1) ?? ''
+  return folder.length >= 8 && name.length > folder.length + 1 && name.startsWith(folder) && '_.-'.includes(name[folder.length]) ? name.slice(folder.length) : name
 }
 const fileFacts = (object: ObjectEntry) =>
   [object.size !== undefined ? formatBytes(object.size) : '', object.lastModified ? relativeTime(object.lastModified.toISOString()) : ''].filter(Boolean).join(', ')
@@ -790,10 +798,11 @@ async function onDrop(event: DragEvent) {
         <table class="w-full table-fixed text-sm @max-[600px]:block">
           <colgroup class="@max-[600px]:hidden">
             <col class="w-11" />
-            <col />
+            <col class="@min-[1280px]:w-[40rem]" />
             <col class="w-24" />
-            <col class="w-24 @max-[960px]:w-0" />
-            <col v-if="mixedOrigins" class="w-40 @max-[960px]:w-0" />
+            <col class="w-24 @max-[720px]:w-0" />
+            <col v-if="mixedOrigins" class="w-40 @max-[720px]:w-0" />
+            <col class="hidden @min-[1280px]:table-column" />
             <col class="w-[132px]" />
           </colgroup>
           <thead class="text-xs text-muted-foreground @max-[600px]:hidden">
@@ -813,21 +822,22 @@ async function onDrop(event: DragEvent) {
                 </label>
               </th>
               <th class="px-3 py-2 text-left font-medium" :aria-sort="ariaSort('name')">
-                <button type="button" class="inline-flex items-center gap-1 uppercase hover:text-foreground" @click="sortBy('name')">
-                  Name <ChevronDown v-if="sort.key === 'name'" class="h-3 w-3" :class="sort.descending ? 'rotate-180' : ''" />
+                <button type="button" class="inline-flex items-center gap-1 hover:text-foreground" @click="sortBy('name')">
+                  Name <component :is="sort.descending ? ArrowDown : ArrowUp" v-if="sort.key === 'name'" class="h-3 w-3" />
                 </button>
               </th>
               <th class="px-3 py-2 text-right font-medium" :aria-sort="ariaSort('size')">
-                <button type="button" class="inline-flex items-center gap-1 uppercase hover:text-foreground" @click="sortBy('size')">
-                  Size <ChevronDown v-if="sort.key === 'size'" class="h-3 w-3" :class="sort.descending ? 'rotate-180' : ''" />
+                <button type="button" class="inline-flex items-center gap-1 hover:text-foreground" @click="sortBy('size')">
+                  Size <component :is="sort.descending ? ArrowDown : ArrowUp" v-if="sort.key === 'size'" class="h-3 w-3" />
                 </button>
               </th>
-              <th class="overflow-hidden px-3 py-2 text-left font-medium @max-[960px]:p-0" :aria-sort="ariaSort('modified')">
-                <button type="button" class="inline-flex items-center gap-1 uppercase hover:text-foreground @max-[960px]:hidden" @click="sortBy('modified')">
-                  Modified <ChevronDown v-if="sort.key === 'modified'" class="h-3 w-3" :class="sort.descending ? 'rotate-180' : ''" />
+              <th class="overflow-hidden px-3 py-2 text-left font-medium @max-[720px]:p-0" :aria-sort="ariaSort('modified')">
+                <button type="button" class="inline-flex items-center gap-1 hover:text-foreground @max-[720px]:hidden" @click="sortBy('modified')">
+                  Modified <component :is="sort.descending ? ArrowDown : ArrowUp" v-if="sort.key === 'modified'" class="h-3 w-3" />
                 </button>
               </th>
-              <th v-if="mixedOrigins" class="overflow-hidden px-3 py-2 text-left font-medium @max-[960px]:p-0"><span class="@max-[960px]:hidden">Origin</span></th>
+              <th v-if="mixedOrigins" class="overflow-hidden px-3 py-2 text-left font-medium @max-[720px]:p-0"><span class="@max-[720px]:hidden">Origin</span></th>
+              <th class="hidden @min-[1280px]:table-cell"></th>
               <th class="p-0"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
@@ -835,8 +845,10 @@ async function onDrop(event: DragEvent) {
             <tr
               v-for="folder in folderRows"
               :key="folder.prefix"
-              class="group cursor-pointer border-b border-border hover:bg-muted/50 @max-[600px]:flex @max-[600px]:items-center"
+              class="group cursor-pointer border-b border-border hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none @max-[600px]:flex @max-[600px]:items-center"
+              tabindex="0"
               @click="openFolder(folder)"
+              @keydown.enter.self="openFolder(folder)"
             >
               <td class="p-0 @max-[600px]:block" @click.stop>
                 <label class="flex h-11 w-11 items-center justify-center">
@@ -854,9 +866,9 @@ async function onDrop(event: DragEvent) {
               <td class="px-3 py-2 @max-[600px]:block @max-[600px]:min-w-0 @max-[600px]:flex-1 @max-[600px]:px-1">
                 <span class="flex min-w-0 items-center gap-2">
                   <ObjectIcon :name="folder.name" folder class="h-4 w-4" />
-                  <button type="button" class="min-w-0 truncate text-left text-foreground hover:underline" :title="`${folder.name}/`" @click.stop="openFolder(folder)">{{ folder.name }}/</button>
-                  <Badge v-if="folderPublic(folder.prefix)" variant="success" size="sm" class="shrink-0 uppercase" title="Everyone can read this folder">
-                    <Globe class="mr-0.5 h-3 w-3" aria-hidden="true" /> public
+                  <button type="button" class="min-w-0 truncate text-left font-medium text-foreground hover:underline @max-[600px]:line-clamp-2 @max-[600px]:whitespace-normal @max-[600px]:break-all" :title="`${folder.name}/`" @click.stop="openFolder(folder)">{{ folder.name }}</button>
+                  <Badge v-if="folderPublic(folder.prefix)" variant="success" size="sm" class="shrink-0" title="Everyone can read this folder">
+                    <Globe class="mr-0.5 h-3 w-3" aria-hidden="true" /> Public
                   </Badge>
                   <ArrowLeftRight
                     v-if="!wholeBucketSynced && keyIsSynced(folder.prefix)"
@@ -875,6 +887,7 @@ async function onDrop(event: DragEvent) {
               <td class="@max-[600px]:hidden"></td>
               <td class="@max-[600px]:hidden"></td>
               <td v-if="mixedOrigins" class="@max-[600px]:hidden"></td>
+              <td class="hidden @min-[1280px]:table-cell"></td>
               <td class="px-2 @max-[600px]:block">
                 <div class="flex items-center justify-end gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100 [@media(hover:none)]:opacity-100 @max-[600px]:opacity-100">
                   <RowMenu
@@ -923,7 +936,7 @@ async function onDrop(event: DragEvent) {
                       :title="brokenReason(object.key) ?? object.name"
                       @click.stop="openObject(object)"
                     >
-                      <span class="truncate @max-[600px]:line-clamp-2 @max-[600px]:whitespace-normal @max-[600px]:break-all">{{ splitName(object.name)[0] }}</span><span class="shrink-0 whitespace-nowrap">{{ splitName(object.name)[1] }}</span>
+                      <span class="truncate @max-[600px]:line-clamp-2 @max-[600px]:whitespace-normal @max-[600px]:break-all">{{ splitName(shortName(object.name))[0] }}</span><span class="shrink-0 whitespace-nowrap">{{ splitName(shortName(object.name))[1] }}</span>
                     </button>
                     <span class="hidden text-xs tabular-nums text-muted-foreground @max-[600px]:block">{{ fileFacts(object) }}</span>
                   </span>
@@ -931,8 +944,8 @@ async function onDrop(event: DragEvent) {
                   <Badge v-if="locked.keyPending(object.key)" variant="warn" size="sm" class="shrink-0">
                     Key pending
                   </Badge>
-                  <Badge v-if="filePublic(object.key)" variant="success" size="sm" class="shrink-0 uppercase" title="Everyone can read this file">
-                    <Globe class="mr-0.5 h-3 w-3" aria-hidden="true" /> public
+                  <Badge v-if="filePublic(object.key)" variant="success" size="sm" class="shrink-0" title="Everyone can read this file">
+                    <Globe class="mr-0.5 h-3 w-3" aria-hidden="true" /> Public
                   </Badge>
                   <ArrowLeftRight
                     v-if="!wholeBucketSynced && keyIsSynced(object.key)"
@@ -951,15 +964,16 @@ async function onDrop(event: DragEvent) {
                 </span>
               </td>
               <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground @max-[600px]:hidden">{{ object.size !== undefined ? formatBytes(object.size) : '' }}</td>
-              <td class="overflow-hidden whitespace-nowrap px-3 py-2 text-muted-foreground @max-[960px]:p-0 @max-[600px]:hidden">
-                <span class="@max-[960px]:hidden">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '' }}</span>
+              <td class="overflow-hidden whitespace-nowrap px-3 py-2 text-muted-foreground @max-[720px]:p-0 @max-[600px]:hidden">
+                <span class="@max-[720px]:hidden">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '' }}</span>
               </td>
-              <td v-if="mixedOrigins" class="overflow-hidden whitespace-nowrap px-3 py-2 text-muted-foreground @max-[960px]:p-0 @max-[600px]:hidden">
-                <span v-if="originOf.get(object.key)" class="block truncate @max-[960px]:hidden">
+              <td v-if="mixedOrigins" class="overflow-hidden whitespace-nowrap px-3 py-2 text-muted-foreground @max-[720px]:p-0 @max-[600px]:hidden">
+                <span v-if="originOf.get(object.key)" class="block truncate @max-[720px]:hidden">
                   <RouterLink v-if="originOf.get(object.key)!.to" :to="originOf.get(object.key)!.to!" class="text-primary hover:underline" @click.stop>{{ originOf.get(object.key)!.label }}</RouterLink>
                   <template v-else>{{ originOf.get(object.key)!.label }}</template>
                 </span>
               </td>
+              <td class="hidden @min-[1280px]:table-cell"></td>
               <td class="px-2 @max-[600px]:block">
                 <div class="flex items-center justify-end gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100 [@media(hover:none)]:opacity-100 @max-[600px]:opacity-100">
                   <IconButton label="Preview" variant="outline" size="icon" class="h-8 w-8 @max-[600px]:hidden" @click.stop="openDetails(object, 'preview')"><Eye class="size-3.5" /></IconButton>
@@ -988,10 +1002,11 @@ async function onDrop(event: DragEvent) {
                 </span>
               </td>
               <td class="@max-[600px]:hidden"></td>
-              <td class="overflow-hidden whitespace-nowrap px-3 py-2 @max-[960px]:p-0 @max-[600px]:hidden">
-                <span class="@max-[960px]:hidden">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '' }}</span>
+              <td class="overflow-hidden whitespace-nowrap px-3 py-2 @max-[720px]:p-0 @max-[600px]:hidden">
+                <span class="@max-[720px]:hidden">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '' }}</span>
               </td>
               <td v-if="mixedOrigins" class="@max-[600px]:hidden"></td>
+              <td class="hidden @min-[1280px]:table-cell"></td>
               <td class="px-2 @max-[600px]:block">
                 <div class="flex items-center justify-end gap-1">
                   <Spinner v-if="restoringKey === object.key" label="Restoring the object" />

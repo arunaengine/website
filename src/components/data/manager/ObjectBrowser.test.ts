@@ -808,12 +808,24 @@ describe('object browser file origins', () => {
     const header = element(root, (node) => node.tag === 'thead')
     const row = element(root, (node) => node.tag === 'tr' && content(node).includes('reads.fastq'))
 
-    expect(nodes(header).filter((node) => node.tag === 'th')).toHaveLength(6)
-    expect(nodes(element(root, (node) => node.tag === 'colgroup')).filter((node) => node.tag === 'col')).toHaveLength(6)
-    expect(row.children.filter((node) => node.tag === 'td')).toHaveLength(6)
+    // A seventh, empty column takes the spare width of a wide view.
+    expect(nodes(header).filter((node) => node.tag === 'th')).toHaveLength(7)
+    expect(nodes(element(root, (node) => node.tag === 'colgroup')).filter((node) => node.tag === 'col')).toHaveLength(7)
+    expect(row.children.filter((node) => node.tag === 'td')).toHaveLength(7)
     expect(content(row.children.filter((node) => node.tag === 'td')[4])).toContain('an upload')
-    const folderRow = element(root, (node) => node.tag === 'tr' && content(node).includes('genomes/'))
-    expect(folderRow.children.filter((node) => node.tag === 'td')).toHaveLength(6)
+    const folderRow = element(root, (node) => node.tag === 'tr' && content(node).includes('genomes'))
+    expect(folderRow.children.filter((node) => node.tag === 'td')).toHaveLength(7)
+  })
+})
+
+describe('object browser names', () => {
+  it('drops the record folder name the files repeat and keeps the full name in the title', async () => {
+    const file = { ...listedObject, key: 'GCF_000005845.2_ASM584v2/GCF_000005845.2_ASM584v2_genomic.fna.gz', name: 'GCF_000005845.2_ASM584v2_genomic.fna.gz' }
+    const objects = ref([file])
+    const root = await render({ objects, visibleObjects: objects, prefix: ref('GCF_000005845.2_ASM584v2') })
+    const name = element(root, (node) => node.tag === 'button' && node.props.title === file.name)
+
+    expect(content(name)).toBe('_genomic.fna.gz')
   })
 })
 
@@ -966,7 +978,8 @@ describe('object browser public access', () => {
     const root = await render({ folders: ref([listedFolder]) })
     const row = element(root, (node) => node.tag === 'tr' && content(node).includes(listedFolder.name))
 
-    expect(content(element(row, (node) => node.tag === 'button' && node.props.title === `${listedFolder.name}/`))).toBe(`${listedFolder.name}/`)
+    // The folder icon marks it; the name carries no trailing slash, the title keeps it.
+    expect(content(element(row, (node) => node.tag === 'button' && node.props.title === `${listedFolder.name}/`))).toBe(listedFolder.name)
     expect(menuLabels(row)).toEqual(['Open', 'Details', 'Rename', 'Copy to', 'Move to', 'Make public', 'Delete folder', 'Delete permanently…'])
 
     await click(menuItem(root, 'Details', `${listedFolder.name}/`))
