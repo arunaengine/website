@@ -5,21 +5,22 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// Figures and units join with a no-break space so "39 TB" never wraps between them.
 export function formatBytes(bytes: number, decimals = 1): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0\u00a0B'
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB']
   const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1)
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))} ${sizes[i]}`
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))}\u00a0${sizes[i]}`
 }
 
 // A limit set in GiB reaches the portal as a GB fraction (2 GiB is
 // 2.147483648 GB); it reads back in the unit it was set in.
 export function formatResourceGb(gb: number): string {
-  if (Math.abs(gb - Math.round(gb)) < 1e-6) return `${Math.round(gb)} GB`
+  if (Math.abs(gb - Math.round(gb)) < 1e-6) return `${Math.round(gb)}\u00a0GB`
   const gib = (gb * 1e9) / 1024 ** 3
-  if (Math.abs(gib - Math.round(gib)) < 1e-6) return `${Math.round(gib)} GiB`
-  return `${gb.toFixed(1)} GB`
+  if (Math.abs(gib - Math.round(gib)) < 1e-6) return `${Math.round(gib)}\u00a0GiB`
+  return `${gb.toFixed(1)}\u00a0GB`
 }
 
 export function formatNumber(n: number): string {

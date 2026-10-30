@@ -108,13 +108,13 @@ describe('RunProvenancePanel', () => {
       site: { nodeId: 'node-2', kind: 'kubernetes' },
       container: { name: 'bakta-rs', sha256: `2bf2${'0'.repeat(55)}f32cc` },
       cpuCores: '4',
-      // TES asks for 2 GB, which the run view shows as 2 GB, not 1.9.
+      // TES asks for 2\u00a0GB, which the run view shows as 2\u00a0GB, not 1.9.
       ramBytes: '2000000000',
     }
     const mounted = await mountApp(RunProvenancePanel, { props: { run } })
     const text = content(mounted.root)
 
-    expect(text).toContain('bakta-dbrelease 6.0 light, DOI 10.5281/zenodo.149168431 KB')
+    expect(text).toContain('bakta-dbrelease 6.0 light, DOI 10.5281/zenodo.149168431\u00a0KB')
     // The results name their count and the folder they went to, linked.
     expect(text).toContain('2 files')
     expect(text).toContain('results/bakta/')
@@ -122,7 +122,7 @@ describe('RunProvenancePanel', () => {
     expect(text).toContain('WhereGiessenKubernetes')
     expect(text).toContain('bakta-rs@sha256:2bf2…f32cc')
     expect(text).not.toContain('0'.repeat(55))
-    expect(text).toContain('Resources4 CPU, 2 GB memory')
+    expect(text).toContain('Resources4\u00a0CPU, 2\u00a0GB memory')
     expect(text).not.toContain('Started by')
     mounted.app.unmount()
   })
@@ -172,7 +172,7 @@ describe('RunProvenancePanel grouped files', () => {
     expect(text).toContain('Bakta database (light)')
     expect(text).toContain('release 6.0 light, 66 files')
     expect(text).toContain('DOI 10.5281/zenodo.14916843')
-    expect(text).toContain('64.5 KB')
+    expect(text).toContain('64.5\u00a0KB')
     // A database counts as one input; results in one folder are a summary of count and folder only.
     expect(text).toContain('2 inputs')
     expect(text).toContain('13 files')
@@ -184,7 +184,7 @@ describe('RunProvenancePanel grouped files', () => {
     const toggle = nodes(mounted.root).find((node) => node.tag === 'button' && content(node).includes('Bakta database'))!
     ;(toggle.props.onClick as () => void)()
     await VueRuntime.nextTick()
-    expect(content(mounted.root)).toContain('part-3.dmnd1000 B')
+    expect(content(mounted.root)).toContain('part-3.dmnd1000\u00a0B')
     mounted.app.unmount()
   })
 

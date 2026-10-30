@@ -101,7 +101,7 @@ const checkLabel = computed(() => (resourcesValid.value ? 'Complete' : 'Check th
       <RunTile
         label="RAM"
         :tag="tag(ramGb, DEFAULT_RESOURCES.ramGb)"
-        :value="String(ramGb).trim() ? `${shown(ramGb)} GB` : shown(ramGb)"
+        :value="String(ramGb).trim() ? `${shown(ramGb)}\u00a0GB` : shown(ramGb)"
       >
         <template v-if="editing">
           <Input
@@ -122,7 +122,7 @@ const checkLabel = computed(() => (resourcesValid.value ? 'Complete' : 'Check th
       <RunTile
         label="Disk"
         :tag="tag(diskGb, DEFAULT_RESOURCES.diskGb)"
-        :value="String(diskGb).trim() ? `${shown(diskGb)} GB` : shown(diskGb)"
+        :value="String(diskGb).trim() ? `${shown(diskGb)}\u00a0GB` : shown(diskGb)"
       >
         <template v-if="editing">
           <Input

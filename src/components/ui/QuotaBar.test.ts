@@ -13,9 +13,9 @@ describe('quota bar', () => {
   it('draws no bar without a quota, only the values', async () => {
     const markup = await render({ used: 2048, quota: null, referenced: 4096, showLabels: true })
     expect(markup).not.toContain('role="meter"')
-    expect(markup).toContain('2 KB')
+    expect(markup).toContain('2\u00a0KB')
     expect(markup).toContain('stored, no quota')
-    expect(markup).toContain('4 KB')
+    expect(markup).toContain('4\u00a0KB')
     expect(markup).toContain('referenced')
   })
 

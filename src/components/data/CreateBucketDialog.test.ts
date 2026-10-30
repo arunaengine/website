@@ -93,7 +93,7 @@ describe('new bucket dialog', () => {
   it('offers the reachable realm nodes, the open node first, with their free space, and a spread', async () => {
     const { root, place, name } = await mount('one')
     const labels = nodes(place()).filter((node) => node.tag === 'option').map((option) => content(option))
-    expect(labels).toEqual(['name-one, 196 GB free', 'name-two', 'Spread over several nodes'])
+    expect(labels).toEqual(['name-one, 196\u00a0GB free', 'name-two', 'Spread over several nodes'])
     expect(place().props.value).toBe('one')
     expect(content(root)).not.toContain('laptop')
     // Stored data names the node that keeps it; a valid name shows its address.

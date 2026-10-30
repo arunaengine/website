@@ -326,7 +326,7 @@ describe('folder entries', () => {
     const mounted = await mount()
 
     expect(content(row(mounted.root, 'notes/kept.md'))).toContain('Sending 25%')
-    expect(content(row(mounted.root, 'notes/kept.md'))).toContain('50 B of 200 B sent.')
+    expect(content(row(mounted.root, 'notes/kept.md'))).toContain('50\u00a0B of 200\u00a0B sent.')
     const unknown = nodes(row(mounted.root, 'notes/bad.md')).find((node) => node.props['data-progress'])
     expect(unknown?.props['data-progress']).toBe('unknown')
     mounted.app.unmount()

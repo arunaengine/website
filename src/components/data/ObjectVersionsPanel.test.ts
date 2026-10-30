@@ -130,7 +130,7 @@ describe('object versions panel', () => {
 
     expect(text).toContain('Current')
     expect(text).toContain('Older')
-    expect(text).toContain('2 KB')
+    expect(text).toContain('2\u00a0KB')
   })
 
   it('offers no bytes actions on a delete marker', async () => {

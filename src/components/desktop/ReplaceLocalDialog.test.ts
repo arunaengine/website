@@ -129,8 +129,8 @@ describe('replacing one file', () => {
 
     expect(html).toContain('On this computer')
     expect(html).toContain('In the realm')
-    expect(html).toContain('2 KB')
-    expect(html).toContain('4 KB')
+    expect(html).toContain('2\u00a0KB')
+    expect(html).toContain('4\u00a0KB')
     expect(html).toContain('aaaabbbb')
     expect(html).toContain('conflicted copy')
     mounted.app.unmount()

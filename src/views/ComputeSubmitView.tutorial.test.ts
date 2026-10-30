@@ -105,7 +105,7 @@ describe('compute tutorial walkthrough', () => {
     const details = content(anchor(mounted.root, 'run-details'))
     expect(details).toContain('Created')
     expect(details).toContain('2 cores')
-    expect(details).toContain('4 GB RAM')
+    expect(details).toContain('4\u00a0GB RAM')
 
     const artifacts = anchor(mounted.root, 'run-artifacts')
     expect(content(artifacts)).toContain('plot.png')

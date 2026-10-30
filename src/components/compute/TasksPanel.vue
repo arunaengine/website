@@ -226,7 +226,7 @@ function taskResources(task: TesTask): string {
   const r = task.resources
   if (!r) return ''
   const parts: string[] = []
-  if (r.cpu_cores != null) parts.push(`${r.cpu_cores} CPU`)
+  if (r.cpu_cores != null) parts.push(`${r.cpu_cores}\u00a0CPU`)
   if (r.ram_gb != null) parts.push(formatResourceGb(r.ram_gb))
   if (r.disk_gb != null) parts.push(`${formatResourceGb(r.disk_gb)} disk`)
   return parts.join(', ')

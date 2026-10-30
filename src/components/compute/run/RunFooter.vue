@@ -42,7 +42,7 @@ const summary = computed(() => [
   { label: 'Tool', value: what.value },
   { label: 'Inputs', value: String(inputCount.value) },
   { label: 'Outputs', value: String(outputRows.value.length) },
-  { label: 'Resources', value: `${String(cpuCores.value).trim() || '?'} CPU, ${String(ramGb.value).trim() || '?'} GB` },
+  { label: 'Resources', value: `${String(cpuCores.value).trim() || '?'}\u00a0CPU, ${String(ramGb.value).trim() || '?'}\u00a0GB` },
   { label: 'Node', value: placementSummary.value },
 ])
 const resultFolders = computed(() => [...new Set(outputRows.value.filter((row) => row.bucket.trim()).map(outputFolder))])

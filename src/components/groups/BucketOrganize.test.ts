@@ -142,7 +142,7 @@ describe('BucketOrganize rename plan', () => {
     const { root } = await mount()
     await click(buttonIn(step(root, 'step-renames')[0], 'Review…'))
     const plan = content(step(root, 'rename-plan')[0])
-    expect(plan).toContain('copy 12 files (3 GB) through Aruna and the rest inside your storage')
+    expect(plan).toContain('copy 12 files (3\u00a0GB) through Aruna and the rest inside your storage')
     expect(plan).not.toContain('not through Aruna')
   })
 

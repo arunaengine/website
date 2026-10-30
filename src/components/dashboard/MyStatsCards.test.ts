@@ -1,7 +1,6 @@
 import { createSSRApp } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { formatBytes } from '@/lib/utils'
 import type { UsageResponse } from '@/lib/api'
 
 const aruna = vi.hoisted(() => ({
@@ -94,7 +93,7 @@ describe('personal statistics tiles', () => {
 
     const text = await renderedText()
 
-    expect(text).toContain(`Storage ${formatBytes(3 * 3072)} total ${formatBytes(3 * 2048)} stored ${formatBytes(3 * 1024)} referenced`)
+    expect(text).toContain('Storage 9 KB total 6 KB stored 3 KB referenced')
     expect(await renderToString(createSSRApp(MyStatsCards))).toContain('aria-label="Stored data counts against quotas. Referenced data stays at its source."')
     expect(text).toContain('Objects 12 3 buckets')
     expect(text).not.toContain('at least')
@@ -139,7 +138,7 @@ describe('personal statistics tiles', () => {
     const text = await renderedText()
 
     expect(text).not.toContain('physical')
-    expect(text).not.toContain(formatBytes(90_000))
+    expect(text).not.toContain('87.9 KB')
   })
 
   it('answers unknown, never zero, when a group could not be read', async () => {

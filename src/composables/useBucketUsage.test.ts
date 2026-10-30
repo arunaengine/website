@@ -17,12 +17,12 @@ const usage = (extra: Partial<BucketUsageResponse> = {}): BucketUsageResponse =>
 
 describe('bucket usage', () => {
   it('names files and size, or the referenced files of a database', () => {
-    expect(usageText(usage(), true)).toBe('16 files, 50.2 MB stored')
-    expect(usageText(usage({ objects: 1 }))).toBe('1 file, 50.2 MB')
+    expect(usageText(usage(), true)).toBe('16 files, 50.2\u00a0MB stored')
+    expect(usageText(usage({ objects: 1 }))).toBe('1 file, 50.2\u00a0MB')
     expect(usageText(usage({ objects: 43_882_006, logical_bytes: 10, referenced_bytes: 10 }), true)).toBe('43,882,006 files referenced')
     // A bucket row is calmer: the files alone.
     expect(usageText(usage({ objects: 43_882_006, logical_bytes: 10, referenced_bytes: 10 }))).toBe('43,882,006 files')
-    expect(usageText(usage({ complete: false }))).toBe('at least 16 files, 50.2 MB')
+    expect(usageText(usage({ complete: false }))).toBe('at least 16 files, 50.2\u00a0MB')
   })
 
   it('keeps only the answer for the bucket still open', async () => {
@@ -58,7 +58,7 @@ describe('listed bucket usage', () => {
     await Promise.resolve()
     await Promise.resolve()
     expect(asked.map((entry) => `${entry.node}/${entry.bucket}`).at(-1)).toBe('n2/e')
-    expect(listed.textOf('a', null)).toBe('2 files, 50.2 MB')
+    expect(listed.textOf('a', null)).toBe('2 files, 50.2\u00a0MB')
     expect(listed.textOf('b', null)).toBeNull()
     listed.ensure(entries)
     expect(asked).toHaveLength(5)

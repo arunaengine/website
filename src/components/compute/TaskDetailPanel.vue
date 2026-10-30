@@ -363,7 +363,7 @@ const failed = computed(() => task.value?.state === 'EXECUTOR_ERROR' || task.val
 const runNode = computed(() => nativeFamily.value?.placement?.target_node_id ?? nodeConstraint.value)
 const resourceShort = computed(() => {
   const r = task.value?.resources
-  const parts = [r?.cpu_cores != null ? `${r.cpu_cores} CPU` : '', r?.ram_gb != null ? formatResourceGb(r.ram_gb) : '']
+  const parts = [r?.cpu_cores != null ? `${r.cpu_cores}\u00a0CPU` : '', r?.ram_gb != null ? formatResourceGb(r.ram_gb) : '']
   return parts.filter(Boolean).join(', ')
 })
 function when(iso: string | undefined): string {

@@ -160,8 +160,8 @@ describe('deletion options', () => {
     const options = deletionOptions(target({ kind: 'version', isCurrent: false, bytes: 2048 }))
 
     expect(options[0].description).toContain('creates a new version')
-    expect(options[0].description).toContain('2 KB')
-    expect(options[1].description).toContain('frees 2 KB')
+    expect(options[0].description).toContain('2\u00a0KB')
+    expect(options[1].description).toContain('frees 2\u00a0KB')
   })
 
   it('never offers an outcome twice or an empty set', () => {

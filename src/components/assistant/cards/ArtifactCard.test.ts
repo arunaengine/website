@@ -230,7 +230,7 @@ describe('ArtifactCard', () => {
     expect(link.props.href).toBe('https://s3.node.test/work/run.bam?signature')
     expect(link.props.download).toBe('run.bam')
     expect(content(root)).toContain('Download')
-    expect(content(root)).toContain('60 MB')
+    expect(content(root)).toContain('60\u00a0MB')
   })
 
   it('keeps an image above the cap as a download row', async () => {

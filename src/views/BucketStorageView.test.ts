@@ -261,7 +261,7 @@ describe('bucket storage page', () => {
 
   it('sums the bucket up in one line and names markers only when there are any', async () => {
     usage.value = { ...usage.value, delete_markers: 0 }
-    expect(content(await render())).toContain('2 KB stored, 52 files, on Node B')
+    expect(content(await render())).toContain('2\u00a0KB stored, 52 files, on Node B')
     usage.value = { ...usage.value, delete_markers: 3 }
     expect(content(await render())).toContain('52 files, 3 delete markers, on Node B')
     usage.value = { ...usage.value, delete_markers: 0 }
@@ -277,7 +277,7 @@ describe('bucket storage page', () => {
     early({ ...usage.value, logical_bytes: 999, objects: 1 })
     await flush()
 
-    expect(content(root)).toContain('4 KB stored, 7 files')
+    expect(content(root)).toContain('4\u00a0KB stored, 7 files')
     expect(content(root)).not.toContain('1 file,')
     bucketUsage.mockImplementation(() => Promise.resolve(usage.value))
   })

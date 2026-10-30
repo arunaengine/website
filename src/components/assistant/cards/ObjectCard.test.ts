@@ -39,7 +39,7 @@ describe('ObjectCard', () => {
 
     expect(markup).toContain('hello.txt')
     expect(markup).toContain('Written to the bucket')
-    expect(markup).toContain('24 B')
+    expect(markup).toContain('24\u00a0B')
     expect(markup).toContain('text/plain; charset=utf-8')
     expect(markup).toContain('1m ago')
     expect(markup).toContain('href="/app/buckets/test?prefix=notes&amp;object=notes%2Fhello.txt"')

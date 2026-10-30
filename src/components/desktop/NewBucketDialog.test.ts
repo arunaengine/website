@@ -149,7 +149,7 @@ describe('a new bucket in the desktop', () => {
     expect(input(mounted.root, 'aria-label', 'This computer').props.checked).toBe(false)
     expect(summary(mounted.root)).toBe('Creates lab-data on node-1 · Giessen for Lab group when the folder is linked.')
     expect(content(mounted.root)).toContain('Stays here. No folder link.')
-    expect(content(mounted.root)).toContain('1 KB free')
+    expect(content(mounted.root)).toContain('1\u00a0KB free')
 
     await click(button(mounted.root, 'Continue'))
 
