@@ -81,6 +81,7 @@ import {
   KeyRound,
   Laptop,
   Link2,
+  ListFilter,
   Lock,
   NotebookPen,
   Plus,
@@ -114,6 +115,7 @@ const { getBucketPlacement } = usePlacementPolicies()
 const { shown } = usePortalFeatures()
 const placementPoliciesEnabled = featureEnabled('placementAdmin')
 const {
+  route,
   router,
   bucket,
   prefix,
@@ -153,6 +155,7 @@ const {
   openDetails,
   download,
   keyIsSynced,
+  runFilter,
   wholeBucketSynced,
   bucketSyncCount,
   showSyncButton,
@@ -469,7 +472,18 @@ const sortLabel = computed(() => SORTS.find((option) => sameSort(option.sort, so
 const ariaSort = (key: SortKey) => (sort.value.key === key ? (sort.value.descending ? 'descending' : 'ascending') : undefined)
 const folderRows = computed(() =>
   sortRows(visibleFolders.value, { key: 'name', descending: sort.value.key === 'name' && sort.value.descending }, (folder) => folder))
-const objectRows = computed(() => sortRows(fileRows(visibleObjects.value, deletedRows.value), sort.value, (row) => row.entry))
+const runKey = computed(() => (runFilter.value ? `job:${runFilter.value}` : ''))
+const objectRows = computed(() => {
+  const rows = fileRows(visibleObjects.value, deletedRows.value)
+  const shown = runKey.value ? rows.filter(({ deleted, entry }) => !deleted && originOf.value.get(entry.key)?.key === runKey.value) : rows
+  return sortRows(shown, sort.value, (row) => row.entry)
+})
+// The filtered run as its files name it, once one of them is read.
+const filteredRun = computed(() => [...originOf.value.values()].find((origin) => origin.key === runKey.value) ?? null)
+function showWholeFolder() {
+  const { run: _run, ...rest } = route.query
+  void router.push({ query: rest })
+}
 const fileFacts = (object: ObjectEntry) =>
   [object.size !== undefined ? formatBytes(object.size) : '', object.lastModified ? relativeTime(object.lastModified.toISOString()) : ''].filter(Boolean).join(', ')
 
@@ -477,7 +491,8 @@ const fileFacts = (object: ObjectEntry) =>
 const rangeText = computed(() => {
   const listed = folders.value.length + objects.value.length
   const shownCount = visibleFolders.value.length + visibleObjects.value.length
-  if (!nameFilter.value && shownCount === listed) return pageRange(page.value, pageSize.value, listed, !nextToken.value)
+  if (runKey.value) return `${formatCount(objectRows.value.length)} of ${formatCount(listed)} from this run`
+  if (!nameFilter.value && shownCount === listed) return `${pageRange(page.value, pageSize.value, listed, !nextToken.value)}${nextToken.value ? '' : ' in this folder'}`
   return `${formatCount(shownCount)} of ${formatCount(listed)} in ${prefix.value.split('/').at(-1) || bucket.value}`
 })
 
@@ -700,7 +715,17 @@ async function onDrop(event: DragEvent) {
           </div>
         </div>
         <SearchHint v-if="hinting" :text="searchText" :folder="hintFolder" :bucket="bucket" class="mx-3 mb-2 hidden shadow-none @max-[600px]:block" />
-        <p v-if="sharedOrigin && !wholeBucket && !remoteBlocked" class="flex min-w-0 items-center gap-1.5 px-4 pb-2.5 text-sm text-muted-foreground @max-[600px]:px-3">
+        <div v-if="runKey && !wholeBucket && !remoteBlocked" class="flex flex-wrap items-center justify-between gap-2 px-4 pb-2.5 @max-[600px]:px-3">
+          <p class="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-muted-foreground">
+            <ListFilter class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span class="min-w-0 [overflow-wrap:anywhere]">Only the results of
+              <RouterLink v-if="filteredRun?.to" :to="filteredRun.to" class="text-primary hover:underline">{{ filteredRun.label }}</RouterLink>
+              <template v-else>{{ filteredRun?.label ?? 'one run' }}</template>
+            </span>
+          </p>
+          <Button variant="outline" size="sm" @click="showWholeFolder"><FolderOpen class="h-4 w-4" /> Show the whole folder</Button>
+        </div>
+        <p v-else-if="sharedOrigin && !wholeBucket && !remoteBlocked" class="flex min-w-0 items-center gap-1.5 px-4 pb-2.5 text-sm text-muted-foreground @max-[600px]:px-3">
           <FlaskConical class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span class="truncate">{{ relativeTime(sharedOrigin.time) }} by
             <RouterLink v-if="sharedOrigin.to" :to="sharedOrigin.to" class="text-primary hover:underline">{{ sharedOrigin.label }}</RouterLink>

@@ -817,6 +817,27 @@ describe('object browser file origins', () => {
   })
 })
 
+describe('object browser run filter', () => {
+  const run = { key: 'job:r1', label: 'Annotate my genome with Bakta', to: { name: 'task', params: { taskId: 't1' } }, time: '2026-02-01T00:00:00Z' }
+  const other = { ...listedObject, key: 'raw/notes.txt', name: 'notes.txt' }
+  afterEach(() => (folderOrigin.byKey.value = new Map()))
+
+  it('lists only the files of the run, names it, and offers the whole folder back', async () => {
+    folderOrigin.byKey.value = new Map([[listedObject.key, run], [other.key, { ...run, key: 'upload', label: 'an upload', to: null }]])
+    const objects = ref([listedObject, other])
+    push.mockClear()
+    const root = await render({ objects, visibleObjects: objects, runFilter: ref('r1'), route: { query: { prefix: 'raw', run: 'r1' } } })
+    const text = content(root)
+
+    expect(text).toContain('reads.fastq')
+    expect(text).not.toContain('notes.txt')
+    expect(text.replace(/\s+/g, ' ')).toContain('Only the results of Annotate my genome with Bakta')
+    expect(text).toContain('1 of 2 from this run')
+    await click(element(root, (node) => node.tag === 'button' && content(node).includes('Show the whole folder')))
+    expect(push).toHaveBeenCalledWith({ query: { prefix: 'raw' } })
+  })
+})
+
 describe('object browser order', () => {
   const big = { ...listedObject, key: 'raw/a-big.fastq', name: 'a-big.fastq', size: 9000, lastModified: new Date('2026-01-01T00:00:00Z') }
   const names = (root: HostNode) =>

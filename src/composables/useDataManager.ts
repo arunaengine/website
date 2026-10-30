@@ -1010,6 +1010,8 @@ export function useDataManager() {
   // The notebooks flavour of the data view keeps its flag while browsing.
   const notebooksQuery = computed(() =>
     route.name === 'notebooks' || route.query.notebooks === '1' ? { notebooks: '1' } : {})
+  // `?run=` lists only the files one run wrote; it stays while folders open.
+  const runFilter = computed(() => routeString(route.query.run))
 
   // The bucket-less route is the picker: it reopens the remembered bucket once
   // this group's list can confirm it, and forgets it when the list cannot.
@@ -1091,6 +1093,7 @@ export function useDataManager() {
         ...(remoteNodeId.value ? { node: remoteNodeId.value } : {}),
         ...(selectedGroupId.value ? { group: selectedGroupId.value } : {}),
         ...notebooksQuery.value,
+        ...(runFilter.value ? { run: runFilter.value } : {}),
       },
     })
   }
@@ -1533,6 +1536,7 @@ export function useDataManager() {
     syncKeyFor,
     keyIsSynced,
     syncsForKey,
+    runFilter,
     wholeBucketSynced,
     bucketSyncCount,
     showSyncButton,

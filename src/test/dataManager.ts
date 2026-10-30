@@ -313,7 +313,9 @@ export function fakeManager(overrides: Record<string, unknown> = {}) {
     set.value = next
   }
   return {
+    route: { query: {} },
     router: { push: vi.fn() },
+    runFilter: ref(''),
     bucket: ref('reef'),
     prefix: ref('raw'),
     s3Prefix: ref('raw/'),

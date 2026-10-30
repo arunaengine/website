@@ -20,7 +20,7 @@ export interface FileOrigin {
 
 const MAX_FILES = 50
 const origins = ref(new Map<string, OriginResponse | null>())
-const runs = ref(new Map<string, { name: string; taskId: string | null } | null>())
+const runs = ref(new Map<string, { name: string; taskId: string | null; record: string | null } | null>())
 // Reads under way, shared by every page that lists the same version.
 const inFlight = new Map<string, Promise<void>>()
 let epochSeen: number | null = null
@@ -54,7 +54,7 @@ export function useFolderOrigin(bucket: Ref<string>, nodeId: Ref<string | null>,
     const taskId = run?.logical_job_id ?? null
     const task = taskId ? await getTask(taskId, 'BASIC').catch(() => null) : null
     if (epoch !== sessionEpoch.value) return
-    runs.value = new Map(runs.value).set(runId, { name: task?.name || 'a run', taskId })
+    runs.value = new Map(runs.value).set(runId, { name: task?.name || 'a run', taskId, record: run?.run_crate ?? null })
   }
 
   watch(
@@ -126,7 +126,9 @@ export function useFolderOrigin(bucket: Ref<string>, nodeId: Ref<string | null>,
     if (answer.hop) return { key: `sync:${answer.hop.relationship_id}`, label: 'a sync', to: null, time }
     if (origin.kind === 'job') {
       const run = runs.value.get(origin.run_id)
-      return { key: `job:${origin.run_id}`, label: run?.name ?? 'a run', to: run?.taskId ? { name: 'task', params: { taskId: run.taskId } } : null, time }
+      // The run record tells most about the files; the run itself when no record is written.
+      const to = run?.record ? { name: 'dataset', params: { id: run.record } } : run?.taskId ? { name: 'task', params: { taskId: run.taskId } } : null
+      return { key: `job:${origin.run_id}`, label: run?.name ?? 'a run', to, time }
     }
     const LABELS = { upload: 'an upload', source: 'an import', copy: 'a copy', storage: 'a storage folder' } as const
     return { key: origin.kind, label: LABELS[origin.kind], to: null, time }

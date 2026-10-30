@@ -7,7 +7,7 @@ const origins: Record<string, unknown> = {}
 const answerFor = async (_bucket: string, query: { key: string; version_id?: string }) =>
   (origins[query.key] ? { ...(origins[query.key] as object), version_id: query.version_id } : null)
 const getFileOrigin = vi.fn((bucket: string, query: { key: string; version_id?: string }, _signal?: AbortSignal): Promise<unknown> => answerFor(bucket, query))
-const getRun = vi.fn(async (_id: string): Promise<{ run_id: string; logical_job_id: string }> => ({ run_id: 'r1', logical_job_id: 't1' }))
+const getRun = vi.fn(async (_id: string): Promise<{ run_id: string; logical_job_id: string; run_crate?: string }> => ({ run_id: 'r1', logical_job_id: 't1' }))
 const getTask = vi.fn(async (_id: string, _view: string): Promise<{ id: string; name: string }> => ({ id: 't1', name: 'Annotate my genome with Bakta' }))
 const sessionEpoch = ref(1)
 // The stored versions the folder listing answers with.
@@ -43,6 +43,16 @@ describe('folder origin', () => {
     expect(origin.shared.value).toEqual({ key: 'job:r1', label: 'Annotate my genome with Bakta', to: { name: 'task', params: { taskId: 't1' } }, time: '2026-10-29T11:00:00Z' })
     expect(origin.mixed.value).toBe(false)
     expect(getRun).toHaveBeenCalledTimes(1)
+  })
+
+  it('links the run record once the run names one', async () => {
+    getRun.mockImplementationOnce(async () => ({ run_id: 'r-record', logical_job_id: 't1', run_crate: 'doc-1' }))
+    const recorded = { ...job('2026-10-29T10:00:00Z'), origin: { kind: 'job', run_id: 'r-record' } }
+    Object.assign(origins, { 'records/a.fna': recorded })
+    const origin = useFolderOrigin(ref('records'), ref(null), ref([file('records/a.fna')]))
+    await settle()
+
+    expect(origin.shared.value?.to).toEqual({ name: 'dataset', params: { id: 'doc-1' } })
   })
 
   it('names each file when the origins differ', async () => {
