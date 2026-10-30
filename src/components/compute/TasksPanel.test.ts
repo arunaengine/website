@@ -7,6 +7,9 @@ import { click, compileClientComponent, content, element, flush, moduleDefault, 
 
 const desktopMode = ref(true)
 const listTasks = vi.fn()
+const push = vi.fn()
+const metadataAtPath = vi.fn()
+const getRun = vi.fn()
 const realmNodes = ref<Array<{ name: string; nodeId?: string; isLocal: boolean; apiBase: string | null; kind?: string }>>([])
 
 const Plain = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
@@ -19,6 +22,16 @@ const ShellStub = defineComponent({
       ? h('div', [props.emptyTitle, slots['empty-actions']?.()])
       : h('div', [slots.filters?.(), slots.tools?.(), slots.default?.(), slots.footer?.()]),
 })
+const InputStub = defineComponent({
+  props: { modelValue: { type: String, default: '' } },
+  emits: ['update:modelValue'],
+  setup: (props, { emit }) => () =>
+    h('input', { value: props.modelValue, onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value) }),
+})
+const IconButtonStub = defineComponent({
+  props: { label: String },
+  setup: (props, { attrs }) => () => h('button', { ...attrs, 'aria-label': props.label }),
+})
 const CellStub = defineComponent({
   props: { label: String },
   setup: (props, { slots }) => () => h('section', [props.label, ' ', slots.value?.(), ' ', slots.default?.()]),
@@ -30,7 +43,7 @@ const TasksPanel = compileClientComponent(new URL('./TasksPanel.vue', import.met
   'vue-router': {
     RouterLink: Plain,
     useRoute: () => ({ name: 'compute', params: {} }),
-    useRouter: () => ({ push: vi.fn() }),
+    useRouter: () => ({ push }),
   },
   '@lucide/vue': new Proxy({}, { get: () => Empty }),
   '@/components/ui/Button.vue': moduleDefault(Plain),
@@ -44,17 +57,20 @@ const TasksPanel = compileClientComponent(new URL('./TasksPanel.vue', import.met
   '@/components/ui/ListSkeleton.vue': moduleDefault(Empty),
   '@/components/ui/ErrorPanel.vue': moduleDefault(Empty),
   '@/components/ui/Spinner.vue': moduleDefault(Empty),
-  '@/components/compute/TaskStateBadge.vue': moduleDefault(Empty),
-  '@/components/compute/TesPlacementTags.vue': moduleDefault(Empty),
+  '@/components/ui/IconButton.vue': moduleDefault(IconButtonStub),
+  '@/components/ui/Input.vue': moduleDefault(InputStub),
+  '@/components/ui/StatusMark.vue': moduleDefault(Empty),
+  '@/components/ui/StatusPill.vue': moduleDefault(Empty),
   '@/components/compute/TaskDetailPanel.vue': moduleDefault(Empty),
   '@/components/compute/NewRunMenu.vue': moduleDefault(Empty),
   '@/composables/useTes': {
     useTes: () => ({ getTesServiceInfo: async () => ({ type: { version: '1.1' } }), listTasks }),
     isTesUnsupported: () => false,
   },
-  '@/composables/useAruna': { useAruna: () => ({ currentUser: ref({ id: 'u1' }), myGroups: ref([]) }) },
+  '@/composables/useAruna': {
+    useAruna: () => ({ currentUser: ref({ id: 'u1' }), myGroups: ref([]), metadataAtPath, getRun }),
+  },
   '@/composables/useAuth': { useAuth: () => ({ authPending: ref(false) }) },
-  '@/composables/useJobs': { useJobs: () => ({ deleteJob: vi.fn() }) },
   '@/composables/useNow': { useNow: () => ref(Date.now()) },
   '@/composables/useRefresh': { useRefresh: (run: () => unknown) => ({ busy: ref(false), refresh: run }) },
   '@/composables/useRealmNodes': {
@@ -68,7 +84,6 @@ const TasksPanel = compileClientComponent(new URL('./TasksPanel.vue', import.met
   '@/composables/useFirstPaint': { useFirstPaint: (ready: () => boolean) => computed(ready) },
   '@/lib/utils': Utils,
   '@/lib/poll': { follow: () => () => {}, onWake: () => () => {} },
-  '@/lib/jobs': { deleteErrorMessage: () => null },
   '@/lib/notebook/submit': { sessionRuntime: () => null },
   '@/lib/desktop': { isDesktop: () => desktopMode.value },
   '@/lib/tes': Tes,
@@ -239,9 +254,44 @@ describe('the run figures', () => {
     const cards = nodes(mounted.root).filter((node) => node.tag === 'section').map((node) => content(node).replace(/\s+/g, ' '))
 
     expect(cards).toContain('Runs 3 2/3 completed')
-    expect(cards).toContain('Running 1 0 waiting to start')
+    expect(cards).toContain('Active 1 0 waiting to start')
     expect(cards.find((card) => card.startsWith('Nodes used'))).toBe('Nodes used 2 name of node-1name of node-2')
     realmNodes.value = []
+    mounted.app.unmount()
+  })
+})
+
+describe('finding a run', () => {
+  it('keeps the runs whose name matches and counts them in the footer', async () => {
+    desktopMode.value = false
+    const mounted = await mountApp(TasksPanel)
+    await flush()
+    const input = element(mounted.root, (node) => node.tag === 'input')
+    ;(input.props.onInput as (event: { target: { value: string } }) => void)({ target: { value: 'ASSEMBLE' } })
+    await flush()
+
+    expect(rows(mounted.root).join(' ')).toContain('assemble-run-17')
+    expect(rows(mounted.root).join(' ')).not.toContain('qc-sample42')
+    expect(content(mounted.root)).toContain('1 of 2 runs')
+    mounted.app.unmount()
+  })
+})
+
+describe('the run record of a row', () => {
+  it('is looked up on click and falls back to the run the node keeps', async () => {
+    desktopMode.value = false
+    metadataAtPath.mockReset().mockResolvedValue(null)
+    getRun.mockReset().mockResolvedValue({ run_id: 'J2', run_crate: 'record-2' })
+    const mounted = await mountApp(TasksPanel)
+    await flush()
+    expect(metadataAtPath).not.toHaveBeenCalled()
+
+    const open = element(mounted.root, (node) => node.tag === 'button' && node.props['aria-label'] === 'Open the run record')
+    await (open.props.onClick as (event: { stopPropagation: () => void }) => Promise<void>)({ stopPropagation: () => {} })
+    await flush()
+
+    expect(metadataAtPath).toHaveBeenCalledWith('runs/J2')
+    expect(push).toHaveBeenLastCalledWith({ name: 'dataset', params: { id: 'record-2' } })
     mounted.app.unmount()
   })
 })

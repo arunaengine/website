@@ -5,28 +5,27 @@ import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Notice from '@/components/ui/Notice.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
-import Badge from '@/components/ui/Badge.vue'
 import OverviewCell from '@/components/dashboard/OverviewCell.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
+import IconButton from '@/components/ui/IconButton.vue'
+import Input from '@/components/ui/Input.vue'
+import StatusMark from '@/components/ui/StatusMark.vue'
+import StatusPill from '@/components/ui/StatusPill.vue'
 import ListShell from '@/components/ui/ListShell.vue'
 import ListSkeleton from '@/components/ui/ListSkeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
-import TesPlacementTags from '@/components/compute/TesPlacementTags.vue'
 import TaskDetailPanel from '@/components/compute/TaskDetailPanel.vue'
 import NewRunMenu from '@/components/compute/NewRunMenu.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
-import { useJobs } from '@/composables/useJobs'
 import { useNow } from '@/composables/useNow'
 import { useRefresh } from '@/composables/useRefresh'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { errorMessage, formatDuration, formatResourceGb, relativeTime, truncateMiddle } from '@/lib/utils'
 import { follow, onWake } from '@/lib/poll'
-import { deleteErrorMessage } from '@/lib/jobs'
 import { sessionRuntime } from '@/lib/notebook/submit'
 import { isDesktop } from '@/lib/desktop'
 import {
@@ -35,11 +34,12 @@ import {
   isLocalRun,
   isTerminalTesState,
   runListed,
+  TES_STATE_META,
   type TesServiceInfo,
   type TesState,
   type TesTask,
 } from '@/lib/tes'
-import { Activity, ChevronRight, CircleCheck, Hourglass, Laptop, Server, Timer, Trash2, Workflow } from '@lucide/vue'
+import { Activity, ChevronRight, CircleCheck, Container, FileText, Hourglass, Laptop, NotebookPen, RotateCcw, Server, Timer, Users, Workflow } from '@lucide/vue'
 
 // Run list section of the unified Compute view. ComputeView gates the feature
 // flag and sign-in, but the panel tracks the session itself so a late or lost
@@ -47,7 +47,7 @@ import { Activity, ChevronRight, CircleCheck, Hourglass, Laptop, Server, Timer, 
 const router = useRouter()
 const route = useRoute()
 const { getTesServiceInfo, listTasks } = useTes()
-const { currentUser, myGroups } = useAruna()
+const { currentUser, myGroups, metadataAtPath, getRun } = useAruna()
 const { authPending } = useAuth()
 
 // Deep-linkable run drawer driven by the :taskId route param (the back button
@@ -57,6 +57,24 @@ const openTaskId = computed(() =>
 )
 function closeTask() {
   void router.push({ name: 'compute' })
+}
+function openTask(id: string) {
+  void router.push({ name: 'task', params: { taskId: id } })
+}
+function rerun(id: string) {
+  void router.push({ name: 'compute-new', query: { rerun: id } })
+}
+// The record is looked up only when asked for, as the run details find it.
+const recordError = ref<string | null>(null)
+async function openRecord(id: string) {
+  recordError.value = null
+  try {
+    const record = (await metadataAtPath(`runs/${id}`))?.document_id ?? (await getRun(id)).run_crate
+    if (record) void router.push({ name: 'dataset', params: { id: record } })
+    else recordError.value = 'This run has no run record yet.'
+  } catch {
+    recordError.value = 'The run record could not be found.'
+  }
 }
 
 // ── Service banner ───────────────────────────────────────────────────────────
@@ -133,10 +151,13 @@ const placeOptions = computed(() =>
 function inGroup(task: TesTask, group: StateFilterGroup): boolean {
   return !!task.state && GROUP_STATES[group].includes(task.state)
 }
+const query = ref('')
 const visibleTasks = computed(() => {
   const group = stateGroup.value
-  if (group === 'all') return placedTasks.value
-  return placedTasks.value.filter((task) => inGroup(task, group))
+  const text = query.value.trim().toLowerCase()
+  return placedTasks.value.filter((task) =>
+    (group === 'all' || inGroup(task, group))
+    && (!text || [task.name, task.id, tool(task)].some((value) => value?.toLowerCase().includes(text))))
 })
 const emptyGroupLabel = computed(() => {
   const group = stateGroup.value
@@ -152,29 +173,6 @@ const chipOptions = computed(() => [
   })),
 ])
 
-// ── Row-level delete (two-step inline confirm) ───────────────────────────────
-const confirmingDeleteId = ref<string | null>(null)
-let rowDeleteTimer: number | undefined
-function requestRowDelete(id: string) {
-  confirmingDeleteId.value = id
-  window.clearTimeout(rowDeleteTimer)
-  rowDeleteTimer = window.setTimeout(() => (confirmingDeleteId.value = null), 4000)
-}
-// The node removes the run for every client; one already gone counts as deleted.
-const { deleteJob } = useJobs()
-const deleteError = ref<string | null>(null)
-async function confirmRowDelete(id: string) {
-  window.clearTimeout(rowDeleteTimer)
-  confirmingDeleteId.value = null
-  deleteError.value = null
-  try {
-    await deleteJob(id)
-  } catch (err) {
-    deleteError.value = deleteErrorMessage(err)
-    if (deleteError.value) return
-  }
-  tasks.value = tasks.value.filter((task) => task.id !== id)
-}
 function onDeleted() {
   const id = openTaskId.value
   tasks.value = tasks.value.filter((task) => task.id !== id)
@@ -209,12 +207,18 @@ let listRequestId = 0
 
 const groupNameById = computed(() => new Map(myGroups.value.map((g) => [g.id, g.name] as const)))
 
-function taskGroup(task: TesTask): { text: string; mono: boolean } | null {
+function taskGroup(task: TesTask): { id: string; text: string; mono: boolean } | null {
   const id = task?.tags?.[TES_GROUP_TAG]
   if (!id) return null
   const name = groupNameById.value.get(id)
-  return name ? { text: name, mono: false } : { text: truncateMiddle(id), mono: true }
+  return name ? { id, text: name, mono: false } : { id, text: truncateMiddle(id), mono: true }
 }
+
+// The tool is the image name without its registry, path and tag.
+function tool(task: TesTask): string {
+  return task.executors?.[0]?.image?.split('/').pop()?.split(/[:@]/)[0] ?? ''
+}
+const stateLabel = (task: TesTask) => TES_STATE_META[task.state ?? 'UNKNOWN'].label
 
 // The facade always emits a `resources` object (`preemptible` is filled in even
 // when the submitter asked for nothing), so an empty summary means no ceilings
@@ -223,8 +227,8 @@ function taskResources(task: TesTask): string {
   const r = task.resources
   if (!r) return ''
   const parts: string[] = []
-  if (r.cpu_cores != null) parts.push(`${r.cpu_cores} cpu`)
-  if (r.ram_gb != null) parts.push(`${formatResourceGb(r.ram_gb)} RAM`)
+  if (r.cpu_cores != null) parts.push(`${r.cpu_cores} CPU`)
+  if (r.ram_gb != null) parts.push(formatResourceGb(r.ram_gb))
   if (r.disk_gb != null) parts.push(`${formatResourceGb(r.disk_gb)} disk`)
   return parts.join(', ')
 }
@@ -454,7 +458,6 @@ onMounted(() => {
 onUnmounted(() => {
   stopFollow?.()
   stopWake?.()
-  window.clearTimeout(rowDeleteTimer)
 })
 </script>
 
@@ -479,7 +482,7 @@ onUnmounted(() => {
         <template #value>{{ stats.total }}</template>
         <span><CircleCheck class="text-status-ok" /><b>{{ stats.completed }}/{{ stats.total }}</b> completed</span>
       </OverviewCell>
-      <OverviewCell label="Running" :icon="Activity" tone="aqua">
+      <OverviewCell label="Active" :icon="Activity" tone="aqua">
         <template #value>{{ stats.active }}</template>
         <span><Hourglass /><b>{{ stats.waiting }}</b> waiting to start</span>
       </OverviewCell>
@@ -513,6 +516,7 @@ onUnmounted(() => {
     >
       <template #filters>
         <div class="flex flex-wrap items-center gap-3">
+          <Input v-model="query" class="h-8 w-full text-xs sm:w-64" placeholder="Find a run" aria-label="Find a run" />
           <template v-if="desktop">
             <FilterChips v-model="place" :options="placeOptions" aria-label="Filter runs by place" />
             <span class="h-4 w-px bg-border" aria-hidden="true" />
@@ -521,8 +525,8 @@ onUnmounted(() => {
         </div>
       </template>
       <template #tools>
-        <span v-if="deleteError" class="text-[11px] text-destructive">{{ deleteError }}</span>
-        <span v-if="lastPollError" class="text-[11px] text-muted-foreground" :title="lastPollError">Refresh failed, retrying.</span>
+        <span v-if="recordError" role="status" class="text-xs text-muted-foreground">{{ recordError }}</span>
+        <span v-if="lastPollError" class="text-xs text-muted-foreground" :title="lastPollError">Refresh failed, retrying.</span>
         <RefreshButton :busy="spinning" sr-label="Refresh runs" @click="onReload" />
       </template>
 
@@ -537,97 +541,99 @@ onUnmounted(() => {
         v-if="!visibleTasks.length"
         compact
         class="rounded-none border-0 shadow-none"
-        :title="`No ${emptyGroupLabel}runs in the loaded list.`"
+        :title="query.trim() ? 'No run matches this name.' : `No ${emptyGroupLabel}runs in the loaded list.`"
       />
 
-      <table v-else class="w-full text-sm">
-        <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground">
-          <tr>
-            <th class="px-5 py-2 text-left font-semibold">Run</th>
-            <th class="px-5 py-2 text-left font-semibold">State</th>
-            <th v-if="desktop" class="px-5 py-2 text-left font-semibold">Runs on</th>
-            <th class="hidden px-5 py-2 text-left font-semibold md:table-cell">Group</th>
-            <th class="hidden px-5 py-2 text-left font-semibold lg:table-cell">Resources</th>
-            <th class="px-5 py-2 text-left font-semibold">Started</th>
-            <th class="hidden px-5 py-2 text-left font-semibold sm:table-cell">Duration</th>
-            <th class="px-5 py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="task in visibleTasks"
-            :key="task.id || task.name"
-            class="border-t border-border hover:bg-muted/40"
-          >
-            <td class="px-5 py-2.5">
-              <RouterLink
-                v-if="task.id"
-                class="font-medium text-foreground hover:text-primary hover:underline"
-                :to="{ name: 'task', params: { taskId: task.id } }"
-              >
-                {{ task.name || 'Untitled run' }}
-              </RouterLink>
-              <div v-else class="font-medium text-foreground">{{ task.name || 'Untitled run' }}</div>
-              <div v-if="task.id" class="font-mono text-[11px] text-muted-foreground" :title="task.id">{{ truncateMiddle(task.id) }}</div>
-            </td>
-            <td class="px-5 py-2.5">
-              <div class="flex flex-wrap items-center gap-1.5">
-                <TaskStateBadge :state="task.state" />
-                <Badge v-if="sessionRuntime(task.tags) !== null" variant="sky" size="sm" title="An interactive notebook kernel, not a batch run">Notebook</Badge>
-              </div>
-              <TesPlacementTags :tags="task.tags" compact class="mt-1" />
-            </td>
-            <td v-if="desktop" class="px-5 py-2.5 text-[13px]">
-              <span v-if="isLocalRun(task.tags)" class="inline-flex items-center gap-1.5 font-medium text-aruna-royal">
-                <Laptop class="h-3.5 w-3.5" /> This computer
-              </span>
-              <span v-else class="inline-flex items-center gap-1.5 text-muted-foreground">
-                <Server class="h-3.5 w-3.5" /> Realm
-              </span>
-            </td>
-            <td class="hidden px-5 py-2.5 text-[11px] text-muted-foreground md:table-cell">
-              <span v-if="taskGroup(task)" :class="taskGroup(task)!.mono ? 'font-mono' : ''">{{ taskGroup(task)!.text }}</span>
-              <span v-else>-</span>
-            </td>
-            <td class="hidden px-5 py-2.5 text-[11px] text-muted-foreground lg:table-cell" :title="resourcesHint(task)">
-              {{ taskResources(task) || '-' }}
-            </td>
-            <td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="task.creation_time">
-              {{ task.creation_time ? relativeTime(task.creation_time) : '-' }}
-            </td>
-            <td class="hidden px-5 py-2.5 text-[11px] tabular-nums text-muted-foreground sm:table-cell" :title="durationHint(task)">
-              {{ taskDuration(task) || '-' }}
-            </td>
-            <td class="px-5 py-2.5 text-right">
-              <div class="flex items-center justify-end gap-1">
-                <template v-if="task.id && isTerminalTesState(task.state)">
-                  <Button
-                    v-if="confirmingDeleteId !== task.id"
-                    variant="ghost"
-                    size="icon-sm"
-                    class="text-muted-foreground hover:text-destructive"
-                    :aria-label="`Delete ${task.name || 'run'}`"
-                    title="Delete this run"
-                    @click.stop="requestRowDelete(task.id)"
-                  >
-                    <Trash2 class="h-3.5 w-3.5" />
-                  </Button>
-                  <Button v-else variant="destructive" size="sm" title="Removes the run from the list in every browser" @click.stop="confirmRowDelete(task.id)">
-                    <Trash2 class="h-3.5 w-3.5" /> Delete?
-                  </Button>
-                </template>
-                <ChevronRight v-if="task.id" class="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div v-else class="overflow-x-auto">
+        <table class="data-table data-table-tall">
+          <thead>
+            <tr>
+              <th class="pl-5">Run</th>
+              <th v-if="desktop" class="hidden md:table-cell">Runs on</th>
+              <th v-else class="hidden md:table-cell">Node</th>
+              <th class="hidden xl:table-cell">Group</th>
+              <th class="hidden lg:table-cell">Resources</th>
+              <th class="hidden text-right sm:table-cell">Started</th>
+              <th class="num hidden sm:table-cell">Duration</th>
+              <th class="w-10 pr-4 sm:w-28"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="task in visibleTasks"
+              :key="task.id || task.name"
+              :class="task.id ? 'cursor-pointer' : ''"
+              @click="task.id && openTask(task.id)"
+            >
+              <td class="w-full max-w-0 pl-5">
+                <span class="flex items-start gap-3">
+                  <StatusMark v-if="task.state === 'COMPLETE'" :label="stateLabel(task)" class="mt-0.5" />
+                  <StatusPill v-else :state="stateLabel(task)" />
+                  <span class="min-w-0">
+                    <RouterLink
+                      v-if="task.id"
+                      class="line-clamp-2 break-words font-medium text-foreground hover:underline"
+                      :to="{ name: 'task', params: { taskId: task.id } }"
+                      @click.stop
+                    >{{ task.name || 'Untitled run' }}</RouterLink>
+                    <span v-else class="line-clamp-2 break-words font-medium text-foreground">{{ task.name || 'Untitled run' }}</span>
+                    <span class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs tabular-nums text-muted-foreground">
+                      <span v-if="tool(task)" class="inline-flex items-center gap-1"><Container class="h-3 w-3" />{{ tool(task) }}</span>
+                      <span v-if="sessionRuntime(task.tags) !== null" class="inline-flex items-center gap-1" title="An interactive notebook kernel, not a batch run"><NotebookPen class="h-3 w-3" />Notebook</span>
+                      <span v-if="taskDuration(task)" class="inline-flex items-center gap-1 sm:hidden"><Timer class="h-3 w-3" />{{ taskDuration(task) }}</span>
+                    </span>
+                  </span>
+                </span>
+              </td>
+              <td v-if="desktop" class="hidden whitespace-nowrap text-[13px] md:table-cell">
+                <span v-if="isLocalRun(task.tags)" class="inline-flex items-center gap-1.5">
+                  <Laptop class="h-3.5 w-3.5 text-muted-foreground" /> This computer
+                </span>
+                <span v-else class="inline-flex items-center gap-1.5">
+                  <Server class="h-3.5 w-3.5 text-muted-foreground" /> Realm
+                </span>
+              </td>
+              <td v-else class="hidden whitespace-nowrap text-[13px] md:table-cell">
+                <RouterLink v-if="nodeOf(task)" :to="{ name: 'node', params: { nodeId: nodeOf(task)! } }" class="inline-flex items-center gap-1.5 hover:underline" @click.stop>
+                  <Server class="h-3.5 w-3.5 text-muted-foreground" />{{ displayName(nodeOf(task)) }}
+                </RouterLink>
+              </td>
+              <td class="hidden whitespace-nowrap text-[13px] xl:table-cell">
+                <RouterLink v-if="taskGroup(task)" :to="{ name: 'group', params: { id: taskGroup(task)!.id } }" class="inline-flex items-center gap-1.5 hover:underline" @click.stop>
+                  <Users class="h-3.5 w-3.5 text-muted-foreground" /><span :class="taskGroup(task)!.mono ? 'font-mono text-xs' : ''">{{ taskGroup(task)!.text }}</span>
+                </RouterLink>
+              </td>
+              <td class="hidden whitespace-nowrap text-xs tabular-nums text-muted-foreground lg:table-cell" :title="resourcesHint(task)">
+                {{ taskResources(task) || '-' }}
+              </td>
+              <td class="hidden whitespace-nowrap text-right text-xs text-muted-foreground sm:table-cell" :title="task.creation_time ? new Date(task.creation_time).toLocaleString() : undefined">
+                {{ task.creation_time ? relativeTime(task.creation_time) : '-' }}
+              </td>
+              <td class="num hidden whitespace-nowrap text-xs text-muted-foreground sm:table-cell" :title="durationHint(task)">
+                {{ taskDuration(task) || '-' }}
+              </td>
+              <td class="w-10 pr-4 sm:w-28">
+                <span class="flex items-center justify-end gap-1">
+                  <span v-if="task.id" class="row-actions hidden items-center gap-1 sm:inline-flex">
+                    <IconButton v-if="isTerminalTesState(task.state)" label="Run again" @click.stop="rerun(task.id)"><RotateCcw class="h-4 w-4" /></IconButton>
+                    <IconButton v-if="task.state === 'COMPLETE'" label="Open the run record" @click.stop="openRecord(task.id)"><FileText class="h-4 w-4" /></IconButton>
+                  </span>
+                  <ChevronRight v-if="task.id" class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-      <template v-if="moreListed || olderHidden" #footer>
-        <Button v-if="moreListed" variant="ghost" size="sm" :disabled="refreshing" :aria-busy="refreshing" @click="fetchList({ more: true })">
-          <Spinner v-if="refreshing" label="Loading more runs" class="text-current" /> Load more
-        </Button>
-        <span v-else class="text-[11px] text-muted-foreground">Finished runs started more than 48 hours ago are not listed.</span>
+      <template #footer>
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs tabular-nums text-muted-foreground">
+          <span>{{ visibleTasks.length }} of {{ placedTasks.length }} {{ placedTasks.length === 1 ? 'run' : 'runs' }}</span>
+          <Button v-if="moreListed" variant="outline" size="sm" :disabled="refreshing" :aria-busy="refreshing" @click="fetchList({ more: true })">
+            <Spinner v-if="refreshing" label="Loading more runs" class="text-current" /> Load more
+          </Button>
+          <span v-else-if="olderHidden">Finished runs started more than 48 hours ago are not listed.</span>
+        </div>
       </template>
     </ListShell>
 
