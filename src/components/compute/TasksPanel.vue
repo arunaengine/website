@@ -6,9 +6,11 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import Notice from '@/components/ui/Notice.vue'
 import OverviewCell from '@/components/dashboard/OverviewCell.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
+import FilterMenu from '@/components/compute/FilterMenu.vue'
+import KindTile from '@/components/compute/KindTile.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import IconButton from '@/components/ui/IconButton.vue'
 import Input from '@/components/ui/Input.vue'
-import StatusMark from '@/components/ui/StatusMark.vue'
 import StatusPill from '@/components/ui/StatusPill.vue'
 import ListShell from '@/components/ui/ListShell.vue'
 import ListSkeleton from '@/components/ui/ListSkeleton.vue'
@@ -26,6 +28,7 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { errorMessage, formatDateTime, formatDuration, formatResourceGb, relativeTime, truncateMiddle } from '@/lib/utils'
 import { follow, onWake } from '@/lib/poll'
 import { sessionRuntime } from '@/lib/notebook/submit'
+import { sessionRuntimeById } from '@/lib/notebook/runtimes'
 import { isDesktop } from '@/lib/desktop'
 import {
   TES_GROUP_TAG,
@@ -38,7 +41,7 @@ import {
   type TesState,
   type TesTask,
 } from '@/lib/tes'
-import { Activity, ChevronRight, CircleCheck, Container, FileText, Hourglass, Laptop, NotebookPen, RotateCcw, Server, Timer, Users, Workflow } from '@lucide/vue'
+import { Activity, ChevronRight, CircleCheck, FileText, Gauge, Hourglass, Laptop, List, NotebookPen, RotateCcw, Server, Timer, Users, Workflow } from '@lucide/vue'
 
 // Run list section of the unified Compute view. ComputeView gates the feature
 // flag and sign-in, but the panel tracks the session itself so a late or lost
@@ -112,7 +115,6 @@ async function loadServiceInfo(): Promise<number> {
 // Chips cover only states the facade actually emits (aruna api tes.rs):
 // PAUSED and PREEMPTED never occur; UNKNOWN (indeterminate) counts as failed.
 type StateFilterGroup = 'active' | 'done' | 'failed' | 'canceled'
-type StateGroup = 'all' | StateFilterGroup
 const GROUP_STATES: Record<StateFilterGroup, TesState[]> = {
   active: ['QUEUED', 'INITIALIZING', 'RUNNING', 'CANCELING'],
   done: ['COMPLETE'],
@@ -125,7 +127,16 @@ const GROUP_LABELS: Record<StateFilterGroup, string> = {
   failed: 'Failed',
   canceled: 'Cancelled',
 }
-const stateGroup = ref<StateGroup>('all')
+const stateGroups = ref<string[]>([])
+
+// A notebook session is a kernel behind a notebook; every other run is a tool run.
+type RunKind = 'tool' | 'notebook'
+const KIND_META: Record<RunKind, { label: string; icon: typeof Workflow; tone: 'royal' | 'aqua' }> = {
+  tool: { label: 'Tool run', icon: Workflow, tone: 'royal' },
+  notebook: { label: 'Notebook session', icon: NotebookPen, tone: 'aqua' },
+}
+const kindOf = (task: TesTask): RunKind => (sessionRuntime(task.tags) !== null ? 'notebook' : 'tool')
+const kinds = ref<string[]>([])
 
 const tasks = ref<TesTask[]>([])
 const now = useNow(60_000)
@@ -152,25 +163,34 @@ function inGroup(task: TesTask, group: StateFilterGroup): boolean {
 }
 const query = ref('')
 const visibleTasks = computed(() => {
-  const group = stateGroup.value
+  const groups = stateGroups.value as StateFilterGroup[]
   const text = query.value.trim().toLowerCase()
   return placedTasks.value.filter((task) =>
-    (group === 'all' || inGroup(task, group))
+    (!groups.length || groups.some((group) => inGroup(task, group)))
+    && (!kinds.value.length || kinds.value.includes(kindOf(task)))
     && (!text || [task.name, task.id, tool(task)].some((value) => value?.toLowerCase().includes(text))))
 })
-const emptyGroupLabel = computed(() => {
-  const group = stateGroup.value
-  if (group === 'all') return ''
-  return `${GROUP_LABELS[group].toLowerCase()} `
-})
-const chipOptions = computed(() => [
-  { value: 'all', label: 'All', count: placedTasks.value.length },
-  ...(Object.keys(GROUP_LABELS) as StateFilterGroup[]).map((group) => ({
-    value: group,
-    label: GROUP_LABELS[group],
-    count: placedTasks.value.filter((task) => inGroup(task, group)).length,
-  })),
-])
+const stateOptions = computed(() => (Object.keys(GROUP_LABELS) as StateFilterGroup[]).map((group) => ({
+  value: group,
+  label: GROUP_LABELS[group],
+  count: placedTasks.value.filter((task) => inGroup(task, group)).length,
+})))
+const kindOptions = computed(() => (Object.keys(KIND_META) as RunKind[]).map((kind) => ({
+  value: kind,
+  label: kind === 'tool' ? 'Tool runs' : 'Notebook sessions',
+  count: placedTasks.value.filter((task) => kindOf(task) === kind).length,
+})))
+function clearFilters() {
+  query.value = ''
+  kinds.value = []
+  stateGroups.value = []
+}
+// What a row says under its name: the kind and the tool or notebook runtime.
+function kindLine(task: TesTask): string {
+  const runtime = sessionRuntime(task.tags)
+  const detail = runtime !== null ? (sessionRuntimeById(runtime)?.label ?? runtime) : tool(task)
+  return detail ? `${KIND_META[kindOf(task)].label}, ${detail}` : KIND_META[kindOf(task)].label
+}
 
 function onDeleted() {
   const id = openTaskId.value
@@ -482,7 +502,9 @@ onUnmounted(() => {
     </Notice>
     <p v-if="otherNodes.truncated.length" class="text-[11px] text-muted-foreground">Only the newest 50 runs of {{ otherNodes.truncated.join(', ') }} are shown.</p>
 
-    <div v-if="painted && shellState === 'ready'" class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+    <section v-if="painted && shellState === 'ready'">
+    <SectionHeading title="Overview" :icon="Gauge" />
+    <div class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
       <OverviewCell label="Runs" :icon="Workflow" tone="ok" :info="statsNote">
         <template #value>{{ stats.total }}</template>
         <span><CircleCheck class="text-status-ok" /><b>{{ stats.completed }}/{{ stats.total }}</b> completed</span>
@@ -507,9 +529,11 @@ onUnmounted(() => {
         <span v-if="stats.nodes.length > 2"><b>{{ stats.nodes.length - 2 }}</b> more</span>
       </OverviewCell>
     </div>
+    </section>
 
     <!-- 'loading' also covers the pre-fetch gap while init() awaits service
          info and a session that has not resolved yet. -->
+    <SectionHeading v-if="painted && shellState === 'ready'" title="Runs" :icon="List" class="!mb-0 pt-2" />
     <ListShell
       v-if="painted"
       :state="shellState"
@@ -526,7 +550,8 @@ onUnmounted(() => {
             <FilterChips v-model="place" :options="placeOptions" aria-label="Filter runs by place" />
             <span class="h-4 w-px bg-border" aria-hidden="true" />
           </template>
-          <FilterChips v-model="stateGroup" :options="chipOptions" aria-label="Filter runs by state" />
+          <FilterMenu v-model="kinds" label="Kind" :options="kindOptions" />
+          <FilterMenu v-model="stateGroups" label="State" :options="stateOptions" />
         </div>
       </template>
       <template #tools>
@@ -545,14 +570,18 @@ onUnmounted(() => {
         v-if="!visibleTasks.length"
         compact
         class="rounded-none border-0 shadow-none"
-        :title="query.trim() ? 'No run matches this name.' : `No ${emptyGroupLabel}runs in the loaded list.`"
-      />
+        :title="query.trim() ? 'No run matches this name.' : 'No runs match these filters.'"
+      >
+        <Button variant="outline" size="sm" @click="clearFilters">Clear filters</Button>
+      </EmptyState>
 
       <div v-else class="overflow-x-auto">
         <table class="data-table data-table-tall">
           <thead>
             <tr>
+              <th class="hidden w-12 pl-5 pr-0 sm:table-cell">Kind</th>
               <th class="pl-5">Run</th>
+              <th>State</th>
               <th v-if="desktop" class="hidden md:table-cell">Runs on</th>
               <th v-else class="hidden md:table-cell">Node</th>
               <th class="hidden xl:table-cell">Group</th>
@@ -569,10 +598,11 @@ onUnmounted(() => {
               :class="task.id ? 'cursor-pointer' : ''"
               @click="task.id && openTask(task.id)"
             >
+              <td class="hidden w-12 pl-5 pr-0 sm:table-cell">
+                <KindTile :icon="KIND_META[kindOf(task)].icon" :tone="KIND_META[kindOf(task)].tone" :label="KIND_META[kindOf(task)].label" />
+              </td>
               <td class="w-full max-w-0 pl-5">
                 <span class="flex items-start gap-3">
-                  <StatusMark v-if="task.state === 'COMPLETE'" :label="stateLabel(task)" class="mt-0.5" />
-                  <StatusPill v-else :state="stateLabel(task)" />
                   <span class="min-w-0">
                     <RouterLink
                       v-if="task.id"
@@ -581,13 +611,18 @@ onUnmounted(() => {
                       @click.stop
                     >{{ task.name || 'Untitled run' }}</RouterLink>
                     <span v-else class="line-clamp-2 break-words font-medium text-foreground">{{ task.name || 'Untitled run' }}</span>
-                    <span class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs tabular-nums text-muted-foreground">
-                      <span v-if="tool(task)" class="inline-flex items-center gap-1"><Container class="h-3 w-3" />{{ tool(task) }}</span>
-                      <span v-if="sessionRuntime(task.tags) !== null" class="inline-flex items-center gap-1" title="An interactive notebook kernel, not a batch run"><NotebookPen class="h-3 w-3" />Notebook</span>
-                      <span v-if="taskDuration(task)" class="inline-flex items-center gap-1 sm:hidden"><Timer class="h-3 w-3" />{{ taskDuration(task) }}</span>
-                    </span>
+                    <span class="mt-1 block text-xs text-muted-foreground">{{ kindLine(task) }}</span>
                   </span>
                 </span>
+              </td>
+              <td class="whitespace-nowrap">
+                <StatusPill
+                  v-if="task.state === 'COMPLETE'"
+                  :state="stateLabel(task)"
+                  :icon="CircleCheck"
+                  class="border-transparent bg-status-ok/10 text-status-ok"
+                />
+                <StatusPill v-else :state="stateLabel(task)" />
               </td>
               <td v-if="desktop" class="hidden whitespace-nowrap text-[13px] md:table-cell">
                 <span v-if="isLocalRun(task.tags)" class="inline-flex items-center gap-1.5">
@@ -618,7 +653,7 @@ onUnmounted(() => {
               </td>
               <td class="w-10 pr-4 sm:w-28">
                 <span class="flex items-center justify-end gap-1">
-                  <span v-if="task.id" class="row-actions hidden items-center gap-1 sm:inline-flex">
+                  <span v-if="task.id" class="hidden items-center gap-1 sm:inline-flex">
                     <IconButton v-if="isTerminalTesState(task.state)" label="Run again" @click.stop="rerun(task.id)"><RotateCcw class="h-4 w-4" /></IconButton>
                     <IconButton v-if="task.state === 'COMPLETE'" label="Open the run record" @click.stop="openRecord(task.id)"><FileText class="h-4 w-4" /></IconButton>
                   </span>

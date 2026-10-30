@@ -36,6 +36,17 @@ const CellStub = defineComponent({
   props: { label: String },
   setup: (props, { slots }) => () => h('section', [props.label, ' ', slots.value?.(), ' ', slots.default?.()]),
 })
+// Each option is a button "label count" that toggles it, like a checkbox in the menu.
+const FilterMenuStub = defineComponent({
+  props: { label: String, options: Array, modelValue: Array },
+  emits: ['update:modelValue'],
+  setup: (props, { emit }) => () => h('span', (props.options as Array<{ value: string; label: string; count: number }>).map((option) =>
+    h('button', {
+      onClick: () => emit('update:modelValue', (props.modelValue as string[]).includes(option.value)
+        ? (props.modelValue as string[]).filter((value) => value !== option.value)
+        : [...(props.modelValue as string[]), option.value]),
+    }, `${option.label} ${option.count}`))),
+})
 const FilterChips = compileClientComponent(new URL('../ui/FilterChips.vue', import.meta.url), { vue: VueRuntime })
 
 const TasksPanel = compileClientComponent(new URL('./TasksPanel.vue', import.meta.url), {
@@ -59,7 +70,9 @@ const TasksPanel = compileClientComponent(new URL('./TasksPanel.vue', import.met
   '@/components/ui/Spinner.vue': moduleDefault(Empty),
   '@/components/ui/IconButton.vue': moduleDefault(IconButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
-  '@/components/ui/StatusMark.vue': moduleDefault(Empty),
+  '@/components/compute/FilterMenu.vue': moduleDefault(FilterMenuStub),
+  '@/components/compute/KindTile.vue': moduleDefault(Empty),
+  '@/components/ui/SectionHeading.vue': moduleDefault(Empty),
   '@/components/ui/StatusPill.vue': moduleDefault(Empty),
   '@/components/compute/TaskDetailPanel.vue': moduleDefault(Empty),
   '@/components/compute/NewRunMenu.vue': moduleDefault(Empty),
@@ -84,7 +97,8 @@ const TasksPanel = compileClientComponent(new URL('./TasksPanel.vue', import.met
   '@/composables/useFirstPaint': { useFirstPaint: (ready: () => boolean) => computed(ready) },
   '@/lib/utils': Utils,
   '@/lib/poll': { follow: () => () => {}, onWake: () => () => {} },
-  '@/lib/notebook/submit': { sessionRuntime: () => null },
+  '@/lib/notebook/submit': { sessionRuntime: (tags?: Record<string, string>) => tags?.session ?? null },
+  '@/lib/notebook/runtimes': { sessionRuntimeById: (id: string) => (id === 'python' ? { label: 'Python' } : undefined) },
   '@/lib/desktop': { isDesktop: () => desktopMode.value },
   '@/lib/tes': Tes,
 })
@@ -307,6 +321,24 @@ describe('the run record of a row', () => {
 
     expect(metadataAtPath).toHaveBeenCalledWith('runs/J2')
     expect(push).toHaveBeenLastCalledWith({ name: 'dataset', params: { id: 'record-2' } })
+    mounted.app.unmount()
+  })
+})
+
+describe('the kind and state filters', () => {
+  it('tells tool runs from notebook sessions and combines both filters', async () => {
+    desktopMode.value = false
+    const session = { ...localRun, id: 'J5', name: 'bakta-summary.ipynb', tags: { session: 'python' } }
+    listTasks.mockReset().mockResolvedValue({ tasks: [localRun, realmRun, session] })
+    const mounted = await mountApp(TasksPanel)
+    await flush()
+
+    expect(rows(mounted.root).find((row) => row.includes('bakta-summary'))).toContain('Notebook session, Python')
+    await click(chip(mounted.root, 'Tool runs 2'))
+    expect(rows(mounted.root).join(' ')).not.toContain('bakta-summary')
+    await click(chip(mounted.root, 'Active 2'))
+    expect(rows(mounted.root).join(' ')).toContain('qc-sample42')
+    expect(rows(mounted.root).join(' ')).not.toContain('assemble-run-17')
     mounted.app.unmount()
   })
 })
