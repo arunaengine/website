@@ -143,8 +143,11 @@ const DialogStub = defineComponent({
   setup: (props, { slots }) => () => (props.open ? h('div', slots.default?.()) : null),
 })
 
+// Bucket holders the federated search answers; this node unless a test says otherwise.
+const searchBuckets = vi.fn(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-id' }], nodes_failed: 0 }))
 const useArunaModule = {
   useAruna: () => ({
+    searchBuckets,
     apiBaseUrl: ref('https://node.example.org/api/v1'),
     authToken: ref('realm-token'),
     bootstrapped: ref(true),
@@ -324,7 +327,14 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
   '@/composables/useAruna': useArunaModule,
   '@/composables/useComputeDataView': { useComputeDataView: () => ref('table') },
   '@/composables/useS3': { useS3: () => s3, s3ErrorMessage: (error: unknown) => String(error) },
-  '@/composables/useRealmNodes': { useRealmNodes: () => ({ nodes: realmNodes }) },
+  '@/composables/useRealmNodes': {
+    useRealmNodes: () => ({
+      nodes: realmNodes,
+      localNodeId: ref('node-id'),
+      isTarget: () => true,
+      nodeById: (id: string | null) => (id === 'node-b' ? { apiBase: 'https://node-b.example.org/api/v1' } : null),
+    }),
+  },
   '@/composables/useRealm': { useRealm: () => ({ realm: ref({ shortName: 'Realm' }) }) },
   '@/composables/useRunTarget': { useRunTarget: () => runTarget },
   '@/composables/useAssistantRunForm': { provideRunFormBridge: () => {} },
@@ -484,6 +494,20 @@ describe('run page', () => {
     expect(submitted.resources).toEqual({ cpu_cores: 1, ram_gb: 2, disk_gb: 10 })
     expect(mounted.router!.currentRoute.value.name).toBe('task')
     expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('sends the run to the node holding its buckets', async () => {
+    searchBuckets.mockImplementationOnce(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-b' }], nodes_failed: 0 }))
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
+    await fillValidRun(mounted.root)
+
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    expect(searchBuckets).toHaveBeenCalledWith('results', { limit: 50 })
+    expect(createTask).toHaveBeenCalledWith(expect.anything(), 'https://node-b.example.org/api/v1')
     mounted.app.unmount()
   })
 

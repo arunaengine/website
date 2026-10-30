@@ -330,6 +330,42 @@ export function parseS3Url(url: string, endpoint?: string | null): ParsedS3Ref |
   return { bucket, key }
 }
 
+function s3Bucket(url: string | undefined): string | null {
+  const value = url?.trim() ?? ''
+  if (!value.startsWith('s3://')) return null
+  return value.slice('s3://'.length).split('/')[0] || null
+}
+
+/** The buckets a task names by `s3://` url: inputs and outputs, each name once. */
+export function taskBuckets(task: Pick<TesTask, 'inputs' | 'outputs'>): { inputs: string[]; outputs: string[] } {
+  const names = (urls: (string | undefined)[]) =>
+    [...new Set(urls.map(s3Bucket).filter((name): name is string => name !== null))]
+  return {
+    inputs: names((task.inputs ?? []).map((input) => input.url)),
+    outputs: names((task.outputs ?? []).map((output) => output.url)),
+  }
+}
+
+/**
+ * The node a task must be sent to: an `s3://` url names a bucket on the receiving node, so the
+ * node holding every named bucket, else every output bucket. Null keeps the connected node.
+ */
+export function holderNode(
+  task: Pick<TesTask, 'inputs' | 'outputs'>,
+  holders: ReadonlyMap<string, readonly string[]>,
+  localNodeId: string | null,
+): string | null {
+  const { inputs, outputs } = taskBuckets(task)
+  const holdingAll = (names: string[]) =>
+    names.length ? (holders.get(names[0]) ?? []).filter((node) => names.every((name) => holders.get(name)?.includes(node))) : []
+  for (const names of [[...new Set([...inputs, ...outputs])], outputs]) {
+    const nodes = holdingAll(names)
+    if (localNodeId && nodes.includes(localNodeId)) return null
+    if (nodes.length) return [...nodes].sort()[0]
+  }
+  return null
+}
+
 // True for the DRS-resolvable id forms the node accepts (routes/drs.rs
 // parse_requested_object_id): a canonical w3id URL with a 64-hex blake3 hash, a
 // content-hash ARN (arn:aruna:<realm>:<node>:ch/<64-hex>). `drs://` URIs are the

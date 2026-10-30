@@ -81,8 +81,9 @@ async function getTask(id: string, view: TesView = 'FULL'): Promise<TesTask> {
 
 // POST /ga4gh/tes/v1/tasks (api/src/routes/tes.rs create_task). Under the
 // portal's bearer auth the backend requires the owning-group tag, so it is
-// validated here before the request leaves the browser.
-async function createTask(task: TesTask): Promise<TesCreateTaskResponse> {
+// validated here before the request leaves the browser. `baseUrl` names the node
+// that holds the task's buckets.
+async function createTask(task: TesTask, baseUrl?: string): Promise<TesCreateTaskResponse> {
   assertEnabled()
   if (!task?.tags?.[TES_GROUP_TAG]) {
     throw new Error(`A task must carry the owning group tag (${TES_GROUP_TAG}).`)
@@ -95,7 +96,7 @@ async function createTask(task: TesTask): Promise<TesCreateTaskResponse> {
     return await request<TesCreateTaskResponse>('/ga4gh/tes/v1/tasks', {
       method: 'POST',
       body: JSON.stringify(task),
-    })
+    }, baseUrl)
   } finally {
     busy.value = false
   }

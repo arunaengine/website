@@ -33,14 +33,14 @@ import { provideRunFormBridge } from '@/composables/useAssistantRunForm'
 import { createRunFormBridge } from '@/lib/runFormBridge'
 import { defaultPlacement, isNativeBlocked, tesFormToExecutionRequest } from '@/lib/nativeSubmit'
 import { submitJob } from '@/lib/jobs'
-import { nativeInput, type TesTask } from '@/lib/tes'
+import { holderNode, nativeInput, taskBuckets, type TesTask } from '@/lib/tes'
 import { errorMessage } from '@/lib/utils'
 
 const router = useRouter()
 const { tesEnabled, busy, createTask, getTask } = useTes()
-const { currentUser, myGroups } = useAruna()
+const { currentUser, myGroups, searchBuckets } = useAruna()
 const { realm } = useRealm()
-const { nodes } = useRealmNodes()
+const { nodes, nodeById, localNodeId, isTarget } = useRealmNodes()
 // Desktop only: this computer can run the container itself.
 const runTarget = useRunTarget()
 const s3 = useS3()
@@ -100,7 +100,7 @@ const endpoint = computed(() => (runTarget.local.value ? 'POST /jobs/' : 'POST /
 const sentTo = computed(() =>
   runTarget.local.value
     ? 'sent to this computer, which runs the container itself'
-    : 'sent to the node you are signed in to; the planner picks the executing node',
+    : 'sent to the node that holds its buckets; the planner picks the executing node',
 )
 
 /** Scrolls to a problem and puts the caret in the field that carries it. */
@@ -139,6 +139,21 @@ async function submitLocally(draft: TesTask): Promise<boolean> {
   const created = await submitJob({ ...mapping.request, target: 'local' }, client)
   void router.push({ name: 'run', params: { jobId: created.job_id } })
   return true
+}
+
+/** The API of the node holding the run's buckets; undefined keeps the connected node. */
+async function holderBase(draft: TesTask): Promise<string | undefined> {
+  const { inputs, outputs } = taskBuckets(draft)
+  const holders = new Map(
+    await Promise.all(
+      [...new Set([...inputs, ...outputs])].map(async (name) => {
+        const found = await searchBuckets(name, { limit: 50 }).catch(() => null)
+        const hits = (found?.hits ?? []).filter((hit) => hit.bucket === name && isTarget(hit.node_id))
+        return [name, hits.map((hit) => hit.node_id)] as const
+      }),
+    ),
+  )
+  return nodeById(holderNode(draft, holders, localNodeId.value))?.apiBase ?? undefined
 }
 
 async function run() {
@@ -184,7 +199,7 @@ async function run() {
       draft = { ...draft, inputs: localInputs }
     }
     if (await submitLocally(draft)) return
-    const created = await createTask(draft)
+    const created = await createTask(draft, await holderBase(draft))
     void router.push({ name: 'task', params: { taskId: created.id } })
   } catch (err) {
     submitError.value = isTesUnsupported(err)
