@@ -355,6 +355,18 @@ describe('object browser link a local folder', () => {
     }
   })
 
+  it('keeps Upload and New folder disabled on a bucket of referenced files and names their source', async () => {
+    bucketUsage.value.value = { objects: 3, logical_bytes: 300, referenced_bytes: 300 } as never
+    try {
+      const root = await render({ referenceStats: computed(() => ({ count: 3, bytes: 300, groups: [{ key: 'ncbi' }] })), referenceGroupLabel: () => 'ftp.ncbi.nlm.nih.gov' })
+      expect(action(root, 'Upload').props.disabled).toBe(true)
+      expect(action(root, 'New folder').props.disabled).toBe(true)
+      expect(content(root)).toContain('Referenced from ftp.ncbi.nlm.nih.gov')
+    } finally {
+      bucketUsage.value.value = null
+    }
+  })
+
   it('says up to date only once the sync has finished and waits for nothing', async () => {
     const base = { source: 'arn:aruna:realm:self:s3/reef', target: 'arn:aruna:realm:laptop-1:s3/reef', state: 'enabled' }
     const shown = async (relationship: object) => content(await render({ syncsForKey: () => [{ relationship, direction: 'outgoing' }] }))

@@ -224,9 +224,20 @@ const syncProblem = computed(() => {
 })
 const lastSync = computed(() =>
   syncsForKey('').map(({ relationship }) => relationship.status?.last_synced_at ?? '').filter(Boolean).sort().at(-1) ?? null)
+// A bucket whose every file is referenced from a source; its files stay there.
+const referencedBucket = computed(() => {
+  const counted = usage.value
+  return Boolean(counted && counted.objects && (counted.referenced_bytes ?? 0) >= counted.logical_bytes && (counted.referenced_bytes ?? 0) > 0)
+})
+const referencedSource = computed(() => {
+  const groups = referenceStats.value.groups
+  return groups.length === 1 ? referenceGroupLabel(groups[0]!) : groups.length > 1 ? `${groups.length} sources` : null
+})
 // Why nothing can be added here; Upload and New folder stay in place, disabled, with this hint.
 const addReason = computed(() =>
-  remoteBlocked.value ? 'This node cannot be browsed from here, so nothing can be added.' : !canWriteCurrentPrefix.value ? (writeRestrictionMessage.value ?? 'This session cannot add files here.') : null)
+  remoteBlocked.value ? 'This node cannot be browsed from here, so nothing can be added.'
+    : referencedBucket.value ? 'The files of this bucket are referenced from their source, so none can be added here.'
+      : !canWriteCurrentPrefix.value ? (writeRestrictionMessage.value ?? 'This session cannot add files here.') : null)
 const hinting = ref(false)
 const hintFolder = computed(() => prefix.value.split('/').at(-1) || bucket.value)
 
@@ -618,6 +629,7 @@ async function onDrop(event: DragEvent) {
           </span>
         </template>
         <span v-if="usage" class="tabular-nums">{{ usageText(usage, true) }}</span>
+        <span v-if="referencedBucket && referencedSource" class="inline-flex items-center gap-1.5"><Link2 class="h-3.5 w-3.5" aria-hidden="true" />Referenced from {{ referencedSource }}</span>
         <span v-if="activeGroupId" class="inline-flex items-center gap-1.5">
           <Users class="h-3.5 w-3.5" aria-hidden="true" />
           <RouterLink :to="{ name: 'group', params: { id: activeGroupId } }" class="text-primary hover:underline">{{ selectedGroupName || activeGroupId }}</RouterLink>

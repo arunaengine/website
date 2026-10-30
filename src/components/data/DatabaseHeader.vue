@@ -5,6 +5,7 @@ import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import IconTile from '@/components/ui/IconTile.vue'
+import InfoHint from '@/components/ui/InfoHint.vue'
 import { useDatabases } from '@/composables/useDatabases'
 import { cn, isHttpUrl } from '@/lib/utils'
 import { Database, ExternalLink, FileText, FolderSync, Package, Scale } from '@lucide/vue'
@@ -47,7 +48,11 @@ const license = computed(() => entry.value?.metadata.license ?? '')
         </template>
         <template v-else>{{ bucket }}</template>
       </p>
-      <p v-if="description" class="text-sm text-muted-foreground">{{ description }}</p>
+      <!-- One line; the whole description is behind the hint. -->
+      <p v-if="description" class="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+        <span class="truncate">{{ description }}</span>
+        <InfoHint :label="description" name="About this database" />
+      </p>
       <p v-if="$slots.default || entry?.public" class="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <slot />
         <span v-if="entry?.public">Public</span>
