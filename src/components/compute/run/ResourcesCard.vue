@@ -8,7 +8,7 @@ import DocsLink from '@/components/ui/DocsLink.vue'
 import RunSection from '@/components/compute/run/RunSection.vue'
 import RunTile from '@/components/compute/run/RunTile.vue'
 import AiMark from '@/components/compute/run/AiMark.vue'
-import { Cpu } from '@lucide/vue'
+import { Check, Cpu, Pencil, RotateCcw } from '@lucide/vue'
 import {
   DEFAULT_RESOURCES,
   MAX_RESOURCE_GB,
@@ -60,8 +60,8 @@ const checkLabel = computed(() => (resourcesValid.value ? 'Complete' : 'Check th
       <DocsLink topic="compute-run" label="Docs" />
     </template>
     <template #controls>
-      <Button v-if="resourcesEdited" variant="link" size="sm" class="h-auto p-0 text-[11px]" @click="resetResources">
-        Reset to defaults
+      <Button v-if="resourcesEdited" variant="outline" size="sm" @click="resetResources">
+        <RotateCcw class="size-3.5" /> Reset to defaults
       </Button>
       <Button
         variant="outline"
@@ -70,11 +70,12 @@ const checkLabel = computed(() => (resourcesValid.value ? 'Complete' : 'Check th
         :aria-label="editing ? 'Done editing resources' : 'Edit resources'"
         @click="toggle"
       >
-        {{ editing ? 'Done' : 'Edit' }}
+        <template v-if="editing"><Check class="size-3.5" /> Done</template>
+        <template v-else><Pencil class="size-3.5" /> Edit resources</template>
       </Button>
     </template>
 
-    <dl data-tutorial="run-resources" class="grid gap-2 sm:grid-cols-3">
+    <dl data-tutorial="run-resources" class="grid gap-x-6 gap-y-4 sm:grid-cols-3">
       <RunTile
         label="CPU cores"
         :tag="tag(cpuCores, DEFAULT_RESOURCES.cpuCores)"
@@ -100,8 +101,7 @@ const checkLabel = computed(() => (resourcesValid.value ? 'Complete' : 'Check th
       <RunTile
         label="RAM"
         :tag="tag(ramGb, DEFAULT_RESOURCES.ramGb)"
-        :value="shown(ramGb)"
-        :sub="String(ramGb).trim() ? 'GB' : ''"
+        :value="String(ramGb).trim() ? `${shown(ramGb)} GB` : shown(ramGb)"
       >
         <template v-if="editing">
           <Input
@@ -122,8 +122,7 @@ const checkLabel = computed(() => (resourcesValid.value ? 'Complete' : 'Check th
       <RunTile
         label="Disk"
         :tag="tag(diskGb, DEFAULT_RESOURCES.diskGb)"
-        :value="shown(diskGb)"
-        :sub="String(diskGb).trim() ? 'GB' : ''"
+        :value="String(diskGb).trim() ? `${shown(diskGb)} GB` : shown(diskGb)"
       >
         <template v-if="editing">
           <Input

@@ -73,13 +73,13 @@ const noOutputs = computed(() => outputRows.value.length === 0)
       <Button data-tutorial="run-submit" class="max-lg:hidden" :disabled="props.running" @click="emit('run')">
         <Play class="size-4" /> {{ props.running ? 'Starting…' : 'Run' }}
       </Button>
-      <div class="flex flex-wrap gap-2">
-        <Button data-tutorial="run-request" variant="outline" class="flex-1" @click="emit('show-request')">
-          <Braces class="size-4" /> Show request
+      <div class="grid grid-cols-2 gap-2">
+        <Button data-tutorial="run-request" variant="outline" size="sm" @click="emit('show-request')">
+          <Braces class="size-3.5" /> Show request
         </Button>
-        <Button variant="outline" class="flex-1" @click="emit('cancel')"><ArrowLeft class="size-4" /> Back to runs</Button>
+        <Button variant="outline" size="sm" @click="emit('cancel')"><ArrowLeft class="size-3.5" /> Back to runs</Button>
+        <Button variant="outline" size="sm" class="col-span-2" @click="emit('save')"><Star class="size-3.5" /> Save as my run</Button>
       </div>
-      <Button variant="outline" @click="emit('save')"><Star class="size-4" /> Save as my run</Button>
       <p v-if="saved" role="status" class="text-center text-xs text-muted-foreground">Saved to My runs.</p>
     </div>
   </aside>

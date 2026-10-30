@@ -246,6 +246,7 @@ const s3 = {
 
 const sharedUi = {
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
+  '@/components/ui/Tooltip.vue': moduleDefault(PassThroughStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
   '@/components/ui/Input.vue': moduleDefault(Input),

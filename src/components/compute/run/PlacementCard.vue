@@ -127,7 +127,7 @@ function isCustom(rowId: number): boolean {
       </Button>
     </template>
 
-    <dl data-tutorial="run-placement" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+    <dl data-tutorial="run-placement" class="grid gap-x-6 gap-y-4 sm:grid-cols-2">
       <RunTile
         label="Run on"
         :tag="local ? 'chosen' : 'default'"
