@@ -54,6 +54,17 @@ const matchingGroups = computed(() => {
   return discoverableGroups.value.filter((group) => `${group.name} ${group.id}`.toLowerCase().includes(query))
 })
 const createGroupOpen = ref(false)
+// The top bar's Add menu opens the dialog with ?create=group; the marker goes once read.
+watch(
+  () => route.query.create,
+  (create) => {
+    if (create !== 'group') return
+    createGroupOpen.value = true
+    const { create: _create, ...rest } = route.query
+    void router.replace({ query: rest })
+  },
+  { immediate: true },
+)
 const selectedGroupId = ref('')
 async function refreshGroups() {
   await Promise.all([

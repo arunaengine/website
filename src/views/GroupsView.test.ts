@@ -9,6 +9,8 @@ const pending = (id: string, group: string) => ({ request_id: id, group_id: grou
 const ownRequests = ref([pending('q1', 'g1'), pending('q2', 'g2')])
 const withdrawRequest = vi.fn(async (_request: unknown) => undefined)
 const reportGlobalError = vi.fn()
+const route = reactive({ params: {}, hash: '', name: 'groups', query: {} as Record<string, string> })
+const replace = vi.fn()
 
 const Empty = defineComponent(() => () => null)
 const Slot = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
@@ -19,7 +21,7 @@ const ButtonStub = defineComponent({
 
 const GroupsView = compileClientComponent(new URL('./GroupsView.vue', import.meta.url), {
   vue: VueRuntime,
-  'vue-router': { useRoute: () => reactive({ params: {}, hash: '', name: 'groups' }), useRouter: () => ({ push: vi.fn() }) },
+  'vue-router': { useRoute: () => route, useRouter: () => ({ push: vi.fn(), replace }) },
   '@lucide/vue': new Proxy({}, { get: () => Empty }),
   '@/components/dashboard/PageHeader.vue': moduleDefault(Empty),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
@@ -31,7 +33,9 @@ const GroupsView = compileClientComponent(new URL('./GroupsView.vue', import.met
   '@/components/ui/ListSkeleton.vue': moduleDefault(Empty),
   '@/components/ui/SectionSkeleton.vue': moduleDefault(Empty),
   '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('i', p.label) })),
-  '@/components/groups/CreateGroupDialog.vue': moduleDefault(Empty),
+  '@/components/groups/CreateGroupDialog.vue': moduleDefault(
+    defineComponent({ props: { open: Boolean }, setup: (p) => () => h('dialog', { 'data-open': String(p.open) }) }),
+  ),
   '@/components/groups/GroupDetail.vue': moduleDefault(Empty),
   '@/components/groups/JoinRequestButton.vue': moduleDefault(Empty),
   '@/composables/useAruna': {
@@ -70,7 +74,20 @@ const GroupsView = compileClientComponent(new URL('./GroupsView.vue', import.met
 const withdrawButtons = (root: Parameters<typeof nodes>[0]) =>
   nodes(root).filter((node) => node.tag === 'button' && content(node).includes('Withdraw'))
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  route.query = {}
+})
+
+describe('GroupsView create query', () => {
+  it('opens Create group from ?create=group and drops the marker', async () => {
+    route.query = { create: 'group', keep: '1' }
+    const { root } = await mountApp(GroupsView)
+    await flush()
+    expect(nodes(root).find((node) => node.tag === 'dialog')?.props['data-open']).toBe('true')
+    expect(replace).toHaveBeenCalledWith({ query: { keep: '1' } })
+  })
+})
 
 describe('GroupsView join requests', () => {
   it('shows the wait on the Withdraw that was clicked, sends one at a time and frees it when it fails', async () => {

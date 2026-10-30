@@ -161,6 +161,17 @@ const newBucketOpen = ref(false)
 watch(newBucketOpen, (open) => {
   contextHold.value = open
 })
+// The top bar's Add menu opens the dialog with ?create=bucket; the marker goes once read.
+watch(
+  () => route.query.create,
+  (create) => {
+    if (create !== 'bucket') return
+    newBucketOpen.value = true
+    const { create: _create, ...rest } = route.query
+    void router.replace({ query: rest })
+  },
+  { immediate: true },
+)
 
 // A found folder opens itself; a found file opens the folder that holds it, on the hit's node.
 // A folder hit opens the folder; a file hit opens its folder with the file's details.

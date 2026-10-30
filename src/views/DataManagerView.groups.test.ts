@@ -82,6 +82,10 @@ describe('Data view group selection', () => {
     expect(browser).toBeGreaterThan(gate)
   })
 
+  it('opens New bucket from the create query and drops the marker', () => {
+    expect(viewSource).toMatch(/\(\) => route\.query\.create,[\s\S]*?create !== 'bucket'[\s\S]*?newBucketOpen\.value = true[\s\S]*?router\.replace\(\{ query: rest \}\)/)
+  })
+
   it('shows one placeholder instead of stacked loading states', () => {
     expect(template.split('<DataViewSkeleton')).toHaveLength(3)
     expect(template).not.toContain('<Spinner')
