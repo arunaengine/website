@@ -54,8 +54,8 @@ const HomeCards = defineAsyncComponent({
   loader: () => import('@/components/desktop/HomeCards.vue'),
   onError: asyncChunkError,
 })
-const DeviceRow = defineAsyncComponent({
-  loader: () => import('@/components/desktop/DeviceRow.vue'),
+const ThisComputer = defineAsyncComponent({
+  loader: () => import('@/components/desktop/ThisComputer.vue'),
   onError: asyncChunkError,
 })
 const desktop = isDesktop()
@@ -224,6 +224,12 @@ const mapComputer = computed(() => {
   const peers = info.connections.filter((peer) => peer.status === 'connected').map((peer) => peer.peer_id)
   return { id: info.node.peer_id, name: deviceName.value, peers }
 })
+// How many realm nodes this computer reaches now, for its state card.
+const computerLinks = computed(() => {
+  const peers = new Set(mapComputer.value?.peers ?? [])
+  if (!mapComputer.value || !infraNodes.value.length) return null
+  return { count: infraNodes.value.filter((node) => peers.has(node.node_id)).length, total: infraNodes.value.length }
+})
 const openNode = (nodeId: string) => void router.push({ name: 'node', params: { nodeId } })
 const groupView = useViewMode('dashboard-groups')
 // The node under the pointer, lit up on the topology and in the table together.
@@ -332,6 +338,13 @@ const pageDescription = computed(() =>
         <IconButton label="Not now" class="absolute right-2 top-2" @click="dismissOnboarding"><X class="h-4 w-4" /></IconButton>
       </section>
       <HomeCards v-if="desktop && currentUser" />
+      <ThisComputer
+        v-if="desktop && currentUser"
+        :name="deviceName"
+        :node-id="renameId"
+        :value="deviceRecord?.display_name ?? null"
+        :connected="computerLinks"
+      />
 
       <!-- Four stat cards: the stored scope decides whose figures, the Realm card is the same for both. -->
       <section aria-labelledby="overview-heading">
@@ -394,12 +407,6 @@ const pageDescription = computed(() =>
             <span v-if="replication"><Copy />{{ replication }}</span>
           </OverviewCell>
         </div>
-        <DeviceRow
-          v-if="desktop && currentUser"
-          :name="deviceName"
-          :node-id="renameId"
-          :value="deviceRecord?.display_name ?? null"
-        />
       </section>
 
       <!-- The scope picks the band below the Overview: my groups, or the realm's nodes. -->

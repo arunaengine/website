@@ -41,7 +41,10 @@ const IconButtonStub = defineComponent({
   props: { label: String },
   setup: (props, { attrs }) => () => h('button', { ...attrs, 'aria-label': props.label }, props.label),
 })
-const DeviceRowStub = defineComponent({ props: { name: String, nodeId: String }, setup: (props) => () => h('div', `device row ${props.name} ${props.nodeId ?? ''}`) })
+const ThisComputerStub = defineComponent({
+  props: { name: String, nodeId: String, connected: Object },
+  setup: (props) => () => h('div', `computer section ${props.name} ${props.nodeId ?? ''} ${props.connected ? `${props.connected.count}/${props.connected.total}` : ''}`),
+})
 const isRealmAdmin = ref(false)
 const renameNode = vi.fn(async () => undefined)
 const nodeNamesStub = { useNodeNames: () => ({ renameNode }) }
@@ -313,7 +316,7 @@ beforeAll(async () => {
     '@/components/ui/EmptyState.vue': moduleDefault(EmptyStub),
     '@/components/ui/SectionHeading.vue': moduleDefault(SectionHeadingStub),
     '@/components/desktop/HomeCards.vue': moduleDefault(HomeCardsStub),
-    '@/components/desktop/DeviceRow.vue': moduleDefault(DeviceRowStub),
+    '@/components/desktop/ThisComputer.vue': moduleDefault(ThisComputerStub),
     '@/lib/chunk-recovery': { asyncChunkError: vi.fn() },
     '@/lib/desktop': { isDesktop: () => desktopMode.value },
   })
@@ -614,20 +617,25 @@ describe('desktop home', () => {
     mounted.app.unmount()
   })
 
-  it('ends the Overview with this computer, named as the realm knows it', async () => {
+  it('shows this computer above the Overview, named as the realm knows it, with the nodes it reaches', async () => {
     currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
     desktopMode.value = true
     scope.value = 'realm'
-    nodeInfo.value = { node: { peer_id: 'own-device' } }
+    nodeInfo.value = { node: { peer_id: 'own-device' }, connections: [{ peer_id: 'mgmt', status: 'connected' }] }
     realmInfo.value = {
       metadata_replication: { default_replication_factor: 3 },
-      nodes: [{ node_id: 'own-device', kind: 'user', info: { labels: { device: 'Microbiology laptop' } } }],
+      nodes: [
+        { node_id: 'own-device', kind: 'user', info: { labels: { device: 'Microbiology laptop' } } },
+        { node_id: 'mgmt', kind: 'management', present: true },
+        { node_id: 'store', kind: 'server', present: true },
+      ],
     }
     const mounted = await mountApp(DashboardClient)
     await flush()
 
-    expect(content(mounted.root)).toContain('device row Microbiology laptop')
-    expect(content(mounted.root).indexOf('device row')).toBeGreaterThan(content(mounted.root).indexOf('Overview'))
+    expect(content(mounted.root)).toContain('computer section Microbiology laptop  1/2')
+    expect(content(mounted.root).indexOf('computer section')).toBeLessThan(content(mounted.root).indexOf('Overview'))
+    expect(content(mounted.root).indexOf('computer section')).toBeGreaterThan(content(mounted.root).indexOf('desktop-home-cards'))
     // The realm table lists this computer first.
     expect(content(mounted.root)).toContain('first own-device')
     mounted.app.unmount()
@@ -642,14 +650,14 @@ describe('desktop home', () => {
     let mounted = await mountApp(DashboardClient)
     await flush()
     // The row renames this computer through the device route, by its node id.
-    expect(content(mounted.root)).toContain('device row Lab laptop own-device')
+    expect(content(mounted.root)).toContain('computer section Lab laptop own-device')
     mounted.app.unmount()
 
     // Its own record has no name yet; the realm node's copy does.
     realmInfo.value = { metadata_replication: { default_replication_factor: 3 }, nodes: [{ node_id: 'own-device', kind: 'user' }] }
     mounted = await mountApp(DashboardClient)
     await flush()
-    expect(content(mounted.root)).toContain('device row Old name')
+    expect(content(mounted.root)).toContain('computer section Old name')
     mounted.app.unmount()
   })
 
@@ -661,7 +669,7 @@ describe('desktop home', () => {
     const mounted = await mountApp(DashboardClient)
     await flush()
 
-    expect(content(mounted.root)).toContain('device row Lab laptop ')
+    expect(content(mounted.root)).toContain('computer section Lab laptop ')
     expect(content(mounted.root)).not.toContain('own-device')
     mounted.app.unmount()
   })
@@ -672,7 +680,7 @@ describe('desktop home', () => {
     await flush()
 
     expect(content(mounted.root)).not.toContain('desktop-home-cards')
-    expect(content(mounted.root)).not.toContain('device row')
+    expect(content(mounted.root)).not.toContain('computer section')
     // The web dashboard needs no technical subtitle.
     expect(content(mounted.root)).not.toContain('Live data from the local Aruna API.')
     mounted.app.unmount()
