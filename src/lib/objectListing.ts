@@ -106,6 +106,6 @@ export function pageRange(page: number, pageSize: number, listed: number, last: 
   if (!listed) return ''
   const first = (page - 1) * pageSize + 1
   const end = first + listed - 1
-  const shown = first === end ? formatCount(first) : `${formatCount(first)} to ${formatCount(end)}`
+  const shown = first === end ? formatCount(first) : `${formatCount(first)}-${formatCount(end)}`
   return last ? `${shown} of ${formatCount(end)}` : shown
 }

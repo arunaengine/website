@@ -19,6 +19,7 @@ import { useCatalogBrowse, type CatalogPageParams } from '@/composables/useCatal
 import { datasetPurposeMatches, datasetPurposeOf, type DatasetPurpose } from '@/lib/datasetPurpose'
 import { errorMessage, formatNumber, truncateMiddle } from '@/lib/utils'
 import { isHiddenBucket } from '@/lib/workspaces'
+import { pageRange } from '@/lib/objectListing'
 import type { MetadataDoc } from '@/data/types'
 import type {
   BucketSearchHit,
@@ -392,12 +393,13 @@ export function useDatasetSearch(searchBox: Ref<{ focus: () => void } | null>) {
   })
 
   const browseSummary = computed(() => {
-    const shown = formatNumber(hits.value.length)
-    const page = formatNumber(browsePage.value)
-    if (pageCount.value === null) return `Page ${page}, ${shown} Datasets on this page.`
+    const shown = hits.value.length
+    const range = pageRange(browsePage.value, BROWSE_PAGE_SIZE, shown, !hasNextPage.value)
+    const noun = shown === 1 && !hasNextPage.value && browsePage.value === 1 ? 'dataset' : 'datasets'
+    if (pageCount.value === null || !hasNextPage.value) return `${range} ${noun}`
     // Favourites are fetched by id, so only the server estimate reads "about".
     const about = favouritesOnly.value ? '' : 'about '
-    return `Page ${page} of ${about}${formatNumber(pageCount.value)}, ${shown} Datasets on this page.`
+    return `${range} ${noun}, page ${formatNumber(browsePage.value)} of ${about}${formatNumber(pageCount.value)}`
   })
 
   function goToPage(page: number) {

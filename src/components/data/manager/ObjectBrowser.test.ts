@@ -780,7 +780,7 @@ describe('object browser pages', () => {
     const two = ref([listedObject, { ...listedObject, key: 'raw/b.fastq', name: 'b.fastq' }])
     const first = await render({ nextPage, previousPage, setPageSize, nextToken: ref('t2'), pageSize: ref(2), objects: two, visibleObjects: two })
 
-    expect(content(first)).toContain('1 to 2')
+    expect(content(first)).toContain('1-2')
     expect(content(first)).not.toContain(' of ')
     expect(action(first, 'Previous page').props.disabled).toBe(true)
     await click(action(first, 'Next page'))
@@ -791,7 +791,7 @@ describe('object browser pages', () => {
     expect(setPageSize).toHaveBeenCalledWith(100)
 
     const last = await render({ nextPage, previousPage, page: ref(3), pageSize: ref(2), objects: two, visibleObjects: two })
-    expect(content(last)).toContain('5 to 6 of 6')
+    expect(content(last)).toContain('5-6 of 6')
     expect(action(last, 'Next page').props.disabled).toBe(true)
     await click(action(last, 'Previous page'))
     expect(previousPage).toHaveBeenCalled()

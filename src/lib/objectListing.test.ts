@@ -100,8 +100,8 @@ describe('object list order and ranges', () => {
   })
 
   it('names the total only once the last page is listed', () => {
-    expect(pageRange(1, 25, 9, true)).toBe('1 to 9 of 9')
-    expect(pageRange(2, 1000, 1000, false)).toBe('1,001 to 2,000')
+    expect(pageRange(1, 25, 9, true)).toBe('1-9 of 9')
+    expect(pageRange(2, 1000, 1000, false)).toBe('1,001-2,000')
     expect(pageRange(3, 10, 1, true)).toBe('21 of 21')
     expect(pageRange(1, 25, 0, true)).toBe('')
   })
