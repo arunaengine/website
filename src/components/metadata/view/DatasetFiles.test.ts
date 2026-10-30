@@ -9,6 +9,7 @@ import * as Uri from '@/lib/profiles/uri'
 import * as Utils from '@/lib/utils'
 import * as FormatCount from '@/lib/formatCount'
 import * as PagedList from '@/composables/usePagedList'
+import * as BucketLayout from '@/lib/bucketLayout'
 
 const load = vi.fn()
 const Slot = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
@@ -36,6 +37,7 @@ const DatasetFiles = compileClientComponent(new URL('./DatasetFiles.vue', import
   '@/components/ui/ListPager.vue': moduleDefault(Slot),
   '@/components/ui/SectionHeading.vue': moduleDefault(Slot),
   '@/composables/usePagedList': PagedList,
+  '@/lib/bucketLayout': BucketLayout,
   '@/lib/formatCount': FormatCount,
   '@/composables/useAruna': {
     useAruna: () => ({ currentUser: ref({ id: 'u1' }), apiBaseUrl: ref('https://api.test') }),
@@ -209,6 +211,33 @@ describe('DatasetFiles', () => {
     expect(text).toContain('a.txt')
     expect(text).toContain('sub')
     expect(text).not.toContain('b.txt')
+    mounted.app.unmount()
+  })
+
+  it('shows a whole bucket as one row with its unlisted files and its layout', async () => {
+    const T = 'https://w3id.org/aruna/terms/'
+    const state = {
+      detailId: ref('d1'),
+      currentCrate: ref({
+        '@graph': [
+          { '@id': 'ro-crate-metadata.json', about: { '@id': './' } },
+          { '@id': './', '@type': 'Dataset', hasPart: [{ '@id': 's3://bakrep/' }] },
+          { '@id': 's3://bakrep/', '@type': 'Dataset', name: 'bakrep/', [`${T}fileCount`]: '43882006', [`${T}layout`]: { '@id': '#l1' } },
+          { '@id': '#l1', additionalType: { '@id': `${T}FilePattern` }, urlTemplate: '{sample}/{sample}.fna.gz', encodingFormat: 'text/x-fasta', [`${T}fileCount`]: '2925467' },
+        ],
+      }),
+      subcrateIris: ref(new Set<string>()),
+      loadingCrate: ref(false),
+      crateNotReady: ref(false),
+      fetchCrate: vi.fn(),
+    }
+    const mounted = await mountApp(DatasetFiles, { props: { state } })
+    const text = content(mounted.root)
+
+    expect(text).toContain('43,882,006 files not listed in this dataset')
+    expect(text).toContain('Open in Data')
+    expect(text).toContain('{sample}/{sample}.fna.gz')
+    expect(text).toContain('2,925,467 files')
     mounted.app.unmount()
   })
 })

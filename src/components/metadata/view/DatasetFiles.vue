@@ -22,8 +22,9 @@ import { useBacklinks } from '@/composables/useBacklinks'
 import { usePagedList } from '@/composables/usePagedList'
 import { useS3 } from '@/composables/useS3'
 import type { DatasetViewState } from '@/composables/useDatasetView'
-import { objectRoute, parseDataIdentity } from '@/lib/crate/dataIdentity'
-import { dataEntityTreeOf, formatContentSize, type DataEntity, type DataEntityNode } from '@/lib/dataEntities'
+import { bucketLayout, declaredFiles } from '@/lib/bucketLayout'
+import { folderRoute, objectRoute, parseDataIdentity } from '@/lib/crate/dataIdentity'
+import { crateGraph, dataEntityTreeOf, formatContentSize, type DataEntity, type DataEntityNode } from '@/lib/dataEntities'
 import { formatCount } from '@/lib/formatCount'
 import { looksLikePart } from '@/lib/linkedPart'
 import { termNameFromUri } from '@/lib/profiles/uri'
@@ -103,7 +104,16 @@ function folderTotals(row: DataEntityNode): { files: number; bytes: number } {
   walk(row.childIds)
   return { files, bytes }
 }
-const fileCount = computed(() => dataEntities.value.filter((row) => !row.directory).length)
+// A folder may declare more files than the dataset lists, such as a whole bucket.
+const rawById = computed(() => new Map(crateGraph(currentCrate.value).map((entity) => [String(entity['@id']), entity])))
+function notListed(row: DataEntityNode): number {
+  const declared = row.directory ? declaredFiles(rawById.value.get(row.id)) : null
+  return declared === null ? 0 : Math.max(0, declared - folderTotals(row).files)
+}
+const fileCount = computed(() =>
+  dataEntities.value.reduce((sum, row) => sum + (row.directory ? (row.depth === 0 ? notListed(row) : 0) : 1), 0),
+)
+const layout = computed(() => bucketLayout(currentCrate.value))
 
 function identityOf(row: DataEntity) {
   return parseDataIdentity(row, s3Endpoint.value)
@@ -168,6 +178,15 @@ function browserRoute(row: DataEntity) {
   return s3 ? objectRoute(s3.bucket, s3.key) : undefined
 }
 
+// Where a row opens in Data: a folder (also a whole bucket) as a folder, a file as its object.
+function dataRoute(row: DataEntityNode) {
+  if (!row.directory) return browserRoute(row)
+  const s3 = identityOf(row).s3
+  if (s3) return folderRoute(s3.bucket, s3.key)
+  const bucket = (row.contentUrl ?? row.id).match(/^s3:\/\/([^/?]+)\/?$/)?.[1]
+  return bucket ? folderRoute(bucket, '') : undefined
+}
+
 function canPreview(row: DataEntity): boolean {
   return Boolean(s3.hasActiveKey.value && s3.endpoint.value && previewRef(row))
 }
@@ -230,8 +249,8 @@ function openPreview(row: DataEntity) {
                       class="min-w-0 truncate text-left underline decoration-border underline-offset-4 hover:decoration-foreground"
                       @click="emit('info', row.id)"
                     >{{ row.name }}</button>
-                    <span v-if="row.directory && folderTotals(row).files" class="shrink-0 text-xs tabular-nums text-muted-foreground">
-                      {{ formatCount(folderTotals(row).files) }} {{ folderTotals(row).files === 1 ? 'file' : 'files' }}
+                    <span v-if="row.directory && folderTotals(row).files + notListed(row)" class="shrink-0 text-xs tabular-nums text-muted-foreground">
+                      {{ formatCount(folderTotals(row).files + notListed(row)) }} {{ folderTotals(row).files + notListed(row) === 1 ? 'file' : 'files' }}
                     </span>
                     <Badge v-if="externalHost(row)" variant="outline" size="sm" :title="`Kept at ${externalHost(row)}`">External</Badge>
                   </span>
@@ -256,14 +275,14 @@ function openPreview(row: DataEntity) {
                     <IconButton :label="`Show metadata of ${row.name}`" @click="emit('info', row.id)">
                       <Info class="size-3.5" />
                     </IconButton>
-                    <DropdownMenu v-if="canPreview(row) || browserRoute(row) || entityLink(row) || (contentW3id(row) && !row.directory)">
+                    <DropdownMenu v-if="canPreview(row) || dataRoute(row) || entityLink(row) || (contentW3id(row) && !row.directory)">
                       <DropdownMenuTrigger as-child>
                         <Button variant="ghost" size="icon-sm" :aria-label="`More for ${row.name}`" :title="`More for ${row.name}`"><Ellipsis class="size-3.5" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" class="w-56">
                         <DropdownMenuItem v-if="canPreview(row)" @click="openPreview(row)"><Eye class="h-3.5 w-3.5" /> Preview</DropdownMenuItem>
-                        <DropdownMenuItem v-if="browserRoute(row)" as-child>
-                          <RouterLink :to="browserRoute(row)!">Open in Data</RouterLink>
+                        <DropdownMenuItem v-if="dataRoute(row)" as-child>
+                          <RouterLink :to="dataRoute(row)!">Open in Data</RouterLink>
                         </DropdownMenuItem>
                         <DropdownMenuItem v-if="entityLink(row)" as-child>
                           <a :href="entityLink(row)" target="_blank" rel="noopener noreferrer">Open the location</a>
@@ -277,6 +296,15 @@ function openPreview(row: DataEntity) {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
+                </td>
+              </tr>
+              <tr v-if="notListed(row) && (isOpen(row) || !row.childIds.length)" class="border-t border-border-subtle">
+                <td colspan="4" class="py-1.5 pr-3">
+                  <span class="flex min-w-0 items-center gap-2" :style="{ paddingLeft: `${2 + row.depth * 1.5}rem` }">
+                    <Files class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <span class="text-muted-foreground">{{ formatCount(notListed(row)) }} {{ notListed(row) === 1 ? 'file' : 'files' }} not listed in this dataset</span>
+                    <RouterLink v-if="dataRoute(row)" :to="dataRoute(row)!" class="shrink-0 text-xs text-primary hover:underline">Open in Data</RouterLink>
+                  </span>
                 </td>
               </tr>
               <tr v-if="selectedBacklinkId === row.id" class="border-t border-border-subtle bg-muted/15">
@@ -294,6 +322,43 @@ function openPreview(row: DataEntity) {
         </tbody>
       </table>
       <ListPager v-if="paged" v-model:page="page" v-model:page-size="pageSize" :total="total" class="border-t border-border-subtle" />
+
+      <div v-if="layout.rows.length" class="space-y-2 border-t border-border p-4">
+        <p class="text-sm font-medium">Layout <span class="font-normal tabular-nums text-muted-foreground">{{ layout.rows.length }}</span></p>
+        <table class="w-full text-sm">
+          <thead class="border-b border-border text-xs text-muted-foreground">
+            <tr>
+              <th class="py-1.5 pr-3 text-left font-medium">Template</th>
+              <th class="px-3 py-1.5 text-left font-medium max-sm:hidden">Format</th>
+              <th class="px-3 py-1.5 text-right font-medium max-sm:hidden">Count</th>
+              <th class="py-1.5 pl-3 text-right font-medium">Size</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="entry in layout.rows" :key="entry.id" class="border-b border-border-subtle last:border-0">
+              <td class="max-w-0 py-1.5 pr-3">
+                <span class="flex min-w-0 items-center gap-2.5">
+                  <component :is="entry.folder ? Folder : FileIcon" class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <span class="min-w-0">
+                    <button type="button" class="block max-w-full truncate text-left font-mono text-xs underline decoration-border underline-offset-4 hover:decoration-foreground" @click="emit('info', entry.id)">{{ entry.template }}</button>
+                    <span v-if="entry.description" class="block truncate text-xs text-muted-foreground">{{ entry.description }}</span>
+                  </span>
+                </span>
+              </td>
+              <td class="truncate px-3 py-1.5 text-xs text-muted-foreground max-sm:hidden">{{ entry.folder ? 'Folder' : entry.format }}</td>
+              <td class="whitespace-nowrap px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground max-sm:hidden">
+                <template v-if="entry.count !== null">{{ formatCount(entry.count) }} {{ entry.folder ? (entry.count === 1 ? 'folder' : 'folders') : entry.count === 1 ? 'file' : 'files' }}</template>
+              </td>
+              <td class="whitespace-nowrap py-1.5 pl-3 text-right text-xs tabular-nums text-muted-foreground">{{ entry.size !== null ? formatBinary(entry.size) : '' }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-if="layout.variables.length" class="text-xs text-muted-foreground">
+          <template v-for="(variable, index) in layout.variables" :key="variable.name">
+            <code class="font-mono text-foreground">{{ '{' + variable.name + '}' }}</code> {{ variable.description }}<template v-if="variable.example">, for example <code class="font-mono">{{ variable.example }}</code></template><template v-if="index < layout.variables.length - 1">; </template>
+          </template>
+        </p>
+      </div>
 
       <EmptyState v-if="crateNotReady" compact title="This dataset is still being prepared.">
         <Button variant="outline" size="sm" @click="fetchCrate(detailId)">Retry</Button>
