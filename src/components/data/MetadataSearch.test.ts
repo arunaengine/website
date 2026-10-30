@@ -3,7 +3,10 @@ import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as SearchGroups from '@/lib/searchGroups'
 import * as TableImport from '@/lib/tableImport'
-import { click, compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
+import { click, compileClientComponent, content, element, flush, mountApp, moduleDefault, nodes, type HostNode } from '@/test/clientRender'
+
+// A found file shows its name and folder apart; its full key stays in the title.
+const shown = (root: HostNode, key: string) => nodes(root).some((node) => node.props.title === key)
 
 const hit = { key: 'GCF_000005845.2_ASM584v2/', bucket: 'ncbi', issuer_node_id: 'n2', group_id: 'g1' }
 const searchObjects = vi.fn(async (_q: string, _options: { match: string }) => ({ hits: [hit] as unknown[], next_cursor: null as string | null, coverage: { complete: true } }))
@@ -25,7 +28,8 @@ const view = compileClientComponent(new URL('./MetadataSearch.vue', import.meta.
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => `node ${id}`, isLocalNode: (id: string) => id === 'n1' }) },
   '@/lib/searchGroups': SearchGroups,
   '@/lib/tableImport': TableImport,
-  '@/lib/utils': { errorMessage: (cause: unknown) => String(cause) },
+  '@/lib/utils': { errorMessage: (cause: unknown) => String(cause), formatBytes: (bytes: number) => `${bytes} B` },
+  '@/components/data/ObjectIcon.vue': moduleDefault(defineComponent(() => () => h('i'))),
 })
 const component = defineComponent({
   props: { bucket: String, nodeId: { type: String, default: null }, onOpen: Function, onBack: Function },
@@ -54,7 +58,7 @@ describe('bucket metadata search', () => {
 
     expect(searchObjects).toHaveBeenCalledWith('coli species_taxid=562', { bucket: 'ncbi', match: 'metadata', limit: 50, cursor: undefined })
     expect(content(root)).toContain('species_taxid = 562')
-    ;(element(root, (node) => node.tag === 'button' && content(node).includes('GCF_')).props.onClick as () => void)()
+    ;(element(root, (node) => node.tag === 'tr' && content(node).includes('GCF_')).props.onClick as () => void)()
     expect(content(root)).toContain('on node n2')
     expect(opened).toEqual([hit])
   })
@@ -106,7 +110,7 @@ describe('bucket metadata search', () => {
 
     expect(searchObjects).toHaveBeenCalledWith('hello', { bucket: 'ncbi', match: 'substring', limit: 50 })
     expect(searchObjects).toHaveBeenCalledWith('hello', expect.objectContaining({ match: 'metadata' }))
-    expect(content(root).split('reads/ui-hello.txt')).toHaveLength(2)
+    expect(nodes(root).filter((node) => node.props.title === 'reads/ui-hello.txt')).toHaveLength(1)
     expect(content(root)).toContain('GCF_')
   })
 
@@ -140,8 +144,8 @@ describe('bucket metadata search', () => {
     await flush()
 
     expect(searchObjects).toHaveBeenLastCalledWith('hello', { bucket: 'ncbi', match: 'substring', limit: 50, cursor: 'n2' })
-    expect(content(root)).toContain('a/first.txt')
-    expect(content(root)).toContain('b/second.txt')
+    expect(shown(root, 'a/first.txt')).toBe(true)
+    expect(shown(root, 'b/second.txt')).toBe(true)
     expect(content(root)).toContain('Some parts of this bucket could not be searched')
     expect(content(root)).not.toContain('Show more')
   })
@@ -170,7 +174,7 @@ describe('bucket metadata search', () => {
     more()
     await flush()
     expect(searchObjects).toHaveBeenLastCalledWith('hello', { bucket: 'ncbi', match: 'substring', limit: 50, cursor: undefined })
-    expect(content(root)).toContain('reads/hello.txt')
+    expect(shown(root, 'reads/hello.txt')).toBe(true)
     expect(content(root)).not.toContain('The name search failed')
     expect(content(root)).not.toContain('Show more')
   })
@@ -195,7 +199,7 @@ describe('bucket metadata search', () => {
     second({ hits: [strain], next_cursor: null, coverage: { complete: true } })
     await flush()
     await flush()
-    expect(content(root)).toContain('GCF_000006665.1_ASM666v1/')
+    expect(shown(root, 'GCF_000006665.1_ASM666v1/')).toBe(true)
     expect(content(root)).not.toContain('Searching…')
   })
 
@@ -307,7 +311,7 @@ describe('bucket metadata search', () => {
     await flush()
 
     expect(searchObjects).toHaveBeenCalledWith('coli species_taxid=562', expect.objectContaining({ match: 'metadata' }))
-    expect(content(root)).toContain('Whole bucket')
+    expect(content(root)).toContain('in the whole bucket')
     expect(content(root)).toContain('species_taxid = 562')
     // The chip leaves the box; the words stay in it.
     expect(text.value).toBe('coli')
@@ -339,18 +343,23 @@ describe('bucket search results by record folder', () => {
     const text = content(root)
 
     expect(text).toContain('Escherichia coli str. K-12 substr. MG1655')
-    expect(text).toContain('GCF_000005845.2, Complete Genome, 2 files,')
+    expect(text).toContain('1 genome and 1 file in the whole bucket')
+    expect(text).toContain('GCF_000005845.2')
+    expect(text).toContain('Complete Genome')
+    expect(text).toContain('2 files')
     expect(text).not.toContain(`${FOLDER}_genomic.fna.gz`)
     expect(text).toContain('plain.txt')
 
-    await click(element(root, (node) => node.tag === 'button' && content(node) === `${FOLDER}/`))
+    ;(element(root, (node) => node.tag === 'button' && node.props['aria-label'] === `Open ${FOLDER}/`).props.onClick as (event: unknown) => void)({ stopPropagation: () => {} })
+    await flush()
     expect(opened).toEqual([found(`${FOLDER}/`, ECOLI)])
 
     const chevron = element(root, (node) => node.props['aria-expanded'] !== undefined)
     expect(chevron.props['aria-expanded']).toBe(false)
     await click(chevron)
     expect(element(root, (node) => node.props['aria-expanded'] !== undefined).props['aria-expanded']).toBe(true)
-    await click(element(root, (node) => node.tag === 'button' && content(node).trim() === `${FOLDER}_ani_report.txt`))
+    // The open group names its files without the folder name they repeat.
+    await click(element(root, (node) => node.tag === 'tr' && content(node).trim() === '_ani_report.txt'))
     expect(opened.at(-1)).toEqual(found(`${FOLDER}/${FOLDER}_ani_report.txt`, ECOLI))
     app.unmount()
     searchObjects.mockReset().mockImplementation(async () => ({ hits: [hit] as unknown[], next_cursor: null, coverage: { complete: true } }))
@@ -366,7 +375,9 @@ describe('bucket search results by record folder', () => {
 
     expect(text).toContain('Escherichia coli O157:H7 str. Sakai substr. RIMD 0509952')
     expect(text).not.toContain('Sakai Sakai')
-    expect(text).toContain('GCF_000008865.2, Complete Genome,GCF_000008865.2_ASM886v2/')
+    expect(text).toContain('GCF_000008865.2')
+    expect(text).toContain('Complete Genome')
+    expect(nodes(root).some((node) => node.props['aria-label'] === 'Open GCF_000008865.2_ASM886v2/')).toBe(true)
     expect(text).not.toContain('0 files')
     app.unmount()
     searchObjects.mockReset().mockImplementation(async () => ({ hits: [hit] as unknown[], next_cursor: null, coverage: { complete: true } }))
@@ -381,16 +392,16 @@ describe('bucket search results by record folder', () => {
         : { hits: [found(`${FOLDER}/${FOLDER}_genomic.fna.gz`, ECOLI)], next_cursor: 'c2', coverage: { complete: true } }
     })
     const { root, app } = await open()
-    expect(content(root)).toContain('Complete Genome, 1+ files,')
+    expect(content(root)).toContain('1+ files')
     await click(element(root, (node) => node.props['aria-expanded'] !== undefined))
 
     await click(element(root, (node) => node.tag === 'button' && content(node).includes('Show more')))
     await flush()
     const text = content(root)
-    expect(text).toContain('Complete Genome, 2 files,')
+    expect(text).toContain('2 files')
     expect(text.indexOf('Escherichia coli str. K-12')).toBeLessThan(text.indexOf('Escherichia coli O157:H7'))
     // The open group stayed open and shows the appended file.
-    expect(text).toContain(`${FOLDER}_genomic.gff.gz`)
+    expect(shown(root, `${FOLDER}/${FOLDER}_genomic.gff.gz`)).toBe(true)
     app.unmount()
     searchObjects.mockReset().mockImplementation(async () => ({ hits: [hit] as unknown[], next_cursor: null, coverage: { complete: true } }))
   })

@@ -6,13 +6,14 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import Button from '@/components/ui/Button.vue'
+import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import type { ObjectSearchHit } from '@/lib/api'
 import { groupFiles, groupHits, groupTitle, type SearchRow } from '@/lib/searchGroups'
 import { searchQuery, searchTerms } from '@/lib/tableImport'
-import { errorMessage } from '@/lib/utils'
-import { ChevronRight, Search, X } from '@lucide/vue'
+import { errorMessage, formatBytes } from '@/lib/utils'
+import { ArrowLeft, ChevronRight, Dna, FolderOpen, Hash, Search, X } from '@lucide/vue'
 
 /** `nodeId` is the node of the open bucket; null for the connected node. */
 const props = defineProps<{ bucket: string; nodeId: string | null }>()
@@ -159,13 +160,26 @@ watch(typed, (text) => {
 type Group = Extract<SearchRow, { kind: 'group' }>
 const rows = computed(() => groupHits(hits.value ?? []))
 const morePages = computed(() => Boolean(cursor.value) || nameCursor.value !== null)
-// "GCF_000005845.2, Complete Genome, 22 files"; a page still to come makes the count a lower bound.
-// A group of only the folder's own entry names no count: the folder link says what it is.
-function groupLine(group: Group): string {
-  const count = groupFiles(group).length
-  const files = count ? `${count}${morePages.value ? '+' : ''} ${count === 1 && !morePages.value ? 'file' : 'files'}` : ''
-  return [group.metadata.assembly_accession, group.metadata.assembly_level, files].filter(Boolean).join(', ')
+// "22 files"; a page still to come makes the count a lower bound. A group of only the folder's
+// own entry names no count: Open folder says what it is.
+// Inside the group the files drop the folder name they repeat; the title keeps the full key.
+function fileName(group: Group, file: ObjectSearchHit): string {
+  const name = file.key.slice(group.folder.length + 1)
+  return name.startsWith(group.folder) && '_.-'.includes(name[group.folder.length] ?? '') ? name.slice(group.folder.length) : name
 }
+function fileCount(group: Group): string {
+  const count = groupFiles(group).length
+  return count ? `${count}${morePages.value ? '+' : ''} ${count === 1 && !morePages.value ? 'file' : 'files'}` : ''
+}
+// "4 genomes" when every group names an assembly, else folders; files found outside a group follow.
+const found = computed(() => {
+  const groups = rows.value.filter((row): row is Group => row.kind === 'group')
+  const files = rows.value.length - groups.length
+  const noun = groups.every((group) => group.metadata.assembly_accession) ? 'genome' : 'folder'
+  const parts = [groups.length ? `${groups.length} ${noun}${groups.length === 1 ? '' : 's'}` : '', files ? `${files} ${files === 1 ? 'file' : 'files'}` : '']
+  const text = parts.filter(Boolean).join(' and ') || 'No match'
+  return morePages.value ? `At least ${text.toLowerCase()}` : text
+})
 // The folder opens through its own hit when the search found it, else through one made of it.
 function openFolder(group: Group) {
   emit('open', group.hits.find((entry) => entry.key === `${group.folder}/`) ?? { ...group.hits[0], key: `${group.folder}/` })
@@ -185,56 +199,86 @@ function drop(index: number) {
 </script>
 
 <template>
-  <section class="space-y-2 px-4 py-3" aria-label="Whole bucket search">
-    <div class="flex flex-wrap items-center gap-1.5 text-xs">
-      <Search class="h-3.5 w-3.5 text-muted-foreground" />
-      <span class="font-medium text-foreground">Whole bucket</span>
-      <span v-for="(chip, index) in chips" :key="`${chip.column}=${chip.value}`" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
-        {{ chip.column }} = {{ chip.value }}
-        <button type="button" :aria-label="`Remove ${chip.column}`" @click="drop(index)"><X class="h-3 w-3" /></button>
-      </span>
-      <Button size="sm" variant="ghost" class="ml-auto" @click="emit('back')"><X class="h-3.5 w-3.5" /> Back to folder</Button>
+  <section aria-label="Whole bucket search">
+    <div class="flex flex-wrap items-center justify-between gap-2 px-4 pb-2.5 @max-[600px]:px-3">
+      <p class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+        <Search class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <span v-if="hits"><b class="font-medium text-foreground">{{ found }}</b> in the whole bucket</span>
+        <span v-else>The whole bucket</span>
+        <span v-for="(chip, index) in chips" :key="`${chip.column}=${chip.value}`" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+          {{ chip.column }} = {{ chip.value }}
+          <button type="button" :aria-label="`Remove ${chip.column}`" @click="drop(index)"><X class="h-3 w-3" /></button>
+        </span>
+      </p>
+      <Button size="sm" variant="outline" @click="emit('back')"><ArrowLeft class="h-4 w-4" /> Back to folder</Button>
     </div>
-    <p v-if="failure" class="text-xs text-destructive">{{ failure }}</p>
-    <ul v-if="hits?.length" class="divide-y divide-border rounded-md border border-border text-xs">
-      <li v-for="row in rows" :key="row.key">
-        <button v-if="row.kind === 'hit'" type="button" class="w-full truncate px-3 py-1.5 text-left font-mono text-primary hover:bg-accent" @click="emit('open', row.hit)">
-          {{ row.hit.key }}<span v-if="elsewhere(row.hit)" class="ml-2 font-sans text-muted-foreground">on {{ displayName(row.hit.issuer_node_id) }}</span>
-        </button>
-        <template v-else>
-          <div class="flex items-start gap-1.5 px-2 py-1.5">
-            <button
-              type="button"
-              class="mt-0.5 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-              :aria-expanded="opened.has(row.key)"
-              :aria-label="`${opened.has(row.key) ? 'Hide' : 'Show'} the files of ${groupTitle(row)}`"
-              @click="toggle(row)"
-            >
-              <ChevronRight class="h-3.5 w-3.5 transition-transform" :class="opened.has(row.key) ? 'rotate-90' : ''" />
-            </button>
-            <div class="min-w-0 flex-1">
-              <p class="truncate text-sm text-foreground" :title="groupTitle(row)">{{ groupTitle(row) }}</p>
-              <p class="flex min-w-0 flex-wrap gap-x-1 text-[11px] text-muted-foreground">
-                <span>{{ groupLine(row) }},</span>
-                <button type="button" class="min-w-0 truncate font-mono text-primary hover:underline" :title="`Open ${row.folder}/`" @click="openFolder(row)">{{ row.folder }}/</button>
-                <span v-if="elsewhere(row.hits[0])">on {{ displayName(row.nodeId) }}</span>
-              </p>
-            </div>
-          </div>
-          <ul v-if="opened.has(row.key)" class="border-t border-border/70 pb-1 pl-8">
-            <li v-for="file in groupFiles(row)" :key="file.key">
-              <button type="button" class="w-full truncate px-2 py-1 text-left font-mono text-primary hover:bg-accent" :title="file.key" @click="emit('open', file)">
-                {{ file.key.slice(row.folder.length + 1) }}
-              </button>
-            </li>
-          </ul>
-        </template>
-      </li>
-    </ul>
-    <p v-else-if="hits && !busy && complete && !nameFailed" class="text-xs text-muted-foreground">Nothing matches.</p>
-    <p v-if="hits && !complete" class="text-[11px] text-muted-foreground">Some parts of this bucket could not be searched, so matches may be missing.</p>
-    <p v-if="hits && nameFailed" class="text-[11px] text-muted-foreground">The name search failed, so matches by name may be missing.</p>
-    <p v-if="busy" role="status" class="text-[11px] text-muted-foreground">Searching…</p>
-    <Button v-if="cursor || nameCursor !== null" size="sm" variant="ghost" :disabled="busy" @click="search(true)">Show more</Button>
+    <p v-if="failure" class="px-4 pb-2 text-xs text-destructive">{{ failure }}</p>
+    <div v-if="hits?.length" class="overflow-x-auto border-t border-border-subtle">
+      <table class="data-table">
+        <tbody>
+          <template v-for="row in rows" :key="row.key">
+            <tr v-if="row.kind === 'hit'" class="cursor-pointer" tabindex="0" @click="emit('open', row.hit)" @keydown.enter.self="emit('open', row.hit)">
+              <td class="w-10 pl-4"><ObjectIcon :name="row.hit.key" :folder="row.hit.key.endsWith('/')" class="h-4 w-4" /></td>
+              <td class="max-w-0 py-2">
+                <span class="block truncate text-foreground" :title="row.hit.key">{{ row.hit.key.replace(/\/$/, '').split('/').at(-1) }}</span>
+                <span class="block truncate text-xs text-muted-foreground">{{ row.hit.bucket }}/{{ row.hit.key.split('/').slice(0, -1).join('/') }}<template v-if="elsewhere(row.hit)">, on {{ displayName(row.hit.issuer_node_id) }}</template></span>
+              </td>
+              <td class="num w-28 pr-4 text-muted-foreground">{{ row.hit.size != null ? formatBytes(row.hit.size) : '' }}</td>
+            </tr>
+            <template v-else>
+              <tr class="cursor-pointer" tabindex="0" :aria-expanded="opened.has(row.key)" @click="toggle(row)" @keydown.enter.self="toggle(row)">
+                <td class="w-10 pl-4 text-muted-foreground">
+                  <ChevronRight class="h-4 w-4 transition-transform" :class="opened.has(row.key) ? 'rotate-90' : ''" :aria-label="`${opened.has(row.key) ? 'Hide' : 'Show'} the files of ${groupTitle(row)}`" />
+                </td>
+                <td class="max-w-0 py-2">
+                  <span class="flex items-start gap-2">
+                    <Dna class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <span class="min-w-0">
+                      <span class="block break-words font-medium text-foreground">{{ groupTitle(row) }}</span>
+                      <span class="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                        <span v-if="row.metadata.assembly_accession" class="inline-flex items-center gap-1"><Hash class="h-3 w-3" aria-hidden="true" />{{ row.metadata.assembly_accession }}</span>
+                        <span v-if="row.metadata.assembly_level">{{ row.metadata.assembly_level }}</span>
+                        <span v-if="fileCount(row)" class="tabular-nums">{{ fileCount(row) }}</span>
+                        <span v-if="elsewhere(row.hits[0])">on {{ displayName(row.nodeId) }}</span>
+                      </span>
+                    </span>
+                  </span>
+                </td>
+                <td class="w-28 pr-4 text-right">
+                  <Button size="sm" variant="outline" :aria-label="`Open ${row.folder}/`" :title="`Open ${row.folder}/`" @click.stop="openFolder(row)">
+                    <FolderOpen class="h-4 w-4" /><span class="@max-[600px]:sr-only">Open folder</span>
+                  </Button>
+                </td>
+              </tr>
+              <template v-if="opened.has(row.key)">
+                <tr v-for="file in groupFiles(row).slice(0, 4)" :key="file.key" class="cursor-pointer bg-muted/20" tabindex="0" @click="emit('open', file)" @keydown.enter.self="emit('open', file)">
+                  <td></td>
+                  <td class="max-w-0">
+                    <span class="flex min-w-0 items-center gap-2 pl-6" :title="file.key">
+                      <ObjectIcon :name="file.key" class="h-4 w-4" />
+                      <span class="truncate text-foreground">{{ fileName(row, file) }}</span>
+                    </span>
+                  </td>
+                  <td class="num w-28 pr-4 text-xs text-muted-foreground">{{ file.size != null ? formatBytes(file.size) : '' }}</td>
+                </tr>
+                <tr v-if="groupFiles(row).length > 4" class="bg-muted/20">
+                  <td></td>
+                  <td colspan="2" class="pl-12">
+                    <Button size="sm" variant="outline" @click="openFolder(row)">Show all {{ fileCount(row) }}</Button>
+                  </td>
+                </tr>
+              </template>
+            </template>
+          </template>
+        </tbody>
+      </table>
+    </div>
+    <div class="space-y-1 px-4 pb-3 empty:hidden">
+      <p v-if="hits && !hits.length && !busy && complete && !nameFailed" class="py-6 text-center text-xs text-muted-foreground">Nothing matches.</p>
+      <p v-if="hits && !complete" class="text-xs text-muted-foreground">Some parts of this bucket could not be searched, so matches may be missing.</p>
+      <p v-if="hits && nameFailed" class="text-xs text-muted-foreground">The name search failed, so matches by name may be missing.</p>
+      <p v-if="busy" role="status" class="text-xs text-muted-foreground">Searching…</p>
+      <Button v-if="cursor || nameCursor !== null" size="sm" variant="outline" :disabled="busy" @click="search(true)">Show more</Button>
+    </div>
   </section>
 </template>
