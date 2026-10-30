@@ -28,15 +28,15 @@ const LABEL_MAX = 22
 
 const KIND_STROKE: Record<RealmNodeInfo['kind'], string> = { management: '#335DC6', server: '#24A9E6', user: 'hsl(var(--muted-foreground))' }
 
-// Drawn in the pane's own pixels, so rings and labels keep their size at every width. A narrow
-// pane lifts the other nodes above the hub so their labels do not collide.
+// Drawn in the pane's own pixels, so rings and labels keep their size at every width. The other
+// nodes stand above the hub in a flat triangle, lifted more on a narrow pane so labels stay apart.
 const root = ref<HTMLElement | null>(null)
 const size = useElementSize(root)
 const box = computed(() => {
   const w = size.width.value || 520
   const h = size.height.value || 330
   const narrow = w < 470
-  const lift = narrow ? 56 : 0
+  const lift = narrow ? 56 : 40
   const spreadX = narrow ? Math.max(80, (w - 32) / 2 - 64) : Math.min(210, Math.max(144, (w - 32) / 2 - 66))
   const below = props.computer ? 58 + 72 : 0
   const top = 44
@@ -74,6 +74,14 @@ const edges = computed(() =>
       }))
     : [],
 )
+// Storage nodes side by side are joined by a straight line while the hub reaches both.
+const storageLinks = computed(() => {
+  const storage = placed.value.filter((spot) => spot.node.kind === 'server' && spot.node.connection_status === 'connected')
+  return storage.slice(1).map((spot, index) => ({
+    id: `${storage[index].node.node_id}-${spot.node.node_id}`,
+    ...trim(storage[index].x, storage[index].y, RING, spot.x, spot.y, RING),
+  }))
+})
 
 const computerSpot = computed(() => {
   const own = props.computer
@@ -142,6 +150,18 @@ const label = computed(() =>
         <line v-if="edge.connected" :x1="edge.x1" :y1="edge.y1" :x2="edge.x2" :y2="edge.y2" stroke="#10b981" stroke-opacity="0.7" stroke-width="2" stroke-linecap="round" />
         <line v-else :x1="edge.x1" :y1="edge.y1" :x2="edge.x2" :y2="edge.y2" stroke="hsl(var(--muted-foreground))" stroke-opacity="0.4" stroke-dasharray="3 6" stroke-width="1.5" stroke-linecap="round" />
       </template>
+      <line
+        v-for="link in storageLinks"
+        :key="`storage-${link.id}`"
+        :x1="link.x1"
+        :y1="link.y1"
+        :x2="link.x2"
+        :y2="link.y2"
+        stroke="#10b981"
+        stroke-opacity="0.7"
+        stroke-width="2"
+        stroke-linecap="round"
+      />
       <line
         v-for="line in computerSpot?.lines ?? []"
         :key="`device-${line.id}`"

@@ -30,6 +30,17 @@ describe('realm topology', () => {
     expect(html).not.toContain('Device link')
   })
 
+  it('lifts the storage nodes above the hub and joins them with a straight line', async () => {
+    const both = [nodes[0], nodes[1], { ...nodes[2], present: true, connection_status: 'connected' }]
+    const html = await render({ nodes: both, localPeerId: 'aaaa-mgmt' })
+
+    // Two spokes, the storage line and the legend sample.
+    expect(html.match(/stroke="#10b981" stroke-opacity="0.7"/g)).toHaveLength(4)
+    expect(html).not.toMatch(/<path[^>]*stroke="#10b981"/)
+    const ring = (stroke: string) => html.match(new RegExp(`<circle cx="[^"]+" cy="([^"]+)" r="2[02]" fill="hsl\\(var\\(--card\\)\\)" stroke="${stroke}"`))
+    expect(Number(ring('#24A9E6')?.[1])).toBeLessThan(Number(ring('#55C4DE')?.[1] ?? ring('#335DC6')?.[1]))
+  })
+
   it('counts places when the nodes stand apart', async () => {
     const html = await render({ nodes: [nodes[0], { ...nodes[1], place: 'Marburg' }], localPeerId: 'aaaa-mgmt' })
     expect(html).toContain('2 places')
