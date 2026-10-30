@@ -8,7 +8,7 @@ import CopyButton from '@/components/ui/CopyButton.vue'
 import ObjectLink from '@/components/assistant/ObjectLink.vue'
 import { keyIn } from '@/lib/assistant/objectLinks'
 import { usePageContext } from '@/composables/usePageContext'
-import { truncateMiddle } from '@/lib/utils'
+import { formatDateTime, truncateMiddle } from '@/lib/utils'
 import { ArrowDown, ArrowUp, Table2 } from '@lucide/vue'
 
 const props = withDefaults(defineProps<{
@@ -69,7 +69,7 @@ const INSTANT_LIKE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\
 
 function shown(text: string, linked: boolean): string {
   if (linked) return text
-  if (INSTANT_LIKE.test(text)) return new Date(text).toLocaleString()
+  if (INSTANT_LIKE.test(text)) return formatDateTime(text)
   return ID_LIKE.test(text) ? truncateMiddle(text, 8, 5) : text
 }
 

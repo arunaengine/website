@@ -9,7 +9,7 @@ import type { HolderSource } from '@/composables/useBucketHolders'
 import { ApiError, listBucketTokens, type BucketTokenEntry, type KeyScope } from '@/lib/api'
 import { encryptionError } from '@/lib/bucketEncryption'
 import { toneVariant } from '@/lib/stateBadge'
-import { shortUserId } from '@/lib/utils'
+import { formatDateTime, shortUserId } from '@/lib/utils'
 
 const props = defineProps<{ bucket: string; source: HolderSource }>()
 
@@ -46,7 +46,7 @@ function scopeText(scope: KeyScope): string {
 
 function createdLabel(at: string): string {
   const ms = Date.parse(at)
-  return Number.isFinite(ms) ? new Date(ms).toLocaleString() : at
+  return Number.isFinite(ms) ? formatDateTime(ms) : at
 }
 
 watch(

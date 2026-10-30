@@ -9,6 +9,7 @@ import Badge from '@/components/ui/Badge.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import { ShieldAlert } from '@lucide/vue'
 import Notice from '@/components/ui/Notice.vue'
+import { formatDateTime } from '@/lib/utils'
 
 const props = withDefaults(
   defineProps<{
@@ -61,7 +62,7 @@ const countdownLabel = computed(() =>
   remainingSecs.value == null ? '' : fmtDuration(remainingSecs.value),
 )
 const absoluteLabel = computed(() =>
-  props.expiresAt == null ? '' : new Date(props.expiresAt * 1000).toLocaleString(),
+  props.expiresAt == null ? '' : formatDateTime(props.expiresAt * 1000),
 )
 </script>
 

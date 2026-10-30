@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { QUOTA_STATE_BADGES, assessQuota } from '@/lib/quota'
-import { formatBytes } from '@/lib/utils'
+import { formatBytes, formatDate, formatDateTime } from '@/lib/utils'
 import { areaPath as areaOf, linePath as lineOf } from '@/lib/chartPaths'
 import type { UsageHistoryPoint } from '@/lib/api'
 
@@ -82,8 +82,8 @@ function pointState(point: UsageHistoryPoint): string {
   return pointBadge(point)?.label ?? assessQuota(point.quota, point.totals.logical_bytes).state
 }
 
-const firstDate = computed(() => (series.value.length ? new Date(tMin.value).toLocaleDateString() : ''))
-const lastDate = computed(() => (series.value.length ? new Date(tMax.value).toLocaleDateString() : ''))
+const firstDate = computed(() => (series.value.length ? formatDate(tMin.value) : ''))
+const lastDate = computed(() => (series.value.length ? formatDate(tMax.value) : ''))
 const ariaLabel = computed(
   () => `Storage usage history, ${series.value.length} snapshots from ${firstDate.value} to ${lastDate.value}`,
 )
@@ -147,7 +147,7 @@ const tooltipLeft = computed(() => (hoverPoint.value ? Math.min(85, Math.max(15,
           :style="{ left: `${tooltipLeft}%` }"
         >
           <div class="font-medium text-foreground tabular-nums">{{ formatBytes(hoverPoint.v) }}</div>
-          <div class="text-[10px] text-muted-foreground">{{ new Date(hoverPoint.t).toLocaleString() }}</div>
+          <div class="text-[10px] text-muted-foreground">{{ formatDateTime(hoverPoint.t) }}</div>
           <div v-if="pointBadge(hoverPoint.point)" class="mt-0.5 text-[10px] font-medium uppercase text-muted-foreground">
             {{ pointBadge(hoverPoint.point)!.label }}
           </div>
@@ -173,7 +173,7 @@ const tooltipLeft = computed(() => (hoverPoint.value ? Math.min(85, Math.max(15,
           </thead>
           <tbody>
             <tr v-for="d in series" :key="d.t" class="border-t border-border">
-              <td class="px-2 py-1 text-muted-foreground">{{ new Date(d.t).toLocaleString() }}</td>
+              <td class="px-2 py-1 text-muted-foreground">{{ formatDateTime(d.t) }}</td>
               <td class="px-2 py-1 text-right tabular-nums text-foreground/80">{{ formatBytes(d.v) }}</td>
               <td class="px-2 py-1 text-muted-foreground">{{ pointState(d.point) }}</td>
             </tr>

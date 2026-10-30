@@ -15,7 +15,7 @@ import { RouterLink } from 'vue-router'
 import { isArunaUserId } from '@/lib/identifiers'
 import type { DatasetVersion } from '@/lib/api'
 import { shortVersion } from '@/lib/versions'
-import { relativeTime } from '@/lib/utils'
+import { formatDateTime, relativeTime } from '@/lib/utils'
 import { FileJson, FilePen, FileText, GitBranch, GitCompare, GitMerge, MoreHorizontal, ShieldCheck, Tag, Waypoints, X } from '@lucide/vue'
 
 const props = defineProps<{ version: DatasetVersion; author: string; canWrite: boolean }>()
@@ -30,7 +30,7 @@ const emit = defineEmits<{
 
 const merge = computed(() => props.version.parents.length > 1)
 const mergeTitle = computed(() => `Merge of ${props.version.parents.map(shortVersion).join(' and ')}`)
-const absolute = computed(() => new Date(props.version.created_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }))
+const absolute = computed(() => formatDateTime(props.version.created_at))
 </script>
 
 <template>

@@ -28,7 +28,7 @@ import {
   type VersionConflict,
 } from '@/lib/api'
 import { branchLabel, shortVersion } from '@/lib/versions'
-import { relativeTime } from '@/lib/utils'
+import { formatDateTime, relativeTime } from '@/lib/utils'
 import { GitCompare, GitMerge, History as HistoryIcon, Plus, Trash2 } from '@lucide/vue'
 
 const props = defineProps<{ history: DatasetHistoryState; state: DatasetViewState }>()
@@ -42,7 +42,7 @@ const branchOptions = computed(() => {
 })
 
 function absolute(iso: string): string {
-  return new Date(iso).toLocaleString()
+  return formatDateTime(iso)
 }
 
 // After a write the list starts again from the first page; main also feeds Overview.

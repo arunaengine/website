@@ -26,7 +26,7 @@ import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { onWake, POLL_SLOW_MS } from '@/lib/poll'
 import { aggregateByLocation } from '@/lib/placement'
-import { errorMessage, formatBytes, formatNumber, relativeTime, truncateMiddle } from '@/lib/utils'
+import { errorMessage, formatBytes, formatClock, formatNumber, relativeTime, truncateMiddle } from '@/lib/utils'
 import type { RealmNodeInfo } from '@/lib/api'
 import type { RealmView } from '@/composables/aruna/realm'
 import { isDesktop } from '@/lib/desktop'
@@ -227,7 +227,7 @@ const degradedNodes = computed(() =>
 
 const lastUpdatedLabel = computed(() =>
   lastUpdated.value
-    ? lastUpdated.value.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    ? formatClock(lastUpdated.value)
     : '-',
 )
 

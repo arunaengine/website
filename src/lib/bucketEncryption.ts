@@ -19,7 +19,7 @@ import {
   type RecoveryStatus,
 } from './api'
 import type { RouteLocationRaw } from 'vue-router'
-import { formatDuration } from './utils'
+import { formatDateTime, formatDuration } from './utils'
 
 export const MODE_LABEL: Record<EncryptionMode, string> = {
   off: 'Off',
@@ -67,7 +67,7 @@ export interface LockView {
 }
 
 function at(ms: number): string {
-  return new Date(ms).toLocaleString()
+  return formatDateTime(ms)
 }
 
 export const ROLE_LABEL: Record<BucketKeyGeneration['role'], string> = {

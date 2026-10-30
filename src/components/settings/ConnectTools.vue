@@ -25,7 +25,7 @@ import { apiRequest, type InfoResponse, type S3CredentialSummary } from '@/lib/a
 import { createDeviceCredential, listDeviceCredentials, revokeDeviceCredential } from '@/lib/deviceApi'
 import { keyNames } from '@/lib/keyNames'
 import { nextflowSnippet, tesAddress, TOOLS, toolSnippet, type ToolId, type ToolKey } from '@/lib/toolSnippets'
-import { errorMessage } from '@/lib/utils'
+import { errorMessage, formatDate } from '@/lib/utils'
 import { Check, KeyRound, Laptop, Play, Plus, Server, SquareTerminal, Trash2 } from '@lucide/vue'
 
 const DEVICE = 'device'
@@ -210,7 +210,7 @@ async function remove(accessKeyId: string, owner: RealmNodeDisplay | null): Prom
 
 function made(iso: string): string {
   const at = new Date(iso)
-  return Number.isNaN(at.getTime()) ? '' : at.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+  return Number.isNaN(at.getTime()) ? '' : formatDate(at)
 }
 </script>
 

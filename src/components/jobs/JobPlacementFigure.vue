@@ -10,7 +10,7 @@ import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { placementVerdict, type JobPlacementResponse } from '@/lib/jobs'
-import { formatBytes, formatDuration } from '@/lib/utils'
+import { formatBytes, formatDateTime, formatDuration } from '@/lib/utils'
 
 const PAGE_SIZE = 8
 
@@ -104,7 +104,7 @@ const summary = computed(() => {
 })
 
 function storedAt(ms: number): string {
-  return new Date(ms).toLocaleString()
+  return formatDateTime(ms)
 }
 
 const movementsOpen = ref(false)

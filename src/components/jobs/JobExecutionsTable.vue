@@ -9,7 +9,7 @@ import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import type { JobExecutionResponse, JobFamilyResponse, JobState } from '@/lib/jobs'
-import { formatDuration, truncateMiddle } from '@/lib/utils'
+import { formatClock, formatDuration, truncateMiddle } from '@/lib/utils'
 
 const props = defineProps<{ family: JobFamilyResponse }>()
 
@@ -44,7 +44,7 @@ function roleOf(execution: JobExecutionResponse): string {
 
 // The node leaves an unknown time out, so it arrives as null or not at all.
 function timeOf(ms: number | null | undefined): string {
-  return ms == null ? 'not recorded' : new Date(ms).toLocaleTimeString()
+  return ms == null ? 'not recorded' : formatClock(ms)
 }
 function isoOf(ms: number | null | undefined): string | undefined {
   return ms == null ? undefined : new Date(ms).toISOString()

@@ -11,7 +11,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useUserSessions } from '@/composables/useUserSessions'
 import { SESSION_KIND_LABELS, type UserSession } from '@/lib/api'
-import { relativeTime } from '@/lib/utils'
+import { formatDateTime, relativeTime } from '@/lib/utils'
 
 const { currentUser, sessionEpoch } = useAruna()
 const { signOut } = useAuth()
@@ -91,13 +91,13 @@ async function confirmRevoke(session: UserSession) {
                 {{ SESSION_KIND_LABELS[session.kind] }}
                 <span v-if="session.current" class="ml-1.5 text-muted-foreground">(this browser)</span>
               </td>
-              <td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="new Date(session.created_at).toLocaleString()">
+              <td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="formatDateTime(session.created_at)">
                 {{ relativeTime(session.created_at) }}
               </td>
               <td
                 class="px-5 py-2.5 text-[11px]"
                 :class="session.revoked || expired(session) ? 'text-destructive' : 'text-muted-foreground'"
-                :title="new Date(session.expires_at).toLocaleString()"
+                :title="formatDateTime(session.expires_at)"
               >
                 {{ session.revoked ? 'revoked' : expired(session) ? `expired ${relativeTime(session.expires_at)}` : relativeTime(session.expires_at) }}
               </td>

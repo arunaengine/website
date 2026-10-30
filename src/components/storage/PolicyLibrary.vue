@@ -14,7 +14,7 @@ import { useAruna } from '@/composables/useAruna'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
 import { placementPoliciesErrorMessage, policyOwnerLabel, policyRefKey } from '@/lib/placementPolicies'
 import type { PolicyRefBody, PolicyResponse, SelectorBody } from '@/lib/placementPolicies'
-import { truncateMiddle } from '@/lib/utils'
+import { formatDateTime, truncateMiddle } from '@/lib/utils'
 import { Library, Search } from '@lucide/vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 
@@ -186,7 +186,7 @@ async function look(policy: PolicyRefBody = lookup.value) {
                 <dt>digest</dt>
                 <dd class="break-all font-mono text-[10px]">{{ entry.ref.digest }}</dd>
                 <dt>published</dt>
-                <dd>{{ new Date(entry.document.created_at_ms).toLocaleString() }}</dd>
+                <dd>{{ formatDateTime(entry.document.created_at_ms) }}</dd>
               </dl>
             </details>
           </template>

@@ -89,7 +89,7 @@ describe('presentCrate', () => {
     ])
     expect(sample?.fields.map((field) => field.profiled)).toEqual([true, true, true, false, false])
     const date = fieldByKey(sample?.fields ?? [], 'collection_date')
-    expect(date?.values[0]).toEqual({ text: 'Mar 5, 2026', title: '2026-03-05' })
+    expect(date?.values[0]).toEqual({ text: '5 Mar 2026', title: '2026-03-05' })
   })
 
   it('claims hero entities', () => {
@@ -311,7 +311,7 @@ describe('presentCrate', () => {
     )
     expect(fieldByKey(result.fields, 'name')).toBeUndefined()
     expect(fieldByKey(result.fields, 'keywords')).toBeUndefined()
-    expect(fieldByKey(result.fields, 'datePublished')?.values[0]).toEqual({ text: 'Jan 15, 2026', title: '2026-01-15' })
+    expect(fieldByKey(result.fields, 'datePublished')?.values[0]).toEqual({ text: '15 Jan 2026', title: '2026-01-15' })
     expect(fieldByKey(result.fields, 'url')?.values[0]?.href).toBe('https://example.org/dataset')
     // Unprofiled root fields sort alphabetically by label.
     expect(result.fields.map((field) => field.key)).toEqual(['datePublished', 'temporalCoverage', 'url', 'version'])

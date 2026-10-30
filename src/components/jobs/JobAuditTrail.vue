@@ -13,7 +13,7 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useJobs } from '@/composables/useJobs'
 import type { JobAuditConflict, JobAuditRecord, JobAuditScope } from '@/lib/jobs'
-import { errorMessage, truncateMiddle } from '@/lib/utils'
+import { errorMessage, formatDateTime, truncateMiddle } from '@/lib/utils'
 
 const props = defineProps<{ jobId: string; open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', value: boolean): void }>()
@@ -81,7 +81,7 @@ async function load(reset = true) {
 }
 
 function formatAuditTime(ms: number): string {
-  return ms > 0 ? new Date(ms).toLocaleString() : 'Not timestamped'
+  return ms > 0 ? formatDateTime(ms) : 'Not timestamped'
 }
 
 // The record kinds as words a reader knows; the backend names stay as they are.

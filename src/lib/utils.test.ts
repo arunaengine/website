@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { formatResourceGb } from './utils'
+import { formatDate, formatDateTime, formatResourceGb } from './utils'
+
+describe('formatDateTime', () => {
+  it('reads day, short month, year and a 24 hour clock without seconds', () => {
+    expect(formatDateTime(new Date(2026, 9, 29, 13, 38, 19))).toBe('29 Oct 2026, 13:38')
+    expect(formatDateTime(new Date(2026, 8, 3, 7, 5))).toBe('3 Sep 2026, 07:05')
+  })
+
+  it('keeps a UTC date on its calendar day and leaves an unreadable value empty', () => {
+    expect(formatDate('2026-10-29', true)).toBe('29 Oct 2026')
+    expect(formatDateTime('not a date')).toBe('')
+  })
+})
 
 describe('formatResourceGb', () => {
   it('names a whole number of GiB in GiB', () => {

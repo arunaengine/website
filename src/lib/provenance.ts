@@ -2,6 +2,7 @@
 // the node answered; a link the user may not read is named by its global id or content id only.
 import { ApiError, type OriginIdentifier, type OriginResponse, type RunResponse } from '@/lib/api'
 import { isContentId, isExactId } from '@/lib/crate/dataIdentity'
+import { formatDate } from '@/lib/utils'
 
 const DATA_PREFIX = 'https://w3id.org/aruna/data/'
 const GLOBAL_VERSION = /^https:\/\/w3id\.org\/aruna\/data\/[A-Za-z0-9_-]+\/[0-9A-HJKMNP-TV-Z]{26}$/
@@ -95,7 +96,7 @@ function add(graph: Graph, parent: string | null, child: Box): string {
 
 /** A file's box, with its database and source added at once and its other links waiting. */
 function fileBox(graph: Graph, parent: string | null, id: string, asked: string, role: string, name: string, origin: OriginResponse) {
-  const file = fileNamed(id, 'file', role, name, { detail: new Date(origin.created_at).toLocaleDateString() })
+  const file = fileNamed(id, 'file', role, name, { detail: formatDate(origin.created_at) })
   const kind = origin.origin?.kind
   if (origin.origin?.kind === 'copy') file.pending.push({ kind: 'version', id: origin.origin.from, role: 'Copied from' })
   if (origin.origin?.kind === 'job') file.pending.push({ kind: 'run', runId: origin.origin.run_id })

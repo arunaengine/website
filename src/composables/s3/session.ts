@@ -9,6 +9,7 @@ import { useAruna } from '../useAruna'
 import { destroyClients, dropClients } from './cache'
 import { connectedEndpoint, endpointForNode, localNodeId, nodeApiBase } from './endpoints'
 import { S3SessionUnavailableError, s3ErrorMessage } from './errors'
+import { formatClock } from '@/lib/utils'
 
 export interface S3Key {
   accessKeyId: string
@@ -296,7 +297,7 @@ async function refreshSession(key: string): Promise<void> {
     // Rotating again without a later expiry would only replace credentials still in use.
     if (refreshed.expiresAt <= session.expiresAt) {
       refreshed.state = 'warning'
-      refreshed.warning = `This S3 session cannot outlast your sign-in. It remains valid until ${new Date(refreshed.expiresAt).toLocaleTimeString()}.`
+      refreshed.warning = `This S3 session cannot outlast your sign-in. It remains valid until ${formatClock(refreshed.expiresAt)}.`
     }
     putSession(key, refreshed)
   } catch (error) {
@@ -309,7 +310,7 @@ async function refreshSession(key: string): Promise<void> {
     putSession(key, {
       ...current,
       state: 'warning',
-      warning: `Session refresh failed. The current session remains valid until ${new Date(current.expiresAt).toLocaleTimeString()}: ${s3ErrorMessage(error)}`,
+      warning: `Session refresh failed. The current session remains valid until ${formatClock(current.expiresAt)}: ${s3ErrorMessage(error)}`,
     })
   } finally {
     if (activeSessionKey.value === key) scheduleActiveSession()

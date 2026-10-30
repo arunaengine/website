@@ -20,7 +20,7 @@ import WorkingDots from '@/components/assistant/WorkingDots.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Button from '@/components/ui/Button.vue'
 import type { ChatMessage } from '@/lib/assistant/types'
-import { relativeTime } from '@/lib/utils'
+import { formatDateTime, relativeTime } from '@/lib/utils'
 import { ArrowDown, Radar, Sparkles } from '@lucide/vue'
 
 /** How far above the end still counts as reading the newest turn. */
@@ -67,7 +67,7 @@ function ago(at: number): string {
 }
 
 function exact(at: number): string {
-  return Number.isFinite(at) ? new Date(at).toLocaleString() : ''
+  return Number.isFinite(at) ? formatDateTime(at) : ''
 }
 
 function distanceToEnd(): number {

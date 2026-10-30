@@ -45,6 +45,33 @@ export function relativeTime(iso: string): string {
   return sec < 0 ? `in ${timeSpan(-sec)}` : `${timeSpan(sec)} ago`
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function dateParts(at: string | number | Date, utc: boolean): Date | null {
+  const date = at instanceof Date ? at : new Date(at)
+  if (Number.isNaN(date.getTime())) return null
+  return utc ? new Date(date.getTime() + date.getTimezoneOffset() * 60_000) : date
+}
+
+// The portal's one date format, "29 Oct 2026"; empty for an unreadable value.
+export function formatDate(at: string | number | Date, utc = false): string {
+  const date = dateParts(at, utc)
+  return date ? `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}` : ''
+}
+
+// "13:38": 24 hours, no seconds.
+export function formatClock(at: string | number | Date, utc = false): string {
+  const date = dateParts(at, utc)
+  if (!date) return ''
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+// "29 Oct 2026, 13:38"; empty for an unreadable value.
+export function formatDateTime(at: string | number | Date, utc = false): string {
+  const date = formatDate(at, utc)
+  return date && `${date}, ${formatClock(at, utc)}`
+}
+
 // Compact elapsed-time label ("42s", "3m 10s", "2h 05m") for run durations.
 export function formatDuration(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return ''

@@ -14,7 +14,7 @@ import { bucketStagingJobs } from '@/composables/useStaging'
 import { ApiError, type StagingJob } from '@/lib/api'
 import { featureEnabled } from '@/lib/config'
 import { stateTone } from '@/lib/stateBadge'
-import { errorMessage, formatBytes, relativeTime } from '@/lib/utils'
+import { errorMessage, formatBytes, formatClock, relativeTime } from '@/lib/utils'
 import { ArrowLeft } from '@lucide/vue'
 
 // `nodes`: who to ask, null for this node; every member of a distributed bucket runs its own jobs.
@@ -203,7 +203,7 @@ function percent(job: StagingJob): number {
           class="mt-2 h-1.5"
         />
         <p v-if="job.paused_until" class="mt-1 text-[11px] text-muted-foreground">
-          Waiting until {{ new Date(job.paused_until).toLocaleTimeString() }}, the source asked to slow down.
+          Waiting until {{ formatClock(job.paused_until) }}, the source asked to slow down.
         </p>
         <p v-if="job.error" class="mt-1 break-all text-[11px] text-destructive">{{ job.error }}</p>
         <p v-else-if="job.errors.length" class="mt-1 break-all text-[11px] text-destructive">

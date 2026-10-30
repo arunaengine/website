@@ -14,7 +14,7 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 import type { ChatMessage, ToolCallView } from '@/lib/assistant/types'
-import { relativeTime } from '@/lib/utils'
+import { formatDateTime, relativeTime } from '@/lib/utils'
 
 const PassthroughStub = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
@@ -36,7 +36,7 @@ const stubs = [
   '@/components/ui/Notice.vue',
 ]
 
-const modules = { '@/lib/utils': { relativeTime } }
+const modules = { '@/lib/utils': { formatDateTime, relativeTime } }
 const FoldRow = compileClientComponent(new URL('./FoldRow.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': icons,
@@ -160,7 +160,7 @@ describe('MessageList', () => {
 
     expect(times).toHaveLength(2)
     expect(times.map((node) => content(node).trim())).toEqual(['5m ago', '5m ago'])
-    for (const node of times) expect(String(node.props.title ?? '')).toBe(new Date(at).toLocaleString())
+    for (const node of times) expect(String(node.props.title ?? '')).toBe(formatDateTime(at))
   })
 
   it('names the model that wrote an answer', async () => {

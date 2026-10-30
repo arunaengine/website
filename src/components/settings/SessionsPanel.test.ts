@@ -3,7 +3,7 @@ import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 import { SESSION_KIND_LABELS, type UserSession } from '@/lib/api/sessions'
-import { relativeTime } from '@/lib/utils'
+import { formatDateTime, relativeTime } from '@/lib/utils'
 
 function session(overrides: Partial<UserSession> = {}): UserSession {
   return {
@@ -53,7 +53,7 @@ const SessionsPanel = compileClientComponent(new URL('./SessionsPanel.vue', impo
     }),
   },
   '@/lib/api': { SESSION_KIND_LABELS },
-  '@/lib/utils': { relativeTime },
+  '@/lib/utils': { formatDateTime, relativeTime },
 })
 
 beforeEach(() => {

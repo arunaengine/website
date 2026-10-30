@@ -14,7 +14,7 @@ import { useUserSessions } from '@/composables/useUserSessions'
 import { createSession } from '@/lib/api'
 import { apiBaseUrl, authToken } from '@/composables/aruna/state'
 import { MCP_CLIENTS, mcpSnippet, type McpClientId } from '@/lib/assistant/mcpSnippets'
-import { errorMessage, relativeTime } from '@/lib/utils'
+import { errorMessage, formatDateTime, relativeTime } from '@/lib/utils'
 import { Plug } from '@lucide/vue'
 
 const { realmInfo, currentUser } = useAruna()
@@ -107,7 +107,7 @@ async function mint() {
               <code class="min-w-0 break-all font-mono text-[11px] text-foreground">{{ token }}</code>
               <CopyButton :value="token" label="Copy the session token" />
             </div>
-            <p class="text-[11px] text-muted-foreground" :title="new Date(expiresAt).toLocaleString()">
+            <p class="text-[11px] text-muted-foreground" :title="formatDateTime(expiresAt)">
               Expires {{ relativeTime(expiresAt) }}.
             </p>
           </div>

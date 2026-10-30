@@ -15,6 +15,7 @@ import { pageIdentifier } from '@/lib/databases'
 import { releaseKey, versionTime } from '@/lib/releases'
 import { crateGraph, crateRootId, stringProp } from '@/lib/dataEntities'
 import { Plus } from '@lucide/vue'
+import { formatDate } from '@/lib/utils'
 
 const props = defineProps<{ bucket: string; nodeId: string | null; canPublish: boolean; page?: string }>()
 
@@ -142,7 +143,7 @@ async function publish() {
             >{{ makers[item.version_id]!.text }}</RouterLink>
             <span v-else :class="makers[item.version_id] ? '' : 'text-muted-foreground'">{{ makers[item.version_id]?.text ?? '…' }}</span>
           </td>
-          <td class="py-2.5 text-muted-foreground">{{ versionTime(item.version_id)?.toLocaleDateString() ?? 'Unknown' }}</td>
+          <td class="py-2.5 text-muted-foreground">{{ formatDate(versionTime(item.version_id) ?? NaN) || 'Unknown' }}</td>
         </tr>
       </tbody>
     </table>

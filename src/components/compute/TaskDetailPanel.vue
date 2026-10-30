@@ -56,7 +56,7 @@ import {
 import { sessionRuntime } from '@/lib/notebook/submit'
 import { objectHref } from '@/lib/assistant/objectLinks'
 import { asyncChunkError } from '@/lib/chunk-recovery'
-import { errorMessage, formatBytes, formatDuration, formatResourceGb, relativeTime, truncateMiddle } from '@/lib/utils'
+import { errorMessage, formatBytes, formatClock, formatDateTime, formatDuration, formatResourceGb, relativeTime, truncateMiddle } from '@/lib/utils'
 import {
   ArrowLeftRight,
   Ban,
@@ -340,11 +340,11 @@ const resourceShort = computed(() => {
 })
 function when(iso: string | undefined): string {
   const at = iso ? Date.parse(iso) : NaN
-  return Number.isFinite(at) ? new Date(at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : ''
+  return Number.isFinite(at) ? formatDateTime(at) : ''
 }
 function clock(iso: string | undefined): string {
   const at = iso ? Date.parse(iso) : NaN
-  return Number.isFinite(at) ? new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : ''
+  return Number.isFinite(at) ? formatClock(at) : ''
 }
 const facts = computed<Detail[]>(() => {
   const done = isTerminalTesState(task.value?.state)

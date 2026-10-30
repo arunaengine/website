@@ -6,7 +6,7 @@
 import { crateGraph, crateRootId, entityKind, isDataEntity, stringProp } from '@/lib/dataEntities'
 import { contentUrlValues, primaryContentUrl } from '@/lib/crate/dataIdentity'
 import { readableIri } from '@/lib/identifiers'
-import { isHttpUrl } from '@/lib/utils'
+import { formatDate, formatDateTime, isHttpUrl } from '@/lib/utils'
 import { contextTermsOf } from '@/lib/profiles/contextTerms'
 import { isDatasetType, termNameFromUri } from '@/lib/profiles/uri'
 import type { ProfileEntityRule } from '@/lib/profiles/types'
@@ -202,24 +202,14 @@ function ruleFor(types: string[], rules: RuleIndex): EntityRuleMatch | undefined
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
 const DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
-const dateFormat = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
-const dateTimeFormat = new Intl.DateTimeFormat('en-US', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-  hourCycle: 'h23',
-  timeZone: 'UTC',
-})
 
 function literalValue(text: string): PresentedValue {
   if (DATE_ONLY.test(text)) {
     const parsed = Date.parse(text)
-    if (Number.isFinite(parsed)) return { text: dateFormat.format(parsed), title: text }
+    if (Number.isFinite(parsed)) return { text: formatDate(parsed, true), title: text }
   } else if (DATE_TIME.test(text)) {
     const parsed = Date.parse(text)
-    if (Number.isFinite(parsed)) return { text: `${dateTimeFormat.format(parsed)} UTC`, title: text }
+    if (Number.isFinite(parsed)) return { text: formatDateTime(parsed), title: text }
   }
   const long = text.length > LONG_TEXT
   // URL parsing accepts embedded spaces, so only a short, whitespace-free value

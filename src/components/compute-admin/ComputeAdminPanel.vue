@@ -31,7 +31,7 @@ import type {
   ComputeSnapshotsResponse,
 } from '@/lib/computeAdmin'
 import { knownLocations as placementLocations } from '@/lib/placement'
-import { formatBytes, formatDuration, formatNumber, truncateMiddle } from '@/lib/utils'
+import { formatBytes, formatDateTime, formatDuration, formatNumber, truncateMiddle } from '@/lib/utils'
 import {
   Activity,
   ArrowRight,
@@ -211,7 +211,7 @@ function quotaValue(value: number | undefined, kind: 'count' | 'bytes' | 'durati
 }
 
 function observedAt(milliseconds: number): string {
-  return new Date(milliseconds).toLocaleString()
+  return formatDateTime(milliseconds)
 }
 
 async function loadAll() {

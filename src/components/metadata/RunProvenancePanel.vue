@@ -20,7 +20,7 @@ import { parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { isArunaUserId } from '@/lib/identifiers'
 import { groupFiles, type FileGroup } from '@/lib/fileGroups'
 import type { RunCrateFileRef, RunCrateModel } from '@/lib/runCrate'
-import { formatBytes, isHttpUrl, shortUserId } from '@/lib/utils'
+import { formatBytes, formatDateTime, isHttpUrl, shortUserId } from '@/lib/utils'
 import { ChevronDown, ChevronRight, Database, Download, ExternalLink as ExternalLinkIcon, File as FileIcon, Files, Folder, GitBranch, LogIn, Terminal } from '@lucide/vue'
 
 // `documentId`: the record's id, named with its API address; `published`: when the record was made.
@@ -87,7 +87,7 @@ const ranItems = computed(() => {
     .join(', ')
   if (resources) items.push({ key: 'resources', label: 'Resources', value: resources })
   if (agentLabel.value) items.push({ key: 'agent', label: 'Started by', value: agentLabel.value })
-  if (props.published) items.push({ key: 'published', label: 'Published', value: new Date(props.published).toLocaleString() })
+  if (props.published) items.push({ key: 'published', label: 'Published', value: formatDateTime(props.published) })
   if (run.workspaceBucket) items.push({ key: 'workspace', label: 'Workspace', value: run.workspaceBucket, mono: true })
   if (props.documentId) {
     items.push({ key: 'record', label: 'Record id', value: props.documentId, mono: true })
@@ -97,7 +97,7 @@ const ranItems = computed(() => {
 })
 const startedAt = computed(() => {
   const ms = props.run.startTime ? Date.parse(props.run.startTime) : NaN
-  return Number.isFinite(ms) ? new Date(ms).toLocaleString() : props.run.startTime ?? ''
+  return Number.isFinite(ms) ? formatDateTime(ms) : props.run.startTime ?? ''
 })
 
 // Same link forms TaskDetailPanel resolves for TES outputs, plus any

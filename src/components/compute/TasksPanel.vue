@@ -24,7 +24,7 @@ import { useNow } from '@/composables/useNow'
 import { useRefresh } from '@/composables/useRefresh'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { errorMessage, formatDuration, formatResourceGb, relativeTime, truncateMiddle } from '@/lib/utils'
+import { errorMessage, formatDateTime, formatDuration, formatResourceGb, relativeTime, truncateMiddle } from '@/lib/utils'
 import { follow, onWake } from '@/lib/poll'
 import { sessionRuntime } from '@/lib/notebook/submit'
 import { isDesktop } from '@/lib/desktop'
@@ -609,7 +609,7 @@ onUnmounted(() => {
               <td class="hidden whitespace-nowrap text-xs tabular-nums text-muted-foreground lg:table-cell" :title="resourcesHint(task)">
                 {{ taskResources(task) || '-' }}
               </td>
-              <td class="hidden whitespace-nowrap text-right text-xs text-muted-foreground sm:table-cell" :title="task.creation_time ? new Date(task.creation_time).toLocaleString() : undefined">
+              <td class="hidden whitespace-nowrap text-right text-xs text-muted-foreground sm:table-cell" :title="task.creation_time ? formatDateTime(task.creation_time) : undefined">
                 {{ task.creation_time ? relativeTime(task.creation_time) : '-' }}
               </td>
               <td class="num hidden whitespace-nowrap text-xs text-muted-foreground sm:table-cell" :title="durationHint(task)">

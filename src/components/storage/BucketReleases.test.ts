@@ -3,6 +3,7 @@ import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as ContentIdentity from '@/lib/contentIdentity'
 import * as Releases from '@/lib/releases'
+import * as Utils from '@/lib/utils'
 import * as DataEntities from '@/lib/dataEntities'
 import { compileClientComponent, content, flush, mountApp, moduleDefault } from '@/test/clientRender'
 
@@ -41,6 +42,7 @@ const component = compileClientComponent(new URL('./BucketReleases.vue', import.
   '@/lib/dataEntities': DataEntities,
   '@/lib/databases': { pageIdentifier: () => null },
   '@/lib/releases': Releases,
+  '@/lib/utils': Utils,
   '@lucide/vue': { Plus: Slotted('i') },
 })
 
@@ -53,7 +55,7 @@ describe('bucket releases', () => {
     expect(text).toContain('VersionFilesMadebyPublished')
     expect(text).toContain('6.0db/PrepareBaktaDB6.0light')
     expect(text).toContain('5.1WholebucketByhand')
-    expect(text).toContain(new Date('2026-10-28T23:26:37.234Z').toLocaleDateString().replace(/\s+/g, ''))
+    expect(text).toContain(Utils.formatDate('2026-10-28T23:26:37.234Z').replace(/\s+/g, ''))
     expect(getRun).toHaveBeenCalledWith('run-1', { baseUrl: 'https://node.test', token: 't' })
     expect(releasePreparation).toHaveBeenCalledWith(
       'https://w3id.org/aruna/data/arn:aruna:realm:node-2:s3/bakta-db/release-6.0.json@01M62DCH5J7HXR3V6784DBERPA',
