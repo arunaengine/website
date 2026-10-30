@@ -178,10 +178,13 @@ function passesFilters(name: string, node: string | null, nodeIds: string[], pin
     pinned: () => pinned,
     public: () => Boolean(database?.public) || props.manager.publicAccess.isPublic(node, { kind: 'bucket', bucket: name, key: '' }),
     dataset: () => Boolean(database?.dataset),
-    inPlace: () => usage.referencedOf(name, usageNode(node)) === true,
+    // Read in place is checked per page, as it reads each bucket's usage from its node.
+    inPlace: () => true,
   }
   return onlyFacts.value.every((fact) => checks[fact]())
 }
+const inPlaceOn = computed(() => onlyFacts.value.includes('inPlace'))
+const readsInPlace = (name: string, node: string | null) => !inPlaceOn.value || usage.referencedOf(name, usageNode(node)) === true
 const realNode = (nodeId: string | null) => nodeId ?? realmNodes.localNodeId.value ?? ''
 const rowNodes = (row: AllRow) => (row.hit ? row.hit.nodes : [realNode(row.nodeId)])
 
@@ -224,7 +227,8 @@ watch([selectedGroupId, bucketNameFilter, bucketNodeChoice, kindFilter, nodeFilt
   pageRun++
   page.value = 1
 })
-const pageRows = computed(() => allRows.value.slice((page.value - 1) * BUCKETS_PER_PAGE, page.value * BUCKETS_PER_PAGE))
+const pageSlice = computed(() => allRows.value.slice((page.value - 1) * BUCKETS_PER_PAGE, page.value * BUCKETS_PER_PAGE))
+const pageRows = computed(() => pageSlice.value.filter((row) => readsInPlace(row.bucket, row.hit?.node_id ?? row.nodeId)))
 const pageFilled = () => allRows.value.length > page.value * BUCKETS_PER_PAGE
 const hasNextPage = computed(() => pageFilled() || all.more.value)
 // "1-25 of 80"; while the nodes have more to list, the total is at least the listed rows.
@@ -282,7 +286,8 @@ const rowNodeId = (row: AllRow) => row.hit?.node_id ?? row.nodeId
 const allSections = computed(() => sectioned(pageRows.value, (row) => row.pinned))
 const shownRows = computed(() => allSections.value.flatMap((section) => section.rows))
 type NodeEntry = (typeof nodeBuckets.value)[number]
-const nodeSections = computed(() => sectioned(nodeBuckets.value, (entry) => entry.pinned))
+const nodeSections = computed(() =>
+  sectioned(nodeBuckets.value.filter((entry) => readsInPlace(entry.bucket, entry.nodeId ?? null)), (entry) => entry.pinned))
 const shownEntries = computed(() => nodeSections.value.flatMap((section) => section.rows))
 // The position of a row in the shown order, for the arrow key highlight.
 const rowIndex = (row: AllRow) => shownRows.value.indexOf(row)
@@ -297,11 +302,11 @@ watch(
   (entries) => usage.ensure(entries),
   { immediate: true },
 )
-// Read in place needs the usage of every listed row, not only the shown ones.
+// Read in place reads the usage of the rows of this page only, and only while it is on.
 const usageCandidates = computed(() =>
-  !onlyFacts.value.includes('inPlace') ? []
-    : searchList.value ? all.hits.value.map((hit) => ({ bucket: hit.bucket, nodeId: usageNode(hit.node_id) }))
-      : sidebarBuckets.value.map((entry) => ({ bucket: entry.bucket, nodeId: usageNode(entry.nodeId ?? null) })))
+  !inPlaceOn.value ? []
+    : searchList.value ? pageSlice.value.map((row) => ({ bucket: row.bucket, nodeId: usageNode(rowNodeId(row)) }))
+      : nodeBuckets.value.map((entry) => ({ bucket: entry.bucket, nodeId: usageNode(entry.nodeId ?? null) })))
 watch(usageCandidates, (entries) => usage.ensure(entries), { immediate: true })
 const checkingUsage = computed(() => usageCandidates.value.some((entry) => !usage.answered(entry.bucket, entry.nodeId)))
 // Arrow keys move through the shown rows of this group, then of other groups.
@@ -487,7 +492,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
       <template v-else-if="searchList">
         <Spinner v-if="all.loading.value && !all.hits.value.length" show-label label="Loading buckets…" class="px-3 py-4" />
         <p v-else-if="all.error.value" class="px-3 py-3 text-xs text-destructive">{{ all.error.value }}</p>
-        <ul v-else-if="allRows.length || examples.length" :id="`${listId}-group`" role="listbox" :class="listClass">
+        <ul v-else-if="pageRows.length || examples.length" :id="`${listId}-group`" role="listbox" :class="listClass">
           <template v-for="section in allSections" :key="section.label">
             <li v-if="section.label" role="presentation" class="px-3.5 pb-1 pt-3 text-xs font-medium text-muted-foreground">{{ section.label }}</li>
             <li v-else-if="allSections.length > 1" role="presentation" class="mx-3.5 my-2 border-t border-border-subtle" />
@@ -537,7 +542,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           <MockBucketRows :filter="bucketNameFilter" :active="bucket" @open="openBucket" />
         </ul>
         <p v-else-if="!all.loading.value && !checkingUsage" class="px-3 py-4 text-xs text-muted-foreground">
-          {{ activeFilters.length ? 'No bucket matches.' : 'No buckets found.' }}
+          {{ !activeFilters.length ? 'No buckets found.' : inPlaceOn && hasNextPage ? 'No bucket on this page matches.' : 'No bucket matches.' }}
           <button v-if="activeFilters.length" type="button" class="text-primary hover:underline" @click="clearFilters">Clear filters</button>
         </p>
         <p v-if="all.failedNodes.value" class="border-t border-border/70 px-3 py-2 text-xs text-muted-foreground">
@@ -567,7 +572,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         <template v-else>
           <!-- A failed revalidation keeps the last good list and reports itself above it. -->
           <p v-if="bucketsError" class="border-b border-border/70 px-3 py-2 text-xs text-destructive">{{ bucketsError }}</p>
-          <ul v-if="nodeBuckets.length || examples.length" :id="`${listId}-group`" role="listbox" :class="listClass">
+          <ul v-if="shownEntries.length || examples.length" :id="`${listId}-group`" role="listbox" :class="listClass">
             <template v-for="section in nodeSections" :key="section.label">
               <li v-if="section.label" role="presentation" class="px-3.5 pb-1 pt-3 text-xs font-medium text-muted-foreground">{{ section.label }}</li>
               <li v-else-if="nodeSections.length > 1" role="presentation" class="mx-3.5 my-2 border-t border-border-subtle" />
@@ -620,7 +625,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
             </template>
             <MockBucketRows :filter="bucketNameFilter" :active="bucket" @open="openBucket" />
           </ul>
-          <p v-else class="px-3 py-4 text-xs text-muted-foreground">No buckets in this group yet.</p>
+          <p v-else-if="!checkingUsage" class="px-3 py-4 text-xs text-muted-foreground">{{ activeFilters.length ? 'No bucket matches.' : 'No buckets in this group yet.' }}</p>
           <div v-if="recentBuckets.length" class="border-t border-border/70 py-1">
             <p class="flex items-center gap-1.5 px-3 pb-1 pt-2 text-xs font-medium text-muted-foreground">
               <History class="h-3.5 w-3.5 shrink-0" />

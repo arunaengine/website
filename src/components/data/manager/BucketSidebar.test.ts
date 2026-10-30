@@ -1026,6 +1026,23 @@ describe('bucket filters', () => {
     expect(opened(root)).toEqual(['refseq'])
   })
 
+  it('reads usage for read in place only for the rows of the current page', async () => {
+    nodeChoice.value = null
+    allBuckets.needsName.value = false
+    allBuckets.more.value = false
+    allBuckets.hits.value = Array.from({ length: 30 }, (_, index) => ({ bucket: `b${String(index).padStart(2, '0')}`, node_id: 'home', group_id: 'g1', nodes: ['home'] }))
+    referencedBuckets.set('b03', true)
+    const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
+    await flush()
+    usageAsked.length = 0
+
+    await pick(root, 'menuitemcheckbox', 'Read in place')
+    const asked = (usageAsked as { bucket: string }[][]).flat().map((entry) => entry.bucket)
+    expect(asked).toContain('b24')
+    expect(asked).not.toContain('b25')
+    expect(opened(root)).toEqual(['b03'])
+  })
+
   it('says nothing matches only once every bucket was checked', async () => {
     const root = await mounted()
     referencedBuckets.delete('refseq')
