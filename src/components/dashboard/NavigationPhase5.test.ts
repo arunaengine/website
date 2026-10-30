@@ -126,8 +126,8 @@ describe('Phase 5 navigation parity', () => {
       expect(portalPaths(html)).not.toContain('/app/admin/onboarding')
       expect(portalPaths(html)).not.toContain('/app/admin/quarantine')
     }
-    expect(adminSource).toContain('v-if="canManageOnboarding"')
-    expect(adminSource).toContain('v-if="canManageQuarantine"')
+    expect(adminSource).toContain('v-if="isRealmAdmin && canManageOnboarding"')
+    expect(adminSource).toContain('v-if="isRealmAdmin && canManageQuarantine"')
     expect(adminSource).toContain("{ name: 'admin-onboarding' }")
     expect(adminSource).toContain("{ name: 'admin-quarantine' }")
   })
