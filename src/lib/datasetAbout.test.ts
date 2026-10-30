@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aboutFacts, citationText } from './datasetAbout'
+import { aboutFacts, bylineOf, citationText } from './datasetAbout'
 import { formatDate } from './utils'
 
 describe('aboutFacts', () => {
@@ -46,5 +46,21 @@ describe('citationText', () => {
     expect(citationText({ authors: ['Ada Lovelace', 'Alan Turing'], year: '2026', title: 'Reef census.', publisher: 'Demo realm', link: 'https://doi.org/10.1/x' }))
       .toBe('Ada Lovelace, Alan Turing (2026). Reef census. Demo realm. https://doi.org/10.1/x')
     expect(citationText({ authors: [], year: '', title: 'Reef census', publisher: '', link: 'https://example.org/d/1' })).toBe('Reef census. https://example.org/d/1')
+  })
+})
+
+describe('bylineOf', () => {
+  const crate = {
+    '@graph': [
+      { '@id': 'ro-crate-metadata.json', about: { '@id': './' } },
+      { '@id': './', author: [{ '@id': '#ada' }, { '@id': '#ada' }, 'Grace Hopper'], creator: { '@id': '#bob' } },
+      { '@id': '#ada', '@type': 'Person', name: 'Ada Lovelace' },
+      { '@id': '#run', '@type': 'CreateAction', agent: { '@id': 'https://orcid.org/0000-0001' } },
+    ],
+  }
+
+  it('names the authors once each, or a run by its agents', () => {
+    expect(bylineOf(crate).map((entry) => entry.name)).toEqual(['Ada Lovelace', 'Grace Hopper'])
+    expect(bylineOf(crate, { agent: { '@id': 'https://orcid.org/0000-0001' } })).toHaveLength(1)
   })
 })

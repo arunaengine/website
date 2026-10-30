@@ -1,5 +1,6 @@
 import { crateGraph, crateRootId, stringProp, typesOf } from '@/lib/dataEntities'
 import { toArray } from '@/lib/contextualEntities'
+import { readableIri } from '@/lib/identifiers'
 import { formatBinary, formatDate, isHttpUrl } from '@/lib/utils'
 
 export interface IdentifierLink {
@@ -68,4 +69,20 @@ export interface CitationParts {
 export function citationText(parts: CitationParts): string {
   const head = [parts.authors.join(', '), parts.year ? `(${parts.year})` : ''].filter(Boolean).join(' ')
   return [head, parts.title, parts.publisher, parts.link].filter(Boolean).map((part) => part.replace(/\.$/, '')).join('. ')
+}
+
+/** Who the header names: a run's agents, else the root's authors or creators, by entity name. */
+export function bylineOf(crate: unknown, action?: Record<string, unknown>): Array<{ id: string; name: string }> {
+  const graph = crateGraph(crate)
+  const root = graph.find((entity) => entity['@id'] === crateRootId(crate))
+  const source = action ? toArray(action.agent) : toArray(root?.author).length ? toArray(root?.author) : toArray(root?.creator)
+  const seen = new Set<string>()
+  return source.flatMap((value) => {
+    const id = stringProp(value) ?? ''
+    if (!id || seen.has(id)) return []
+    seen.add(id)
+    const entity = graph.find((candidate) => candidate['@id'] === id)
+    const name = stringProp(entity?.name) || (value && typeof value === 'object' ? '' : id)
+    return [{ id, name: name || readableIri(id) }]
+  })
 }
