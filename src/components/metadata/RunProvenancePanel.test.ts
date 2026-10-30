@@ -20,6 +20,16 @@ const RunProvenancePanel = compileClientComponent(new URL('./RunProvenancePanel.
   '@/components/ui/Badge.vue': moduleDefault(Slot),
   '@/components/ui/ExternalLink.vue': moduleDefault(defineComponent({ props: { href: String, label: String }, setup: (props) => () => h('a', { href: props.href }, props.label) })),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
+  '@/components/ui/Button.vue': moduleDefault(defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()) })),
+  '@/components/ui/CopyButton.vue': moduleDefault(defineComponent({ props: { value: String, label: String }, setup: (props) => () => h('button', { 'aria-label': props.label, 'data-copy': props.value }) })),
+  '@/components/ui/DetailList.vue': moduleDefault(defineComponent({
+    props: { items: { type: Array, required: true } },
+    setup: (props, { slots }) => () => h('dl', (props.items as { key?: string; label: string; value: string }[]).map((item) =>
+      h('div', [h('dt', item.label), h('dd', slots[item.key ?? item.label]?.({ item }) ?? item.value)]))),
+  })),
+  '@/components/ui/IconTile.vue': moduleDefault(defineComponent(() => () => h('i'))),
+  '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent({ props: { title: String }, setup: (props, { slots }) => () => h('div', [h('h2', props.title), slots.actions?.()]) })),
+  '@/components/data/ObjectIcon.vue': moduleDefault(defineComponent(() => () => h('i'))),
   '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
   '@/composables/useAruna': { useAruna: () => ({ apiBaseUrl: ref('https://api.test') }) },
   '@/composables/useUserDirectory': {
@@ -93,11 +103,29 @@ describe('RunProvenancePanel', () => {
     const text = content(mounted.root)
 
     expect(text).toContain('bakta-dbrelease 6.0 light, DOI 10.5281/zenodo.149168431 KB')
-    expect(text).toContain('Saved to results/bakta/')
+    // The results name their count and the folder they went to, linked.
+    expect(text).toContain('2 files')
+    expect(text).toContain('results/bakta/')
     expect(text).toContain('Command/bakta --db /work/in/db genome.fasta')
-    expect(text).toContain('WhereGiessen, kubernetes')
+    expect(text).toContain('WhereGiessenkubernetes')
     expect(text).toContain('Resources4 CPU, 8 GB memory')
     expect(text).not.toContain('Started by')
+    mounted.app.unmount()
+  })
+})
+
+describe('RunProvenancePanel record facts', () => {
+  it('names the record id and its API address with copy buttons, and asks for the full chain', async () => {
+    const chain = vi.fn()
+    const run = { inputs: [], outputs: [], command: 'run.sh' }
+    const mounted = await mountApp(RunProvenancePanel, { props: { run, documentId: 'doc-1', published: '2026-10-29T10:00:00Z', onChain: chain } })
+    const copies = nodes(mounted.root).filter((node) => node.props['data-copy']).map((node) => node.props['data-copy'])
+
+    expect(content(mounted.root)).toContain('Record iddoc-1')
+    expect(copies).toEqual(['doc-1', 'https://api.test/metadata/doc-1', 'run.sh'])
+    expect(content(mounted.root)).toContain('Published')
+    ;(nodes(mounted.root).find((node) => node.tag === 'button' && content(node).includes('Full chain'))!.props.onClick as () => void)()
+    expect(chain).toHaveBeenCalledOnce()
     mounted.app.unmount()
   })
 })
@@ -115,7 +143,7 @@ const stored = (bucket: string, key: string, size: string, extra: Record<string,
 })
 
 describe('RunProvenancePanel grouped files', () => {
-  it('collapses a database and a crowded results folder into one row each', async () => {
+  it('collapses a database into one row and shows the first results of their folder', async () => {
     const inputs = [
       stored('laptop', 'my-genome/genome.fasta', '4900000', { device: 'device-1', name: 'work/in/genome.fasta' }),
       ...Array.from({ length: 66 }, (_, index) => stored('bakta-db', `db/part-${index}.dmnd`, '1000', { partOf: [DATABASE, RELEASE] })),
@@ -131,7 +159,12 @@ describe('RunProvenancePanel grouped files', () => {
     expect(text).toContain('release 6.0 light, 66 files')
     expect(text).toContain('DOI 10.5281/zenodo.14916843')
     expect(text).toContain('64.5 KB')
-    expect(text).toContain('13 files in laptop/results/bakta/')
+    // Results in one folder: the summary names count and folder, the list shows five, then all.
+    expect(text).toContain('13 files')
+    expect(text).toContain('laptop/results/bakta/')
+    expect(text).toContain('genome-4.tsv')
+    expect(text).not.toContain('genome-5.tsv')
+    expect(text).toContain('Show all 13 files')
     expect(text).not.toContain('part-3.dmnd')
 
     const toggle = nodes(mounted.root).find((node) => node.tag === 'button' && content(node).includes('Bakta database'))!
@@ -157,8 +190,9 @@ describe('RunProvenancePanel grouped files', () => {
     expect(text).toContain('from Microbiology laptop')
     expect(text).not.toContain('old-slug')
     expect(text).not.toContain('from a device')
-    const name = nodes(mounted.root).find((node) => node.tag === 'a' && content(node).trim() === 'genome.fasta')
-    expect(name).toBeTruthy()
+    // The whole row opens the input's folder.
+    const row = nodes(mounted.root).find((node) => node.tag === 'a' && content(node).includes('genome.fasta'))
+    expect(row?.props.to).toEqual({ name: 'bucket', params: { bucketId: 'laptop' }, query: { prefix: 'inputs' } })
     mounted.app.unmount()
   })
 })

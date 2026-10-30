@@ -21,13 +21,15 @@ describe('MetadataView', () => {
     expect(source).toContain("watch(routeTab, (value) => value === 'graph' && (developersOpen.value = true), { immediate: true })")
   })
 
-  it('keeps the people and context of a run record in the developer section', () => {
-    const overview = source.slice(source.indexOf('<RunProvenancePanel'), source.indexOf('<details'))
-    const developers = source.slice(source.indexOf('<details'))
+  it('keeps the people, context and details of a run record in the developer section inside What ran', () => {
+    const overview = source.slice(source.indexOf('<RunProvenancePanel'), source.indexOf('<ReuseDevelopers v-if'))
+    const developers = source.slice(source.indexOf('<DefineDevelopers>'), source.indexOf('</DefineDevelopers>'))
+    expect(overview).toContain('<ReuseDevelopers />\n          </RunProvenancePanel>')
     expect(overview).toContain('<template v-if="!runProvenance">\n            <PeopleSection')
-    expect(developers).toContain('<template v-if="runProvenance">\n              <PeopleSection')
+    expect(developers).toContain('<template v-if="runProvenance">\n          <DetailsSection')
+    expect(developers).toContain('<PeopleSection')
     expect(developers).toContain('<ContextSection')
-    expect(overview).toContain('<DetailsSection')
+    expect(overview).toContain('<DetailsSection\n            v-if="!runProvenance"')
   })
 
   it('shows the dataset id once, in the developer section with a copy button', () => {

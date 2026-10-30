@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import Button from '@/components/ui/Button.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
+import DetailList, { type Detail } from '@/components/ui/DetailList.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
+import IconTile from '@/components/ui/IconTile.vue'
 import Notice from '@/components/ui/Notice.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
+import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import { useAruna } from '@/composables/useAruna'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -14,10 +20,12 @@ import { parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { isArunaUserId } from '@/lib/identifiers'
 import { groupFiles, type FileGroup } from '@/lib/fileGroups'
 import type { RunCrateFileRef, RunCrateModel } from '@/lib/runCrate'
-import { formatBytes, isHttpUrl, shortUserId, truncateMiddle } from '@/lib/utils'
-import { ChevronRight, Download, ExternalLink as ExternalLinkIcon } from '@lucide/vue'
+import { formatBytes, isHttpUrl, shortUserId } from '@/lib/utils'
+import { ChevronRight, Database, Download, ExternalLink as ExternalLinkIcon, File as FileIcon, Files, Folder, FolderOpen, GitBranch, LogIn, Terminal } from '@lucide/vue'
 
-const props = defineProps<{ run: RunCrateModel }>()
+// `documentId`: the record's id, named with its API address; `published`: when the record was made.
+const props = defineProps<{ run: RunCrateModel; documentId?: string; published?: string }>()
+const emit = defineEmits<{ (e: 'chain'): void }>()
 
 const { apiBaseUrl } = useAruna()
 const userDir = useUserDirectory()
@@ -64,26 +72,28 @@ const containerLabel = computed(() => {
 })
 
 // What ran, one row per fact the crate gives; nothing is filled in.
-const ranRows = computed(() => {
+const ranItems = computed(() => {
   const run = props.run
-  const rows: { key: string; label: string; value: string; mono?: boolean }[] = []
+  const items: Detail[] = []
   const tool = [instrumentLabel.value, run.instrument?.version && !run.instrument.version.startsWith('sha256:') ? run.instrument.version : '']
     .filter(Boolean)
     .join(' ')
-  if (tool) rows.push({ key: 'tool', label: 'Tool', value: tool })
-  if (containerLabel.value) rows.push({ key: 'image', label: 'Image', value: containerLabel.value, mono: true })
-  if (run.command) rows.push({ key: 'command', label: 'Command', value: run.command, mono: true })
-  const site = run.site
-  if (site) {
-    const where = [site.nodeId ? displayName(site.nodeId) : '', site.kind ?? ''].filter(Boolean).join(', ')
-    rows.push({ key: 'where', label: 'Where', value: [where, site.reason ?? ''].filter(Boolean).join('. ') })
-  }
+  if (tool) items.push({ key: 'tool', label: 'Tool', value: tool })
+  if (run.site) items.push({ key: 'where', label: 'Where', value: run.site.nodeId ?? '' })
+  if (containerLabel.value) items.push({ key: 'image', label: 'Image', value: containerLabel.value, mono: true })
   const memory = Number(run.ramBytes)
   const resources = [run.cpuCores ? `${run.cpuCores} CPU` : '', Number.isFinite(memory) && memory > 0 ? `${formatBytes(memory)} memory` : '']
     .filter(Boolean)
     .join(', ')
-  if (resources) rows.push({ key: 'resources', label: 'Resources', value: resources })
-  return rows
+  if (resources) items.push({ key: 'resources', label: 'Resources', value: resources })
+  if (agentLabel.value) items.push({ key: 'agent', label: 'Started by', value: agentLabel.value })
+  if (props.published) items.push({ key: 'published', label: 'Published', value: new Date(props.published).toLocaleString() })
+  if (run.workspaceBucket) items.push({ key: 'workspace', label: 'Workspace', value: run.workspaceBucket, mono: true })
+  if (props.documentId) {
+    items.push({ key: 'record', label: 'Record id', value: props.documentId, mono: true })
+    items.push({ key: 'api', label: 'API', value: `${apiBaseUrl.value.replace(/\/+$/, '')}/metadata/${props.documentId}`, mono: true })
+  }
+  return items
 })
 const startedAt = computed(() => {
   const ms = props.run.startTime ? Date.parse(props.run.startTime) : NaN
@@ -128,6 +138,32 @@ function toRow(ref: RunCrateFileRef): FileRow {
 }
 
 const outputRows = computed(() => props.run.outputs.map(toRow))
+const folderRoute = (link: { bucketId: string; prefix: string }, run?: string) => ({
+  name: 'bucket',
+  params: { bucketId: link.bucketId },
+  query: { ...(link.prefix ? { prefix: link.prefix } : {}), ...(run ? { run } : {}) },
+})
+// A stored result opens its folder; a content address opens through DRS in a new tab.
+function rowLink(link: ResolvedLink) {
+  if (link.kind === 's3') return { to: folderRoute(link) }
+  if (link.kind === 'drs') return { href: link.object, target: '_blank', rel: 'noopener noreferrer' }
+  return {}
+}
+// "2 inputs, 3.8 GB"; a size only when every input names one.
+function bytesOf(files: RunCrateFileRef[]): string {
+  const sizes = files.map((file) => Number(file.contentSize))
+  return files.length && sizes.every((size) => Number.isFinite(size) && size >= 0) ? formatBytes(sizes.reduce((a, b) => a + b, 0)) : ''
+}
+const inputSummary = computed(() => {
+  const count = props.run.inputs.length
+  return count ? [`${count} ${count === 1 ? 'input' : 'inputs'}`, bytesOf(props.run.inputs)].filter(Boolean).join(', ') : ''
+})
+const outputBytes = computed(() => bytesOf(props.run.outputs))
+// The kinds of the results by their extensions, such as "GBFF, FAA, JSON".
+const outputKinds = computed(() => {
+  const kinds = props.run.outputs.map((file) => /\.([a-z0-9]+)(?:\.gz)?$/i.exec(file.name)?.[1]?.toUpperCase()).filter((kind): kind is string => Boolean(kind))
+  return [...new Set(kinds)].slice(0, 8).join(', ')
+})
 
 // One folder all results went to, for the "Saved to" line; null when they are spread out.
 const savedTo = computed(() => {
@@ -182,6 +218,12 @@ function listRows(files: RunCrateFileRef[]): ListRow[] {
 }
 const inputList = computed(() => listRows(props.run.inputs))
 const outputList = computed(() => listRows(props.run.outputs))
+// Results in one folder are that folder's files; the summary above already names the folder.
+const resultRows = computed<ListRow[]>(() => {
+  const only = outputList.value.length === 1 ? outputList.value[0] : undefined
+  if (only?.kind !== 'group') return outputList.value
+  return only.group.files.map((file) => ({ kind: 'file', key: `${only.key}:${file.id}`, row: toRow(file), label: fileLabel(file, only.group), nested: false }))
+})
 
 function groupTitle(group: FileGroup): string {
   const name = group.database?.name ?? group.release?.name
@@ -214,92 +256,156 @@ function groupSize(group: FileGroup): string {
 </script>
 
 <template>
-  <div class="space-y-4" aria-label="Run record">
+  <div class="space-y-6" aria-label="Run record">
     <Notice v-if="run.error" tone="error">{{ run.error }}</Notice>
-    <div class="grid gap-4 lg:grid-cols-2">
-      <section v-for="stage in [{ key: 'inputs', label: 'Inputs', list: inputList, empty: 'No declared inputs.' }, { key: 'outputs', label: 'Results', list: outputList, empty: 'No results were captured.' }]" :key="stage.key" class="surface p-5">
-        <h2 class="mb-3 font-display text-sm font-semibold text-aruna-navy">{{ stage.label }}</h2>
-        <p v-if="!stage.list.length" class="text-xs text-muted-foreground">{{ stage.empty }}</p>
-        <table v-else class="w-full text-left text-xs">
-          <tbody class="divide-y divide-border">
-            <tr v-for="entry in stage.list" :key="entry.key">
-              <template v-if="entry.kind === 'group'">
-                <td class="py-2 pr-4 font-medium">
-                  <button
-                    type="button"
-                    class="inline-flex items-center gap-1 text-left text-foreground hover:text-primary"
-                    :aria-expanded="opened.has(entry.key)"
-                    @click="toggle(entry.key)"
-                  >
-                    <ChevronRight class="h-3.5 w-3.5 shrink-0 transition-transform" :class="opened.has(entry.key) ? 'rotate-90' : ''" />
-                    {{ groupTitle(entry.group) }}
+    <div class="grid gap-6 lg:grid-cols-2">
+      <section class="flex min-w-0 flex-col" aria-labelledby="run-inputs-heading">
+        <SectionHeading id="run-inputs-heading" title="Inputs" :icon="LogIn">
+          <template #actions>
+            <span v-if="inputSummary" class="text-xs tabular-nums text-muted-foreground">{{ inputSummary }}</span>
+            <Button variant="outline" size="sm" @click="emit('chain')"><GitBranch class="h-4 w-4" /> Full chain</Button>
+          </template>
+        </SectionHeading>
+        <div class="surface flex-1 overflow-hidden">
+          <p v-if="!inputList.length" class="px-5 py-4 text-sm text-muted-foreground">No declared inputs.</p>
+          <ul v-else class="divide-y divide-border-subtle">
+            <li v-for="entry in inputList" :key="entry.key">
+              <div v-if="entry.kind === 'group'" class="flex items-start gap-3 px-5 py-3">
+                <IconTile :icon="entry.group.database || entry.group.release ? Database : Folder" :tone="entry.group.database || entry.group.release ? 'royal' : 'muted'" size="sm" />
+                <span class="min-w-0 flex-1">
+                  <button type="button" class="flex items-center gap-1 text-left text-sm font-medium text-foreground hover:text-primary" :aria-expanded="opened.has(entry.key)" @click="toggle(entry.key)">
+                    <span class="break-words">{{ groupTitle(entry.group) }}</span>
+                    <ChevronRight class="h-3.5 w-3.5 shrink-0 transition-transform" :class="opened.has(entry.key) ? 'rotate-90' : ''" aria-hidden="true" />
                   </button>
-                </td>
-                <td v-if="stage.key === 'inputs'" class="py-2 pr-4 text-muted-foreground">
-                  {{ groupNote(entry.group) }}<template v-for="link in groupLinks(entry.group)" :key="link.href">, <ExternalLink :href="link.href" :label="link.label" /></template>
-                </td>
-                <td class="whitespace-nowrap py-2 text-right tabular-nums text-muted-foreground">
-                  {{ groupSize(entry.group) }}
-                </td>
-              </template>
-              <template v-else>
-                <td class="py-2 pr-4 font-medium" :class="entry.nested ? 'pl-5' : ''">
-                  <RouterLink
-                    v-if="entry.row.link.kind === 's3'"
-                    class="break-all text-primary hover:underline"
-                    :to="{ name: 'bucket', params: { bucketId: entry.row.link.bucketId }, query: entry.row.link.prefix ? { prefix: entry.row.link.prefix } : {} }"
-                    :title="entry.row.id"
-                  >{{ entry.label }}</RouterLink>
-                  <span v-else-if="entry.row.link.kind === 'drs'" class="inline-flex items-center gap-1.5">
-                    <a class="inline-flex items-center gap-1 break-all text-primary hover:underline" :href="entry.row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(entry.label, 24, 12) }} <ExternalLinkIcon class="h-3 w-3" /></a>
-                    <a class="text-muted-foreground hover:text-foreground" :href="entry.row.link.download" target="_blank" rel="noopener noreferrer" :aria-label="`Download ${entry.row.name}`"><Download class="h-3.5 w-3.5" /></a>
+                  <span class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                    <span v-if="groupNote(entry.group)">{{ groupNote(entry.group) }}</span>
+                    <ExternalLink v-for="link in groupLinks(entry.group)" :key="link.href" :href="link.href" :label="link.label" />
                   </span>
-                  <span v-else class="break-all" :title="entry.row.id">{{ entry.label }}</span>
-                </td>
-                <td v-if="stage.key === 'inputs'" class="py-2 pr-4 text-muted-foreground">{{ entry.nested ? '' : inputNote(entry.row) }}</td>
-                <td class="whitespace-nowrap py-2 text-right tabular-nums text-muted-foreground">{{ entry.row.size }}</td>
-              </template>
-            </tr>
-          </tbody>
-        </table>
-        <p v-if="stage.key === 'outputs' && savedTo" class="mt-3 text-xs text-muted-foreground">
-          Saved to
-          <RouterLink
-            class="font-mono text-primary hover:underline"
-            :to="{ name: 'bucket', params: { bucketId: savedTo.bucketId }, query: savedTo.prefix ? { prefix: savedTo.prefix } : {} }"
-          >{{ savedTo.bucketId }}/{{ savedTo.prefix ? `${savedTo.prefix}/` : '' }}</RouterLink>
-        </p>
+                </span>
+                <span class="shrink-0 text-xs tabular-nums text-muted-foreground">{{ groupSize(entry.group) }}</span>
+              </div>
+              <component
+                :is="entry.row.link.kind === 's3' ? RouterLink : 'div'"
+                v-else
+                v-bind="entry.row.link.kind === 's3' ? { to: folderRoute(entry.row.link) } : {}"
+                class="flex items-start gap-3 px-5 py-3"
+                :class="[entry.nested ? 'pl-16' : '', entry.row.link.kind === 's3' ? 'hover:bg-muted/40' : '']"
+                :title="entry.row.id"
+              >
+                <IconTile v-if="!entry.nested" :icon="FileIcon" tone="muted" size="sm" />
+                <span class="min-w-0 flex-1">
+                  <span class="flex min-w-0 items-center gap-2 text-sm font-medium text-foreground">
+                    <ObjectIcon v-if="entry.nested" :name="entry.label" class="h-4 w-4" />
+                    <span class="truncate">{{ entry.label }}</span>
+                  </span>
+                  <span v-if="!entry.nested && inputNote(entry.row)" class="mt-0.5 block text-xs text-muted-foreground">{{ inputNote(entry.row) }}</span>
+                  <span v-if="entry.row.link.kind === 'drs'" class="mt-0.5 flex items-center gap-2 text-xs">
+                    <a class="inline-flex items-center gap-1 text-primary hover:underline" :href="entry.row.link.object" target="_blank" rel="noopener noreferrer">Open the object <ExternalLinkIcon class="h-3 w-3" /></a>
+                    <a class="inline-flex items-center gap-1 text-primary hover:underline" :href="entry.row.link.download" target="_blank" rel="noopener noreferrer" :aria-label="`Download ${entry.row.name}`"><Download class="h-3 w-3" /> Download</a>
+                  </span>
+                </span>
+                <span class="shrink-0 text-xs tabular-nums text-muted-foreground">{{ entry.row.size }}</span>
+              </component>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="flex min-w-0 flex-col" aria-labelledby="run-results-heading">
+        <SectionHeading id="run-results-heading" title="Results" :icon="Files" />
+        <div class="surface flex flex-1 flex-col">
+          <p v-if="!run.outputs.length" class="px-5 py-4 text-sm text-muted-foreground">No results were captured.</p>
+          <template v-else>
+            <div class="flex items-start gap-3 px-5 py-4">
+              <IconTile :icon="Folder" tone="aqua" size="sm" />
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-foreground">
+                  {{ run.outputs.length }} {{ run.outputs.length === 1 ? 'file' : 'files' }}
+                  <span v-if="outputBytes" class="ml-2 text-xs font-normal tabular-nums text-muted-foreground">{{ outputBytes }}</span>
+                </p>
+                <RouterLink v-if="savedTo" :to="folderRoute(savedTo, run.runId)" class="break-all font-mono text-xs text-primary hover:underline">{{ savedTo.bucketId }}/{{ savedTo.prefix ? `${savedTo.prefix}/` : '' }}</RouterLink>
+                <p v-if="outputKinds" class="mt-0.5 text-xs text-muted-foreground">{{ outputKinds }}</p>
+              </div>
+            </div>
+            <ul class="divide-y divide-border-subtle border-t border-border-subtle">
+              <li v-for="entry in resultRows.slice(0, 5)" :key="entry.key">
+                <button v-if="entry.kind === 'group'" type="button" class="flex w-full items-center gap-2 px-5 py-2 text-left text-sm text-foreground hover:bg-muted/40" :aria-expanded="opened.has(entry.key)" @click="toggle(entry.key)">
+                  <ChevronRight class="h-3.5 w-3.5 shrink-0 transition-transform" :class="opened.has(entry.key) ? 'rotate-90' : ''" aria-hidden="true" />
+                  <span class="min-w-0 flex-1 truncate">{{ groupTitle(entry.group) }}</span>
+                  <span class="shrink-0 text-xs tabular-nums text-muted-foreground">{{ groupSize(entry.group) }}</span>
+                </button>
+                <component
+                  :is="entry.row.link.kind === 's3' ? RouterLink : entry.row.link.kind === 'drs' ? 'a' : 'div'"
+                  v-else
+                  v-bind="rowLink(entry.row.link)"
+                  class="flex items-center gap-2 px-5 py-2 text-sm"
+                  :class="[entry.nested ? 'pl-10' : '', entry.row.link.kind !== 'plain' ? 'hover:bg-muted/40' : '']"
+                  :title="entry.row.id"
+                >
+                  <ObjectIcon :name="entry.label" class="h-4 w-4" />
+                  <span class="min-w-0 flex-1 truncate text-foreground">{{ entry.label }}</span>
+                  <span class="shrink-0 text-xs tabular-nums text-muted-foreground">{{ entry.row.size }}</span>
+                </component>
+              </li>
+            </ul>
+            <div v-if="resultRows.length > 5 && savedTo" class="border-t border-border-subtle px-5 py-2.5">
+              <Button variant="outline" size="sm" as-child>
+                <RouterLink :to="folderRoute(savedTo, run.runId)"><FolderOpen class="h-4 w-4" /> Show all {{ run.outputs.length }} files</RouterLink>
+              </Button>
+            </div>
+          </template>
+        </div>
       </section>
     </div>
-    <section class="surface p-5">
-      <h2 class="mb-3 font-display text-sm font-semibold text-aruna-navy">What ran</h2>
-      <dl class="grid gap-x-8 gap-y-2 text-xs sm:grid-cols-[8rem_1fr]">
-        <template v-for="row in ranRows" :key="row.key">
-          <dt class="text-muted-foreground">{{ row.label }}</dt>
-          <dd :class="row.mono ? 'whitespace-pre-wrap break-all font-mono text-[11px]' : 'text-foreground'">
-            <ExternalLink v-if="row.key === 'tool' && run.instrument?.identifier && isHttpUrl(run.instrument.identifier)" :href="run.instrument.identifier" :label="row.value" />
-            <a v-else-if="row.key === 'image' && run.container?.url" :href="run.container.url" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-primary hover:underline">{{ row.value }} <ExternalLinkIcon class="h-3 w-3 shrink-0" /></a>
-            <template v-else>{{ row.value }}</template>
-          </dd>
+
+    <section aria-labelledby="run-ran-heading">
+      <SectionHeading id="run-ran-heading" title="What ran" :icon="Terminal">
+        <template v-if="tesEnabled && run.runId && shown('compute')" #actions>
+          <Button variant="outline" size="sm" as-child>
+            <RouterLink :to="{ name: 'task', params: { taskId: run.runId } }"><ExternalLinkIcon class="h-4 w-4" /> Open the run</RouterLink>
+          </Button>
         </template>
-        <template v-if="agentLabel">
-          <dt class="text-muted-foreground">Started by</dt>
-          <dd :title="run.agent?.identifier || run.agent?.id">
-            <RouterLink v-if="agentLink.kind === 'user'" class="text-primary hover:underline" :to="{ name: 'user', params: { id: agentLink.id } }">{{ agentLabel }}</RouterLink>
-            <ExternalLink v-else-if="agentLink.kind === 'external'" :href="agentLink.href" :label="agentLabel" />
-            <span v-else>{{ agentLabel }}</span><template v-if="startedAt">, {{ startedAt }}</template>
-          </dd>
-        </template>
-        <template v-if="run.workspaceBucket">
-          <dt class="text-muted-foreground">Workspace</dt>
-          <dd><RouterLink class="font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: run.workspaceBucket } }">{{ run.workspaceBucket }}</RouterLink></dd>
-        </template>
-        <template v-if="tesEnabled && run.runId && shown('compute')">
-          <dt class="text-muted-foreground">Run</dt>
-          <dd><RouterLink class="text-primary hover:underline" :to="{ name: 'task', params: { taskId: run.runId } }">Open the run</RouterLink></dd>
-        </template>
-      </dl>
-      <p v-if="!ranRows.length && !agentLabel" class="text-xs text-muted-foreground">No details of the run were recorded.</p>
+      </SectionHeading>
+      <div class="surface space-y-5 p-5">
+        <DetailList :items="ranItems">
+          <template #tool="{ item }">
+            <ExternalLink v-if="run.instrument?.identifier && isHttpUrl(run.instrument.identifier)" :href="run.instrument.identifier" :label="item.value" />
+            <template v-else>{{ item.value }}</template>
+          </template>
+          <template #where>
+            <RouterLink v-if="run.site?.nodeId" :to="{ name: 'node', params: { nodeId: run.site.nodeId } }" class="text-primary hover:underline">{{ displayName(run.site.nodeId) }}</RouterLink>
+            <span v-if="run.site?.kind" class="block text-xs text-muted-foreground">{{ run.site.kind }}</span>
+            <span v-if="run.site?.reason" class="block text-xs text-muted-foreground">{{ run.site.reason }}</span>
+          </template>
+          <template #image="{ item }">
+            <a v-if="run.container?.url" :href="run.container.url" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-primary hover:underline">{{ item.value }} <ExternalLinkIcon class="h-3 w-3 shrink-0" /></a>
+            <template v-else>{{ item.value }}</template>
+          </template>
+          <template #agent>
+            <span :title="run.agent?.identifier || run.agent?.id">
+              <RouterLink v-if="agentLink.kind === 'user'" class="text-primary hover:underline" :to="{ name: 'user', params: { id: agentLink.id } }">{{ agentLabel }}</RouterLink>
+              <ExternalLink v-else-if="agentLink.kind === 'external'" :href="agentLink.href" :label="agentLabel" />
+              <template v-else>{{ agentLabel }}</template>
+            </span>
+            <span v-if="startedAt" class="block text-xs tabular-nums text-muted-foreground">{{ startedAt }}</span>
+          </template>
+          <template #workspace="{ item }">
+            <RouterLink class="text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: item.value } }">{{ item.value }}</RouterLink>
+          </template>
+          <template #record="{ item }">
+            <span class="inline-flex max-w-full items-center gap-1"><span class="truncate">{{ item.value }}</span><CopyButton :value="item.value" label="Copy the record id" /></span>
+          </template>
+          <template #api="{ item }">
+            <span class="inline-flex max-w-full items-center gap-1"><span class="break-all">{{ item.value }}</span><CopyButton :value="item.value" label="Copy the API address" /></span>
+          </template>
+        </DetailList>
+        <div v-if="run.command">
+          <p class="type-label">Command</p>
+          <div class="relative mt-1 whitespace-pre-wrap break-words rounded-md bg-muted px-3 py-2.5 pr-11 font-mono text-[12.5px] leading-5 text-foreground">{{ run.command }}<CopyButton :value="run.command" label="Copy the command" class="absolute right-1.5 top-1.5" /></div>
+        </div>
+        <p v-if="!ranItems.length && !run.command" class="text-xs text-muted-foreground">No details of the run were recorded.</p>
+        <slot />
+      </div>
     </section>
   </div>
 </template>

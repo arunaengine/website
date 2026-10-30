@@ -44,6 +44,7 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import DataEntityDialog from '@/components/metadata/DataEntityDialog.vue'
 import { computed, nextTick, ref, watch } from 'vue'
+import { createReusableTemplate } from '@vueuse/core'
 import { useRouter, RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useDatasetView } from '@/composables/useDatasetView'
@@ -62,6 +63,8 @@ import { errorMessage, isHttpUrl, relativeTime, truncateMiddle } from '@/lib/uti
 import { ArrowLeft, Clock, Code2, Container, GitBranch, History as HistoryIcon, LayoutDashboard, Scale, Server, Timer, Users } from '@lucide/vue'
 
 const router = useRouter()
+// The developer details sit inside a run record's What ran card and below any other dataset.
+const [DefineDevelopers, ReuseDevelopers] = createReusableTemplate()
 const { currentUser, saving, deleteMetadataDocument, fullCrates, sessionEpoch, myGroups } = useAruna()
 // The breadcrumb names a group the reader belongs to; another group keeps its short id.
 const groupLabel = (id: string) => myGroups.value.find((group) => group.id === id)?.name ?? truncateMiddle(id)
@@ -242,6 +245,80 @@ function jumpTo(entityId: string) {
 </script>
 
 <template>
+  <!-- Id, persistent link, Git, SPARQL, storage, graph and the raw crate, folded away. -->
+  <DefineDevelopers>
+    <details
+      :class="runProvenance ? '-mx-5 -mb-5 border-t border-border-subtle' : 'surface overflow-hidden'"
+      :open="developersOpen"
+      @toggle="developersOpen = ($event.target as HTMLDetailsElement).open"
+    >
+      <summary class="flex cursor-pointer items-center gap-2 px-5 py-3.5 text-sm font-medium text-foreground">
+        <Code2 class="h-4 w-4 text-primary" /> For developers
+      </summary>
+      <div class="space-y-4 border-t border-border p-5">
+        <p class="flex items-center gap-2 text-xs">
+          <span class="text-muted-foreground">Id</span>
+          <span class="font-mono">{{ detailId }}</span>
+          <CopyButton :value="detailId" label="Copy the dataset id" />
+        </p>
+        <PersistentIdSection
+          v-if="fetchedSummary"
+          ref="pidSection"
+          :document-id="detailId"
+          :is-public="fetchedSummary.public"
+          :links="repositoryList"
+        />
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 class="text-sm font-medium text-foreground">Query this dataset</h3>
+            <p class="mt-1 text-xs text-muted-foreground">Open the SPARQL workbench with this dataset fixed.</p>
+          </div>
+          <Button variant="outline" size="sm" as-child>
+            <RouterLink :to="{ name: 'datasets', query: { expert: '1', document: detailId } }"><Code2 class="h-3.5 w-3.5" /> Query this dataset</RouterLink>
+          </Button>
+        </div>
+        <DatasetGitRow v-if="currentUser" :document-id="detailId" :group-id="fetchedSummary?.group_id" :changed="changedStorage" />
+        <DatasetStorageRow
+          v-if="currentUser && fetchedSummary"
+          :document-id="detailId"
+          :group-id="fetchedSummary.group_id"
+          :can-write="canWrite"
+          @changed="(value: StorageLocation) => (changedStorage = value)"
+        />
+        <template v-if="runProvenance">
+          <DetailsSection
+            :fields="presentation.fields"
+            :loading="loadingCrate"
+            :preparing="Boolean(cratePending[detailId])"
+            :not-ready="crateNotReady"
+            :error="crateError"
+            @retry="fetchCrate(detailId)"
+            @jump="jumpEntity"
+          />
+          <PeopleSection
+            :people="presentation.people"
+            :organizations="presentation.organizations"
+            :highlight-id="highlightId"
+            @jump="jumpEntity"
+          />
+          <ContextSection
+            :entities="presentation.entities"
+            :comments="presentation.comments"
+            :highlight-id="highlightId"
+            @jump="jumpEntity"
+          />
+        </template>
+        <DatasetGraph v-if="developersOpen" :state="state" @open="openInfo" />
+        <CrateImportExport
+          ref="crateSection"
+          :crate="currentCrate"
+          :document-id="detailId"
+          :can-import="canWrite"
+          @imported="onSaved"
+        />
+      </div>
+    </details>
+  </DefineDevelopers>
   <div>
     <PageHeader
       :title="pageTitle"
@@ -348,9 +425,13 @@ function jumpTo(entityId: string) {
           </div>
           <AuthorChips v-if="!runProvenance" :crate="currentCrate" />
 
-          <RunProvenancePanel v-if="runProvenance" :run="runProvenance" />
+          <!-- A run record keeps its developer details inside What ran; no card of their own. -->
+          <RunProvenancePanel v-if="runProvenance" :run="runProvenance" :document-id="detailId" :published="current?.createdAt" @chain="tab = 'provenance'">
+            <ReuseDevelopers />
+          </RunProvenancePanel>
 
           <DetailsSection
+            v-if="!runProvenance"
             :fields="presentation.fields"
             :loading="loadingCrate"
             :preparing="Boolean(cratePending[detailId])"
@@ -390,70 +471,7 @@ function jumpTo(entityId: string) {
 
         </template>
 
-        <!-- Id, persistent link, Git, SPARQL, storage, graph and the raw crate, folded away. -->
-        <details
-          v-show="tab === 'overview'"
-          class="surface overflow-hidden"
-          :open="developersOpen"
-          @toggle="developersOpen = ($event.target as HTMLDetailsElement).open"
-        >
-          <summary class="flex cursor-pointer items-center gap-2 px-5 py-3.5 text-sm font-medium text-foreground">
-            <Code2 class="h-4 w-4 text-primary" /> For developers
-          </summary>
-          <div class="space-y-4 border-t border-border p-5">
-            <p class="flex items-center gap-2 text-xs">
-              <span class="text-muted-foreground">Id</span>
-              <span class="font-mono">{{ detailId }}</span>
-              <CopyButton :value="detailId" label="Copy the dataset id" />
-            </p>
-            <PersistentIdSection
-              v-if="fetchedSummary"
-              ref="pidSection"
-              :document-id="detailId"
-              :is-public="fetchedSummary.public"
-              :links="repositoryList"
-            />
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 class="text-sm font-medium text-foreground">Query this dataset</h3>
-                <p class="mt-1 text-xs text-muted-foreground">Open the SPARQL workbench with this dataset fixed.</p>
-              </div>
-              <Button variant="outline" size="sm" as-child>
-                <RouterLink :to="{ name: 'datasets', query: { expert: '1', document: detailId } }"><Code2 class="h-3.5 w-3.5" /> Query this dataset</RouterLink>
-              </Button>
-            </div>
-            <DatasetGitRow v-if="currentUser" :document-id="detailId" :group-id="fetchedSummary?.group_id" :changed="changedStorage" />
-            <DatasetStorageRow
-              v-if="currentUser && fetchedSummary"
-              :document-id="detailId"
-              :group-id="fetchedSummary.group_id"
-              :can-write="canWrite"
-              @changed="(value: StorageLocation) => (changedStorage = value)"
-            />
-            <template v-if="runProvenance">
-              <PeopleSection
-                :people="presentation.people"
-                :organizations="presentation.organizations"
-                :highlight-id="highlightId"
-                @jump="jumpEntity"
-              />
-              <ContextSection
-                :entities="presentation.entities"
-                :comments="presentation.comments"
-                :highlight-id="highlightId"
-                @jump="jumpEntity"
-              />
-            </template>
-            <DatasetGraph v-if="developersOpen" :state="state" @open="openInfo" />
-            <CrateImportExport
-              ref="crateSection"
-              :crate="currentCrate"
-              :document-id="detailId"
-              :can-import="canWrite"
-              @imported="onSaved"
-            />
-          </div>
-        </details>
+        <ReuseDevelopers v-if="!runProvenance && tab === 'overview'" />
       </template>
 
       <EmptyState
