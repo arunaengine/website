@@ -174,6 +174,19 @@ describe('RunProvenancePanel grouped files', () => {
     mounted.app.unmount()
   })
 
+  it('shows every result on request when they lie in several folders', async () => {
+    const outputs = Array.from({ length: 8 }, (_, index) => stored('laptop', `results/part-${index % 2}/file-${index}.tsv`, '100'))
+    const mounted = await mountApp(RunProvenancePanel, { props: { run: { inputs: [], outputs } } })
+    expect(content(mounted.root)).not.toContain('file-7.tsv')
+
+    const more = nodes(mounted.root).find((node) => node.tag === 'button' && content(node).includes('Show all 8 files'))!
+    ;(more.props.onClick as () => void)()
+    await VueRuntime.nextTick()
+    expect(content(mounted.root)).toContain('file-7.tsv')
+    expect(content(mounted.root)).not.toContain('Show all 8 files')
+    mounted.app.unmount()
+  })
+
   it('names a device without a name of its own in plain words', async () => {
     const inputs = [stored('laptop', 'my-genome/genome.fasta', '4900000', { device: 'device-9', name: 'work/in/genome.fasta' })]
     const mounted = await mountApp(RunProvenancePanel, { props: { run: { inputs, outputs: [] } } })

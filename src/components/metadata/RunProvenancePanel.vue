@@ -21,7 +21,7 @@ import { isArunaUserId } from '@/lib/identifiers'
 import { groupFiles, type FileGroup } from '@/lib/fileGroups'
 import type { RunCrateFileRef, RunCrateModel } from '@/lib/runCrate'
 import { formatBytes, isHttpUrl, shortUserId } from '@/lib/utils'
-import { ChevronRight, Database, Download, ExternalLink as ExternalLinkIcon, File as FileIcon, Files, Folder, FolderOpen, GitBranch, LogIn, Terminal } from '@lucide/vue'
+import { ChevronDown, ChevronRight, Database, Download, ExternalLink as ExternalLinkIcon, File as FileIcon, Files, Folder, GitBranch, LogIn, Terminal } from '@lucide/vue'
 
 // `documentId`: the record's id, named with its API address; `published`: when the record was made.
 const props = defineProps<{ run: RunCrateModel; documentId?: string; published?: string }>()
@@ -189,6 +189,8 @@ function inputNote(row: FileRow): string {
 
 // One row per database or crowded folder, opened to its files on request.
 const opened = ref(new Set<string>())
+// The results list shows five rows until all are asked for, wherever they were saved.
+const allResults = ref(false)
 function toggle(key: string) {
   const next = new Set(opened.value)
   if (!next.delete(key)) next.add(key)
@@ -328,7 +330,7 @@ function groupSize(group: FileGroup): string {
               </div>
             </div>
             <ul class="divide-y divide-border-subtle border-t border-border-subtle">
-              <li v-for="entry in resultRows.slice(0, 5)" :key="entry.key">
+              <li v-for="entry in allResults ? resultRows : resultRows.slice(0, 5)" :key="entry.key">
                 <button v-if="entry.kind === 'group'" type="button" class="flex w-full items-center gap-2 px-5 py-2 text-left text-sm text-foreground hover:bg-muted/40" :aria-expanded="opened.has(entry.key)" @click="toggle(entry.key)">
                   <ChevronRight class="h-3.5 w-3.5 shrink-0 transition-transform" :class="opened.has(entry.key) ? 'rotate-90' : ''" aria-hidden="true" />
                   <span class="min-w-0 flex-1 truncate">{{ groupTitle(entry.group) }}</span>
@@ -348,10 +350,8 @@ function groupSize(group: FileGroup): string {
                 </component>
               </li>
             </ul>
-            <div v-if="resultRows.length > 5 && savedTo" class="border-t border-border-subtle px-5 py-2.5">
-              <Button variant="outline" size="sm" as-child>
-                <RouterLink :to="folderRoute(savedTo, run.runId)"><FolderOpen class="h-4 w-4" /> Show all {{ run.outputs.length }} files</RouterLink>
-              </Button>
+            <div v-if="resultRows.length > 5 && !allResults" class="border-t border-border-subtle px-5 py-2.5">
+              <Button variant="outline" size="sm" @click="allResults = true"><ChevronDown class="h-4 w-4" /> Show all {{ run.outputs.length }} files</Button>
             </div>
           </template>
         </div>
