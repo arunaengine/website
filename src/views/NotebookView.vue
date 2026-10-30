@@ -221,7 +221,7 @@ const savedLabel = computed(() => {
       sign-in-description="A notebook reads and writes stored data."
       :redirect-to="redirectTo"
     >
-      <div class="container space-y-6 py-6">
+      <div class="w-full px-4 sm:px-6 space-y-6 py-6">
         <Notice v-if="notebook.loadError.value" tone="error">{{ notebook.loadError.value }}</Notice>
         <Notice v-if="notebook.saveError.value" tone="error">{{ notebook.saveError.value }}</Notice>
 

@@ -172,7 +172,7 @@ const browserLink = computed(() => ({
       </template>
     </PageHeader>
 
-    <Tabs v-model="tab" class="container space-y-5 py-6">
+    <Tabs v-model="tab" class="w-full px-4 sm:px-6 space-y-5 py-6">
       <div class="overflow-x-auto">
         <TabsList aria-label="Bucket settings sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>

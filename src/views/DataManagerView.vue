@@ -356,7 +356,7 @@ async function createFolder() {
       </template>
     </PageHeader>
 
-    <div class="container space-y-6 py-8">
+    <div class="w-full px-4 sm:px-6 space-y-6 py-8">
       <DataViewSkeleton v-if="!bootstrapped" />
 
       <section v-else-if="mockOnly" class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">

@@ -50,7 +50,7 @@ function onEnrolled() {
       :docs="{ topic: 'realm-nodes-groups', section: 'Nodes and the realm' }"
     />
 
-    <div class="container space-y-5 py-5">
+    <div class="w-full px-4 sm:px-6 space-y-5 py-5">
       <EnrollPanel v-if="showEnroll" :invite="invite" @enrolled="onEnrolled" />
       <NodePanel />
       <LinkedFolders id="folders" />

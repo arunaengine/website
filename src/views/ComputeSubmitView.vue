@@ -218,7 +218,7 @@ async function run() {
       sign-in-description="Starting a run is an authenticated operation."
       redirect-to="/app/compute/new"
     >
-      <div class="container max-w-5xl space-y-4 py-8">
+      <div class="w-full px-4 sm:px-6 max-w-5xl space-y-4 py-8">
         <RerunPrefillNote
           :loading="rerunLoading"
           :error="rerunError"

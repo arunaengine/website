@@ -232,7 +232,7 @@ function glossaryLink(anchor: string) {
     </PageHeader>
 
     <!-- These pages document the portal; the node's REST surface has its own reference. -->
-    <div class="container pt-6">
+    <div class="w-full px-4 sm:px-6 pt-6">
       <div
         class="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-border bg-muted/40 px-4 py-2.5 text-xs leading-relaxed text-muted-foreground"
       >
@@ -251,7 +251,7 @@ function glossaryLink(anchor: string) {
     </div>
 
     <!-- A guide either narrates the real controls or offers the tutorial. -->
-    <div v-if="tour.length || tutorial" class="container pt-4">
+    <div v-if="tour.length || tutorial" class="w-full px-4 sm:px-6 pt-4">
       <div
         class="flex flex-wrap items-center gap-4 rounded-lg border border-primary/25 bg-gradient-to-r from-primary/10 via-primary/[0.04] to-transparent px-4 py-3.5"
       >
@@ -277,7 +277,7 @@ function glossaryLink(anchor: string) {
       </div>
     </div>
 
-    <div class="container py-6">
+    <div class="w-full px-4 sm:px-6 py-6">
       <div class="grid min-w-0 gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
         <nav class="surface h-fit p-3" aria-label="Docs topics">
           <RouterLink

@@ -28,14 +28,14 @@ function startSignIn() {
 </script>
 
 <template>
-  <div v-if="!enabled" class="container py-8">
+  <div v-if="!enabled" class="w-full px-4 sm:px-6 py-8">
     <EmptyState title="Compute is not enabled" :description="disabledDescription">
       <template #icon><Cpu class="h-7 w-7" /></template>
     </EmptyState>
   </div>
 
   <!-- A stored token is still resolving, so never flash the signed-out gate. -->
-  <div v-else-if="authPending" class="container py-8">
+  <div v-else-if="authPending" class="w-full px-4 sm:px-6 py-8">
     <section class="surface mx-auto max-w-xl space-y-3 p-8">
       <Skeleton class="mx-auto h-8 w-8 rounded-full" />
       <Skeleton class="mx-auto h-4 w-44" />
@@ -43,7 +43,7 @@ function startSignIn() {
     </section>
   </div>
 
-  <div v-else-if="!currentUser" class="container py-8">
+  <div v-else-if="!currentUser" class="w-full px-4 sm:px-6 py-8">
     <section class="surface mx-auto max-w-xl p-8 text-center">
       <Cpu class="mx-auto h-8 w-8 text-muted-foreground/70" />
       <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">{{ signInTitle }}</h2>

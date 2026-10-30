@@ -92,7 +92,7 @@ function jump(entityId: string) {
 <template>
   <!-- The mobile bottom bar owns the last 5rem of the viewport, as main's pb-20 does. -->
   <section class="sticky bottom-20 z-20 border-t border-border bg-background/95 backdrop-blur md:bottom-0">
-    <div v-if="expanded" class="container max-h-48 overflow-y-auto py-3 md:max-h-64">
+    <div v-if="expanded" class="w-full px-4 sm:px-6 max-h-48 overflow-y-auto py-3 md:max-h-64">
       <div v-for="group in groups" :key="group.entityId" class="border-b border-border py-2 last:border-0">
         <div class="flex items-center gap-3">
           <p class="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{{ group.name }}</p>
@@ -110,7 +110,7 @@ function jump(entityId: string) {
       </div>
     </div>
 
-    <div data-tutorial="dataset-issues" class="container flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+    <div data-tutorial="dataset-issues" class="w-full px-4 sm:px-6 flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
       <button
         type="button"
         class="flex flex-1 items-center gap-2 text-left text-xs font-medium text-foreground"

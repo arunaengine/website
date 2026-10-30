@@ -122,7 +122,7 @@ const bucketLink = (hit: BucketSearchHit) => ({
       </template>
     </PageHeader>
 
-    <div class="container space-y-5 py-6">
+    <div class="w-full px-4 sm:px-6 space-y-5 py-6">
       <EmptyState v-if="!node" title="This node is not in the realm's node list." />
       <template v-else>
         <section class="surface p-5" aria-label="Node facts">

@@ -7,7 +7,7 @@ const route = useRoute()
 </script>
 
 <template>
-  <div class="container flex min-h-[60vh] items-center justify-center py-16">
+  <div class="w-full px-4 sm:px-6 flex min-h-[60vh] items-center justify-center py-16">
     <div class="surface w-full max-w-lg p-8 text-center">
       <p class="font-display text-3xl font-bold tracking-tight text-aruna-navy">404: page not found</p>
       <p class="mt-3 text-sm text-muted-foreground">

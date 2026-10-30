@@ -70,7 +70,7 @@ function setTab(next: string) {
       sign-in-description="Runs and system jobs are scoped to your account."
       :redirect-to="route.fullPath"
     >
-      <div class="container py-8">
+      <div class="w-full px-4 sm:px-6 py-8">
         <LocalCompute v-if="desktop" class="mb-5" />
         <Tabs v-if="bothEnabled" :model-value="tab" @update:model-value="setTab">
           <TabsList>

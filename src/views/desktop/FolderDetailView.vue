@@ -346,7 +346,7 @@ const filesText = computed(() => {
       </template>
     </PageHeader>
 
-    <div class="container space-y-4 py-5">
+    <div class="w-full px-4 sm:px-6 space-y-4 py-5">
       <RefusalNote v-if="folder?.last_error" :message="folder.last_error" />
       <RefusalNote
         v-if="actionErrors.get(folderId) && actionErrors.get(folderId) !== folder?.last_error"

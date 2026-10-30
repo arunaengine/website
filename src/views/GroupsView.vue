@@ -176,12 +176,12 @@ const shellState = computed<'loading' | 'empty' | 'ready'>(() => {
       </template>
     </PageHeader>
 
-    <div v-if="!painted" class="container space-y-6 py-8">
+    <div v-if="!painted" class="w-full px-4 sm:px-6 space-y-6 py-8">
       <ListSkeleton header :rows="3" label="Loading groups" />
       <SectionSkeleton :lines="2" />
     </div>
 
-    <div v-else class="container space-y-6 py-8">
+    <div v-else class="w-full px-4 sm:px-6 space-y-6 py-8">
       <ListShell :state="shellState" :rows="3" :empty-title="emptyGroupsMessage">
         <template #icon><Users class="h-6 w-6" /></template>
         <template #empty-actions>

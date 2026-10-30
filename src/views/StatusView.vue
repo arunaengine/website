@@ -290,7 +290,7 @@ watch(
       </template>
     </PageHeader>
 
-    <div class="container space-y-6 py-8">
+    <div class="w-full px-4 sm:px-6 space-y-6 py-8">
       <template v-if="!painted">
         <SectionSkeleton :lines="3" />
         <SectionSkeleton :lines="2" />

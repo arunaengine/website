@@ -312,7 +312,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
       </template>
     </PageHeader>
 
-    <div v-if="!painted" class="container grid gap-6 py-8 lg:grid-cols-[360px_1fr]">
+    <div v-if="!painted" class="w-full px-4 sm:px-6 grid gap-6 py-8 lg:grid-cols-[360px_1fr]">
       <ListSkeleton :rows="5" label="Loading profiles" />
       <div class="space-y-5">
         <SectionSkeleton :header="false" :lines="3" :tiles="3" />
@@ -320,7 +320,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
       </div>
     </div>
 
-    <div v-else class="container grid gap-6 py-8 lg:grid-cols-[360px_1fr]">
+    <div v-else class="w-full px-4 sm:px-6 grid gap-6 py-8 lg:grid-cols-[360px_1fr]">
       <aside class="surface max-h-[80vh] overflow-y-auto scrollbar-thin">
         <ul v-if="visibleProfiles.length" class="divide-y divide-border">
           <li v-for="profile in visibleProfiles" :key="profile.id">

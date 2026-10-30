@@ -451,7 +451,7 @@ async function submit() {
       </template>
     </PageHeader>
 
-    <div class="container space-y-5 py-6">
+    <div class="w-full px-4 sm:px-6 space-y-5 py-6">
       <!-- First visit to a fresh create page: what a profile is, in three lines. -->
       <Notice v-if="showIntro" tone="info" class="flex flex-wrap items-start gap-x-3 gap-y-1 p-3">
         <div class="min-w-0 flex-1 space-y-0.5">

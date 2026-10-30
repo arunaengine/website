@@ -237,12 +237,12 @@ watch(
 
 <template>
   <div>
-    <div v-if="!bootstrapped" class="container space-y-3 py-8">
+    <div v-if="!bootstrapped" class="w-full px-4 sm:px-6 space-y-3 py-8">
       <Skeleton class="h-24" />
       <Skeleton class="h-40" />
     </div>
 
-    <div v-else class="container py-8">
+    <div v-else class="w-full px-4 sm:px-6 py-8">
       <p class="surface mb-6 px-5 py-3 text-sm text-muted-foreground">
         Compute administration controls execution admission and capacity signals, while record placement separately decides which nodes hold records and system jobs.
       </p>

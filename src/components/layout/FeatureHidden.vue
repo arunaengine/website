@@ -17,7 +17,7 @@ const hidden = computed(() => {
 </script>
 
 <template>
-  <div v-if="hidden" class="container pt-6">
+  <div v-if="hidden" class="w-full px-4 sm:px-6 pt-6">
     <Notice :title="`${hidden.label} is hidden`">
       <p>Turn it on in Settings to see it in the menu.</p>
       <Button size="sm" variant="outline" class="mt-2" @click="setChoice(hidden.key, true)">Show {{ hidden.label }}</Button>

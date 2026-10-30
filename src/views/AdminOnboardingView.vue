@@ -342,13 +342,13 @@ const secretRows = computed<SecretRow[]>(() =>
     </PageHeader>
 
     <!-- Gate 1: still bootstrapping -->
-    <div v-if="!bootstrapped" class="container max-w-[1100px] space-y-4 py-8">
+    <div v-if="!bootstrapped" class="w-full px-4 sm:px-6 max-w-[1100px] space-y-4 py-8">
       <Skeleton class="h-24 w-full" />
       <Skeleton class="h-64 w-full" />
     </div>
 
     <!-- Gate 2: not a realm admin with the onboarding permission -->
-    <div v-else-if="!currentUser || !canManageOnboarding" class="container max-w-[1400px] py-8">
+    <div v-else-if="!currentUser || !canManageOnboarding" class="w-full px-4 sm:px-6 py-8">
       <section class="surface mx-auto max-w-xl p-8 text-center">
         <ShieldCheck class="mx-auto h-8 w-8 text-muted-foreground/70" />
         <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">Realm admin access required</h2>
@@ -363,7 +363,7 @@ const secretRows = computed<SecretRow[]>(() =>
     </div>
 
     <!-- Gated content: wizard + outstanding secrets -->
-    <div v-else class="container max-w-[1100px] space-y-6 py-8">
+    <div v-else class="w-full px-4 sm:px-6 max-w-[1100px] space-y-6 py-8">
       <section class="surface">
         <div class="border-b border-border px-5 py-4">
           <WizardSteps :steps="wizardSteps" :current="currentStep" />

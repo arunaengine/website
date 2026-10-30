@@ -258,12 +258,12 @@ watch(
 
 <template>
   <div>
-    <div v-if="!bootstrapped" class="container space-y-3 py-8">
+    <div v-if="!bootstrapped" class="w-full px-4 sm:px-6 space-y-3 py-8">
       <Skeleton class="h-24" />
       <Skeleton class="h-40" />
     </div>
 
-    <div v-else-if="!placementAdminEnabled" class="container py-8">
+    <div v-else-if="!placementAdminEnabled" class="w-full px-4 sm:px-6 py-8">
       <section class="surface mx-auto max-w-xl p-8">
         <EmptyState
           title="Record placement is not enabled on this portal"
@@ -274,7 +274,7 @@ watch(
       </section>
     </div>
 
-    <div v-else class="container space-y-5 py-6">
+    <div v-else class="w-full px-4 sm:px-6 space-y-5 py-6">
       <div class="surface flex flex-wrap items-center justify-between gap-3 px-5 py-4">
         <p class="max-w-3xl text-sm text-muted-foreground">
           Record placement decides which nodes hold dataset records and system jobs. It never

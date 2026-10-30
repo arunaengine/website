@@ -284,7 +284,7 @@ const pageDescription = computed(() =>
       </template>
     </PageHeader>
 
-    <div class="container space-y-5 py-6">
+    <div class="w-full px-4 sm:px-6 space-y-5 py-6">
       <div v-if="!painted" class="space-y-5" aria-busy="true">
         <span class="sr-only">Loading dashboard</span>
         <Skeleton class="h-44 w-full" />

@@ -182,7 +182,7 @@ onUnmounted(exitTutorial)
 
 <template>
   <div>
-    <div class="container pt-6">
+    <div class="w-full px-4 sm:px-6 pt-6">
       <Notice tone="info" data-tutorial="run-progress">
         <span class="font-medium">Tutorial:</span>
         this is a practice run against made-up data. Nothing is created, and no request leaves your browser.

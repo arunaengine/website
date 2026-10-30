@@ -91,7 +91,7 @@ const askPrompt = computed(() =>
       </template>
     </PageHeader>
 
-    <div class="container space-y-6 py-8">
+    <div class="w-full px-4 sm:px-6 space-y-6 py-8">
       <template v-if="!expertMode">
         <DatasetSearch
           ref="searchBox"

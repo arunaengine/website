@@ -768,17 +768,17 @@ async function save(anyway = false) {
       </template>
     </PageHeader>
 
-    <div v-if="loading" class="container space-y-3 py-6">
+    <div v-if="loading" class="w-full px-4 sm:px-6 space-y-3 py-6">
       <Skeleton class="h-40" />
       <Skeleton class="h-64" />
     </div>
-    <div v-else-if="loadError" class="container py-6">
+    <div v-else-if="loadError" class="w-full px-4 sm:px-6 py-6">
       <ErrorPanel :message="loadError" @retry="load" />
     </div>
 
     <template v-else>
       <div class="@container">
-        <div class="container flex flex-col gap-4 py-6 @min-[60rem]:flex-row @min-[60rem]:items-start @min-[60rem]:gap-5">
+        <div class="w-full px-4 sm:px-6 flex flex-col gap-4 py-6 @min-[60rem]:flex-row @min-[60rem]:items-start @min-[60rem]:gap-5">
           <EntityBrowser
             :draft="draft"
             :vocab="vocab"

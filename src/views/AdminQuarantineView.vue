@@ -255,12 +255,12 @@ async function runPrunePass() {
       </template>
     </PageHeader>
 
-    <div v-if="!bootstrapped" class="container space-y-3 py-8">
+    <div v-if="!bootstrapped" class="w-full px-4 sm:px-6 space-y-3 py-8">
       <Skeleton class="h-24" />
       <Skeleton class="h-64" />
     </div>
 
-    <div v-else-if="!ready" class="container py-8">
+    <div v-else-if="!ready" class="w-full px-4 sm:px-6 py-8">
       <section class="surface mx-auto max-w-xl p-8 text-center">
         <ShieldCheck class="mx-auto h-8 w-8 text-muted-foreground/70" />
         <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">Realm admin access required</h2>
@@ -274,7 +274,7 @@ async function runPrunePass() {
       </section>
     </div>
 
-    <div v-else class="container py-8">
+    <div v-else class="w-full px-4 sm:px-6 py-8">
       <section class="surface">
         <header class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div class="flex items-center gap-2">

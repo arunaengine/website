@@ -55,7 +55,7 @@ const askPrompt = computed(() =>
       </template>
     </PageHeader>
 
-    <div class="container py-8">
+    <div class="w-full px-4 sm:px-6 py-8">
       <div v-if="loading" class="space-y-3">
         <Skeleton class="h-20" />
         <Skeleton class="h-32" />

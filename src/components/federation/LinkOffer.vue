@@ -31,7 +31,7 @@ function linkHere() {
 </script>
 
 <template>
-  <div v-if="offer" class="container mt-4">
+  <div v-if="offer" class="w-full px-4 sm:px-6 mt-4">
   <section class="surface flex flex-wrap items-center gap-4 border-primary/40 px-5 py-4" aria-labelledby="link-offer-title">
     <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Link2 class="h-4 w-4" /></span>
     <div class="min-w-0 flex-1">

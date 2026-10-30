@@ -23,7 +23,7 @@ function toWelcome(): void {
 </script>
 
 <template>
-  <div class="container flex justify-center py-16">
+  <div class="w-full px-4 sm:px-6 flex justify-center py-16">
     <section class="surface relative w-full max-w-lg overflow-hidden p-6" aria-live="polite">
       <div
         aria-hidden="true"

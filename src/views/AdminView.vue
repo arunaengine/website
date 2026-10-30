@@ -239,7 +239,7 @@ async function save() {
 
     <!-- Session restore in flight: the admin role is unknown until the user
          profile resolves, never flash the access-required gate. -->
-    <div v-if="authPending" class="container py-8">
+    <div v-if="authPending" class="w-full px-4 sm:px-6 py-8">
       <section class="surface mx-auto max-w-xl space-y-3 p-8">
         <Skeleton class="mx-auto h-8 w-8 rounded-full" />
         <Skeleton class="mx-auto h-4 w-44" />
@@ -247,7 +247,7 @@ async function save() {
       </section>
     </div>
 
-    <div v-else-if="!isRealmAdmin" class="container py-8">
+    <div v-else-if="!isRealmAdmin" class="w-full px-4 sm:px-6 py-8">
       <section class="surface mx-auto max-w-xl p-8 text-center">
         <ShieldCheck class="mx-auto h-8 w-8 text-muted-foreground/70" />
         <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">Realm admin access required</h2>
@@ -262,7 +262,7 @@ async function save() {
     </div>
 
     <Tabs v-else v-model="tab">
-      <div class="container pt-6">
+      <div class="w-full px-4 sm:px-6 pt-6">
         <TabsList aria-label="Realm administration sections" class="h-auto flex-wrap justify-start">
           <TabsTrigger v-for="entry in tabs" :key="entry.id" :value="entry.id">
             {{ entry.label }}
@@ -276,16 +276,16 @@ async function save() {
 
       <TabsContent v-if="placementAdminEnabled" value="data-placement" class="mt-0"><DataPlacementPanel /></TabsContent>
 
-      <TabsContent v-if="policiesEnabled" value="policies" class="container mt-0 space-y-8 py-8">
+      <TabsContent v-if="policiesEnabled" value="policies" class="w-full px-4 sm:px-6 mt-0 space-y-8 py-8">
         <PoliciesSection scope="realm" :can-admin="isRealmAdmin" />
         <EffectivePolicies />
       </TabsContent>
 
-      <TabsContent value="federation" class="container mt-0 py-8"><FederationSettings /></TabsContent>
+      <TabsContent value="federation" class="w-full px-4 sm:px-6 mt-0 py-8"><FederationSettings /></TabsContent>
 
-      <TabsContent value="portal-features" class="container mt-0 py-8"><FeatureDefaults /></TabsContent>
+      <TabsContent value="portal-features" class="w-full px-4 sm:px-6 mt-0 py-8"><FeatureDefaults /></TabsContent>
 
-      <TabsContent value="realm" class="container mt-0 grid gap-6 py-8 lg:grid-cols-[260px_1fr]">
+      <TabsContent value="realm" class="w-full px-4 sm:px-6 mt-0 grid gap-6 py-8 lg:grid-cols-[260px_1fr]">
       <nav class="flex flex-col gap-1 text-sm lg:sticky lg:top-20 lg:self-start">
         <a href="#usage" class="rounded-md px-3 py-2 font-medium text-primary bg-primary/5">Realm usage</a>
         <a href="#policy" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Quota policy</a>

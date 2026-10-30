@@ -120,14 +120,14 @@ onUnmounted(endSession)
 
 <template>
   <div>
-    <div class="container pt-6">
+    <div class="w-full px-4 sm:px-6 pt-6">
       <Notice tone="info">
         <span class="font-medium">Tutorial:</span>
         this is a practice profile on made-up rules. Nothing is created, and no request leaves your browser.
       </Notice>
     </div>
 
-    <div v-if="stage === 'saved'" class="container py-8">
+    <div v-if="stage === 'saved'" class="w-full px-4 sm:px-6 py-8">
       <div data-tutorial="tutorial-done" class="surface space-y-2 p-5">
         <h2 class="font-display text-sm font-semibold text-aruna-navy">The dataset was accepted</h2>
         <p class="text-sm text-muted-foreground">

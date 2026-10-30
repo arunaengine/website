@@ -248,7 +248,7 @@ const createGroupOpen = ref(false)
     </PageHeader>
 
     <Tabs v-model="tab">
-      <div class="container pt-6">
+      <div class="w-full px-4 sm:px-6 pt-6">
         <TabsList aria-label="Settings sections" class="h-auto flex-wrap justify-start">
           <TabsTrigger
             v-for="entry in settingsTabs"
@@ -261,13 +261,13 @@ const createGroupOpen = ref(false)
         </TabsList>
       </div>
 
-      <div v-if="!painted" class="container space-y-5 py-6">
+      <div v-if="!painted" class="w-full px-4 sm:px-6 space-y-5 py-6">
         <SectionSkeleton :lines="4" />
         <SectionSkeleton :lines="3" />
       </div>
 
       <template v-else>
-      <TabsContent value="access" class="container mt-0 min-w-0 space-y-5 py-6">
+      <TabsContent value="access" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-5 py-6">
         <ConnectTools v-if="desktop" />
         <section v-if="authPending || !isAuthenticated" class="surface">
           <!-- While the stored session restores, show a placeholder instead of
@@ -358,13 +358,13 @@ const createGroupOpen = ref(false)
 
       </TabsContent>
 
-      <TabsContent value="devices" class="container mt-0 min-w-0 space-y-5 py-6">
+      <TabsContent value="devices" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-5 py-6">
         <section class="surface overflow-hidden">
           <DevicesPanel />
         </section>
       </TabsContent>
 
-      <TabsContent value="profile" class="container mt-0 min-w-0 space-y-5 py-6">
+      <TabsContent value="profile" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-5 py-6">
         <LinkAccount />
         <section class="surface">
           <header class="border-b border-border px-5 py-4">
@@ -425,7 +425,7 @@ const createGroupOpen = ref(false)
         <LinkedLogins />
       </TabsContent>
 
-      <TabsContent value="groups" class="container mt-0 min-w-0 space-y-5 py-6">
+      <TabsContent value="groups" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-5 py-6">
         <section class="surface overflow-hidden">
           <header class="flex items-center justify-between border-b border-border px-5 py-4">
             <div class="flex items-center gap-2"><h3 class="font-display text-sm font-semibold text-aruna-navy">Groups &amp; roles</h3><Badge variant="outline" class="tabular-nums">{{ myGroups.length }} groups</Badge></div>
@@ -465,16 +465,16 @@ const createGroupOpen = ref(false)
         </section>
       </TabsContent>
 
-      <TabsContent value="assistant" class="container mt-0 min-w-0 space-y-5 py-6">
+      <TabsContent value="assistant" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-5 py-6">
         <AssistantProviders />
         <McpConnect />
       </TabsContent>
 
-      <TabsContent value="keys" class="container mt-0 min-w-0 space-y-5 py-6">
+      <TabsContent value="keys" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-5 py-6">
         <VaultSettings />
       </TabsContent>
 
-      <TabsContent value="appearance" class="container mt-0 min-w-0 space-y-5 py-6">
+      <TabsContent value="appearance" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-5 py-6">
         <section class="surface">
           <header class="flex items-center justify-between border-b border-border px-5 py-4"><div class="flex items-center gap-2"><Palette class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Appearance</h3></div></header>
           <div class="grid gap-3 p-5 md:grid-cols-3">

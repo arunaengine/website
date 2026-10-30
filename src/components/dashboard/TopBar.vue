@@ -89,7 +89,7 @@ async function handleSignOut() {
 
 <template>
   <div class="sticky top-0 z-30 border-b border-border/80 bg-background/90 backdrop-blur-xl">
-    <div class="container flex h-14 items-center gap-1 min-[480px]:gap-3">
+    <div class="w-full px-4 sm:px-6 flex h-14 items-center gap-1 min-[480px]:gap-3">
       <!-- The device plate: this computer's node. The switcher after it shows the realm. -->
       <RouterLink
         v-if="desktop"
