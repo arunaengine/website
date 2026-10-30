@@ -4,6 +4,9 @@ import { RouterLink } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
+import StatusMark from '@/components/ui/StatusMark.vue'
+import StatusPill from '@/components/ui/StatusPill.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -241,15 +244,13 @@ async function runPrunePass() {
   <div>
     <PageHeader
       title="Sync quarantine"
-      description="Replicated sync events this node rejected, retained as evidence for review."
+      :crumbs="[{ label: 'Admin', to: { name: 'admin' } }, { label: 'Sync quarantine' }]"
+      description="Replicated sync events this node rejected, kept as evidence for review."
       :docs="{ topic: 'where-data-lives', section: 'Syncs' }"
     >
       <template #actions>
-        <Button variant="outline" size="sm" as-child>
-          <RouterLink :to="{ name: 'admin' }">Admin</RouterLink>
-        </Button>
-        <RefreshButton :busy="spinning" :disabled="!ready" @click="onRefresh" />
-        <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="!ready" @click="openPrune">
+        <RefreshButton :busy="spinning" :disabled="!ready" size="default" @click="onRefresh" />
+        <Button variant="outline" class="text-destructive hover:text-destructive" :disabled="!ready" @click="openPrune">
           <Trash2 class="h-4 w-4" /> Prune acknowledged
         </Button>
       </template>
@@ -274,18 +275,15 @@ async function runPrunePass() {
       </section>
     </div>
 
-    <div v-else class="w-full px-4 sm:px-6 py-8">
-      <section class="surface">
-        <header class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-          <div class="flex items-center gap-2">
-            <ShieldAlert class="h-4 w-4 text-primary" />
-            <h3 class="font-display text-sm font-semibold text-aruna-navy">Quarantined events</h3>
-            <Badge v-if="usage" variant="outline" class="tabular-nums">
-              {{ formatNumber(usage.records) }} / {{ formatNumber(usage.max_records) }} records ·
-              {{ formatBytes(usage.bytes) }} / {{ formatBytes(usage.max_bytes) }}
-            </Badge>
-          </div>
-          <div class="w-full sm:max-w-xs">
+    <div v-else class="w-full px-4 py-6 sm:px-6">
+      <section aria-labelledby="quarantine-heading">
+        <SectionHeading id="quarantine-heading" title="Quarantined events" :icon="ShieldAlert">
+          <template #actions>
+            <span v-if="usage" class="flex flex-wrap items-center gap-x-4 text-sm tabular-nums text-muted-foreground">
+              <span><b class="font-medium text-foreground">{{ formatNumber(usage.records) }}</b> of {{ formatNumber(usage.max_records) }} records</span>
+              <span><b class="font-medium text-foreground">{{ formatBytes(usage.bytes) }}</b> of {{ formatBytes(usage.max_bytes) }}</span>
+            </span>
+          <div class="w-full sm:w-64">
             <label for="quarantine-topic-filter" class="sr-only">Filter by hex sync topic</label>
             <Input
               id="quarantine-topic-filter"
@@ -294,11 +292,13 @@ async function runPrunePass() {
               placeholder="Filter by hex sync topic"
               class="font-mono"
             />
-            <p v-if="topicInvalid" class="mt-1 text-[11px] text-amber-700 dark:text-amber-300">
+            <p v-if="topicInvalid" class="mt-1 text-xs text-amber-700 dark:text-amber-300">
               Topics are even-length hex strings; the filter is not applied.
             </p>
           </div>
-        </header>
+          </template>
+        </SectionHeading>
+        <div class="surface overflow-hidden">
 
         <p v-if="ackError" class="border-b border-border bg-destructive/5 px-5 py-2 text-xs text-destructive">
           Acknowledge failed: {{ ackError }}
@@ -325,10 +325,10 @@ async function runPrunePass() {
         </EmptyState>
 
         <div v-else class="overflow-x-auto">
-          <table class="w-full text-sm">
+          <table class="data-table">
             <caption class="sr-only">Quarantined sync events</caption>
             <thead>
-              <tr class="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+              <tr>
                 <th scope="col" class="px-5 py-2.5 font-medium">Family</th>
                 <th scope="col" class="px-5 py-2.5 font-medium">Target</th>
                 <th scope="col" class="px-5 py-2.5 font-medium">Origin</th>
@@ -364,8 +364,8 @@ async function runPrunePass() {
                   {{ quarantinedAt(record) }}
                 </td>
                 <td class="px-5 py-3">
-                  <Badge v-if="record.acknowledged" variant="success">Acknowledged</Badge>
-                  <Badge v-else variant="warn">Unreviewed</Badge>
+                  <span v-if="record.acknowledged" class="inline-flex items-center gap-1.5 text-muted-foreground"><StatusMark label="Acknowledged" size="sm" />Acknowledged</span>
+                  <StatusPill v-else state="Unreviewed" tone="attention" />
                 </td>
                 <td class="px-5 py-3 text-right">
                   <div class="flex items-center justify-end gap-1">
@@ -417,6 +417,7 @@ async function runPrunePass() {
             </button>
           </div>
         </footer>
+        </div>
       </section>
     </div>
 

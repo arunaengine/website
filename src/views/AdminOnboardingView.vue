@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
@@ -30,7 +31,7 @@ import {
 import { kindLabel, kindVariant } from '@/components/nodes/node-display'
 import { shortUserId, truncateMiddle } from '@/lib/utils'
 import { apiOrigin, type CreateOnboardingSecretResponse, type OnboardingMode, type RealmNodeInfo } from '@/lib/api'
-import { ArrowLeft, ArrowRight, ExternalLink, ServerCog, ShieldCheck } from '@lucide/vue'
+import { Activity, ArrowLeft, ArrowRight, ExternalLink, KeyRound, ServerCog, ShieldCheck } from '@lucide/vue'
 import Notice from '@/components/ui/Notice.vue'
 
 const { apiBaseUrl, bootstrapped, currentUser, canManageOnboarding, nodeInfo, realmInfo } = useAruna()
@@ -331,18 +332,19 @@ const secretRows = computed<SecretRow[]>(() =>
   <div>
     <PageHeader
       title="Node onboarding"
-      description="Mint single-use secrets, generate the new node's configuration, and watch it join the realm."
+      :crumbs="[{ label: 'Admin', to: { name: 'admin' } }, { label: 'Node onboarding' }]"
+      description="Mint a single-use secret, generate the node's configuration and watch it join."
       :docs="{ topic: 'realm-nodes-groups', section: 'Nodes and the realm' }"
     >
       <template #actions>
-        <Button variant="outline" size="sm" as-child>
-          <RouterLink :to="{ name: 'admin' }"><ArrowLeft class="h-4 w-4" /> Admin</RouterLink>
+        <Button variant="outline" as-child>
+          <RouterLink :to="{ name: 'status' }"><Activity class="h-4 w-4" /> Status</RouterLink>
         </Button>
       </template>
     </PageHeader>
 
     <!-- Gate 1: still bootstrapping -->
-    <div v-if="!bootstrapped" class="w-full px-4 sm:px-6 max-w-[1100px] space-y-4 py-8">
+    <div v-if="!bootstrapped" class="w-full space-y-4 px-4 py-6 sm:px-6">
       <Skeleton class="h-24 w-full" />
       <Skeleton class="h-64 w-full" />
     </div>
@@ -363,8 +365,10 @@ const secretRows = computed<SecretRow[]>(() =>
     </div>
 
     <!-- Gated content: wizard + outstanding secrets -->
-    <div v-else class="w-full px-4 sm:px-6 max-w-[1100px] space-y-6 py-8">
-      <section class="surface">
+    <div v-else class="w-full space-y-8 px-4 py-6 sm:px-6">
+      <section aria-labelledby="onboarding-wizard-heading">
+        <SectionHeading id="onboarding-wizard-heading" title="Add a node" :icon="ServerCog" />
+        <div class="surface">
         <div class="border-b border-border px-5 py-4">
           <WizardSteps :steps="wizardSteps" :current="currentStep" />
         </div>
@@ -562,18 +566,17 @@ const secretRows = computed<SecretRow[]>(() =>
             </p>
           </div>
         </div>
+        </div>
       </section>
 
       <!-- Outstanding secrets -->
-      <section class="surface overflow-hidden">
-        <header class="flex items-center justify-between border-b border-border px-5 py-4">
-          <div class="flex items-center gap-2">
-            <ServerCog class="h-4 w-4 text-primary" />
-            <h3 class="font-display text-sm font-semibold text-aruna-navy">Outstanding secrets</h3>
-          </div>
-          <RefreshButton :busy="spinning" @click="onRefresh" />
-        </header>
-        <div class="p-5">
+      <section aria-labelledby="onboarding-secrets-heading">
+        <SectionHeading id="onboarding-secrets-heading" title="Outstanding secrets" :icon="KeyRound" info="Secrets that no node has used yet. Revoke one you no longer need.">
+          <template #actions>
+            <RefreshButton :busy="spinning" @click="onRefresh" />
+          </template>
+        </SectionHeading>
+        <div class="surface overflow-hidden p-5">
           <ErrorPanel v-if="listError" :message="listError" @retry="refreshSecrets" />
           <EmptyState
             v-else-if="!secretRows.length"
