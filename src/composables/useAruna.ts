@@ -110,6 +110,7 @@ import {
   userInfo,
 } from './aruna/state'
 import {
+  describeBucket,
   getBucketMetadata,
   listReleases,
   publishRelease,
@@ -298,6 +299,7 @@ export function useAruna() {
     getDataLinks,
     getBucketMetadata,
     putBucketMetadata,
+    describeBucket,
     listReleases,
     publishRelease,
     testIdentifierRules,

@@ -1,10 +1,14 @@
 import {
+  describeBucket as requestDescribe,
   getBucketMetadata as requestMetadata,
   listReleases as requestReleases,
   publishRelease as requestPublish,
   putBucketMetadata as requestPutMetadata,
   testIdentifierRules as requestRulesTest,
   type BucketMetadata,
+  type BucketMetadataAnswer,
+  type DescribeBucketRequest,
+  type DescribeBucketResponse,
   type FoundIdentifier,
   type IdentifierParser,
   type PublishReleaseRequest,
@@ -24,12 +28,15 @@ async function change<T>(work: () => Promise<T>): Promise<T> {
   }
 }
 
-export async function getBucketMetadata(bucket: string, nodeId?: string | null, signal?: AbortSignal): Promise<BucketMetadata | null> {
+export async function getBucketMetadata(bucket: string, nodeId?: string | null, signal?: AbortSignal): Promise<BucketMetadataAnswer> {
   return requestMetadata(bucket, await nodeClientReady(nodeId, undefined, signal), signal)
 }
 
-export const putBucketMetadata = (bucket: string, metadata: BucketMetadata | null, nodeId?: string | null): Promise<BucketMetadata | null> =>
+export const putBucketMetadata = (bucket: string, metadata: BucketMetadata | null, nodeId?: string | null): Promise<BucketMetadataAnswer> =>
   change(async () => requestPutMetadata(bucket, metadata, await nodeClientReady(nodeId)))
+
+export const describeBucket = (bucket: string, body: DescribeBucketRequest, nodeId?: string | null): Promise<DescribeBucketResponse> =>
+  change(async () => requestDescribe(bucket, body, await nodeClientReady(nodeId)))
 
 export async function listReleases(bucket: string, nodeId?: string | null, signal?: AbortSignal): Promise<ReleaseListResponse> {
   return requestReleases(bucket, await nodeClientReady(nodeId, undefined, signal), signal)
