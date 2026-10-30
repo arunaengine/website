@@ -7,6 +7,9 @@ import Notice from '@/components/ui/Notice.vue'
 import Popover from '@/components/ui/Popover.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
+import StatusMark from '@/components/ui/StatusMark.vue'
+import StatusPill from '@/components/ui/StatusPill.vue'
+import DatabaseHeader from '@/components/data/DatabaseHeader.vue'
 import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
@@ -80,15 +83,16 @@ import {
   Lock,
   NotebookPen,
   Plus,
-  RefreshCw,
   Search,
   Settings,
   Upload,
+  Users,
   Trash2,
   Undo2,
 } from '@lucide/vue'
 
-const props = defineProps<{ manager: DataManager; notebooks?: boolean }>()
+// `setId`: the set of a bucket of this node, null for an ordinary one, undefined while not known.
+const props = defineProps<{ manager: DataManager; notebooks?: boolean; setId?: string | null }>()
 const emit = defineEmits<{
   (e: 'add-data'): void
   (e: 'new-folder'): void
@@ -113,6 +117,7 @@ const {
   bucket,
   prefix,
   selectedGroupId,
+  selectedGroupName,
   s3Prefix,
   remoteNodeId,
   realmNodes,
@@ -147,6 +152,7 @@ const {
   openDetails,
   download,
   keyIsSynced,
+  wholeBucketSynced,
   bucketSyncCount,
   showSyncButton,
   currentBindSource,
@@ -191,6 +197,13 @@ const syncPartners = computed(() => {
     parseArunaArn(direction === 'outgoing' ? relationship.target : relationship.source)?.nodeId ?? null)
   return [...new Set(ids)].filter((id): id is string => Boolean(id) && id !== own).map((id) => ({ id, name: realmNodes.displayName(id) }))
 })
+// A failed or paused sync says so; otherwise the newest sync time of the bucket.
+const syncProblem = computed(() => {
+  const states = syncsForKey('').map(({ relationship }) => relationship.state)
+  return states.includes('failed') ? 'Sync failed' : states.includes('paused') ? 'Sync paused' : null
+})
+const lastSync = computed(() =>
+  syncsForKey('').map(({ relationship }) => relationship.status?.last_synced_at ?? '').filter(Boolean).sort().at(-1) ?? null)
 const hinting = ref(false)
 const hintFolder = computed(() => prefix.value.split('/').at(-1) || bucket.value)
 
@@ -542,6 +555,80 @@ async function onDrop(event: DragEvent) {
           </span>
         </template>
       </SectionHeading>
+      <!-- One card for every bucket: its source, sync and size; the slot adds what is wrong. -->
+      <DatabaseHeader :bucket="bucket" :node-id="remoteNodeId" :set-id="setId" :synced-with="syncPartners">
+        <template v-if="syncPartners.length">
+          <StatusPill v-if="syncProblem" :state="syncProblem" />
+          <span v-else class="inline-flex items-center gap-1.5">
+            <StatusMark label="Up to date" size="sm" />Up to date<template v-if="lastSync">, last sync {{ relativeTime(lastSync) }}</template>
+          </span>
+        </template>
+        <span v-if="usage" class="tabular-nums">{{ usageText(usage, true) }}</span>
+        <span v-if="activeGroupId" class="inline-flex items-center gap-1.5">
+          <Users class="h-3.5 w-3.5" aria-hidden="true" />
+          <RouterLink :to="{ name: 'group', params: { id: activeGroupId } }" class="text-primary hover:underline">{{ selectedGroupName || activeGroupId }}</RouterLink>
+        </span>
+        <StatusPill v-if="lockedOnNode" state="Locked on the node" tone="attention" :icon="Lock" />
+        <span v-if="availableToYou" class="inline-flex items-center gap-1.5"><StatusMark label="Available to you" size="sm" />Available to you</span>
+        <span v-if="providerBucket" class="min-w-0 truncate">
+          Stored in provider bucket <span class="font-mono text-foreground">{{ providerBucket }}</span>
+        </span>
+        <Popover v-if="showReferenceStats">
+          <Button
+            variant="outline"
+            size="sm"
+            :title="`${referenceStats.count} referenced object${referenceStats.count === 1 ? '' : 's'}, ${formatBytes(referenceStats.bytes)}, open per-source breakdown`"
+          >
+            <Link2 class="h-4 w-4 text-primary" />
+            <span class="text-xs">{{ referenceStats.count }} referenced, {{ formatBytes(referenceStats.bytes) }}</span>
+          </Button>
+          <template #content>
+            <div class="space-y-2">
+              <div>
+                <p class="text-sm font-semibold text-foreground">Referenced data</p>
+                <p class="mt-0.5 text-xs text-muted-foreground">
+                  {{ referenceStats.count }} object{{ referenceStats.count === 1 ? '' : 's' }} in this
+                  bucket point{{ referenceStats.count === 1 ? 's' : '' }} at data held elsewhere,
+                  {{ formatBytes(referenceStats.bytes) }} in total.
+                </p>
+              </div>
+              <ul class="space-y-1 border-t border-border pt-2">
+                <li
+                  v-for="group in referenceStats.groups"
+                  :key="group.key"
+                  class="flex items-start justify-between gap-3 text-xs"
+                >
+                  <span class="min-w-0 text-foreground">
+                    <RouterLink
+                      v-if="group.connectorId && activeGroupId && shown('connectors')"
+                      :to="{ name: 'group', params: { id: activeGroupId }, query: { tab: 'sources', connector: group.connectorId } }"
+                      class="block truncate text-primary hover:underline"
+                      :title="`${referenceGroupLabel(group)}, open the connector`"
+                    >
+                      {{ referenceGroupLabel(group) }}
+                    </RouterLink>
+                    <RouterLink
+                      v-else-if="group.originNodeId"
+                      :to="{ name: 'status', query: { node: group.originNodeId } }"
+                      class="block truncate text-primary hover:underline"
+                      :title="`${referenceGroupLabel(group)}, open the node on the Status page`"
+                    >
+                      {{ referenceGroupLabel(group) }}
+                    </RouterLink>
+                    <span v-else class="block truncate" :title="referenceGroupLabel(group)">{{ referenceGroupLabel(group) }}</span>
+                    <span v-if="group.sourcePaths.length" class="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground" :title="group.sourcePaths.join('\n')">
+                      {{ group.sourcePaths.join(', ') }}<template v-if="group.count > group.sourcePaths.length">, …</template>
+                    </span>
+                  </span>
+                  <span class="shrink-0 font-mono text-muted-foreground">
+                    {{ group.count }}, {{ formatBytes(group.bytes) }}
+                  </span>
+                </li>
+              </ul>
+            </div>
+          </template>
+        </Popover>
+      </DatabaseHeader>
       <slot name="header" />
       <div v-if="deletedLoading || (showDeleted && deletedTruncated)" class="flex flex-wrap items-center gap-x-3 gap-y-1">
         <Spinner v-if="deletedLoading" label="Loading deleted objects" />
@@ -583,79 +670,6 @@ async function onDrop(event: DragEvent) {
         @dragleave="dragActive = false"
         @drop.prevent="onDrop"
       >
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-2.5 @max-[600px]:px-3">
-          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted-foreground">
-            <span v-if="usage" class="tabular-nums">{{ usageText(usage, true) }}</span>
-            <Badge v-if="syncPartners.length" variant="success" size="sm" class="max-w-full gap-1">
-              <RefreshCw class="h-3 w-3 shrink-0" aria-hidden="true" />
-              <span class="truncate">synced with
-                <template v-for="(partner, index) in syncPartners" :key="partner.id"><template v-if="index">, </template><RouterLink :to="{ name: 'node', params: { nodeId: partner.id } }" class="hover:underline">{{ partner.name }}</RouterLink></template>
-              </span>
-            </Badge>
-            <Badge v-if="lockedOnNode" :variant="stateVariant('locked')" size="sm" class="shrink-0">
-              <Lock class="mr-0.5 h-3 w-3" aria-hidden="true" /> Locked on the node
-            </Badge>
-            <Badge v-if="availableToYou" variant="success" size="sm" class="shrink-0">Available to you</Badge>
-            <span v-if="providerBucket" class="min-w-0 truncate text-xs">
-              Stored in provider bucket <span class="font-mono text-foreground">{{ providerBucket }}</span>
-            </span>
-            <Popover v-if="showReferenceStats">
-              <Button
-                variant="outline"
-                size="sm"
-                :title="`${referenceStats.count} referenced object${referenceStats.count === 1 ? '' : 's'}, ${formatBytes(referenceStats.bytes)}, open per-source breakdown`"
-              >
-                <Link2 class="h-4 w-4 text-primary" />
-                <span class="text-xs">{{ referenceStats.count }} referenced, {{ formatBytes(referenceStats.bytes) }}</span>
-              </Button>
-              <template #content>
-                <div class="space-y-2">
-                  <div>
-                    <p class="text-sm font-semibold text-foreground">Referenced data</p>
-                    <p class="mt-0.5 text-xs text-muted-foreground">
-                      {{ referenceStats.count }} object{{ referenceStats.count === 1 ? '' : 's' }} in this
-                      bucket point{{ referenceStats.count === 1 ? 's' : '' }} at data held elsewhere,
-                      {{ formatBytes(referenceStats.bytes) }} in total.
-                    </p>
-                  </div>
-                  <ul class="space-y-1 border-t border-border pt-2">
-                    <li
-                      v-for="group in referenceStats.groups"
-                      :key="group.key"
-                      class="flex items-start justify-between gap-3 text-xs"
-                    >
-                      <span class="min-w-0 text-foreground">
-                        <RouterLink
-                          v-if="group.connectorId && activeGroupId && shown('connectors')"
-                          :to="{ name: 'group', params: { id: activeGroupId }, query: { tab: 'sources', connector: group.connectorId } }"
-                          class="block truncate text-primary hover:underline"
-                          :title="`${referenceGroupLabel(group)}, open the connector`"
-                        >
-                          {{ referenceGroupLabel(group) }}
-                        </RouterLink>
-                        <RouterLink
-                          v-else-if="group.originNodeId"
-                          :to="{ name: 'status', query: { node: group.originNodeId } }"
-                          class="block truncate text-primary hover:underline"
-                          :title="`${referenceGroupLabel(group)}, open the node on the Status page`"
-                        >
-                          {{ referenceGroupLabel(group) }}
-                        </RouterLink>
-                        <span v-else class="block truncate" :title="referenceGroupLabel(group)">{{ referenceGroupLabel(group) }}</span>
-                        <span v-if="group.sourcePaths.length" class="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground" :title="group.sourcePaths.join('\n')">
-                          {{ group.sourcePaths.join(', ') }}<template v-if="group.count > group.sourcePaths.length">, …</template>
-                        </span>
-                      </span>
-                      <span class="shrink-0 font-mono text-muted-foreground">
-                        {{ group.count }}, {{ formatBytes(group.bytes) }}
-                      </span>
-                    </li>
-                  </ul>
-                </div>
-              </template>
-            </Popover>
-          </div>
-        </div>
         <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pb-2 pt-2.5 @max-[600px]:px-3">
           <div class="flex min-w-0 max-w-full items-center gap-2">
             <Breadcrumbs :bucket="bucket" :path="prefix" single-line @navigate="openCrumb" />
@@ -816,7 +830,7 @@ async function onDrop(event: DragEvent) {
                     <Globe class="mr-0.5 h-3 w-3" aria-hidden="true" /> public
                   </Badge>
                   <ArrowLeftRight
-                    v-if="keyIsSynced(folder.prefix)"
+                    v-if="!wholeBucketSynced && keyIsSynced(folder.prefix)"
                     class="h-3 w-3 shrink-0 text-primary/40"
                     aria-label="Covered by a sync relationship"
                   />
@@ -892,7 +906,7 @@ async function onDrop(event: DragEvent) {
                     <Globe class="mr-0.5 h-3 w-3" aria-hidden="true" /> public
                   </Badge>
                   <ArrowLeftRight
-                    v-if="keyIsSynced(object.key)"
+                    v-if="!wholeBucketSynced && keyIsSynced(object.key)"
                     class="h-3 w-3 shrink-0 text-primary/40"
                     aria-label="Covered by a sync relationship"
                   />

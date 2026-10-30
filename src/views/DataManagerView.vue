@@ -27,7 +27,6 @@ import FileDetailsDialog from '@/components/data/FileDetailsDialog.vue'
 import PublicAccessDialog from '@/components/data/PublicAccessDialog.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import MockSidebar from '@/components/data/manager/MockSidebar.vue'
-import DatabaseHeader from '@/components/data/DatabaseHeader.vue'
 import DistributionBanner from '@/components/data/manager/DistributionBanner.vue'
 import ObjectBrowser from '@/components/data/manager/ObjectBrowser.vue'
 import UploadPanel from '@/components/data/manager/UploadPanel.vue'
@@ -471,6 +470,7 @@ async function createFolder() {
         <ObjectBrowser
           v-else-if="bucket"
           :manager="manager"
+          :set-id="exampleBucket ? null : bucketSetId"
           :notebooks="notebooksView"
           @add-data="addDataOpen = true"
           @new-folder="openNewFolder"
@@ -482,7 +482,6 @@ async function createFolder() {
         >
           <template #header>
             <DistributionBanner v-if="storedBucket" :bucket="storedBucket" />
-            <DatabaseHeader v-if="bucket && !exampleBucket" :bucket="bucket" :node-id="remoteNodeId" :set-id="bucketSetId" />
           </template>
           <UploadPanel :manager="manager" />
         </ObjectBrowser>

@@ -343,8 +343,10 @@ describe('object browser link a local folder', () => {
       const root = await render({ syncsForKey: () => [{ relationship, direction: 'outgoing' }] })
       const text = content(root)
       expect(text).toContain('16 files stored')
-      expect(text).toContain('synced with node laptop-1')
-      expect(element(root, (node) => node.tag === 'a' && content(node) === 'node laptop-1').props.to).toEqual({ name: 'node', params: { nodeId: 'laptop-1' } })
+      expect(text).toContain('Up to date')
+      // The bucket header names the partners, each linked to its node page.
+      const header = element(root, (node) => node.tag === 'section' && Array.isArray(node.props['synced-with'] ?? node.props.syncedWith))
+      expect(header.props['synced-with'] ?? header.props.syncedWith).toEqual([{ id: 'laptop-1', name: 'node laptop-1' }])
     } finally {
       bucketUsage.value.value = null
     }
@@ -353,7 +355,7 @@ describe('object browser link a local folder', () => {
   it('shows no count while the usage is unknown, never a zero', async () => {
     const root = await render()
     expect(content(root)).not.toContain('files stored')
-    expect(content(root)).not.toContain('synced with')
+    expect(content(root)).not.toContain('Up to date')
   })
 
   it('keeps the button out of the web portal', async () => {

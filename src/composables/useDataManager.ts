@@ -417,6 +417,8 @@ export function useDataManager() {
   const bucketSyncInfo = computed(
     () => syncByBucket.value.get(syncKeyFor(remoteNodeId.value, bucket.value)) ?? null,
   )
+  // A sync of the whole bucket is named in the bucket header, so rows carry no mark of their own.
+  const wholeBucketSynced = computed(() => Boolean(bucketSyncInfo.value?.prefixes.includes('')))
   const bucketSyncCount = computed(() =>
     bucketSyncInfo.value ? bucketSyncInfo.value.outgoing + bucketSyncInfo.value.incoming : 0,
   )
@@ -1531,6 +1533,7 @@ export function useDataManager() {
     syncKeyFor,
     keyIsSynced,
     syncsForKey,
+    wholeBucketSynced,
     bucketSyncCount,
     showSyncButton,
     bindSourceFor,
