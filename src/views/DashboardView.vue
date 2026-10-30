@@ -10,7 +10,12 @@ import NodeTable from '@/components/dashboard/NodeTable.vue'
 import RecentDatasetsCard from '@/components/dashboard/RecentDatasetsCard.vue'
 import RecentRunsCard from '@/components/dashboard/RecentRunsCard.vue'
 import OverviewCell from '@/components/dashboard/OverviewCell.vue'
-import WebStart from '@/components/dashboard/WebStart.vue'
+import IconButton from '@/components/ui/IconButton.vue'
+import IconTile from '@/components/ui/IconTile.vue'
+import DropdownMenu from '@/components/ui/DropdownMenu.vue'
+import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
+import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
+import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 import SignInPanel from '@/components/auth/SignInPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -18,7 +23,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import type { RealmView } from '@/composables/aruna/realm'
 import type { RealmNodeInfo } from '@/lib/api'
 import { givenName } from '@/components/nodes/node-display'
-import { ArrowRight, CircleCheck, Copy, Download, FileJson2, Files, Gauge, HardDrive, Link, LoaderCircle, Network, Package, Plus, Server, TriangleAlert, Workflow } from '@lucide/vue'
+import { ArrowRight, BookOpen, ChevronDown, CircleCheck, Copy, Download, FileJson2, Files, Gauge, HardDrive, Link, ListChecks, LoaderCircle, Network, Package, Plus, Server, TriangleAlert, Workflow, X } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
@@ -30,6 +35,10 @@ import { computerName } from '@/composables/useRealmNodes'
 import { hasCoordinates } from '@/lib/nodePlaces'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useNotifications } from '@/composables/useNotifications'
+import { useOnboarding } from '@/composables/useOnboarding'
+import { startTour } from '@/composables/useTour'
+import { docsTopicBySlug } from '@/docs/v1'
+import { featureEnabled } from '@/lib/config'
 import { useRefresh } from '@/composables/useRefresh'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 import { asyncChunkError } from '@/lib/chunk-recovery'
@@ -60,6 +69,9 @@ const { currentUser, myGroups, nodeInfo, realmInfo, usageInfo, loading, bootstra
 const { authPending } = useAuth()
 const { dashboardRevision } = useNotifications()
 const { scope, setScope } = useDashboardScope()
+const { isNewUser, dismissOnboarding } = useOnboarding()
+// The short tour of the dashboard, shared with its docs topic.
+const portalTour = docsTopicBySlug('portal-tour')?.tour ?? []
 const refreshing = ref(false)
 const quotaRevision = ref(0)
 // The info poll reads the cheap group figures again, never every bucket.
@@ -302,8 +314,36 @@ const pageDescription = computed(() =>
       <template v-else>
       <SignInPanel v-if="!currentUser" />
 
-      <!-- First steps in one line; the tours and tutorials live in Docs. -->
-      <WebStart v-if="!desktop && currentUser && !authPending" />
+      <!-- First visit on the web: the docs and the short tour first, tutorials behind them. -->
+      <section
+        v-if="!desktop && currentUser && !authPending && isNewUser"
+        class="surface relative flex flex-wrap items-center gap-4 border-primary/40 bg-primary/5 p-5 pr-12"
+        aria-labelledby="welcome-heading"
+      >
+        <IconTile :icon="BookOpen" />
+        <div class="min-w-0 flex-1">
+          <h2 id="welcome-heading" class="font-display text-sm font-semibold text-aruna-navy">New here? Start with the basics.</h2>
+          <p class="mt-1 text-xs text-muted-foreground">The docs explain the portal in a few short pages, and the tour points out the main controls.</p>
+        </div>
+        <div class="flex w-full flex-wrap items-center gap-2 lg:w-auto">
+          <Button size="sm" class="max-sm:flex-1" as-child>
+            <RouterLink :to="{ name: 'docs', params: { topic: 'portal-tour' } }">Open the docs</RouterLink>
+          </Button>
+          <Button variant="outline" size="sm" class="max-sm:flex-1" @click="startTour(portalTour)">Take the tour</Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button variant="outline" size="sm" class="max-sm:flex-1">Tutorials <ChevronDown class="h-3.5 w-3.5" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" class="w-56">
+              <DropdownMenuItem v-if="featureEnabled('tes')" @click="router.push({ name: 'tutorial-compute' })">
+                <Workflow class="h-3.5 w-3.5" /> Compute tutorial
+              </DropdownMenuItem>
+              <DropdownMenuItem @click="router.push({ name: 'tutorial-profile' })"><ListChecks class="h-3.5 w-3.5" /> Profile tutorial</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <IconButton label="Not now" class="absolute right-2 top-2" @click="dismissOnboarding"><X class="h-4 w-4" /></IconButton>
+      </section>
       <HomeCards v-if="desktop && currentUser" />
 
       <!-- Four stat cards: the stored scope decides whose figures, the Realm card is the same for both. -->

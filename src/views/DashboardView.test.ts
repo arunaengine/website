@@ -32,7 +32,16 @@ const dashboardRevision = ref(0)
 const scope = ref<'personal' | 'realm'>('personal')
 const desktopMode = ref(false)
 const HomeCardsStub = defineComponent(() => () => h('div', 'desktop-home-cards'))
-const WebStartStub = defineComponent(() => () => h('div', 'web-first-steps'))
+const isNewUser = ref(false)
+const dismissOnboarding = vi.fn(async () => undefined)
+const startTour = vi.fn()
+const onboardingStub = { useOnboarding: () => ({ isNewUser, dismissOnboarding }) }
+const tourStub = { startTour }
+const PassStub = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
+const IconButtonStub = defineComponent({
+  props: { label: String },
+  setup: (props, { attrs }) => () => h('button', { ...attrs, 'aria-label': props.label }, props.label),
+})
 const DeviceRowStub = defineComponent({ props: { name: String, nodeId: String }, setup: (props) => () => h('div', `device row ${props.name} ${props.nodeId ?? ''}`) })
 const isRealmAdmin = ref(false)
 const renameNode = vi.fn(async () => undefined)
@@ -207,7 +216,9 @@ beforeAll(async () => {
   vi.doMock('@/components/dashboard/NodeGeoMap.vue', () => ({ default: GeoMapStub }))
   vi.doMock('@/components/dashboard/RecentRunsCard.vue', () => ({ default: RunsCardStub }))
   vi.doMock('@/components/dashboard/RecentDatasetsCard.vue', () => ({ default: DatasetsCardStub }))
-  vi.doMock('@/components/dashboard/WebStart.vue', () => ({ default: WebStartStub }))
+  vi.doMock('@/composables/useOnboarding', () => onboardingStub)
+  vi.doMock('@/composables/useTour', () => tourStub)
+  vi.doMock('@/lib/config', () => ({ featureEnabled: () => true }))
   vi.doMock('@/composables/useRealmNodes', () => realmNodesStub)
   vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: SkeletonStub }))
   vi.doMock('@/components/ui/SectionHeading.vue', () => ({ default: SectionHeadingStub }))
@@ -287,7 +298,16 @@ beforeAll(async () => {
     '@/components/dashboard/RecentRunsCard.vue': moduleDefault(RunsCardStub),
     '@/components/dashboard/RecentDatasetsCard.vue': moduleDefault(DatasetsCardStub),
     '@/lib/nodePlaces': NodePlaces,
-    '@/components/dashboard/WebStart.vue': moduleDefault(WebStartStub),
+    '@/composables/useOnboarding': onboardingStub,
+    '@/composables/useTour': tourStub,
+    '@/docs/v1': { docsTopicBySlug: () => ({ tour: [] }) },
+    '@/lib/config': { featureEnabled: () => true },
+    '@/components/ui/IconButton.vue': moduleDefault(IconButtonStub),
+    '@/components/ui/IconTile.vue': moduleDefault(EmptyStub),
+    '@/components/ui/DropdownMenu.vue': moduleDefault(PassStub),
+    '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(PassStub),
+    '@/components/ui/DropdownMenuContent.vue': moduleDefault(PassStub),
+    '@/components/ui/DropdownMenuItem.vue': moduleDefault(ButtonStub),
     '@/composables/useRealmNodes': realmNodesStub,
     '@/components/nodes/node-display': NodeDisplay,
     '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
@@ -302,6 +322,8 @@ beforeAll(async () => {
 
 beforeEach(() => {
   currentUser.value = null
+  isNewUser.value = false
+  dismissOnboarding.mockClear()
   metadata.value = []
   profiles.value = []
   nodes.value = []
@@ -538,26 +560,42 @@ describe('authenticated dashboard scope', () => {
   })
 })
 
-describe('first steps', () => {
-  it('shows the one-line first steps on the web, without the welcome card and its tours', async () => {
+describe('welcome card', () => {
+  it('greets a new user on the web with the docs, the tour and the tutorials', async () => {
+    vi.stubGlobal('window', {})
     currentUser.value = { id: 'user-id', name: 'Ada Lovelace' }
+    isNewUser.value = true
 
-    const text = await renderedText()
-
-    expect(text).toContain('web-first-steps')
-    for (const gone of ['New here?', 'Take the tour', 'Compute tutorial', 'Profile tutorial', 'Not now']) {
-      expect(text).not.toContain(gone)
+    const mounted = await mountApp(DashboardClient)
+    const text = content(mounted.root)
+    for (const shown of ['New here? Start with the basics.', 'Open the docs', 'Take the tour', 'Tutorials', 'Compute tutorial', 'Profile tutorial']) {
+      expect(text).toContain(shown)
     }
+    await click(button(mounted.root, 'Take the tour'))
+    expect(startTour).toHaveBeenCalled()
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Not now'))
+    expect(dismissOnboarding).toHaveBeenCalledOnce()
+    mounted.app.unmount()
+    vi.unstubAllGlobals()
   })
 
-  it('leaves them out while a stored session resolves and for a visitor', async () => {
+  it('leaves it out for a returning user, while a session resolves, for a visitor and in the desktop', async () => {
     currentUser.value = { id: 'user-id', name: 'Ada Lovelace' }
+    expect(await renderedText()).not.toContain('New here?')
+
+    isNewUser.value = true
     authPending.value = true
-    expect(await renderedText()).not.toContain('web-first-steps')
+    expect(await renderedText()).not.toContain('New here?')
 
     authPending.value = false
     currentUser.value = null
-    expect(await renderedText()).not.toContain('web-first-steps')
+    expect(await renderedText()).not.toContain('New here?')
+
+    currentUser.value = { id: 'user-id', name: 'Ada Lovelace' }
+    desktopMode.value = true
+    const mounted = await mountApp(DashboardClient)
+    expect(content(mounted.root)).not.toContain('New here?')
+    mounted.app.unmount()
   })
 })
 
@@ -569,7 +607,6 @@ describe('desktop home', () => {
     await flush()
 
     expect(content(mounted.root)).toContain('desktop-home-cards')
-    expect(content(mounted.root)).not.toContain('web-first-steps')
     expect(content(mounted.root)).toContain('Your realm and this computer at a glance.')
     mounted.app.unmount()
   })
