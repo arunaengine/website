@@ -247,8 +247,8 @@ function onPopState() {
   finishPanelClose()
 }
 
-async function openPanel(event: MouseEvent) {
-  triggerEl.value = event.currentTarget as HTMLElement
+async function openPanel(event: MouseEvent | null) {
+  triggerEl.value = (event?.currentTarget ?? document.activeElement) as HTMLElement | null
   if (panelOpen.value) return
   const state = window.history.state
   window.history.pushState(
@@ -383,7 +383,8 @@ const shortcut = mac ? '⌘K' : 'Ctrl K'
 function onShortcut(event: KeyboardEvent) {
   if (event.key.toLowerCase() !== 'k' || !(mac ? event.metaKey : event.ctrlKey) || event.altKey || event.shiftKey) return
   event.preventDefault()
-  inputEl.value?.focus()
+  if (isNarrowSearch.value && !panelOpen.value) void openPanel(null)
+  else inputEl.value?.focus()
 }
 
 onMounted(() => {

@@ -344,6 +344,7 @@ interface Mounted {
   root: HostNode
   errors: unknown[]
   dispatchPopstate: () => void
+  dispatchKeydown: (event: Partial<KeyboardEvent>) => void
   history: { pushed: number; backed: number }
 }
 
@@ -362,13 +363,16 @@ async function mount(): Promise<Mounted> {
       for (const listener of listeners) listener()
     },
   }
+  const keyListeners = new Set<(event: unknown) => void>()
   const testWindow = {
     history,
     addEventListener(type: string, listener: () => void) {
       if (type === 'popstate') listeners.add(listener)
+      if (type === 'keydown') keyListeners.add(listener)
     },
     removeEventListener(type: string, listener: () => void) {
       if (type === 'popstate') listeners.delete(listener)
+      if (type === 'keydown') keyListeners.delete(listener)
     },
   }
   vi.stubGlobal('window', testWindow)
@@ -390,6 +394,9 @@ async function mount(): Promise<Mounted> {
     errors,
     dispatchPopstate: () => {
       for (const listener of listeners) listener()
+    },
+    dispatchKeydown: (event: Partial<KeyboardEvent>) => {
+      for (const listener of keyListeners) listener({ preventDefault() {}, ...event })
     },
     history,
   }
@@ -466,6 +473,17 @@ describe('narrow TopBar search panel', () => {
     expect(activeElement).toBe(input)
     expect(mounted.history.pushed).toBe(1)
     expect(element(mounted.root, (node) => node.props.role === 'dialog')).toBeDefined()
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('opens the collapsed panel and focuses its input on Ctrl K', async () => {
+    const mounted = await mount()
+    mounted.dispatchKeydown({ key: 'k', ctrlKey: true, metaKey: true })
+    await flush()
+
+    expect(element(mounted.root, (node) => node.props.role === 'dialog')).toBeDefined()
+    expect(activeElement).toBe(element(mounted.root, (node) => node.tag === 'input'))
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
