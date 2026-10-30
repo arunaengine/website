@@ -55,3 +55,17 @@ export function aboutFacts(crate: unknown): AboutFacts {
     doi: identifiers.find((link) => link.href?.startsWith('https://doi.org/'))?.href,
   }
 }
+
+export interface CitationParts {
+  authors: string[]
+  year: string
+  title: string
+  publisher: string
+  link: string
+}
+
+/** "Doe, A., Roe, B. (2026). Title. Publisher. https://doi.org/..."; missing parts drop out. */
+export function citationText(parts: CitationParts): string {
+  const head = [parts.authors.join(', '), parts.year ? `(${parts.year})` : ''].filter(Boolean).join(' ')
+  return [head, parts.title, parts.publisher, parts.link].filter(Boolean).map((part) => part.replace(/\.$/, '')).join('. ')
+}

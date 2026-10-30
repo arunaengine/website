@@ -42,14 +42,11 @@ function plainTitle(value: PresentedValue): string | undefined {
     <div
       v-for="field in fields"
       :key="field.id"
-      class="mb-3 last:mb-0 sm:mb-0 sm:grid sm:grid-cols-[minmax(10rem,14rem)_minmax(0,1fr)] sm:gap-x-6 sm:border-b sm:border-border/50 sm:py-2 sm:last:border-b-0"
+      class="mb-3 last:mb-0 sm:mb-0 sm:grid sm:grid-cols-[minmax(10rem,14rem)_minmax(0,1fr)] sm:gap-x-6 sm:py-1.5"
     >
       <!-- The raw property name and its term stay in the tooltip, not next to the label. -->
       <dt class="mb-0.5 flex flex-wrap items-baseline gap-x-1.5 sm:mb-0 sm:pt-px" :title="[field.description, field.termUri ?? field.key].filter(Boolean).join('\n')">
-        <span
-          class="text-[11px] font-medium uppercase tracking-wider"
-          :class="field.profiled ? 'text-foreground/80' : 'text-muted-foreground'"
-        >{{ field.label }}</span>
+        <span :class="field.profiled ? 'text-foreground/80' : 'text-muted-foreground'">{{ field.label }}</span>
       </dt>
       <dd class="min-w-0">
         <div v-if="chips(field)" class="flex flex-wrap gap-1.5">

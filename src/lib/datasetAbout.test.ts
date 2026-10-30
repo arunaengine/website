@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aboutFacts } from './datasetAbout'
+import { aboutFacts, citationText } from './datasetAbout'
 import { formatDate } from './utils'
 
 describe('aboutFacts', () => {
@@ -38,5 +38,13 @@ describe('aboutFacts', () => {
     const crate = { '@graph': [{ '@id': './', datePublished: 'spring 2020', contentSize: 'about 2 GB' }] }
     expect(aboutFacts(crate)).toMatchObject({ published: 'spring 2020', size: 'about 2 GB', files: 0, identifiers: [] })
     expect(aboutFacts({})).toMatchObject({ published: '', size: '', files: 0 })
+  })
+})
+
+describe('citationText', () => {
+  it('joins the parts and drops the missing ones', () => {
+    expect(citationText({ authors: ['Ada Lovelace', 'Alan Turing'], year: '2026', title: 'Reef census.', publisher: 'Demo realm', link: 'https://doi.org/10.1/x' }))
+      .toBe('Ada Lovelace, Alan Turing (2026). Reef census. Demo realm. https://doi.org/10.1/x')
+    expect(citationText({ authors: [], year: '', title: 'Reef census', publisher: '', link: 'https://example.org/d/1' })).toBe('Reef census. https://example.org/d/1')
   })
 })
