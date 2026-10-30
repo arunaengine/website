@@ -33,13 +33,14 @@ import { provideRunFormBridge } from '@/composables/useAssistantRunForm'
 import { createRunFormBridge } from '@/lib/runFormBridge'
 import { defaultPlacement, isNativeBlocked, tesFormToExecutionRequest } from '@/lib/nativeSubmit'
 import { submitJob } from '@/lib/jobs'
-import { TES_GROUP_TAG, holderNode, nativeInput, taskBuckets, type TesTask } from '@/lib/tes'
+import { TES_GROUP_TAG, nativeInput, parseS3Url, runRoute, taskBuckets, type TesInput, type TesTask } from '@/lib/tes'
+import { versionObjectId } from '@/lib/contentIdentity'
 import { errorMessage } from '@/lib/utils'
 import type { BucketSearchHit } from '@/lib/api'
 
 const router = useRouter()
 const { tesEnabled, busy, createTask, getTask } = useTes()
-const { currentUser, myGroups, searchBuckets, getBucketDistribution } = useAruna()
+const { currentUser, myGroups, nodeInfo, searchBuckets, getBucketDistribution, listBucketObjects } = useAruna()
 const { realm } = useRealm()
 const { nodes, nodeById, localNodeId, isTarget, isLocalNode, displayName } = useRealmNodes()
 // Desktop only: this computer can run the container itself.
@@ -168,8 +169,41 @@ async function bucketHolders(name: string, groupId?: string): Promise<string[]> 
   return [...nodes]
 }
 
-/** The API of the node holding the run's buckets; undefined keeps the connected node. */
-async function holderBase(draft: TesTask): Promise<string | undefined> {
+/** Every current version below a key prefix on one node, read page by page. */
+async function listedVersions(bucket: string, prefix: string, nodeId: string): Promise<{ key: string; versionId: string }[]> {
+  const files: { key: string; versionId: string }[] = []
+  let cursor: string | undefined
+  do {
+    const page = await listBucketObjects(bucket, { prefix, cursor, limit: 1000 }, isLocalNode(nodeId) ? null : nodeId)
+    files.push(...page.objects.map((item) => ({ key: item.key, versionId: item.version_id })))
+    cursor = page.next_cursor ?? undefined
+  } while (cursor)
+  return files
+}
+
+/** An input of another node, named by the exact versions it reads there; a folder becomes its files. */
+async function pinInput(input: TesInput, holders: ReadonlyMap<string, readonly string[]>, realmId: string): Promise<TesInput[]> {
+  const { bucket, key } = parseS3Url(input.url ?? '')!
+  const node = [...(holders.get(bucket) ?? [])].sort()[0]
+  if (!node) throw new Error(`No node holds bucket ${bucket}, so the run was not started.`)
+  const pinned = (file: { key: string; versionId: string }) => versionObjectId(realmId, node, bucket, file.key, file.versionId)
+  if (input.type !== 'DIRECTORY' && !key.endsWith('/')) {
+    const file = (await listedVersions(bucket, key, node)).find((entry) => entry.key === key)
+    if (!file) throw new Error(`${bucket}/${key} was not found on ${displayName(node)}, so the run was not started.`)
+    return [{ ...input, url: pinned(file) }]
+  }
+  const prefix = key.endsWith('/') ? key : `${key}/`
+  const files = await listedVersions(bucket, prefix, node)
+  if (!files.length) throw new Error(`The folder ${bucket}/${prefix} is empty on ${displayName(node)}, so the run was not started.`)
+  const base = input.path.replace(/\/+$/, '')
+  return files.map((file) => {
+    const relative = file.key.slice(prefix.length)
+    return { ...input, name: relative, url: pinned(file), path: `${base}/${relative}`, type: 'FILE' as const }
+  })
+}
+
+/** The run as the receiving node reads it, and that node's API; undefined keeps the connected node. */
+async function routeRun(draft: TesTask): Promise<{ draft: TesTask; base: string | undefined }> {
   const { inputs, outputs } = taskBuckets(draft)
   const names = [...new Set([...inputs, ...outputs])]
   // Results are written to a bucket of the run's own group.
@@ -178,11 +212,21 @@ async function holderBase(draft: TesTask): Promise<string | undefined> {
     [name, await bucketHolders(name, outputs.includes(name) ? group : undefined)] as const)))
   const missing = names.find((name) => !holders.get(name)?.length)
   if (missing) throw new Error(`No node holds bucket ${missing}, so the run was not started.`)
-  const node = holderNode(draft, holders, localNodeId.value)
-  if (!node) return undefined
-  const base = nodeById(node)?.apiBase
-  if (!base) throw new Error(`${displayName(node)} holds the run's buckets but names no API address, so the run was not started.`)
-  return base
+  const route = runRoute(draft, holders, localNodeId.value)
+  if (!route) throw new Error('No node holds every result bucket of this run, so it was not started. Choose result buckets on one node.')
+  if (route.pin.length) {
+    const realmId = nodeInfo.value?.node.realm_id
+    if (!realmId) throw new Error('The realm of this node is not known yet, so the run was not started. Try again.')
+    const read = (input: TesInput) => {
+      const bucket = parseS3Url(input.url ?? '')?.bucket
+      return bucket && input.url?.startsWith('s3://') && route.pin.includes(bucket) ? pinInput(input, holders, realmId) : Promise.resolve([input])
+    }
+    draft = { ...draft, inputs: (await Promise.all((draft.inputs ?? []).map(read))).flat() }
+  }
+  if (!route.node) return { draft, base: undefined }
+  const base = nodeById(route.node)?.apiBase
+  if (!base) throw new Error(`${displayName(route.node)} holds the run's buckets but names no API address, so the run was not started.`)
+  return { draft, base }
 }
 
 async function run() {
@@ -228,7 +272,8 @@ async function run() {
       draft = { ...draft, inputs: localInputs }
     }
     if (await submitLocally(draft)) return
-    const created = await createTask(draft, await holderBase(draft))
+    const routed = await routeRun(draft)
+    const created = await createTask(routed.draft, routed.base)
     void router.push({ name: 'task', params: { taskId: created.id } })
   } catch (err) {
     submitError.value = isTesUnsupported(err)

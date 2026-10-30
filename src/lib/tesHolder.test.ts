@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { holderNode, taskBuckets, type TesTask } from './tes'
+import { runRoute, taskBuckets, type TesTask } from './tes'
 
 const align: Pick<TesTask, 'inputs' | 'outputs'> = {
   inputs: [
@@ -20,7 +20,7 @@ describe('run holder node', () => {
       ['laptop', ['node-b']],
       ['ncbi-refseq', ['node-c', 'node-b']],
     ])
-    expect(holderNode(align, holders, 'node-a')).toBe('node-b')
+    expect(runRoute(align, holders, 'node-a')).toEqual({ node: 'node-b', pin: [] })
   })
 
   it('keeps the connected node when it holds the buckets', () => {
@@ -28,18 +28,24 @@ describe('run holder node', () => {
       ['laptop', ['node-a', 'node-b']],
       ['ncbi-refseq', ['node-a', 'node-b']],
     ])
-    expect(holderNode(align, holders, 'node-a')).toBeNull()
+    expect(runRoute(align, holders, 'node-a')).toEqual({ node: null, pin: [] })
   })
 
-  it('falls back to the output holder when no node holds every bucket', () => {
+  it('sends the run to the output holder and pins the inputs of other nodes', () => {
     const holders = new Map([
       ['laptop', ['node-b']],
       ['ncbi-refseq', ['node-c']],
     ])
-    expect(holderNode(align, holders, 'node-a')).toBe('node-b')
+    expect(runRoute(align, holders, 'node-a')).toEqual({ node: 'node-b', pin: ['ncbi-refseq'] })
   })
 
-  it('keeps the connected node for unknown buckets', () => {
-    expect(holderNode(align, new Map(), 'node-a')).toBeNull()
+  it('finds no route when no node holds every output bucket', () => {
+    const split = { ...align, outputs: [...align.outputs!, { url: 's3://ncbi-refseq/out/', path: '/work/out2', type: 'DIRECTORY' as const }] }
+    const holders = new Map([
+      ['laptop', ['node-b']],
+      ['ncbi-refseq', ['node-c']],
+    ])
+    expect(runRoute(split, holders, 'node-a')).toBeNull()
+    expect(runRoute(align, new Map(), 'node-a')).toBeNull()
   })
 })

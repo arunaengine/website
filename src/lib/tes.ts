@@ -352,24 +352,34 @@ export function taskBuckets(task: Pick<TesTask, 'inputs' | 'outputs'>): { inputs
   }
 }
 
+/** Where a task goes, and the input buckets it reads from other nodes. */
+export interface RunRoute {
+  /** The receiving node; null keeps the connected node. */
+  node: string | null
+  /** Input buckets the receiving node does not hold; their inputs must name exact versions first. */
+  pin: string[]
+}
+
 /**
- * The node a task must be sent to: an `s3://` url names a bucket on the receiving node, so the
- * node holding every named bucket, else every output bucket. Null keeps the connected node.
+ * An `s3://` url names a bucket on the receiving node, so a task goes to a node holding every output
+ * bucket and, of those, the most input buckets. Null when no node holds every output bucket.
  */
-export function holderNode(
+export function runRoute(
   task: Pick<TesTask, 'inputs' | 'outputs'>,
   holders: ReadonlyMap<string, readonly string[]>,
   localNodeId: string | null,
-): string | null {
+): RunRoute | null {
   const { inputs, outputs } = taskBuckets(task)
-  const holdingAll = (names: string[]) =>
-    names.length ? (holders.get(names[0]) ?? []).filter((node) => names.every((name) => holders.get(name)?.includes(node))) : []
-  for (const names of [[...new Set([...inputs, ...outputs])], outputs]) {
-    const nodes = holdingAll(names)
-    if (localNodeId && nodes.includes(localNodeId)) return null
-    if (nodes.length) return [...nodes].sort()[0]
-  }
-  return null
+  if (!inputs.length && !outputs.length) return { node: null, pin: [] }
+  const holding = (name: string) => holders.get(name) ?? []
+  const candidates = [...new Set([...inputs, ...outputs].flatMap(holding))]
+    .filter((node) => outputs.every((name) => holding(name).includes(node)))
+  if (!candidates.length) return null
+  const held = (node: string) => inputs.filter((name) => holding(name).includes(node)).length
+  const most = Math.max(...candidates.map(held))
+  const best = candidates.filter((node) => held(node) === most).sort()
+  const node = localNodeId && best.includes(localNodeId) ? localNodeId : best[0]!
+  return { node: node === localNodeId ? null : node, pin: inputs.filter((name) => !holding(name).includes(node)) }
 }
 
 // True for the DRS-resolvable id forms the node accepts (routes/drs.rs

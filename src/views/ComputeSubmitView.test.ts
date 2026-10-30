@@ -31,6 +31,7 @@ import * as QuickRuntimes from '@/lib/quickRuntimes'
 import * as RunPaths from '@/lib/runPaths'
 import * as RunTarget from '@/lib/runTarget'
 import * as Shellwords from '@/lib/shellwords'
+import * as ContentIdentity from '@/lib/contentIdentity'
 import * as Tes from '@/lib/tes'
 import * as Utils from '@/lib/utils'
 import * as Workspaces from '@/lib/workspaces'
@@ -152,10 +153,15 @@ const searchBuckets = vi.fn(async (q: string, _options?: { cursor?: string; grou
 const getBucketDistribution = vi.fn(async (_bucket: string, _signal?: AbortSignal, _nodeId?: string | null) => ({
   members: [] as Array<{ node_id: string; state: string }>,
 }))
+const listBucketObjects = vi.fn(async (_bucket: string, _query: { prefix?: string }, _nodeId?: string | null) => ({
+  objects: [] as Array<{ key: string; version_id: string }>,
+  next_cursor: null as string | null,
+}))
 const useArunaModule = {
   useAruna: () => ({
     searchBuckets,
     getBucketDistribution,
+    listBucketObjects,
     apiBaseUrl: ref('https://node.example.org/api/v1'),
     authToken: ref('realm-token'),
     bootstrapped: ref(true),
@@ -164,7 +170,7 @@ const useArunaModule = {
     canManageOnboarding: ref(true),
     isManagementNode: ref(true),
     nodeInfo: ref({
-      node: { peer_id: 'node-id', capabilities: 'management' },
+      node: { peer_id: 'node-id', capabilities: 'management', realm_id: 'realm' },
       services: { interfaces: { rest: { url: 'https://node.example.org/api/v1' } } },
     }),
     realmInfo: ref({
@@ -333,6 +339,7 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
     useTes: () => ({ tesEnabled: ref(true), busy: ref(false), createTask, getTask: vi.fn() }),
   },
   '@/composables/useAruna': useArunaModule,
+  '@/lib/contentIdentity': ContentIdentity,
   '@/composables/useComputeDataView': { useComputeDataView: () => ref('table') },
   '@/composables/useS3': { useS3: () => s3, s3ErrorMessage: (error: unknown) => String(error) },
   '@/composables/useRealmNodes': {
@@ -678,6 +685,42 @@ describe('run page', () => {
     const submitted = (createTask.mock.calls.at(-1) as unknown[])[0] as Tes.TesTask
     expect(submitted.inputs?.find((input) => input.path === '/work/script.py')?.url).toBe(arn)
     useSavedRuns().remove('r3')
+    mounted.app.unmount()
+  })
+
+  it('sends the run to its result node and pins an input of another node to its version', async () => {
+    const version = '01K8W1B3D5F7H9KMQ1S3V5X7Z1'
+    searchBuckets.mockImplementation(async (q: string) => ({
+      hits: [{ bucket: q, node_id: q === 'refs' ? 'node-c' : 'node-b', group_id: 'group-id' }],
+      nodes_failed: 0,
+      next_cursor: null,
+    }))
+    listBucketObjects.mockResolvedValueOnce({ objects: [{ key: 'k12.fna', version_id: version }], next_cursor: null })
+    createTask.mockClear()
+    useSavedRuns().save({
+      id: 'r4', name: 'Split', savedAt: '2026-10-30T10:00:00Z',
+      task: {
+        name: 'Split',
+        executors: [{ image: 'alpine:3.20', command: ['cat', '/work/in/k12.fna'] }],
+        inputs: [{ name: 'k12.fna', path: '/work/in/k12.fna', url: 's3://refs/k12.fna', type: 'FILE' }],
+        outputs: [{ url: 's3://results/split/', path: '/work/out/', type: 'DIRECTORY' }],
+      },
+      ask: { inputs: [], results: false },
+    })
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?saved=r4')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    expect(listBucketObjects).toHaveBeenCalledWith('refs', expect.objectContaining({ prefix: 'k12.fna' }), 'node-c')
+    const [submitted, base] = createTask.mock.calls.at(-1) as unknown as [Tes.TesTask, string]
+    expect(base).toBe('https://node-b.example.org/api/v1')
+    expect(submitted.inputs?.[0]?.url).toBe(ContentIdentity.versionObjectId('realm', 'node-c', 'refs', 'k12.fna', version))
+    searchBuckets.mockReset()
+    searchBuckets.mockImplementation(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-id', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
+    useSavedRuns().remove('r4')
     mounted.app.unmount()
   })
 
