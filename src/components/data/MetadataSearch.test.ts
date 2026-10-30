@@ -7,6 +7,11 @@ import { click, compileClientComponent, content, element, flush, mountApp, modul
 
 // A found file shows its name and folder apart; its full key stays in the title.
 const shown = (root: HostNode, key: string) => nodes(root).some((node) => node.props.title === key)
+// The expand button stops its click from reaching the row, as a browser event allows.
+async function expand(root: HostNode) {
+  ;(element(root, (node) => node.props['aria-expanded'] !== undefined).props.onClick as (event: unknown) => void)({ stopPropagation: () => {} })
+  await flush()
+}
 
 const hit = { key: 'GCF_000005845.2_ASM584v2/', bucket: 'ncbi', issuer_node_id: 'n2', group_id: 'g1' }
 const searchObjects = vi.fn(async (_q: string, _options: { match: string }) => ({ hits: [hit] as unknown[], next_cursor: null as string | null, coverage: { complete: true } }))
@@ -355,8 +360,11 @@ describe('bucket search results by record folder', () => {
     expect(opened).toEqual([found(`${FOLDER}/`, ECOLI)])
 
     const chevron = element(root, (node) => node.props['aria-expanded'] !== undefined)
+    // A native button keeps its name, focus and Space key.
+    expect(chevron.tag).toBe('button')
+    expect(chevron.props['aria-label']).toMatch(/^Show the files of /)
     expect(chevron.props['aria-expanded']).toBe(false)
-    await click(chevron)
+    await expand(root)
     expect(element(root, (node) => node.props['aria-expanded'] !== undefined).props['aria-expanded']).toBe(true)
     // The open group names its files without the folder name they repeat.
     await click(element(root, (node) => node.tag === 'tr' && content(node).trim() === '_ani_report.txt'))
@@ -393,7 +401,7 @@ describe('bucket search results by record folder', () => {
     })
     const { root, app } = await open()
     expect(content(root)).toContain('1+ files')
-    await click(element(root, (node) => node.props['aria-expanded'] !== undefined))
+    await expand(root)
 
     await click(element(root, (node) => node.tag === 'button' && content(node).includes('Show more')))
     await flush()

@@ -226,9 +226,17 @@ function drop(index: number) {
               <td class="num w-28 pr-4 text-muted-foreground">{{ row.hit.size != null ? formatBytes(row.hit.size) : '' }}</td>
             </tr>
             <template v-else>
-              <tr class="cursor-pointer" tabindex="0" :aria-expanded="opened.has(row.key)" @click="toggle(row)" @keydown.enter.self="toggle(row)">
+              <tr class="cursor-pointer" @click="toggle(row)">
                 <td class="w-10 pl-4 text-muted-foreground">
-                  <ChevronRight class="h-4 w-4 transition-transform" :class="opened.has(row.key) ? 'rotate-90' : ''" :aria-label="`${opened.has(row.key) ? 'Hide' : 'Show'} the files of ${groupTitle(row)}`" />
+                  <button
+                    type="button"
+                    class="rounded p-0.5 hover:bg-accent hover:text-foreground"
+                    :aria-expanded="opened.has(row.key)"
+                    :aria-label="`${opened.has(row.key) ? 'Hide' : 'Show'} the files of ${groupTitle(row)}`"
+                    @click.stop="toggle(row)"
+                  >
+                    <ChevronRight class="h-4 w-4 transition-transform" :class="opened.has(row.key) ? 'rotate-90' : ''" aria-hidden="true" />
+                  </button>
                 </td>
                 <td class="max-w-0 py-2">
                   <span class="flex items-start gap-2">
