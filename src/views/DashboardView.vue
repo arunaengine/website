@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
+import ViewToggle from '@/components/ui/ViewToggle.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import DashboardScopeToggle from '@/components/dashboard/DashboardScopeToggle.vue'
@@ -23,7 +24,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import type { RealmView } from '@/composables/aruna/realm'
 import type { RealmNodeInfo } from '@/lib/api'
 import { givenName } from '@/components/nodes/node-display'
-import { ArrowRight, BookOpen, ChevronDown, CircleCheck, Copy, Download, FileJson2, Files, Gauge, HardDrive, Link, ListChecks, LoaderCircle, Network, Package, Plus, Server, TriangleAlert, Workflow, X } from '@lucide/vue'
+import { Activity, BookOpen, ChevronDown, CircleCheck, Copy, Download, FileJson2, Files, Gauge, HardDrive, Link, ListChecks, LoaderCircle, Network, Package, Server, TriangleAlert, Users, Workflow, X } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
@@ -32,7 +33,7 @@ import { useMyGroupsUsage } from '@/composables/useMyGroupsUsage'
 import { useRecentRuns } from '@/composables/useRecentRuns'
 import { useDatabases } from '@/composables/useDatabases'
 import { computerName } from '@/composables/useRealmNodes'
-import { hasCoordinates } from '@/lib/nodePlaces'
+import { useViewMode } from '@/composables/useViewMode'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useNotifications } from '@/composables/useNotifications'
 import { useOnboarding } from '@/composables/useOnboarding'
@@ -51,11 +52,6 @@ import { countText, useRealmBucketCount } from '@/composables/useBucketCount'
 // The desktop adds its own parts; the web build never loads them.
 const HomeCards = defineAsyncComponent({
   loader: () => import('@/components/desktop/HomeCards.vue'),
-  onError: asyncChunkError,
-})
-// The map of places loads only once a node has coordinates.
-const NodeGeoMap = defineAsyncComponent({
-  loader: () => import('@/components/dashboard/NodeGeoMap.vue'),
   onError: asyncChunkError,
 })
 const DeviceRow = defineAsyncComponent({
@@ -176,9 +172,8 @@ watch(realmInfo, () => void loadPanelRealm(), { immediate: true })
 const panelRealm = computed(() => realmView.value?.realm ?? realmInfo.value)
 
 // Devices (kind 'user') run on their owner's computer, not on realm
-// infrastructure: they are summarized only, never listed or aggregated.
+// infrastructure: they are never listed or aggregated with the nodes.
 const infraNodes = computed(() => (panelRealm.value?.nodes ?? []).filter((node) => node.kind !== 'user'))
-const deviceNodes = computed(() => (panelRealm.value?.nodes ?? []).filter((node) => node.kind === 'user'))
 
 // This computer by its own /system/info, the device node, named by its own realm record first and
 // by a realm node's copy when its own has no name yet.
@@ -222,14 +217,6 @@ const runsLine = computed(() => {
   if (atLeast || !runs.length) return null
   return { running: 0, atLeast: false, completed: runs.filter((run) => run.task.state === 'COMPLETE').length, total: runs.length }
 })
-// After the online count: replication and devices, plain.
-const realmFacts = computed(() => {
-  const devices = deviceNodes.value.length
-  return [replication.value?.toLowerCase(), devices ? `${formatCount(devices)} ${plural(devices, 'device', 'devices')}` : null]
-    .filter(Boolean)
-    .map((fact) => `, ${fact}`)
-    .join('')
-})
 // This computer on the map, in the desktop: the realm nodes it is connected to now.
 const mapComputer = computed(() => {
   const info = nodeInfo.value
@@ -238,7 +225,7 @@ const mapComputer = computed(() => {
   return { id: info.node.peer_id, name: deviceName.value, peers }
 })
 const openNode = (nodeId: string) => void router.push({ name: 'node', params: { nodeId } })
-const mapNodes = computed(() => [...(desktop && deviceRecord.value ? [deviceRecord.value] : []), ...infraNodes.value])
+const groupView = useViewMode('dashboard-groups')
 
 const replication = computed(() => {
   const factor = realmInfo.value?.metadata_replication.default_replication_factor
@@ -261,7 +248,13 @@ const realmBucketsLine = computed(() => {
 })
 // The realm counts every record kind at once; only the groups count datasets apart from runs, so
 // a signed-in Work cell counts them as the group card does. A guest sees the public record count.
-const groupsUsage = useMyGroupsUsage().aggregate
+const myUsage = useMyGroupsUsage()
+const groupsUsage = myUsage.aggregate
+// The group cards keep the group figures fresh; the realm scope has none, and its Runs card reads them too.
+watch(myUsage.membershipKey, () => void myUsage.load(), { immediate: true })
+watch(cardsRevision, () => {
+  if (scope.value === 'realm') void myUsage.refresh()
+})
 const guestRecords = computed(() => publicOverview.value?.live_datasets ?? null)
 // Without node records (a guest) the realm still names how many nodes it has configured.
 const realmNodeCount = computed(() => infraNodes.value.length || (publicOverview.value?.nodes_configured ?? null))
@@ -293,18 +286,10 @@ const pageDescription = computed(() =>
     >
       <template #actions>
         <RefreshButton :busy="spinning" size="default" @click="onRefresh" />
-        <Button v-if="currentUser" variant="outline" @click="router.push({ name: 'dataset-new' })">
-          <Plus class="h-4 w-4" /> Create dataset
-        </Button>
-        <Button :variant="currentUser ? 'default' : 'outline'" as-child>
-          <RouterLink :to="{ name: 'datasets' }">
-            Open datasets <ArrowRight class="h-4 w-4" />
-          </RouterLink>
-        </Button>
       </template>
     </PageHeader>
 
-    <div class="w-full px-4 sm:px-6 space-y-5 py-6">
+    <div class="w-full px-4 sm:px-6 space-y-8 py-6">
       <div v-if="!painted" class="space-y-5" aria-busy="true">
         <span class="sr-only">Loading dashboard</span>
         <Skeleton class="h-44 w-full" />
@@ -415,21 +400,27 @@ const pageDescription = computed(() =>
         />
       </section>
 
-      <!-- The realm's nodes: the map on the left, the table on the right; both open a node's page. -->
-      <section v-if="currentUser && (infraNodes.length || deviceRecord)" class="surface overflow-hidden" aria-labelledby="realm-heading">
-        <header class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-          <h2 id="realm-heading" class="font-display text-[15px] font-semibold text-foreground">Realm</h2>
-          <p class="text-xs text-muted-foreground">
-            <span class="text-emerald-600 dark:text-emerald-400">{{ formatCount(onlineNodes) }} of {{ formatCount(infraNodes.length) }} {{ plural(infraNodes.length, 'node', 'nodes') }} online</span>{{ realmFacts }}
-            <RouterLink :to="{ name: 'status' }" class="text-primary hover:underline">Status</RouterLink>
-          </p>
-        </header>
-        <div class="grid divide-y divide-border lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
-          <div class="p-4">
-            <!-- Nodes that carry coordinates stand on a map; without any, the topology shows. -->
-            <NodeGeoMap v-if="hasCoordinates(mapNodes)" :nodes="mapNodes" @select="openNode" />
+      <!-- The scope picks the band below the Overview: my groups, or the realm's nodes. -->
+      <section v-if="currentUser && scope === 'personal' && myGroups.length" aria-labelledby="dashboard-groups-heading">
+        <SectionHeading id="dashboard-groups-heading" title="Groups" :icon="Users" info="A bucket stored on several nodes counts once.">
+          <template #actions>
+            <ViewToggle v-model="groupView" />
+            <Button variant="outline" size="sm" as-child><RouterLink :to="{ name: 'groups' }">All groups</RouterLink></Button>
+          </template>
+        </SectionHeading>
+        <GroupQuotaCards :refresh-revision="cardsRevision" :view="groupView" />
+      </section>
+
+      <!-- The topology on the left, the table on the right; both open a node's page. -->
+      <section v-else-if="currentUser && scope === 'realm' && (infraNodes.length || deviceRecord)" aria-labelledby="realm-heading">
+        <SectionHeading id="realm-heading" title="Realm" :icon="Network">
+          <template #actions>
+            <Button variant="outline" size="sm" as-child><RouterLink :to="{ name: 'status' }"><Activity class="h-4 w-4" /> Status</RouterLink></Button>
+          </template>
+        </SectionHeading>
+        <div class="grid overflow-hidden rounded-xl border border-border-subtle bg-card shadow-sm dark:shadow-none lg:grid-cols-[minmax(480px,34%)_minmax(0,1fr)]">
+          <div class="relative border-b border-border/60 bg-background lg:border-b-0 lg:border-r">
             <FederationPanel
-              v-else
               compact
               :nodes="infraNodes"
               :local-peer-id="(realmView?.info ?? nodeInfo)?.node.peer_id"
@@ -441,11 +432,7 @@ const pageDescription = computed(() =>
         </div>
       </section>
 
-      <!-- The bottom row: groups, the latest runs and the latest datasets, side by side when wide. -->
-      <div v-if="currentUser" class="grid gap-5 lg:grid-cols-3">
-        <div v-if="myGroups.length" class="surface px-5 pb-4">
-          <GroupQuotaCards compact :refresh-revision="cardsRevision" />
-        </div>
+      <div v-if="currentUser" class="grid gap-6" :class="recentRuns.state.value !== 'off' ? 'lg:grid-cols-2' : ''">
         <RecentRunsCard v-if="recentRuns.state.value !== 'off'" :runs="recentRuns.runs.value" :state="recentRuns.state.value" />
         <RecentDatasetsCard :refresh-revision="quotaRevision" />
       </div>

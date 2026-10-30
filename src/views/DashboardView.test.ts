@@ -4,7 +4,6 @@ import { renderToString } from '@vue/server-renderer'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, content, compileClientComponent, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
 import * as NodeDisplay from '@/components/nodes/node-display'
-import * as NodePlaces from '@/lib/nodePlaces'
 const RealmNodes = await vi.importActual<typeof import('@/composables/useRealmNodes')>('@/composables/useRealmNodes')
 
 const firstPaintMock = vi.hoisted(() => ({
@@ -59,10 +58,6 @@ const MapStub = defineComponent({
 })
 const RunsCardStub = defineComponent({ props: { runs: Array, state: String }, setup: (props) => () => h('div', `recent runs ${props.state} ${props.runs?.length}`) })
 const DatasetsCardStub = defineComponent({ props: { refreshRevision: Number }, setup: () => () => h('div', 'recent datasets') })
-const GeoMapStub = defineComponent({
-  props: { nodes: { type: Array, default: () => [] } },
-  setup: (props) => () => h('div', `osm map ${(props.nodes as Array<{ node_id: string }>).map((node) => node.node_id).join(' ')}`),
-})
 const TableStub = defineComponent({
   props: { nodes: { type: Array, default: () => [] }, computer: Object },
   setup: (props) => () =>
@@ -78,7 +73,11 @@ const runsState = ref('ready')
 const loadRuns = vi.fn(async () => undefined)
 // The caller's group counts, which split datasets from runs; the group cards read the same state.
 const groupsAggregate = ref<{ datasets: number | null; processRuns: number | null; pending?: boolean }>({ datasets: null, processRuns: null })
-const groupsUsageStub = { useMyGroupsUsage: () => ({ aggregate: groupsAggregate }) }
+const loadGroupsUsage = vi.fn(async () => undefined)
+const refreshGroupsUsage = vi.fn(async () => undefined)
+const groupsUsageStub = {
+  useMyGroupsUsage: () => ({ aggregate: groupsAggregate, membershipKey: ref('k'), load: loadGroupsUsage, refresh: refreshGroupsUsage }),
+}
 const recentRunsStub = { useRecentRuns: () => ({ runs: recentRunList, running: runningRuns, state: runsState, load: loadRuns }) }
 const setScope = vi.fn(async () => undefined)
 const refresh = vi.fn(async () => undefined)
@@ -213,7 +212,7 @@ beforeAll(async () => {
   vi.doMock('@/composables/useMyGroupsUsage', () => groupsUsageStub)
   vi.doMock('@/components/dashboard/FederationPanel.vue', () => ({ default: MapStub }))
   vi.doMock('@/components/dashboard/NodeTable.vue', () => ({ default: TableStub }))
-  vi.doMock('@/components/dashboard/NodeGeoMap.vue', () => ({ default: GeoMapStub }))
+  vi.doMock('@/composables/useViewMode', () => ({ useViewMode: () => ref('cards') }))
   vi.doMock('@/components/dashboard/RecentRunsCard.vue', () => ({ default: RunsCardStub }))
   vi.doMock('@/components/dashboard/RecentDatasetsCard.vue', () => ({ default: DatasetsCardStub }))
   vi.doMock('@/composables/useOnboarding', () => onboardingStub)
@@ -294,10 +293,10 @@ beforeAll(async () => {
     '@/composables/useMyGroupsUsage': groupsUsageStub,
     '@/components/dashboard/FederationPanel.vue': moduleDefault(MapStub),
     '@/components/dashboard/NodeTable.vue': moduleDefault(TableStub),
-    '@/components/dashboard/NodeGeoMap.vue': moduleDefault(GeoMapStub),
+    '@/components/ui/ViewToggle.vue': moduleDefault(EmptyStub),
+    '@/composables/useViewMode': { useViewMode: () => ref('cards') },
     '@/components/dashboard/RecentRunsCard.vue': moduleDefault(RunsCardStub),
     '@/components/dashboard/RecentDatasetsCard.vue': moduleDefault(DatasetsCardStub),
-    '@/lib/nodePlaces': NodePlaces,
     '@/composables/useOnboarding': onboardingStub,
     '@/composables/useTour': tourStub,
     '@/docs/v1': { docsTopicBySlug: () => ({ tour: [] }) },
@@ -454,23 +453,25 @@ describe('authenticated dashboard scope', () => {
     }
   }
 
-  it('shows my figures and the activity in the Overview, then the realm card and the groups', async () => {
+  it('shows my figures in the Overview, then my groups and no node list', async () => {
     signedInRealm()
 
     const text = await renderedText()
     const overview = text.indexOf('Overview')
-    const realmCard = text.indexOf('Realm 1 of 2 nodes online')
+    const realmCard = text.indexOf('Realm 2 nodes')
 
     expect(overview).toBeGreaterThanOrEqual(0)
     expect(text.indexOf('my stats cards')).toBeGreaterThan(overview)
     expect(text.indexOf('Runs Unknown')).toBeGreaterThan(text.indexOf('my stats cards'))
     // One state signal: an offline node turns the online count into a warning.
     expect(text.indexOf('Realm 2 nodes 1/2 online')).toBeGreaterThan(text.indexOf('Runs Unknown'))
-    expect(realmCard).toBeGreaterThan(text.indexOf('Realm 2 nodes'))
-    expect(text.indexOf('group quota cards')).toBeGreaterThan(realmCard)
+    expect(text.indexOf('Groups A bucket stored on several nodes counts once. Cards Table All groups group quota cards')).toBeGreaterThan(realmCard)
     expect(text).toContain('scope toggle personal')
-    expect(text).toContain('map compact=true')
-    expect(text).toMatch(/row node-a\s+row node-b/)
+    expect(text).not.toContain('map compact=true')
+    expect(text).not.toContain('row node-a')
+    // Refresh is the only page action; creating sits in the top bar.
+    expect(text).not.toContain('Create dataset')
+    expect(text).not.toContain('Open datasets')
     // The old sections and the boxes the sidebar already offers are gone.
     for (const gone of ['My statistics', 'Realm statistics', 'Replica-inclusive placement records held', 'Open Data']) {
       expect(text).not.toContain(gone)
@@ -481,7 +482,7 @@ describe('authenticated dashboard scope', () => {
     signedInRealm()
     const text = await renderedText()
     const groups = text.indexOf('group quota cards')
-    expect(groups).toBeGreaterThan(text.indexOf('Realm 1 of 2'))
+    expect(groups).toBeGreaterThan(text.indexOf('Realm 2 nodes'))
     expect(text.indexOf('recent runs ready 0')).toBeGreaterThan(groups)
     expect(text.indexOf('recent datasets')).toBeGreaterThan(text.indexOf('recent runs'))
 
@@ -514,7 +515,10 @@ describe('authenticated dashboard scope', () => {
     groupsAggregate.value = { datasets: 0, processRuns: 1, pending: true }
     const waiting = await renderedText()
     expect(waiting).not.toContain('Runs 1')
-    expect(text).toContain('group quota cards')
+    // The realm scope lists the nodes instead of the groups.
+    expect(text).toContain('Realm Status map compact=true')
+    expect(text).toMatch(/row node-a\s+row node-b/)
+    expect(text).not.toContain('group quota cards')
     expect(text).not.toContain('my stats cards')
   })
 
@@ -552,9 +556,8 @@ describe('authenticated dashboard scope', () => {
 
     const text = await renderedText()
 
-    // The device is counted apart and never listed among the realm nodes.
-    expect(text).toMatch(/Realm 1 of 1 node online\s*, replication on all eligible nodes, 1 device Status/)
-    expect(text).toContain('Realm 1 node')
+    // The device is never counted or listed among the realm nodes.
+    expect(text).toContain('Realm 1 node 1/1 online')
     expect(text).toContain('row server-node')
     expect(text).not.toContain('row owned-device')
   })
@@ -614,6 +617,7 @@ describe('desktop home', () => {
   it('ends the Overview with this computer, named as the realm knows it', async () => {
     currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
     desktopMode.value = true
+    scope.value = 'realm'
     nodeInfo.value = { node: { peer_id: 'own-device' } }
     realmInfo.value = {
       metadata_replication: { default_replication_factor: 3 },
@@ -657,17 +661,8 @@ describe('desktop home', () => {
     const mounted = await mountApp(DashboardClient)
     await flush()
 
-    expect(content(mounted.root)).toContain('device row Lab laptop Realm')
-    mounted.app.unmount()
-  })
-
-  it('keeps a space between the realm facts and the Status link', async () => {
-    currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
-    realmInfo.value = { metadata_replication: { default_replication_factor: 3 }, nodes: [{ node_id: 'n1', kind: 'server', present: true }] }
-    const mounted = await mountApp(DashboardClient)
-    await flush()
-
-    expect(content(mounted.root).replace(/\s+/g, ' ')).toContain('1 of 1 node online, replication ×3 Status')
+    expect(content(mounted.root)).toContain('device row Lab laptop ')
+    expect(content(mounted.root)).not.toContain('own-device')
     mounted.app.unmount()
   })
 
@@ -689,6 +684,7 @@ describe('realm nodes in the overview', () => {
 
   beforeEach(() => {
     currentUser.value = { id: 'u1', name: 'Lena Hartmann' }
+    scope.value = 'realm'
     nodeInfo.value = { node: { peer_id: 'own-device' } }
     // The device's own view: stale heartbeats and itself as the serving node.
     realmInfo.value = {
@@ -709,26 +705,31 @@ describe('realm nodes in the overview', () => {
 
     expect(text).toContain('mgmt-node beat 9000')
     expect(text).toContain('server-node beat 8000')
-    expect(text).toContain('1 device Status')
+    expect(text).toMatch(/Realm\s*2\s*nodes/)
     expect(text).not.toContain('beat 1000')
     mounted.app.unmount()
   })
 
-  it('puts the nodes on an OpenStreetMap map once one carries coordinates, else shows the topology', async () => {
-    let mounted = await mountApp(DashboardClient)
-    await flush()
-    expect(content(mounted.root)).toContain('map compact=true')
-    expect(content(mounted.root)).not.toContain('osm map')
-    mounted.app.unmount()
-
+  it('draws the topology even when the nodes carry coordinates', async () => {
     realmInfo.value = {
       metadata_replication: { default_replication_factor: null },
       nodes: [{ ...beat('mgmt-node', 'management', 1000), coordinates: { lat: 50.58, lon: 8.68 } }, beat('own-device', 'user', 1000)],
     }
-    mounted = await mountApp(DashboardClient)
+    const mounted = await mountApp(DashboardClient)
     await flush()
-    expect(content(mounted.root)).toContain('osm map mgmt-node')
-    expect(content(mounted.root)).not.toContain('map compact=true')
+    expect(content(mounted.root)).toContain('map compact=true')
+    expect(content(mounted.root)).toContain('mgmt-node beat 1000')
+    mounted.app.unmount()
+  })
+
+  it('keeps the group figures fresh for the Runs card while no group card is shown', async () => {
+    const mounted = await mountApp(DashboardClient)
+    await flush()
+    expect(loadGroupsUsage).toHaveBeenCalled()
+    refreshGroupsUsage.mockClear()
+    await pollInfo()
+    await flush()
+    expect(refreshGroupsUsage).toHaveBeenCalledOnce()
     mounted.app.unmount()
   })
 
@@ -836,6 +837,7 @@ describe('realm nodes in the overview', () => {
   })
 
   it('counts the listed runs as completed only when the list holds every run, else the running ones', async () => {
+    scope.value = 'personal'
     myGroups.value = [{ id: 'g1', name: 'Genome Lab' }]
     groupsAggregate.value = { datasets: 0, processRuns: 3 }
     const run = (state: string) => ({ task: { id: state + Math.random(), state }, nodeId: null })

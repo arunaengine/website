@@ -6,7 +6,6 @@ import { ModuleKind, ScriptTarget, transpileModule } from 'typescript'
 import * as VueRuntime from 'vue'
 import { createRenderer, defineComponent, h, nextTick, type App, type Component } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { memoryStorage } from '@/test/storage'
 import type { UsageResponse } from '@/lib/api'
 import * as Quota from '@/lib/quota'
 import * as Utils from '@/lib/utils'
@@ -22,7 +21,6 @@ vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
 const MyGroupsUsage = await import('@/composables/useMyGroupsUsage')
 const ReachableUsage = await import('@/composables/useReachableUsage')
 const BucketCount = await import('@/composables/useBucketCount')
-const ViewMode = await import('@/composables/useViewMode')
 const Distribution = await import('@/lib/distribution')
 const FormatCount = await import('@/lib/formatCount')
 const { myGroups, getGroupUsage } = aruna
@@ -72,14 +70,12 @@ const GroupQuotaCards = compileClientComponent(new URL('./GroupQuotaCards.vue', 
   '@lucide/vue': icons,
   '@/components/ui/Badge.vue': moduleDefault(SlotStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
-  '@/components/ui/ViewToggle.vue': moduleDefault(SlotStub),
   '@/components/dashboard/GroupStorage.vue': moduleDefault(SlotStub),
   '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
   '@/components/ui/ErrorPanel.vue': moduleDefault(ErrorPanelStub),
   '@/composables/useMyGroupsUsage': MyGroupsUsage,
   '@/composables/useReachableUsage': ReachableUsage,
   '@/composables/useBucketCount': BucketCount,
-  '@/composables/useViewMode': ViewMode,
   '@/lib/distribution': Distribution,
   '@/lib/formatCount': FormatCount,
   '@/lib/quota': Quota,
@@ -165,9 +161,9 @@ async function flush() {
   }
 }
 
-function mountCards(): { app: App<HostNode>; root: HostNode } {
+function mountCards(view: 'cards' | 'table' = 'cards'): { app: App<HostNode>; root: HostNode } {
   const root = hostNode('root')
-  const app = renderer.createApp(GroupQuotaCards, { refreshRevision: 0 })
+  const app = renderer.createApp(GroupQuotaCards, { refreshRevision: 0, view })
   app.mount(root)
   mountedApps.push(app)
   return { app, root }
@@ -202,19 +198,14 @@ describe('group purpose counts', () => {
     await flush()
     const text = content(mounted.root)
 
-    expect(text).toContain('Groups')
     expect(text).toContain('Research group')
     expect(text).toContain('objects 2 bucket 1 dataset 1 runs 3')
-    expect(text).toContain('A bucket stored on several nodes counts once.')
   })
 
   it('shows the same figures as table rows when the table was chosen', async () => {
-    const storage = memoryStorage()
-    storage.setItem('aruna.view.dashboard-groups', 'table')
-    vi.stubGlobal('localStorage', storage)
     myGroups.value = [{ id: 'table-1', name: 'Research group' }]
     getGroupUsage.mockResolvedValue(usage({ dataset_count: 4, profile_count: 0, process_run_count: 5 }))
-    const mounted = mountCards()
+    const mounted = mountCards('table')
 
     await flush()
     const text = content(mounted.root)

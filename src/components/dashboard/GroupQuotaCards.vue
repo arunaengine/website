@@ -5,21 +5,19 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
-import ViewToggle from '@/components/ui/ViewToggle.vue'
 import GroupStorage from '@/components/dashboard/GroupStorage.vue'
 import { useMyGroupsUsage, entryState, QUOTA_SEVERITY, type GroupUsageEntry } from '@/composables/useMyGroupsUsage'
 import { countText } from '@/composables/useBucketCount'
 import { useReachableUsage } from '@/composables/useReachableUsage'
-import { useViewMode } from '@/composables/useViewMode'
+import type { ViewMode } from '@/composables/useViewMode'
 import { distinctCount } from '@/lib/distribution'
 import { formatCount } from '@/lib/formatCount'
 import { QUOTA_STATE_BADGES } from '@/lib/quota'
 
 const { entries, membershipKey, refresh, retry } = useMyGroupsUsage()
 const reach = useReachableUsage()
-const view = useViewMode('dashboard-groups')
-/** `compact`: a column of the landing view's bottom row, one card wide and without nested surfaces. */
-const props = defineProps<{ refreshRevision: number; compact?: boolean }>()
+/** `view`: cards or table, as the heading's toggle holds it. */
+const props = withDefaults(defineProps<{ refreshRevision: number; view?: ViewMode }>(), { view: 'cards' })
 
 // Only states that need attention get a badge; an unlimited group shows "no quota" in its line.
 function badgeFor(entry: GroupUsageEntry) {
@@ -72,11 +70,7 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
 </script>
 
 <template>
-  <section class="space-y-3.5" aria-labelledby="dashboard-groups-heading">
-    <div class="flex items-center justify-between gap-2 pt-2">
-      <h3 id="dashboard-groups-heading" class="font-display text-sm font-semibold text-aruna-navy">Groups</h3>
-      <ViewToggle v-model="view" />
-    </div>
+  <div class="space-y-3.5">
 
     <ErrorPanel
       v-if="entries.length && entries.filter((e) => e.status === 'error').length * 2 > entries.length"
@@ -84,8 +78,8 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
       @retry="refresh"
     />
 
-    <div v-if="view === 'cards'" class="grid gap-3.5" :class="compact ? '' : 'sm:grid-cols-2 xl:grid-cols-3'">
-      <div v-for="entry in sortedEntries()" :key="entry.groupId" :class="compact ? 'rounded-md border border-border p-3' : 'surface p-4'">
+    <div v-if="view === 'cards'" class="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+      <div v-for="entry in sortedEntries()" :key="entry.groupId" class="surface p-4">
         <div class="flex items-center justify-between gap-2">
           <RouterLink
             :to="{ name: 'group', params: { id: entry.groupId } }"
@@ -114,7 +108,7 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
       </div>
     </div>
 
-    <div v-else class="overflow-x-auto" :class="compact ? '' : 'surface'">
+    <div v-else class="surface overflow-x-auto">
       <table class="data-table">
         <thead>
           <tr>
@@ -154,6 +148,5 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
         </tbody>
       </table>
     </div>
-    <p class="text-xs text-muted-foreground">A bucket stored on several nodes counts once.</p>
-  </section>
+  </div>
 </template>
