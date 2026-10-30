@@ -14,6 +14,7 @@ import {
   TUTORIAL_ENDPOINT,
   TUTORIAL_GROUP,
   TUTORIAL_NODE_ID,
+  UPLOAD_VERSION,
   artifactFor,
   objectHead,
   plotPngBytes,
@@ -96,6 +97,6 @@ export function tutorialS3(userId: string): S3Surface {
       }
       return new Blob([artifact?.text ?? ''], { type: artifact?.contentType ?? 'text/plain' })
     },
-    putTextObject: async () => ({ versionId: null }),
+    putTextObject: async () => ({ versionId: UPLOAD_VERSION }),
   }
 }

@@ -12,6 +12,9 @@ export const DATASET_PREFIX = 'survey-2026/'
 
 export const TUTORIAL_BUCKETS: BucketEntry[] = [{ name: INPUT_BUCKET }, { name: RESULT_BUCKET }]
 
+/** The version every tutorial upload answers with, so a run can name its script exactly. */
+export const UPLOAD_VERSION = '01TUTORIALUPLOAD000000000'
+
 /** Version ids the inputs pin to, so the wizard can teach exact references. */
 export const INPUT_VERSIONS: Record<string, string> = {
   [`${DATASET_PREFIX}station-a.csv`]: '01TUTORIALVERSIONA0000000',
