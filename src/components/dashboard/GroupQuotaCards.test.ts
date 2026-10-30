@@ -24,6 +24,7 @@ const BucketCount = await import('@/composables/useBucketCount')
 const Distribution = await import('@/lib/distribution')
 const FormatCount = await import('@/lib/formatCount')
 const { myGroups, getGroupUsage } = aruna
+const push = vi.fn()
 
 const SlotStub = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
@@ -66,10 +67,11 @@ function compileClientComponent(url: URL, modules: Record<string, unknown>): Com
 
 const GroupQuotaCards = compileClientComponent(new URL('./GroupQuotaCards.vue', import.meta.url), {
   vue: VueRuntime,
-  'vue-router': { RouterLink: RouterLinkStub },
+  'vue-router': { RouterLink: RouterLinkStub, useRouter: () => ({ push }) },
   '@lucide/vue': icons,
   '@/components/ui/Badge.vue': moduleDefault(SlotStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/IconTile.vue': moduleDefault(SlotStub),
   '@/components/dashboard/GroupStorage.vue': moduleDefault(SlotStub),
   '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
   '@/components/ui/ErrorPanel.vue': moduleDefault(ErrorPanelStub),
@@ -154,6 +156,10 @@ function content(node: HostNode): string {
   return `${node.text} ${node.children.map(content).join(' ')}`.replace(/\s+/g, ' ').trim()
 }
 
+function allNodes(node: HostNode): HostNode[] {
+  return [node, ...node.children.flatMap(allNodes)]
+}
+
 async function flush() {
   for (let i = 0; i < 4; i += 1) {
     await Promise.resolve()
@@ -199,7 +205,11 @@ describe('group purpose counts', () => {
     const text = content(mounted.root)
 
     expect(text).toContain('Research group')
-    expect(text).toContain('objects 2 bucket 1 dataset 1 runs 3')
+    expect(text).toContain('2 objects 1 bucket 1 dataset 3 runs')
+    // The last card creates a group.
+    const links = allNodes(mounted.root).filter((node) => node.tag === 'a')
+    expect(links.at(-1)?.props.to).toEqual({ name: 'groups', query: { create: 'group' } })
+    expect(content(links.at(-1)!)).toBe('Create group')
   })
 
   it('shows the same figures as table rows when the table was chosen', async () => {
@@ -210,8 +220,11 @@ describe('group purpose counts', () => {
     await flush()
     const text = content(mounted.root)
 
-    expect(text).toContain('Group Storage Objects Buckets Datasets Runs')
-    expect(text).toContain('Research group v-if 2 1 4 5')
+    expect(text).toContain('Group Storage Objects Buckets Datasets Runs Open')
+    expect(text).toMatch(/Research group (v-if )*2 1 4 5/)
+    // Phones read the counts in one line; both lists end with Create group.
+    expect(text).toContain('1 bucket, 4 datasets, 5 runs')
+    expect(text.match(/Create group/g)).toHaveLength(2)
   })
 
   it('badges a group near its quota and leaves an unlimited one plain', async () => {
@@ -243,8 +256,8 @@ describe('group purpose counts', () => {
     await flush()
     const text = content(mounted.root)
 
-    expect(text).toMatch(/datasets Unknown/)
-    expect(text).toMatch(/runs 12/)
+    expect(text).toMatch(/Unknown datasets/)
+    expect(text).toMatch(/12 runs/)
     expect(text).not.toContain('~12')
   })
 
