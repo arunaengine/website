@@ -48,3 +48,23 @@ describe('Datasets purpose filters', () => {
     expect(sources).not.toContain("document_path.startsWith('profiles/')")
   })
 })
+
+describe('Datasets page layout', () => {
+  const view = read('./SearchView.vue')
+  const actions = view.slice(view.indexOf('<template #actions>'), view.indexOf('</PageHeader>'))
+
+  it('keeps only Refresh and one actions menu in the header', () => {
+    expect(actions).toContain('<RefreshButton')
+    expect(actions).toContain('aria-label="More actions"')
+    expect(actions).toContain('Import an RO-Crate or a repository record')
+    expect(actions).toContain('SPARQL workbench')
+    expect(actions).not.toContain("name: 'dataset-new'")
+    expect(view).not.toContain('description="Browse every visible RO-Crate')
+  })
+
+  it('opens on the run records tab, kept in the URL', () => {
+    expect(view).toContain("useRouteTab(['records', 'datasets'], 'records')")
+    expect(view).toContain('title="Run records"')
+    expect(view).toContain('<DatasetBrowse v-else :state="state" skip-runs />')
+  })
+})

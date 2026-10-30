@@ -17,7 +17,8 @@ import type { DatasetSearchState } from '@/composables/useDatasetSearch'
 import { useViewMode } from '@/composables/useViewMode'
 import { FileJson2, ListChecks, Play, Plus } from '@lucide/vue'
 
-const props = defineProps<{ state: DatasetSearchState }>()
+// `skipRuns`: the run records have their own tab, so only datasets and profiles show here.
+const props = defineProps<{ state: DatasetSearchState; skipRuns?: boolean }>()
 const {
   browsePage,
   browseSource,
@@ -45,7 +46,7 @@ const sections = computed(() => [
   { key: 'datasets' as const, title: filtering.value ? 'Matching datasets' : 'Datasets', icon: FileJson2, docs: catalogSplit.value.datasets },
   { key: 'profiles' as const, title: 'Profiles', icon: ListChecks, docs: catalogSplit.value.profiles },
   { key: 'runs' as const, title: 'Process Runs', icon: Play, docs: catalogSplit.value.runs },
-].filter((section) => section.docs.length))
+].filter((section) => section.docs.length && !(props.skipRuns && section.key === 'runs')))
 </script>
 
 <template>
@@ -75,7 +76,7 @@ const sections = computed(() => [
     <!-- Paging keeps the outgoing page on screen; it dims and is marked
          busy so it never reads as the page that was just requested. -->
     <div
-      v-if="hits.length"
+      v-if="sections.length"
       class="space-y-6 transition-opacity"
       :class="browseStale ? 'opacity-40' : ''"
       :aria-busy="browseBusy"
