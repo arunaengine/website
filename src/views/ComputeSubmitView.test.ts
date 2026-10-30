@@ -515,7 +515,7 @@ describe('run page', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     await flush()
 
-    expect(content(mounted.root)).toContain('Choose the input for /data/genome.fna')
+    expect(content(mounted.root)).toContain('Choose genome.fna')
     expect(content(mounted.root)).not.toContain('Image is missing')
     await click(runButton(mounted.root))
     await flush()

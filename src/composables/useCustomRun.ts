@@ -990,7 +990,7 @@ function createStore(deps: CustomRunDeps) {
       list.push({ section: 'section-placement', field: 'run-node', text: 'No node matches the placement' })
     }
     for (const path of openInputs.value) {
-      list.push({ section: 'section-saved', field: 'saved-inputs', text: `Choose the input for ${path}` })
+      list.push({ section: 'section-saved', field: 'saved-inputs', text: `Choose ${path.replace(/\/+$/, '').split('/').pop() || path}` })
     }
     for (const name of openSecrets.value) {
       list.push({ section: 'section-saved', field: 'saved-secrets', text: `Enter the value of ${name}` })
