@@ -6,6 +6,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import Notice from '@/components/ui/Notice.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
+import OverviewCell from '@/components/dashboard/OverviewCell.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
 import ListShell from '@/components/ui/ListShell.vue'
 import ListSkeleton from '@/components/ui/ListSkeleton.vue'
@@ -38,7 +39,7 @@ import {
   type TesState,
   type TesTask,
 } from '@/lib/tes'
-import { ChevronRight, Laptop, Server, Trash2 } from '@lucide/vue'
+import { Activity, ChevronRight, CircleCheck, Hourglass, Laptop, Server, Timer, Trash2, Workflow } from '@lucide/vue'
 
 // Run list section of the unified Compute view. ComputeView gates the feature
 // flag and sign-in, but the panel tracks the session itself so a late or lost
@@ -191,12 +192,17 @@ const refreshing = ref(false)
 const lastPollError = ref<string | null>(null)
 // Each node lists only the runs it owns, so the first page also reads the other nodes.
 // Only places of the realm are asked; a device is its owner's computer.
-const { targets: realmNodes } = useRealmNodes()
+const { targets: realmNodes, localNodeId, displayName } = useRealmNodes()
 const otherNodes = ref<{ failed: string[]; truncated: string[] }>({ failed: [], truncated: [] })
 function otherNodeTasks() {
   const others = desktop ? [] : realmNodes.value.filter((node) => !node.isLocal && node.apiBase)
   return Promise.all(others.map((node) =>
     listTasks({ view: 'BASIC', page_size: 50 }, node.apiBase!).then((page) => ({ node, page }), () => ({ node, page: null }))))
+}
+// The node each run from another node came from; the serving node's own runs are not in it.
+const remoteNode = ref(new Map<string, string>())
+function nodeOf(task: TesTask): string | null {
+  return (task.id && remoteNode.value.get(task.id)) || localNodeId.value
 }
 // Stale responses are dropped via a request id (ObjectBrowserPanel pattern).
 let listRequestId = 0
@@ -234,16 +240,41 @@ function taskLog(task: TesTask) {
   return logs?.length ? logs[logs.length - 1] : undefined
 }
 
-function taskDuration(task: TesTask): string {
+function runMs(task: TesTask): number | null {
   const log = taskLog(task)
-  if (!log?.start_time) return ''
+  if (!log?.start_time) return null
   const start = Date.parse(log.start_time)
   const end = log.end_time ? Date.parse(log.end_time) : isActiveTesState(task.state) ? Date.now() : NaN
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return ''
-  const label = formatDuration(end - start)
-  if (!label) return ''
-  return log.end_time ? label : `${label} so far`
+  return Number.isFinite(start) && Number.isFinite(end) && end >= start ? end - start : null
 }
+
+function taskDuration(task: TesTask): string {
+  const ms = runMs(task)
+  const label = ms === null ? '' : formatDuration(ms)
+  if (!label) return ''
+  return taskLog(task)?.end_time ? label : `${label} so far`
+}
+
+// Figures over the loaded runs only; older pages and nodes that did not answer are not in them.
+const stats = computed(() => {
+  const list = shownTasks.value
+  const times = list.map(runMs).filter((ms): ms is number => ms !== null)
+  const nodes = [...new Set(list.map(nodeOf).filter((id): id is string => Boolean(id)))]
+  return {
+    total: list.length,
+    completed: list.filter((task) => task.state === 'COMPLETE').length,
+    active: list.filter((task) => isActiveTesState(task.state)).length,
+    waiting: list.filter((task) => task.state === 'QUEUED' || task.state === 'INITIALIZING').length,
+    time: formatDuration(times.reduce((sum, ms) => sum + ms, 0)),
+    timed: times.length,
+    nodes,
+    local: list.filter((task) => isLocalRun(task.tags)).length,
+  }
+})
+const statsNote = computed(() =>
+  otherNodes.value.failed.length || moreListed.value || olderHidden.value
+    ? 'Counts the loaded runs only.'
+    : undefined)
 
 // A task the node has not started yet has no start time by design; one that is
 // already past that point and still reports none cannot be timed here.
@@ -263,6 +294,7 @@ function clearNoUser() {
   localLastCreated.value = undefined
   pagesLoaded.value = 0
   otherNodes.value = { failed: [], truncated: [] }
+  remoteNode.value = new Map()
   listError.value = null
   lastPollError.value = null
   listState.value = authPending.value ? 'loading' : 'signed-out'
@@ -291,6 +323,14 @@ async function fetchList({ more = false, silent = false } = {}) {
         failed: others.filter((entry) => !entry.page).map((entry) => entry.node.name ?? entry.node.nodeId),
         truncated: others.filter((entry) => entry.page?.next_page_token).map((entry) => entry.node.name ?? entry.node.nodeId),
       }
+      const local = new Set(res.tasks.map((task) => task.id))
+      const owners = new Map<string, string>()
+      for (const entry of others) {
+        for (const task of entry.page?.tasks ?? []) {
+          if (task.id && !local.has(task.id) && !owners.has(task.id)) owners.set(task.id, entry.node.nodeId)
+        }
+      }
+      remoteNode.value = owners
       const seen = new Set<string>()
       tasks.value = [...res.tasks, ...others.flatMap((entry) => entry.page?.tasks ?? [])]
         .filter((task) => !seen.has(task.id ?? '') && Boolean(seen.add(task.id ?? '')))
@@ -420,20 +460,8 @@ onUnmounted(() => {
 
 <template>
   <div class="space-y-4">
-    <p class="text-xs text-muted-foreground">
-      Runs are the work <span class="font-medium text-foreground">you start</span>, listed from every node; begin with a script template, or describe your own container.
-    </p>
-
     <ListSkeleton v-if="!painted" header :rows="5" label="Loading runs" />
 
-    <!-- Service banner: capability and storage only; the protocol version lives
-         in the tooltip and the realm identity in the page header badge. -->
-    <p v-else-if="serviceState === 'ready' && serviceInfo" class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-      <span class="font-medium text-foreground" :title="`GA4GH TES ${serviceInfo.type.version}`">Run service</span>
-      <template v-if="serviceInfo.storage?.length">
-        <Badge v-for="s in serviceInfo.storage" :key="s" variant="outline" class="font-mono">{{ s }}</Badge>
-      </template>
-    </p>
     <Notice v-else-if="serviceState === 'unsupported'" tone="warning">
       This node does not accept runs. Configure a compute backend first.
     </Notice>
@@ -445,6 +473,32 @@ onUnmounted(() => {
       <Button variant="outline" size="sm" :disabled="spinning" @click="onReload">Retry</Button>
     </Notice>
     <p v-if="otherNodes.truncated.length" class="text-[11px] text-muted-foreground">Only the newest 50 runs of {{ otherNodes.truncated.join(', ') }} are shown.</p>
+
+    <div v-if="painted && shellState === 'ready'" class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <OverviewCell label="Runs" :icon="Workflow" tone="ok" :info="statsNote">
+        <template #value>{{ stats.total }}</template>
+        <span><CircleCheck class="text-status-ok" /><b>{{ stats.completed }}/{{ stats.total }}</b> completed</span>
+      </OverviewCell>
+      <OverviewCell label="Running" :icon="Activity" tone="aqua">
+        <template #value>{{ stats.active }}</template>
+        <span><Hourglass /><b>{{ stats.waiting }}</b> waiting to start</span>
+      </OverviewCell>
+      <OverviewCell label="Compute time" :icon="Timer" tone="sky" info="The time the started runs ran, added up.">
+        <template #value>{{ stats.time || '0s' }}</template>
+        <span><Workflow /><b>{{ stats.timed }}</b> {{ stats.timed === 1 ? 'run' : 'runs' }} started</span>
+      </OverviewCell>
+      <OverviewCell v-if="desktop" label="On this computer" :icon="Laptop" tone="royal">
+        <template #value>{{ stats.local }}</template>
+        <span><Server /><b>{{ stats.total - stats.local }}</b> in the realm</span>
+      </OverviewCell>
+      <OverviewCell v-else label="Nodes used" :icon="Server" tone="royal">
+        <template #value>{{ stats.nodes.length }}</template>
+        <span v-for="id in stats.nodes.slice(0, 2)" :key="id" class="min-w-0">
+          <Server /><RouterLink :to="{ name: 'node', params: { nodeId: id } }" class="truncate hover:text-foreground hover:underline">{{ displayName(id) }}</RouterLink>
+        </span>
+        <span v-if="stats.nodes.length > 2"><b>{{ stats.nodes.length - 2 }}</b> more</span>
+      </OverviewCell>
+    </div>
 
     <!-- 'loading' also covers the pre-fetch gap while init() awaits service
          info and a session that has not resolved yet. -->

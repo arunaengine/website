@@ -7,7 +7,7 @@ import { click, compileClientComponent, content, element, flush, moduleDefault, 
 
 const desktopMode = ref(true)
 const listTasks = vi.fn()
-const realmNodes = ref<Array<{ name: string; isLocal: boolean; apiBase: string | null; kind?: string }>>([])
+const realmNodes = ref<Array<{ name: string; nodeId?: string; isLocal: boolean; apiBase: string | null; kind?: string }>>([])
 
 const Plain = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
 const Empty = defineComponent(() => () => null)
@@ -18,6 +18,10 @@ const ShellStub = defineComponent({
     props.state === 'empty'
       ? h('div', [props.emptyTitle, slots['empty-actions']?.()])
       : h('div', [slots.filters?.(), slots.tools?.(), slots.default?.(), slots.footer?.()]),
+})
+const CellStub = defineComponent({
+  props: { label: String },
+  setup: (props, { slots }) => () => h('section', [props.label, ' ', slots.value?.(), ' ', slots.default?.()]),
 })
 const FilterChips = compileClientComponent(new URL('../ui/FilterChips.vue', import.meta.url), { vue: VueRuntime })
 
@@ -34,6 +38,7 @@ const TasksPanel = compileClientComponent(new URL('./TasksPanel.vue', import.met
   '@/components/ui/Notice.vue': moduleDefault(Plain),
   '@/components/ui/RefreshButton.vue': moduleDefault(Empty),
   '@/components/ui/Badge.vue': moduleDefault(Plain),
+  '@/components/dashboard/OverviewCell.vue': moduleDefault(CellStub),
   '@/components/ui/FilterChips.vue': moduleDefault(FilterChips),
   '@/components/ui/ListShell.vue': moduleDefault(ShellStub),
   '@/components/ui/ListSkeleton.vue': moduleDefault(Empty),
@@ -56,6 +61,8 @@ const TasksPanel = compileClientComponent(new URL('./TasksPanel.vue', import.met
     useRealmNodes: () => ({
       nodes: realmNodes,
       targets: computed(() => realmNodes.value.filter((node) => node.kind !== 'user')),
+      localNodeId: ref('node-1'),
+      displayName: (id: string) => `name of ${id}`,
     }),
   },
   '@/composables/useFirstPaint': { useFirstPaint: (ready: () => boolean) => computed(ready) },
@@ -215,6 +222,25 @@ describe('runs of devices', () => {
     await flush()
 
     expect(listTasks.mock.calls.map(([, baseUrl]) => baseUrl)).toEqual([undefined, 'https://n2.test/api/v1'])
+    realmNodes.value = []
+    mounted.app.unmount()
+  })
+})
+
+describe('the run figures', () => {
+  it('counts the completed runs and names the nodes they came from', async () => {
+    desktopMode.value = false
+    realmNodes.value = [{ name: 'node-2', nodeId: 'node-2', isLocal: false, apiBase: 'https://n2.test/api/v1' }]
+    const farRun = { id: 'J3', name: 'far-run', state: 'COMPLETE', creation_time: created, tags: {} }
+    listTasks.mockReset().mockImplementation(async (_params: unknown, baseUrl?: string) =>
+      baseUrl ? { tasks: [farRun] } : { tasks: [localRun, realmRun] })
+    const mounted = await mountApp(TasksPanel)
+    await flush()
+    const cards = nodes(mounted.root).filter((node) => node.tag === 'section').map((node) => content(node).replace(/\s+/g, ' '))
+
+    expect(cards).toContain('Runs 3 2/3 completed')
+    expect(cards).toContain('Running 1 0 waiting to start')
+    expect(cards.find((card) => card.startsWith('Nodes used'))).toBe('Nodes used 2 name of node-1name of node-2')
     realmNodes.value = []
     mounted.app.unmount()
   })

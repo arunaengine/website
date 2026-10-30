@@ -46,6 +46,9 @@ describe('new run menu', () => {
     const mounted = await mountApp(NewRunMenu)
 
     expect(content(mounted.root)).toContain('New run')
+    // The left half of the split button opens a blank run at once.
+    await click(button(mounted.root, 'New run'))
+    expect(push).toHaveBeenLastCalledWith({ name: 'compute-new' })
     const entries = ['Python script', 'JavaScript script', 'Bash script', 'Blank run']
     for (const entry of entries) expect(content(mounted.root)).toContain(entry)
     expect(

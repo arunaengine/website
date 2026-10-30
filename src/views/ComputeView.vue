@@ -15,6 +15,7 @@ import { useJobs } from '@/composables/useJobs'
 import { useAruna } from '@/composables/useAruna'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import { isDesktop } from '@/lib/desktop'
+import { Settings, Workflow } from '@lucide/vue'
 
 // The desktop shows whether this computer runs jobs; the web never loads it.
 const LocalCompute = defineAsyncComponent({
@@ -52,11 +53,7 @@ function setTab(next: string) {
 
 <template>
   <div>
-    <PageHeader
-      :title="pageTitle"
-      :description="desktop ? 'Your runs, on this computer or in the realm.' : 'The runs you started on any node, and the system jobs of this node.'"
-      :docs="{ topic: 'compute-run', section: 'Follow the run' }"
-    >
+    <PageHeader :title="pageTitle" :docs="{ topic: 'compute-run', section: 'Follow the run' }">
       <!-- One Run entry point; the menu explains the two ways to start one. -->
       <template v-if="tesEnabled && currentUser" #actions>
         <NewRunMenu size="sm" />
@@ -70,15 +67,15 @@ function setTab(next: string) {
       sign-in-description="Runs and system jobs are scoped to your account."
       :redirect-to="route.fullPath"
     >
-      <div class="w-full px-4 sm:px-6 py-8">
+      <div class="w-full px-4 py-6 sm:px-6">
         <LocalCompute v-if="desktop" class="mb-5" />
         <Tabs v-if="bothEnabled" :model-value="tab" @update:model-value="setTab">
           <TabsList>
-            <TabsTrigger value="tasks">Runs</TabsTrigger>
-            <TabsTrigger value="jobs">System jobs</TabsTrigger>
+            <TabsTrigger value="tasks"><Workflow class="size-4" aria-hidden="true" />Runs</TabsTrigger>
+            <TabsTrigger value="jobs"><Settings class="size-4" aria-hidden="true" />System jobs</TabsTrigger>
           </TabsList>
-          <TabsContent value="tasks" class="mt-4"><TasksPanel /></TabsContent>
-          <TabsContent value="jobs" class="mt-4"><JobsPanel /></TabsContent>
+          <TabsContent value="tasks" class="mt-6"><TasksPanel /></TabsContent>
+          <TabsContent value="jobs" class="mt-6"><JobsPanel /></TabsContent>
         </Tabs>
         <TasksPanel v-else-if="tesEnabled" />
         <JobsPanel v-else />
