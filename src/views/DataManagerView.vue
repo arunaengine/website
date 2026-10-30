@@ -495,7 +495,7 @@ async function createFolder() {
           @new-bucket="newBucketOpen = true"
         />
 
-        <BucketChooser v-if="!bucket && !narrow" :manager="manager" />
+        <BucketChooser v-if="!bucket && !narrow" />
         <ObjectBrowser
           v-else-if="bucket"
           :manager="manager"
