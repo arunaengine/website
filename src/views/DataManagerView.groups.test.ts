@@ -83,6 +83,12 @@ describe('Data view group selection', () => {
     expect(viewSource).toMatch(/\(\) => route\.query\.create,[\s\S]*?create !== 'bucket'[\s\S]*?newBucketOpen\.value = true[\s\S]*?router\.replace\(\{ query: rest \}\)/)
   })
 
+  it('opens Upload files only once a bucket is chosen', () => {
+    expect(viewSource).toContain("if (flag === '1') uploadPending.value = true")
+    expect(viewSource).toContain('if (!uploadPending.value || !bucket.value || !contextReady.value) return')
+    expect(template).toContain('Choose a bucket to upload files to.')
+  })
+
   it('shows one placeholder instead of stacked loading states', () => {
     expect(template.split('<DataViewSkeleton')).toHaveLength(3)
     expect(template).not.toContain('<Spinner')

@@ -270,13 +270,20 @@ watch(addDataOpen, (open) => {
   if (!open) addDataTab.value = addDataLink.value = undefined
 })
 
+// Upload files asks for a bucket first: the dialog opens once one is open and ready.
+const uploadPending = ref(false)
+watch([bucket, contextReady, uploadPending], () => {
+  if (!uploadPending.value || !bucket.value || !contextReady.value) return
+  uploadPending.value = false
+  addDataOpen.value = true
+})
 // The retired bucket-builder route redirects here with ?addData=1 so old links
 // land in the consolidated dialog; strip the marker once consumed.
 watch(
   () => route.query.addData,
   (flag) => {
     if (flag === undefined) return
-    if (flag === '1') addDataOpen.value = true
+    if (flag === '1') uploadPending.value = true
     const { addData: _addData, ...rest } = route.query
     void router.replace({ query: rest })
   },
@@ -470,6 +477,9 @@ async function createFolder() {
       <section v-else class="grid gap-x-6 gap-y-8" :class="narrow ? '' : 'grid-cols-[300px_minmax(0,1fr)] 2xl:grid-cols-[340px_minmax(0,1fr)]'">
         <Notice v-if="sessionWarning" tone="warning" :class="narrow ? '' : 'col-span-2'">
           {{ sessionWarning }}
+        </Notice>
+        <Notice v-if="uploadPending && !bucket" :class="narrow ? '' : 'col-span-2'">
+          Choose a bucket to upload files to.
         </Notice>
 
         <!-- A narrow view without an open bucket shows the list itself instead of the title picker. -->
