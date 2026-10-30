@@ -1,22 +1,28 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import * as DatasetPurpose from '@/lib/datasetPurpose'
+import * as Licenses from '@/lib/licenses'
 import { PROCESS_RUN_PROFILE_URI } from '@/lib/profiles/builtinProfiles'
-import { compileClientComponent, content, element, flush, mountApp, nodes } from '@/test/clientRender'
+import { compileClientComponent, content, element, flush, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 
 const metadata = ref<unknown[]>([])
 const listRecentMetadata = vi.fn()
 const LinkStub = defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()) })
+const Pass = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
+const HeadingStub = defineComponent({ props: { title: String }, setup: (props, { slots }) => () => h('div', [h('h2', props.title), slots.actions?.()]) })
 const RecentDatasetsCard = compileClientComponent(new URL('./RecentDatasetsCard.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': { RouterLink: LinkStub },
-  '@/composables/useAruna': { useAruna: () => ({ metadata, listRecentMetadata, sessionEpoch: ref(1) }) },
+  '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => null) }),
+  '@/components/ui/Button.vue': moduleDefault(Pass),
+  '@/components/ui/SectionHeading.vue': moduleDefault(HeadingStub),
+  '@/components/ui/StatusMark.vue': moduleDefault(defineComponent(() => () => null)),
+  '@/composables/useAruna': { useAruna: () => ({ metadata, myGroups: ref([{ id: 'g1', name: 'demo' }]), listRecentMetadata, sessionEpoch: ref(1) }) },
+  '@/lib/licenses': Licenses,
   '@/lib/utils': { relativeTime: (value: string) => `at ${value}` },
-  '@/lib/datasetPurpose': DatasetPurpose,
 })
 
-const doc = (ulid: string, title: string, updatedAt: string) => ({ ulid, title, updatedAt, type: 'Dataset', conformsToIds: [] as string[] })
+const doc = (ulid: string, title: string, updatedAt: string) => ({ ulid, title, updatedAt, type: 'Dataset', conformsToIds: [] as string[], linkedObjects: [] as string[], license: '', realmId: '' })
 const run = (ulid: string, title: string) => ({ ...doc(ulid, title, '2026-10-29'), conformsToIds: [PROCESS_RUN_PROFILE_URI] })
 
 describe('recent datasets', () => {
@@ -25,11 +31,12 @@ describe('recent datasets', () => {
     const mounted = await mountApp(RecentDatasetsCard)
     await flush()
 
-    expect(nodes(mounted.root).filter((node) => node.tag === 'a' && node.props['data-to']?.toString().includes('dataset"')).map((node) => content(node))).toEqual([
-      'Reef censusat 2026-10-29',
-      'Coral surveyat 2026-10-28',
+    expect(nodes(mounted.root).filter((node) => node.tag === 'a' && node.props['data-to']?.toString().includes('dataset"')).map((node) => content(node).trim())).toEqual([
+      'Reef census',
+      'Coral survey',
     ])
-    expect(JSON.parse(String(element(mounted.root, (node) => node.tag === 'a' && content(node) === 'Reef censusat 2026-10-29').props['data-to']))).toEqual({ name: 'dataset', params: { id: 'd2' } })
+    expect(JSON.parse(String(element(mounted.root, (node) => node.tag === 'a' && content(node).trim() === 'Reef census').props['data-to']))).toEqual({ name: 'dataset', params: { id: 'd2' } })
+    expect(content(mounted.root)).toContain('Updated at 2026-10-29')
     expect(content(mounted.root)).toContain('All datasets')
     mounted.app.unmount()
   })
@@ -44,13 +51,17 @@ describe('recent datasets', () => {
     metadata.value = []
   })
 
-  it('leaves run records to the runs card and offers to create a dataset when none remain', async () => {
-    listRecentMetadata.mockClear().mockResolvedValueOnce({ documents: [run('r1', 'Annotate my genome with Bakta'), doc('d1', 'Reef census', '2026-10-28')], complete: true })
+  it('lists run records too, with their files, group and license, and offers to create a dataset when none exist', async () => {
+    listRecentMetadata.mockClear().mockResolvedValueOnce({
+      documents: [{ ...run('r1', 'Annotate my genome with Bakta'), linkedObjects: ['a', 'b'], realmId: 'g1', license: 'https://creativecommons.org/licenses/by/4.0/' }, doc('d1', 'Reef census', '2026-10-28')],
+      complete: true,
+    })
     const mixed = await mountApp(RecentDatasetsCard)
     await flush()
-    expect(listRecentMetadata).toHaveBeenCalledWith(5, { skipRuns: true })
-    expect(content(mixed.root)).toContain('Reef census')
-    expect(content(mixed.root)).not.toContain('Annotate my genome')
+    expect(listRecentMetadata).toHaveBeenCalledWith(5)
+    const text = content(mixed.root).replace(/\s+/g, ' ')
+    expect(text).toContain('Annotate my genome with Bakta2 filesdemoCC BY 4.0Updated at 2026-10-29')
+    expect(text).toContain('Reef censusUpdated at 2026-10-28')
     mixed.app.unmount()
 
     // The registry was read to its end and holds no dataset.
@@ -73,11 +84,10 @@ describe('recent datasets', () => {
     cut.app.unmount()
 
     listRecentMetadata.mockResolvedValueOnce(null)
-    metadata.value = [run('r1', 'Annotate my genome with Bakta')]
+    metadata.value = []
     const window = await mountApp(RecentDatasetsCard)
     await flush()
     expect(content(window.root)).toContain('No recent datasets.')
     window.app.unmount()
-    metadata.value = []
   })
 })
