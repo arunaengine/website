@@ -386,6 +386,7 @@ describe('distributed job detail components', () => {
   }
   const figureModules = {
     vue: VueRuntime,
+    '@lucide/vue': icons,
     '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
     '@/components/ui/Button.vue': moduleDefault(ButtonStub),
     '@/components/ui/DocsLink.vue': moduleDefault(PassThroughStub),

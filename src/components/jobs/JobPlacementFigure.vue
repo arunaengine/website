@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// What the plan decided, as one sentence and one bar. The per-input and
+// What the plan decided, as one sentence and one line of figures. The per-input and
 // per-candidate rows stay behind buttons: a run may carry hundreds of both.
 import { computed, ref } from 'vue'
+import { ArrowLeftRight, MapPin } from '@lucide/vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import DocsLink from '@/components/ui/DocsLink.vue'
@@ -71,7 +72,6 @@ const stayedBytes = computed(() =>
   inputs.value.reduce((total, input) => (input.source_node_id ? total : total + input.bytes), 0),
 )
 const totalBytes = computed(() => stayedBytes.value + movedBytes.value)
-const stayedPercent = computed(() => (totalBytes.value ? (stayedBytes.value / totalBytes.value) * 100 : 0))
 
 function estimatedTime(ms: number): string {
   return ms < 1000 ? `${ms} ms` : formatDuration(ms)
@@ -143,26 +143,16 @@ function candidateVerdict(verdictName: string, rank?: number): string {
       </div>
 
       <div v-if="placement" class="space-y-2 p-3">
-        <template v-if="totalBytes && inputs.length">
-          <div
-            class="flex h-1.5 overflow-hidden rounded-full bg-muted"
-            role="img"
-            :aria-label="`${formatBytes(stayedBytes)} stayed, ${formatBytes(movedBytes)} moved`"
-          >
-            <div class="bg-emerald-500" :style="{ width: `${stayedPercent}%` }" />
-            <div class="bg-aruna-sky" :style="{ width: `${100 - stayedPercent}%` }" />
-          </div>
-          <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-            <span class="inline-flex items-center gap-1.5">
-              <span aria-hidden="true" class="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-              {{ formatBytes(stayedBytes) }} stayed
-            </span>
-            <span class="inline-flex items-center gap-1.5">
-              <span aria-hidden="true" class="inline-block h-2 w-2 rounded-full bg-aruna-sky" />
-              {{ formatBytes(movedBytes) }} moved, ~{{ estimatedTime(movedMs) }}
-            </span>
-          </div>
-        </template>
+        <p v-if="totalBytes && inputs.length" class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span class="inline-flex items-center gap-1.5">
+            <MapPin class="size-3.5 shrink-0" aria-hidden="true" />
+            <b class="font-medium text-foreground">{{ formatBytes(stayedBytes) }}</b> stayed
+          </span>
+          <span class="inline-flex items-center gap-1.5">
+            <ArrowLeftRight class="size-3.5 shrink-0" aria-hidden="true" />
+            <b class="font-medium text-foreground">{{ formatBytes(movedBytes) }}</b> moved, ~{{ estimatedTime(movedMs) }}
+          </span>
+        </p>
 
         <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
           <span v-if="placement.target_node_id" class="inline-flex items-center gap-1">
