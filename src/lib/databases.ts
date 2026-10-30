@@ -95,6 +95,12 @@ export function pageIdentifier(text: string): BucketIdentifier | null {
   return /^https?:\/\/\S+$/i.test(value) ? { name: 'Link', value, url: value } : null
 }
 
+/** Where an identifier resolves: its own http(s) link, else a DOI's doi.org page, else nowhere. */
+export function identifierUrl(item: { value: string; url?: string | null }): string | null {
+  if (item.url && /^https?:\/\//i.test(item.url)) return item.url
+  return pageIdentifier(item.value)?.url ?? null
+}
+
 /** The identifiers with the first DOI or link replaced by the field's value; others stay. */
 export function withPage(identifiers: readonly BucketIdentifier[], text: string): BucketIdentifier[] {
   const page = pageIdentifier(text)

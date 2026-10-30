@@ -10,6 +10,7 @@ import * as PublicAccessLib from '@/lib/publicAccess'
 import * as SyncLib from '@/lib/sync'
 import * as ChecksumsLib from '@/lib/checksums'
 import * as ContentIdentity from '@/lib/contentIdentity'
+import * as DatabasesLib from '@/lib/databases'
 import {
   button,
   click,
@@ -54,6 +55,15 @@ const ButtonStub = defineComponent({
 const headObject = vi.fn()
 const apiRequest = vi.fn()
 const getFileOrigin = vi.fn()
+// The origin section hands its answer to the details; null stands for a section still reading.
+const originAnswer = ref<Record<string, unknown> | null>(null)
+const OriginStub = defineComponent({
+  emits: ['origin'],
+  setup: (_, { emit }) => {
+    emit('origin', originAnswer.value)
+    return () => h('section', 'origin of this version')
+  },
+})
 let afterReset: (() => void) | null = null
 const hasActiveKey = ref(true)
 const currentUser = ref<{ id: string } | null>({ id: 'u-1' })
@@ -73,6 +83,7 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   '@/components/ui/DetailDialog.vue': moduleDefault(DetailDialogStub),
   '@/components/ui/DetailList.vue': moduleDefault(compileClientComponent(new URL('../ui/DetailList.vue', import.meta.url), { vue: VueRuntime })),
   '@/components/ui/DialogTitle.vue': moduleDefault(Slotted('h2')),
+  '@/components/ui/ExternalLink.vue': moduleDefault(defineComponent({ props: { href: String, label: String }, setup: (props) => () => h('a', { href: props.href }, props.label) })),
   '@/components/ui/Spinner.vue': moduleDefault(Slotted('i')),
   '@/components/ui/Tabs.vue': moduleDefault(TabsStub),
   '@/components/ui/TabsContent.vue': moduleDefault(TabsContentStub),
@@ -82,7 +93,7 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   '@/components/data/MockFileStorage.vue': moduleDefault(Marker('mock file storage')),
   '@/components/data/LinkedDatasets.vue': moduleDefault(Marker('datasets that link this')),
   '@/components/data/FilePartOf.vue': moduleDefault(Marker('datasets this file is part of')),
-  '@/components/data/FileOrigin.vue': moduleDefault(Marker('origin of this version')),
+  '@/components/data/FileOrigin.vue': moduleDefault(OriginStub),
   '@/components/data/ObjectMetadata.vue': moduleDefault(compileClientComponent(new URL('./ObjectMetadata.vue', import.meta.url), { vue: VueRuntime })),
   '@/lib/distributedMock': { mockEnabled: () => false },
   '@/lib/distributedMockData': { mockFile: () => undefined },
@@ -113,6 +124,7 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   '@/lib/api': { ApiError, apiRequest },
   '@/lib/checksums': ChecksumsLib,
   '@/lib/contentIdentity': ContentIdentity,
+  '@/lib/databases': DatabasesLib,
   '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
   '@/composables/useAruna': {
     useAruna: () => ({
@@ -384,6 +396,44 @@ describe('file details facts', () => {
     expect(content(root)).not.toContain('Content type')
     expect(content(root)).not.toContain('Current version')
     expect(content(root)).not.toContain('unknown')
+  })
+})
+
+describe('file details identifiers', () => {
+  const links = (root: Parameters<typeof content>[0]) =>
+    nodes(root).filter((node) => node.tag === 'a' && node.props.href).map((node) => `${content(node)} ${node.props.href}`)
+
+  it('shows the file, record and dataset identifiers the origin names, as links where they resolve', async () => {
+    originAnswer.value = {
+      content_id: 'https://w3id.org/aruna/data/abc',
+      identifiers: [{ name: 'RefSeq assembly', value: 'GCF_000005845.2', url: 'https://www.ncbi.nlm.nih.gov/assembly/GCF_000005845.2', target: 'key' }],
+      bucket_metadata: {
+        database: true,
+        identifiers: [{ name: 'DOI', value: '10.5281/zenodo.4247252', url: '' }, { name: 'Accession', value: 'PRJNA1', url: '' }],
+        dataset: 'doc-1',
+      },
+    }
+    const { root } = await mount('general')
+    originAnswer.value = null
+    const text = content(root)
+
+    expect(text).toContain('Identifiers')
+    expect(text).toContain('Record')
+    expect(text).toContain('Dataset')
+    expect(links(root)).toEqual([
+      'https://w3id.org/aruna/data/abc https://w3id.org/aruna/data/abc',
+      'GCF_000005845.2 https://www.ncbi.nlm.nih.gov/assembly/GCF_000005845.2',
+      '10.5281/zenodo.4247252 https://doi.org/10.5281/zenodo.4247252',
+    ])
+    expect(element(root, (node) => node.props['data-copy'] === 'PRJNA1')).toBeTruthy()
+    expect(element(root, (node) => node.props['data-to'] === JSON.stringify({ name: 'dataset', params: { id: 'doc-1' } }))).toBeTruthy()
+  })
+
+  it('shows no identifier rows while the origin is unknown', async () => {
+    const text = content((await mount('general')).root)
+
+    expect(text).not.toContain('Identifiers')
+    expect(text).not.toContain('Record')
   })
 })
 

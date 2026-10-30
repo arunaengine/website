@@ -1,10 +1,9 @@
 <script setup lang="ts">
 // Where a file version came from, as the node recorded it when the version was made. A sync adds
 // the version it copied from. The ids and what a dataset may say about the file wait in Details.
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import OriginLine from '@/components/data/OriginLine.vue'
-import ExternalLink from '@/components/ui/ExternalLink.vue'
 import ProvenanceView from '@/components/data/ProvenanceView.vue'
 import Button from '@/components/ui/Button.vue'
 import DetailDialog from '@/components/ui/DetailDialog.vue'
@@ -16,14 +15,18 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { s3ErrorMessage, useS3 } from '@/composables/useS3'
 import { ARUNA_CONTENT_W3ID_PREFIX, versionObjectId } from '@/lib/contentIdentity'
 import { hopFrom, originFrom, projectionRows } from '@/lib/fileOrigin'
+import type { OriginResponse } from '@/lib/api'
 import type { ProvenanceStart } from '@/lib/provenance'
 import { shortUserId, truncateMiddle } from '@/lib/utils'
 
 const props = defineProps<{ target: OriginTarget }>()
+// The answer goes to the details above, which show the identifiers in it.
+const emit = defineEmits<{ (e: 'origin', value: OriginResponse | null): void }>()
 
 const { displayName, localNodeId } = useRealmNodes()
 const s3 = useS3()
 const found = useFileOrigin(computed(() => props.target))
+watch(() => found.origin.value, (value) => emit('origin', value), { immediate: true })
 
 const origin = computed(() =>
   found.origin.value
@@ -53,8 +56,6 @@ const start = computed<ProvenanceStart | null>(() => {
   const origin = found.origin.value
   return origin && startId.value ? { kind: 'file', id: startId.value, name: fileName.value, origin } : null
 })
-// Links to public records; they come from the bucket's rules as they are now.
-const identifiers = computed(() => found.origin.value?.identifiers ?? [])
 // The version downloads through this session's short-lived signed URL, never with the token in a URL.
 const downloadError = ref<string | null>(null)
 async function download() {
@@ -88,13 +89,6 @@ const recorded = computed(() => Boolean(origin.value || hop.value))
         <OriginLine v-if="origin" short :origin="origin" />
         <OriginLine v-if="hop" short :origin="hop" />
         <p v-if="!recorded" class="text-muted-foreground">Not recorded for this version.</p>
-      </div>
-      <div v-if="identifiers.length" class="space-y-0.5 text-xs">
-        <p v-for="item in identifiers" :key="`${item.name}:${item.value}`">
-          <span class="text-muted-foreground">Identifier:</span> {{ item.name }}
-          <ExternalLink :href="item.url" :label="item.value" class="font-mono" />
-        </p>
-        <p class="text-muted-foreground">Found by the current rules of the bucket.</p>
       </div>
       <div v-if="startId">
         <Button size="sm" variant="outline" @click="showing = true">Where it came from</Button>

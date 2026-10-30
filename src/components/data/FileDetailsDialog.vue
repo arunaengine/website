@@ -10,6 +10,7 @@ import CopyButton from '@/components/ui/CopyButton.vue'
 import DetailDialog from '@/components/ui/DetailDialog.vue'
 import DetailList, { type Detail } from '@/components/ui/DetailList.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
+import ExternalLink from '@/components/ui/ExternalLink.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
@@ -37,9 +38,10 @@ import type { SyncRow } from '@/composables/useBucketSyncs'
 import { usePublicAccess, type PublicAccess } from '@/composables/usePublicAccess'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { useAssistantObject } from '@/composables/useAssistantObject'
-import { ApiError, apiRequest } from '@/lib/api'
+import { ApiError, apiRequest, type OriginResponse } from '@/lib/api'
 import { exactFileBacklinkPreflight } from '@/lib/backlinks'
 import { fileChecksums, type FileChecksum } from '@/lib/checksums'
+import { identifierUrl } from '@/lib/databases'
 import { versionObjectId, type DrsObjectResponse } from '@/lib/contentIdentity'
 import { publicUrl, type PublicTarget } from '@/lib/publicAccess'
 import { arnLocationLabel, parseArunaArn } from '@/lib/sync'
@@ -302,9 +304,26 @@ const details = computed(() => props.folder ? [
   { label: 'Last modified', value: shownModified.value ? relativeTime(shownModified.value.toISOString()) : '' },
   { label: 'Content type', value: head.value?.contentType || '' },
 ])
+// The origin answer of the shown version, read by the origin section below the details.
+const origin = ref<OriginResponse | null>(null)
+watch(() => [props.open, props.bucket, props.objectKey], () => (origin.value = null))
+// Identifiers of the file, of its record by the bucket's rules, and of the dataset the bucket is.
+type Identifier = { name: string; value: string; url: string | null }
+const identifierRows = computed(() => {
+  const answer = origin.value
+  const entries = (items: { name: string; value: string; url?: string | null }[]): Identifier[] =>
+    items.map((item) => ({ name: item.name, value: item.value, url: identifierUrl(item) }))
+  const bucket = answer?.bucket_metadata
+  return [
+    { key: 'file-ids', label: 'Identifiers', entries: entries(answer?.content_id ? [{ name: 'Content id', value: answer.content_id, url: answer.content_id }] : []), dataset: null },
+    { key: 'record-ids', label: 'Record', entries: entries(answer?.identifiers ?? []), dataset: null },
+    { key: 'dataset-ids', label: 'Dataset', entries: entries(bucket?.identifiers ?? []), dataset: bucket?.dataset ?? null },
+  ].filter((row) => row.entries.length || row.dataset)
+})
 // Label above value; a fact the node did not give is left out, never shown as unknown.
 const generalItems = computed<Detail[]>(() => [
   ...details.value.filter((detail) => detail.value),
+  ...identifierRows.value.map((row) => ({ key: row.key, label: row.label, value: '' })),
   ...(!props.folder && (headBusy.value || currentVersion.value) ? [{ key: 'version', label: 'Current version', value: currentVersion.value ?? '' }] : []),
   ...(props.groupId && !mock.value ? [{ key: 'access', label: 'Public access', value: '' }] : []),
 ])
@@ -397,6 +416,19 @@ const generalItems = computed<Detail[]>(() => [
                 </template>
               </span>
             </template>
+            <template v-for="row in identifierRows" :key="row.key" #[row.key]>
+              <span class="flex flex-col gap-1">
+                <span v-for="item in row.entries" :key="`${item.name}:${item.value}`" class="flex min-w-0 items-center gap-1.5">
+                  <span class="shrink-0 text-muted-foreground">{{ item.name }}</span>
+                  <ExternalLink v-if="item.url" :href="item.url" :label="item.value" class="min-w-0 break-all font-mono text-xs" />
+                  <template v-else>
+                    <span class="min-w-0 break-all font-mono text-xs">{{ item.value }}</span>
+                    <CopyButton :value="item.value" :label="`Copy the ${item.name}`" />
+                  </template>
+                </span>
+                <RouterLink v-if="row.dataset" :to="{ name: 'dataset', params: { id: row.dataset } }" class="text-primary hover:underline">Open the dataset</RouterLink>
+              </span>
+            </template>
             <template #access>
               <span class="flex flex-wrap items-center gap-2">
                 <span class="inline-flex items-center gap-1.5">
@@ -450,6 +482,7 @@ const generalItems = computed<Detail[]>(() => [
           v-if="props.open && !mock && !remote && !props.folder"
           class="mt-4"
           :target="{ bucket: props.bucket, key: props.objectKey, versionId: pinnedVersion }"
+          @origin="(value) => (origin = value)"
         />
         <FilePartOf
           v-if="props.open && !mock && !remote && !props.folder"

@@ -81,7 +81,7 @@ describe('file origin', () => {
 })
 
 describe('file origin identifiers', () => {
-  it('shows each identifier of the database as a link, and adds it to datasets', async () => {
+  it('hands its answer to the details, which show the identifiers, and adds them to datasets', async () => {
     const url = 'https://www.ebi.ac.uk/biosamples/samples/SAMN15803895'
     state.value = 'ready'
     origin.value = response({
@@ -90,10 +90,13 @@ describe('file origin identifiers', () => {
       identifiers: [{ name: 'BioSample', value: 'SAMN15803895', url, target: 'key' }],
       projection: [{ property: 'identifier', name: 'BioSample', value: 'SAMN15803895', url }],
     })
-    const root = await render()
+    const handed: unknown[] = []
+    const { root } = await mountApp(component, {
+      props: { target: { bucket: 'spire', key: 'a.tsv', versionId: null }, onOrigin: (value: unknown) => handed.push(value) },
+    })
 
-    expect(content(root)).toContain('Identifier: BioSample SAMN15803895')
-    expect(content(root)).toContain('Found by the current rules of the bucket.')
+    expect(handed).toEqual([origin.value])
+    expect(content(root)).not.toContain('Identifier: BioSample')
     expect(content(root)).toContain('identifierBioSample SAMN15803895')
   })
 })
