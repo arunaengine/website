@@ -45,13 +45,13 @@ const target = (tile: Tile) => ({
 </script>
 
 <template>
-  <div class="flex min-w-0 flex-col">
-    <SectionHeading title="Choose a bucket" :icon="FolderOpen" />
-    <div class="surface flex flex-1 flex-col">
+  <div class="min-w-0 self-start">
+    <SectionHeading title="Files" :icon="FolderOpen" />
+    <div class="surface">
       <div class="px-5 py-8 text-center">
         <div class="mb-3 flex justify-center"><IconTile :icon="Boxes" tone="muted" /></div>
-        <p class="text-sm font-medium text-foreground">Choose a bucket</p>
-        <p class="mt-1 text-sm text-muted-foreground">Its files, folders and search show up here.</p>
+        <p class="text-sm font-medium text-foreground">No bucket open</p>
+        <p class="mt-1 text-sm text-muted-foreground">Choose a bucket to see its files.</p>
       </div>
       <ul v-if="tiles.length" class="grid gap-3 border-t border-border-subtle p-4 sm:grid-cols-2 2xl:grid-cols-3">
         <li v-for="tile in tiles" :key="tile.key">
