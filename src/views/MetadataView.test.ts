@@ -1,35 +1,34 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-// The page pulls in the whole portal, so the tab wiring is checked at the
-// source: three tabs, the graph inside "For developers", and an opened node
-// lands in the same dialog the file rows use.
+// The page pulls in the whole portal, so the layout wiring is checked at the source: four tabs, one
+// area at a time on the overview, and an opened entity lands in the same dialog the file rows use.
 const source = readFileSync(new URL('./MetadataView.vue', import.meta.url), 'utf8')
+const details = readFileSync(new URL('../components/metadata/view/DatasetDetails.vue', import.meta.url), 'utf8')
 
 describe('MetadataView', () => {
-  it('offers overview, where it came from and history, with the graph among the developer parts', () => {
+  it('offers overview, provenance, history and JSON-LD tabs', () => {
     expect(source).toContain('<TabsTrigger value="overview"><LayoutDashboard class="size-4" /> Overview</TabsTrigger>')
-    // A phone names the provenance tab Source.
-    expect(source).toContain('<span class="max-sm:hidden">Where it came from</span><span class="sm:hidden">Source</span>')
+    expect(source).toContain('<TabsTrigger value="provenance"><GitBranch class="size-4" /> Provenance</TabsTrigger>')
+    expect(source).toContain('<TabsTrigger v-if="historyShown" value="history">')
+    expect(source).toContain('<TabsTrigger value="jsonld"><Braces class="size-4" /> JSON-LD</TabsTrigger>')
     expect(source).not.toContain('<TabsTrigger value="graph">')
-    expect(source).toContain('For developers')
-    expect(source).toContain('<DatasetGraph v-if="developersOpen" :state="state" @open="openInfo" />')
     expect(source).toContain('<template v-if="tab === \'overview\'">')
   })
 
-  it('opens the developer section for every old graph link, also on a reused page', () => {
-    expect(source).toContain("watch(routeTab, (value) => value === 'graph' && (developersOpen.value = true), { immediate: true })")
+  it('puts About first, then one area chosen in the seg query', () => {
+    const overview = source.slice(source.indexOf('<template v-if="tab === \'overview\'">'))
+    expect(overview.indexOf('<DatasetAbout')).toBeLessThan(overview.indexOf('<OptionToggle'))
+    expect(source).toContain("useRouteTab(['files', 'people', 'runs', 'graph', 'details'], '', 'seg')")
+    expect(source).toContain("return isRun.value && actionCount.value ? 'runs' : 'files'")
+    // An old graph tab link opens the graph area.
+    expect(source).toContain("const wanted = routeTab.value === 'graph' ? 'graph' : routeSeg.value")
   })
 
-  it('keeps the people, context and details of a run record in the developer section inside What ran', () => {
-    const overview = source.slice(source.indexOf('<RunProvenancePanel'), source.indexOf('<ReuseDevelopers v-if'))
-    const developers = source.slice(source.indexOf('<DefineDevelopers>'), source.indexOf('</DefineDevelopers>'))
-    expect(overview).toContain('<ReuseDevelopers />\n          </RunProvenancePanel>')
-    expect(overview).toContain('<template v-if="!runProvenance">\n            <PeopleSection')
-    expect(developers).toContain('<template v-if="runProvenance">\n          <DetailsSection')
-    expect(developers).toContain('<PeopleSection')
-    expect(developers).toContain('<ContextSection')
-    expect(overview).toContain('<DetailsSection\n            v-if="!runProvenance"')
+  it('shows a run record in full under Runs with the other runs as a table', () => {
+    const runs = source.slice(source.indexOf('<template v-else-if="seg === \'runs\'">'), source.indexOf('<DatasetGraph'))
+    expect(runs).toContain('<RunProvenancePanel v-if="runProvenance"')
+    expect(runs).toContain(':skip="runProvenance?.actionId"')
   })
 
   it('opens the run results in the record group and on the node holding them', () => {
@@ -39,10 +38,9 @@ describe('MetadataView', () => {
     expect(results).toContain('...(isLocalNode(node) ? {} : { node })')
   })
 
-  it('shows the dataset id once, in the developer section with a copy button', () => {
-    expect(source.match(/\{\{ detailId \}\}/g)).toHaveLength(1)
-    expect(source).toContain('<CopyButton :value="detailId" label="Copy the dataset id" />')
-    expect(source).not.toContain('<DatasetHeader')
+  it('shows the dataset id once, in Details with a copy button', () => {
+    expect(source).not.toContain('{{ detailId }}')
+    expect(details).toContain('<CopyButton :value="detailId" label="Copy the dataset ID" />')
   })
 
   it('returns to the overview for a jump out of the entity dialog', () => {
@@ -51,7 +49,7 @@ describe('MetadataView', () => {
   })
 
   it('keeps the repository links loaded on every tab for the published badge', () => {
-    expect(source).toContain(':class="{ hidden: tab !== \'overview\' || !shown(\'repositories\') }"')
+    expect(source).toContain(":class=\"{ hidden: tab !== 'overview' || seg !== 'details' || !shown('repositories') }\"")
     expect(source).toContain('v-if="published.length"')
     expect(source).toContain(':hide-manage="!shown(\'repositories\')"')
     expect(source).toContain('@manage="manageRepositories"')

@@ -5,15 +5,19 @@ import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Notice from '@/components/ui/Notice.vue'
-import StatusMark from '@/components/ui/StatusMark.vue'
+import OptionToggle from '@/components/ui/OptionToggle.vue'
 import StatusPill from '@/components/ui/StatusPill.vue'
-import DetailsSection from '@/components/metadata/DetailsSection.vue'
-import PeopleSection from '@/components/metadata/PeopleSection.vue'
 import ContextSection from '@/components/metadata/ContextSection.vue'
+import CrateTypeBadge from '@/components/datasets/CrateTypeBadge.vue'
+import DatasetTile from '@/components/datasets/DatasetTile.vue'
+import CiteDialog from '@/components/metadata/view/CiteDialog.vue'
+import CrateRuns from '@/components/metadata/view/CrateRuns.vue'
+import DatasetAbout from '@/components/metadata/view/DatasetAbout.vue'
+import DatasetDetails from '@/components/metadata/view/DatasetDetails.vue'
+import PeoplePlaces from '@/components/metadata/view/PeoplePlaces.vue'
 import CrateImportExport from '@/components/metadata/CrateImportExport.vue'
 import CrateTransferDialog from '@/components/metadata/CrateTransferDialog.vue'
 import SubcratesSection from '@/components/metadata/SubcratesSection.vue'
-import PersistentIdSection from '@/components/metadata/PersistentIdSection.vue'
 import RunProvenancePanel from '@/components/metadata/RunProvenancePanel.vue'
 import RepositoryLinksSection from '@/components/metadata/view/RepositoryLinksSection.vue'
 import RepositoryPublishDialog from '@/components/metadata/view/RepositoryPublishDialog.vue'
@@ -23,12 +27,6 @@ import DatasetDetailSkeleton from '@/components/metadata/view/DatasetDetailSkele
 import DatasetFiles from '@/components/metadata/view/DatasetFiles.vue'
 import DatasetGraph from '@/components/metadata/view/DatasetGraph.vue'
 import DatasetProvenance from '@/components/metadata/view/DatasetProvenance.vue'
-import AuthorChips from '@/components/metadata/AuthorChips.vue'
-import ProfileChip from '@/components/metadata/ProfileChip.vue'
-import CopyButton from '@/components/ui/CopyButton.vue'
-import ExternalLink from '@/components/ui/ExternalLink.vue'
-import DatasetGitRow from '@/components/metadata/view/DatasetGitRow.vue'
-import DatasetStorageRow from '@/components/metadata/view/DatasetStorageRow.vue'
 import DatasetRelated from '@/components/metadata/view/DatasetRelated.vue'
 import DatasetHistory from '@/components/metadata/history/DatasetHistory.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
@@ -44,8 +42,7 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import DataEntityDialog from '@/components/metadata/DataEntityDialog.vue'
 import { computed, nextTick, ref, watch } from 'vue'
-import { createReusableTemplate } from '@vueuse/core'
-import { useRouter, RouterLink } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useDatasetView } from '@/composables/useDatasetView'
 import { useDatasetHistory } from '@/composables/useDatasetHistory'
@@ -54,21 +51,21 @@ import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { providePageContext } from '@/composables/usePageContext'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { datasetPurposeOf } from '@/lib/datasetPurpose'
-import { resultsFolder, runDuration, runState } from '@/lib/runCrate'
+import { crateActions, crateTypeOf } from '@/lib/crateType'
+import { aboutFacts, bylineOf, citationText } from '@/lib/datasetAbout'
+import { mainAction } from '@/lib/datasetFacts'
+import { crateGraph, crateRootId, stringProp } from '@/lib/dataEntities'
+import { resultsFolder, runState } from '@/lib/runCrate'
 import { folderRoute, parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { useS3 } from '@/composables/useS3'
 import { type MetadataDocumentSummary, type RepositoryLink, type StorageLocation } from '@/lib/api'
 import { publishedLinks } from '@/lib/repository'
-import { errorMessage, isHttpUrl, relativeTime, truncateMiddle } from '@/lib/utils'
-import { ArrowLeft, Clock, Code2, Container, GitBranch, History as HistoryIcon, LayoutDashboard, Scale, Server, Timer, Users } from '@lucide/vue'
+import { errorMessage } from '@/lib/utils'
+import { ArrowLeft, Braces, FolderTree, GitBranch, History as HistoryIcon, LayoutDashboard, List, Play, Share2, Users } from '@lucide/vue'
 
 const router = useRouter()
-// The developer details sit inside a run record's What ran card and below any other dataset.
-const [DefineDevelopers, ReuseDevelopers] = createReusableTemplate()
-const { currentUser, saving, deleteMetadataDocument, fullCrates, sessionEpoch, myGroups } = useAruna()
-// The breadcrumb names a group the reader belongs to; another group keeps its short id.
-const groupLabel = (id: string) => myGroups.value.find((group) => group.id === id)?.name ?? truncateMiddle(id)
+const route = useRoute()
+const { currentUser, saving, deleteMetadataDocument, fullCrates, sessionEpoch, realm } = useAruna()
 const { shown } = usePortalFeatures()
 
 const state = useDatasetView()
@@ -96,31 +93,27 @@ const {
   presentation,
   highlightId,
   jumpEntity,
-  licenseLabel,
   projectCrate,
 } = state
 const { displayName, isLocalNode } = useRealmNodes()
 
-// One header for the dataset: its kind, a run's state and where it ran, and a line of facts.
-const KIND = { 'process-run': 'Run record', profile: 'Profile', dataset: 'Dataset', unknown: 'Dataset' } as const
-const KINDS = { 'process-run': 'Run records', profile: 'Profiles', dataset: 'Datasets', unknown: 'Datasets' } as const
-const purpose = computed(() => datasetPurposeOf(current.value))
+// One header for every crate: one type pill, a run's outcome, and who made it.
+const crateType = computed(() => crateTypeOf(current.value))
+const isRun = computed(() => crateType.value.endsWith('-run'))
 const groupId = computed(() => current.value?.realmId || fetchedSummary.value?.group_id || '')
-const groupMember = computed(() => myGroups.value.some((group) => group.id === groupId.value))
+// A run still going shows its state; a finished one has the check or cross after the type pill.
 const runStateLabel = computed(() => {
   const value = runProvenance.value ? runState(runProvenance.value) : null
-  if (value === 'succeeded') return 'Completed'
-  if (value === 'failed') return 'Failed'
-  return value
+  return value === 'succeeded' || value === 'failed' ? null : value
 })
-const runTool = computed(() => runProvenance.value?.instrument?.name || runProvenance.value?.container?.name || '')
+const byline = computed(() => bylineOf(currentCrate.value, isRun.value ? mainAction(currentCrate.value) : undefined))
 const pageTitle = computed(() => current.value?.title || fetchedSummary.value?.document_path || 'Dataset')
 // Datasets, then the kind's own list where it has one, then this page.
 const crumbs = computed(() => {
   if (!current.value) return []
-  const kind = purpose.value === 'process-run'
+  const kind = isRun.value
     ? [{ label: 'Run records', to: { name: 'datasets', query: { type: 'process-run,workflow-run' } } }]
-    : purpose.value === 'profile' ? [{ label: KINDS.profile, to: { name: 'profiles' } }] : []
+    : crateType.value === 'profile' ? [{ label: 'Profiles', to: { name: 'profiles' } }] : []
   return [...kind, { label: pageTitle.value }]
 })
 // Show results opens the results folder in the record's group, on the node that holds it, with only
@@ -170,11 +163,8 @@ providePageContext(() => {
   }
 })
 
-// The graph now sits in "For developers"; an old link to its tab opens that section, also on a
-// query change or Back, which reuse this page.
-const routeTab = useRouteTab(['overview', 'graph', 'provenance', 'history'], 'overview')
-const developersOpen = ref(false)
-watch(routeTab, (value) => value === 'graph' && (developersOpen.value = true), { immediate: true })
+// Overview, Provenance, History and the raw JSON-LD; an old link to the graph tab opens the graph.
+const routeTab = useRouteTab(['overview', 'graph', 'provenance', 'history', 'jsonld'], 'overview')
 const history = useDatasetHistory(
   detailId,
   () => docState.value === 'found' && Boolean(currentUser.value),
@@ -187,10 +177,38 @@ const tab = computed({
   get: () => ((routeTab.value === 'history' && !historyShown.value) || routeTab.value === 'graph' ? 'overview' : routeTab.value),
   set: (next: string) => (routeTab.value = next),
 })
+
+// The overview shows one area at a time, kept in `?seg=`; a run opens on its runs.
+const facts = computed(() => aboutFacts(currentCrate.value))
+const actionCount = computed(() => crateActions(currentCrate.value).length)
+const peopleCount = computed(() => {
+  const view = presentation.value
+  return view.people.length + view.organizations.length + view.entities.filter((entity) => entity.kind === 'places').length
+})
+const segments = computed(() => [
+  { value: 'files', label: 'Files', icon: FolderTree, count: facts.value.files },
+  ...(peopleCount.value ? [{ value: 'people', label: 'People and places', icon: Users, count: peopleCount.value }] : []),
+  ...(actionCount.value ? [{ value: 'runs', label: 'Runs', icon: Play, count: actionCount.value }] : []),
+  { value: 'graph', label: 'Graph', icon: Share2 },
+  { value: 'details', label: 'Details', icon: List },
+])
+const routeSeg = useRouteTab(['files', 'people', 'runs', 'graph', 'details'], '', 'seg')
+const seg = computed({
+  get: () => {
+    const wanted = routeTab.value === 'graph' ? 'graph' : routeSeg.value
+    if (segments.value.some((entry) => entry.value === wanted)) return wanted
+    return isRun.value && actionCount.value ? 'runs' : 'files'
+  },
+  set: (next: string) => {
+    // An old graph tab link carries the area in `tab`; picking another area drops it.
+    if (routeTab.value === 'graph') void router.replace({ query: { ...route.query, tab: undefined, seg: next === 'files' ? undefined : next } })
+    else routeSeg.value = next
+  },
+})
+const otherEntities = computed(() => presentation.value.entities.filter((entity) => entity.kind !== 'places'))
 const showCrateExport = ref(false)
 const showPublish = ref(false)
 const repositoryLinks = ref<InstanceType<typeof RepositoryLinksSection> | null>(null)
-const pidSection = ref<InstanceType<typeof PersistentIdSection> | null>(null)
 // The Repositories section loads the links; null means unknown.
 const repositoryList = ref<RepositoryLink[] | null>(null)
 watch([detailId, sessionEpoch], () => (repositoryList.value = null))
@@ -200,6 +218,7 @@ const showPublished = ref(false)
 async function manageRepositories() {
   showPublished.value = false
   tab.value = 'overview'
+  seg.value = 'details'
   await nextTick()
   repositoryLinks.value?.$el?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
 }
@@ -226,14 +245,33 @@ async function onSaved(summary?: MetadataDocumentSummary) {
   await fetchCrate(detailId.value)
 }
 
-// Header import and raw view both drive the crate section's own panel, inside "For developers".
+// Header import and raw view both drive the crate section on the JSON-LD tab.
 const crateSection = ref<InstanceType<typeof CrateImportExport> | null>(null)
+const details = ref<InstanceType<typeof DatasetDetails> | null>(null)
 async function openCrate(part: 'openImport' | 'openRaw') {
-  tab.value = 'overview'
-  developersOpen.value = true
+  tab.value = 'jsonld'
   await nextTick()
   crateSection.value?.[part]()
 }
+watch(tab, async (value) => {
+  if (value !== 'jsonld') return
+  await nextTick()
+  crateSection.value?.openRaw()
+}, { immediate: true })
+
+// Cite: authors, year, title, publisher and the DOI, or else this page's address.
+const showCite = ref(false)
+const citation = computed(() => {
+  const root = crateGraph(currentCrate.value).find((entity) => entity['@id'] === crateRootId(currentCrate.value))
+  const publisher = presentation.value.organizations.find((entity) => entity.roles.includes('Publisher'))?.name
+  return citationText({
+    authors: bylineOf(currentCrate.value).map((entry) => entry.name),
+    year: (stringProp(root?.datePublished) ?? '').slice(0, 4),
+    title: pageTitle.value,
+    publisher: publisher ?? realm.value.shortName,
+    link: facts.value.doi ?? new URL(router.resolve({ name: 'dataset', params: { id: detailId.value } }).href, window.location.origin).href,
+  })
+})
 
 const infoEntityId = ref('')
 const infoOpen = ref(false)
@@ -258,135 +296,41 @@ function jumpTo(entityId: string) {
 </script>
 
 <template>
-  <!-- Id, persistent link, Git, SPARQL, storage, graph and the raw crate, folded away. -->
-  <DefineDevelopers>
-    <details
-      :class="runProvenance ? '-mx-5 -mb-5 border-t border-border-subtle' : 'surface overflow-hidden'"
-      :open="developersOpen"
-      @toggle="developersOpen = ($event.target as HTMLDetailsElement).open"
-    >
-      <summary class="flex cursor-pointer items-center gap-2 px-5 py-3.5 text-sm font-medium text-foreground">
-        <Code2 class="h-4 w-4 text-primary" /> For developers
-      </summary>
-      <div class="space-y-4 border-t border-border p-5">
-        <p class="flex items-center gap-2 text-xs">
-          <span class="text-muted-foreground">Id</span>
-          <span class="font-mono">{{ detailId }}</span>
-          <CopyButton :value="detailId" label="Copy the dataset id" />
-        </p>
-        <PersistentIdSection
-          v-if="fetchedSummary"
-          ref="pidSection"
-          :document-id="detailId"
-          :is-public="fetchedSummary.public"
-          :links="repositoryList"
-        />
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 class="text-sm font-medium text-foreground">Query this dataset</h3>
-            <p class="mt-1 text-xs text-muted-foreground">Open the SPARQL workbench with this dataset fixed.</p>
-          </div>
-          <Button variant="outline" size="sm" as-child>
-            <RouterLink :to="{ name: 'datasets', query: { expert: '1', document: detailId } }"><Code2 class="h-3.5 w-3.5" /> Query this dataset</RouterLink>
-          </Button>
-        </div>
-        <DatasetGitRow v-if="currentUser" :document-id="detailId" :group-id="fetchedSummary?.group_id" :changed="changedStorage" />
-        <DatasetStorageRow
-          v-if="currentUser && fetchedSummary"
-          :document-id="detailId"
-          :group-id="fetchedSummary.group_id"
-          :can-write="canWrite"
-          @changed="(value: StorageLocation) => (changedStorage = value)"
-        />
-        <template v-if="runProvenance">
-          <DetailsSection
-            :fields="presentation.fields"
-            :loading="loadingCrate"
-            :preparing="Boolean(cratePending[detailId])"
-            :not-ready="crateNotReady"
-            :error="crateError"
-            @retry="fetchCrate(detailId)"
-            @jump="jumpEntity"
-          />
-          <PeopleSection
-            :people="presentation.people"
-            :organizations="presentation.organizations"
-            :highlight-id="highlightId"
-            @jump="jumpEntity"
-          />
-          <ContextSection
-            :entities="presentation.entities"
-            :comments="presentation.comments"
-            :highlight-id="highlightId"
-            @jump="jumpEntity"
-          />
-        </template>
-        <DatasetGraph v-if="developersOpen" :state="state" @open="openInfo" />
-        <CrateImportExport
-          ref="crateSection"
-          :crate="currentCrate"
-          :document-id="detailId"
-          :can-import="canWrite"
-          @imported="onSaved"
-        />
-      </div>
-    </details>
-  </DefineDevelopers>
   <div>
     <PageHeader
       :title="pageTitle"
       :crumbs="crumbs"
       :docs="{ topic: 'datasets', section: 'The bundle is an RO-Crate' }"
+      content-class="mx-auto max-w-5xl"
     >
       <template #title>
-        <span class="inline-flex flex-wrap items-center gap-2">
-          {{ pageTitle }}
-          <template v-if="runProvenance">
-            <StatusMark v-if="runState(runProvenance) === 'succeeded'" label="Completed" />
-            <StatusPill v-else-if="runStateLabel" :state="runStateLabel" />
-          </template>
-          <Badge v-else-if="current" variant="royal">{{ KIND[purpose] }}</Badge>
+        <span class="flex items-start gap-3">
+          <DatasetTile v-if="current" :doc="current" size="lg" class="mt-0.5" />
+          <span class="min-w-0 break-words">{{ pageTitle }}</span>
+        </span>
+      </template>
+      <template v-if="current || fetchedSummary" #description>
+        <span class="flex flex-wrap items-center gap-2">
+          <CrateTypeBadge v-if="current" :type="crateType" :crate="currentCrate" />
+          <StatusPill v-if="runStateLabel" :state="runStateLabel" />
           <Badge v-if="projectCrate" variant="outline">Project dataset</Badge>
           <button v-if="published.length" type="button" class="rounded-full" aria-label="Published. Show where this dataset is published" @click="showPublished = true">
             <Badge variant="success" class="cursor-pointer hover:opacity-80">Published</Badge>
           </button>
         </span>
-      </template>
-      <template v-if="current || fetchedSummary" #description>
-        <!-- A run record: one row of icon facts, each linked to its page where one exists. -->
-        <span v-if="runProvenance" class="flex flex-wrap gap-x-4 gap-y-1 [&>*]:inline-flex [&>*]:items-center [&>*]:gap-1.5">
-          <span v-if="runTool"><Container class="h-3.5 w-3.5" aria-hidden="true" />{{ runTool }}</span>
-          <RouterLink v-if="runProvenance.site?.nodeId" :to="{ name: 'node', params: { nodeId: runProvenance.site.nodeId } }" class="text-primary hover:underline">
-            <Server class="h-3.5 w-3.5" aria-hidden="true" />{{ displayName(runProvenance.site.nodeId) }}
-          </RouterLink>
-          <span v-if="runDuration(runProvenance)" class="tabular-nums"><Timer class="h-3.5 w-3.5" aria-hidden="true" />{{ runDuration(runProvenance) }}</span>
-          <RouterLink v-if="groupId && groupMember" :to="{ name: 'group', params: { id: groupId } }" class="text-primary hover:underline"><Users class="h-3.5 w-3.5" aria-hidden="true" />{{ groupLabel(groupId) }}</RouterLink>
-          <span v-else-if="groupId" :title="groupId"><Users class="h-3.5 w-3.5" aria-hidden="true" />{{ groupLabel(groupId) }}</span>
-          <a v-if="current?.license && isHttpUrl(current.license)" :href="current.license" target="_blank" rel="noopener noreferrer" class="hover:text-foreground hover:underline" :title="current.license"><Scale class="h-3.5 w-3.5" aria-hidden="true" />{{ licenseLabel }}</a>
-          <span v-else-if="current?.license"><Scale class="h-3.5 w-3.5" aria-hidden="true" />{{ licenseLabel }}</span>
-          <span v-if="current" :title="current.updatedAt"><Clock class="h-3.5 w-3.5" aria-hidden="true" />Updated {{ relativeTime(current.updatedAt) }}</span>
+        <span v-if="byline.length" class="mt-2 block text-sm text-foreground">
+          <template v-if="isRun">Run by </template>
+          <template v-for="(person, index) in byline" :key="person.id">
+            <button type="button" class="underline decoration-border underline-offset-4 hover:decoration-foreground" @click="openInfo(person.id)">{{ person.name }}</button><template v-if="index < byline.length - 1">, </template>
+          </template>
         </span>
-        <template v-else>
-          <span v-if="current?.description" class="line-clamp-2 block">{{ current.description }}</span>
-          <span class="mt-1.5 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
-            <span v-if="groupId">Group
-              <RouterLink v-if="groupMember" :to="{ name: 'group', params: { id: groupId } }" class="text-primary hover:underline">{{ groupLabel(groupId) }}</RouterLink>
-              <span v-else :title="groupId">{{ groupLabel(groupId) }}</span>
-            </span>
-            <span v-if="current" class="inline-flex items-center gap-1.5">Profile {{ profileName }} <ProfileChip :doc="current" status-only /></span>
-            <span v-if="current?.license">License
-              <ExternalLink v-if="isHttpUrl(current.license)" :href="current.license" :label="licenseLabel" :title="current.license" />
-              <template v-else>{{ licenseLabel }}</template>
-            </span>
-            <span v-if="current">Updated {{ relativeTime(current.updatedAt) }}</span>
-          </span>
-        </template>
       </template>
       <template #actions>
         <DatasetActions
           :state="state"
-          :run="Boolean(runProvenance)"
+          :run="isRun"
           :results="runResults"
+          @cite="showCite = true"
           @export="showCrateExport = true"
           @import="openCrate('openImport')"
           @publish="showPublish = true"
@@ -396,17 +340,16 @@ function jumpTo(entityId: string) {
       </template>
     </PageHeader>
 
-    <div class="w-full px-4 sm:px-6 space-y-6 py-8">
+    <div class="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 sm:px-6">
       <DatasetDetailSkeleton v-if="!painted" />
 
       <template v-else-if="docState === 'found'">
         <Tabs :model-value="tab" @update:model-value="(value: string) => (tab = value)">
-          <TabsList aria-label="Dataset views">
+          <TabsList aria-label="Dataset views" class="max-sm:h-auto max-sm:flex-wrap">
             <TabsTrigger value="overview"><LayoutDashboard class="size-4" /> Overview</TabsTrigger>
-            <TabsTrigger value="provenance">
-              <GitBranch class="size-4" /><span class="max-sm:hidden">Where it came from</span><span class="sm:hidden">Source</span>
-            </TabsTrigger>
+            <TabsTrigger value="provenance"><GitBranch class="size-4" /> Provenance</TabsTrigger>
             <TabsTrigger v-if="historyShown" value="history"><HistoryIcon class="size-4" /> History</TabsTrigger>
+            <TabsTrigger value="jsonld"><Braces class="size-4" /> JSON-LD</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -420,72 +363,82 @@ function jumpTo(entityId: string) {
 
         <DatasetHistory v-if="tab === 'history'" :history="history" :state="state" />
 
+        <CrateImportExport
+          v-if="tab === 'jsonld'"
+          ref="crateSection"
+          :crate="currentCrate"
+          :document-id="detailId"
+          :can-import="canWrite"
+          @imported="onSaved"
+        />
+
+        <template v-if="tab === 'overview'">
+          <DatasetAbout :state="state" @open="openInfo" @cite="showCite = true" />
+
+          <div class="space-y-5">
+            <OptionToggle
+              :model-value="seg"
+              :options="segments"
+              aria-label="Content"
+              class="flex w-full flex-wrap sm:inline-flex sm:w-auto"
+              @update:model-value="(value: string) => (seg = value)"
+            />
+
+            <template v-if="seg === 'files'">
+              <SubcratesSection
+                v-if="subcrateIris.size"
+                :crate="currentCrate"
+                :document-id="detailId"
+                :can-write="Boolean(current) && canWrite"
+              />
+              <DatasetFiles :state="state" @preview="openPreview" @info="openInfo" />
+            </template>
+
+            <PeoplePlaces v-else-if="seg === 'people'" :state="state" @open="openInfo" />
+
+            <template v-else-if="seg === 'runs'">
+              <RunProvenancePanel v-if="runProvenance" :run="runProvenance" :document-id="detailId" :published="current?.createdAt" @chain="tab = 'provenance'" />
+              <CrateRuns
+                :crate="currentCrate"
+                :skip="runProvenance?.actionId"
+                :title="runProvenance ? 'Other runs' : 'Runs'"
+                @open="openInfo"
+              />
+            </template>
+
+            <DatasetGraph v-else-if="seg === 'graph'" :state="state" @open="openInfo" />
+
+            <template v-else-if="seg === 'details'">
+              <DatasetDetails
+                ref="details"
+                :state="state"
+                :links="repositoryList"
+                :changed="changedStorage"
+                @changed="(value: StorageLocation) => (changedStorage = value)"
+              />
+              <DatasetRelated :state="state" />
+              <ContextSection
+                :entities="otherEntities"
+                :comments="presentation.comments"
+                :highlight-id="highlightId"
+                @jump="jumpEntity"
+              />
+            </template>
+          </div>
+        </template>
+
         <!-- Stays mounted on every tab: the header badge needs its links. -->
         <RepositoryLinksSection
           v-if="fetchedSummary && currentUser"
           ref="repositoryLinks"
-          :class="{ hidden: tab !== 'overview' || !shown('repositories') }"
+          :class="{ hidden: tab !== 'overview' || seg !== 'details' || !shown('repositories') }"
           :document-id="detailId"
           :group-id="fetchedSummary.group_id"
           :can-write="canWrite"
           @publish="showPublish = true"
-          @settled="pidSection?.reload()"
+          @settled="details?.reload()"
           @links="(list: RepositoryLink[] | null) => (repositoryList = list)"
         />
-
-        <template v-if="tab === 'overview'">
-          <div v-if="current && !runProvenance && current.keywords.length" class="flex flex-wrap gap-1.5">
-            <span v-for="keyword in current.keywords" :key="keyword" class="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] text-foreground/80">#{{ keyword }}</span>
-          </div>
-          <AuthorChips v-if="!runProvenance" :crate="currentCrate" />
-
-          <!-- A run record keeps its developer details inside What ran; no card of their own. -->
-          <RunProvenancePanel v-if="runProvenance" :run="runProvenance" :document-id="detailId" :published="current?.createdAt" @chain="tab = 'provenance'">
-            <ReuseDevelopers />
-          </RunProvenancePanel>
-
-          <DetailsSection
-            v-if="!runProvenance"
-            :fields="presentation.fields"
-            :loading="loadingCrate"
-            :preparing="Boolean(cratePending[detailId])"
-            :not-ready="crateNotReady"
-            :error="crateError"
-            @retry="fetchCrate(detailId)"
-            @jump="jumpEntity"
-          />
-
-          <!-- A run record's people and context entities are technical; they wait in "For developers". -->
-          <template v-if="!runProvenance">
-            <PeopleSection
-              :people="presentation.people"
-              :organizations="presentation.organizations"
-              :highlight-id="highlightId"
-              @jump="jumpEntity"
-            />
-
-            <ContextSection
-              :entities="presentation.entities"
-              :comments="presentation.comments"
-              :highlight-id="highlightId"
-              @jump="jumpEntity"
-            />
-          </template>
-
-          <SubcratesSection
-            v-if="subcrateIris.size"
-            :crate="currentCrate"
-            :document-id="detailId"
-            :can-write="Boolean(current) && canWrite"
-          />
-
-          <DatasetFiles v-if="!runProvenance" :state="state" @preview="openPreview" @info="openInfo" />
-
-          <DatasetRelated :state="state" />
-
-        </template>
-
-        <ReuseDevelopers v-if="!runProvenance && tab === 'overview'" />
       </template>
 
       <EmptyState
@@ -543,6 +496,7 @@ function jumpTo(entityId: string) {
       @jump="jumpTo"
     />
 
+    <CiteDialog v-model:open="showCite" :citation="citation" />
     <CrateTransferDialog v-model:open="showCrateExport" :document-id="detailId" :document-path="currentPath" />
     <RepositoryPublishDialog
       v-if="fetchedSummary"

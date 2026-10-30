@@ -7,7 +7,7 @@ function read(path: string): string {
 }
 
 const source = read('../components/metadata/view/DatasetFiles.vue')
-const view = read('./MetadataView.vue')
+const view = read('../components/metadata/view/DatasetDetails.vue')
 const list = read('../components/data/ReferencedBy.vue')
 
 describe('Dataset file discovery presentation', () => {
