@@ -62,7 +62,7 @@ import {
 } from '@/lib/crate/editor'
 import { addFilePart } from '@/lib/crate/references'
 import { looksLikePart } from '@/lib/linkedPart'
-import { CircleAlert, CircleCheck, FileJson2, FolderTree, Send, TriangleAlert, X } from '@lucide/vue'
+import { CircleAlert, FileJson2, FolderTree, Send, TriangleAlert, X } from '@lucide/vue'
 
 // The graph carries Vue Flow and dagre; only the Graph tab pays for them.
 const CrateGraph = defineAsyncComponent(() => import('@/components/metadata/CrateGraph.vue'))
@@ -805,9 +805,6 @@ async function save(anyway = false) {
           <TriangleAlert v-else class="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
           {{ issueCountText }}
         </Button>
-        <span v-else class="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-          <CircleCheck class="h-3.5 w-3.5 text-status-ok" /> No open issues
-        </span>
         <AskAiButton size="sm" prompt="Help me describe this dataset." :subject="assistantSubject" />
         <Button variant="outline" size="sm" @click="locationOpen = true">
           <FolderTree class="h-3.5 w-3.5" /> Location

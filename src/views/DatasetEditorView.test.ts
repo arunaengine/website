@@ -220,6 +220,11 @@ const EditorStub = defineComponent({
         h('button', { onClick: () => emit('profile', profile.value) }, `Choose ${profile.label}`)),
       h('button', { onClick: () => emit('profile', '') }, 'Choose no profile'),
       h('button', { onClick: () => emit('update', seeded(props.draft as Editor.CrateDraft)) }, 'Seed dataset'),
+      h('button', {
+        onClick: () => emit('update', Editor.setProperty(props.draft as Editor.CrateDraft, './', 'license', [
+          { kind: 'url', value: 'https://creativecommons.org/licenses/by/4.0/' },
+        ])),
+      }, 'License dataset'),
     ])
   },
 })
@@ -1018,6 +1023,17 @@ describe('DatasetEditorView', () => {
     expect(content(mounted.root)).toContain('Seed dataset')
     await click(button(mounted.root, 'Seed dataset'))
     expect(button(mounted.root, '1 to consider')).toBeTruthy()
+    mounted.app.unmount()
+  })
+
+  it('shows no issue count at the top once nothing is open', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'License dataset'))
+
+    expect(content(mounted.root)).toContain('Drawer issues 0')
+    expect(content(mounted.root)).not.toContain('to consider')
+    expect(content(mounted.root)).not.toContain('No open issues')
     mounted.app.unmount()
   })
 
