@@ -863,6 +863,19 @@ describe('object browser run filter', () => {
 
     expect([...hiddenObjectKeys.value]).toEqual([other.key])
   })
+
+  it('keeps files of unknown origin listed and marked', async () => {
+    const objects = ref([listedObject, other])
+    const hiddenObjectKeys = ref<ReadonlySet<string>>(new Set())
+    const root = await render({ objects, visibleObjects: objects, hiddenObjectKeys, runFilter: ref('r1'), route: { query: { prefix: 'raw', run: 'r1' } } })
+    const text = content(root)
+
+    expect(text).toContain('reads.fastq')
+    expect(text).toContain('notes.txt')
+    expect(text).toContain('Origin unknown')
+    expect(text).toContain('0 of 2 from this run, 2 of unknown origin')
+    expect(hiddenObjectKeys.value.size).toBe(0)
+  })
 })
 
 describe('object browser order', () => {

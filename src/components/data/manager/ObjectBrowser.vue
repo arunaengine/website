@@ -483,7 +483,9 @@ const ariaSort = (key: SortKey) => (sort.value.key === key ? (sort.value.descend
 const folderRows = computed(() =>
   sortRows(visibleFolders.value, { key: 'name', descending: sort.value.key === 'name' && sort.value.descending }, (folder) => folder))
 const runKey = computed(() => (runFilter.value ? `job:${runFilter.value}` : ''))
-const runHides = (key: string) => Boolean(runKey.value) && originOf.value.get(key)?.key !== runKey.value
+// A file not read yet, or of a page too large to read, stays listed; only another origin hides it.
+const runHides = (key: string) => Boolean(runKey.value && originOf.value.get(key) && originOf.value.get(key)?.key !== runKey.value)
+const originUnknown = (key: string) => Boolean(runKey.value) && !originOf.value.get(key)
 const objectRows = computed(() => {
   const rows = fileRows(visibleObjects.value, deletedRows.value)
   const shown = runKey.value ? rows.filter(({ deleted, entry }) => !deleted && !runHides(entry.key)) : rows
@@ -514,7 +516,11 @@ const fileFacts = (object: ObjectEntry) =>
 const rangeText = computed(() => {
   const listed = folders.value.length + objects.value.length
   const shownCount = visibleFolders.value.length + visibleObjects.value.length
-  if (runKey.value) return `${formatCount(objectRows.value.length)} of ${formatCount(listed)} from this run`
+  if (runKey.value) {
+    const unknown = objectRows.value.filter(({ entry }) => originUnknown(entry.key)).length
+    const known = `${formatCount(objectRows.value.length - unknown)} of ${formatCount(listed)} from this run`
+    return unknown ? `${known}, ${formatCount(unknown)} of unknown origin` : known
+  }
   if (!nameFilter.value && shownCount === listed) return `${pageRange(page.value, pageSize.value, listed, !nextToken.value)}${nextToken.value ? '' : ' in this folder'}`
   return `${formatCount(shownCount)} of ${formatCount(listed)} in ${prefix.value.split('/').at(-1) || bucket.value}`
 })
@@ -956,6 +962,9 @@ async function onDrop(event: DragEvent) {
                     <span class="hidden text-xs tabular-nums text-muted-foreground @max-[600px]:block">{{ fileFacts(object) }}</span>
                   </span>
                   <Badge v-if="isNotebook(object)" variant="royal" size="sm" class="shrink-0">Notebook</Badge>
+                  <Badge v-if="originUnknown(object.key)" variant="outline" size="sm" class="shrink-0" title="Not known yet whether this run wrote this file">
+                    Origin unknown
+                  </Badge>
                   <Badge v-if="locked.keyPending(object.key)" variant="warn" size="sm" class="shrink-0">
                     Key pending
                   </Badge>
