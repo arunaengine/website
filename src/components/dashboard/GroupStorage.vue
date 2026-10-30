@@ -28,16 +28,16 @@ function quotaPercent(): number {
         <Link class="size-3.5 shrink-0" /><b class="font-medium text-foreground">{{ formatBytes(entry.referencedBytes) }}</b> referenced
       </span>
     </p>
-    <QuotaBar
-      v-if="entry.quota?.quota_bytes != null"
-      :class="compact ? 'mt-1.5 w-48 max-w-full' : 'mt-2.5'"
-      :used="entry.usedBytes ?? 0"
-      :quota="entry.quota.quota_bytes"
-      :ceiling="entry.quota.ceiling_bytes"
-      :referenced="entry.referencedBytes ?? 0"
-      :warn="entry.quota.warning"
-      :compact="compact"
-      :show-labels="false"
-    />
+    <div v-if="entry.quota?.quota_bytes != null" :class="compact ? 'mt-1.5 w-48 max-w-full' : 'mt-2.5'">
+      <QuotaBar
+        :used="entry.usedBytes ?? 0"
+        :quota="entry.quota.quota_bytes"
+        :ceiling="entry.quota.ceiling_bytes"
+        :referenced="entry.referencedBytes ?? 0"
+        :warn="entry.quota.warning"
+        :compact="compact"
+        :show-labels="false"
+      />
+    </div>
   </div>
 </template>
