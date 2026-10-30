@@ -928,7 +928,7 @@ async function onDrop(event: DragEvent) {
               <td v-if="mixedOrigins" class="@max-[600px]:hidden"></td>
               <td class="hidden @min-[1280px]:table-cell"></td>
               <td class="px-2 @max-[600px]:block">
-                <div class="flex items-center justify-end gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100 [@media(hover:none)]:opacity-100 @max-[600px]:opacity-100">
+                <div class="flex items-center justify-end gap-1">
                   <RowMenu
                     :name="`${folder.name}/`"
                     folder
@@ -1017,7 +1017,7 @@ async function onDrop(event: DragEvent) {
               </td>
               <td class="hidden @min-[1280px]:table-cell"></td>
               <td class="px-2 @max-[600px]:block">
-                <div class="flex items-center justify-end gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100 [@media(hover:none)]:opacity-100 @max-[600px]:opacity-100">
+                <div class="flex items-center justify-end gap-1">
                   <IconButton label="Preview" variant="outline" size="icon" class="h-8 w-8 @max-[600px]:hidden" @click.stop="openDetails(object, 'preview')"><Eye class="size-3.5" /></IconButton>
                   <IconButton label="Download" variant="outline" size="icon" class="h-8 w-8 @max-[600px]:hidden" @click.stop="locked.download(object)"><Download class="size-3.5" /></IconButton>
                   <RowMenu

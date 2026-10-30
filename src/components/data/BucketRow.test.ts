@@ -97,11 +97,10 @@ describe('BucketRow lines and marks', () => {
     expect(nodes(unlinked).some((node) => node.props['aria-label'] === 'Link a local folder')).toBe(true)
   })
 
-  it('keeps the pin with the row actions, shown on hover or focus', async () => {
+  it('keeps the pin with the row actions, always visible', async () => {
     const root = await mount({ nodeId: 'node-2' })
     const pin = nodes(root).find((node) => node.props['aria-label'] === 'Pin genes')!
-    expect(String(pin.parent!.props.class)).toContain('opacity-0')
-    expect(String(pin.parent!.props.class)).toContain('group-focus-within:opacity-100')
+    expect(String(pin.parent!.props.class)).not.toContain('opacity-0')
   })
 
   it('pins on a long press and does not open the bucket then', async () => {

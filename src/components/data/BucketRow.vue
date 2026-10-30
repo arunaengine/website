@@ -207,7 +207,7 @@ function onClick() {
         </template>
       </Popover>
     </div>
-    <div v-if="$slots.link || $slots.actions || pinnable" class="relative flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+    <div v-if="$slots.link || $slots.actions || pinnable" class="relative flex shrink-0 items-center gap-0.5">
       <slot v-if="!linkedTo" name="link" />
       <slot name="actions" />
       <button
