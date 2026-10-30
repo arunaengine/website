@@ -104,6 +104,30 @@ describe('databases', () => {
     scope.stop()
   })
 
+  it('reads a changed dataset again when its description or a node was missing', async () => {
+    aruna.searchBuckets.mockResolvedValueOnce(page([view('lab')]))
+    const { databases, scope } = start()
+    databases.ensure()
+    await vi.waitFor(() => expect(databases.state.value).toBe('ready'))
+
+    aruna.searchBuckets.mockResolvedValueOnce(page([{ ...view('lab'), description: null }]))
+    aruna.datasetChanges.value = [...aruna.datasetChanges.value, 'd-lab']
+    databases.ensure()
+    await vi.waitFor(() => expect(aruna.searchBuckets).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(databases.state.value).toBe('ready'))
+
+    aruna.searchBuckets.mockResolvedValueOnce(page([view('lab', 'Lab renamed')], undefined, 1))
+    databases.ensure()
+    await vi.waitFor(() => expect(databases.find('lab', null, null)?.title).toBe('Lab renamed'))
+
+    aruna.searchBuckets.mockResolvedValueOnce(page([view('lab', 'Lab renamed')]))
+    databases.ensure()
+    await vi.waitFor(() => expect(aruna.searchBuckets).toHaveBeenCalledTimes(4))
+    databases.ensure()
+    expect(aruna.searchBuckets).toHaveBeenCalledTimes(4)
+    scope.stop()
+  })
+
   it('reads every page up to the end and finds the database of a bucket', async () => {
     aruna.searchBuckets.mockResolvedValueOnce(page([view('lab')], 'c1'))
     aruna.searchBuckets.mockResolvedValueOnce(page([view('spire')]))

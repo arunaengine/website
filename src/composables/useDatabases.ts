@@ -56,9 +56,13 @@ export function useDatabases() {
       listedEpoch.value = epoch
       complete.value = failedNodes === 0
       state.value = 'ready'
-      // Changes are read only once a read that started after them succeeds.
-      changesRead = seen
-      if (changed()) void load()
+      // Changes count as read only once a later read reached every node and each changed dataset;
+      // otherwise the next ensure() reads again, while changes that came in during this read do now.
+      const affects = (ids: string[]) => listed.value.some((row) => row.datasetId !== null && ids.includes(row.datasetId))
+      const pending = datasetChanges.value.slice(changesRead, seen)
+      const unread = listed.value.some((row) => row.datasetId !== null && pending.includes(row.datasetId) && !row.description)
+      if (failedNodes === 0 && !unread) changesRead = seen
+      if (affects(datasetChanges.value.slice(seen))) void load()
     } catch (cause) {
       if (run !== runs || epoch !== sessionEpoch.value) return
       state.value = 'failed'
