@@ -192,6 +192,17 @@ describe('desktop routes', () => {
     }
   })
 
+  it('sends the old notebook and run template pages to their Compute tabs', async () => {
+    const routes = await build()
+    for (const path of ['notebooks', 'compute/notebooks']) {
+      const redirect = child(routes, path)?.redirect as () => unknown
+      expect(redirect()).toEqual({ name: 'compute', query: { tab: 'notebooks' } })
+    }
+    expect(child(routes, 'compute/saved')?.redirect).toEqual({ name: 'compute', query: { tab: 'templates' } })
+    expect(child(routes, 'compute/templates')?.redirect).toEqual({ name: 'compute', query: { tab: 'templates' } })
+    expect(child(routes, 'admin/jobs')?.redirect).toEqual({ path: '/app/admin', query: { tab: 'jobs' } })
+  })
+
   it('opens an old run link in the Compute run drawer', async () => {
     const routes = await build({ apiBaseUrl: '/api/v1' })
     const run = child(routes, 'runs/:jobId')
