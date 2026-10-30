@@ -16,6 +16,7 @@ import DatasetLocationDialog from '@/components/metadata/editor/DatasetLocationD
 import EntityBrowser from '@/components/metadata/editor/EntityBrowser.vue'
 import EntityEditor from '@/components/metadata/editor/EntityEditor.vue'
 import IssueDrawer from '@/components/metadata/editor/IssueDrawer.vue'
+import JsonLdPane from '@/components/metadata/editor/JsonLdPane.vue'
 import NodeCheckPanel from '@/components/metadata/editor/NodeCheckPanel.vue'
 import PidWithdraw from '@/components/metadata/PidWithdraw.vue'
 import { profileReferenceIri, useAruna } from '@/composables/useAruna'
@@ -88,7 +89,7 @@ const documentId = computed(() => String(route.params.id ?? ''))
 const draft = ref<CrateDraft>(newDraft())
 const vocab = shallowRef<VocabIndex | null>(null)
 const selected = ref(rootId(draft.value))
-const tab = ref<'editor' | 'graph'>('editor')
+const tab = ref<'editor' | 'graph' | 'json'>('editor')
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 const importOpen = ref(false)
@@ -434,6 +435,12 @@ function imported(next: CrateDraft) {
     pendingSeed.value = hasRules(expectation.value) ? '' : profile.id
   }
   draft.value = alignValueKinds(draft.value, vocab.value, expectation.value)
+}
+
+// Edited JSON-LD replaces the draft as an import does, keeping the stored dataset it belongs to.
+function applyJson(next: unknown) {
+  imported({ ...fromRoCrate(next), documentId: draft.value.documentId })
+  tab.value = 'editor'
 }
 
 function hasRules(rules: ProfileExpectation | null): boolean {
@@ -836,7 +843,7 @@ async function save(anyway = false) {
           <div class="min-w-0 flex-1 space-y-5">
             <div class="inline-flex items-center rounded-md border border-border p-0.5" role="tablist">
               <button
-                v-for="pane in (['editor', 'graph'] as const)"
+                v-for="pane in (['editor', 'graph', 'json'] as const)"
                 :key="pane"
                 type="button"
                 role="tab"
@@ -845,7 +852,7 @@ async function save(anyway = false) {
                 :aria-selected="tab === pane"
                 @click="tab = pane"
               >
-                {{ pane === 'editor' ? 'Editor' : 'Graph' }}
+                {{ { editor: 'Editor', graph: 'Graph', json: 'JSON-LD' }[pane] }}
               </button>
             </div>
 
@@ -919,6 +926,7 @@ async function save(anyway = false) {
               </NodeCheckPanel>
               <PidWithdraw v-if="mode === 'edit'" :document-id="documentId" />
             </template>
+            <JsonLdPane v-else-if="tab === 'json'" :rocrate="crate" @apply="applyJson" />
             <CrateGraph
               v-else
               :source="draft"

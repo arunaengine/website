@@ -98,7 +98,6 @@ const EntityEditor = compileClientComponent(new URL('./EntityEditor.vue', import
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
-  '@/components/ui/CopyButton.vue': moduleDefault(EmptyStub),
   '@/components/ui/EmptyState.vue': moduleDefault(EmptyStub),
   './RootForm.vue': moduleDefault(EmptyStub),
   './EntityHeader.vue': moduleDefault(EmptyStub),

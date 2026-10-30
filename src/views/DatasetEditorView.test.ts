@@ -224,6 +224,19 @@ const EditorStub = defineComponent({
   },
 })
 const GraphStub = defineComponent(() => () => h('p', 'Graph pane'))
+// The JSON-LD pane, reduced to one applied crate that renames the dataset.
+const JsonStub = defineComponent({
+  emits: ['apply'],
+  setup: (_, { emit }) => () => h('button', {
+    onClick: () => emit('apply', {
+      '@context': 'https://w3id.org/ro/crate/1.2/context',
+      '@graph': [
+        { '@id': 'ro-crate-metadata.json', '@type': 'CreativeWork', about: { '@id': './' } },
+        { '@id': './', '@type': 'Dataset', name: 'Edited as JSON' },
+      ],
+    }),
+  }, 'Apply JSON'),
+})
 const DrawerStub = defineComponent({
   props: {
     issues: { type: Array, default: () => [] },
@@ -324,6 +337,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/components/metadata/editor/EntityEditor.vue': moduleDefault(EditorStub),
   '@/components/metadata/CrateGraph.vue': moduleDefault(GraphStub),
   '@/components/metadata/editor/IssueDrawer.vue': moduleDefault(DrawerStub),
+  '@/components/metadata/editor/JsonLdPane.vue': moduleDefault(JsonStub),
   '@/components/metadata/editor/NodeCheckPanel.vue': moduleDefault(NodeCheckStub),
   '@/components/metadata/PidWithdraw.vue': moduleDefault(WithdrawStub),
   '@/composables/useAruna': {
@@ -1004,6 +1018,18 @@ describe('DatasetEditorView', () => {
     expect(content(mounted.root)).toContain('Seed dataset')
     await click(button(mounted.root, 'Seed dataset'))
     expect(button(mounted.root, '1 to consider')).toBeTruthy()
+    mounted.app.unmount()
+  })
+
+  it('reads applied JSON-LD back into the editor', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    await click(element(mounted.root, (node) => node.props.role === 'tab' && content(node).trim() === 'JSON-LD'))
+
+    await click(button(mounted.root, 'Apply JSON'))
+
+    expect(content(mounted.root)).toContain('Seed dataset')
+    expect(content(mounted.root)).toContain('Edited as JSON')
+    expect(content(mounted.root)).toContain('Research group')
     mounted.app.unmount()
   })
 

@@ -297,6 +297,11 @@ const EntityEditor = compileClientComponent(url('components/metadata/editor/Enti
   '@/lib/crate/profileSeed': CrateProfileSeed,
 })
 const NodeCheckPanel = compileClientComponent(url('components/metadata/editor/NodeCheckPanel.vue'), editorShared)
+// The panel plus the crate it checks, so tests read the draft as the editor would send it.
+const NodeCheckWithCrate = defineComponent({
+  inheritAttrs: false,
+  setup: (_, { attrs, slots }) => () => h('div', [h(NodeCheckPanel, attrs, slots), h('code', JSON.stringify(attrs.rocrate))]),
+})
 const IssueDrawer = compileClientComponent(url('components/metadata/editor/IssueDrawer.vue'), editorShared)
 const DatasetEditorView = compileClientComponent(url('views/DatasetEditorView.vue'), {
   ...editorShared,
@@ -307,7 +312,8 @@ const DatasetEditorView = compileClientComponent(url('views/DatasetEditorView.vu
   '@/components/metadata/editor/EntityBrowser.vue': moduleDefault(GenericStub),
   '@/components/metadata/editor/EntityEditor.vue': moduleDefault(EntityEditor),
   '@/components/metadata/editor/IssueDrawer.vue': moduleDefault(IssueDrawer),
-  '@/components/metadata/editor/NodeCheckPanel.vue': moduleDefault(NodeCheckPanel),
+  '@/components/metadata/editor/JsonLdPane.vue': moduleDefault(GenericStub),
+  '@/components/metadata/editor/NodeCheckPanel.vue': moduleDefault(NodeCheckWithCrate),
   '@/components/metadata/CrateGraph.vue': moduleDefault(GenericStub),
   '@/components/metadata/PidWithdraw.vue': moduleDefault(GenericStub),
   '@/composables/useAruna': Aruna,

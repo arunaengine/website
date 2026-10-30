@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
-import CopyButton from '@/components/ui/CopyButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import RootForm from './RootForm.vue'
 import EntityHeader from './EntityHeader.vue'
@@ -16,7 +15,6 @@ import {
   profileShape,
   ROOT_FORM_PROPERTIES,
   rootId,
-  toRoCrate,
   type CrateDraft,
   type DraftValueKind,
   type LiveIssue,
@@ -62,7 +60,6 @@ const loose = computed(() => props.issues.filter((issue) => {
   if (!property) return true
   return !entity.value?.properties[property] && !(isRoot.value && ROOT_FORM_PROPERTIES.includes(property))
 }))
-const json = computed(() => JSON.stringify(toRoCrate(props.draft), null, 2))
 
 // A property owned by a picker is added by picking a value, never as an empty
 // row nothing could fill or remove.
@@ -150,15 +147,6 @@ function addOptional() {
       />
     </div>
 
-    <details v-if="isRoot" class="border-t border-border">
-      <summary class="cursor-pointer px-5 py-2.5 text-xs font-medium text-foreground">Show JSON-LD</summary>
-      <div class="border-t border-border p-5">
-        <div class="mb-2 flex justify-end">
-          <CopyButton :value="json" label="Copy the JSON-LD" />
-        </div>
-        <pre class="max-h-96 overflow-auto rounded-md bg-muted/30 p-3 text-[11px] leading-relaxed"><code>{{ json }}</code></pre>
-      </div>
-    </details>
   </section>
 
   <EmptyState v-else title="Pick something on the left to edit it." />

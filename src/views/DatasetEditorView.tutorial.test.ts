@@ -17,7 +17,7 @@ interface CrateNode {
 
 let mounted: TutorialMount
 
-/** The draft as the editor would send it, read from the JSON-LD it renders. */
+/** The draft as the editor would send it, read from the crate the harness renders. */
 function draftGraph(): CrateNode[] {
   const code = element(mounted.root, (node) => node.tag === 'code')
   return (JSON.parse(content(code)) as { '@graph': CrateNode[] })['@graph']
