@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import Badge from '@/components/ui/Badge.vue'
-import Button from '@/components/ui/Button.vue'
-import { ChevronLeft } from '@lucide/vue'
+import { ChevronRight } from '@lucide/vue'
 import { ApiReference, type ApiReferenceConfiguration } from '@scalar/api-reference'
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -58,14 +56,14 @@ const configuration = computed<Partial<ApiReferenceConfiguration>>(() => ({
        fixed height so the scroll region's size is exact. Narrower, it flows. -->
   <div class="min-[1000px]:flex min-[1000px]:h-[calc(100dvh-3.5rem)] min-[1000px]:flex-col">
     <div class="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4 sm:px-6">
-      <h1 class="font-display text-base font-semibold text-aruna-navy">API reference</h1>
-      <Badge variant="outline">REST</Badge>
+      <nav aria-label="Breadcrumb" class="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+        <RouterLink :to="{ name: 'docs' }" class="shrink-0 hover:text-foreground hover:underline">Docs</RouterLink>
+        <ChevronRight class="size-3.5 shrink-0" aria-hidden="true" />
+        <h1 class="truncate font-display text-base font-semibold text-foreground">API reference</h1>
+      </nav>
       <span class="hidden truncate text-xs text-muted-foreground md:inline">
         Every REST endpoint of this node, live from its OpenAPI document.
       </span>
-      <Button variant="outline" size="sm" class="ml-auto shrink-0" as-child>
-        <RouterLink :to="{ name: 'docs' }"><ChevronLeft class="h-4 w-4" /> Portal docs</RouterLink>
-      </Button>
     </div>
 
     <!-- Theme is forced from the portal theme; remount applies a toggle. -->

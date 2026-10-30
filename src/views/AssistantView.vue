@@ -242,7 +242,7 @@ function continueInPanel() {
           <Plus class="size-4" />
         </Button>
         <div class="flex min-w-0 flex-1 items-baseline gap-2">
-          <span class="eyebrow hidden shrink-0 sm:inline">Assistant</span>
+          <span class="hidden shrink-0 items-center gap-1.5 text-sm text-muted-foreground sm:inline-flex"><Sparkles class="size-4" />Assistant</span>
           <Input
             v-if="renaming"
             v-model="titleDraft"
