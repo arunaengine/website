@@ -89,7 +89,7 @@ const RouterLinkStub = defineComponent((_, { attrs, slots }) => () => h('a', att
 const SkeletonStub = defineComponent(() => () => h('span', 'loading'))
 const OverviewCellStub = defineComponent({
   props: { label: String },
-  setup: (props, { slots }) => () => h('div', [h('span', props.label), slots.value?.(), slots.default?.()]),
+  setup: (props, { slots }) => () => h('div', [h('span', props.label), slots.value?.(), ' ', slots.unit?.(), ' ', slots.default?.()]),
 })
 // The realm's database list; its count shows once the list was read.
 const databaseRows = ref<unknown[]>([])
@@ -140,6 +140,10 @@ const ScopeToggleStub = defineComponent({
     ]),
 })
 const EmptyStub = defineComponent(() => () => null)
+const SectionHeadingStub = defineComponent({
+  props: { title: String, info: String },
+  setup: (props, { slots }) => () => h('div', [h('h2', props.title), props.info ? h('i', props.info) : null, slots.actions?.()]),
+})
 const RefreshButtonStub = defineComponent((_, { attrs }) => () => h('button', attrs, 'Refresh'))
 const icons = new Proxy({}, { get: () => EmptyStub })
 
@@ -206,6 +210,7 @@ beforeAll(async () => {
   vi.doMock('@/components/dashboard/WebStart.vue', () => ({ default: WebStartStub }))
   vi.doMock('@/composables/useRealmNodes', () => realmNodesStub)
   vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: SkeletonStub }))
+  vi.doMock('@/components/ui/SectionHeading.vue', () => ({ default: SectionHeadingStub }))
   DashboardView = (await import('./DashboardView.vue')).default
   const FirstPaint = await vi.importActual<typeof import('@/composables/useFirstPaint')>('@/composables/useFirstPaint')
 
@@ -287,6 +292,7 @@ beforeAll(async () => {
     '@/components/nodes/node-display': NodeDisplay,
     '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
     '@/components/ui/EmptyState.vue': moduleDefault(EmptyStub),
+    '@/components/ui/SectionHeading.vue': moduleDefault(SectionHeadingStub),
     '@/components/desktop/HomeCards.vue': moduleDefault(HomeCardsStub),
     '@/components/desktop/DeviceRow.vue': moduleDefault(DeviceRowStub),
     '@/lib/chunk-recovery': { asyncChunkError: vi.fn() },
@@ -379,7 +385,7 @@ describe('guest dashboard truth', () => {
     const text = await renderedText()
 
     // The public count covers every record kind, runs too, so it names no datasets.
-    expect(text).toContain('Work 23 records')
+    expect(text).toContain('Records 23')
     expect(text).toContain('Realm 4 nodes')
     expect(text).toContain('Sign in')
     // Storage and data are figures of a signed-in session.
@@ -395,7 +401,7 @@ describe('guest dashboard truth', () => {
   it('renders absent public counts as unknown rather than zero', async () => {
     const text = await renderedText()
 
-    expect(text).toContain('Work Unknown')
+    expect(text).toContain('Records Unknown')
     expect(text).toContain('Realm Unknown')
     expect(text).toContain('Public counts are unavailable from this node')
     expect(text).not.toContain('0 / 0')
@@ -435,8 +441,10 @@ describe('authenticated dashboard scope', () => {
 
     expect(overview).toBeGreaterThanOrEqual(0)
     expect(text.indexOf('my stats cards')).toBeGreaterThan(overview)
-    expect(text.indexOf('Activity')).toBeGreaterThan(text.indexOf('my stats cards'))
-    expect(realmCard).toBeGreaterThan(text.indexOf('Activity'))
+    expect(text.indexOf('Runs Unknown')).toBeGreaterThan(text.indexOf('my stats cards'))
+    // One state signal: an offline node turns the online count into a warning.
+    expect(text.indexOf('Realm 2 nodes 1/2 online')).toBeGreaterThan(text.indexOf('Runs Unknown'))
+    expect(realmCard).toBeGreaterThan(text.indexOf('Realm 2 nodes'))
     expect(text.indexOf('group quota cards')).toBeGreaterThan(realmCard)
     expect(text).toContain('scope toggle personal')
     expect(text).toContain('map compact=true')
@@ -471,19 +479,19 @@ describe('authenticated dashboard scope', () => {
     const text = await renderedText()
 
     expect(text).toContain('scope toggle realm')
-    expect(text).toContain('Storage 2 KB stored 64 B referenced')
+    expect(text).toContain('Storage 2.1 KB total 2 KB stored 64 B referenced')
     // The database list holds only what this caller may read, so it is no realm total.
-    expect(text).toContain('Data 11 objects 3 buckets')
+    expect(text).toContain('Objects 11 3 buckets')
     expect(text).not.toContain('database')
-    // The realm's 9 records are 4 runs and no dataset, counted as the group card counts them.
-    expect(text).toContain('Work 4 runs 0 running, 0 datasets')
+    // The realm counts no runs apart, so the card counts the groups' runs and says so.
+    expect(text).toContain('Runs 4 in your groups')
+    expect(text).not.toContain('completed')
     expect(text).not.toContain('9 datasets')
 
-    // While a group still loads, the cell waits instead of showing a partial sum.
+    // While a group still loads, the card waits instead of showing a partial sum.
     groupsAggregate.value = { datasets: 0, processRuns: 1, pending: true }
     const waiting = await renderedText()
-    expect(waiting).not.toContain('Work')
-    expect(waiting).not.toContain('1 run')
+    expect(waiting).not.toContain('Runs 1')
     expect(text).toContain('group quota cards')
     expect(text).not.toContain('my stats cards')
   })
@@ -494,7 +502,7 @@ describe('authenticated dashboard scope', () => {
 
     const mounted = await mountApp(DashboardClient)
     expect(content(mounted.root)).toContain('my stats cards')
-    expect(content(mounted.root)).not.toContain('2 runs')
+    expect(content(mounted.root)).not.toMatch(/Runs\s*2/)
 
     await click(button(mounted.root, 'show realm'))
     expect(setScope).toHaveBeenCalledWith('realm')
@@ -503,7 +511,7 @@ describe('authenticated dashboard scope', () => {
     groupsAggregate.value = { datasets: 1, processRuns: 2 }
     scope.value = 'realm'
     await flush()
-    expect(content(mounted.root)).toContain('2 runs')
+    expect(content(mounted.root)).toMatch(/Runs\s*2\s*in your groups/)
     expect(content(mounted.root)).not.toContain('my stats cards')
     mounted.app.unmount()
     vi.unstubAllGlobals()
@@ -524,6 +532,7 @@ describe('authenticated dashboard scope', () => {
 
     // The device is counted apart and never listed among the realm nodes.
     expect(text).toMatch(/Realm 1 of 1 node online\s*, replication on all eligible nodes, 1 device Status/)
+    expect(text).toContain('Realm 1 node')
     expect(text).toContain('row server-node')
     expect(text).not.toContain('row owned-device')
   })
@@ -577,7 +586,7 @@ describe('desktop home', () => {
     await flush()
 
     expect(content(mounted.root)).toContain('device row Microbiology laptop')
-    expect(content(mounted.root).indexOf('device row')).toBeGreaterThan(content(mounted.root).indexOf('Activity'))
+    expect(content(mounted.root).indexOf('device row')).toBeGreaterThan(content(mounted.root).indexOf('Overview'))
     // The realm table lists this computer first.
     expect(content(mounted.root)).toContain('first own-device')
     mounted.app.unmount()
@@ -724,8 +733,9 @@ describe('realm nodes in the overview', () => {
     web.app.unmount()
   })
 
-  it('sums the imports the realm snapshot reports in the activity cell, and drops them with a new snapshot', async () => {
+  it('sums the imports the realm snapshot reports in the realm scope, and drops them with a new snapshot', async () => {
     desktopMode.value = true
+    scope.value = 'realm'
     // The device's own copy has no heartbeats; the realm node's snapshot counts the imports.
     loadRealmView.mockResolvedValue({
       info: { node: { peer_id: 'mgmt-node' } },
@@ -736,7 +746,7 @@ describe('realm nodes in the overview', () => {
     })
     let mounted = await mountApp(DashboardClient)
     await flush()
-    expect(content(mounted.root).replace(/\s+/g, ' ')).toContain('Activity16 imports running on Unnamed node and Unnamed node')
+    expect(content(mounted.root).replace(/\s+/g, ' ')).toContain('Realm2 nodes 16 importing')
     mounted.app.unmount()
 
     // One node has no heartbeat count: the known imports are a lower bound.
@@ -749,20 +759,19 @@ describe('realm nodes in the overview', () => {
     })
     mounted = await mountApp(DashboardClient)
     await flush()
-    expect(content(mounted.root).replace(/\s+/g, ' ')).toContain('Activityat least 2 imports running on Unnamed node')
+    expect(content(mounted.root).replace(/\s+/g, ' ')).toContain('at least 2 importing')
 
-    // Another session reads its own snapshot; the old counts never linger.
+    // Another session reads its own snapshot; the old counts never linger. No count yet: the online count.
     loadRealmView.mockResolvedValue(null)
     sessionEpoch.value++
     realmInfo.value = { metadata_replication: { default_replication_factor: null }, nodes: [beat('mgmt-node', 'management', 1000)] }
     await flush()
     await flush()
-    // No heartbeat carries a count yet: a dash, and nothing more.
-    expect(content(mounted.root)).toContain('Activity-')
-    expect(content(mounted.root)).not.toContain('Not every node')
+    expect(content(mounted.root)).not.toContain('importing')
+    expect(content(mounted.root)).toContain('1/1 online')
     mounted.app.unmount()
 
-    // One node says 0 and another has no count yet: still a dash.
+    // One node says 0 and another has no count yet: nothing known, so the online count.
     loadRealmView.mockResolvedValue({
       info: { node: { peer_id: 'mgmt-node' } },
       realm: { nodes: [
@@ -772,10 +781,10 @@ describe('realm nodes in the overview', () => {
     })
     mounted = await mountApp(DashboardClient)
     await flush()
-    expect(content(mounted.root)).toContain('Activity-')
+    expect(content(mounted.root)).not.toContain('importing')
     mounted.app.unmount()
 
-    // Every node says 0: "none", and nothing more.
+    // Every node says 0: zero is known.
     loadRealmView.mockResolvedValue({
       info: { node: { peer_id: 'mgmt-node' } },
       realm: { nodes: [
@@ -785,10 +794,22 @@ describe('realm nodes in the overview', () => {
     })
     mounted = await mountApp(DashboardClient)
     await flush()
-    const text = content(mounted.root)
-    expect(text).toContain('Activitynone')
-    expect(text).not.toContain('Not every node')
+    expect(content(mounted.root)).toContain('0 importing')
     mounted.app.unmount()
+  })
+
+  it('counts the listed runs as completed only when the list holds every run, else the running ones', async () => {
+    myGroups.value = [{ id: 'g1', name: 'Genome Lab' }]
+    groupsAggregate.value = { datasets: 0, processRuns: 3 }
+    const run = (state: string) => ({ task: { id: state + Math.random(), state }, nodeId: null })
+    recentRunList.value = [run('COMPLETE'), run('COMPLETE'), run('EXECUTOR_ERROR')]
+    expect(await renderedText()).toContain('Runs 3 2/3 completed')
+
+    runningRuns.value = { count: 1, atLeast: true }
+    expect(await renderedText()).toContain('Runs 3 at least 1 running')
+
+    runningRuns.value = { count: 0, atLeast: true }
+    expect(await renderedText()).not.toContain('completed')
   })
 })
 

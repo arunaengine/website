@@ -14,8 +14,10 @@ const OptionToggle = compileClientComponent(new URL('../ui/OptionToggle.vue', im
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/lib/utils': Utils,
 })
+const icon = (name: string) => defineComponent(() => () => h('i', { 'data-icon': name }))
 const toggle = compileClientComponent(new URL('./DashboardScopeToggle.vue', import.meta.url), {
   vue: VueRuntime,
+  '@lucide/vue': { Users: icon('users'), Globe: icon('globe') },
   '@/components/ui/OptionToggle.vue': moduleDefault(OptionToggle),
 })
 
@@ -26,6 +28,8 @@ describe('dashboard scope toggle', () => {
     expect(button(root, 'My groups').props['aria-pressed']).toBe(true)
     expect(button(root, 'Whole realm').props['aria-pressed']).toBe(false)
     expect(content(root)).not.toContain('Lead with')
+    expect(button(root, 'My groups').children.some((child) => child.props?.['data-icon'] === 'users')).toBe(true)
+    expect(button(root, 'Whole realm').children.some((child) => child.props?.['data-icon'] === 'globe')).toBe(true)
   })
 
   it('emits only a change of scope', async () => {

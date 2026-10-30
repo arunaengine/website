@@ -1,14 +1,43 @@
 <script setup lang="ts">
-// One cell of the Overview card: a label, the figures (each number in <b>, its word plain) and a short line.
-defineProps<{ label: string }>()
+// A stat card: the label, the figure with its unit, a tinted icon tile and a footer of icon facts
+// (each number in <b>). With `to` the whole card opens that page.
+import type { Component } from 'vue'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
+import { Info } from '@lucide/vue'
+import IconTile, { type TileTone } from '@/components/ui/IconTile.vue'
+import Tooltip from '@/components/ui/Tooltip.vue'
+
+withDefaults(defineProps<{ label: string; icon: Component; tone?: TileTone; info?: string; to?: RouteLocationRaw }>(), {
+  tone: 'royal',
+  info: undefined,
+  to: undefined,
+})
 </script>
 
 <template>
-  <div class="flex min-w-0 flex-col gap-1.5 bg-card px-5 py-4">
-    <span class="text-xs text-muted-foreground">{{ label }}</span>
-    <div class="flex flex-wrap items-baseline gap-x-1.5 text-sm text-muted-foreground [&_b]:font-display [&_b]:text-2xl [&_b]:font-semibold [&_b]:text-foreground">
-      <slot name="value" />
+  <component
+    :is="to ? RouterLink : 'div'"
+    :to="to"
+    class="flex h-full min-w-0 flex-col gap-3 rounded-xl border border-border-subtle bg-card p-4 text-card-foreground shadow-sm transition-colors dark:shadow-none sm:gap-4 sm:p-5"
+    :class="to ? 'hover:border-primary/40' : ''"
+  >
+    <div class="flex flex-col-reverse items-start justify-between gap-3 sm:flex-row">
+      <div class="min-w-0">
+        <p class="type-label flex items-center gap-1.5">
+          {{ label }}
+          <Tooltip v-if="info" :label="info">
+            <span class="inline-flex text-muted-foreground" tabindex="0" :aria-label="info"><Info class="size-3.5" aria-hidden="true" /></span>
+          </Tooltip>
+        </p>
+        <p class="mt-2 flex flex-wrap items-baseline gap-x-2">
+          <span class="type-number max-sm:text-xl"><slot name="value" /></span>
+          <span v-if="$slots.unit" class="text-sm text-muted-foreground"><slot name="unit" /></span>
+        </p>
+      </div>
+      <IconTile :icon="icon" :tone="tone" />
     </div>
-    <p v-if="$slots.default" class="text-xs text-muted-foreground"><slot /></p>
-  </div>
+    <div v-if="$slots.default" class="mt-auto flex flex-wrap gap-x-5 gap-y-1 type-secondary max-sm:flex-col [&_b]:whitespace-nowrap [&_b]:font-medium [&_b]:text-foreground [&>span]:inline-flex [&>span]:items-center [&>span]:gap-1.5 [&_svg]:size-3.5 [&_svg]:shrink-0">
+      <slot />
+    </div>
+  </component>
 </template>

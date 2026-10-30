@@ -11,13 +11,14 @@ import RecentDatasetsCard from '@/components/dashboard/RecentDatasetsCard.vue'
 import RecentRunsCard from '@/components/dashboard/RecentRunsCard.vue'
 import OverviewCell from '@/components/dashboard/OverviewCell.vue'
 import WebStart from '@/components/dashboard/WebStart.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import SignInPanel from '@/components/auth/SignInPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import type { RealmView } from '@/composables/aruna/realm'
 import type { RealmNodeInfo } from '@/lib/api'
-import { givenName, nodeName } from '@/components/nodes/node-display'
-import { ArrowRight, Plus } from '@lucide/vue'
+import { givenName } from '@/components/nodes/node-display'
+import { ArrowRight, CircleCheck, Copy, Download, FileJson2, Files, Gauge, HardDrive, Link, LoaderCircle, Network, Package, Plus, Server, TriangleAlert, Workflow } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
@@ -182,6 +183,7 @@ const renameId = computed(() => {
 })
 
 const onlineNodes = computed(() => infraNodes.value.filter((node) => node.present).length)
+const offlineNodes = computed(() => infraNodes.value.length - onlineNodes.value)
 
 // Imports explain a busy node; each node's heartbeat counts them in the realm snapshot. A node
 // without a heartbeat count adds nothing known, so the sum is then a lower bound.
@@ -193,12 +195,21 @@ const activity = computed(() => {
     running: counts.reduce<number>((sum, count) => sum + (count ?? 0), 0),
     reported: counts.length > 0 && counts.every((count) => count !== undefined),
     atLeast: counts.some((count) => count === undefined),
-    nodes: infraNodes.value.filter((node) => (node.info?.utilization?.imports_running ?? 0) > 0),
   }
 })
 
-// The visible runs, newest first: the Work cell counts the running ones.
+// The visible runs, newest first: the Runs card counts the running ones.
 const recentRuns = useRecentRuns()
+// The Runs card's line: the running runs, else how many of the listed runs completed, but only
+// when the list holds every run.
+const runsLine = computed(() => {
+  if (recentRuns.state.value !== 'ready') return null
+  const { count, atLeast } = recentRuns.running.value
+  if (count) return { running: count, atLeast, completed: 0, total: 0 }
+  const runs = recentRuns.runs.value
+  if (atLeast || !runs.length) return null
+  return { running: 0, atLeast: false, completed: runs.filter((run) => run.task.state === 'COMPLETE').length, total: runs.length }
+})
 // After the online count: replication and devices, plain.
 const realmFacts = computed(() => {
   const devices = deviceNodes.value.length
@@ -230,21 +241,18 @@ const realmTotals = computed(() => usageInfo.value?.realm ?? null)
 const realmBuckets = useRealmBucketCount(realmTotals)
 const plural = (count: number, one: string, many: string) => (count === 1 ? one : many)
 // No database count here: the list holds only the databases the caller may read, not the realm's.
-const realmDataLine = computed(() => {
+const realmBucketsLine = computed(() => {
   const totals = realmTotals.value
-  if (!totals) return ''
+  if (!totals) return null
   const buckets = realmBuckets.value ?? { count: totals.buckets, exact: true }
-  return `${countText(buckets, formatCount)} ${plural(buckets.exact ? buckets.count : 2, 'bucket', 'buckets')}`
+  return { value: countText(buckets, formatCount), word: plural(buckets.exact ? buckets.count : 2, 'bucket', 'buckets') }
 })
 // The realm counts every record kind at once; only the groups count datasets apart from runs, so
 // a signed-in Work cell counts them as the group card does. A guest sees the public record count.
 const groupsUsage = useMyGroupsUsage().aggregate
 const guestRecords = computed(() => publicOverview.value?.live_datasets ?? null)
-const realmNodesText = computed(() => {
-  if (infraNodes.value.length) return { count: onlineNodes.value, word: 'online' }
-  const configured = publicOverview.value?.nodes_configured
-  return configured == null ? null : { count: configured, word: '' }
-})
+// Without node records (a guest) the realm still names how many nodes it has configured.
+const realmNodeCount = computed(() => infraNodes.value.length || (publicOverview.value?.nodes_configured ?? null))
 
 // While a stored session restores, keep the copy neutral instead of flashing
 // the guest greeting and its sign-in hint.
@@ -298,82 +306,65 @@ const pageDescription = computed(() =>
       <WebStart v-if="!desktop && currentUser && !authPending" />
       <HomeCards v-if="desktop && currentUser" />
 
-      <!-- One card for the figures: the stored scope decides whose, the realm cell is the same for both. -->
-      <section class="surface overflow-hidden" aria-labelledby="overview-heading">
-        <header class="flex flex-wrap items-center justify-between gap-3 px-5 pt-4">
-          <h2 id="overview-heading" class="font-display text-[15px] font-semibold text-foreground">Overview</h2>
-          <DashboardScopeToggle v-if="currentUser" :model-value="scope" @update:model-value="setScope" />
-        </header>
-        <div class="mt-3 grid gap-px border-t border-border bg-border sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr]">
+      <!-- Four stat cards: the stored scope decides whose figures, the Realm card is the same for both. -->
+      <section aria-labelledby="overview-heading">
+        <SectionHeading id="overview-heading" title="Overview" :icon="Gauge">
+          <template v-if="currentUser" #actions>
+            <DashboardScopeToggle :model-value="scope" @update:model-value="setScope" />
+          </template>
+        </SectionHeading>
+        <div class="grid grid-cols-2 gap-3 sm:gap-4" :class="currentUser ? 'xl:grid-cols-4' : ''">
           <template v-if="currentUser && scope === 'personal'">
-            <MyStatsCards v-if="myGroups.length" :refresh-revision="quotaRevision" :running="recentRuns.state.value === 'ready' ? recentRuns.running.value : null" />
-            <div v-else class="bg-card px-5 py-4 lg:col-span-3"><EmptyState compact title="You do not belong to any groups yet." /></div>
+            <MyStatsCards v-if="myGroups.length" :refresh-revision="quotaRevision" />
+            <div v-else class="surface col-span-2 grid place-items-center p-4"><EmptyState compact title="You do not belong to any groups yet." /></div>
           </template>
           <template v-else-if="!bootstrapped">
-            <div v-for="n in 3" :key="n" class="bg-card px-5 py-4"><Skeleton class="h-16" /></div>
+            <Skeleton v-for="n in 2" :key="n" class="h-[132px] rounded-xl" />
           </template>
-          <template v-else>
-            <template v-if="currentUser">
-              <OverviewCell label="Storage">
-                <template v-if="realmTotals" #value>
-                  <b>{{ formatBytes(realmTotals.logical_bytes) }}</b> stored
-                  <b class="ml-2">{{ formatBytes(realmTotals.referenced_bytes) }}</b> referenced
-                </template>
-                <template v-else #value>Unknown</template>
-                Stored counts against quotas. Referenced data stays at its source.
-              </OverviewCell>
-              <OverviewCell label="Data">
-                <template v-if="realmTotals" #value>
-                  <RouterLink :to="{ name: 'buckets' }" class="hover:underline"><b>{{ formatCount(realmTotals.objects) }}</b></RouterLink>
-                  {{ plural(realmTotals.objects, 'object', 'objects') }}
-                </template>
-                <template v-else #value>Unknown</template>
-                {{ realmDataLine }}
-              </OverviewCell>
-            </template>
-            <!-- Totals wait for every group, so a partial sum never reads as the count. -->
-            <div v-if="currentUser && groupsUsage.pending" class="bg-card px-5 py-4"><Skeleton class="h-16" /></div>
-            <OverviewCell v-else-if="currentUser" label="Work">
-              <template v-if="groupsUsage.processRuns != null" #value>
-                <RouterLink :to="{ name: 'compute' }" class="hover:underline"><b>{{ formatCount(groupsUsage.processRuns) }}</b></RouterLink>
-                {{ plural(groupsUsage.processRuns, 'run', 'runs') }}
+          <template v-else-if="currentUser">
+            <OverviewCell label="Storage" :icon="HardDrive" info="Stored data counts against quotas. Referenced data stays at its source.">
+              <template #value>{{ realmTotals ? formatBytes(realmTotals.logical_bytes + realmTotals.referenced_bytes) : 'Unknown' }}</template>
+              <template v-if="realmTotals" #unit>total</template>
+              <template v-if="realmTotals">
+                <span><Server /><b>{{ formatBytes(realmTotals.logical_bytes) }}</b> stored</span>
+                <span><Link /><b>{{ formatBytes(realmTotals.referenced_bytes) }}</b> referenced</span>
               </template>
-              <template v-else #value>Unknown</template>
-              {{ [
-                recentRuns.state.value === 'ready' ? `${recentRuns.running.value.atLeast ? 'at least ' : ''}${formatCount(recentRuns.running.value.count)} running` : '',
-                groupsUsage.datasets != null ? `${formatCount(groupsUsage.datasets)} ${plural(groupsUsage.datasets, 'dataset', 'datasets')}` : '',
-              ].filter(Boolean).join(', ') }}
             </OverviewCell>
-            <OverviewCell v-else label="Work" class="sm:col-span-1 lg:col-span-3">
-              <template v-if="guestRecords !== null" #value>
-                <RouterLink :to="{ name: 'datasets' }" class="hover:underline"><b>{{ formatCount(guestRecords) }}</b></RouterLink>
-                {{ plural(guestRecords, 'record', 'records') }}
-              </template>
-              <template v-else #value>Unknown</template>
+            <OverviewCell label="Objects" :icon="Files" tone="aqua" :to="{ name: 'buckets' }">
+              <template #value>{{ realmTotals ? formatCount(realmTotals.objects) : 'Unknown' }}</template>
+              <span v-if="realmBucketsLine"><Package /><b>{{ realmBucketsLine.value }}</b> {{ realmBucketsLine.word }}</span>
             </OverviewCell>
           </template>
-          <OverviewCell v-if="currentUser" label="Activity">
-            <template v-if="activity.running" #value>
-              <b>{{ activity.atLeast ? 'at least ' : '' }}{{ formatCount(activity.running) }}</b> {{ activity.running === 1 ? 'import' : 'imports' }} running
-            </template>
-            <template v-else #value>{{ activity.reported ? 'none' : '-' }}</template>
-            <!-- Each importing node by name, opening its page. -->
-            <template v-if="activity.nodes.length">
-              on
-              <template v-for="(busy, index) in activity.nodes" :key="busy.node_id">
-                <template v-if="index">{{ index === activity.nodes.length - 1 ? ' and ' : ', ' }}</template>
-                <RouterLink :to="{ name: 'node', params: { nodeId: busy.node_id } }" class="hover:underline">{{ nodeName(busy) }}</RouterLink>
-              </template>
-            </template>
+          <!-- Totals wait for every group, so a partial sum never reads as the count. -->
+          <template v-if="currentUser">
+            <Skeleton v-if="groupsUsage.pending" class="h-[132px] rounded-xl" />
+            <OverviewCell v-else label="Runs" :icon="Workflow" tone="ok" :to="{ name: 'compute' }">
+              <template #value>{{ groupsUsage.processRuns != null ? formatCount(groupsUsage.processRuns) : 'Unknown' }}</template>
+              <!-- The realm counts no runs on its own, so the realm scope names whose they are. -->
+              <template v-if="scope === 'realm'" #unit>in your groups</template>
+              <span v-if="runsLine?.running"><LoaderCircle /><b>{{ runsLine.atLeast ? 'at least ' : '' }}{{ formatCount(runsLine.running) }}</b> running</span>
+              <span v-else-if="runsLine">
+                <CircleCheck v-if="runsLine.completed === runsLine.total" class="text-status-ok" />
+                <b>{{ formatCount(runsLine.completed) }}/{{ formatCount(runsLine.total) }}</b> completed
+              </span>
+            </OverviewCell>
+          </template>
+          <OverviewCell v-else label="Records" :icon="FileJson2" tone="ok" :to="{ name: 'datasets' }">
+            <template #value>{{ guestRecords !== null ? formatCount(guestRecords) : 'Unknown' }}</template>
           </OverviewCell>
-          <OverviewCell v-else label="Realm">
-            <template v-if="realmNodesText" #value>
-              <b>{{ formatCount(realmNodesText.count) }}</b> {{ plural(realmNodesText.count, 'node', 'nodes') }} {{ realmNodesText.word }}
+          <OverviewCell label="Realm" :icon="Network" :tone="offlineNodes ? 'failed' : 'ok'" :to="{ name: 'status' }">
+            <template #value>{{ realmNodeCount !== null ? formatCount(realmNodeCount) : 'Unknown' }}</template>
+            <template v-if="realmNodeCount !== null" #unit>{{ plural(realmNodeCount, 'node', 'nodes') }}</template>
+            <!-- One state signal: the online count, a warning when nodes are offline; the realm scope
+                 shows what the nodes import instead when every node reports it. -->
+            <template v-if="infraNodes.length">
+              <span v-if="offlineNodes" class="text-status-warn"><TriangleAlert /><b>{{ onlineNodes }}/{{ infraNodes.length }}</b> online</span>
+              <span v-else-if="scope === 'realm' && currentUser && (activity.running || activity.reported)">
+                <Download /><b>{{ activity.atLeast ? 'at least ' : '' }}{{ formatCount(activity.running) }}</b> importing
+              </span>
+              <span v-else><CircleCheck class="text-status-ok" /><b>{{ onlineNodes }}/{{ infraNodes.length }}</b> online</span>
             </template>
-            <template v-else #value>Unknown</template>
-            <!-- The line break before the link is the space between them. -->
-            {{ replication ?? '' }}
-            <RouterLink :to="{ name: 'status' }" class="text-primary hover:underline">Status</RouterLink>
+            <span v-if="replication"><Copy />{{ replication }}</span>
           </OverviewCell>
         </div>
         <DeviceRow

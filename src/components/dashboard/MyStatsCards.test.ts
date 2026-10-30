@@ -78,7 +78,7 @@ beforeEach(() => {
 })
 
 describe('personal statistics tiles', () => {
-  it('shows storage, objects and datasets with each distributed bucket once', async () => {
+  it('shows the storage total, stored, referenced and objects with each distributed bucket once', async () => {
     aruna.myGroups.value = [
       { id: 'sum-1', name: 'Alpha' },
       { id: 'sum-2', name: 'Beta' },
@@ -94,14 +94,13 @@ describe('personal statistics tiles', () => {
 
     const text = await renderedText()
 
-    expect(text).toContain(`Storage ${formatBytes(3 * 2048)} stored of ${formatBytes(2 * 10_000)} ${formatBytes(3 * 1024)} referenced`)
-    expect(text).toContain('Stored counts against quotas. Referenced data stays at its source.')
-    expect(text).toContain('Data 12 objects 3 buckets')
-    expect(text).toContain('Work 4 runs 6 datasets')
+    expect(text).toContain(`Storage ${formatBytes(3 * 3072)} total ${formatBytes(3 * 2048)} stored ${formatBytes(3 * 1024)} referenced`)
+    expect(await renderToString(createSSRApp(MyStatsCards))).toContain('aria-label="Stored data counts against quotas. Referenced data stays at its source."')
+    expect(text).toContain('Objects 12 3 buckets')
     expect(text).not.toContain('at least')
   })
 
-  it('uses the singular for one bucket and one process run', async () => {
+  it('uses the singular for one bucket', async () => {
     aruna.myGroups.value = [{ id: 'one-1', name: 'Alpha' }]
     aruna.getGroupUsage.mockResolvedValue(usage({ dataset_count: 0, process_run_count: 1, realm: { buckets: 1, distinct_buckets: 1, objects: 5, logical_bytes: 1_000, referenced_bytes: 1 } }))
     aruna.searchBuckets.mockResolvedValue(listing([hit('a', 'n1', 'one-1')]))
@@ -111,8 +110,7 @@ describe('personal statistics tiles', () => {
 
     const text = await renderedText()
 
-    expect(text).toContain('1 object 1 bucket ')
-    expect(text).toMatch(/Work 1 run 0 datasets$/)
+    expect(text).toMatch(/Objects 1 1 bucket$/)
   })
 
   it('shows a lower bound when a bucket could not be read', async () => {
@@ -128,7 +126,7 @@ describe('personal statistics tiles', () => {
 
     const text = await renderedText()
 
-    expect(text).toContain(`Storage at least 10 B stored of ${formatBytes(10_000)} at least 0 B referenced`)
+    expect(text).toContain('Storage at least 10 B total at least 10 B stored at least 0 B referenced')
     expect(text).toContain('could not be read, so it is not counted')
     expect(text).toContain('1 bucket does not report referenced data')
   })
@@ -153,13 +151,15 @@ describe('personal statistics tiles', () => {
       if (groupId === 'failed-2') throw new Error('node unreachable')
       return usage()
     })
+    aruna.searchBuckets.mockResolvedValue(listing([hit('a', 'n1', 'failed-1')]))
+    aruna.getBucketUsage.mockResolvedValue(bucketUsage(10, 0, 1))
     await loadMyGroupsUsage()
+    await useReachableUsage().load()
 
     const text = await renderedText()
 
-    expect(text).toMatch(/Work Unknown runs Unknown datasets/)
     expect(text).toContain('Totals stay unknown while the storage of Ocean lab cannot be read.')
-    expect(text).not.toMatch(/Work 0/)
+    expect(text).not.toContain('0 buckets')
   })
 
   it('counts the databases of my groups once the database list was read', async () => {
@@ -173,23 +173,10 @@ describe('personal statistics tiles', () => {
     expect(await renderedText()).not.toContain('database')
 
     databases.state.value = 'ready'
-    expect(await renderedText()).toContain('2 buckets, 1 database')
+    expect(await renderedText()).toContain('2 buckets 1 database')
   })
 
-  it('says no quota when no group has one, and how many visible runs run now', async () => {
-    aruna.myGroups.value = [{ id: 'free-1', name: 'Alpha' }]
-    aruna.getGroupUsage.mockResolvedValue(usage({ quota: { quota_bytes: null, ceiling_bytes: null, warn_threshold_percent: 80, warning: false } }))
-    aruna.searchBuckets.mockResolvedValue(listing([hit('a', 'n1', 'free-1')]))
-    aruna.getBucketUsage.mockResolvedValue(bucketUsage(10, 0, 1))
-    await loadMyGroupsUsage()
-    await useReachableUsage().load()
-
-    expect(await renderedText()).toContain('10 B stored, no quota')
-    expect(await renderedText({ running: { count: 2, atLeast: false } })).toContain('Work 2 runs 2 running, 3 datasets')
-    expect(await renderedText({ running: { count: 0, atLeast: true } })).toContain('at least 0 running')
-  })
-
-  it('links the counts that have a page: the objects to Data, the runs to Compute', async () => {
+  it('opens Data from the Objects card', async () => {
     aruna.myGroups.value = [{ id: 'link-1', name: 'Alpha' }]
     aruna.getGroupUsage.mockResolvedValue(usage())
     aruna.searchBuckets.mockResolvedValue(listing([hit('a', 'n1', 'link-1')]))
@@ -198,7 +185,7 @@ describe('personal statistics tiles', () => {
     await useReachableUsage().load()
     const html = await renderToString(createSSRApp(MyStatsCards))
 
-    expect(html).toMatch(/data-to="\{&quot;name&quot;:&quot;buckets&quot;\}"[^>]*><b>3<\/b>/)
-    expect(html).toMatch(/data-to="\{&quot;name&quot;:&quot;compute&quot;\}"[^>]*><b>2<\/b>/)
+    expect(html).toMatch(/data-to="\{&quot;name&quot;:&quot;buckets&quot;\}"[^>]*>[\s\S]*?Objects/)
+    expect(html).not.toContain('compute')
   })
 })

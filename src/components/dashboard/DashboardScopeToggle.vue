@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // Switches the dashboard between the caller's own statistics and the realm's.
+import { Globe, Users } from '@lucide/vue'
 import OptionToggle from '@/components/ui/OptionToggle.vue'
 import type { DashboardScope } from '@/composables/useDashboardScope'
 
@@ -7,8 +8,8 @@ defineProps<{ modelValue: DashboardScope }>()
 const emit = defineEmits<{ (e: 'update:modelValue', value: DashboardScope): void }>()
 
 const OPTIONS = [
-  { value: 'personal', label: 'My groups' },
-  { value: 'realm', label: 'Whole realm' },
+  { value: 'personal', label: 'My groups', icon: Users },
+  { value: 'realm', label: 'Whole realm', icon: Globe },
 ]
 </script>
 

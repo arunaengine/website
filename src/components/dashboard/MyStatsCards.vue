@@ -1,9 +1,9 @@
 <script setup lang="ts">
-// The Overview cells over every group the caller belongs to. Storage and objects come from the
-// buckets themselves, so a distributed bucket counts once; a part that was not read makes the
-// figure a lower bound instead of a smaller number.
+// The Storage and Objects cards of the Overview over every group the caller belongs to. They come
+// from the buckets themselves, so a distributed bucket counts once; a part that was not read makes
+// the figure a lower bound instead of a smaller number.
 import { computed, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { Database, Files, HardDrive, Link, Package, Server } from '@lucide/vue'
 import Notice from '@/components/ui/Notice.vue'
 import OverviewCell from '@/components/dashboard/OverviewCell.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -16,13 +16,9 @@ import { distinctCount } from '@/lib/distribution'
 import { formatCount } from '@/lib/formatCount'
 import { formatBytes } from '@/lib/utils'
 
-/** `running`: the visible runs that run right now; null while they are not known. */
-const props = withDefaults(defineProps<{ refreshRevision?: number; running?: { count: number; atLeast: boolean } | null }>(), {
-  refreshRevision: 0,
-  running: null,
-})
+const props = withDefaults(defineProps<{ refreshRevision?: number }>(), { refreshRevision: 0 })
 
-const { aggregate, entries, membershipKey, load } = useMyGroupsUsage()
+const { aggregate, membershipKey, load } = useMyGroupsUsage()
 const reach = useReachableUsage()
 const { myGroups } = useAruna()
 const databases = useDatabases()
@@ -64,72 +60,43 @@ const notes = computed(() => {
 // Group totals count a bucket stored on several nodes once per node; the listed buckets correct that.
 const buckets = computed(() => {
   const total = aggregate.value.buckets
-  if (total == null) return 'Buckets unknown'
+  if (total == null) return null
   const counted = aggregate.value.bucketsDistinct
     ? { count: total, exact: true }
     : distinctCount(total, reach.copies.value, reach.total.value.buckets, reach.listedAll.value)
-  return `${countText(counted, formatCount)} ${plural(counted.exact ? counted.count : 2, 'bucket', 'buckets')}`
+  return { value: countText(counted, formatCount), word: plural(counted.exact ? counted.count : 2, 'bucket', 'buckets') }
 })
 // The databases of my groups, once the realm's database list was read.
 const databaseText = computed(() => {
   if (databases.state.value !== 'ready') return null
   const mine = new Set(myGroups.value.map((group) => group.id))
   const count = databases.rows.value.filter((row) => mine.has(row.ownerGroup)).length
-  return `${lowerBound(!databases.complete.value, formatCount(count))} ${plural(count, 'database', 'databases')}`
-})
-
-// The groups' quotas: a sum when every group has one, "no quota" when none has; mixed says nothing.
-const quotaText = computed(() => {
-  const quotas = entries.value.map((entry) => entry.quota?.quota_bytes ?? null)
-  if (!quotas.length || entries.value.some((entry) => entry.status !== 'ready')) return ''
-  if (quotas.every((quota) => quota === null)) return ', no quota'
-  if (quotas.every((quota) => quota !== null)) return ` of ${formatBytes(quotas.reduce<number>((total, quota) => total + (quota ?? 0), 0))}`
-  return ''
-})
-
-const datasets = computed(() => (aggregate.value.datasets == null ? 'Unknown' : formatCount(aggregate.value.datasets)))
-const runCount = computed(() => (aggregate.value.processRuns == null ? 'Unknown' : formatCount(aggregate.value.processRuns)))
-// Below the runs: how many run right now, and the datasets.
-const workLine = computed(() => {
-  const running = props.running ? `${props.running.atLeast ? 'at least ' : ''}${formatCount(props.running.count)} running` : null
-  const datasetCount = aggregate.value.datasets
-  return [running, `${datasets.value} ${datasetCount === 1 ? 'dataset' : 'datasets'}`].filter(Boolean).join(', ')
+  return { value: lowerBound(!databases.complete.value, formatCount(count)), word: plural(count, 'database', 'databases') }
 })
 </script>
 
 <template>
-  <!-- Cells of the Overview grid; the notes run below its row. -->
+  <!-- Cards of the Overview grid; the notes run below its row. -->
   <div class="contents">
     <template v-if="!loaded">
-      <div class="bg-card px-5 py-4"><Skeleton class="h-16" /></div>
-      <div class="bg-card px-5 py-4"><Skeleton class="h-16" /></div>
+      <Skeleton class="h-[132px] rounded-xl" />
+      <Skeleton class="h-[132px] rounded-xl" />
     </template>
     <template v-else>
-      <OverviewCell label="Storage">
-        <template #value>
-          <b>{{ lowerBound(atLeast, formatBytes(sum.stored)) }}</b> stored{{ quotaText }}
-          <b class="ml-2">{{ lowerBound(referencedLower, formatBytes(sum.referenced)) }}</b> referenced
-        </template>
-        Stored counts against quotas. Referenced data stays at its source.
+      <OverviewCell label="Storage" :icon="HardDrive" info="Stored data counts against quotas. Referenced data stays at its source.">
+        <template #value>{{ lowerBound(referencedLower, formatBytes(sum.stored + sum.referenced)) }}</template>
+        <template #unit>total</template>
+        <span><Server /><b>{{ lowerBound(atLeast, formatBytes(sum.stored)) }}</b> stored</span>
+        <span><Link /><b>{{ lowerBound(referencedLower, formatBytes(sum.referenced)) }}</b> referenced</span>
       </OverviewCell>
-      <OverviewCell label="Data">
-        <template #value>
-          <RouterLink :to="{ name: 'buckets' }" class="hover:underline"><b>{{ lowerBound(atLeast, formatCount(sum.objects)) }}</b></RouterLink>
-          {{ plural(sum.objects, 'object', 'objects') }}
-        </template>
-        {{ [buckets, databaseText].filter(Boolean).join(', ') }}
+      <OverviewCell label="Objects" :icon="Files" tone="aqua" :to="{ name: 'buckets' }">
+        <template #value>{{ lowerBound(atLeast, formatCount(sum.objects)) }}</template>
+        <span v-if="buckets"><Package /><b>{{ buckets.value }}</b> {{ buckets.word }}</span>
+        <span v-if="databaseText"><Database /><b>{{ databaseText.value }}</b> {{ databaseText.word }}</span>
       </OverviewCell>
     </template>
-    <div v-if="aggregate.pending" class="bg-card px-5 py-4"><Skeleton class="h-16" /></div>
-    <OverviewCell v-else label="Work">
-      <template #value>
-        <RouterLink :to="{ name: 'compute' }" class="hover:underline"><b>{{ runCount }}</b></RouterLink>
-        {{ aggregate.processRuns === 1 ? 'run' : 'runs' }}
-      </template>
-      {{ workLine }}
-    </OverviewCell>
 
-    <div v-if="loaded && (notes.length || aggregate.failed.length)" class="order-last space-y-2 bg-card px-5 py-3 sm:col-span-2 lg:col-span-4">
+    <div v-if="loaded && (notes.length || aggregate.failed.length)" class="order-last col-span-full space-y-2">
       <ul v-if="notes.length" class="space-y-1 text-xs text-muted-foreground">
         <li v-for="note in notes" :key="note">{{ note }}</li>
       </ul>
