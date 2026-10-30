@@ -32,7 +32,7 @@ const userDir = useUserDirectory()
 const s3 = useS3()
 const tesEnabled = computed(() => featureEnabled('tes'))
 const { shown } = usePortalFeatures()
-const { displayName, nodes: realmNodes } = useRealmNodes()
+const { displayName, isLocalNode, nodes: realmNodes } = useRealmNodes()
 
 // The agent Person carries a `{ulid}@{realm}` identifier; resolve it to a
 // display name through the shared user directory, short id as the fallback.
@@ -106,20 +106,21 @@ const startedAt = computed(() => {
 // Same link forms TaskDetailPanel resolves for TES outputs, plus any
 // workspace-relative refs mapped through the crate's recorded bucket.
 type ResolvedLink =
-  | { kind: 's3'; bucketId: string; prefix: string }
+  | { kind: 's3'; bucketId: string; prefix: string; nodeId?: string }
   | { kind: 'drs'; object: string; download: string }
   | { kind: 'plain' }
 
-function s3Link(bucketId: string, key: string): ResolvedLink {
+function s3Link(bucketId: string, key: string, nodeId?: string): ResolvedLink {
   // Slash-less parent prefix, matching DataManagerView.navigateTo.
   const prefix = key.includes('/') ? key.slice(0, key.lastIndexOf('/')) : ''
-  return { kind: 's3', bucketId, prefix }
+  return { kind: 's3', bucketId, prefix, ...(nodeId && !isLocalNode(nodeId) ? { nodeId } : {}) }
 }
 
 function resolveRef(ref: RunCrateFileRef): ResolvedLink {
   const url = ref.contentUrl ?? ref.id
-  const parsed = parseDataIdentity(ref, s3.endpoint.value).s3
-  if (parsed) return s3Link(parsed.bucket, parsed.key)
+  const identity = parseDataIdentity(ref, s3.endpoint.value)
+  const parsed = identity.s3
+  if (parsed) return s3Link(parsed.bucket, parsed.key, identity.arn?.nodeId)
   if (isDrsReference(url) && !/^drs:\/\//i.test(url)) {
     return { kind: 'drs', object: drsObjectHref(apiBaseUrl.value, url), download: drsDownloadHref(apiBaseUrl.value, url) }
   }
@@ -141,10 +142,10 @@ function toRow(ref: RunCrateFileRef): FileRow {
 }
 
 const outputRows = computed(() => props.run.outputs.map(toRow))
-const folderRoute = (link: { bucketId: string; prefix: string }, run?: string) => ({
+const folderRoute = (link: { bucketId: string; prefix: string; nodeId?: string }, run?: string) => ({
   name: 'bucket',
   params: { bucketId: link.bucketId },
-  query: { ...(link.prefix ? { prefix: link.prefix } : {}), ...(run ? { run } : {}) },
+  query: { ...(link.prefix ? { prefix: link.prefix } : {}), ...(link.nodeId ? { node: link.nodeId } : {}), ...(run ? { run } : {}) },
 })
 // A stored result opens its folder; a content address opens through DRS in a new tab.
 function rowLink(link: ResolvedLink) {

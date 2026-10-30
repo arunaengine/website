@@ -260,7 +260,20 @@ function taskPanel(
   metadataAtPath: unknown = vi.fn(async () => null),
   listTasks: unknown = vi.fn(async () => ({ tasks: [] })),
 ): Component {
-  return compileClientComponent(new URL('../compute/TaskDetailPanel.vue', import.meta.url), {
+  return compileClientComponent(
+    new URL('../compute/TaskDetailPanel.vue', import.meta.url),
+    panelModules(getTask, getJob, deleteJob, metadataAtPath, listTasks),
+  )
+}
+
+function panelModules(
+  getTask: unknown,
+  getJob: unknown,
+  deleteJob: unknown = vi.fn(),
+  metadataAtPath: unknown = vi.fn(async () => null),
+  listTasks: unknown = vi.fn(async () => ({ tasks: [] })),
+): Record<string, unknown> {
+  return {
     vue: VueRuntime,
     'vue-router': { RouterLink: RouterLinkStub, useRouter: () => ({ push: vi.fn() }) },
     '@lucide/vue': icons,
@@ -336,7 +349,7 @@ function taskPanel(
     '@/lib/tes': Tes,
     '@/lib/notebook/submit': { sessionRuntime: () => null },
     '@/lib/utils': Utils,
-  })
+  }
 }
 
 function jobPanel(job: JobStatusResponse): Component {
@@ -1424,6 +1437,24 @@ describe('distributed job detail components', () => {
     expect(await folderText([])).toContain('laptop/results/run/out/')
     expect(await folderText([{ outputs: [written] }])).toContain('laptop/results/run/out/')
     expect(await folderText([])).not.toContain('laptop/results/run/')
+  })
+
+  it('opens an output folder on the node that holds its bucket', async () => {
+    const declared = { url: 's3://reads/out/count.txt', path: '/work/out/count.txt' }
+    const getTask = vi.fn(async () => ({ id: 'done', state: 'COMPLETE', executors: [], inputs: [], outputs: [declared], logs: [], tags: {} }))
+    const owned = { ...family, outputs: [{ bucket: 'reads', key: 'out/count.txt', version_id: 'v1', execution_id: 'e', size: 1, endpoint_url: 'https://owner.node.test' }] }
+    const routes: unknown[] = []
+    const Link = defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => (routes.push(props.to), h('a', slots.default?.())) })
+    const component = compileClientComponent(new URL('../compute/TaskDetailPanel.vue', import.meta.url), {
+      ...panelModules(getTask, vi.fn(async () => ({ family: owned }))),
+      'vue-router': { RouterLink: Link, useRouter: () => ({ push: vi.fn() }) },
+    })
+
+    const mounted = await mount(component, { taskId: 'done', open: true })
+    await flushPanel()
+
+    expect(routes).toContainEqual({ name: 'bucket', params: { bucketId: 'reads' }, query: { prefix: 'out', node: 'owner-node' } })
+    mounted.app.unmount()
   })
 
   it('stays on a run that already holds its placement', async () => {

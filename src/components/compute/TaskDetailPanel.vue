@@ -440,9 +440,16 @@ function executorDetails(i: number): Detail[] {
 function inputLink(url: string | undefined) {
   if (!url) return null
   const link = resolveUrl(url)
-  return link.kind === 's3'
-    ? { name: 'bucket', params: { bucketId: link.bucketId }, query: link.prefix ? { prefix: link.prefix } : {} }
-    : null
+  return link.kind === 's3' ? bucketRoute(link.bucketId, link.prefix) : null
+}
+// The node holding each output bucket, read from where the run wrote, so its folder opens there.
+const outputNodes = computed(() => new Map((nativeFamily.value?.outputs ?? []).flatMap((output) => {
+  const owner = output.endpoint_url ? resolveObjectUrl(`${output.endpoint_url.replace(/\/+$/, '')}/${output.bucket}/${output.key}`) : null
+  return owner?.nodeId ? [[output.bucket, owner.nodeId] as const] : []
+})))
+function bucketRoute(bucketId: string, prefix: string) {
+  const node = outputNodes.value.get(bucketId)
+  return { name: 'bucket', params: { bucketId }, query: { ...(prefix ? { prefix } : {}), ...(node ? { node } : {}) } }
 }
 
 // The one line that says what happened; the badge, the stages and this line
@@ -660,7 +667,7 @@ const resultsFolder = computed(() => {
   const prefix = !row.captured && /[/*]$/.test(row.path) ? row.link.objectKey.replace(/\/+$/, '') : row.link.prefix
   return {
     path: `${bucketId}/${prefix ? `${prefix}/` : ''}`,
-    to: { name: 'bucket', params: { bucketId }, query: prefix ? { prefix } : {} },
+    to: bucketRoute(bucketId, prefix),
   }
 })
 const outputSummary = computed(() => {
@@ -1077,7 +1084,7 @@ async function confirmDelete() {
                       </td>
                       <td class="px-3 py-2 font-mono text-muted-foreground">{{ row.path }}</td>
                       <td class="px-3 py-2">
-                        <RouterLink v-if="row.link.kind === 's3'" class="break-all font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
+                        <RouterLink v-if="row.link.kind === 's3'" class="break-all font-mono text-primary hover:underline" :to="bucketRoute(row.link.bucketId, row.link.prefix)">{{ row.url }}</RouterLink>
                         <span v-else-if="row.link.kind === 'drs'" class="inline-flex items-center gap-1">
                           <a class="font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.url, 24, 12) }}</a>
                           <Tooltip label="Download this output">

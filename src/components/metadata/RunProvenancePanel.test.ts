@@ -39,6 +39,7 @@ const RunProvenancePanel = compileClientComponent(new URL('./RunProvenancePanel.
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
       displayName: (id: string) => (id === 'node-2' ? 'Giessen' : id),
+      isLocalNode: (id: string) => id === 'n1',
       // `given` is the shared name rule's answer: the realm display name first, then the labels.
       nodes: ref([
         { nodeId: 'device-1', info: { labels: { name: 'laptop' } }, given: 'laptop' },
@@ -72,6 +73,15 @@ describe('RunProvenancePanel', () => {
       name: 'bucket',
       params: { bucketId: 'results' },
       query: { prefix: 'runs' },
+    })
+  })
+
+  it('opens an output of another node on that node', async () => {
+    const id = 'https://w3id.org/aruna/data/arn:aruna:r1:node-2:s3/laptop/results/run/out/out.csv@01JABCDEF0123456789ABCDEFG'
+    expect((await linkOf({ id, contentUrl: CONTENT }))?.to).toEqual({
+      name: 'bucket',
+      params: { bucketId: 'laptop' },
+      query: { prefix: 'results/run/out', node: 'node-2' },
     })
   })
 
@@ -209,7 +219,7 @@ describe('RunProvenancePanel grouped files', () => {
     expect(text).not.toContain('from a device')
     // The whole row opens the input's folder.
     const row = nodes(mounted.root).find((node) => node.tag === 'a' && content(node).includes('genome.fasta'))
-    expect(row?.props.to).toEqual({ name: 'bucket', params: { bucketId: 'laptop' }, query: { prefix: 'inputs' } })
+    expect(row?.props.to).toEqual({ name: 'bucket', params: { bucketId: 'laptop' }, query: { prefix: 'inputs', node: 'node-2' } })
     mounted.app.unmount()
   })
 })
