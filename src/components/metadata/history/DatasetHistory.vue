@@ -174,7 +174,7 @@ function discardKept(conflict: VersionConflict) {
           <Tooltip :label="absolute(conflict.version.created_at)"><span>{{ relativeTime(conflict.version.created_at) }}</span></Tooltip>
           did not apply because another node saved at the same time.
         </span>
-        <Button v-if="conflict.branch" variant="ghost" size="sm" @click="openCompare(conflict.branch, conflict.version.version)">Compare</Button>
+        <Button v-if="conflict.branch" variant="ghost" size="sm" @click="openCompare(conflict.branch, conflict.version.version)">Compare versions</Button>
         <Button v-if="conflict.branch && canWrite" variant="ghost" size="sm" @click="mergeKept(conflict)">Merge</Button>
         <Button v-if="canWrite" variant="ghost" size="sm" class="text-destructive" @click="discardKept(conflict)">Discard</Button>
       </div>
@@ -183,16 +183,16 @@ function discardKept(conflict: VersionConflict) {
     <section class="space-y-3" aria-labelledby="history-heading">
       <SectionHeading id="history-heading" title="History" :icon="HistoryIcon">
         <template #actions>
-          <Select v-model="branch" :options="branchOptions" aria-label="Branch" class="h-8 w-56 text-xs" />
-          <Button v-if="canWrite" variant="outline" size="sm" @click="openName('branch', branch)"><Plus class="h-4 w-4" /> New branch</Button>
-          <Button variant="outline" size="sm" :disabled="!selected" @click="compareBranch"><GitCompare class="h-4 w-4" /> Compare</Button>
+          <Select v-model="branch" :options="branchOptions" aria-label="Version line" class="h-8 w-56 text-xs" />
+          <Button v-if="canWrite" variant="outline" size="sm" @click="openName('branch', branch)"><Plus class="h-4 w-4" /> New version line</Button>
+          <Button variant="outline" size="sm" :disabled="!selected" @click="compareBranch"><GitCompare class="h-4 w-4" /> Compare versions</Button>
         </template>
       </SectionHeading>
 
       <div v-if="isDraft" class="flex flex-wrap items-center gap-3 rounded-md border border-border bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
-        <span class="min-w-0 flex-1">Draft branch. Its changes do not affect the live metadata until they are merged into main.</span>
+        <span class="min-w-0 flex-1">Draft version line. Its changes do not affect the current version until they are merged into it.</span>
         <template v-if="canWrite">
-          <Button size="sm" @click="mergeDraft"><GitMerge class="h-3.5 w-3.5" /> Merge into main</Button>
+          <Button size="sm" @click="mergeDraft"><GitMerge class="h-3.5 w-3.5" /> Merge into current version</Button>
           <Button variant="ghost" size="sm" class="text-destructive" @click="deleteDraft"><Trash2 class="h-3.5 w-3.5" /> Delete</Button>
         </template>
       </div>

@@ -57,7 +57,7 @@ export function visibleBranches(branches: DatasetBranch[]): DatasetBranch[] {
 }
 
 export function branchLabel(branch: DatasetBranch): string {
-  if (branch.name === 'main') return 'main (live metadata)'
+  if (branch.name === 'main') return 'Current version'
   return `${branch.name} (${relativeTime(branch.head.created_at)})`
 }
 

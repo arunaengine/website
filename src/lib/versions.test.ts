@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError, type DatasetBranch, type DatasetVersion } from '@/lib/api'
-import { authorName, historyProblem, propertyRow, valueText, visibleBranches, writeMessage } from './versions'
+import { authorName, branchLabel, historyProblem, propertyRow, valueText, visibleBranches, writeMessage } from './versions'
 
 function version(author: DatasetVersion['author']): DatasetVersion {
   return {
@@ -59,6 +59,11 @@ describe('visibleBranches', () => {
     const names = visibleBranches([branch('aruna', true), branch('draft/b', false), branch('main', true), branch('draft/a', false)])
       .map((entry) => entry.name)
     expect(names).toEqual(['main', 'draft/a', 'draft/b'])
+  })
+
+  it('calls the live line the current version', () => {
+    const main = { name: 'main', protected: true, version: 'v', head: version({ name: 'Aruna', email: '' }) } as DatasetBranch
+    expect(branchLabel(main)).toBe('Current version')
   })
 })
 

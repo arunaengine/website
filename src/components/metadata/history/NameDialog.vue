@@ -71,9 +71,9 @@ async function submit() {
   <Dialog v-model:open="open">
     <DialogContent class="max-w-md">
       <DialogHeader>
-        <DialogTitle>{{ kind === 'branch' ? 'New branch' : 'Create tag' }}</DialogTitle>
+        <DialogTitle>{{ kind === 'branch' ? 'New version line' : 'Create tag' }}</DialogTitle>
         <DialogDescription v-if="kind === 'branch'">
-          A branch is a draft line of versions. It does not change the live metadata until it is merged into main.
+          A version line is a draft. It does not change the current version until it is merged into it.
         </DialogDescription>
         <DialogDescription v-else>A tag is a fixed name for one version, such as v1.0.</DialogDescription>
       </DialogHeader>

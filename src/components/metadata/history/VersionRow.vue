@@ -69,7 +69,7 @@ const absolute = computed(() => formatDateTime(props.version.created_at))
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem class="cursor-pointer" @select="emit('compare')"><GitCompare class="h-4 w-4" /> Compare with main</DropdownMenuItem>
+        <DropdownMenuItem class="cursor-pointer" @select="emit('compare')"><GitCompare class="h-4 w-4" /> Compare with current version</DropdownMenuItem>
         <DropdownMenuItem class="cursor-pointer" @select="emit('crate')"><FileJson class="h-4 w-4" /> View RO-Crate</DropdownMenuItem>
         <template v-if="canWrite">
           <DropdownMenuSeparator />
