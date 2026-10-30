@@ -9,7 +9,6 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import IconButton from '@/components/ui/IconButton.vue'
 import Notice from '@/components/ui/Notice.vue'
-import RefusalNote from '@/components/ui/RefusalNote.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { deletionOptions, type DeletionOptionId } from '@/lib/deletion/options'
@@ -43,12 +42,13 @@ const actionError = ref<string | null>(null)
 const restoringId = ref<string | null>(null)
 let loadSeq = 0
 
+// Versions list through the bucket's node; only purging needs the owner node itself.
 const remote = computed(() => Boolean(props.nodeId))
 const canWrite = computed(() => s3.canWrite(props.bucket, props.objectKey, props.nodeId ?? null))
 const headIsMarker = computed(() => versions.value.find((entry) => entry.isLatest)?.deleteMarker ?? false)
 
 async function load() {
-  if (!props.objectKey || remote.value) return
+  if (!props.objectKey) return
   const seq = ++loadSeq
   loading.value = true
   loadError.value = null
@@ -147,88 +147,79 @@ async function restore(entry: ObjectVersionEntry) {
 
 <template>
   <div class="space-y-3">
-    <RefusalNote
-      v-if="remote"
-      tone="warning"
-      message="This bucket is served by another node.
-Its S3 endpoint does not allow cross-origin browsing from this portal, so its versions cannot be listed here."
-    />
+    <p class="text-xs text-muted-foreground">
+      Every write keeps the previous version. A delete marker is the version a plain Delete writes:
+      removing it makes the file current again.
+    </p>
 
-    <template v-else>
-      <p class="text-xs text-muted-foreground">
-        Every write keeps the previous version. A delete marker is the version a plain Delete writes:
-        removing it makes the file current again.
-      </p>
+    <Spinner v-if="loading && !versions.length" show-label label="Loading versions…" class="py-6" />
+    <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />
+    <EmptyState v-else-if="!versions.length" compact title="This node holds no version of this file." />
 
-      <Spinner v-if="loading && !versions.length" show-label label="Loading versions…" class="py-6" />
-      <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />
-      <EmptyState v-else-if="!versions.length" compact title="This node holds no version of this file." />
-
-      <ul v-else class="space-y-1">
-        <li
-          v-for="entry in versions"
-          :key="entry.versionId"
-          class="flex flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2 text-xs"
-        >
-          <Badge :variant="stateVariant(versionStateLabel(entry))" size="sm">{{ versionStateLabel(entry) }}</Badge>
-          <span class="hash" :title="entry.versionId">{{ truncateMiddle(entry.versionId, 8, 6) }}</span>
-          <CopyButton :value="entry.versionId" label="Copy version id" />
-          <span class="text-muted-foreground">
-            {{ entry.lastModified ? relativeTime(entry.lastModified.toISOString()) : 'unknown date' }}
-          </span>
-          <span class="font-mono text-muted-foreground">
-            {{ entry.deleteMarker || entry.size === undefined ? '-' : formatBytes(entry.size) }}
-          </span>
-          <span class="flex flex-1 items-center justify-end gap-1">
-            <template v-if="!entry.deleteMarker">
-              <IconButton label="Preview this version" @click="emit('preview', entry.versionId)">
-                <Eye class="size-3.5" />
-              </IconButton>
-              <IconButton label="Download this version" @click="download(entry)">
-                <Download class="size-3.5" />
-              </IconButton>
-            </template>
-            <Spinner v-if="restoringId === entry.versionId" label="Restoring the object" />
-            <Button
-              v-if="option(entry, 'restore')"
-              variant="outline"
-              size="sm"
-              :disabled="Boolean(option(entry, 'restore')?.disabledReason) || restoringId !== null"
-              :title="option(entry, 'restore')?.disabledReason ?? option(entry, 'restore')?.description"
-              @click="restore(entry)"
-            >
-              <Undo2 class="size-3.5" /> Restore
-            </Button>
-            <Button
-              v-if="option(entry, 'make-current')"
-              variant="outline"
-              size="sm"
-              :disabled="Boolean(option(entry, 'make-current')?.disabledReason)"
-              :title="option(entry, 'make-current')?.description"
-              @click="emit('delete', target(entry, 'make-current'))"
-            >
-              Make current
-            </Button>
-            <IconButton
-              v-if="option(entry, 'delete-version')"
-              label="Delete this version…"
-              class="text-destructive hover:text-destructive"
-              :disabled-reason="option(entry, 'delete-version')?.disabledReason ?? null"
-              @click="emit('delete', target(entry, 'delete-version'))"
-            >
-              <Trash2 class="size-3.5" />
+    <ul v-else class="space-y-1">
+      <li
+        v-for="entry in versions"
+        :key="entry.versionId"
+        class="flex flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2 text-xs"
+      >
+        <Badge :variant="stateVariant(versionStateLabel(entry))" size="sm">{{ versionStateLabel(entry) }}</Badge>
+        <span class="hash" :title="entry.versionId">{{ truncateMiddle(entry.versionId, 8, 6) }}</span>
+        <CopyButton :value="entry.versionId" label="Copy version id" />
+        <span class="text-muted-foreground">
+          {{ entry.lastModified ? relativeTime(entry.lastModified.toISOString()) : 'unknown date' }}
+        </span>
+        <span class="font-mono text-muted-foreground">
+          {{ entry.deleteMarker || entry.size === undefined ? '-' : formatBytes(entry.size) }}
+        </span>
+        <span class="flex flex-1 items-center justify-end gap-1">
+          <template v-if="!entry.deleteMarker">
+            <IconButton label="Preview this version" @click="emit('preview', entry.versionId)">
+              <Eye class="size-3.5" />
             </IconButton>
-          </span>
-        </li>
-      </ul>
+            <IconButton label="Download this version" @click="download(entry)">
+              <Download class="size-3.5" />
+            </IconButton>
+          </template>
+          <Spinner v-if="restoringId === entry.versionId" label="Restoring the object" />
+          <Button
+            v-if="option(entry, 'restore')"
+            variant="outline"
+            size="sm"
+            :disabled="Boolean(option(entry, 'restore')?.disabledReason) || restoringId !== null"
+            :title="option(entry, 'restore')?.disabledReason ?? option(entry, 'restore')?.description"
+            @click="restore(entry)"
+          >
+            <Undo2 class="size-3.5" /> Restore
+          </Button>
+          <Button
+            v-if="option(entry, 'make-current')"
+            variant="outline"
+            size="sm"
+            :disabled="Boolean(option(entry, 'make-current')?.disabledReason)"
+            :title="option(entry, 'make-current')?.description"
+            @click="emit('delete', target(entry, 'make-current'))"
+          >
+            Make current
+          </Button>
+          <IconButton
+            v-if="option(entry, 'delete-version')"
+            label="Delete this version…"
+            class="text-destructive hover:text-destructive"
+            :disabled-reason="option(entry, 'delete-version')?.disabledReason ?? null"
+            @click="emit('delete', target(entry, 'delete-version'))"
+          >
+            <Trash2 class="size-3.5" />
+          </IconButton>
+        </span>
+      </li>
+    </ul>
 
-      <p v-if="truncated" class="text-xs text-muted-foreground">
-        Only the newest versions of this file are listed.
-      </p>
-      <Notice v-if="actionError" tone="error">{{ actionError }}</Notice>
-      <p v-if="!canWrite" class="text-xs text-muted-foreground">
-        This session is read-only for this file, so its versions cannot be changed.
-      </p>
-    </template>
+    <p v-if="truncated" class="text-xs text-muted-foreground">
+      Only the newest versions of this file are listed.
+    </p>
+    <Notice v-if="actionError" tone="error">{{ actionError }}</Notice>
+    <p v-if="!canWrite" class="text-xs text-muted-foreground">
+      This session is read-only for this file, so its versions cannot be changed.
+    </p>
   </div>
 </template>

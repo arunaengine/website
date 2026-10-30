@@ -185,11 +185,12 @@ describe('object versions panel', () => {
     expect(content(root)).toContain('Delete marker')
   })
 
-  it('says why a bucket on another node has no version list', async () => {
+  it('lists the versions of a bucket on another node through that node', async () => {
     listObjectVersions.mockClear()
     const { root } = await render([current], 'node-b')
 
-    expect(content(root)).toContain('served by another node')
-    expect(listObjectVersions).not.toHaveBeenCalled()
+    expect(listObjectVersions).toHaveBeenCalledWith('reef', 'a.txt', 'node-b')
+    expect(content(root)).not.toContain('served by another node')
+    expect(content(root)).toContain('Current')
   })
 })

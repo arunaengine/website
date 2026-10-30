@@ -392,12 +392,6 @@ describe('Data Manager versions and restore', () => {
     expect(functionSource(managerSource, 'restoreObject')).toContain('entry.markerVersionId')
   })
 
-  it('keeps versions unavailable for a bucket on another node, with the reason', () => {
-    expect(versionsPanel.template).toContain('<RefusalNote')
-    expect(versionsSource).toContain('This bucket is served by another node.')
-    expect(versionsSource).toContain('cannot be listed here')
-  })
-
   it('lists and restores deleted keys from the browser', () => {
     expect(managerSource).toContain("const SHOW_DELETED_KEY = 'aruna.data.showDeleted'")
     expect(managerSource).toContain("readStored(SHOW_DELETED_KEY) === '1'")
