@@ -7,6 +7,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import ListSkeleton from '@/components/ui/ListSkeleton.vue'
 import Notice from '@/components/ui/Notice.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Select from '@/components/ui/Select.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import ConfirmAction from './ConfirmAction.vue'
@@ -28,7 +29,7 @@ import {
 } from '@/lib/api'
 import { branchLabel, shortVersion } from '@/lib/versions'
 import { relativeTime } from '@/lib/utils'
-import { GitCompare, GitMerge, Plus, Trash2 } from '@lucide/vue'
+import { GitCompare, GitMerge, History as HistoryIcon, Plus, Trash2 } from '@lucide/vue'
 
 const props = defineProps<{ history: DatasetHistoryState; state: DatasetViewState }>()
 const { branches, tags, conflicts, branch, selected, isDraft, versions, nextCursor, loadingMore, moreError } = props.history
@@ -179,14 +180,14 @@ function discardKept(conflict: VersionConflict) {
       </div>
     </Notice>
 
-    <section class="space-y-3">
-      <div class="flex flex-wrap items-center gap-2">
-        <Select v-model="branch" :options="branchOptions" aria-label="Branch" label="Branch" class="w-72" />
-        <Button v-if="canWrite" variant="outline" @click="openName('branch', branch)"><Plus class="h-4 w-4" /> New branch</Button>
-        <Button variant="ghost" class="ml-auto text-muted-foreground" :disabled="!selected" @click="compareBranch">
-          <GitCompare class="h-4 w-4" /> Compare
-        </Button>
-      </div>
+    <section class="space-y-3" aria-labelledby="history-heading">
+      <SectionHeading id="history-heading" title="History" :icon="HistoryIcon">
+        <template #actions>
+          <Select v-model="branch" :options="branchOptions" aria-label="Branch" class="h-8 w-56 text-xs" />
+          <Button v-if="canWrite" variant="outline" size="sm" @click="openName('branch', branch)"><Plus class="h-4 w-4" /> New branch</Button>
+          <Button variant="outline" size="sm" :disabled="!selected" @click="compareBranch"><GitCompare class="h-4 w-4" /> Compare</Button>
+        </template>
+      </SectionHeading>
 
       <div v-if="isDraft" class="flex flex-wrap items-center gap-3 rounded-md border border-border bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
         <span class="min-w-0 flex-1">Draft branch. Its changes do not affect the live metadata until they are merged into main.</span>
@@ -211,7 +212,7 @@ function discardKept(conflict: VersionConflict) {
       />
       <EmptyState v-else-if="!versions?.length" :title="isDraft ? 'No changes on this draft yet' : 'No versions yet'" />
       <template v-else>
-        <ul class="surface divide-y divide-border overflow-hidden">
+        <ol class="surface divide-y divide-border-subtle overflow-hidden">
           <VersionRow
             v-for="version in versions"
             :key="version.version"
@@ -225,7 +226,7 @@ function discardKept(conflict: VersionConflict) {
             @branch="openName('branch', version.version)"
             @untag="(name: string) => removeTag(version, name)"
           />
-        </ul>
+        </ol>
         <div v-if="nextCursor || moreError" class="flex flex-wrap items-center gap-3">
           <Button variant="outline" size="sm" :disabled="loadingMore" @click="history.loadMore()">
             {{ loadingMore ? 'Loading…' : 'Load older versions' }}
