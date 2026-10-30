@@ -10,6 +10,8 @@ export interface ToggleOption {
   value: string
   label: string
   icon?: Component
+  /** A quiet count after the label, such as the files in a dataset. */
+  count?: number
 }
 
 const props = withDefaults(
@@ -42,6 +44,7 @@ function select(value: string) {
     >
       <component :is="option.icon" v-if="option.icon" class="h-3.5 w-3.5" />
       {{ option.label }}
+      <span v-if="option.count" class="tabular-nums text-muted-foreground">{{ option.count.toLocaleString('en-US') }}</span>
     </Button>
   </div>
 </template>
