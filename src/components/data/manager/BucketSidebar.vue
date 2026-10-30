@@ -7,6 +7,8 @@ import Notice from '@/components/ui/Notice.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
 import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
+import DropdownMenuLabel from '@/components/ui/DropdownMenuLabel.vue'
+import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
@@ -32,7 +34,7 @@ import { folderName } from '@/lib/deviceApi'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
 import { isFolderBucket, isHiddenBucket } from '@/lib/workspaces'
 import type { BucketShortcut } from '@/composables/useBucketShortcuts'
-import { Boxes, Check, ChevronLeft, ChevronRight, FolderPlus, FolderSync, History, KeyRound, ListFilter, Trash2 } from '@lucide/vue'
+import { Boxes, Check, ChevronLeft, ChevronRight, FolderPlus, FolderSync, History, KeyRound, ListFilter, Trash2, X } from '@lucide/vue'
 import { computed, ref, useId, watch } from 'vue'
 
 // `sheet`: the list inside the bucket picker of a narrow view, without its card and header.
@@ -83,13 +85,34 @@ watch(() => all.loading.value, (busy) => busy || listings.value++)
 // realm's databases, so those of other readable groups show too.
 type KindFilter = 'all' | 'databases' | 'hide'
 const KINDS: { value: KindFilter; label: string }[] = [
-  { value: 'all', label: 'All buckets' },
-  { value: 'databases', label: 'Only databases' },
-  { value: 'hide', label: 'Hide databases' },
+  { value: 'all', label: 'All' },
+  { value: 'databases', label: 'Databases' },
+  { value: 'hide', label: 'Buckets' },
 ]
 const kindFilter = ref<KindFilter>('all')
-const filterLabel = computed(() =>
-  kindFilter.value === 'all' ? 'Filter buckets' : `Filter buckets: ${KINDS.find((kind) => kind.value === kindFilter.value)?.label}`)
+// One node, and facts a row must have; each fact is read from what its node reports.
+const nodeFilter = ref<string | null>(null)
+type Fact = 'pinned' | 'public' | 'dataset' | 'inPlace'
+const FACTS: { value: Fact; label: string }[] = [
+  { value: 'pinned', label: 'Pinned' },
+  { value: 'public', label: 'Public' },
+  { value: 'dataset', label: 'Has a dataset' },
+  { value: 'inPlace', label: 'Read in place' },
+]
+const onlyFacts = ref<Fact[]>([])
+const toggleFact = (fact: Fact) =>
+  (onlyFacts.value = onlyFacts.value.includes(fact) ? onlyFacts.value.filter((entry) => entry !== fact) : [...onlyFacts.value, fact])
+const activeFilters = computed(() => [
+  ...(kindFilter.value === 'all' ? [] : [{ key: 'kind', label: KINDS.find((kind) => kind.value === kindFilter.value)!.label, clear: () => (kindFilter.value = 'all') }]),
+  ...(nodeFilter.value ? [{ key: 'node', label: realmNodes.displayName(nodeFilter.value), clear: () => (nodeFilter.value = null) }] : []),
+  ...FACTS.filter((fact) => onlyFacts.value.includes(fact.value)).map((fact) => ({ key: fact.value, label: fact.label, clear: () => toggleFact(fact.value) })),
+])
+function clearFilters() {
+  kindFilter.value = 'all'
+  nodeFilter.value = null
+  onlyFacts.value = []
+}
+const filterLabel = computed(() => (activeFilters.value.length ? `Filter buckets, ${activeFilters.value.length} on` : 'Filter buckets'))
 const databaseMode = computed(() => kindFilter.value === 'databases')
 const hideDatabases = computed(() => kindFilter.value === 'hide')
 // The example rows show even when the group has no bucket of its own.
@@ -108,7 +131,8 @@ const jobOf = (name: string, nodeId: string | null) => jobs.value.get(nodeId && 
 const nodeBuckets = computed(() => {
   const term = bucketNameFilter.value.trim().toLowerCase()
   return sidebarBuckets.value.filter((entry) =>
-    (!term || entry.bucket.toLowerCase().includes(term)) && !(hideDatabases.value && databaseOf(entry.bucket, entry.nodeId ?? null)))
+    (!term || entry.bucket.toLowerCase().includes(term)) && !(hideDatabases.value && databaseOf(entry.bucket, entry.nodeId ?? null))
+    && passesFilters(entry.bucket, entry.nodeId ?? null, [realNode(entry.nodeId ?? null)], entry.pinned))
 })
 // Matches in other groups for the same query, below this group's list.
 const search = useBucketSearch(bucketNameFilter)
@@ -135,15 +159,31 @@ const spread = (hit: ListedBucket) => (hit.set_id ? hit.nodes.length : 0)
 // by bucket and the node that holds it.
 const databases = useDatabases()
 databases.ensure()
-function databaseOf(name: string, nodeId: string | null): { title: string } | null {
+function databaseOf(name: string, nodeId: string | null): { title: string; dataset: string | null; public: boolean } | null {
   const node = nodeId ?? realmNodes.localNodeId.value
   const row = databases.rows.value.find((entry) => entry.bucket === name && entry.places.some((place) => place.nodeId === node))
   if (!row) return null
   // The description line names the version too, unless the title already does.
   const title = row.title ?? name
   const version = row.description?.version?.trim()
-  return { title: version && !title.includes(version) ? `${title} ${version}` : title }
+  return { title: version && !title.includes(version) ? `${title} ${version}` : title, dataset: row.datasetId, public: row.public }
 }
+
+// A row passes the node and fact filters; a fact its node has not reported yet does not pass.
+// `nodeId` is null for this node; `nodeIds` are every node of the row by id.
+function passesFilters(name: string, node: string | null, nodeIds: string[], pinned: boolean): boolean {
+  if (nodeFilter.value && !nodeIds.includes(nodeFilter.value)) return false
+  const database = databaseOf(name, node)
+  const checks: Record<Fact, () => boolean> = {
+    pinned: () => pinned,
+    public: () => Boolean(database?.public) || props.manager.publicAccess.isPublic(node, { kind: 'bucket', bucket: name, key: '' }),
+    dataset: () => Boolean(database?.dataset),
+    inPlace: () => usage.referencedOf(name, usageNode(node)) === true,
+  }
+  return onlyFacts.value.every((fact) => checks[fact]())
+}
+const realNode = (nodeId: string | null) => nodeId ?? realmNodes.localNodeId.value ?? ''
+const rowNodes = (row: AllRow) => (row.hit ? row.hit.nodes : [realNode(row.nodeId)])
 
 // All nodes rows: pins first, then the rest in the nodes' name order, so opening a bucket never
 // moves a row. A row's node is named only when it is not this node, as the pins are keyed.
@@ -168,22 +208,31 @@ const allRows = computed<AllRow[]>(() => {
     !isFolderBucket(entry.bucket) && realmNodes.isTarget(entry.nodeId) && entry.bucket.toLowerCase().includes(term)
   const pins = shortcuts.pinned.value.filter(shownPin).flatMap(take)
   const rest = hits.filter((hit) => !used.has(hit)).map((hit) => ({ key: `${hit.node_id}/${hit.bucket}`, bucket: hit.bucket, nodeId: shortcutNode(hit), hit, pinned: false }))
-  const rows = [...pins, ...rest]
+  const rows = [...pins, ...rest].filter((row) => passesFilters(row.bucket, row.hit?.node_id ?? row.nodeId, rowNodes(row), row.pinned))
   return hideDatabases.value ? rows.filter((row) => !databaseOf(row.bucket, row.hit?.node_id ?? row.nodeId)) : rows
 })
+// The nodes the listed rows are on, for the node filter.
+const filterNodes = computed(() => [...new Set(all.hits.value.flatMap((hit) => hit.nodes))]
+  .sort((a, b) => realmNodes.displayName(a).localeCompare(realmNodes.displayName(b))))
 // Pages of 25 rows, the pins on top of the first; the next page is read from the nodes when
 // needed. The nodes name no total, so no page count is shown.
 const BUCKETS_PER_PAGE = 25
 const page = ref(1)
 // Each list starts its own count, so a Next still reading for a replaced list does nothing.
 let pageRun = 0
-watch([selectedGroupId, bucketNameFilter, bucketNodeChoice, kindFilter], () => {
+watch([selectedGroupId, bucketNameFilter, bucketNodeChoice, kindFilter, nodeFilter, onlyFacts], () => {
   pageRun++
   page.value = 1
 })
 const pageRows = computed(() => allRows.value.slice((page.value - 1) * BUCKETS_PER_PAGE, page.value * BUCKETS_PER_PAGE))
 const pageFilled = () => allRows.value.length > page.value * BUCKETS_PER_PAGE
 const hasNextPage = computed(() => pageFilled() || all.more.value)
+// "1-25 of 80"; while the nodes have more to list, the total is at least the listed rows.
+const pageRange = computed(() => {
+  const start = (page.value - 1) * BUCKETS_PER_PAGE
+  const end = Math.min(allRows.value.length, start + BUCKETS_PER_PAGE)
+  return `${formatCount(start + 1)}-${formatCount(end)} of ${all.more.value ? 'at least ' : ''}${formatCount(allRows.value.length)}`
+})
 // A short page (rows filtered or merged away) fills up first and stays, so no row is skipped;
 // a full page moves on once the next one has rows. A few reads at most per click.
 async function nextPage() {
@@ -220,20 +269,20 @@ function listPlace(nodeId: string | null): RowPlace {
   return other(nodeId) === other(remoteNodeId.value) ? { place: null, placeTitle: null, placeNode: null } : rowPlace(nodeId)
 }
 
-// Pinned rows first, then databases, then the other buckets, each under its label and by name.
+// Pinned rows first under their label, then every other bucket, each part by name. The database
+// icon tells databases apart; an empty label marks the rest.
 type Named = { bucket: string; nodeId?: string | null }
 const byName = (a: Named, b: Named) => a.bucket.localeCompare(b.bucket) || (a.nodeId ?? '').localeCompare(b.nodeId ?? '')
-function sectioned<R extends Named>(rows: R[], pinned: (row: R) => boolean, database: (row: R) => boolean): { label: string; rows: R[] }[] {
+function sectioned<R extends Named>(rows: R[], pinned: (row: R) => boolean): { label: string; rows: R[] }[] {
   const pins = rows.filter(pinned).sort(byName)
-  const bases = rows.filter((row) => !pinned(row) && database(row)).sort(byName)
-  const rest = rows.filter((row) => !pinned(row) && !database(row)).sort(byName)
-  return [{ label: 'Pinned', rows: pins }, { label: 'Databases', rows: bases }, { label: 'Buckets', rows: rest }].filter((section) => section.rows.length)
+  const rest = rows.filter((row) => !pinned(row)).sort(byName)
+  return [{ label: 'Pinned', rows: pins }, { label: '', rows: rest }].filter((section) => section.rows.length)
 }
 const rowNodeId = (row: AllRow) => row.hit?.node_id ?? row.nodeId
-const allSections = computed(() => sectioned(pageRows.value, (row) => row.pinned, (row) => Boolean(databaseOf(row.bucket, rowNodeId(row)))))
+const allSections = computed(() => sectioned(pageRows.value, (row) => row.pinned))
 const shownRows = computed(() => allSections.value.flatMap((section) => section.rows))
 type NodeEntry = (typeof nodeBuckets.value)[number]
-const nodeSections = computed(() => sectioned(nodeBuckets.value, (entry) => entry.pinned, (entry) => Boolean(databaseOf(entry.bucket, entry.nodeId ?? null))))
+const nodeSections = computed(() => sectioned(nodeBuckets.value, (entry) => entry.pinned))
 const shownEntries = computed(() => nodeSections.value.flatMap((section) => section.rows))
 // The position of a row in the shown order, for the arrow key highlight.
 const rowIndex = (row: AllRow) => shownRows.value.indexOf(row)
@@ -248,6 +297,13 @@ watch(
   (entries) => usage.ensure(entries),
   { immediate: true },
 )
+// Read in place needs the usage of every listed row, not only the shown ones.
+const usageCandidates = computed(() =>
+  !onlyFacts.value.includes('inPlace') ? []
+    : searchList.value ? all.hits.value.map((hit) => ({ bucket: hit.bucket, nodeId: usageNode(hit.node_id) }))
+      : sidebarBuckets.value.map((entry) => ({ bucket: entry.bucket, nodeId: usageNode(entry.nodeId ?? null) })))
+watch(usageCandidates, (entries) => usage.ensure(entries), { immediate: true })
+const checkingUsage = computed(() => usageCandidates.value.some((entry) => !usage.answered(entry.bucket, entry.nodeId)))
 // Arrow keys move through the shown rows of this group, then of other groups.
 const listId = `bucket-results-${useId()}`
 const listClass = 'pb-1'
@@ -314,7 +370,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
 </script>
 
 <template>
-  <aside :class="sheet ? '' : 'flex h-full min-w-0 flex-col'">
+  <aside :class="sheet ? '' : 'min-w-0 self-start'">
     <SectionHeading v-if="!sheet" title="Buckets" :icon="Boxes" :count="bucketCount">
       <template #actions>
         <!-- Background revalidation only: the cached list stays readable behind it. -->
@@ -326,9 +382,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
       <DialogTitle class="type-section-title">Buckets <span class="text-sm font-normal tabular-nums text-muted-foreground">{{ bucketCount }}</span></DialogTitle>
       <Button size="sm" data-tour="bucket-create" @click="emit('new-bucket')"><FolderPlus class="h-4 w-4" /> New bucket</Button>
     </div>
-    <!-- At least as tall as the files beside it and as tall as its rows, so none is cut off. -->
-    <div :class="sheet ? '' : 'flex flex-1 flex-col lg:min-h-[24rem]'">
-    <div :class="sheet ? '' : 'surface flex-1'" :aria-busy="bucketsRefreshing">
+    <div :class="sheet ? '' : 'surface'" :aria-busy="bucketsRefreshing">
       <div class="sticky top-0 z-10 flex items-center gap-2 bg-card px-3.5 pb-1 pt-3" :class="sheet ? 'bg-background' : ''">
         <Input
           v-model="bucketNameFilter"
@@ -343,11 +397,12 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         />
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
-            <Button :variant="kindFilter === 'all' ? 'outline' : 'default'" size="icon" class="h-8 w-8 shrink-0" :title="filterLabel" :aria-label="filterLabel">
+            <Button variant="outline" size="icon" class="h-8 w-8 shrink-0" :class="activeFilters.length ? 'border-primary/40 text-primary' : ''" :title="filterLabel" :aria-label="filterLabel">
               <ListFilter class="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" class="w-60">
+            <DropdownMenuLabel>Kind</DropdownMenuLabel>
             <DropdownMenuItem
               v-for="kind in KINDS"
               :key="kind.value"
@@ -357,13 +412,75 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               @click="kindFilter = kind.value"
             >
               <span class="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-                <Check v-if="kindFilter === kind.value" class="h-3.5 w-3.5" />
+                <Check v-if="kindFilter === kind.value" class="h-3.5 w-3.5 text-primary" />
               </span>
               {{ kind.label }}
             </DropdownMenuItem>
+            <template v-if="searchList && filterNodes.length">
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Node</DropdownMenuLabel>
+              <DropdownMenuItem
+                v-for="node in [null, ...filterNodes]"
+                :key="node ?? 'all'"
+                role="menuitemradio"
+                :aria-checked="nodeFilter === node"
+                class="pl-8"
+                @click="nodeFilter = node"
+              >
+                <span class="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                  <Check v-if="nodeFilter === node" class="h-3.5 w-3.5 text-primary" />
+                </span>
+                {{ node ? realmNodes.displayName(node) : 'All nodes' }}
+              </DropdownMenuItem>
+            </template>
+            <!-- A list of one node, opened from a failed session, goes back to every node here. -->
+            <template v-else-if="!allNodes">
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Node</DropdownMenuLabel>
+              <DropdownMenuItem role="menuitemradio" :aria-checked="false" class="pl-8" @click="props.manager.pickNode(null)">All nodes</DropdownMenuItem>
+              <DropdownMenuItem role="menuitemradio" :aria-checked="true" class="pl-8">
+                <span class="absolute left-2 flex h-3.5 w-3.5 items-center justify-center"><Check class="h-3.5 w-3.5 text-primary" /></span>
+                {{ realmNodes.displayName(bucketNodeChoice) }}
+              </DropdownMenuItem>
+            </template>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Only</DropdownMenuLabel>
+            <DropdownMenuItem
+              v-for="fact in FACTS"
+              :key="fact.value"
+              role="menuitemcheckbox"
+              :aria-checked="onlyFacts.includes(fact.value)"
+              class="pl-8"
+              @select.prevent
+              @click="toggleFact(fact.value)"
+            >
+              <span class="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                <Check v-if="onlyFacts.includes(fact.value)" class="h-3.5 w-3.5 text-primary" />
+              </span>
+              {{ fact.label }}
+            </DropdownMenuItem>
+            <template v-if="activeFilters.length">
+              <DropdownMenuSeparator />
+              <DropdownMenuItem @click="clearFilters"><X class="h-3.5 w-3.5" /> Clear filters</DropdownMenuItem>
+            </template>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <div v-if="activeFilters.length" class="flex flex-wrap items-center gap-1.5 px-3.5 pt-2">
+        <Button
+          v-for="filter in activeFilters"
+          :key="filter.key"
+          variant="secondary"
+          size="sm"
+          class="h-7 gap-1 px-2"
+          :aria-label="`Remove filter ${filter.label}`"
+          @click="filter.clear()"
+        >
+          {{ filter.label }} <X class="h-3 w-3" />
+        </Button>
+        <button type="button" class="ml-auto text-xs text-primary hover:underline" @click="clearFilters">Clear</button>
+      </div>
+      <Spinner v-if="checkingUsage" show-label label="Checking which buckets read in place…" class="px-3.5 pt-2" />
       <ul v-if="databaseMode" :id="`${listId}-group`" role="listbox" :class="listClass">
         <DatabaseRows ref="databaseRows" :filter="bucketNameFilter" :active="bucket" :highlighted="activeIndex" @open="openBucketOn" />
       </ul>
@@ -373,6 +490,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         <ul v-else-if="allRows.length || examples.length" :id="`${listId}-group`" role="listbox" :class="listClass">
           <template v-for="section in allSections" :key="section.label">
             <li v-if="section.label" role="presentation" class="px-3.5 pb-1 pt-3 text-xs font-medium text-muted-foreground">{{ section.label }}</li>
+            <li v-else-if="allSections.length > 1" role="presentation" class="mx-3.5 my-2 border-t border-border-subtle" />
             <li v-for="row in section.rows" :key="row.key" role="presentation">
               <BucketRow
                 v-if="row.hit"
@@ -418,18 +536,24 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           </template>
           <MockBucketRows :filter="bucketNameFilter" :active="bucket" @open="openBucket" />
         </ul>
-        <p v-else-if="!all.loading.value" class="px-3 py-4 text-xs text-muted-foreground">No buckets found.</p>
+        <p v-else-if="!all.loading.value && !checkingUsage" class="px-3 py-4 text-xs text-muted-foreground">
+          {{ activeFilters.length ? 'No bucket matches.' : 'No buckets found.' }}
+          <button v-if="activeFilters.length" type="button" class="text-primary hover:underline" @click="clearFilters">Clear filters</button>
+        </p>
         <p v-if="all.failedNodes.value" class="border-t border-border/70 px-3 py-2 text-xs text-muted-foreground">
           {{ all.failedNodes.value }} {{ all.failedNodes.value === 1 ? 'node' : 'nodes' }} did not answer.
           <button type="button" class="text-primary hover:underline" @click="all.reload()">Retry</button>
         </p>
-        <div v-if="page > 1 || hasNextPage" class="flex items-center justify-end gap-2 border-t border-border/70 px-3.5 py-2">
-          <IconButton label="Previous buckets" variant="outline" size="icon" class="h-8 w-8" :disabled="page <= 1 || all.loading.value" @click="page--">
-            <ChevronLeft class="size-3.5" />
-          </IconButton>
-          <IconButton label="Next buckets" variant="outline" size="icon" class="h-8 w-8" :disabled="!hasNextPage || all.loading.value" @click="nextPage">
-            <ChevronRight class="size-3.5" />
-          </IconButton>
+        <div v-if="page > 1 || hasNextPage" class="flex items-center justify-between gap-2 border-t border-border-subtle px-3.5 py-2 text-xs tabular-nums text-muted-foreground">
+          <span>{{ pageRange }}</span>
+          <span class="flex gap-1">
+            <IconButton label="Previous page" variant="outline" size="icon" class="h-7 w-7" :disabled="page <= 1 || all.loading.value" @click="page--">
+              <ChevronLeft class="size-3.5" />
+            </IconButton>
+            <IconButton label="Next page" variant="outline" size="icon" class="h-7 w-7" :disabled="!hasNextPage || all.loading.value" @click="nextPage">
+              <ChevronRight class="size-3.5" />
+            </IconButton>
+          </span>
         </div>
       </template>
       <template v-else>
@@ -446,6 +570,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           <ul v-if="nodeBuckets.length || examples.length" :id="`${listId}-group`" role="listbox" :class="listClass">
             <template v-for="section in nodeSections" :key="section.label">
               <li v-if="section.label" role="presentation" class="px-3.5 pb-1 pt-3 text-xs font-medium text-muted-foreground">{{ section.label }}</li>
+              <li v-else-if="nodeSections.length > 1" role="presentation" class="mx-3.5 my-2 border-t border-border-subtle" />
               <li
                 v-for="entry in section.rows"
                 :key="`${entry.nodeId ?? 'local'}/${entry.bucket}`"
@@ -578,7 +703,6 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
       <footer v-if="sheet" class="px-3.5 pb-4 pt-2">
         <p class="text-xs text-muted-foreground">Press and hold a bucket to pin it.</p>
       </footer>
-    </div>
     </div>
   </aside>
 </template>

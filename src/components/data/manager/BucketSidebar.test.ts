@@ -147,6 +147,9 @@ const InputStub = defineComponent({
     }),
 })
 
+// Buckets the group's public role covers, and the read in place answer of each listed bucket.
+const publicBuckets = new Set<string>()
+const referencedBuckets = new Map<string, boolean | null>()
 const sidebarModules = {
   vue: VueRuntime,
   '@lucide/vue': icons,
@@ -168,10 +171,12 @@ const sidebarModules = {
   '@/components/ui/DropdownMenu.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuContent.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuItem.vue': moduleDefault(Passthrough),
+  '@/components/ui/DropdownMenuLabel.vue': moduleDefault(Passthrough),
+  '@/components/ui/DropdownMenuSeparator.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Passthrough),
   '@/lib/distributedMockData': { exampleBuckets: () => [] },
   '@/lib/distributedMock': { mockEnabled: () => false, defaultPlacement: () => ({}), placementLabel: () => '' },
-  '@/composables/useBucketUsage': { useListedUsage: () => ({ ensure: (entries: unknown[]) => usageAsked.push(entries), textOf: (name: string) => listedFacts.get(name) ?? null }) },
+  '@/composables/useBucketUsage': { useListedUsage: () => ({ ensure: (entries: unknown[]) => usageAsked.push(entries), textOf: (name: string) => listedFacts.get(name) ?? null, referencedOf: (name: string) => referencedBuckets.get(name) ?? null, answered: (name: string) => referencedBuckets.has(name) }) },
   '@/composables/useBucketSearch': {
     useBucketSearch: () => ({ hits: otherSearch, error: otherError, searched: ref(true), nodesFailed: otherFailed }),
   },
@@ -270,6 +275,7 @@ function manager() {
         groupId,
       ),
     linkedFolderFor: (_nodeId: string | null, _name: string) => null as { root: string } | null,
+    publicAccess: { isPublic: (_nodeId: string | null, target: { bucket: string }) => publicBuckets.has(target.bucket) },
   }
 }
 
@@ -300,7 +306,7 @@ function places(root: Parameters<typeof content>[0]) {
   return nodes(root).filter((node) => node.props['data-testid'] === 'row-place').map((node) => content(node).split(': ')[1])
 }
 
-function pager(root: Parameters<typeof content>[0], label: 'Previous buckets' | 'Next buckets') {
+function pager(root: Parameters<typeof content>[0], label: 'Previous page' | 'Next page') {
   return element(root, (node) => node.props['aria-label'] === label)
 }
 
@@ -706,16 +712,18 @@ describe('Bucket sidebar node choice', () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
     await flush()
     expect(shown(root)).toHaveLength(25)
-    expect(content(root)).not.toContain('Page')
-    expect(pager(root, 'Previous buckets').props.disabled).toBe(true)
+    // While the nodes have more, the total is only a lower bound.
+    expect(content(root)).toContain('1-25 of at least 25')
+    expect(pager(root, 'Previous page').props.disabled).toBe(true)
 
-    await click(pager(root, 'Next buckets'))
+    await click(pager(root, 'Next page'))
     await flush()
     expect(loadMore).toHaveBeenCalledOnce()
     expect(shown(root)).toEqual(['b25', 'b26', 'b27', 'b28', 'b29'])
-    expect(pager(root, 'Next buckets').props.disabled).toBe(true)
+    expect(content(root)).toContain('26-30 of 30')
+    expect(pager(root, 'Next page').props.disabled).toBe(true)
 
-    await click(pager(root, 'Previous buckets'))
+    await click(pager(root, 'Previous page'))
     expect(shown(root)[0]).toBe('b00')
     allBuckets.hits.value = []
   })
@@ -842,7 +850,7 @@ describe('Bucket sidebar search keys', () => {
     openDatabase.mockReset()
     const state = withBucket()
     const { root } = await mountApp(DatabaseSidebar, { props: { manager: state } })
-    await filter(root, 'Only databases')
+    await filter(root, 'Databases')
     const field = element(root, (node) => node.props['aria-label'] === 'Find a bucket')
 
     await key(field, 'ArrowDown')
@@ -906,7 +914,7 @@ describe('Bucket sidebar sections', () => {
   const order = (root: Parameters<typeof content>[0]) =>
     nodes(root).filter((node) => String(node.props['aria-label'] ?? '').startsWith('Open ')).map((node) => content(node))
 
-  it('lists pins, then databases, then the other buckets, each row with its files and size', async () => {
+  it('lists pins, then a line, then every other bucket by name, each row with its files and size', async () => {
     nodeChoice.value = null
     allBuckets.needsName.value = false
     databaseRows.value = [{ bucket: 'bakta-database', places: [{ bucket: 'bakta-database', nodeId: 'node-2' }], title: 'Bakta database (light)', description: null, metadata: { database: true, dataset: 'd1' } }]
@@ -925,7 +933,8 @@ describe('Bucket sidebar sections', () => {
       const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
       await flush()
 
-      expect(labels(root)).toEqual(['Pinned', 'Databases', 'Buckets'])
+      // The database icon tells databases apart, so the rest has no heading, only a thin line.
+      expect(labels(root)).toEqual(['Pinned', ''])
       expect(order(root)).toEqual(['images', 'bakta-database', 'laptop'])
       expect(nodes(root).filter((node) => node.props['data-testid'] === 'row-facts').map((node) => content(node))).toEqual(['laptop: 16 files, 50.2 MB'])
       expect(nodes(root).filter((node) => node.props['data-testid'] === 'row-sync').map((node) => content(node))).toEqual(['laptop: laptop-device'])
@@ -948,13 +957,85 @@ describe('Bucket sidebar sections', () => {
     }
   })
 
-  it('labels the section even when every row is an ordinary bucket', async () => {
+  it('shows no heading and no line when nothing is pinned', async () => {
     nodeChoice.value = null
     allBuckets.hits.value = [{ bucket: 'laptop', node_id: 'node-2', group_id: 'g1' }]
     const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
     await flush()
-    expect(labels(root)).toEqual(['Buckets'])
+    expect(labels(root)).toEqual([])
     allBuckets.hits.value = []
+  })
+})
+
+describe('bucket filters', () => {
+  const opened = (root: Parameters<typeof content>[0]) =>
+    nodes(root).filter((node) => String(node.props['aria-label']).startsWith('Open ')).map((node) => content(node))
+  const pick = async (root: Parameters<typeof content>[0], role: string, label: string) =>
+    click(element(root, (node) => node.props.role === role && content(node).trim() === label))
+
+  async function mounted() {
+    nodeChoice.value = null
+    allBuckets.needsName.value = false
+    allBuckets.more.value = false
+    databaseRows.value = [{ bucket: 'bakta-database', places: [{ bucket: 'bakta-database', nodeId: 'node-2' }], title: 'Bakta', description: null, datasetId: 'd1', public: true, metadata: { database: true, dataset: 'd1' } }]
+    allBuckets.hits.value = [
+      { bucket: 'bakta-database', node_id: 'node-2', group_id: 'g1', nodes: ['node-2'] },
+      { bucket: 'images', node_id: 'home', group_id: 'g1', nodes: ['home'] },
+      { bucket: 'refseq', node_id: 'home', group_id: 'g1', nodes: ['home'] },
+      { bucket: 'reads', node_id: 'node-2', group_id: 'g1', nodes: ['node-2'] },
+    ]
+    publicBuckets.add('images')
+    referencedBuckets.set('refseq', true).set('reads', false).set('images', false).set('bakta-database', false)
+    const state = manager()
+    state.shortcuts.pinned.value = [{ bucket: 'reads', nodeId: 'node-2' }]
+    const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
+    await flush()
+    return root
+  }
+  afterEach(() => {
+    databaseRows.value = []
+    allBuckets.hits.value = []
+    publicBuckets.clear()
+    referencedBuckets.clear()
+  })
+
+  it('keeps the rows of one node and names the filter in a chip that removes it', async () => {
+    const root = await mounted()
+    expect(opened(root)).toEqual(['reads', 'bakta-database', 'images', 'refseq'])
+
+    await pick(root, 'menuitemradio', 'name-node-2')
+    expect(opened(root)).toEqual(['reads', 'bakta-database'])
+    await click(element(root, (node) => node.props['aria-label'] === 'Remove filter name-node-2'))
+    expect(opened(root)).toHaveLength(4)
+  })
+
+  it('keeps only rows with every chosen fact, each from what the nodes report', async () => {
+    const root = await mounted()
+    await pick(root, 'menuitemcheckbox', 'Pinned')
+    expect(opened(root)).toEqual(['reads'])
+    await pick(root, 'menuitemcheckbox', 'Pinned')
+
+    // A database row says whether it is public; the group's public role covers the others.
+    await pick(root, 'menuitemcheckbox', 'Public')
+    expect(opened(root)).toEqual(['bakta-database', 'images'])
+    await pick(root, 'menuitemcheckbox', 'Has a dataset')
+    expect(opened(root)).toEqual(['bakta-database'])
+    await click(button(root, 'Clear'))
+
+    await pick(root, 'menuitemcheckbox', 'Read in place')
+    expect(opened(root)).toEqual(['refseq'])
+  })
+
+  it('says nothing matches only once every bucket was checked', async () => {
+    const root = await mounted()
+    referencedBuckets.delete('refseq')
+    await pick(root, 'menuitemcheckbox', 'Read in place')
+    expect(opened(root)).toEqual([])
+    expect(content(root)).not.toContain('No bucket matches.')
+    referencedBuckets.set('refseq', true)
+    allBuckets.hits.value = [...allBuckets.hits.value]
+    await flush()
+    expect(opened(root)).toEqual(['refseq'])
   })
 })
 
@@ -994,20 +1075,21 @@ describe('database buckets in the list', () => {
     const checked = () => nodes(root).filter((node) => node.props['aria-checked'] === true).map((node) => content(node).trim())
 
     expect(nodes(root).some((node) => node.props.role === 'radiogroup')).toBe(false)
-    expect(nodes(root).filter((node) => node.props.role === 'menuitemradio').map((node) => content(node).trim()))
-      .toEqual(['All buckets', 'Only databases', 'Hide databases'])
-    expect(checked()).toEqual(['All buckets'])
+    // The kinds lead; a one node list adds its way back to every node after them.
+    expect(nodes(root).filter((node) => node.props.role === 'menuitemradio').map((node) => content(node).trim()).slice(0, 3))
+      .toEqual(['All', 'Databases', 'Buckets'])
+    expect(checked().slice(0, 1)).toEqual(['All'])
     expect(trigger().props).toMatchObject({ 'aria-label': 'Filter buckets', variant: 'outline' })
     expect(content(root)).toContain('reef-survey')
 
-    await filter(root, 'Only databases')
-    expect(checked()).toEqual(['Only databases'])
-    expect(trigger().props).toMatchObject({ 'aria-label': 'Filter buckets: Only databases', variant: 'default' })
+    await filter(root, 'Databases')
+    expect(checked().slice(0, 1)).toEqual(['Databases'])
+    expect(trigger().props).toMatchObject({ 'aria-label': 'Filter buckets, 1 on' })
     expect(content(root)).toContain('spire database')
     expect(content(root)).not.toContain('reef-survey')
 
-    await filter(root, 'All buckets')
-    expect(trigger().props).toMatchObject({ 'aria-label': 'Filter buckets', variant: 'outline' })
+    await filter(root, 'All')
+    expect(trigger().props).toMatchObject({ 'aria-label': 'Filter buckets' })
     expect(content(root)).not.toContain('spire database')
   })
 
@@ -1028,15 +1110,15 @@ describe('database buckets in the list', () => {
     await flush()
     expect(opened(all.root)).toEqual(['bakta-database', 'laptop'])
 
-    await filter(all.root, 'Hide databases')
+    await filter(all.root, 'Buckets')
     expect(opened(all.root)).toEqual(['laptop'])
-    expect(element(all.root, (node) => node.props['aria-label'] === 'Filter buckets: Hide databases').props.variant).toBe('default')
+    expect(element(all.root, (node) => node.props['aria-label'] === 'Remove filter Buckets')).toBeTruthy()
 
     const state = withBucket()
     state.sidebarBuckets.value = [{ bucket: 'reef-survey', nodeId: null, pinned: false }, { bucket: 'plain', nodeId: null, pinned: false }] as never
     const one = await mountApp(BucketSidebar, { props: { manager: state } })
     await pickNode()
-    await filter(one.root, 'Hide databases')
+    await filter(one.root, 'Buckets')
     expect(opened(one.root)).toEqual(['plain'])
     databaseRows.value = []
     allBuckets.hits.value = []
@@ -1096,7 +1178,7 @@ describe('database buckets in the list', () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
     await flush()
 
-    await click(pager(root, 'Next buckets'))
+    await click(pager(root, 'Next page'))
     await flush()
     expect(shown(root)).toEqual(['b25', 'b26', 'b27', 'b28', 'b29'])
     allBuckets.hits.value = []
@@ -1125,9 +1207,9 @@ describe('database buckets in the list', () => {
     const before = shown(root)
     expect(before[3]).toContain('b03')
 
-    await click(pager(root, 'Next buckets'))
+    await click(pager(root, 'Next page'))
     await flush()
-    await click(pager(root, 'Previous buckets'))
+    await click(pager(root, 'Previous page'))
     expect(shown(root)).toEqual(before)
     allBuckets.hits.value = []
   })
@@ -1148,11 +1230,11 @@ describe('database buckets in the list', () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
     await flush()
 
-    await click(pager(root, 'Next buckets'))
+    await click(pager(root, 'Next page'))
     await flush()
-    expect(pager(root, 'Previous buckets').props.disabled).toBe(true)
+    expect(pager(root, 'Previous page').props.disabled).toBe(true)
     expect(shown(root)).toEqual(listed(25).map((entry) => entry.bucket))
-    await click(pager(root, 'Next buckets'))
+    await click(pager(root, 'Next page'))
     expect(shown(root)).toEqual(['b25', 'b26', 'b27', 'b28', 'b29'])
     allBuckets.hits.value = []
   })
@@ -1171,12 +1253,12 @@ describe('database buckets in the list', () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
     await flush()
 
-    void (pager(root, 'Next buckets').props.onClick as () => Promise<void>)()
+    void (pager(root, 'Next page').props.onClick as () => Promise<void>)()
     state.bucketNameFilter.value = 'b2'
     await flush()
     answer()
     await flush()
-    expect(pager(root, 'Previous buckets').props.disabled).toBe(true)
+    expect(pager(root, 'Previous page').props.disabled).toBe(true)
     allBuckets.hits.value = []
     allBuckets.more.value = false
   })

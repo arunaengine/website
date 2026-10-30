@@ -85,5 +85,14 @@ export function useListedUsage() {
     return usage ? usageText(usage) : null
   }
 
-  return { ensure, textOf }
+  // Whether the bucket reads files in place at their source; null while unknown.
+  function referencedOf(bucket: string, nodeId: string | null): boolean | null {
+    const usage = listed.value.get(listedKey(bucket, nodeId))
+    return usage ? (usage.referenced_bytes ?? 0) > 0 : null
+  }
+
+  // The row's node answered, or failed to; false while its read is still waiting.
+  const answered = (bucket: string, nodeId: string | null) => listed.value.has(listedKey(bucket, nodeId))
+
+  return { ensure, textOf, referencedOf, answered }
 }
