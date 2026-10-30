@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // Page-header actions for one dataset: keep it offline, favourite and watch it, export it as a
-// crate, edit it; the other transfers and Delete wait in the More menu.
+// crate, edit it; the other transfers and Delete wait in the More menu. A run record leads with
+// its results instead; watching, export and edit move into the menu.
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter, type RouteLocationRaw } from 'vue-router'
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import Button from '@/components/ui/Button.vue'
 import Switch from '@/components/ui/Switch.vue'
@@ -19,10 +20,12 @@ import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import type { DatasetViewState } from '@/composables/useDatasetView'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { downloadCrateJson } from '@/lib/crateImport'
-import { errorMessage } from '@/lib/utils'
-import { Code2, Download, Ellipsis, FileArchive, FileJson2, Pencil, Send, Star, Trash2, Upload } from '@lucide/vue'
+import { assistantAvailable } from '@/composables/assistantState'
+import { copyToClipboard, errorMessage } from '@/lib/utils'
+import { Code2, Download, Ellipsis, Eye, FileArchive, FileJson2, FolderOpen, Link, Pencil, Send, Sparkles, Star, Trash2, Upload } from '@lucide/vue'
 
-const props = defineProps<{ state: DatasetViewState }>()
+// `results`: where a run record's results open; set only for a run record.
+const props = defineProps<{ state: DatasetViewState; run?: boolean; results?: RouteLocationRaw | null }>()
 const emit = defineEmits<{
   (e: 'export'): void
   (e: 'import'): void
@@ -75,6 +78,12 @@ async function exportCrate() {
   }
 }
 
+const locationHref = () => window.location.href
+const watcher = ref<{ show: () => void; watching: boolean; available: boolean } | null>(null)
+function askAi() {
+  void import('@/composables/useAssistantChat').then(({ useAssistantChat }) => useAssistantChat().openWith(askPrompt.value, `dataset ${detailId.value}`))
+}
+
 const isFav = computed(() => Boolean(currentUser.value?.favouriteMetadataIds?.includes(detailId.value)))
 const favBusy = ref(false)
 async function toggleFav() {
@@ -116,24 +125,53 @@ async function toggleFav() {
   </Button>
   <WatchButton
     v-if="docState === 'found'"
+    ref="watcher"
     surface="dataset"
     :path-prefix="watchPathPrefix"
     :group-id="current?.realmId ?? null"
     :resource-label="currentPath"
+    :hide-trigger="run"
   />
-  <AskAiButton v-if="current" :prompt="askPrompt" :subject="`dataset ${current.ulid}`" icon-only />
-  <Button v-if="docState === 'found' && currentUser" :disabled="exporting" @click="exportCrate">
-    <Download class="h-4 w-4" /> {{ exporting ? 'Exporting…' : 'Export as crate' }}
+  <template v-if="!run">
+    <AskAiButton v-if="current" :prompt="askPrompt" :subject="`dataset ${current.ulid}`" icon-only />
+    <Button v-if="docState === 'found' && currentUser" :disabled="exporting" @click="exportCrate">
+      <Download class="h-4 w-4" /> {{ exporting ? 'Exporting…' : 'Export as crate' }}
+    </Button>
+    <Button v-if="current && canWrite" variant="outline" @click="router.push({ name: 'dataset-edit', params: { id: detailId } })"><Pencil class="h-4 w-4" /> Edit</Button>
+  </template>
+  <Button v-else-if="results" as-child>
+    <RouterLink :to="results"><FolderOpen class="h-4 w-4" /> Show results</RouterLink>
   </Button>
-  <Button v-if="current && canWrite" variant="outline" @click="router.push({ name: 'dataset-edit', params: { id: detailId } })"><Pencil class="h-4 w-4" /> Edit</Button>
   <!-- The other transfers, the raw crate and Delete, each named by what it moves. -->
   <DropdownMenu v-if="docState === 'found'">
     <DropdownMenuTrigger as-child>
-      <Button variant="outline" size="icon" aria-label="More" title="More">
+      <Button variant="outline" size="icon" :aria-label="run ? 'More actions' : 'More'" :title="run ? 'More actions' : 'More'">
         <Ellipsis class="h-4 w-4" />
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" class="w-80 p-1.5">
+      <template v-if="run">
+        <DropdownMenuItem class="cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2" :disabled="!watcher?.available" @click="watcher?.show()">
+          <Eye class="h-4 w-4 shrink-0 text-primary" /> {{ watcher?.watching ? 'Watching' : 'Watch' }}
+        </DropdownMenuItem>
+        <DropdownMenuItem v-if="currentUser" class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5" :disabled="exporting" @click="exportCrate">
+          <Download class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <span class="min-w-0">
+            <span class="block text-sm font-medium text-foreground">{{ exporting ? 'Exporting…' : 'Export as RO-Crate' }}</span>
+            <span class="block text-xs leading-relaxed text-muted-foreground">Inputs, tool, command and results with their links.</span>
+          </span>
+        </DropdownMenuItem>
+        <DropdownMenuItem class="cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2" @click="copyToClipboard(locationHref())">
+          <Link class="h-4 w-4 shrink-0 text-primary" /> Copy link
+        </DropdownMenuItem>
+        <DropdownMenuItem v-if="current && canWrite" class="cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2" @click="router.push({ name: 'dataset-edit', params: { id: detailId } })">
+          <Pencil class="h-4 w-4 shrink-0 text-primary" /> Edit
+        </DropdownMenuItem>
+        <DropdownMenuItem v-if="current && assistantAvailable" class="cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2" @click="askAi">
+          <Sparkles class="h-4 w-4 shrink-0 text-primary" /> Ask AI
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+      </template>
       <DropdownMenuLabel>Export</DropdownMenuLabel>
       <DropdownMenuItem
         class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5"

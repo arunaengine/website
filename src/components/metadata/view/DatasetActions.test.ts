@@ -1,7 +1,7 @@
 import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { button, compileClientComponent, flush, mountApp, moduleDefault } from '@/test/clientRender'
+import { button, compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
 
 const Passthrough = defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h('div', attrs, slots.default?.()) })
 const Empty = defineComponent(() => () => null)
@@ -9,12 +9,16 @@ const downloadProvenanceCrate = vi.fn()
 
 const component = compileClientComponent(new URL('./DatasetActions.vue', import.meta.url), {
   vue: VueRuntime,
-  'vue-router': { useRouter: () => ({ push: vi.fn() }) },
+  'vue-router': {
+    useRouter: () => ({ push: vi.fn() }),
+    RouterLink: defineComponent({ props: { to: { type: Object, required: true } }, setup: (props, { slots }) => () => h('a', { to: props.to }, slots.default?.()) }),
+  },
+  '@/composables/assistantState': { assistantAvailable: ref(false) },
   '@lucide/vue': new Proxy({}, { get: () => Empty }),
   '@/components/assistant/AskAiButton.vue': moduleDefault(Empty),
   '@/components/ui/Button.vue': moduleDefault(defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()) })),
   '@/components/ui/Switch.vue': moduleDefault(Empty),
-  '@/components/ui/DropdownMenu.vue': moduleDefault(Empty),
+  '@/components/ui/DropdownMenu.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuContent.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuItem.vue': moduleDefault(Passthrough),
@@ -26,12 +30,34 @@ const component = compileClientComponent(new URL('./DatasetActions.vue', import.
   '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => false }) },
   '@/composables/useGlobalErrors': { reportGlobalError: vi.fn() },
   '@/lib/crateImport': { downloadCrateJson: vi.fn() },
-  '@/lib/utils': { errorMessage: (cause: unknown) => String(cause) },
+  '@/lib/utils': { errorMessage: (cause: unknown) => String(cause), copyToClipboard: vi.fn() },
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
+})
+
+function viewState() {
+  return {
+    detailId: ref('record-1'), docState: ref('found'), current: ref({ ulid: 'record-1', title: 'Annotate', realmId: 'g1' }), currentCrate: ref(null),
+    crateHasEntities: ref(false), canWrite: ref(true), currentPath: ref(''), watchPathPrefix: ref(''), offlineShown: ref(false),
+    offlineSelected: ref(false), offlineBusy: ref(false), setOffline: vi.fn(),
+  }
+}
+
+describe('run record actions', () => {
+  it('leads with Show results and keeps watch, export, link and edit in one menu', async () => {
+    const results = { name: 'bucket', params: { bucketId: 'laptop' }, query: { prefix: 'results/bakta', run: 'r1' } }
+    const { root } = await mountApp(component, { props: { state: viewState(), run: true, results } })
+    const text = content(root)
+
+    expect(element(root, (node) => node.props['aria-label'] === 'More actions')).toBeTruthy()
+    expect(element(root, (node) => node.tag === 'a' && content(node).includes('Show results')).props.to).toEqual(results)
+    for (const label of ['Watch', 'Export as RO-Crate', 'Copy link', 'Edit']) expect(text).toContain(label)
+    // Export and Edit no longer sit beside the menu as their own buttons.
+    expect(() => button(root, 'Export as crate')).toThrow()
+  })
 })
 
 describe('dataset crate export', () => {

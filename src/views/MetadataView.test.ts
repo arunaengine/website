@@ -8,8 +8,9 @@ const source = readFileSync(new URL('./MetadataView.vue', import.meta.url), 'utf
 
 describe('MetadataView', () => {
   it('offers overview, where it came from and history, with the graph among the developer parts', () => {
-    expect(source).toContain('<TabsTrigger value="overview">Overview</TabsTrigger>')
-    expect(source).toContain('<TabsTrigger value="provenance">Where it came from</TabsTrigger>')
+    expect(source).toContain('<TabsTrigger value="overview"><LayoutDashboard class="size-4" /> Overview</TabsTrigger>')
+    // A phone names the provenance tab Source.
+    expect(source).toContain('<span class="max-sm:hidden">Where it came from</span><span class="sm:hidden">Source</span>')
     expect(source).not.toContain('<TabsTrigger value="graph">')
     expect(source).toContain('For developers')
     expect(source).toContain('<DatasetGraph v-if="developersOpen" :state="state" @open="openInfo" />')

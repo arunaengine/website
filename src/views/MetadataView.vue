@@ -5,6 +5,8 @@ import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Notice from '@/components/ui/Notice.vue'
+import StatusMark from '@/components/ui/StatusMark.vue'
+import StatusPill from '@/components/ui/StatusPill.vue'
 import DetailsSection from '@/components/metadata/DetailsSection.vue'
 import PeopleSection from '@/components/metadata/PeopleSection.vue'
 import ContextSection from '@/components/metadata/ContextSection.vue'
@@ -52,12 +54,12 @@ import { providePageContext } from '@/composables/usePageContext'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { datasetPurposeOf } from '@/lib/datasetPurpose'
-import { runDuration, runState } from '@/lib/runCrate'
-import { stateVariant } from '@/lib/stateBadge'
+import { resultsFolder, runDuration, runState } from '@/lib/runCrate'
+import { useS3 } from '@/composables/useS3'
 import { type MetadataDocumentSummary, type RepositoryLink, type StorageLocation } from '@/lib/api'
 import { publishedLinks } from '@/lib/repository'
 import { errorMessage, isHttpUrl, relativeTime, truncateMiddle } from '@/lib/utils'
-import { ArrowLeft, Code2 } from '@lucide/vue'
+import { ArrowLeft, Clock, Code2, Container, GitBranch, History as HistoryIcon, LayoutDashboard, Scale, Server, Timer, Users } from '@lucide/vue'
 
 const router = useRouter()
 const { currentUser, saving, deleteMetadataDocument, fullCrates, sessionEpoch, myGroups } = useAruna()
@@ -107,13 +109,23 @@ const runStateLabel = computed(() => {
   if (value === 'failed') return 'Failed'
   return value
 })
-const runLine = computed(() => {
+const runTool = computed(() => runProvenance.value?.instrument?.name || runProvenance.value?.container?.name || '')
+const pageTitle = computed(() => current.value?.title || fetchedSummary.value?.document_path || 'Dataset')
+// Datasets, then the kind's own list where it has one, then this page.
+const crumbs = computed(() => {
+  if (!current.value) return []
+  const kind = purpose.value === 'process-run'
+    ? [{ label: 'Run records', to: { name: 'datasets', query: { tab: 'records' } } }]
+    : purpose.value === 'profile' ? [{ label: KINDS.profile, to: { name: 'profiles' } }] : []
+  return [...kind, { label: pageTitle.value }]
+})
+// Show results opens the results folder with only this run's files.
+const { endpoint: s3Endpoint } = useS3()
+const runResults = computed(() => {
   const run = runProvenance.value
-  if (!run) return ''
-  const tool = run.instrument?.name || run.container?.name || ''
-  const node = run.site?.nodeId ? displayName(run.site.nodeId) : ''
-  const where = node ? `on ${node}${run.site?.kind ? ` (${run.site.kind})` : ''}` : ''
-  return [[tool, where].filter(Boolean).join(' '), runDuration(run)].filter(Boolean).join(', ')
+  const folder = run ? resultsFolder(run, s3Endpoint.value) : null
+  if (!run || !folder) return null
+  return { name: 'bucket', params: { bucketId: folder.bucket }, query: { ...(folder.prefix ? { prefix: folder.prefix } : {}), ...(run.runId ? { run: run.runId } : {}) } }
 })
 
 // The page paints once the registry entry and the crate have both answered;
@@ -232,15 +244,18 @@ function jumpTo(entityId: string) {
 <template>
   <div>
     <PageHeader
-      :title="current ? current.title : fetchedSummary ? fetchedSummary.document_path : 'Dataset'"
-      :crumbs="current ? [{ label: KINDS[purpose] }] : []"
+      :title="pageTitle"
+      :crumbs="crumbs"
       :docs="{ topic: 'datasets', section: 'The bundle is an RO-Crate' }"
     >
       <template #title>
         <span class="inline-flex flex-wrap items-center gap-2">
-          {{ current ? current.title : fetchedSummary ? fetchedSummary.document_path : 'Dataset' }}
-          <Badge v-if="current" variant="royal">{{ KIND[purpose] }}</Badge>
-          <Badge v-if="runStateLabel" :variant="stateVariant(runState(runProvenance!) ?? '')">{{ runStateLabel }}</Badge>
+          {{ pageTitle }}
+          <template v-if="runProvenance">
+            <StatusMark v-if="runState(runProvenance) === 'succeeded'" label="Completed" />
+            <StatusPill v-else-if="runStateLabel" :state="runStateLabel" />
+          </template>
+          <Badge v-else-if="current" variant="royal">{{ KIND[purpose] }}</Badge>
           <Badge v-if="projectCrate" variant="outline">Project dataset</Badge>
           <button v-if="published.length" type="button" class="rounded-full" aria-label="Published. Show where this dataset is published" @click="showPublished = true">
             <Badge variant="success" class="cursor-pointer hover:opacity-80">Published</Badge>
@@ -248,24 +263,40 @@ function jumpTo(entityId: string) {
         </span>
       </template>
       <template v-if="current || fetchedSummary" #description>
-        <span v-if="runLine" class="block">{{ runLine }}</span>
-        <span v-else-if="current?.description" class="line-clamp-2 block">{{ current.description }}</span>
-        <span class="mt-1.5 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
-          <span v-if="groupId">Group
-            <RouterLink v-if="groupMember" :to="{ name: 'group', params: { id: groupId } }" class="text-primary hover:underline">{{ groupLabel(groupId) }}</RouterLink>
-            <span v-else :title="groupId">{{ groupLabel(groupId) }}</span>
-          </span>
-          <span v-if="current && !runProvenance" class="inline-flex items-center gap-1.5">Profile {{ profileName }} <ProfileChip :doc="current" status-only /></span>
-          <span v-if="current?.license">License
-            <ExternalLink v-if="isHttpUrl(current.license)" :href="current.license" :label="licenseLabel" :title="current.license" />
-            <template v-else>{{ licenseLabel }}</template>
-          </span>
-          <span v-if="current">Updated {{ relativeTime(current.updatedAt) }}</span>
+        <!-- A run record: one row of icon facts, each linked to its page where one exists. -->
+        <span v-if="runProvenance" class="flex flex-wrap gap-x-4 gap-y-1 [&>*]:inline-flex [&>*]:items-center [&>*]:gap-1.5">
+          <span v-if="runTool"><Container class="h-3.5 w-3.5" aria-hidden="true" />{{ runTool }}</span>
+          <RouterLink v-if="runProvenance.site?.nodeId" :to="{ name: 'node', params: { nodeId: runProvenance.site.nodeId } }" class="text-primary hover:underline">
+            <Server class="h-3.5 w-3.5" aria-hidden="true" />{{ displayName(runProvenance.site.nodeId) }}
+          </RouterLink>
+          <span v-if="runDuration(runProvenance)" class="tabular-nums"><Timer class="h-3.5 w-3.5" aria-hidden="true" />{{ runDuration(runProvenance) }}</span>
+          <RouterLink v-if="groupId && groupMember" :to="{ name: 'group', params: { id: groupId } }" class="text-primary hover:underline"><Users class="h-3.5 w-3.5" aria-hidden="true" />{{ groupLabel(groupId) }}</RouterLink>
+          <span v-else-if="groupId" :title="groupId"><Users class="h-3.5 w-3.5" aria-hidden="true" />{{ groupLabel(groupId) }}</span>
+          <a v-if="current?.license && isHttpUrl(current.license)" :href="current.license" target="_blank" rel="noopener noreferrer" class="hover:text-foreground hover:underline" :title="current.license"><Scale class="h-3.5 w-3.5" aria-hidden="true" />{{ licenseLabel }}</a>
+          <span v-else-if="current?.license"><Scale class="h-3.5 w-3.5" aria-hidden="true" />{{ licenseLabel }}</span>
+          <span v-if="current" :title="current.updatedAt"><Clock class="h-3.5 w-3.5" aria-hidden="true" />Updated {{ relativeTime(current.updatedAt) }}</span>
         </span>
+        <template v-else>
+          <span v-if="current?.description" class="line-clamp-2 block">{{ current.description }}</span>
+          <span class="mt-1.5 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
+            <span v-if="groupId">Group
+              <RouterLink v-if="groupMember" :to="{ name: 'group', params: { id: groupId } }" class="text-primary hover:underline">{{ groupLabel(groupId) }}</RouterLink>
+              <span v-else :title="groupId">{{ groupLabel(groupId) }}</span>
+            </span>
+            <span v-if="current" class="inline-flex items-center gap-1.5">Profile {{ profileName }} <ProfileChip :doc="current" status-only /></span>
+            <span v-if="current?.license">License
+              <ExternalLink v-if="isHttpUrl(current.license)" :href="current.license" :label="licenseLabel" :title="current.license" />
+              <template v-else>{{ licenseLabel }}</template>
+            </span>
+            <span v-if="current">Updated {{ relativeTime(current.updatedAt) }}</span>
+          </span>
+        </template>
       </template>
       <template #actions>
         <DatasetActions
           :state="state"
+          :run="Boolean(runProvenance)"
+          :results="runResults"
           @export="showCrateExport = true"
           @import="openCrate('openImport')"
           @publish="showPublish = true"
@@ -281,9 +312,11 @@ function jumpTo(entityId: string) {
       <template v-else-if="docState === 'found'">
         <Tabs :model-value="tab" @update:model-value="(value: string) => (tab = value)">
           <TabsList aria-label="Dataset views">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="provenance">Where it came from</TabsTrigger>
-            <TabsTrigger v-if="historyShown" value="history">History</TabsTrigger>
+            <TabsTrigger value="overview"><LayoutDashboard class="size-4" /> Overview</TabsTrigger>
+            <TabsTrigger value="provenance">
+              <GitBranch class="size-4" /><span class="max-sm:hidden">Where it came from</span><span class="sm:hidden">Source</span>
+            </TabsTrigger>
+            <TabsTrigger v-if="historyShown" value="history"><HistoryIcon class="size-4" /> History</TabsTrigger>
           </TabsList>
         </Tabs>
 

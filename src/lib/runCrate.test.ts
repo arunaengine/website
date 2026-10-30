@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseRunCrate, runClaimedIds, runDuration, runState } from './runCrate'
+import { parseRunCrate, resultsFolder, runClaimedIds, runDuration, runState } from './runCrate'
 
 const RUN = 'https://w3id.org/aruna/01RUNRECORD'
 const crate = {
@@ -68,5 +68,18 @@ describe('run state and duration', () => {
     expect(run.inputs[1]).toMatchObject({ device: 'node-laptop' })
     expect(run.inputs[1]!.partOf).toBeUndefined()
     expect(runClaimedIds(run)).toEqual(expect.arrayContaining(['#bucket-metadata-0123', 'https://w3id.org/aruna/rel']))
+  })
+})
+
+describe('results folder', () => {
+  const run = (urls: string[]) => ({ inputs: [], outputs: urls.map((url, index) => ({ id: `#out-${index}`, name: url.split('/').pop() ?? '', contentUrl: url })) })
+
+  it('names the one folder every result went to', () => {
+    expect(resultsFolder(run(['s3://laptop/results/bakta/a.gff3', 's3://laptop/results/bakta/b.tsv']))).toEqual({ bucket: 'laptop', prefix: 'results/bakta' })
+  })
+
+  it('names none when the results are spread or not stored in a bucket', () => {
+    expect(resultsFolder(run(['s3://laptop/results/a.tsv', 's3://laptop/other/b.tsv']))).toBeNull()
+    expect(resultsFolder(run([]))).toBeNull()
   })
 })

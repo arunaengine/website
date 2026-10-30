@@ -44,6 +44,8 @@ const props = defineProps<{
   bell?: boolean
   // Shows "Notify me" next to the bell, with this class on the text.
   labelClass?: string
+  // No button of its own: a menu item opens the dialog through `show`.
+  hideTrigger?: boolean
 }>()
 
 const NO_SYNC_REASON = 'This folder is not the source of a sync'
@@ -155,6 +157,8 @@ function onOpenChange(value: boolean) {
   if (isData.value && (props.bell || !watching.value)) void checkSyncSource()
 }
 
+defineExpose({ show: () => onOpenChange(true), watching, available: computed(() => available.value && !unavailableReason.value) })
+
 const unchanged = computed(() => {
   const events = existing.value?.events ?? []
   return events.length === selected.value.length && selected.value.every((kind) => events.includes(kind))
@@ -239,7 +243,7 @@ const onDelete = () => exclusive(async () => {
 </script>
 
 <template>
-  <Tooltip v-if="available && unavailableReason" :label="unavailableReason">
+  <Tooltip v-if="available && unavailableReason && !hideTrigger" :label="unavailableReason">
     <span class="inline-flex">
       <Button
         variant="outline"
@@ -332,7 +336,7 @@ const onDelete = () => exclusive(async () => {
   </Popover>
 
   <Dialog v-else-if="available" :open="open" @update:open="onOpenChange">
-    <DialogTrigger as-child>
+    <DialogTrigger v-if="!hideTrigger" as-child>
       <Button
         variant="outline"
         :size="size ?? 'default'"

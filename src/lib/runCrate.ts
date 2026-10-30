@@ -1,4 +1,4 @@
-import { contentUrlValues, primaryContentUrl } from './crate/dataIdentity'
+import { contentUrlValues, parseDataIdentity, primaryContentUrl } from './crate/dataIdentity'
 import { PROCESS_RUN_PROFILE_URI } from './profiles/builtinProfiles'
 
 // Parses the backend's Process Run Crate into the dedicated run UI model.
@@ -313,4 +313,14 @@ export function runDuration(run: RunCrateModel): string {
   const min = Math.floor(sec / 60)
   if (min < 60) return `${min}m ${sec % 60}s`
   return `${Math.floor(min / 60)}h ${min % 60}m`
+}
+
+/** The one bucket folder every result went to; null when they are spread out or not in a bucket. */
+export function resultsFolder(run: RunCrateModel, endpoint?: string | null): { bucket: string; prefix: string } | null {
+  const places = run.outputs.map((file) => {
+    const key = parseDataIdentity(file, endpoint).s3
+    return key ? { bucket: key.bucket, prefix: key.key.includes('/') ? key.key.slice(0, key.key.lastIndexOf('/')) : '' } : null
+  })
+  const first = places[0]
+  return first && places.every((place) => place?.bucket === first.bucket && place.prefix === first.prefix) ? first : null
 }
