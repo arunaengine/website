@@ -18,7 +18,7 @@ import LocalNodeDetails from '@/components/nodes/LocalNodeDetails.vue'
 import NodeDetailPanel from '@/components/nodes/NodeDetailPanel.vue'
 import LocationAggregates from '@/components/placement/LocationAggregates.vue'
 import SectionSkeleton from '@/components/ui/SectionSkeleton.vue'
-import { givenName, isDegradedStatus, nodeName, statusProblem } from '@/components/nodes/node-display'
+import { givenName, isDegradedStatus, nodeName, nodeOnline, statusProblem } from '@/components/nodes/node-display'
 import { nodeApiBase, probeNode, type NodeProbe } from '@/components/nodes/node-probe'
 import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
@@ -32,7 +32,7 @@ import type { RealmNodeInfo } from '@/lib/api'
 import type { RealmView } from '@/composables/aruna/realm'
 import { isDesktop } from '@/lib/desktop'
 import { computerName } from '@/composables/useRealmNodes'
-import { Activity, Boxes, CircleCheck, Clock, Copy, Files, HardDrive, Laptop, MapPinned, Network, Package, Server, TriangleAlert, UserRound } from '@lucide/vue'
+import { Activity, Boxes, CircleCheck, Clock, Copy, Files, HardDrive, Laptop, MapPinned, Network, Package, Server, TriangleAlert, Unplug, UserRound } from '@lucide/vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 
@@ -152,6 +152,7 @@ const deviceNodes = computed(() => (realmInfo.value?.nodes ?? []).filter((node) 
 const activeDevices = computed(
   () => deviceNodes.value.filter((node) => node.connection_status === 'seen').length,
 )
+const offlineDevices = computed(() => deviceNodes.value.filter((node) => !nodeOnline(node)).length)
 // Freshest device contact this node recorded, blank until it has heard from one.
 const deviceLastSeen = computed(() => {
   const seen = deviceNodes.value.map((node) => node.last_seen_ms ?? 0)
@@ -347,6 +348,7 @@ watch(
           <template #value>{{ formatNumber(deviceNodes.length) }}</template>
           <template #unit>enrolled</template>
           <span><Activity /><b>{{ activeDevices }}</b> active</span>
+          <span v-if="offlineDevices"><Unplug /><b>{{ offlineDevices }}</b> offline</span>
           <span v-if="ownedDevices"><UserRound /><b>{{ ownedDevices }}</b> yours</span>
           <span v-if="deviceLastSeen"><Clock />Seen {{ deviceLastSeen }}</span>
         </OverviewCell>

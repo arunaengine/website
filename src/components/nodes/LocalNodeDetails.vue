@@ -5,7 +5,7 @@ import CopyButton from '@/components/ui/CopyButton.vue'
 import DetailList from '@/components/ui/DetailList.vue'
 import InfoHint from '@/components/ui/InfoHint.vue'
 import QuotaBar from '@/components/ui/QuotaBar.vue'
-import { readableWarning, statusProblem } from './node-display'
+import { readableWarning, statusProblem, warningPeer } from './node-display'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { CircleCheck, Database, ExternalLink, HardDrive, Network, Tag, TriangleAlert, Users } from '@lucide/vue'
 import { backendQuota } from '@/lib/storage'
@@ -93,8 +93,11 @@ const backends = computed(() =>
 )
 
 // Peer ids in warnings read as node names; the raw text stays behind a hint.
-const { displayName } = useRealmNodes()
-const warnings = computed(() => props.info.warnings.map((text) => readableWarning(text, displayName)))
+// Devices are often offline: the Devices card counts them, so no warning names one.
+const { displayName, nodeById } = useRealmNodes()
+const warnings = computed(() =>
+  props.info.warnings.filter((text) => nodeById(warningPeer(text))?.kind !== 'user').map((text) => readableWarning(text, displayName)),
+)
 const META = 'flex flex-wrap items-center gap-x-5 gap-y-1 type-secondary [&>span]:inline-flex [&>span]:items-center [&>span]:gap-1.5 [&_svg]:size-3.5'
 </script>
 
@@ -181,7 +184,7 @@ const META = 'flex flex-wrap items-center gap-x-5 gap-y-1 type-secondary [&>span
       </ul>
     </div>
 
-    <div v-if="info.warnings.length">
+    <div v-if="warnings.length">
       <h2 class="font-display text-sm font-semibold text-aruna-navy">Warnings</h2>
       <Notice tone="warning" class="mt-1.5">
         <p v-for="(warning, index) in warnings" :key="index" class="flex items-center gap-1.5">

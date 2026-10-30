@@ -212,7 +212,7 @@ describe('device summary', () => {
     const text = await renderedText()
 
     expect(text).toContain('Devices')
-    expect(text).toContain('2 enrolled 1 active 1 yours Seen 4m ago')
+    expect(text).toContain('2 enrolled 1 active 1 offline 1 yours Seen 4m ago')
     // The realm node is one card; devices are only counted.
     expect(text).toContain('Nodes Unnamed node eu-west')
     expect(text).not.toContain('laptop-')
@@ -236,7 +236,7 @@ describe('device summary', () => {
 
     const text = await renderedText()
 
-    expect(text).toContain('1 enrolled 0 active')
+    expect(text).toContain('1 enrolled 0 active 1 offline')
     expect(text).not.toContain('Seen')
   })
 

@@ -27,7 +27,10 @@ const details = compileClientComponent(new URL('./LocalNodeDetails.vue', import.
     setup: (props) => () => h('dl', (props.items as { label: string; value: string }[]).map((item) => h('div', [h('dt', item.label), h('dd', item.value)]))),
   })),
   '@/components/ui/InfoHint.vue': moduleDefault(HintStub),
-  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => (id === 'a'.repeat(64) ? 'Microbiology laptop' : `${id.slice(0, 8)}…`) }) },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({
+    displayName: (id: string) => (id === 'a'.repeat(64) ? 'Giessen storage' : `${id.slice(0, 8)}…`),
+    nodeById: (id: string | null) => (id === 'b'.repeat(64) ? { kind: 'user' } : id ? { kind: 'server' } : null),
+  }) },
   '@/components/ui/CopyButton.vue': moduleDefault(CopyStub),
   '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
   '@/components/ui/QuotaBar.vue': moduleDefault(Slotted('div')),
@@ -134,8 +137,17 @@ describe('node interfaces', () => {
     warned.warnings = [raw]
     const { root } = await mountApp(details, { props: { info: warned } })
 
-    expect(content(root)).toContain('Microbiology laptop is unreachable')
+    expect(content(root)).toContain('Giessen storage is unreachable')
     expect(content(root)).not.toContain('a'.repeat(64))
     expect(nodes(root).some((node) => node.props['data-hint'] === raw)).toBe(true)
+  })
+
+  it('warns about no device, as devices are often offline', async () => {
+    const warned = info('https://api.example.org/api/v1')
+    warned.warnings = [`managed peer ${'b'.repeat(64)} unreachable: DHT error: timeout`]
+    const { root } = await mountApp(details, { props: { info: warned } })
+
+    expect(content(root)).not.toContain('Warnings')
+    expect(content(root)).not.toContain('unreachable')
   })
 })

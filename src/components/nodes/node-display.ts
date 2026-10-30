@@ -46,6 +46,11 @@ export function nodeName(node: Pick<RealmNodeInfo, 'kind' | 'display_name' | 'in
 
 const PEER_ID = /\b[0-9a-f]{64}\b/
 
+/** The node a warning is about, by the peer id it names; null when it names none. */
+export function warningPeer(text: string): string | null {
+  return text.match(PEER_ID)?.[0] ?? null
+}
+
 /** A node warning for people: a peer id reads as its node's name, the raw text is kept for a hint. */
 export function readableWarning(text: string, name: (nodeId: string) => string): { text: string; raw?: string } {
   const id = text.match(PEER_ID)?.[0]
