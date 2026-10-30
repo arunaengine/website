@@ -42,6 +42,16 @@ describe('navigation feature switches', () => {
     expect(navItemActive(entry, '/app/buckets')).toBe(false)
   })
 
+  it('keeps the dashboard marked on a node page it opens', () => {
+    const entry = navEntries({ desktop: false, isRealmAdmin: false, canInspectUsers: false })
+      .filter((item): item is NavItem => !('separator' in item))
+      .find((item) => item.to === '/app')!
+
+    expect(navItemActive(entry, '/app/nodes/n-1')).toBe(true)
+    expect(navItemActive(entry, '/app')).toBe(true)
+    expect(navItemActive(entry, '/app/buckets')).toBe(false)
+  })
+
   it('never hides admin pages', () => {
     expect(paths(['profiles', 'compute', 'notebooks', 'watches'])).toContain('/app/admin')
   })
