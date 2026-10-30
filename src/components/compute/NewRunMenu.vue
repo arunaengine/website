@@ -12,7 +12,8 @@ import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
 import { useSavedRuns } from '@/composables/useSavedRuns'
 import { askedFor } from '@/lib/savedRuns'
 import type { ButtonVariants } from '@/components/ui/button'
-import { Braces, ChevronDown, FileCode2, FileTerminal, ListPlus, Play, Star } from '@lucide/vue'
+import { RUN_TEMPLATES } from '@/lib/runTemplates'
+import { ChevronDown, Play, Star } from '@lucide/vue'
 
 defineProps<{
   size?: ButtonVariants['size']
@@ -23,12 +24,7 @@ const router = useRouter()
 const saved = useSavedRuns()
 const managing = ref(false)
 
-const TEMPLATES = [
-  { template: 'python', icon: FileCode2, label: 'Python script', hint: 'uv runs it; packages come from PyPI.' },
-  { template: 'javascript', icon: Braces, label: 'JavaScript script', hint: 'Deno runs it; packages come from npm.' },
-  { template: 'bash', icon: FileTerminal, label: 'Bash script', hint: 'Plain shell, no extra tooling.' },
-  { template: '', icon: ListPlus, label: 'Blank run', hint: 'Bring your own container image and command.' },
-]
+const TEMPLATES = RUN_TEMPLATES
 
 function open(template: string) {
   void router.push({ name: 'compute-new', ...(template ? { query: { template } } : {}) })

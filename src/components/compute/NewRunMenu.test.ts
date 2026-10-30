@@ -2,6 +2,7 @@ import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as SavedRuns from '@/lib/savedRuns'
+import { RUN_TEMPLATES } from '@/lib/runTemplates'
 import {
   button,
   click,
@@ -37,6 +38,7 @@ const NewRunMenu = compileClientComponent(new URL('./NewRunMenu.vue', import.met
   '@/components/compute/MyRunsDialog.vue': moduleDefault(Passthrough),
   '@/composables/useSavedRuns': { useSavedRuns: () => ({ runs: savedRuns }) },
   '@/lib/savedRuns': SavedRuns,
+  '@/lib/runTemplates': { RUN_TEMPLATES },
 })
 
 describe('new run menu', () => {

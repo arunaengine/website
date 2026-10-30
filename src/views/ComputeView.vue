@@ -7,7 +7,8 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import ComputeGates from '@/components/compute/ComputeGates.vue'
-import NewRunMenu from '@/components/compute/NewRunMenu.vue'
+import ComputeNewMenu from '@/components/compute/ComputeNewMenu.vue'
+import RunTemplatesPanel from '@/components/compute/RunTemplatesPanel.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import TasksPanel from '@/components/compute/TasksPanel.vue'
 import JobsPanel from '@/components/jobs/JobsPanel.vue'
@@ -17,7 +18,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import { isDesktop } from '@/lib/desktop'
-import { Settings, Workflow } from '@lucide/vue'
+import { Settings, Star, Workflow } from '@lucide/vue'
 
 // The desktop shows whether this computer runs jobs; the web never loads it.
 const LocalCompute = defineAsyncComponent({
@@ -41,31 +42,32 @@ const { busy: refreshBusy, refresh: onRefresh } = useRefresh(async () => {
 })
 
 const anyEnabled = computed(() => tesEnabled.value || jobsEnabled.value)
-const bothEnabled = computed(() => tesEnabled.value && jobsEnabled.value)
 
-// System job routes and ?tab=jobs select System jobs.
+// Runs, Run templates and System jobs are tabs in ?tab=; job routes select System jobs.
+const TABS = ['runs', 'templates', 'jobs'] as const
 const tab = computed(() => {
   if (!tesEnabled.value) return 'jobs'
-  if (!jobsEnabled.value) return 'tasks'
-  return route.name === 'job' || route.query.tab === 'jobs' ? 'jobs' : 'tasks'
+  if (route.name === 'job') return jobsEnabled.value ? 'jobs' : 'runs'
+  if (route.name === 'task') return 'runs'
+  const asked = TABS.find((entry) => entry === route.query.tab)
+  return asked === 'jobs' && !jobsEnabled.value ? 'runs' : (asked ?? 'runs')
 })
 const pageTitle = computed(() => {
   if (route.name === 'job') return `System job ${String(route.params.jobId ?? '')}`
-  if (route.name === 'task') return `Run ${String(route.params.taskId ?? '')}`
   return 'Compute'
 })
 function setTab(next: string) {
-  void router.replace({ name: 'compute', query: next === 'jobs' ? { tab: 'jobs' } : {} })
+  void router.replace({ name: 'compute', query: next === 'runs' ? {} : { tab: next } })
 }
 </script>
 
 <template>
   <div>
     <PageHeader :title="pageTitle" :docs="{ topic: 'compute-run', section: 'Follow the run' }">
-      <!-- One Run entry point; the menu explains the two ways to start one. -->
+      <!-- One New menu: a run, a run template or a notebook. -->
       <template v-if="currentUser && anyEnabled" #actions>
         <RefreshButton :busy="refreshBusy" @click="onRefresh" />
-        <NewRunMenu v-if="tesEnabled" size="sm" />
+        <ComputeNewMenu v-if="tesEnabled" />
       </template>
     </PageHeader>
 
@@ -78,15 +80,16 @@ function setTab(next: string) {
     >
       <div class="w-full px-4 py-6 sm:px-6">
         <LocalCompute v-if="desktop" class="mb-5" />
-        <Tabs v-if="bothEnabled" :model-value="tab" @update:model-value="setTab">
+        <Tabs v-if="tesEnabled" :model-value="tab" @update:model-value="setTab">
           <TabsList>
-            <TabsTrigger value="tasks"><Workflow class="size-4" aria-hidden="true" />Runs</TabsTrigger>
-            <TabsTrigger value="jobs"><Settings class="size-4" aria-hidden="true" />System jobs</TabsTrigger>
+            <TabsTrigger value="runs"><Workflow class="size-4" aria-hidden="true" />Runs</TabsTrigger>
+            <TabsTrigger value="templates"><Star class="size-4" aria-hidden="true" />Run templates</TabsTrigger>
+            <TabsTrigger v-if="jobsEnabled" value="jobs"><Settings class="size-4" aria-hidden="true" />System jobs</TabsTrigger>
           </TabsList>
-          <TabsContent value="tasks" class="mt-6"><TasksPanel :refresh-revision="revision" /></TabsContent>
-          <TabsContent value="jobs" class="mt-6"><JobsPanel :refresh-revision="revision" /></TabsContent>
+          <TabsContent value="runs" class="mt-6"><TasksPanel :refresh-revision="revision" /></TabsContent>
+          <TabsContent value="templates" class="mt-6"><RunTemplatesPanel /></TabsContent>
+          <TabsContent v-if="jobsEnabled" value="jobs" class="mt-6"><JobsPanel :refresh-revision="revision" /></TabsContent>
         </Tabs>
-        <TasksPanel v-else-if="tesEnabled" :refresh-revision="revision" />
         <JobsPanel v-else :refresh-revision="revision" />
       </div>
     </ComputeGates>

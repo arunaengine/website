@@ -199,6 +199,8 @@ export function portalRoutes(): RouteRecordRaw[] {
           component: () => import('@/views/NotebookView.vue'),
           meta: { feature: 'notebooks' },
         },
+        { path: 'compute/templates', redirect: { name: 'compute', query: { tab: 'templates' } } },
+        { path: 'compute/saved', redirect: { name: 'compute', query: { tab: 'templates' } } },
         { path: 'compute/jobs', redirect: { name: 'compute', query: { tab: 'jobs' } } },
         {
           path: 'compute/jobs/:jobId',
