@@ -47,7 +47,7 @@ export function originFrom(response: OriginResponse, labels: OriginLabels): Orig
         ...(source?.url ? { url: source.url } : {}),
         ...(source?.etag ? { etag: source.etag } : {}),
         ...(digest ? { digest: `${digest.algorithm}:${digest.digest}` } : {}),
-        ...(response.bucket_metadata?.database ? { database: response.bucket_metadata.title || 'a database' } : {}),
+        ...(response.bucket_metadata?.database ? { database: response.description?.title || 'a database' } : {}),
       }
     }
     case 'copy':

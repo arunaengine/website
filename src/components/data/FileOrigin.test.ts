@@ -86,7 +86,8 @@ describe('file origin identifiers', () => {
     state.value = 'ready'
     origin.value = response({
       origin: { kind: 'source' },
-      bucket_metadata: { database: true, title: 'BakRep', identifiers: [] },
+      bucket_metadata: { database: true, dataset: 'd1' },
+      description: { title: 'BakRep', identifiers: [] },
       identifiers: [{ name: 'BioSample', value: 'SAMN15803895', url, target: 'key' }],
       projection: [{ property: 'identifier', name: 'BioSample', value: 'SAMN15803895', url }],
     })

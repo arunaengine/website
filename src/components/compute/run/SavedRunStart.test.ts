@@ -86,7 +86,8 @@ describe('saved run start', () => {
       bucket: 'bakta-database',
       places: [{ bucket: 'bakta-database', nodeId: 'node-1' }],
       title: 'Bakta database (light)',
-      metadata: { database: true, version: '6.0 light', identifiers: [] },
+      description: { title: 'Bakta database (light)', version: '6.0 light', identifiers: [] },
+      metadata: { database: true, dataset: 'd1' },
     }]
     const { root } = await mountApp(component)
     const text = content(root)
@@ -101,7 +102,8 @@ describe('saved run start', () => {
       bucket: 'bakta-database',
       places: [{ bucket: 'bakta-database', nodeId: 'node-2' }],
       title: 'Bakta database (light)',
-      metadata: { database: true, version: '6.0 light', identifiers: [] },
+      description: { title: 'Bakta database (light)', version: '6.0 light', identifiers: [] },
+      metadata: { database: true, dataset: 'd1' },
     }]
     const { root } = await mountApp(component)
 

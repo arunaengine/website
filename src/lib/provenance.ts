@@ -108,7 +108,7 @@ function fileBox(graph: Graph, parent: string | null, id: string, asked: string,
   file.identifiers = origin.identifiers ?? []
   const metadata = origin.bucket_metadata
   if (metadata?.database) {
-    const title = metadata.title || 'A database'
+    const title = origin.description?.title || 'A database'
     const unchecked = origin.releases_complete === false ? 'Release membership could not be checked everywhere.' : undefined
     const releases = origin.releases ?? []
     // A release that pins this exact version names it; one box per release file version.

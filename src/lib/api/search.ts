@@ -11,7 +11,7 @@
 // is always served (schema:name with subject/path fallback); `snippet` is optional.
 // Partiality is signalled by `nodes_failed` (not a `partial` flag); `truncated`
 // marks a page that stopped at the server depth cap before exhausting matches.
-import type { BucketMetadata } from './databases'
+import type { BucketMetadata, DatasetDescription } from './databases'
 
 export interface MetadataSearchHit {
   document_id: string
@@ -67,6 +67,8 @@ export interface BucketSearchHit {
   set_id?: string | null
   /** The bucket's metadata, in a `database=true` search only. */
   metadata?: BucketMetadata | null
+  /** A database's linked dataset description, read now; absent while it cannot be read. */
+  description?: DatasetDescription | null
   /** Anyone, also without a login, may read the bucket; in a `database=true` search only. */
   public?: boolean
 }

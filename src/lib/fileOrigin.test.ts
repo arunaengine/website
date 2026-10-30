@@ -23,7 +23,8 @@ describe('file origin', () => {
     const origin = originFrom(
       response({
         origin: { kind: 'source' },
-        bucket_metadata: { database: true, title: 'SPIRE', identifiers: [] },
+        bucket_metadata: { database: true, dataset: 'd1' },
+        description: { title: 'SPIRE', identifiers: [] },
         source: {
           url: 'https://s3.example.org/bakrep/a/genome.fna.gz',
           path: 'a/genome.fna.gz',
@@ -49,7 +50,7 @@ describe('file origin', () => {
     const origin = originFrom(
       response({
         origin: { kind: 'source' },
-        bucket_metadata: { database: true, identifiers: [] },
+        bucket_metadata: { database: true, dataset: 'd1' },
         source: { path: 'drive/a.bin', digests: [] },
       }),
       labels,

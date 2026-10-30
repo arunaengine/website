@@ -721,7 +721,7 @@ describe('narrow TopBar search panel', () => {
     databaseRows = [{
       datasetId: 'd1', bucket: 'spire-db', ownerGroup: 'group-a', title: 'SPIRE microbiome', public: false,
       target: { kind: 'ordinary', node_id: 'node-b', bucket: 'spire-db' },
-      places: [{ bucket: 'spire-db', nodeId: 'node-b' }], metadata: { database: true, identifiers: [] },
+      places: [{ bucket: 'spire-db', nodeId: 'node-b' }], description: null, metadata: { database: true, dataset: 'd1' },
     }]
     const mounted = await mount()
     await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))

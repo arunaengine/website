@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { BucketSearchHit } from '@/lib/api'
-import { databaseOf, pageIdentifier, pageText, placeOf, rowsOf, sameTarget, searchRows, targetOf, withPage } from './databases'
+import { databaseOf, datasetIdOf, pageIdentifier, pageText, placeOf, rowsOf, sameTarget, searchRows, targetOf, withPage } from './databases'
 
 function hit(bucket: string, node: string, extra: Partial<BucketSearchHit> = {}): BucketSearchHit {
   return {
     arn: `arn:aruna:r:${node}:s3/${bucket}`, bucket, node_id: node, group_id: 'g1', created_at: '2026-10-28T00:00:00Z',
-    metadata: { database: true, title: `${bucket} database`, identifiers: [] }, public: false, ...extra,
+    metadata: { database: true, dataset: `d-${bucket}` }, description: { title: `${bucket} database`, identifiers: [] }, public: false, ...extra,
   }
 }
 
@@ -21,10 +21,10 @@ describe('database rows', () => {
     expect(rows[0].target).toEqual(set)
   })
 
-  it('leaves out hits without database metadata and keeps a missing title empty', () => {
-    const rows = rowsOf([hit('plain', 'n1', { metadata: null }), hit('off', 'n1', { metadata: { database: false, identifiers: [] } }), hit('x', 'n1', { metadata: { database: true, identifiers: [], dataset: 'd1' } })])
+  it('leaves out hits without database metadata and keeps a title it cannot read empty', () => {
+    const rows = rowsOf([hit('plain', 'n1', { metadata: null }), hit('off', 'n1', { metadata: { database: false } }), hit('x', 'n1', { metadata: { database: true, dataset: 'd1' }, description: null })])
 
-    expect(rows.map((row) => [row.bucket, row.title, row.datasetId])).toEqual([['x', null, 'd1']])
+    expect(rows.map((row) => [row.bucket, row.title, row.description, row.datasetId])).toEqual([['x', null, null, 'd1']])
   })
 
   it('finds the database of a set by its id and of an ordinary bucket by node and name', () => {
@@ -51,7 +51,7 @@ describe('database rows', () => {
   })
 
   it('searches the title and the bucket for every word', () => {
-    const rows = rowsOf([hit('spire', 'n1', { metadata: { database: true, title: 'SPIRE microbiome', identifiers: [] } }), hit('refseq', 'n1')])
+    const rows = rowsOf([hit('spire', 'n1', { description: { title: 'SPIRE microbiome', identifiers: [] } }), hit('refseq', 'n1')])
 
     expect(searchRows(rows, 'microbiome spire').map((row) => row.bucket)).toEqual(['spire'])
     expect(searchRows(rows, 'a')).toEqual([])
@@ -76,5 +76,15 @@ describe('DOI or link field', () => {
     expect(withPage([other, old], '')).toEqual([other])
     expect(withPage([other], 'https://x.org')[0].name).toBe('Link')
     expect(pageText([other, old])).toBe('10.1234/a')
+  })
+})
+
+describe('dataset links', () => {
+  it('reads a dataset id from the id, its w3id or a portal link', () => {
+    const id = '01M63099Q2000108CB51QQDB2P'
+    expect(datasetIdOf(` ${id} `)).toBe(id)
+    expect(datasetIdOf(`https://w3id.org/aruna/${id.toLowerCase()}`)).toBe(id)
+    expect(datasetIdOf(`https://v3-debug.aruna-engine.org/app/datasets/${id}/edit`)).toBe(id)
+    expect(datasetIdOf('datasets/run-42')).toBeNull()
   })
 })

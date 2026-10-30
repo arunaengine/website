@@ -25,7 +25,7 @@ const component = compileClientComponent(new URL('./DatabasesTab.vue', import.me
 
 function row(bucket: string, target: Databases.DatabaseRow['target']): Databases.DatabaseRow {
   const nodeId = target.kind === 'ordinary' ? target.node_id : 'n3'
-  return { datasetId: 'd', bucket, ownerGroup: 'g', title: `${bucket} title`, public: false, target, places: [{ bucket, nodeId }], metadata: { database: true, identifiers: [] } }
+  return { datasetId: 'd', bucket, ownerGroup: 'g', title: `${bucket} title`, public: false, target, places: [{ bucket, nodeId }], description: null, metadata: { database: true, dataset: 'd' } }
 }
 
 describe('databases in Add data', () => {

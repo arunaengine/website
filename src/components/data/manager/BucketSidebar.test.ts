@@ -909,7 +909,7 @@ describe('Bucket sidebar sections', () => {
   it('lists pins, then databases, then the other buckets, each row with its files and size', async () => {
     nodeChoice.value = null
     allBuckets.needsName.value = false
-    databaseRows.value = [{ bucket: 'bakta-database', places: [{ bucket: 'bakta-database', nodeId: 'node-2' }], title: 'Bakta database (light)', metadata: { database: true, identifiers: [] } }]
+    databaseRows.value = [{ bucket: 'bakta-database', places: [{ bucket: 'bakta-database', nodeId: 'node-2' }], title: 'Bakta database (light)', description: null, metadata: { database: true, dataset: 'd1' } }]
     allBuckets.hits.value = [
       { bucket: 'laptop', node_id: 'node-2', group_id: 'g1' },
       { bucket: 'bakta-database', node_id: 'node-2', group_id: 'g1' },
@@ -963,8 +963,8 @@ describe('database buckets in the list', () => {
     nodeChoice.value = null
     allBuckets.needsName.value = false
     databaseRows.value = [
-      { bucket: 'bakta-database', places: [{ bucket: 'bakta-database', nodeId: 'node-2' }], title: 'Bakta database (light)', metadata: { database: true, identifiers: [] } },
-      { bucket: 'reef-survey', places: [{ bucket: 'reef-survey', nodeId: 'home' }], title: null, metadata: { database: true, title: 'Reef survey', identifiers: [] } },
+      { bucket: 'bakta-database', places: [{ bucket: 'bakta-database', nodeId: 'node-2' }], title: 'Bakta database (light)', description: null, metadata: { database: true, dataset: 'd1' } },
+      { bucket: 'reef-survey', places: [{ bucket: 'reef-survey', nodeId: 'home' }], title: 'Reef survey', description: null, metadata: { database: true, dataset: 'd2' } },
     ]
     allBuckets.hits.value = [
       { bucket: 'bakta-database', node_id: 'node-2', group_id: 'g1' },
@@ -977,7 +977,7 @@ describe('database buckets in the list', () => {
 
     expect(marks(all.root, 'database-icon')).toEqual(['bakta-database is a database'])
     expect(marks(all.root, 'row-subtitle')).toEqual(['bakta-database: Bakta database (light)'])
-    databaseRows.value = [{ ...(databaseRows.value[0] as object), metadata: { database: true, version: '6.0', identifiers: [] } }, databaseRows.value[1]]
+    databaseRows.value = [{ ...(databaseRows.value[0] as object), description: { version: '6.0', identifiers: [] } }, databaseRows.value[1]]
     await flush()
     expect(marks(all.root, 'row-subtitle')).toEqual(['bakta-database: Bakta database (light) 6.0'])
 
@@ -1015,8 +1015,8 @@ describe('database buckets in the list', () => {
     nodeChoice.value = null
     allBuckets.needsName.value = false
     databaseRows.value = [
-      { bucket: 'bakta-database', places: [{ bucket: 'bakta-database', nodeId: 'node-2' }], title: 'Bakta database (light)', metadata: { database: true, identifiers: [] } },
-      { bucket: 'reef-survey', places: [{ bucket: 'reef-survey', nodeId: 'home' }], title: null, metadata: { database: true, title: 'Reef survey', identifiers: [] } },
+      { bucket: 'bakta-database', places: [{ bucket: 'bakta-database', nodeId: 'node-2' }], title: 'Bakta database (light)', description: null, metadata: { database: true, dataset: 'd1' } },
+      { bucket: 'reef-survey', places: [{ bucket: 'reef-survey', nodeId: 'home' }], title: 'Reef survey', description: null, metadata: { database: true, dataset: 'd2' } },
     ]
     allBuckets.hits.value = [
       { bucket: 'bakta-database', node_id: 'node-2', group_id: 'g1' },

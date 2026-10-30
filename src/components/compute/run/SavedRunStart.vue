@@ -50,7 +50,7 @@ function databaseOf(entry: TesDataRefEntry): { title: string; release: string | 
   const node = arn?.nodeId ?? localNodeId.value
   const row = databases.rows.value.find((entry) => entry.bucket === bucket && entry.places.some((place) => place.nodeId === node))
   if (!row) return null
-  return { title: row.title ?? row.metadata.title ?? bucket, release: row.metadata.version ?? null }
+  return { title: row.title ?? bucket, release: row.description?.version ?? null }
 }
 const fixedRows = computed(() => fixed.value.map((entry) => ({ entry, database: databaseOf(entry) })))
 

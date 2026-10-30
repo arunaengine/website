@@ -407,11 +407,8 @@ describe('file details identifiers', () => {
     originAnswer.value = {
       content_id: 'https://w3id.org/aruna/data/abc',
       identifiers: [{ name: 'RefSeq assembly', value: 'GCF_000005845.2', url: 'https://www.ncbi.nlm.nih.gov/assembly/GCF_000005845.2', target: 'key' }],
-      bucket_metadata: {
-        database: true,
-        identifiers: [{ name: 'DOI', value: '10.5281/zenodo.4247252', url: '' }, { name: 'Accession', value: 'PRJNA1', url: '' }],
-        dataset: 'doc-1',
-      },
+      bucket_metadata: { database: true, dataset: 'doc-1' },
+      description: { identifiers: [{ name: 'DOI', value: '10.5281/zenodo.4247252', url: '' }, { name: 'Accession', value: 'PRJNA1', url: '' }] },
     }
     const { root } = await mount('general')
     originAnswer.value = null

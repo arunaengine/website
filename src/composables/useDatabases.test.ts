@@ -15,7 +15,7 @@ const { useDatabases } = await import('@/composables/useDatabases')
 function view(bucket: string, title = `${bucket} database`): BucketSearchHit {
   return {
     arn: `arn:aruna:r1:n1:s3/${bucket}`, bucket, node_id: 'n1', group_id: 'g1', created_at: '2026-10-28T00:00:00Z',
-    metadata: { database: true, title, identifiers: [] }, public: false,
+    metadata: { database: true, dataset: `d-${bucket}` }, description: { title, identifiers: [] }, public: false,
   }
 }
 

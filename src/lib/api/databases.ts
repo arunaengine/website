@@ -1,6 +1,6 @@
 // ── Bucket metadata, releases and identifier rules ──────────────────────────
-// Verified against aruna api/src/routes/storage/bucket_metadata.rs, storage/releases.rs and
-// identifiers.rs (feat/run-provenance-gaps). A database is any bucket whose metadata says
+// Verified against aruna api/src/routes/storage/bucket_metadata.rs, bucket_dataset.rs,
+// storage/releases.rs and identifiers.rs (test/debug-realm-139). A database is any bucket whose metadata says
 // `database: true`; `/search/buckets?database=true` finds them. Each call goes to the bucket's node.
 import { apiRequest, type ApiClientOptions } from './client'
 
@@ -30,33 +30,71 @@ export interface FoundIdentifier {
   target: 'key' | 'source_url'
 }
 
-/** What describes a bucket; `database` lets the portal show it as a database. */
+/**
+ * What a bucket keeps itself; `database` lets the portal show it as a database and needs `dataset`.
+ * Title, description, version, license and identifiers live only in the linked dataset.
+ */
 export interface BucketMetadata {
   database: boolean
+  parser?: IdentifierParser | null
+  /** The dataset document that describes the bucket. */
+  dataset?: string | null
+}
+
+/** What the linked dataset's root entity says now. */
+export interface DatasetDescription {
   title?: string | null
   description?: string | null
   version?: string | null
   /** A license URL or SPDX id. */
   license?: string | null
   identifiers: BucketIdentifier[]
-  parser?: IdentifierParser | null
-  /** The dataset document that describes the bucket. */
-  dataset?: string | null
+}
+
+/** A bucket's metadata with its dataset's description, or why that could not be read now. */
+export interface BucketMetadataAnswer {
+  metadata: BucketMetadata | null
+  description: DatasetDescription | null
+  description_unavailable?: string | null
 }
 
 const bucketPath = (bucket: string, rest: string) => `/data/buckets/${encodeURIComponent(bucket)}/${rest}`
 
-/** The bucket's metadata; `null` when it has none. */
-export async function getBucketMetadata(bucket: string, client: ApiClientOptions = {}, signal?: AbortSignal): Promise<BucketMetadata | null> {
-  const answer = await apiRequest<{ metadata?: BucketMetadata | null }>(bucketPath(bucket, 'metadata'), { signal }, client)
-  return answer.metadata ?? null
+function answerOf(answer: Partial<BucketMetadataAnswer>): BucketMetadataAnswer {
+  return { metadata: answer.metadata ?? null, description: answer.description ?? null, description_unavailable: answer.description_unavailable ?? null }
 }
 
-/** Replaces the bucket's metadata, or clears it with `null`. Needs admin rights on the owning group. */
-export async function putBucketMetadata(bucket: string, metadata: BucketMetadata | null, client: ApiClientOptions = {}): Promise<BucketMetadata | null> {
+/** The bucket's metadata and its dataset's description; `metadata` is `null` when it has none. */
+export async function getBucketMetadata(bucket: string, client: ApiClientOptions = {}, signal?: AbortSignal): Promise<BucketMetadataAnswer> {
+  return answerOf(await apiRequest<Partial<BucketMetadataAnswer>>(bucketPath(bucket, 'metadata'), { signal }, client))
+}
+
+/** Replaces the bucket's metadata, or clears it with `null`. Needs admin rights on the owning group and READ on the dataset. */
+export async function putBucketMetadata(bucket: string, metadata: BucketMetadata | null, client: ApiClientOptions = {}): Promise<BucketMetadataAnswer> {
   const body = JSON.stringify({ metadata })
-  const answer = await apiRequest<{ metadata?: BucketMetadata | null }>(bucketPath(bucket, 'metadata'), { method: 'PUT', body }, client)
-  return answer.metadata ?? null
+  return answerOf(await apiRequest<Partial<BucketMetadataAnswer>>(bucketPath(bucket, 'metadata'), { method: 'PUT', body }, client))
+}
+
+export interface DescribeBucketRequest {
+  title: string
+  description: string
+  version?: string | null
+  /** A license URL or SPDX id. */
+  license?: string | null
+  identifiers: BucketIdentifier[]
+  public: boolean
+}
+
+export interface DescribeBucketResponse {
+  bucket: string
+  dataset: string
+  metadata: BucketMetadata
+  description: DatasetDescription
+}
+
+/** Creates a dataset that describes the bucket and links it, in one step. */
+export function describeBucket(bucket: string, body: DescribeBucketRequest, client: ApiClientOptions = {}): Promise<DescribeBucketResponse> {
+  return apiRequest(bucketPath(bucket, 'dataset'), { method: 'POST', body: JSON.stringify(body) }, client)
 }
 
 /** A release: the exact version of its tagged release file. */

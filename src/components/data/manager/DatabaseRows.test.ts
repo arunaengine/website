@@ -34,7 +34,8 @@ function row(bucket: string, extra: Partial<Databases.DatabaseRow> = {}): Databa
   return {
     datasetId: `d-${bucket}`, bucket, ownerGroup: 'g1', title: `${bucket} title`, public: false,
     target: { kind: 'ordinary', node_id: 'n1', bucket }, places: [{ bucket, nodeId: 'n1' }],
-    metadata: { database: true, identifiers: [] },
+    description: null,
+    metadata: { database: true, dataset: `d-${bucket}` },
     ...extra,
   }
 }

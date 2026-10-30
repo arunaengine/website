@@ -140,8 +140,8 @@ function databaseOf(name: string, nodeId: string | null): { title: string } | nu
   const row = databases.rows.value.find((entry) => entry.bucket === name && entry.places.some((place) => place.nodeId === node))
   if (!row) return null
   // The description line names the version too, unless the title already does.
-  const title = row.title ?? row.metadata.title ?? name
-  const version = row.metadata.version?.trim()
+  const title = row.title ?? name
+  const version = row.description?.version?.trim()
   return { title: version && !title.includes(version) ? `${title} ${version}` : title }
 }
 

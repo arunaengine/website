@@ -161,7 +161,8 @@ describe('provenance view', () => {
       if (id === tarball) return origin({ origin: { kind: 'source' } as never, source: { url: 'https://zenodo.org/records/14916843' } as never })
       return origin({
         origin: { kind: 'job', run_id: 'prep' },
-        bucket_metadata: { database: true, title: 'Bakta database (light)' } as never,
+        bucket_metadata: { database: true, dataset: 'd1' },
+        description: { title: 'Bakta database (light)', identifiers: [] },
         releases: [{ crate_version: 'cv-6', label: '6.0 light', upstream: [{ name: 'DOI', value: '10.5281/zenodo.14916843', url: 'https://doi.org/10.5281/zenodo.14916843' }] }] as never,
       })
     })
@@ -203,7 +204,7 @@ describe('provenance view', () => {
       : { '@graph': [{ '@id': '#prep', '@type': 'CreateAction', name: 'Prepare' }] })
     aruna.getVersionOrigin.mockImplementation(async (id: string) => origin({
       origin: { kind: 'job', run_id: id.includes('/out@') ? 'r1' : 'prep' },
-      ...(id.includes('/out@') ? {} : { bucket_metadata: { database: true, title: 'Bakta database (light)' } as never, releases: [{ crate_version: 'cv', label: '6.0 light', upstream: [] }] as never }),
+      ...(id.includes('/out@') ? {} : { bucket_metadata: { database: true, dataset: 'd1' }, description: { title: 'Bakta database (light)', identifiers: [] }, releases: [{ crate_version: 'cv', label: '6.0 light', upstream: [] }] as never }),
     }))
     const start = { kind: 'dataset', documentId: '01M63099Q2000108CB51QQDB2P', title: 'Bakta run', crate: { '@graph': [...dbFiles, result] } }
     const { root } = await mountApp(component, { props: { start } })

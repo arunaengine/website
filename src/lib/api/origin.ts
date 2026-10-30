@@ -3,7 +3,7 @@
 // The server sets the origin when it mints the version and never changes it. A sync adds a hop.
 // Readers of the file see the full record; `projection` is what a dataset may say about it.
 import { apiRequest, type ApiClientOptions } from './client'
-import type { BucketIdentifier, BucketMetadata } from './databases'
+import type { BucketIdentifier, BucketMetadata, DatasetDescription } from './databases'
 
 export type OriginBody =
   /** Uploaded directly; the uploader is `created_by`. */
@@ -68,6 +68,8 @@ export interface OriginResponse {
   projection: OriginProjection[]
   /** The bucket's metadata now; it may differ from when the file was made. */
   bucket_metadata?: BucketMetadata | null
+  /** What the bucket's linked dataset says now; null while it cannot be read. */
+  description?: DatasetDescription | null
   identifiers?: OriginIdentifier[]
   /** The content id of the stored bytes; absent for references. */
   content_id?: string | null

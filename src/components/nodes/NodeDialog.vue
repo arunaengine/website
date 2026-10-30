@@ -171,7 +171,7 @@ watch(currentUser, (user) => {
 // A database by the realm's database list, as the Data view's bucket list finds it.
 const databaseOf = (hit: BucketSearchHit) => {
   const row = databases.rows.value.find((entry) => entry.bucket === hit.bucket && entry.places.some((place) => place.nodeId === hit.node_id))
-  return row ? { title: row.title ?? row.metadata.title ?? null } : null
+  return row ? { title: row.title ?? null } : null
 }
 const usage = useListedUsage()
 const usageNode = (hit: BucketSearchHit) => (isLocalNode(hit.node_id) ? null : hit.node_id)

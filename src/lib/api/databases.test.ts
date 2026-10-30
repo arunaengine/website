@@ -25,14 +25,14 @@ describe('bucket metadata requests', () => {
   it('reads and writes the metadata of a bucket', async () => {
     const calls = stubFetch({ bucket: 'bakta db', metadata: null })
 
-    expect(await getBucketMetadata('bakta db', client)).toBeNull()
-    await putBucketMetadata('bakta db', { database: true, identifiers: [] }, client)
+    expect(await getBucketMetadata('bakta db', client)).toEqual({ metadata: null, description: null, description_unavailable: null })
+    await putBucketMetadata('bakta db', { database: true, dataset: 'd1' }, client)
 
     expect(calls.map((call) => [call.method, new URL(call.url).pathname])).toEqual([
       ['GET', '/api/v1/data/buckets/bakta%20db/metadata'],
       ['PUT', '/api/v1/data/buckets/bakta%20db/metadata'],
     ])
-    expect(calls[1].body).toEqual({ metadata: { database: true, identifiers: [] } })
+    expect(calls[1].body).toEqual({ metadata: { database: true, dataset: 'd1' } })
   })
 
   it('publishes a release of a folder', async () => {

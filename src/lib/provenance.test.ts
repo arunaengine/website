@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { ApiError, type OriginResponse } from '@/lib/api'
 import { bucketOf, chainColumns, dataParts, drawnChain, emptyGraph, expand, expandAll, hasPending, intoRecord, runInputs, runRecordDetail, startDataset, startFile, type Box, type Readers } from './provenance'
 
-const bakrep = { database: true, title: 'BakRep', dataset: 'd1', identifiers: [] }
+const bakrep = { database: true, dataset: 'd1' }
+// The title comes from the dataset the bucket links.
+const described = { title: 'BakRep', identifiers: [] }
 
 const arn = (key: string, version: string) => `https://w3id.org/aruna/data/arn:aruna:realm:node:s3/lab/${key}@${version}`
 const V1 = '01K8W1B3D5F7H9KMQ1S3V5X7Z1'
@@ -45,7 +47,7 @@ describe('provenance graph', () => {
     const found = [{ name: 'BioSample', value: 'SAMN1', url: 'https://x.org/SAMN1', target: 'key' as const }]
     const read = readers(
       {
-        [arn('a.faa', V1)]: origin({ origin: { kind: 'source' }, bucket_metadata: bakrep, identifiers: found }),
+        [arn('a.faa', V1)]: origin({ origin: { kind: 'source' }, bucket_metadata: bakrep, description: described, identifiers: found }),
         [arn('b.faa', V2)]: origin({ origin: { kind: 'upload', node_id: 'n1' } }),
       },
       runCrate,
@@ -204,7 +206,7 @@ describe('provenance graph', () => {
 
   it('keeps identifiers on each file, not on their shared database', async () => {
     const found = (value: string) => [{ name: 'BioSample', value, url: `https://x.org/${value}`, target: 'key' as const }]
-    const from = (value: string) => origin({ origin: { kind: 'source' }, bucket_metadata: bakrep, identifiers: found(value) })
+    const from = (value: string) => origin({ origin: { kind: 'source' }, bucket_metadata: bakrep, description: described, identifiers: found(value) })
     const read = readers({ [arn('a.faa', V1)]: from('SAMN1'), [arn('b.faa', V2)]: from('SAMN2') }, runCrate)
     const graph = emptyGraph()
     startFile(graph, arn('out.tsv', V1), 'out.tsv', origin({ origin: { kind: 'job', run_id: 'r1' } }))
@@ -217,7 +219,7 @@ describe('provenance graph', () => {
 
   it('keeps databases of different buckets apart, also with the same or no title', async () => {
     const other = (key: string, version: string) => arn(key, version).replace('s3/lab/', 's3/other/')
-    const untitled = { database: true, identifiers: [] }
+    const untitled = { database: true, dataset: 'd2' }
     const stored = { '@graph': [
       { '@id': '#a', '@type': 'File', name: 'a', contentUrl: arn('a', V1) },
       { '@id': '#b', '@type': 'File', name: 'b', contentUrl: other('b', V2) },
@@ -251,7 +253,8 @@ describe('provenance graph', () => {
     const doi = { name: 'DOI', value: '10.5281/zenodo.4247252', url: 'https://doi.org/10.5281/zenodo.4247252' }
     const pinned = emptyGraph()
     startFile(pinned, arn('a', V1), 'a', origin({
-      bucket_metadata: { ...bakrep, title: 'Bakta database' },
+      bucket_metadata: bakrep,
+      description: { title: 'Bakta database', identifiers: [] },
       releases: [{ crate_version: 'rv1', label: '6.0', upstream: [doi] }],
       releases_complete: true,
     }))

@@ -1,6 +1,6 @@
 // What the portal shows of the realm's databases: buckets whose metadata says `database: true`,
 // found with the bucket search. Every member of a distributed bucket answers its own hit.
-import type { BucketIdentifier, BucketMetadata, BucketSearchHit } from '@/lib/api'
+import type { BucketIdentifier, BucketMetadata, BucketSearchHit, DatasetDescription } from '@/lib/api'
 
 export type DatabaseTarget =
   | { kind: 'distributed'; set_id: string }
@@ -17,7 +17,10 @@ export interface DatabaseRow {
   target: DatabaseTarget
   /** Each node that answered for the bucket; one per member of a distributed bucket. */
   places: DatabasePlace[]
+  /** The dataset's title; null while the dataset cannot be read. */
   title: string | null
+  /** What the dataset that describes the bucket says now. */
+  description: DatasetDescription | null
   /** The dataset that describes the bucket, when one is named. */
   datasetId: string | null
   /** Anyone may read the bucket, also without a login. */
@@ -56,7 +59,8 @@ export function rowsOf(hits: readonly BucketSearchHit[]): DatabaseRow[] {
       ownerGroup: hit.group_id,
       target,
       places: [place],
-      title: hit.metadata.title ?? null,
+      title: hit.description?.title ?? null,
+      description: hit.description ?? null,
       datasetId: hit.metadata.dataset ?? null,
       public: hit.public ?? false,
       metadata: hit.metadata,
@@ -113,3 +117,10 @@ export function withPage(identifiers: readonly BucketIdentifier[], text: string)
 /** The "DOI or link" field's text for stored identifiers. */
 export const pageText = (identifiers: readonly BucketIdentifier[]) =>
   identifiers.find((item) => item.name === 'DOI' || item.name === 'Link')?.value ?? ''
+
+const DATASET_ID = /(?:^|[/:])([0-9A-HJKMNP-TV-Z]{26})(?:[/?#]|$)/i
+
+/** The dataset id a typed id or dataset link names, such as a w3id or a portal link; else null. */
+export function datasetIdOf(text: string): string | null {
+  return DATASET_ID.exec(text.trim())?.[1]?.toUpperCase() ?? null
+}

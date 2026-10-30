@@ -317,7 +317,7 @@ const identifierRows = computed(() => {
   return [
     { key: 'file-ids', label: 'Identifiers', entries: entries(answer?.content_id ? [{ name: 'Content id', value: answer.content_id, url: answer.content_id }] : []), dataset: null },
     { key: 'record-ids', label: 'Record', entries: entries(answer?.identifiers ?? []), dataset: null },
-    { key: 'dataset-ids', label: 'Dataset', entries: entries(bucket?.identifiers ?? []), dataset: bucket?.dataset ?? null },
+    { key: 'dataset-ids', label: 'Dataset', entries: entries(answer?.description?.identifiers ?? []), dataset: bucket?.dataset ?? null },
   ].filter((row) => row.entries.length || row.dataset)
 })
 // Label above value; a fact the node did not give is left out, never shown as unknown.
