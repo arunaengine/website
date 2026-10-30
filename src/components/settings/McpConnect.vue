@@ -2,6 +2,7 @@
 // Connect an outside MCP client to this node in three steps: pick the client,
 // mint the session it authenticates with, paste the snippet. The token is
 // shown once, exactly like an S3 secret.
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import { computed, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
@@ -51,16 +52,9 @@ async function mint() {
 </script>
 
 <template>
-  <section data-tour="assistant-mcp" class="surface overflow-hidden">
-    <header class="border-b border-border px-5 py-4">
-      <div class="flex items-center gap-2">
-        <Plug class="h-4 w-4 text-primary" />
-        <h3 class="font-display text-sm font-semibold text-aruna-navy">Connect an MCP client</h3>
-      </div>
-      <p class="text-xs text-muted-foreground">
-        Point an AI client at this node's MCP endpoint. The client gets its own session, listed and revocable under Sessions.
-      </p>
-    </header>
+  <section data-tour="assistant-mcp" aria-labelledby="mcp-heading">
+    <SectionHeading id="mcp-heading" title="Connect an MCP client" :icon="Plug" :level="3" info="Point an AI client at this node's MCP endpoint. Its session is listed under Access." />
+    <div class="surface overflow-hidden">
 
     <div class="border-b border-border px-5 py-3">
       <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">MCP endpoint</div>
@@ -137,5 +131,6 @@ async function mint() {
         </div>
       </li>
     </ol>
+    </div>
   </section>
 </template>

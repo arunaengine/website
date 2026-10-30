@@ -11,6 +11,7 @@ import { homeRealmLabel } from '@/composables/useFederation'
 import { linkFailure, removeLogin, setPendingLink } from '@/composables/useLinking'
 import { knownRealm } from '@/lib/federation/realms'
 import { Link2 } from '@lucide/vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 
 const { currentUser, userInfo, realm, apiBaseUrl } = useAruna()
 const { signIn } = useAuth()
@@ -48,12 +49,9 @@ function linkHere() {
 </script>
 
 <template>
-  <section class="surface overflow-hidden" aria-labelledby="linked-logins-title">
-    <header class="border-b border-border px-5 py-4">
-      <h3 id="linked-logins-title" class="flex items-center gap-2 font-display text-sm font-semibold text-aruna-navy">
-        <Link2 class="h-4 w-4 text-primary" /> Linked logins
-      </h3>
-    </header>
+  <section aria-labelledby="linked-logins-title">
+    <SectionHeading id="linked-logins-title" title="Linked logins" :icon="Link2" info="Removing a login ends its open sessions." />
+    <div class="surface overflow-hidden">
     <div v-if="foreign" class="flex flex-wrap items-center justify-between gap-3 p-5">
       <p class="text-sm text-muted-foreground">Have an account here too? Log in to link it.</p>
       <Button size="sm" @click="linkHere">Link to my account here</Button>
@@ -67,8 +65,6 @@ function linkHere() {
       </li>
     </ul>
     <Notice v-if="failure" tone="error" class="mx-5 mb-3">{{ failure }}</Notice>
-    <footer v-if="!foreign && logins.length" class="border-t border-border bg-muted/30 px-5 py-2.5 text-xs text-muted-foreground">
-      Removing it ends its open sessions.
-    </footer>
+    </div>
   </section>
 </template>

@@ -91,6 +91,7 @@ const LinkStub = defineComponent({
 const AssistantProviders = compileClientComponent(new URL('./AssistantProviders.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': icons,
+  '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent({ props: { info: String }, setup: (p, { slots }) => () => h('div', [p.info, slots.actions?.()]) })),
   '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Dialog.vue': moduleDefault(DialogStub),

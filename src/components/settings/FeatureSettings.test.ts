@@ -43,6 +43,8 @@ beforeAll(async () => {
   FeatureSettings = compileClientComponent(new URL('./FeatureSettings.vue', import.meta.url), {
     vue: VueRuntime,
     '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+    '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent((_, { slots }) => () => h('div', slots.actions?.()))),
+    '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => null) }),
     '@/components/ui/Switch.vue': moduleDefault(SwitchStub),
     '@/composables/useAruna': { useAruna: () => aruna },
     '@/composables/usePortalFeatures': composable,

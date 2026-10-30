@@ -1,6 +1,8 @@
 <script setup lang="ts">
 // The passphrase that seals provider keys on this node: create it, unlock the
 // keys here, change the passphrase, lock them again, or reset and start over.
+import { Lock } from '@lucide/vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import { computed, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -81,15 +83,9 @@ async function confirmReset() {
 </script>
 
 <template>
-  <section data-tour="vault-settings" class="surface overflow-hidden">
-    <header class="border-b border-border px-5 py-4">
-      <h3 class="font-display text-sm font-semibold text-aruna-navy">Your vault on this node</h3>
-      <p class="text-xs text-muted-foreground">Holds your provider keys and bucket keys. Lock it when you are done.</p>
-      <p class="text-xs text-muted-foreground">
-        A provider key kept on this node is sealed with a passphrase only you know. The node stores what it
-        cannot read, and the key follows you to other browsers.
-      </p>
-    </header>
+  <section data-tour="vault-settings" aria-labelledby="vault-heading">
+    <SectionHeading id="vault-heading" title="Your vault on this node" :icon="Lock" :level="3" info="Holds your provider and bucket keys, sealed with a passphrase only you know. Lock it when you are done." />
+    <div class="surface overflow-hidden">
     <div class="px-5 py-4">
       <VaultRecoveryCode class="mb-4" />
       <Notice v-if="error" tone="error">The provider keys on this node could not be read: {{ error }}</Notice>
@@ -199,5 +195,6 @@ async function confirmReset() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </div>
   </section>
 </template>

@@ -361,9 +361,7 @@ const createGroupOpen = ref(false)
       </TabsContent>
 
       <TabsContent value="devices" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-8 py-6">
-        <section class="surface overflow-hidden">
-          <DevicesPanel />
-        </section>
+        <DevicesPanel />
       </TabsContent>
 
       <TabsContent value="profile" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-8 py-6">

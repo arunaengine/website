@@ -76,7 +76,7 @@ describe('devices panel', () => {
     // Without a realm record its contact is not known, which is not the same as offline.
     expect(rendered).toContain('unknown')
     expect(rendered).not.toContain('offline')
-    expect(rendered).toContain('pending')
+    expect(rendered).toContain('Pending')
     expect(rendered).toContain('Remove')
   })
 
@@ -94,7 +94,7 @@ describe('devices panel', () => {
     deviceLimit.value = 2
 
     const rendered = await text()
-    expect(rendered).toContain('expired')
+    expect(rendered).toContain('Expired')
     expect(rendered).toContain('1 of 2 devices')
   })
 
@@ -106,8 +106,8 @@ describe('devices panel', () => {
     const rendered = await text()
 
     expect(rendered).toContain('Name Status Last seen')
-    expect(rendered).toContain('Microbiology laptop 73ea340a online 2m ago')
-    expect(rendered).toContain('enr-9abc pending unknown')
+    expect(rendered).toContain('Microbiology laptop 73ea340a Online 2m ago')
+    expect(rendered).toContain('enr-9abc Pending unknown')
   })
 
   it('reads a device the realm has seen as online, and one without contact as unknown', async () => {
@@ -120,8 +120,8 @@ describe('devices panel', () => {
     devices.value = [device({ id: 'seen1234abcd', node_id: 'seen1234abcd' }), device({ id: 'quiet234abcd', node_id: 'quiet234abcd' })]
     const rendered = await text()
 
-    expect(rendered).toContain('seen1234 online 5m ago')
-    expect(rendered).toContain('quiet234 unknown unknown')
+    expect(rendered).toContain('seen1234 Online 5m ago')
+    expect(rendered).toContain('quiet234 Unknown unknown')
     expect(rendered).not.toContain('offline')
   })
 
@@ -130,7 +130,7 @@ describe('devices panel', () => {
     devices.value = [device({ id: '73ea340a1234', node_id: '73ea340a1234' })]
     const rendered = await text()
 
-    expect(rendered).toContain('Lab laptop 73ea340a online')
+    expect(rendered).toContain('Lab laptop 73ea340a Online')
     expect(rendered).not.toContain('Microbiology laptop')
   })
 
@@ -148,9 +148,9 @@ describe('devices panel', () => {
     devices.value = [device({ id: '73ea340a1234', node_id: '73ea340a1234' }), device({ id: '5b1c9d2e7777', node_id: '5b1c9d2e7777' })]
     const rendered = await text()
 
-    expect(rendered).toContain('Device 73ea340a online')
+    expect(rendered).toContain('Device 73ea340a Online')
     // Not listed by the realm yet: still a device, never a bare id.
-    expect(rendered).toContain('Device 5b1c9d2e unknown')
+    expect(rendered).toContain('Device 5b1c9d2e Unknown')
   })
 
   it('says the realm caps nothing when it does not', async () => {

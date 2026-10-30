@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ToggleRight } from '@lucide/vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Button from '@/components/ui/Button.vue'
 import Switch from '@/components/ui/Switch.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -16,14 +18,12 @@ const groups = FEATURE_GROUPS.map((group) => ({
 </script>
 
 <template>
-  <section class="surface">
-    <header class="border-b border-border px-5 py-4">
-      <h3 class="font-display text-sm font-semibold text-aruna-navy">Features</h3>
-      <p class="text-xs text-muted-foreground">Show or hide parts of the portal. Hidden features keep working.</p>
-    </header>
+  <section aria-labelledby="features-heading">
+    <SectionHeading id="features-heading" title="Features" :icon="ToggleRight" :level="3" info="Show or hide parts of the portal. Hidden features keep working." />
+    <div class="surface">
     <div class="space-y-5 p-5">
       <div v-for="group in groups" :key="group.label">
-        <h4 class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{{ group.label }}</h4>
+        <h4 class="text-xs font-medium text-muted-foreground">{{ group.label }}</h4>
         <ul class="mt-1 divide-y divide-border">
           <li v-for="info in group.features" :key="info.key" class="flex items-center gap-4 py-2.5">
             <div class="min-w-0 flex-1">
@@ -48,6 +48,7 @@ const groups = FEATURE_GROUPS.map((group) => ({
           </li>
         </ul>
       </div>
+    </div>
     </div>
   </section>
 </template>

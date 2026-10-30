@@ -55,7 +55,8 @@ const S3SessionsPanel = compileClientComponent(new URL('./S3SessionsPanel.vue', 
   '@/components/ui/RefusalNote.vue': moduleDefault(NoteStub),
   '@/components/ui/Badge.vue': moduleDefault(defineComponent((_, { slots }) => () => h('span', slots.default?.()))),
   '@/components/data/CreateCredentialDialog.vue': moduleDefault(DialogStub),
-  'vue-router': { useRoute: () => ({ query: routeQuery.value }) },
+  'vue-router': { RouterLink: defineComponent((_, { slots }) => () => h('a', slots.default?.())), useRoute: () => ({ query: routeQuery.value }) },
+  '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent((_, { slots }) => () => h('div', slots.actions?.()))),
   '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => null) }),
   '@/composables/useAruna': { useAruna: () => aruna, isUnsupportedEndpoint },
   '@/lib/api': Api,
@@ -92,7 +93,7 @@ describe('S3SessionsPanel', () => {
     const parent = all.find((node) => node.children.includes(table))!
 
     expect(String(parent.props.class)).toContain('overflow-x-auto')
-    expect(String(all.find((node) => node.tag === 'section')!.props.class)).toContain('overflow-hidden')
+    expect(String(all.find((node) => node.children.includes(parent))!.props.class)).toContain('overflow-hidden')
   })
 
   it('lists a session with its key, group and expiry', async () => {
@@ -130,7 +131,6 @@ describe('S3SessionsPanel', () => {
     await vi.waitFor(() => expect(content(root)).toContain('AK1'))
     const text = content(root)
 
-    expect(text).toContain('Keys for command-line tools. A secret is shown once.')
     expect(text).toMatch(/LONG1\s*Genomics\s*Key/)
     expect(text).toMatch(/AK1\s*Genomics\s*Temporary/)
     await click(button(root, 'Revoke'))

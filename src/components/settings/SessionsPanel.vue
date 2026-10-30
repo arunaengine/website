@@ -2,7 +2,8 @@
 // Every bearer this account holds, listed by the session it is bound to.
 // Revoking the session this browser is using ends the sign-in as well.
 import { computed, ref, watch } from 'vue'
-import Badge from '@/components/ui/Badge.vue'
+import { LogIn } from '@lucide/vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
@@ -55,13 +56,9 @@ async function confirmRevoke(session: UserSession) {
 </script>
 
 <template>
-  <section class="surface overflow-hidden">
-    <header class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-      <div class="min-w-0">
-        <h3 class="font-display text-sm font-semibold text-aruna-navy">Sign-ins</h3>
-        <p class="text-xs text-muted-foreground">Where your account is signed in. Revoke one to sign it out everywhere.</p>
-      </div>
-      <div class="flex items-center gap-2">
+  <section aria-labelledby="sign-ins-heading">
+    <SectionHeading id="sign-ins-heading" title="Sign-ins" :icon="LogIn" :level="3" info="Where your account is signed in. Revoke one to sign it out everywhere.">
+      <template #actions>
         <template v-if="others.length">
           <template v-if="confirmingOthers">
             <span class="text-[11px] text-muted-foreground">Sign out {{ others.length }} other {{ others.length === 1 ? 'sign-in' : 'sign-ins' }}?</span>
@@ -71,15 +68,16 @@ async function confirmRevoke(session: UserSession) {
           <Button v-else variant="outline" size="sm" :disabled="!listed || loading" @click="confirmingOthers = true">Sign out all others</Button>
         </template>
         <RefreshButton :busy="loading" sr-label="Refresh sign-ins" @click="load" />
-      </div>
-    </header>
+      </template>
+    </SectionHeading>
+    <div class="surface overflow-hidden">
 
     <p v-if="!currentUser" class="px-5 py-6 text-xs text-muted-foreground">Sign in to see where you are signed in.</p>
     <template v-else>
       <RefusalNote v-if="error" :message="error" class="mx-5 mt-4" />
       <div class="min-w-0 overflow-x-auto">
-        <table class="w-full min-w-max text-sm">
-          <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground">
+        <table class="data-table min-w-max">
+          <thead>
             <tr>
               <th class="px-5 py-2 text-left font-semibold">Where</th>
               <th class="px-5 py-2 text-left font-semibold">Signed in</th>
@@ -91,7 +89,7 @@ async function confirmRevoke(session: UserSession) {
             <tr v-for="session in rows" :key="session.session_id" class="border-t border-border">
               <td class="px-5 py-2.5 text-[12px] text-foreground" :title="[session.label, session.session_id].filter(Boolean).join(', ')">
                 {{ SESSION_KIND_LABELS[session.kind] }}
-                <Badge v-if="session.current" size="sm" variant="accent" class="ml-1.5">this browser</Badge>
+                <span v-if="session.current" class="ml-1.5 text-muted-foreground">(this browser)</span>
               </td>
               <td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="new Date(session.created_at).toLocaleString()">
                 {{ relativeTime(session.created_at) }}
@@ -140,5 +138,6 @@ async function confirmRevoke(session: UserSession) {
         <Button variant="ghost" size="sm" @click="all = !all">{{ all ? `Show the newest ${SHOWN}` : `Show all ${sorted.length}` }}</Button>
       </div>
     </template>
+    </div>
   </section>
 </template>

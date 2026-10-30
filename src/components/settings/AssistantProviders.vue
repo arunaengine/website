@@ -2,6 +2,7 @@
 // Every configured provider in one list: the keys of this browser session, the
 // keys sealed on the node, and the sign-ins the node keeps. Adding and editing
 // happen in one dialog; a key can be moved between the session and the node.
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
@@ -32,7 +33,7 @@ import { apiBaseUrl, authToken } from '@/composables/aruna/state'
 import { testAssistantProvider, type AssistantProvider } from '@/lib/api'
 import { toneVariant } from '@/lib/stateBadge'
 import { errorMessage } from '@/lib/utils'
-import { Check, HardDrive, MoreHorizontal, Pencil, Plug2, Plus, Star, Trash2 } from '@lucide/vue'
+import { Check, HardDrive, Lock, MoreHorizontal, Pencil, Plug2, Plus, Sparkles, Star, Trash2 } from '@lucide/vue'
 
 const { currentUser, sessionEpoch } = useAruna()
 const { providers, loading, error, load, remove, check, direct, storageOf, move } = useAssistantProviders()
@@ -159,28 +160,27 @@ async function confirmRemove() {
 </script>
 
 <template>
-  <section data-tour="assistant-providers" class="surface overflow-hidden">
-    <header class="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
-      <div class="min-w-0">
-        <h3 class="font-display text-sm font-semibold text-aruna-navy">Providers</h3>
-        <p class="text-xs text-muted-foreground">
-          {{ nodeKeeps
-            ? 'API keys stay in this browser session, or on this node sealed with your passphrase. A ChatGPT sign-in is kept by the node.'
-            : 'API keys stay in this browser tab and are never sent to Aruna; a ChatGPT sign-in is kept by the node.' }}
-          <RouterLink
-            v-if="nodeKeeps"
-            :to="{ name: 'settings', query: { tab: 'keys' } }"
-            class="text-primary hover:underline"
-          >Manage the passphrase under Vault.</RouterLink>
-        </p>
-      </div>
-      <div class="flex shrink-0 items-center gap-2">
+  <section data-tour="assistant-providers" aria-labelledby="providers-heading">
+    <SectionHeading
+      id="providers-heading"
+      title="Providers"
+      :icon="Sparkles"
+      :level="3"
+      :info="nodeKeeps
+        ? 'API keys stay in this browser session, or on this node sealed with your passphrase. A ChatGPT sign-in is kept by the node.'
+        : 'API keys stay in this browser tab and are never sent to Aruna; a ChatGPT sign-in is kept by the node.'"
+    >
+      <template #actions>
         <RefreshButton :busy="loading" sr-label="Refresh providers" @click="load" />
-        <Button size="sm" :disabled="!currentUser" @click="add">
+        <Button v-if="nodeKeeps" variant="outline" size="sm" as-child>
+          <RouterLink :to="{ name: 'settings', query: { tab: 'keys' } }"><Lock class="size-3.5" /> Vault</RouterLink>
+        </Button>
+        <Button variant="outline" size="sm" :disabled="!currentUser" @click="add">
           <Plus class="size-3.5" /> Add provider
         </Button>
-      </div>
-    </header>
+      </template>
+    </SectionHeading>
+    <div class="surface overflow-hidden">
 
     <EmptyState v-if="!currentUser" compact title="Sign in to configure a provider." class="m-5" />
     <template v-else>
@@ -307,5 +307,6 @@ async function confirmRemove() {
         <VaultGate @done="finishMove" />
       </DialogContent>
     </Dialog>
+    </div>
   </section>
 </template>

@@ -16,7 +16,9 @@ import {
   type S3SessionSummary,
 } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
-import { KeyRound, Plus } from '@lucide/vue'
+import { RouterLink } from 'vue-router'
+import { Eye, EyeOff, KeyRound, Plus } from '@lucide/vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 
 /** `keys`: also list and create the long-lived keys (the desktop lists them elsewhere). */
 const props = withDefaults(defineProps<{ keys?: boolean }>(), { keys: true })
@@ -106,30 +108,24 @@ async function revoke(row: KeyRow) {
 </script>
 
 <template>
-  <section v-if="keys || !unsupported" class="surface overflow-hidden">
-    <header class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-      <div class="min-w-0">
-        <h3 class="flex items-center gap-2 font-display text-sm font-semibold text-aruna-navy"><KeyRound class="h-4 w-4 text-primary" /> S3 access keys</h3>
-        <p class="text-xs text-muted-foreground">Keys for command-line tools. A secret is shown once.</p>
-      </div>
-      <div class="flex items-center gap-2">
-        <button
-          v-if="inactiveCount"
-          type="button"
-          class="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
-          @click="showInactive = !showInactive"
-        >{{ showInactive ? 'Hide inactive' : `Show inactive (${inactiveCount})` }}</button>
+  <section v-if="keys || !unsupported" aria-labelledby="s3-keys-heading">
+    <SectionHeading id="s3-keys-heading" title="S3 access keys" :icon="KeyRound" :level="3" info="Keys for command-line tools. A secret is shown once.">
+      <template #actions>
+        <Button v-if="inactiveCount" variant="outline" size="sm" @click="showInactive = !showInactive">
+          <component :is="showInactive ? EyeOff : Eye" class="h-3.5 w-3.5" /> {{ showInactive ? 'Hide inactive' : `Show inactive (${inactiveCount})` }}
+        </Button>
         <RefreshButton :busy="loading" sr-label="Refresh S3 access keys" @click="load" />
-        <Button v-if="keys" size="sm" :disabled="!currentUser" @click="createOpen = true"><Plus class="h-4 w-4" /> Create key</Button>
-      </div>
-    </header>
+        <Button v-if="keys" variant="outline" size="sm" :disabled="!currentUser" @click="createOpen = true"><Plus class="h-3.5 w-3.5" /> Create key</Button>
+      </template>
+    </SectionHeading>
+    <div class="surface overflow-hidden">
 
     <p v-if="!currentUser" class="px-5 py-6 text-xs text-muted-foreground">Sign in to see your S3 access keys.</p>
     <template v-else>
       <RefusalNote v-if="error" :message="error" class="mx-5 mt-4" />
       <div class="min-w-0 overflow-x-auto">
-        <table class="w-full min-w-max text-sm">
-          <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground">
+        <table class="data-table min-w-max">
+          <thead>
             <tr>
               <th class="px-5 py-2 text-left font-semibold">Access key</th>
               <th class="px-5 py-2 text-left font-semibold">Group</th>
@@ -141,7 +137,10 @@ async function revoke(row: KeyRow) {
           <tbody>
             <tr v-for="row in rows" :key="`${row.kind}/${row.id}`" class="border-t border-border">
               <td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ row.id }}</td>
-              <td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="row.groupId">{{ row.group }}</td>
+              <td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="row.groupId">
+                <RouterLink v-if="row.groupId" :to="{ name: 'group', params: { id: row.groupId } }" class="hover:text-foreground hover:underline">{{ row.group }}</RouterLink>
+                <template v-else>{{ row.group }}</template>
+              </td>
               <td class="px-5 py-2.5 text-[11px] text-muted-foreground">
                 {{ row.kind }}
                 <Badge v-if="row.status !== 'active'" size="sm" :variant="row.status === 'revoked' ? 'destructive' : 'secondary'" class="ml-1.5">{{ row.status }}</Badge>
@@ -169,6 +168,7 @@ async function revoke(row: KeyRow) {
         </table>
       </div>
     </template>
+    </div>
     <CreateCredentialDialog v-if="keys" v-model:open="createOpen" />
   </section>
 </template>

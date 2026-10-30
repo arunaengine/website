@@ -34,7 +34,8 @@ const EmptyStub = defineComponent(() => () => null)
 
 const SessionsPanel = compileClientComponent(new URL('./SessionsPanel.vue', import.meta.url), {
   vue: VueRuntime,
-  '@/components/ui/Badge.vue': moduleDefault(SpanStub),
+  '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent((_, { slots }) => () => h('div', slots.actions?.()))),
+  '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => null) }),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/RefreshButton.vue': moduleDefault(ButtonStub),
   '@/components/ui/RefusalNote.vue': moduleDefault(EmptyStub),

@@ -59,6 +59,8 @@ const NoteStub = defineComponent({ props: { action: String }, setup: (props) => 
 const VaultSettings = compileClientComponent(new URL('./VaultSettings.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/Badge.vue': moduleDefault(Passthrough),
+  '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent((_, { slots }) => () => h('div', slots.actions?.()))),
+  '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => null) }),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Dialog.vue': moduleDefault(DialogStub),
   '@/components/ui/DialogContent.vue': moduleDefault(Passthrough),
