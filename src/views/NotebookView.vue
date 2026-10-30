@@ -32,7 +32,7 @@ import { activeGroupId } from '@/composables/useGroupSelection'
 import { useNotebookLocation } from '@/composables/useNotebookLocation'
 import { SESSION_RUNTIMES } from '@/lib/notebook/runtimes'
 import { errorMessage, relativeTime } from '@/lib/utils'
-import { ArrowLeft, FileText, Lock, Unlock, PanelLeft, Plus, Save } from '@lucide/vue'
+import { ArrowLeft, FileText, Lock, Package, Unlock, PanelLeft, Plus, Save } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -42,6 +42,7 @@ const { tesEnabled } = useTes()
 
 const bucket = computed(() => String(route.params.bucketId ?? ''))
 const key = computed(() => String(route.params.key ?? ''))
+const routeGroup = computed(() => (typeof route.query.group === 'string' ? route.query.group : activeGroupId.value) || undefined)
 
 const notebook = createNotebook(bucket, key, () => ({
   runtime: typeof route.query.runtime === 'string' ? route.query.runtime : SESSION_RUNTIMES[0].id,
@@ -203,7 +204,17 @@ const savedLabel = computed(() => {
 
 <template>
   <div>
-    <PageHeader eyebrow="Notebooks" :title="notebook.name.value || 'Notebook'" :docs="{ topic: 'notebooks', section: 'The session bar' }">
+    <PageHeader
+      :title="notebook.name.value || 'Notebook'"
+      :crumbs="[{ label: bucket, to: { name: 'bucket', params: { bucketId: bucket }, query: { group: routeGroup } } }, { label: notebook.name.value || 'Notebook' }]"
+      :docs="{ topic: 'notebooks', section: 'The session bar' }"
+    >
+      <template #description>
+        <span class="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <RouterLink :to="{ name: 'bucket', params: { bucketId: bucket }, query: { group: routeGroup } }" class="inline-flex items-center gap-1.5 hover:text-foreground hover:underline"><Package class="size-4" />{{ bucket }}</RouterLink>
+          <span class="inline-flex min-w-0 items-center gap-1.5 font-mono text-xs" :title="key"><FileText class="size-4 shrink-0" /><span class="truncate">{{ key }}</span></span>
+        </span>
+      </template>
       <template #actions>
         <AskAiButton size="default" prompt="Help me with this notebook." :subject="assistantSubject" />
         <Button variant="outline" size="default" as-child>
