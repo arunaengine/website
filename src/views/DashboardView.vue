@@ -427,7 +427,7 @@ const pageDescription = computed(() =>
         <GroupQuotaCards :refresh-revision="cardsRevision" :view="groupView" />
       </section>
 
-      <!-- The topology on the left, the table on the right; both open a node's page. -->
+      <!-- The topology on the left, the table on the right; both open a node's details. -->
       <section v-else-if="currentUser && scope === 'realm' && (infraNodes.length || deviceRecord)" aria-labelledby="realm-heading">
         <SectionHeading id="realm-heading" title="Realm" :icon="Network">
           <template #actions>

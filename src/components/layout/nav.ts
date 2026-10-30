@@ -71,7 +71,6 @@ export function navEntries(options: NavOptions): NavEntry[] {
       icon: LayoutDashboard,
       label: options.desktop ? 'Home' : 'Dashboard',
       exact: true,
-      match: ['/app/nodes'],
       primary: true,
     },
     { to: '/app/buckets', icon: Boxes, label: 'Data', primary: true },
@@ -110,7 +109,7 @@ export function navItemActive(item: NavItem, path: string, notebooks = false): b
   // The notebooks flavour of the data view belongs to Notebooks, not to Data.
   if (notebooks) return item.to === '/app/notebooks'
   const under = (prefix: string) => path === prefix || path.startsWith(`${prefix}/`)
-  // An exact entry is still active on the pages it opens, such as a node page from the dashboard.
+  // An exact entry is still active on the paths it also matches.
   if (item.exact) return path === item.to || (item.match ?? []).some(under)
   return (item.match ?? [item.to]).some(under)
 }

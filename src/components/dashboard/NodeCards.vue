@@ -20,9 +20,8 @@ const props = defineProps<{
   devices: RealmNodeInfo[]
   /** The node serving this portal, named as such. */
   localNodeId?: string | null
-  /** Offers a Details link per card; `openId` is the card whose details show. */
+  /** Offers a Details button per card that opens the node's dialog. */
   details?: boolean
-  openId?: string
   /** Offered to a realm admin: names a node, null resets it. */
   rename?: (nodeId: string, name: string | null) => Promise<void>
 }>()
@@ -84,10 +83,9 @@ const devicesLine = computed(() => {
           variant="outline"
           size="sm"
           class="mt-auto self-start"
-          :aria-expanded="openId === node.node_id"
           @click="$emit('details', node.node_id)"
         >
-          <Info class="h-3.5 w-3.5" /> {{ openId === node.node_id ? 'Hide details' : 'Details' }}
+          <Info class="h-3.5 w-3.5" /> Details
         </Button>
       </li>
     </ul>

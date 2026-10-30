@@ -27,7 +27,7 @@ const DEVICE_STEPS = ['Device', 'Hand off', 'Watch it join']
 const FIRST_STEP = 1
 
 const { currentUser, realmInfo, nodeInfo } = useAruna()
-// In the desktop app this computer's own row opens its device page, the others their node page.
+// In the desktop app this computer's own row opens its device page, the others their node details.
 const desktop = isDesktop()
 const deviceLink = (nodeId: string) =>
   desktop && nodeInfo?.value?.node.peer_id === nodeId ? { name: 'device' } : { name: 'node', params: { nodeId } }

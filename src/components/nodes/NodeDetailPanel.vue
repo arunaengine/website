@@ -15,7 +15,7 @@ defineProps<{
   probe?: NodeProbe | null
   /** Offered to a realm admin: names the node, null resets it. */
   rename?: (nodeId: string, name: string | null) => Promise<void>
-  /** The node page names the node in its own header. */
+  /** The node dialog names the node in its own header. */
   hideName?: boolean
 }>()
 </script>

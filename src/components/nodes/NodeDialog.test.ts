@@ -36,10 +36,9 @@ const record = (overrides: Partial<RealmNodeInfo> = {}): RealmNodeInfo => ({
   ...overrides,
 })
 
-const Plain = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
-const HeaderStub = defineComponent({
-  props: { title: String, description: String },
-  setup: (props, { slots }) => () => h('header', [h('h1', slots.title?.() ?? props.title), h('p', slots.description?.() ?? props.description), slots.actions?.()]),
+const DialogStub = defineComponent({
+  emits: ['update:open'],
+  setup: (_, { emit, slots }) => () => h('div', [h('header', slots.header?.()), slots.default?.(), h('button', { onClick: () => emit('update:open', false) }, 'Close')]),
 })
 const LinkStub = defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()) })
 // Each editor keeps its own draft, so a new one shows as a new instance.
@@ -72,14 +71,13 @@ const loadRuns = vi.fn(async () => undefined)
 const loadInfo = vi.fn(async () => undefined)
 const task = (id: string, state: string, nodeId: string | null) => ({ task: { id, state }, nodeId })
 
-const NodeView = compileClientComponent(new URL('./NodeView.vue', import.meta.url), {
+const NodeDialog = compileClientComponent(new URL('./NodeDialog.vue', import.meta.url), {
   vue: VueRuntime,
-  // The route reads the params ref on each access, so a test can navigate.
-  'vue-router': { RouterLink: LinkStub, useRoute: () => ({ get params() { return params.value } }) },
-  '@/components/dashboard/PageHeader.vue': moduleDefault(HeaderStub),
+  'vue-router': { RouterLink: LinkStub },
+  '@/components/ui/DetailDialog.vue': moduleDefault(DialogStub),
+  '@/components/ui/DialogTitle.vue': moduleDefault(defineComponent((_, { slots }) => () => h('h2', slots.default?.()))),
   '@/components/dashboard/OverviewCell.vue': moduleDefault(CardStub),
   '@/components/dashboard/RecentRunsCard.vue': moduleDefault(RunsStub),
-  '@/components/ui/Button.vue': moduleDefault(Plain),
   '@/components/ui/CopyButton.vue': moduleDefault(defineComponent(() => () => null)),
   '@/components/ui/DetailList.vue': moduleDefault(DetailsStub),
   '@/components/ui/IconTile.vue': moduleDefault(defineComponent(() => () => null)),
@@ -112,6 +110,10 @@ const NodeView = compileClientComponent(new URL('./NodeView.vue', import.meta.ur
   '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => null) }),
 })
 
+// The Status page hands the dialog the node its query names; a test changes it through `params`.
+const closed = vi.fn()
+const NodeView = defineComponent(() => () => h(NodeDialog, { nodeId: params.value.nodeId, onClose: closed }))
+
 beforeEach(() => {
   params.value = { nodeId: 'store-1' }
   realm.value = { nodes: [record()] }
@@ -125,7 +127,7 @@ beforeEach(() => {
   renameDevice.mockClear()
 })
 
-describe('node page', () => {
+describe('node dialog', () => {
   it('heads the node with its state, type, place and work, then stat cards and its details', async () => {
     recentRuns.value = [task('r1', 'COMPLETE', 'store-1'), task('r2', 'COMPLETE', 'store-1'), task('r3', 'COMPLETE', null)]
     searchBuckets.mockResolvedValue({ hits: [{ bucket: 'refseq', node_id: 'store-1', group_id: 'g1' }] })
@@ -146,9 +148,16 @@ describe('node page', () => {
     expect(text).toContain('LocationGiessen')
     expect(text).toContain('Version3.0.0-alpha.140')
     expect(text).toContain('details hideName=true')
-    // The status page opens on this node.
-    const status = element(mounted.root, (node) => node.tag === 'a' && content(node).includes('Open in status'))
-    expect(JSON.parse(String(status.props['data-to']))).toEqual({ name: 'status', query: { node: 'store-1' } })
+    expect(text).not.toContain('Open in status')
+    mounted.app.unmount()
+  })
+
+  it('asks the Status page to close it', async () => {
+    closed.mockClear()
+    const mounted = await mountApp(NodeView)
+    await flush()
+    await click(element(mounted.root, (node) => node.tag === 'button' && content(node) === 'Close'))
+    expect(closed).toHaveBeenCalledOnce()
     mounted.app.unmount()
   })
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import RealmTopology from '@/components/dashboard/RealmTopology.vue'
@@ -15,7 +15,7 @@ import InfoHint from '@/components/ui/InfoHint.vue'
 import ListSkeleton from '@/components/ui/ListSkeleton.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import LocalNodeDetails from '@/components/nodes/LocalNodeDetails.vue'
-import NodeDetailPanel from '@/components/nodes/NodeDetailPanel.vue'
+import NodeDialog from '@/components/nodes/NodeDialog.vue'
 import LocationAggregates from '@/components/placement/LocationAggregates.vue'
 import SectionSkeleton from '@/components/ui/SectionSkeleton.vue'
 import { givenName, isDegradedStatus, nodeName, nodeOnline, statusProblem } from '@/components/nodes/node-display'
@@ -47,7 +47,6 @@ const rename = computed(() => (isRealmAdmin.value ? renameNode : undefined))
 // "measuring" meanwhile. Subsequent rounds fire immediately.
 const INITIAL_PROBE_DELAY_MS = 2_000
 
-const expandedId = ref('')
 const statusError = ref<string | null>(null)
 const lastUpdated = ref<Date | null>(null)
 const refreshing = ref(false)
@@ -235,9 +234,6 @@ const lastUpdatedLabel = computed(() =>
     : '-',
 )
 
-function toggleNode(nodeId: string) {
-  expandedId.value = expandedId.value === nodeId ? '' : nodeId
-}
 // The cards and their details come from the same realm snapshot as the map; in the desktop that
 // is a realm node's, which knows the names and heartbeats the device's own copy lacks.
 // This node's realm record. In the desktop it is this computer's own node, which listens here only.
@@ -257,35 +253,14 @@ const realmApi = computed(() => {
 const cardNodes = computed(() =>
   [...panelInfra.value].sort((a, b) => kindOrder[a.kind] - kindOrder[b.kind] || a.node_id.localeCompare(b.node_id)),
 )
-const expandedNode = computed(() => cardNodes.value.find((node) => node.node_id === expandedId.value) ?? null)
-
-const targetNodeId = computed(() => (typeof route.query.node === 'string' ? route.query.node : ''))
-let highlightedTarget = ''
-
-async function showNode(id: string) {
-  expandedId.value = id
-  await nextTick()
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  document
-    .getElementById(`status-node-${id}`)
-    ?.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' })
+// The node named in the query opens in a dialog; links from elsewhere and the old node pages name it.
+const openNodeId = computed(() => (typeof route.query.node === 'string' ? route.query.node : ''))
+const nodeQuery = (id: string) => ({ query: { ...route.query, node: id } })
+const openNode = (id: string) => void router.push(nodeQuery(id))
+function closeNode() {
+  const { node: _closed, ...query } = route.query
+  void router.replace({ query })
 }
-
-// A realm node opens its details below; this computer has no card, so its own page opens.
-const pickNode = (id: string) =>
-  cardNodes.value.some((node) => node.node_id === id) ? void showNode(id) : void router.push({ name: 'node', params: { nodeId: id } })
-
-// A link from elsewhere names the node in the query; a node chosen on the map opens directly.
-watch(
-  [targetNodeId, cardNodes] as const,
-  ([id, nodes]) => {
-    if (!id || id === highlightedTarget) return
-    if (!nodes.some((node) => node.node_id === id)) return
-    highlightedTarget = id
-    void showNode(id)
-  },
-  { immediate: true },
-)
 </script>
 
 <template>
@@ -294,7 +269,7 @@ watch(
       <template #description>
         <span class="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span v-if="realm.description && realm.description !== realm.name">{{ realm.description }}</span>
-          <span v-if="localPeerId" class="inline-flex items-center gap-1.5"><Server class="size-4" />Served by <RouterLink :to="{ name: 'node', params: { nodeId: localPeerId } }" class="hover:underline">{{ ownRecord ? nodeName(ownRecord) : 'this node' }}</RouterLink></span>
+          <span v-if="localPeerId" class="inline-flex items-center gap-1.5"><Server class="size-4" />Served by <RouterLink :to="nodeQuery(localPeerId)" class="hover:underline">{{ ownRecord ? nodeName(ownRecord) : 'this node' }}</RouterLink></span>
           <span class="inline-flex items-center gap-1.5">Realm id<InfoHint :label="realm.id" name="Realm id" /><CopyButton :value="realm.id" label="Copy realm id" /></span>
           <span class="inline-flex items-center gap-1.5 tabular-nums"><Clock class="size-4" />Updated {{ lastUpdatedLabel }}</span>
         </span>
@@ -362,14 +337,14 @@ watch(
       </div>
 
       <section v-if="currentUser" aria-labelledby="status-map-heading">
-        <SectionHeading id="status-map-heading" title="Node map" :icon="Network" info="Pick a node to see its details below." />
+        <SectionHeading id="status-map-heading" title="Node map" :icon="Network" info="Pick a node to see its details." />
         <div class="relative h-[300px] overflow-hidden rounded-xl border border-border-subtle bg-background shadow-sm dark:shadow-none">
           <RealmTopology
             :nodes="panelInfra"
             :local-peer-id="(realmView?.info ?? nodeInfo)?.node.peer_id"
             :computer="computer"
-            :highlight="expandedId || null"
-            @select="pickNode"
+            :highlight="openNodeId || null"
+            @select="openNode"
           />
         </div>
       </section>
@@ -381,15 +356,10 @@ watch(
             :nodes="cardNodes"
             :devices="[]"
             :local-node-id="localPeerId"
-            :open-id="expandedId"
             details
             :rename="rename"
-            @details="toggleNode"
+            @details="openNode"
           />
-          <!-- One node's details at a time, below the cards: labels, latency and what it reports. -->
-          <div v-if="expandedNode" :id="`status-node-${expandedNode.node_id}`" class="surface mt-3 px-5 py-4">
-            <NodeDetailPanel :node="expandedNode" :is-local="isLocal(expandedNode)" :probe="probeFor(expandedNode)" :rename="rename" />
-          </div>
         </div>
         <EmptyState v-else title="No nodes reported for this realm yet.">
           <template #icon><Server class="size-6" /></template>
@@ -413,7 +383,7 @@ watch(
               :tone="statusProblem(nodeInfo.node.status)!.failed ? 'failed' : 'attention'"
             />
             <Button v-if="localPeerId" variant="outline" size="sm" as-child>
-              <RouterLink :to="{ name: 'node', params: { nodeId: localPeerId } }"><Server class="h-3.5 w-3.5" /> Node page</RouterLink>
+              <RouterLink :to="nodeQuery(localPeerId)"><Server class="h-3.5 w-3.5" /> Node details</RouterLink>
             </Button>
           </template>
         </SectionHeading>
@@ -429,5 +399,6 @@ watch(
       </section>
       </template>
     </div>
+    <NodeDialog v-if="openNodeId" :node-id="openNodeId" @close="closeNode" />
   </div>
 </template>

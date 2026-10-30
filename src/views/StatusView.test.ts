@@ -51,7 +51,7 @@ beforeAll(async () => {
   vi.doMock('@/components/ui/Badge.vue', () => ({ default: BadgeStub }))
   vi.doMock('@/components/ui/CopyButton.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/nodes/LocalNodeDetails.vue', () => ({ default: EmptyStub }))
-  vi.doMock('@/components/nodes/NodeDetailPanel.vue', () => ({ default: EmptyStub }))
+  vi.doMock('@/components/nodes/NodeDialog.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/placement/LocationAggregates.vue', () => ({ default: AggregatesStub }))
   vi.doMock('@/composables/useNodeNames', () => ({ useNodeNames: () => ({ renameNode: vi.fn() }) }))
   vi.doMock('@/composables/useDeviceStatus', () => ({ useDeviceStatus: () => ({ identity: ref(null) }) }))

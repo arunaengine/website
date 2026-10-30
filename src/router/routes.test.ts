@@ -111,6 +111,16 @@ describe('web routes', () => {
     })
   })
 
+  it('opens an old node page as the node dialog on the Status page', async () => {
+    const routes = await build()
+    const node = child(routes, 'nodes/:nodeId')
+    const redirect = node?.redirect as ((to: { params: Record<string, string> }) => unknown) | undefined
+
+    expect(node?.name).toBe('node')
+    expect(node?.component).toBeUndefined()
+    expect(redirect?.({ params: { nodeId: 'store-1' } })).toEqual({ name: 'status', query: { node: 'store-1' } })
+  })
+
   it('serves the public pages outside the app shell', async () => {
     const routes = await build()
     const expected = [

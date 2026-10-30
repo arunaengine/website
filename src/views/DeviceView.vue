@@ -53,7 +53,7 @@ function onEnrolled() {
     >
       <template #actions>
         <Button v-if="status?.nodeId" variant="outline" as-child>
-          <RouterLink :to="{ name: 'node', params: { nodeId: status.nodeId } }"><Server class="h-4 w-4" /> Node page</RouterLink>
+          <RouterLink :to="{ name: 'node', params: { nodeId: status.nodeId } }"><Server class="h-4 w-4" /> Node details</RouterLink>
         </Button>
       </template>
     </PageHeader>

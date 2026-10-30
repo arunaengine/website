@@ -88,9 +88,9 @@ describe('node cards', () => {
     const other = node({ node_id: 'b', api: 'https://api.node-3.example.org' })
     expect(await text([full, other])).not.toContain('Details')
 
-    const shown = await text([full, other], [], { details: true, localNodeId: '12D3KooWHashHashHash', openId: 'b' })
+    const shown = await text([full, other], [], { details: true, localNodeId: '12D3KooWHashHashHash' })
     expect(shown).toContain('node-2 This node 2 KB stored, full, draining Details')
-    expect(shown).toContain('node-3 2 KB stored Hide details')
+    expect(shown).toContain('node-3 2 KB stored Details')
   })
 
   it('offers a rename on each card only when renaming is allowed', async () => {

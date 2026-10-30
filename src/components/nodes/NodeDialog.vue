@@ -1,15 +1,15 @@
 <script setup lang="ts">
-// One realm node: its name and state, type, place, stored data, load and runs as stat cards, its
-// details, the buckets it holds and its recent runs. The addresses and probes sit under For
-// developers. Reached from the dashboard's topology and table and from the Status page.
+// One realm node in a dialog on the Status page: its name and state, type, place, stored data, load
+// and runs as stat cards, its details, the buckets it holds and its recent runs. The addresses and
+// probes sit under For developers. Every link to a node opens it.
 import { computed, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
-import PageHeader from '@/components/dashboard/PageHeader.vue'
+import { RouterLink } from 'vue-router'
 import OverviewCell from '@/components/dashboard/OverviewCell.vue'
 import RecentRunsCard from '@/components/dashboard/RecentRunsCard.vue'
-import Button from '@/components/ui/Button.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
+import DetailDialog from '@/components/ui/DetailDialog.vue'
 import DetailList, { type Detail } from '@/components/ui/DetailList.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import IconTile from '@/components/ui/IconTile.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
@@ -32,10 +32,11 @@ import { formatCount } from '@/lib/formatCount'
 import { LOCATION_AFFINITY_KEY } from '@/lib/placement'
 import { isActiveTesState } from '@/lib/tes'
 import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
-import { Activity, Boxes, ChevronRight, CircleCheck, Cpu, Database, Download, HardDrive, Info, Laptop, LoaderCircle, MapPin, Package, Server, Workflow } from '@lucide/vue'
+import { Boxes, ChevronRight, CircleCheck, Cpu, Database, Download, HardDrive, Info, Laptop, LoaderCircle, MapPin, Package, Server, Workflow } from '@lucide/vue'
 
-const route = useRoute()
-const nodeId = computed(() => String(route.params.nodeId ?? ''))
+const props = defineProps<{ nodeId: string }>()
+const emit = defineEmits<{ (e: 'close'): void }>()
+const nodeId = computed(() => props.nodeId)
 const { authToken, currentUser, myGroups, nodeInfo, usageInfo, isRealmAdmin, searchBuckets, sessionEpoch, loadInfo } = useAruna()
 const { realm } = useRealmSnapshot()
 const { isLocalNode, localNodeId } = useRealmNodes()
@@ -184,33 +185,32 @@ const bucketLink = (hit: BucketSearchHit) => ({
 </script>
 
 <template>
-  <div>
-    <PageHeader :title="name" :crumbs="[{ label: name }]" :docs="{ topic: 'realm-nodes-groups', section: 'Nodes and the realm' }">
-      <template v-if="node" #title>
-        <span class="inline-flex flex-wrap items-center gap-2.5">
-          {{ name }}
-          <StatusMark v-if="nodeOnline(node)" label="Online" />
-          <StatusMark v-else label="Offline" offline />
-        </span>
-      </template>
-      <template v-if="node" #description>
-        <span class="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <span class="inline-flex items-center gap-1.5"><component :is="node.kind === 'user' ? Laptop : Server" class="size-4" />{{ TYPE[node.kind] }}</span>
-          <span v-if="place" class="inline-flex items-center gap-1.5"><MapPin class="size-4" />{{ place }}</span>
-          <span v-if="nodeActivity(node)" class="inline-flex items-center gap-1 text-xs text-sky-700 dark:text-aruna-aqua"><Download class="h-3 w-3" />{{ nodeActivity(node) }}</span>
-        </span>
-      </template>
-      <template #actions>
-        <RefreshButton :busy="refreshBusy" size="default" @click="onRefresh" />
-        <Button v-if="node" variant="outline" as-child>
-          <RouterLink :to="{ name: 'status', query: { node: node.node_id } }"><Activity class="h-4 w-4" /> Open in status</RouterLink>
-        </Button>
-        <!-- A draft belongs to one node and one session; another node starts a fresh editor. -->
-        <NodeNameEdit v-if="node && rename" :key="`${sessionEpoch}/${node.node_id}`" :name="name" :value="node.display_name" :save="rename" outline><span class="sr-only">{{ name }}</span></NodeNameEdit>
-      </template>
-    </PageHeader>
+  <DetailDialog :open="true" @update:open="(open) => open || emit('close')">
+    <template #header>
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0">
+          <DialogTitle class="inline-flex flex-wrap items-center gap-2.5 leading-normal">
+            {{ name }}
+            <template v-if="node">
+              <StatusMark v-if="nodeOnline(node)" label="Online" />
+              <StatusMark v-else label="Offline" offline />
+            </template>
+          </DialogTitle>
+          <p v-if="node" class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <span class="inline-flex items-center gap-1.5"><component :is="node.kind === 'user' ? Laptop : Server" class="size-4" />{{ TYPE[node.kind] }}</span>
+            <span v-if="place" class="inline-flex items-center gap-1.5"><MapPin class="size-4" />{{ place }}</span>
+            <span v-if="nodeActivity(node)" class="inline-flex items-center gap-1 text-xs text-sky-700 dark:text-aruna-aqua"><Download class="h-3 w-3" />{{ nodeActivity(node) }}</span>
+          </p>
+        </div>
+        <div class="flex shrink-0 items-center gap-2">
+          <RefreshButton :busy="refreshBusy" @click="onRefresh" />
+          <!-- A draft belongs to one node and one session; another node starts a fresh editor. -->
+          <NodeNameEdit v-if="node && rename" :key="`${sessionEpoch}/${node.node_id}`" :name="name" :value="node.display_name" :save="rename" outline><span class="sr-only">{{ name }}</span></NodeNameEdit>
+        </div>
+      </div>
+    </template>
 
-    <div class="w-full space-y-8 px-4 py-6 sm:px-6">
+    <div class="space-y-8">
       <EmptyState v-if="!node" title="This node is not in the realm's node list." />
       <template v-else>
         <div class="grid gap-3 sm:gap-4" :class="recentRuns.state.value === 'off' ? 'md:grid-cols-2' : 'md:grid-cols-3'">
@@ -282,5 +282,5 @@ const bucketLink = (hit: BucketSearchHit) => ({
         </details>
       </template>
     </div>
-  </div>
+  </DetailDialog>
 </template>

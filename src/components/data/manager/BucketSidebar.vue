@@ -216,7 +216,7 @@ function openRow(row: AllRow) {
   if (row.hit) openHit(row.hit)
   else openBucketOn(row.bucket, row.nodeId)
 }
-// Every row names its node, linked to the node's page; the desktop names this computer so and
+// Every row names its node, linked to the node's details; the desktop names this computer so and
 // adds location, kind and id to the title.
 type RowPlace = { place: string | null; placeTitle: string | null; placeNode: string | null }
 function rowPlace(nodeId: string | null): RowPlace {

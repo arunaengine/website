@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The realm's nodes as a table: name, location, type, stored data, CPU, what runs there and the
 // state. This computer leads in the desktop, offline nodes come first. Five rows a page under a
-// search. A row opens the node's page; hovering one lights up its node on the topology.
+// search. A row opens the node's details; hovering one lights up its node on the topology.
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import FilterChips from '@/components/ui/FilterChips.vue'

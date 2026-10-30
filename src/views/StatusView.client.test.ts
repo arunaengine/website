@@ -14,6 +14,12 @@ const isRealmAdmin = ref(false)
 // The desktop's own node, as the shell's device status names it.
 const identity = ref<{ nodeId: string; realm: string } | null>(null)
 const renameNode = vi.fn(async () => undefined)
+// The route's query, which the router writes back as the page opens and closes a node.
+const query = ref<Record<string, string>>({})
+const router = {
+  push: vi.fn((to: { query: Record<string, string> }) => void (query.value = to.query)),
+  replace: vi.fn((to: { query: Record<string, string> }) => void (query.value = to.query)),
+}
 
 const node = (node_id: string, name?: string, present = true) => ({
   node_id,
@@ -35,7 +41,7 @@ const MapStub = defineComponent({
     h('div', (props.nodes as Array<{ node_id: string }>).map((entry) => h('button', { 'data-map': entry.node_id, onClick: () => emit('select', entry.node_id) }, `map ${entry.node_id}`))),
 })
 const CardsStub = defineComponent({
-  props: { nodes: { type: Array, default: () => [] }, openId: String, rename: Function },
+  props: { nodes: { type: Array, default: () => [] }, rename: Function },
   emits: ['details'],
   setup: (props, { emit }) => () =>
     h('div', (props.nodes as Array<{ node_id: string; present: boolean; info?: { labels?: Record<string, string> } | null }>).map((entry) =>
@@ -46,11 +52,15 @@ const LocalStub = defineComponent({
   props: { device: Boolean, realmApi: String, publicApi: String },
   setup: (props) => () => h('div', `local device=${props.device} realm=${props.realmApi ?? '-'} api=${props.publicApi ?? '-'}`),
 })
-const DetailStub = defineComponent({ props: { node: { type: Object, required: true } }, setup: (props) => () => h('div', `details ${(props.node as { node_id: string }).node_id}`) })
+const DialogStub = defineComponent({
+  props: { nodeId: String },
+  emits: ['close'],
+  setup: (props, { emit }) => () => h('button', { 'data-dialog': props.nodeId, onClick: () => emit('close') }, `dialog ${props.nodeId}`),
+})
 
 const StatusView = compileClientComponent(new URL('./StatusView.vue', import.meta.url), {
   vue: VueRuntime,
-  'vue-router': { RouterLink: Plain, useRoute: () => ({ query: {} }), useRouter: () => ({ push: vi.fn() }) },
+  'vue-router': { RouterLink: Plain, useRoute: () => ({ get query() { return query.value } }), useRouter: () => router },
   '@/components/dashboard/PageHeader.vue': moduleDefault(Plain),
   '@/components/dashboard/RealmTopology.vue': moduleDefault(MapStub),
   '@/components/dashboard/NodeCards.vue': moduleDefault(CardsStub),
@@ -65,7 +75,7 @@ const StatusView = compileClientComponent(new URL('./StatusView.vue', import.met
   '@/components/ui/ListSkeleton.vue': moduleDefault(Empty),
   '@/components/ui/NodeLabel.vue': moduleDefault(Empty),
   '@/components/nodes/LocalNodeDetails.vue': moduleDefault(LocalStub),
-  '@/components/nodes/NodeDetailPanel.vue': moduleDefault(DetailStub),
+  '@/components/nodes/NodeDialog.vue': moduleDefault(DialogStub),
   '@/components/placement/LocationAggregates.vue': moduleDefault(Empty),
   '@/components/ui/SectionSkeleton.vue': moduleDefault(Empty),
   '@/components/ui/EmptyState.vue': moduleDefault(Empty),
@@ -110,6 +120,7 @@ beforeEach(() => {
   loadRealmView.mockReset().mockResolvedValue(null)
   isRealmAdmin.value = false
   identity.value = null
+  query.value = {}
 })
 
 afterEach(() => vi.unstubAllGlobals())
@@ -126,22 +137,35 @@ describe('status nodes', () => {
     expect(content(mounted.root)).toContain('map server-a')
     expect(content(mounted.root)).toContain('card Giessen storage online')
     await click(element(mounted.root, (entry) => entry.props['data-card'] === 'server-a'))
-    expect(content(mounted.root)).toContain('details server-a')
+    expect(content(mounted.root)).toContain('dialog server-a')
     mounted.app.unmount()
   })
 
-  it('opens a node chosen on the map again after its details were hidden', async () => {
+  it('opens the node dialog from the map and the cards, and closes it again', async () => {
+    query.value = { tab: 'kept' }
     const mounted = await mountApp(StatusView)
     await flush()
     const onMap = () => element(mounted.root, (entry) => entry.props['data-map'] === 'server-a')
     const card = () => element(mounted.root, (entry) => entry.props['data-card'] === 'server-a')
+    const dialog = () => element(mounted.root, (entry) => entry.props['data-dialog'] === 'server-a')
+    expect(content(mounted.root)).not.toContain('dialog')
 
     await click(onMap())
-    expect(content(mounted.root)).toContain('details server-a')
+    expect(query.value).toEqual({ tab: 'kept', node: 'server-a' })
+    expect(content(mounted.root)).toContain('dialog server-a')
+    await click(dialog())
+    expect(query.value).toEqual({ tab: 'kept' })
+    expect(content(mounted.root)).not.toContain('dialog')
     await click(card())
-    expect(content(mounted.root)).not.toContain('details server-a')
-    await click(onMap())
-    expect(content(mounted.root)).toContain('details server-a')
+    expect(content(mounted.root)).toContain('dialog server-a')
+    mounted.app.unmount()
+  })
+
+  it('opens the node a link names, also one without a card', async () => {
+    query.value = { node: 'laptop' }
+    const mounted = await mountApp(StatusView)
+    await flush()
+    expect(content(mounted.root)).toContain('dialog laptop')
     mounted.app.unmount()
   })
 
