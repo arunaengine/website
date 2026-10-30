@@ -51,9 +51,11 @@ const collapsed = computed(() => narrow.value || manualCollapsed.value)
 </script>
 
 <template>
+  <!-- The column runs the full page height; the navigation stays in view inside it. -->
+  <div class="hidden shrink-0 border-r border-border bg-card md:block">
   <aside
     :class="[
-      'sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-r border-border bg-card transition-[width] duration-200 md:flex',
+      'sticky top-0 flex h-screen flex-col overflow-hidden transition-[width] duration-200',
       collapsed ? 'w-16' : 'w-56',
     ]"
   >
@@ -123,4 +125,5 @@ const collapsed = computed(() => narrow.value || manualCollapsed.value)
       <slot name="footer" :collapsed="collapsed" />
     </div>
   </aside>
+  </div>
 </template>
