@@ -172,7 +172,7 @@ import {
 export { readableIri } from '@/lib/identifiers'
 export { colorFor, initials } from './aruna/format'
 export { publicProfileIri, profileReferenceIri } from './aruna/profileIri'
-export { isRecencyOrdered, notRunRecord, RECENT_MAX_PAGES_FILTERED, walkRecentPages, type RecentWalk } from './aruna/catalog'
+export { isRecencyOrdered, walkRecentPages, type RecentWalk } from './aruna/catalog'
 export { isUnsupportedEndpoint } from './aruna/connectors'
 export { CrateNotReadyError } from './aruna/crates'
 export {
