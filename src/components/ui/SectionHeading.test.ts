@@ -21,4 +21,9 @@ describe('section heading', () => {
     expect(html).not.toContain('About Groups')
     expect(html).not.toContain('flex-wrap items-center gap-2')
   })
+
+  it('shows a count after the title', async () => {
+    const html = await renderToString(createSSRApp({ render: () => h(SectionHeading, { title: 'Buckets', count: '5' }) }))
+    expect(html).toMatch(/>Buckets<\/h2><span[^>]*tabular-nums[^>]*>5<\/span>/)
+  })
 })
