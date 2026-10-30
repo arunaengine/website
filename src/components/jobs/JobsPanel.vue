@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
-import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
 import ListShell from '@/components/ui/ListShell.vue'
@@ -50,7 +49,6 @@ const {
   listState,
   listError,
   nextCursor,
-  refreshing,
   loadingMore,
   moreError,
   lastPollError,
@@ -96,8 +94,10 @@ function reload() {
   void list.load()
 }
 
-const { busy: reloadBusy, refresh: onReload } = useRefresh(reload)
-const spinning = computed(() => reloadBusy.value || refreshing.value)
+const { refresh: onReload } = useRefresh(reload)
+// The page header's refresh reads the system jobs again.
+const props = defineProps<{ refreshRevision?: number }>()
+watch(() => props.refreshRevision, () => void onReload())
 
 // One placeholder until the first page has answered; later loads refresh in place.
 const painted = useFirstPaint(() => listState.value !== 'idle' && listState.value !== 'loading')
@@ -150,7 +150,6 @@ onMounted(() => void list.load())
       </template>
       <template #tools>
         <span v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</span>
-        <RefreshButton :busy="spinning" sr-label="Refresh system jobs" @click="onReload" />
       </template>
 
       <EmptyState

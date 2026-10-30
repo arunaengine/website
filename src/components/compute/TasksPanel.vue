@@ -4,7 +4,6 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Notice from '@/components/ui/Notice.vue'
-import RefreshButton from '@/components/ui/RefreshButton.vue'
 import OverviewCell from '@/components/dashboard/OverviewCell.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
 import IconButton from '@/components/ui/IconButton.vue'
@@ -166,7 +165,8 @@ const emptyGroupLabel = computed(() => {
 })
 const chipOptions = computed(() => [
   { value: 'all', label: 'All', count: placedTasks.value.length },
-  ...(Object.keys(GROUP_LABELS) as StateFilterGroup[]).map((group) => ({
+  // Completed runs are counted on the Runs card above, so they get no chip of their own.
+  ...(Object.keys(GROUP_LABELS) as StateFilterGroup[]).filter((group) => group !== 'done').map((group) => ({
     value: group,
     label: GROUP_LABELS[group],
     count: placedTasks.value.filter((task) => inGroup(task, group)).length,
@@ -373,6 +373,9 @@ function reload() {
 }
 
 const { busy: reloadBusy, refresh: onReload } = useRefresh(reload)
+// The page header's refresh reads the runs again.
+const props = defineProps<{ refreshRevision?: number }>()
+watch(() => props.refreshRevision, () => void onReload())
 const spinning = computed(() => reloadBusy.value || refreshing.value)
 
 // No listed run brings the run-mode chooser back.
@@ -530,7 +533,6 @@ onUnmounted(() => {
       <template #tools>
         <span v-if="recordError" role="status" class="text-xs text-muted-foreground">{{ recordError }}</span>
         <span v-if="lastPollError" class="text-xs text-muted-foreground" :title="lastPollError">Refresh failed, retrying.</span>
-        <RefreshButton :busy="spinning" sr-label="Refresh runs" @click="onReload" />
       </template>
 
       <!-- The first-run empty state doubles as the run-mode chooser. -->

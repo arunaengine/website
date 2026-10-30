@@ -136,7 +136,8 @@ describe('the run list in the desktop', () => {
     await click(chip(mounted.root, 'This computer 1'))
     expect(rows(mounted.root).join(' ')).toContain('qc-sample42')
     expect(rows(mounted.root).join(' ')).not.toContain('assemble-run-17')
-    expect(() => chip(mounted.root, 'Completed 0')).not.toThrow()
+    expect(() => chip(mounted.root, 'Failed 0')).not.toThrow()
+    expect(() => chip(mounted.root, 'Completed 0')).toThrow()
 
     await click(chip(mounted.root, 'Realm 1'))
     expect(rows(mounted.root).join(' ')).toContain('assemble-run-17')

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Tabs from '@/components/ui/Tabs.vue'
@@ -8,11 +8,13 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import ComputeGates from '@/components/compute/ComputeGates.vue'
 import NewRunMenu from '@/components/compute/NewRunMenu.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import TasksPanel from '@/components/compute/TasksPanel.vue'
 import JobsPanel from '@/components/jobs/JobsPanel.vue'
 import { useTes } from '@/composables/useTes'
 import { useJobs } from '@/composables/useJobs'
 import { useAruna } from '@/composables/useAruna'
+import { useRefresh } from '@/composables/useRefresh'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import { isDesktop } from '@/lib/desktop'
 import { Settings, Workflow } from '@lucide/vue'
@@ -31,6 +33,12 @@ const route = useRoute()
 const { tesEnabled } = useTes()
 const { jobsEnabled } = useJobs()
 const { currentUser } = useAruna()
+
+// One refresh in the header reads the shown list again.
+const revision = ref(0)
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(async () => {
+  revision.value++
+})
 
 const anyEnabled = computed(() => tesEnabled.value || jobsEnabled.value)
 const bothEnabled = computed(() => tesEnabled.value && jobsEnabled.value)
@@ -55,8 +63,9 @@ function setTab(next: string) {
   <div>
     <PageHeader :title="pageTitle" :docs="{ topic: 'compute-run', section: 'Follow the run' }">
       <!-- One Run entry point; the menu explains the two ways to start one. -->
-      <template v-if="tesEnabled && currentUser" #actions>
-        <NewRunMenu size="sm" />
+      <template v-if="currentUser && anyEnabled" #actions>
+        <RefreshButton :busy="refreshBusy" size="default" @click="onRefresh" />
+        <NewRunMenu v-if="tesEnabled" />
       </template>
     </PageHeader>
 
@@ -74,11 +83,11 @@ function setTab(next: string) {
             <TabsTrigger value="tasks"><Workflow class="size-4" aria-hidden="true" />Runs</TabsTrigger>
             <TabsTrigger value="jobs"><Settings class="size-4" aria-hidden="true" />System jobs</TabsTrigger>
           </TabsList>
-          <TabsContent value="tasks" class="mt-6"><TasksPanel /></TabsContent>
-          <TabsContent value="jobs" class="mt-6"><JobsPanel /></TabsContent>
+          <TabsContent value="tasks" class="mt-6"><TasksPanel :refresh-revision="revision" /></TabsContent>
+          <TabsContent value="jobs" class="mt-6"><JobsPanel :refresh-revision="revision" /></TabsContent>
         </Tabs>
-        <TasksPanel v-else-if="tesEnabled" />
-        <JobsPanel v-else />
+        <TasksPanel v-else-if="tesEnabled" :refresh-revision="revision" />
+        <JobsPanel v-else :refresh-revision="revision" />
       </div>
     </ComputeGates>
   </div>
