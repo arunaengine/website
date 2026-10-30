@@ -613,9 +613,11 @@ export function useDataManager() {
   const shown = computed(() => shownEntries(folders.value, objects.value, listShow.value))
   const visibleFolders = computed(() => shown.value.folders)
   const visibleObjects = computed(() => shown.value.objects)
+  // Files the browser lists but hides from view, such as other runs' results, are never selected.
+  const hiddenObjectKeys = ref<ReadonlySet<string>>(new Set())
   const selection = useBrowserSelection({
     folders: visibleFolders,
-    objects: visibleObjects,
+    objects: computed(() => visibleObjects.value.filter((object) => !hiddenObjectKeys.value.has(object.key))),
     canSelectObject: (key) => s3.canWrite(bucket.value, key, remoteNodeId.value),
     canSelectFolder: (prefix) => s3.canDeletePrefix(bucket.value, prefix, remoteNodeId.value),
   })
@@ -630,6 +632,7 @@ export function useDataManager() {
     setFolderSelected,
     setAllListedSelected,
   } = selection
+  watch(hiddenObjectKeys, () => selection.keepListed())
 
   // ListObjectsV2 hides a key whose head is a delete marker, so the toggle
   // lists them through ListObjectVersions and offers them back. The choice is
@@ -1537,6 +1540,7 @@ export function useDataManager() {
     keyIsSynced,
     syncsForKey,
     runFilter,
+    hiddenObjectKeys,
     wholeBucketSynced,
     bucketSyncCount,
     showSyncButton,

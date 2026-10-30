@@ -854,6 +854,15 @@ describe('object browser run filter', () => {
     await click(element(root, (node) => node.tag === 'button' && content(node).includes('Show the whole folder')))
     expect(push).toHaveBeenCalledWith({ query: { prefix: 'raw' } })
   })
+
+  it('keeps the files of other runs out of the selection', async () => {
+    folderOrigin.byKey.value = new Map([[listedObject.key, run], [other.key, { ...run, key: 'upload', label: 'an upload', to: null }]])
+    const objects = ref([listedObject, other])
+    const hiddenObjectKeys = ref<ReadonlySet<string>>(new Set())
+    await render({ objects, visibleObjects: objects, hiddenObjectKeys, runFilter: ref('r1'), route: { query: { prefix: 'raw', run: 'r1' } } })
+
+    expect([...hiddenObjectKeys.value]).toEqual([other.key])
+  })
 })
 
 describe('object browser order', () => {

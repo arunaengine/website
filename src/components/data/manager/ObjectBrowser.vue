@@ -161,6 +161,7 @@ const {
   download,
   keyIsSynced,
   runFilter,
+  hiddenObjectKeys,
   wholeBucketSynced,
   bucketSyncCount,
   showSyncButton,
@@ -482,11 +483,19 @@ const ariaSort = (key: SortKey) => (sort.value.key === key ? (sort.value.descend
 const folderRows = computed(() =>
   sortRows(visibleFolders.value, { key: 'name', descending: sort.value.key === 'name' && sort.value.descending }, (folder) => folder))
 const runKey = computed(() => (runFilter.value ? `job:${runFilter.value}` : ''))
+const runHides = (key: string) => Boolean(runKey.value) && originOf.value.get(key)?.key !== runKey.value
 const objectRows = computed(() => {
   const rows = fileRows(visibleObjects.value, deletedRows.value)
-  const shown = runKey.value ? rows.filter(({ deleted, entry }) => !deleted && originOf.value.get(entry.key)?.key === runKey.value) : rows
+  const shown = runKey.value ? rows.filter(({ deleted, entry }) => !deleted && !runHides(entry.key)) : rows
   return sortRows(shown, sort.value, (row) => row.entry)
 })
+// Select all and the bulk actions reach only the files the filter shows.
+watch(
+  () => visibleObjects.value.filter((object) => runHides(object.key)).map((object) => object.key),
+  (keys) => (hiddenObjectKeys.value = new Set(keys)),
+  { immediate: true },
+)
+onBeforeUnmount(() => (hiddenObjectKeys.value = new Set()))
 // The filtered run as its files name it, once one of them is read.
 const filteredRun = computed(() => [...originOf.value.values()].find((origin) => origin.key === runKey.value) ?? null)
 function showWholeFolder() {
