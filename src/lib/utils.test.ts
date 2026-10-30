@@ -9,6 +9,8 @@ describe('formatDateTime', () => {
 
   it('keeps a UTC date on its calendar day and leaves an unreadable value empty', () => {
     expect(formatDate('2026-10-29', true)).toBe('29 Oct 2026')
+    expect(formatDate('2026-04-05', true)).toBe('5 Apr 2026')
+    expect(formatDateTime('2026-04-05T00:30:00Z', true)).toBe('5 Apr 2026, 00:30')
     expect(formatDateTime('not a date')).toBe('')
   })
 })
