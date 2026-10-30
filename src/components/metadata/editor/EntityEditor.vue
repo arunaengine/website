@@ -8,11 +8,13 @@ import EntityHeader from './EntityHeader.vue'
 import PropertyEditor from './PropertyEditor.vue'
 import AddPropertyDialog from './AddPropertyDialog.vue'
 import AddFilesDialog from './AddFilesDialog.vue'
+import IssueMark from './IssueMark.vue'
 import {
   addValue,
   defaultValue,
   findEntity,
   profileShape,
+  ROOT_FORM_PROPERTIES,
   rootId,
   toRoCrate,
   type CrateDraft,
@@ -53,6 +55,13 @@ const shape = computed(() =>
 // What the profile still offers this entity, once its rows are added.
 const suggested = computed(() => (shape.value?.optional ?? [])
   .filter((rule) => !entity.value?.properties[rule.valueName]))
+// Issues no row shows, such as a type the profile expects; the header owns the unreachable file.
+const loose = computed(() => props.issues.filter((issue) => {
+  if (issue.entityId !== props.selected || issue.key.startsWith('orphan:')) return false
+  const property = issue.property
+  if (!property) return true
+  return !entity.value?.properties[property] && !(isRoot.value && ROOT_FORM_PROPERTIES.includes(property))
+}))
 const json = computed(() => JSON.stringify(toRoCrate(props.draft), null, 2))
 
 // A property owned by a picker is added by picking a value, never as an empty
@@ -87,6 +96,8 @@ function addOptional() {
       @update="(next) => emit('update', next)"
       @select="(id) => emit('select', id)"
     />
+
+    <div v-if="loose.length" class="border-t border-border px-5 py-2.5"><IssueMark :issues="loose" /></div>
 
     <RootForm
       v-if="isRoot"

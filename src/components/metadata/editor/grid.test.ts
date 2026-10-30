@@ -81,10 +81,9 @@ describe('editor row alignment', () => {
 
     expect(rows(row.root, Grid.ROW_GRID)).toHaveLength(1)
     expect(rows(form.root, Grid.ROW_GRID).length).toBeGreaterThan(1)
-    expect(rows(row.root, Grid.ROW_ACTIONS)).toHaveLength(1)
-    expect(rows(form.root, Grid.ROW_ACTIONS).length).toBe(rows(form.root, Grid.ROW_GRID).length)
-    expect(Grid.ROW_GRID).toContain('grid-cols-[11rem_minmax(0,1fr)_auto]')
-    expect(Grid.ROW_ACTIONS).toContain('w-20')
+    expect(rows(row.root, Grid.ROW_VALUE)).toHaveLength(1)
+    expect(rows(form.root, Grid.ROW_VALUE).length).toBe(rows(form.root, Grid.ROW_GRID).length)
+    expect(Grid.ROW_GRID).toContain('grid-cols-[11rem_minmax(0,1fr)]')
     row.app.unmount()
     form.app.unmount()
   })

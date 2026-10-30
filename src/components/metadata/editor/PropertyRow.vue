@@ -17,7 +17,7 @@ import LinkEntityDialog from './LinkEntityDialog.vue'
 import AddEntityDialog from './AddEntityDialog.vue'
 import AddFilesDialog from './AddFilesDialog.vue'
 import IssueMark from './IssueMark.vue'
-import { ROW_ACTIONS, ROW_GRID, ROW_LABEL, ROW_VALUE, issueState, ruleTitle } from './grid'
+import { ROW_GRID, ROW_LABEL, ROW_VALUE, issueState, ruleTitle } from './grid'
 import {
   addValue,
   allowedKinds,
@@ -204,7 +204,7 @@ function created(next: CrateDraft, entityId: string) {
       </Tooltip>
     </div>
 
-    <div class="space-y-2" :class="ROW_VALUE">
+    <div :class="ROW_VALUE">
       <p v-if="hint" class="text-[11px] text-muted-foreground">{{ hint }}</p>
       <div v-for="(value, index) in values" :key="index" class="flex items-start gap-1">
         <div class="relative min-w-0 flex-1">
@@ -308,9 +308,6 @@ function created(next: CrateDraft, entityId: string) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </div>
-
-    <div :class="ROW_ACTIONS">
       <IssueMark :issues="issues ?? []" />
     </div>
 

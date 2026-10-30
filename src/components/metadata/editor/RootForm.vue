@@ -6,7 +6,7 @@ import Textarea from '@/components/ui/Textarea.vue'
 import PropertyEditor from './PropertyEditor.vue'
 import PropertyRow from './PropertyRow.vue'
 import IssueMark from './IssueMark.vue'
-import { ROW_ACTIONS, ROW_GRID, ROW_LABEL, ROW_LIST, ROW_VALUE, issueState, ruleTitle } from './grid'
+import { ROW_GRID, ROW_LABEL, ROW_LIST, ROW_VALUE, issueState, ruleTitle } from './grid'
 import {
   addValue,
   findEntity,
@@ -86,8 +86,8 @@ function addKeyword() {
             placeholder="What this dataset is called"
             @update:model-value="(value: string | number) => setText('name', String(value))"
           />
+          <IssueMark :issues="issuesFor('name')" />
         </div>
-        <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('name')" /></div>
       </div>
 
       <div :class="ROW_GRID" data-tutorial="dataset-description">
@@ -104,8 +104,8 @@ function addKeyword() {
             placeholder="What it contains and how it was made"
             @update:model-value="(value: string) => setText('description', value, 'longtext')"
           />
+          <IssueMark :issues="issuesFor('description')" />
         </div>
-        <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('description')" /></div>
       </div>
 
       <div :class="ROW_GRID">
@@ -120,8 +120,8 @@ function addKeyword() {
             aria-label="Date published"
             @update:model-value="(value: string | number) => setText('datePublished', String(value), 'date')"
           />
+          <IssueMark :issues="issuesFor('datePublished')" />
         </div>
-        <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('datePublished')" /></div>
       </div>
 
       <PropertyRow
@@ -140,7 +140,7 @@ function addKeyword() {
 
       <div :class="ROW_GRID">
         <label :class="ROW_LABEL" for="root-keywords">Keywords</label>
-        <div class="space-y-2" :class="ROW_VALUE">
+        <div :class="ROW_VALUE">
           <div v-if="keywords.length" class="flex flex-wrap gap-1.5">
             <span v-for="(keyword, index) in keywords" :key="index" class="chip h-6">
               {{ keyword.value }}
@@ -163,8 +163,8 @@ function addKeyword() {
             placeholder="Type a keyword and press Enter"
             @keydown.enter="addKeyword"
           />
+          <IssueMark :issues="issuesFor('keywords')" />
         </div>
-        <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('keywords')" /></div>
       </div>
 
       <div :class="ROW_GRID" data-tutorial="dataset-profile">
@@ -174,6 +174,7 @@ function addKeyword() {
             :model-value="profileId"
             :options="[{ value: '', label: 'No profile' }, ...profiles]"
             placeholder="No profile"
+            :invalid="issueState(issuesFor('conformsTo'))"
             aria-label="Profile"
             @update:model-value="(value: string) => emit('profile', value)"
           />
@@ -182,8 +183,8 @@ function addKeyword() {
             and "No profile" removes it again. Public profiles and the profiles of this dataset's group
             can be assigned; other groups' profiles are not listed.
           </p>
+          <IssueMark :issues="issuesFor('conformsTo')" />
         </div>
-        <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('conformsTo')" /></div>
       </div>
     </div>
 

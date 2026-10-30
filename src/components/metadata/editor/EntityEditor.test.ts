@@ -15,6 +15,10 @@ import * as ProfileSeed from '@/lib/crate/profileSeed'
 
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const EmptyStub = defineComponent(() => () => null)
+const IssueStub = defineComponent({
+  props: { issues: { type: Array, default: () => [] } },
+  setup: (props) => () => h('ul', (props.issues as Editor.LiveIssue[]).map((issue) => h('li', issue.key))),
+})
 // The data picker, reduced to the target it is bound to.
 const FilesStub = defineComponent({
   props: { target: { type: Object, required: true } },
@@ -98,6 +102,7 @@ const EntityEditor = compileClientComponent(new URL('./EntityEditor.vue', import
   '@/components/ui/EmptyState.vue': moduleDefault(EmptyStub),
   './RootForm.vue': moduleDefault(EmptyStub),
   './EntityHeader.vue': moduleDefault(EmptyStub),
+  './IssueMark.vue': moduleDefault(IssueStub),
   './PropertyEditor.vue': moduleDefault(EmptyStub),
   './AddPropertyDialog.vue': moduleDefault(PropertyStub),
   './AddFilesDialog.vue': moduleDefault(FilesStub),
@@ -111,13 +116,14 @@ function mount(
   draft = Editor.newDraft(),
   selected = './',
   profileRules: Editor.ProfileExpectation | null = null,
+  issues: Editor.LiveIssue[] = [],
 ) {
   return mountApp(EntityEditor, {
     props: {
       draft,
       selected,
       vocab: null,
-      issues: [],
+      issues,
       profiles: [],
       profileId: '',
       profileRules,
@@ -127,6 +133,20 @@ function mount(
 }
 
 describe('EntityEditor', () => {
+  it('writes the issues no row shows under the header', async () => {
+    const at = (key: string, property?: string): Editor.LiveIssue =>
+      ({ key, severity: 'warning', message: key, entityId: './', property })
+    const issues = [at('profileType:Person'), at('rule:author', 'author'), at('root:name', 'name'), at('orphan:x')]
+    const mounted = await mount([], Editor.newDraft(), './', null, issues)
+
+    const text = content(mounted.root)
+    expect(text).toContain('profileType:Person')
+    expect(text).toContain('rule:author')
+    expect(text).not.toContain('root:name')
+    expect(text).not.toContain('orphan:x')
+    mounted.app.unmount()
+  })
+
   it('opens the picker instead of adding an empty parts row', async () => {
     const updates: Editor.CrateDraft[] = []
     const mounted = await mount(updates)
