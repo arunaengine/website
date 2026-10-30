@@ -151,7 +151,7 @@ watch(currentUser, () => void ensureLoaded())
                   <!-- Data watches are node-scoped: the same bucket on another node is a different watch. -->
                   <template v-if="info?.nodeId">
                     <span>· on</span>
-                    <NodeLabel :node-id="info.nodeId" size="sm" />
+                    <RouterLink :to="{ name: 'node', params: { nodeId: info.nodeId } }" class="hover:underline"><NodeLabel :node-id="info.nodeId" size="sm" /></RouterLink>
                   </template>
                   <span>· created {{ timeOf(w) }}</span>
                 </p>

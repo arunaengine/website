@@ -311,14 +311,14 @@ watch(
       <Notice v-if="unreachableNodes.length" tone="error" class="p-4 text-sm">
         {{ unreachableNodes.length === 1 ? 'The browser API probe failed for 1 node' : `The browser API probe failed for ${unreachableNodes.length} nodes` }}:
         <span v-for="(node, index) in unreachableNodes" :key="node.node_id">
-          <NodeLabel :node-id="node.node_id" /><template v-if="index < unreachableNodes.length - 1">, </template>
+          <RouterLink :to="{ name: 'node', params: { nodeId: node.node_id } }" class="hover:underline"><NodeLabel :node-id="node.node_id" /></RouterLink><template v-if="index < unreachableNodes.length - 1">, </template>
         </span>
       </Notice>
 
       <Notice v-if="degradedNodes.length" tone="warning" class="p-4 text-sm">
         Degraded interfaces on {{ degradedNodes.length === 1 ? 'node' : 'nodes' }}:
         <span v-for="(node, index) in degradedNodes" :key="node.node_id">
-          <NodeLabel :node-id="node.node_id" /><template v-if="index < degradedNodes.length - 1">, </template>
+          <RouterLink :to="{ name: 'node', params: { nodeId: node.node_id } }" class="hover:underline"><NodeLabel :node-id="node.node_id" /></RouterLink><template v-if="index < degradedNodes.length - 1">, </template>
         </span>
       </Notice>
 
