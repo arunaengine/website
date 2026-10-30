@@ -247,8 +247,8 @@ const onDelete = () => exclusive(async () => {
     <span class="inline-flex">
       <Button
         variant="outline"
-        :size="bell ? 'icon' : size ?? 'default'"
-        :class="bell ? (labelClass === undefined ? 'h-8 w-8' : 'h-8 w-auto px-2.5') : undefined"
+        :size="bell ? (labelClass === undefined ? 'icon' : 'sm') : size ?? 'default'"
+        :class="bell && labelClass === undefined ? 'h-8 w-8' : undefined"
         disabled
         :title="unavailableReason"
         :aria-label="bell && labelClass === undefined ? title : undefined"
@@ -262,8 +262,8 @@ const onDelete = () => exclusive(async () => {
   <Popover v-else-if="available && bell" :open="open" align="end" @update:open="onOpenChange">
     <Button
       variant="outline"
-      size="icon"
-      :class="labelClass === undefined ? 'h-8 w-8' : 'h-8 w-auto px-2.5'"
+      :size="labelClass === undefined ? 'icon' : 'sm'"
+      :class="labelClass === undefined ? 'h-8 w-8' : undefined"
       :aria-pressed="watching"
       :aria-label="labelClass === undefined ? title : undefined"
       :title="watching ? `You are watching this ${isData ? 'folder' : 'path'}` : title"
