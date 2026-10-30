@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import PageHeader from '@/components/dashboard/PageHeader.vue'
-import StatCard from '@/components/ui/StatCard.vue'
+import OverviewCell from '@/components/dashboard/OverviewCell.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Input from '@/components/ui/Input.vue'
@@ -35,7 +37,7 @@ import {
 } from '@/views/adminQuota'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
-import { Database, HardDrive, Layers, Link2, Boxes, Save, Plus, Trash2, ShieldCheck, Users, UserCog } from '@lucide/vue'
+import { Cpu, Database, Files, Gauge, Globe, HardDrive, Layers, Link2, Boxes, MapPinned, Save, Plus, ServerCog, ShieldAlert, Trash2, ShieldCheck, SlidersHorizontal, Users, UserCog, Workflow } from '@lucide/vue'
 
 const { realmInfo, usageInfo, isRealmAdmin, canInspectUsers, canManageOnboarding, canManageQuarantine, setRealmQuota, saving, myGroups, discoverableGroups, searchUsers, refresh } = useAruna()
 const realmBuckets = useRealmBucketCount(computed(() => usageInfo.value?.realm))
@@ -52,6 +54,15 @@ const placementAdminEnabled = featureEnabled('placementAdmin')
 const policiesEnabled = featureEnabled('policies')
 
 const tabs = adminTabs({ placement: placementAdminEnabled, policies: policiesEnabled })
+const TAB_ICONS: Record<string, unknown> = {
+  realm: Gauge,
+  compute: Cpu,
+  placement: Workflow,
+  'data-placement': MapPinned,
+  policies: ShieldAlert,
+  federation: Globe,
+  'portal-features': SlidersHorizontal,
+}
 const tab = useRouteTab(
   tabs.map((entry) => entry.id),
   'realm',
@@ -231,9 +242,18 @@ async function save() {
 
 <template>
   <div>
-    <PageHeader title="Realm administration" description="Realm-wide usage, quotas, compute, where records are placed and where data may be stored." :docs="{ topic: 'data-to-compute', section: 'Placement policies and record placement' }">
+    <PageHeader title="Realm administration" :docs="{ topic: 'data-to-compute', section: 'Placement policies and record placement' }">
       <template #actions>
         <RefreshButton :busy="refreshBusy" size="default" @click="onRefresh" />
+        <Button v-if="isRealmAdmin && canInspectUsers" variant="outline" as-child>
+          <RouterLink :to="{ name: 'admin-users' }"><Users class="h-4 w-4" /> Users</RouterLink>
+        </Button>
+        <Button v-if="isRealmAdmin && canManageOnboarding" variant="outline" as-child>
+          <RouterLink :to="{ name: 'admin-onboarding' }"><ServerCog class="h-4 w-4" /> Node onboarding</RouterLink>
+        </Button>
+        <Button v-if="isRealmAdmin && canManageQuarantine" variant="outline" as-child>
+          <RouterLink :to="{ name: 'admin-quarantine' }"><ShieldAlert class="h-4 w-4" /> Sync quarantine</RouterLink>
+        </Button>
       </template>
     </PageHeader>
 
@@ -264,8 +284,8 @@ async function save() {
     <Tabs v-else v-model="tab">
       <div class="w-full px-4 sm:px-6 pt-6">
         <TabsList aria-label="Realm administration sections" class="h-auto flex-wrap justify-start">
-          <TabsTrigger v-for="entry in tabs" :key="entry.id" :value="entry.id">
-            {{ entry.label }}
+          <TabsTrigger v-for="entry in tabs" :key="entry.id" :value="entry.id" class="gap-1.5">
+            <component :is="TAB_ICONS[entry.id]" class="h-3.5 w-3.5" /> {{ entry.label }}
           </TabsTrigger>
         </TabsList>
       </div>
@@ -285,56 +305,31 @@ async function save() {
 
       <TabsContent value="portal-features" class="w-full px-4 sm:px-6 mt-0 py-8"><FeatureDefaults /></TabsContent>
 
-      <TabsContent value="realm" class="w-full px-4 sm:px-6 mt-0 grid gap-6 py-8 lg:grid-cols-[260px_1fr]">
-      <nav class="flex flex-col gap-1 text-sm lg:sticky lg:top-20 lg:self-start">
-        <a href="#usage" class="rounded-md px-3 py-2 font-medium text-primary bg-primary/5">Realm usage</a>
-        <a href="#policy" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Quota policy</a>
-        <a href="#group-overrides" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Group overrides</a>
-        <a href="#user-overrides" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">User caps</a>
-        <RouterLink v-if="canInspectUsers" :to="{ name: 'admin-users' }" class="mt-1 rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Users &rarr;</RouterLink>
-        <RouterLink
-          v-if="canManageOnboarding"
-          :to="{ name: 'admin-onboarding' }"
-          class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          Node onboarding &rarr;
-        </RouterLink>
-        <RouterLink
-          v-if="canManageQuarantine"
-          :to="{ name: 'admin-quarantine' }"
-          class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          Sync quarantine &rarr;
-        </RouterLink>
-      </nav>
-
-      <div class="space-y-6">
-        <section id="usage" class="surface">
-          <header class="flex items-center gap-2 border-b border-border px-5 py-4">
-            <HardDrive class="h-4 w-4 text-primary" />
-            <h3 class="font-display text-sm font-semibold text-aruna-navy">Realm usage</h3>
-          </header>
-          <div v-if="usageInfo?.realm" class="grid gap-3.5 p-5 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Objects" :value="formatNumber(usageInfo.realm.objects)" :icon="Database" :hint="`${formatNumber(usageInfo.realm.stored_blobs ?? 0)} physical blob locations`" />
-            <StatCard label="Stored data" :value="formatBytes(usageInfo.realm.stored_bytes ?? 0)" :icon="HardDrive" hint="Physical blob storage" />
-            <StatCard label="Logical data" :value="formatBytes(usageInfo.realm.logical_bytes)" :icon="Layers" hint="Counts against quotas" />
-            <StatCard label="Referenced data" :value="formatBytes(usageInfo.realm.referenced_bytes)" :icon="Link2" hint="Does not count against quotas" />
-            <StatCard
-              label="Buckets"
-              :value="realmBuckets ? countText(realmBuckets, formatNumber) : formatNumber(usageInfo.realm.buckets)"
-              :icon="Boxes"
-              hint="A bucket stored on several nodes counts once"
-            />
+      <TabsContent value="realm" class="w-full px-4 sm:px-6 mt-0 space-y-8 py-6">
+        <section id="usage" class="scroll-mt-24" aria-labelledby="admin-usage-heading">
+          <SectionHeading id="admin-usage-heading" title="Realm usage" :icon="Gauge" />
+          <div v-if="usageInfo?.realm" class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+            <OverviewCell label="Stored data" :icon="HardDrive" info="Physical blob storage on every node. Logical data counts against quotas.">
+              <template #value>{{ formatBytes(usageInfo.realm.stored_bytes ?? 0) }}</template>
+              <span><Layers /><b>{{ formatBytes(usageInfo.realm.logical_bytes) }}</b> logical</span>
+            </OverviewCell>
+            <OverviewCell label="Referenced data" :icon="Link2" tone="aqua" info="Data that stays at its source. It does not count against quotas.">
+              <template #value>{{ formatBytes(usageInfo.realm.referenced_bytes) }}</template>
+            </OverviewCell>
+            <OverviewCell label="Objects" :icon="Files" tone="sky">
+              <template #value>{{ formatNumber(usageInfo.realm.objects) }}</template>
+              <span><Database /><b>{{ formatNumber(usageInfo.realm.stored_blobs ?? 0) }}</b> physical blob locations</span>
+            </OverviewCell>
+            <OverviewCell label="Buckets" :icon="Boxes" tone="ok" info="A bucket stored on several nodes counts once." :to="{ name: 'buckets' }">
+              <template #value>{{ realmBuckets ? countText(realmBuckets, formatNumber) : formatNumber(usageInfo.realm.buckets) }}</template>
+            </OverviewCell>
           </div>
-          <p v-else class="px-5 py-4 text-sm text-muted-foreground">Realm-wide totals need an authenticated session on a quota-aware backend.</p>
+          <EmptyState v-else title="Realm totals need a signed-in session on a quota-aware node." />
         </section>
 
-        <section id="policy" class="surface">
-          <header class="flex items-center gap-2 border-b border-border px-5 py-4">
-            <ShieldCheck class="h-4 w-4 text-primary" />
-            <h3 class="font-display text-sm font-semibold text-aruna-navy">Quota policy</h3>
-          </header>
-          <div class="space-y-5 p-5">
+        <section id="policy" class="scroll-mt-24" aria-labelledby="admin-policy-heading">
+          <SectionHeading id="admin-policy-heading" title="Quota policy" :icon="ShieldCheck" />
+          <div class="surface space-y-5 p-5">
             <div>
               <label class="text-xs font-medium text-foreground">Default group quota</label>
               <div class="mt-1.5 flex flex-wrap items-center gap-2">
@@ -377,12 +372,13 @@ async function save() {
           </div>
         </section>
 
-        <section id="group-overrides" class="surface">
-          <header class="flex items-center justify-between border-b border-border px-5 py-4">
-            <div class="flex items-center gap-2"><Users class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Group overrides</h3></div>
-            <Button size="sm" variant="outline" @click="addOverride"><Plus class="h-3.5 w-3.5" /> Add override</Button>
-          </header>
-          <div class="space-y-3 p-5">
+        <section id="group-overrides" class="scroll-mt-24" aria-labelledby="admin-group-overrides-heading">
+          <SectionHeading id="admin-group-overrides-heading" title="Group overrides" :icon="Users">
+            <template #actions>
+              <Button size="sm" variant="outline" @click="addOverride"><Plus class="h-3.5 w-3.5" /> Add override</Button>
+            </template>
+          </SectionHeading>
+          <div class="surface space-y-3 p-5">
             <div v-for="(o, i) in draft.overrides" :key="i" class="rounded-lg border border-border bg-background p-3">
               <div class="flex flex-wrap items-center gap-2">
                 <Select v-model="o.group_id" :options="groupOptions" placeholder="Select group" class="w-56" :invalid="duplicateGroupIds.has(o.group_id) ? 'error' : undefined" />
@@ -408,16 +404,13 @@ async function save() {
           </div>
         </section>
 
-        <section id="user-overrides" class="surface">
-          <header class="flex items-center gap-2 border-b border-border px-5 py-4">
-            <UserCog class="h-4 w-4 text-primary" />
-            <h3 class="font-display text-sm font-semibold text-aruna-navy">User group-cap overrides</h3>
-          </header>
-          <div class="space-y-3 p-5">
+        <section id="user-overrides" class="scroll-mt-24" aria-labelledby="admin-user-caps-heading">
+          <SectionHeading id="admin-user-caps-heading" title="User caps" :icon="UserCog" info="The most groups one user may create, above the realm default." />
+          <div class="surface space-y-3 p-5">
             <div v-for="(u, i) in draft.userCaps" :key="u.user_id" class="rounded-lg border border-border bg-background p-3">
               <div class="flex flex-wrap items-center gap-2">
                 <div class="min-w-0" :title="u.user_id">
-                  <div class="truncate text-sm font-medium text-foreground">{{ capName(u) }}</div>
+                  <RouterLink :to="{ name: 'user', params: { id: u.user_id } }" class="block truncate text-sm font-medium text-foreground hover:underline">{{ capName(u) }}</RouterLink>
                   <div v-if="capHasName(u)" class="truncate font-mono text-[10px] text-muted-foreground">{{ shortUserId(u.user_id) }}</div>
                 </div>
                 <div class="ml-auto flex items-center gap-2">
@@ -463,7 +456,6 @@ async function save() {
             <Button size="sm" :disabled="!dirty || saving || invalid" @click="save"><Save class="h-3.5 w-3.5" /> Save policy</Button>
           </div>
         </div>
-      </div>
       </TabsContent>
     </Tabs>
   </div>
