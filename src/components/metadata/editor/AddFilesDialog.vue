@@ -41,6 +41,7 @@ import {
   orderedEntities,
   rootId,
   typeLabel,
+  typeName,
   type CrateDraft,
   type DraftEntity,
 } from '@/lib/crate/editor'
@@ -510,7 +511,7 @@ function addUrl() {
               @click="linkExisting(entity)"
             >
               <span class="min-w-0 flex-1 truncate font-medium text-foreground">{{ displayName(entity) }}</span>
-              <span class="shrink-0 text-muted-foreground">{{ entity.types.map(typeLabel).join(', ') }}</span>
+              <span class="shrink-0 text-muted-foreground" :title="entity.types.map(typeLabel).join(', ')">{{ entity.types.map(typeName).join(', ') }}</span>
             </button>
           </li>
         </ul>

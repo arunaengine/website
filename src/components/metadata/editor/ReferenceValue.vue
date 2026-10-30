@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import { entityIcon } from './icons'
-import { displayName, findEntity, rootId, typeLabel, type CrateDraft } from '@/lib/crate/editor'
+import { displayName, findEntity, rootId, typeLabel, typeName, type CrateDraft } from '@/lib/crate/editor'
 import { isHttpUrl, truncateMiddle } from '@/lib/utils'
 import { Link2, Plus } from '@lucide/vue'
 
@@ -60,7 +60,7 @@ const tint = computed(() => {
     >
       <component :is="icon" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       <span class="min-w-0 flex-1 truncate text-sm text-foreground">{{ displayName(target) }}</span>
-      <Badge variant="secondary" size="sm">{{ target.types.map(typeLabel).join(', ') }}</Badge>
+      <Badge variant="secondary" size="sm" :title="target.types.map(typeLabel).join(', ')">{{ target.types.map(typeName).join(', ') }}</Badge>
     </button>
     <a
       v-else-if="external"

@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
+  typeName,
   addEntity,
   alignValueKinds,
   allowedKinds,
@@ -289,6 +290,14 @@ describe('crate draft', () => {
 
     expect(names).toContain('author')
     expect(names).not.toContain('keywords')
+  })
+})
+
+describe('type names', () => {
+  it('shows a plain name and keeps the schema name otherwise', () => {
+    expect(typeName('IndividualProduct')).toBe('Instrument')
+    expect(typeName('http://schema.org/SoftwareApplication')).toBe('Software')
+    expect(typeName('Person')).toBe('Person')
   })
 })
 

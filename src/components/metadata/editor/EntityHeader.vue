@@ -20,6 +20,7 @@ import {
   renameEntity,
   setTypes,
   typeLabel,
+  typeName,
   type CrateDraft,
   type DraftEntity,
 } from '@/lib/crate/editor'
@@ -191,8 +192,8 @@ function applyRor() {
         <Separator orientation="vertical" class="mx-1 h-4" />
       </template>
 
-      <span v-for="type in entity.types" :key="type" class="chip h-6">
-        {{ typeLabel(type) }}
+      <span v-for="type in entity.types" :key="type" class="chip h-6" :title="typeLabel(type)">
+        {{ typeName(type) }}
         <button
           v-if="entity.types.length > 1"
           type="button"

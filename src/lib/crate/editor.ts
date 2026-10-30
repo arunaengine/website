@@ -145,6 +145,29 @@ export function typeLabel(type: string): string {
   return termNameFromUri(type)
 }
 
+const TYPE_NAMES: Readonly<Record<string, string>> = {
+  IndividualProduct: 'Instrument',
+  CreateAction: 'Run',
+  SoftwareApplication: 'Software',
+  SoftwareSourceCode: 'Source code',
+  ComputerLanguage: 'Programming language',
+  DefinedTerm: 'Term',
+  PropertyValue: 'Value',
+  GeoCoordinates: 'Coordinates',
+  ContactPoint: 'Contact',
+  MediaObject: 'File',
+  CreativeWork: 'Creative work',
+  ScholarlyArticle: 'Article',
+  ComputationalWorkflow: 'Workflow',
+  HowTo: 'How-to',
+}
+
+/** The plain name a type is shown by; typeLabel stays the schema name. */
+export function typeName(type: string): string {
+  const label = typeLabel(type)
+  return TYPE_NAMES[label] ?? label
+}
+
 // RO-Crate names a data entity File; schema.org calls the same thing a
 // MediaObject, which is where its properties are declared.
 const TYPE_ALIASES: Readonly<Record<string, string>> = { File: 'MediaObject' }

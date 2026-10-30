@@ -4,7 +4,7 @@ import Button from '@/components/ui/Button.vue'
 import CommandDialog from '@/components/ui/CommandDialog.vue'
 import Input from '@/components/ui/Input.vue'
 import { entityIcon } from './icons'
-import { displayName, orderedEntities, rootId, typeLabel, type CrateDraft, type DraftEntity } from '@/lib/crate/editor'
+import { displayName, orderedEntities, rootId, typeLabel, typeName, type CrateDraft, type DraftEntity } from '@/lib/crate/editor'
 import { isAbsoluteUri, normalizeTypeUri } from '@/lib/profiles/uri'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 
@@ -78,7 +78,7 @@ function pickUrl() {
       <component :is="entityIcon(entity, entity.id === rootId(draft))" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       <span class="min-w-0 flex-1">
         <span class="block truncate font-medium text-foreground">{{ displayName(entity) }}</span>
-        <span class="block truncate text-muted-foreground">{{ entity.types.map(typeLabel).join(', ') }}</span>
+        <span class="block truncate text-muted-foreground" :title="entity.types.map(typeLabel).join(', ')">{{ entity.types.map(typeName).join(', ') }}</span>
       </span>
     </button>
     <p v-if="!listed.length" class="px-2.5 py-2 text-xs text-muted-foreground">Nothing in this dataset matches.</p>

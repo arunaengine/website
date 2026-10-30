@@ -11,6 +11,7 @@ import {
   entityGroup,
   partIds,
   typeLabel,
+  typeName,
   type CrateDraft,
   type DraftEntity,
   type LiveIssue,
@@ -128,8 +129,8 @@ function pick(entityId: string) {
                 <component :is="iconFor(entity)" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <span class="min-w-0 flex-1">
                   <span class="block truncate text-xs font-medium">{{ displayName(entity) }}</span>
-                  <span class="block truncate text-[11px] text-muted-foreground">
-                    {{ entity.types.map(typeLabel).join(', ') }}
+                  <span class="block truncate text-[11px] text-muted-foreground" :title="entity.types.map(typeLabel).join(', ')">
+                    {{ entity.types.map(typeName).join(', ') }}
                   </span>
                 </span>
                 <Badge
