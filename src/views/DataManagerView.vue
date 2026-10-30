@@ -192,17 +192,18 @@ function openFound(hit: ObjectSearchHit) {
 // A referenced bucket goes on to the list import of its source address, once the bucket is open.
 const addDataTab = ref<string | undefined>(undefined)
 const addDataLink = ref<string | undefined>(undefined)
-const pendingImport = ref<{ bucket: string; source: string } | null>(null)
-watch([bucket, contextReady, pendingImport], () => {
+const pendingImport = ref<{ bucket: string; nodeId: string | null; source: string } | null>(null)
+watch([bucket, remoteNodeId, contextReady, pendingImport], () => {
   const pending = pendingImport.value
-  if (!pending || bucket.value !== pending.bucket || !contextReady.value) return
+  if (!pending || bucket.value !== pending.bucket || remoteNodeId.value !== pending.nodeId || !contextReady.value) return
   pendingImport.value = null
   addDataTab.value = 'list'
   addDataLink.value = pending.source
   addDataOpen.value = true
 })
 function onBucketCreated(created: BindSource, source?: string) {
-  pendingImport.value = source ? { bucket: created.bucket, source } : null
+  const nodeId = realmNodes.isLocalNode(created.nodeId) ? null : created.nodeId
+  pendingImport.value = source ? { bucket: created.bucket, nodeId, source } : null
   manager.openSearchHit({
     arn: '',
     bucket: created.bucket,
@@ -524,6 +525,7 @@ async function createFolder() {
       :tab="addDataTab"
       :link="addDataLink"
       :bucket="bucket"
+      :node-id="remoteNodeId"
       :prefix="s3Prefix"
       :group-id="activeGroupId"
       :existing-keys="listedKeys"

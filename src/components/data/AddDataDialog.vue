@@ -29,6 +29,8 @@ import { Boxes, CloudDownload, Database, Library, ListChecks, Upload } from '@lu
 const props = defineProps<{
   open: boolean
   bucket: string
+  /** The node holding the bucket; empty for this node. */
+  nodeId?: string | null
   prefix: string
   groupId: string | null
   /** Keys visible in the parent's current listing, for overwrite warnings. */
@@ -131,7 +133,7 @@ function onImportsCreated() {
       </TabsContent>
 
       <TabsContent v-if="shown('connectors')" value="list" class="space-y-3">
-        <ListImportTab :bucket="bucket" :source="connectorSource" :link="link" @started="emit('staged')" />
+        <ListImportTab :bucket="bucket" :node-id="nodeId" :source="connectorSource" :link="link" @started="emit('staged')" />
       </TabsContent>
 
       <TabsContent value="other" class="space-y-3">

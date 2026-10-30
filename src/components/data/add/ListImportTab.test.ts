@@ -71,6 +71,17 @@ describe('import from a list', () => {
     expect(content(root)).toContain('S01')
   })
 
+  it('starts the import on the node holding the bucket', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('sample,url\nS01,https://x.org/S01.fq\n', { status: 200 })))
+    createStagingJob.mockClear()
+    const { root } = await mountApp(component, { props: { bucket: 'samples', nodeId: 'node-2', source, link: 'https://x.org/given.csv' } })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    await click(button(root, 'Start import'))
+
+    expect(createStagingJob).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'samples' }), 'node-2')
+  })
+
   it('waits for the preview of a new source and sends what was shown when Start was pressed', async () => {
     const csv = 'sample,url\nS01,https://x.org/S01.fq\n'
     let release: (value: Response) => void = () => {}

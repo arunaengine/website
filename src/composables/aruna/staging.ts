@@ -29,11 +29,12 @@ export async function listStagingJobs(cursor?: string, limit = 50, nodeId?: stri
   return request<ListStagingJobsResponse>('/data/staging/jobs', { query: { limit, cursor } }, nodeId)
 }
 
-export async function createStagingJob(input: StagingBatchRequest): Promise<CreateStagingJobResponse> {
+/** Starts a staging job on the node holding the bucket, this one unless named. */
+export async function createStagingJob(input: StagingBatchRequest, nodeId?: string | null): Promise<CreateStagingJobResponse> {
   return request<CreateStagingJobResponse>('/data/staging/jobs', {
     method: 'POST',
     body: JSON.stringify(input),
-  })
+  }, nodeId)
 }
 
 export async function getStagingJob(jobId: string, nodeId?: string | null): Promise<StagingJob> {

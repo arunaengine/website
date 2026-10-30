@@ -83,6 +83,11 @@ describe('Data view group selection', () => {
     expect(viewSource).toMatch(/\(\) => route\.query\.create,[\s\S]*?create !== 'bucket'[\s\S]*?newBucketOpen\.value = true[\s\S]*?router\.replace\(\{ query: rest \}\)/)
   })
 
+  it('hands a referenced bucket to the list import on its own node', () => {
+    expect(viewSource).toContain('remoteNodeId.value !== pending.nodeId')
+    expect(template).toContain(':node-id="remoteNodeId"')
+  })
+
   it('opens Upload files only once a bucket is chosen', () => {
     expect(viewSource).toContain("if (flag === '1') uploadPending.value = true")
     expect(viewSource).toContain('if (!uploadPending.value || !bucket.value || !contextReady.value) return')

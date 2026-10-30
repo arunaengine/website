@@ -17,7 +17,7 @@ import {
 import { errorMessage } from '@/lib/utils'
 import { ArrowRight, FileUp } from '@lucide/vue'
 
-const props = defineProps<{ bucket: string; source: ConnectorSource; link?: string }>()
+const props = defineProps<{ bucket: string; nodeId?: string | null; source: ConnectorSource; link?: string }>()
 const emit = defineEmits<{ started: [jobId: string] }>()
 
 const { createStagingJob } = useAruna()
@@ -209,8 +209,8 @@ async function start() {
     },
   }
   try {
-    if (listFile) await s3.uploadObject(props.bucket, `lists/${listFile.name}`, listFile).promise
-    const answer = await createStagingJob(request)
+    if (listFile) await s3.uploadObject(props.bucket, `lists/${listFile.name}`, listFile, undefined, props.nodeId).promise
+    const answer = await createStagingJob(request, props.nodeId)
     started.value = answer.job_id
     emit('started', answer.job_id)
   } catch (cause) {
