@@ -12,7 +12,7 @@ const rows = Object.entries(VALUE_PRESETS).flatMap(([property, presets]) =>
 
 <template>
   <div>
-    <PageHeader title="Presets" :crumbs="[{ label: 'Presets' }]" />
+    <PageHeader title="Presets" :crumbs="[{ label: 'Presets' }]" :docs="{ topic: 'datasets' }" />
     <div class="mx-auto w-full max-w-5xl space-y-4 px-4 py-8 sm:px-6">
       <p class="text-sm text-muted-foreground">Ready-made values the dataset editor offers. Datasets refer to them by their @id.</p>
       <div class="surface overflow-x-auto">
