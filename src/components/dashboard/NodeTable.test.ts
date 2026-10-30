@@ -22,12 +22,25 @@ const PagerStub = defineComponent({
   setup: (props, { emit }) => () => h('nav', [`page ${props.page} of ${props.pageCount}`, h('button', { onClick: () => emit('update:page', (props.page ?? 1) + 1) }, 'Next')]),
 })
 
+const ChipsStub = defineComponent({
+  props: { modelValue: String, options: Array },
+  emits: ['update:modelValue'],
+  setup: (props, { emit }) => () =>
+    h('div', (props.options as Array<{ value: string; label: string; count: number }>).map((option) =>
+      h('button', { 'aria-pressed': option.value === props.modelValue, onClick: () => emit('update:modelValue', option.value) }, `${option.label} ${option.count}`))),
+})
+const MarkStub = defineComponent({ props: { label: String }, setup: (props) => () => h('span', { 'data-mark': props.label }, props.label) })
+const PillStub = defineComponent({ props: { state: String }, setup: (props) => () => h('span', { 'data-pill': props.state }, props.state) })
+
 const NodeTable = compileClientComponent(new URL('./NodeTable.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': { RouterLink: LinkStub, useRouter: () => ({ push }) },
-  '@/components/ui/Badge.vue': moduleDefault(Plain),
+  '@/components/ui/FilterChips.vue': moduleDefault(ChipsStub),
+  '@/components/ui/IconTile.vue': moduleDefault(Plain),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Pagination.vue': moduleDefault(PagerStub),
+  '@/components/ui/StatusMark.vue': moduleDefault(MarkStub),
+  '@/components/ui/StatusPill.vue': moduleDefault(PillStub),
   '@/components/nodes/node-display': NodeDisplay,
   '@/composables/useRealmNodes': { computerName: (node: RealmNodeInfo) => node.display_name ?? 'This computer' },
   '@/lib/placement': Placement,
@@ -56,15 +69,19 @@ const many = (count: number) => Array.from({ length: count }, (_, index) => real
 const names = (root: Parameters<typeof content>[0]) =>
   nodes(root).filter((node) => node.tag === 'a').map((node) => content(node).trim())
 
-describe('the realm node table', () => {
-  it('states each fact once per row: role, location, stored, CPU, activity and one state word', async () => {
-    const mounted = await mountApp(NodeTable, { props: { nodes: many(5) } })
-    const row = (name: string) => content(element(mounted.root, (node) => node.tag === 'tr' && content(node).includes(name)))
+const row = (root: Parameters<typeof content>[0], name: string) =>
+  element(root, (node) => node.tag === 'tr' && content(node).includes(name))
 
-    expect(row('Giessen storage 0')).toContain('Marburgmanagement')
-    expect(row('Giessen storage 3').replace(/\s+/g, '')).toContain('Giessenstorage3KB30%Importing,2jobsonline')
-    expect(row('Giessen storage 4')).toContain('offline')
-    // A CPU above 70% turns its meter amber.
+describe('the realm node table', () => {
+  it('states each fact once per row: type, location, stored, CPU, activity and the state', async () => {
+    const mounted = await mountApp(NodeTable, { props: { nodes: many(5) } })
+    const text = (name: string) => content(row(mounted.root, name)).replace(/\s+/g, '')
+
+    expect(text('Giessen storage 0')).toContain('MarburgManagement')
+    expect(text('Giessen storage 3')).toContain('Giessenstorage3StorageGiessenImporting,2jobsGiessenStorage3KB30%Importing,2jobsOnline')
+    // A fine node is a check, an offline one a pill; no bar for the CPU.
+    expect(nodes(row(mounted.root, 'Giessen storage 3')).some((node) => node.props['data-mark'] === 'Online')).toBe(true)
+    expect(nodes(row(mounted.root, 'Giessen storage 4')).some((node) => node.props['data-pill'] === 'Offline')).toBe(true)
     expect(nodes(mounted.root).some((node) => String(node.props.class ?? '').includes('bg-amber-500'))).toBe(false)
     mounted.app.unmount()
   })
@@ -75,74 +92,86 @@ describe('the realm node table', () => {
       realmNode(2, { place: 'Giessen', placement: { location: 'rack-b', weight: 1, full: false, draining: false } }),
       realmNode(3, { place: 'Giessen', placement: { location: 'Giessen', weight: 1, full: false, draining: false } }),
     ] } })
-    const cell = (name: string) => content(element(mounted.root, (node) => node.tag === 'tr' && content(node).includes(name)).children[1]).trim()
+    const cell = (name: string) => content(row(mounted.root, name).children[1]).trim()
 
     expect(cell('Giessen storage 1')).toBe('Giessen')
-    expect(cell('Giessen storage 2')).toBe('Giessenrack-b')
+    expect(cell('Giessen storage 2')).toBe('Giessen, rack-b')
     expect(cell('Giessen storage 3')).toBe('Giessen')
     mounted.app.unmount()
   })
 
-  it('fits a narrow card: role, location and work fold under the name, the state column always stays', async () => {
-    const mounted = await mountApp(NodeTable, { props: { nodes: [realmNode(3, { place: 'Giessen' })] } })
-    const headers = nodes(mounted.root).filter((node) => node.tag === 'th')
-    const header = (label: string) => String(headers.find((node) => content(node).trim() === label)!.props.class)
+  it('leaves the location out when every node stands in one place', async () => {
+    const giessen = { location: 'Giessen', weight: 1, full: false, draining: false }
+    const mounted = await mountApp(NodeTable, { props: { nodes: [realmNode(1, { place: 'Giessen', placement: giessen }), realmNode(2, { place: 'Giessen', placement: giessen })] } })
+    const headers = nodes(mounted.root).filter((node) => node.tag === 'th').map((node) => content(node).trim())
 
-    expect(nodes(mounted.root).some((node) => String(node.props.class ?? '').startsWith('@container'))).toBe(true)
-    expect(header('Role')).toContain('hidden')
-    expect(header('Role')).toContain('@min-[48rem]:table-cell')
-    expect(header('Location')).toContain('@min-[40rem]:table-cell')
-    expect(header('Activity')).toContain('@min-[32rem]:table-cell')
-    for (const always of ['Node', 'Stored', 'CPU', 'State']) expect(header(always)).not.toContain('hidden')
+    expect(headers).toEqual(['Node', 'Type', 'Stored', 'CPU', 'Activity', 'State'])
+    expect(content(row(mounted.root, 'Giessen storage 1'))).not.toContain('Giessen,')
     const table = element(mounted.root, (node) => node.tag === 'table')
-    expect(String(table.props.class)).toBe('data-table')
-    expect(String(element(mounted.root, (node) => node.tag === 'thead').props.class ?? '')).not.toContain('uppercase')
-    expect(header('Stored')).toContain('num')
-
-    // The folded line under the name says what the hidden columns would.
-    const name = element(mounted.root, (node) => node.tag === 'td' && content(node).includes('Giessen storage 3'))
-    const folded = name.children.find((node) => String(node.props.class ?? '').includes('@min-[48rem]:hidden'))!
-    expect(content(folded).replace(/\s+/g, ' ')).toContain('storage, Giessen')
-    expect(content(folded)).toContain('Importing, 2 jobs')
+    expect(String(table.props.class)).toBe('data-table data-table-tall')
     mounted.app.unmount()
   })
 
-  it('puts this computer first and opens a node page from its row', async () => {
+  it('puts this computer first, filters nodes and devices, and opens a node page from its row', async () => {
     const computer = realmNode(9, { node_id: 'laptop', kind: 'user', display_name: 'Microbiology laptop', connection_status: 'seen', present: false })
     const mounted = await mountApp(NodeTable, { props: { nodes: many(3), computer } })
 
     expect(names(mounted.root)[0]).toBe('Microbiology laptop')
-    expect(content(element(mounted.root, (node) => node.tag === 'tr' && content(node).includes('Microbiology laptop')))).toContain('this computerdevice')
-    await click(element(mounted.root, (node) => node.tag === 'tr' && content(node).includes('Giessen storage 2')))
+    expect(content(row(mounted.root, 'Microbiology laptop'))).toContain('This computer')
+    expect(element(mounted.root, (node) => node.tag === 'input').props.placeholder).toBe('Find a node or device')
+    await click(element(mounted.root, (node) => node.tag === 'button' && content(node) === 'Devices 1'))
+    expect(names(mounted.root)).toEqual(['Microbiology laptop'])
+    await click(element(mounted.root, (node) => node.tag === 'button' && content(node) === 'Nodes 3'))
+    expect(names(mounted.root)).toHaveLength(3)
+    await click(row(mounted.root, 'Giessen storage 2'))
     expect(push).toHaveBeenCalledWith({ name: 'node', params: { nodeId: 'node-2' } })
     mounted.app.unmount()
   })
 
-  it('shows eight rows a page with the portal pager, and a search only past eight', async () => {
-    const few = await mountApp(NodeTable, { props: { nodes: many(8) } })
-    expect(nodes(few.root).some((node) => node.tag === 'input')).toBe(false)
+  it('offers no device filter on the web', async () => {
+    const mounted = await mountApp(NodeTable, { props: { nodes: many(3) } })
+    expect(content(mounted.root)).not.toContain('Devices')
+    expect(element(mounted.root, (node) => node.tag === 'input').props.placeholder).toBe('Find a node')
+    mounted.app.unmount()
+  })
+
+  it('shows five rows a page under a search, offline nodes first, with the time they were last seen', async () => {
+    const few = await mountApp(NodeTable, { props: { nodes: many(5) } })
+    expect(nodes(few.root).some((node) => node.tag === 'input')).toBe(true)
     expect(content(few.root)).not.toContain('page 1 of')
+    // Node 4 is offline, so it leads.
+    expect(names(few.root)[0]).toBe('Giessen storage 4')
+    expect(content(row(few.root, 'Giessen storage 4'))).toContain('Last seen')
     few.app.unmount()
 
-    const mounted = await mountApp(NodeTable, { props: { nodes: many(20) } })
-    expect(names(mounted.root)).toHaveLength(8)
-    expect(content(mounted.root)).toContain('page 1 of 3')
+    const mounted = await mountApp(NodeTable, { props: { nodes: many(20).map((node) => ({ ...node, present: true })) } })
+    expect(names(mounted.root)).toHaveLength(5)
+    expect(content(mounted.root)).toContain('page 1 of 4')
     await click(element(mounted.root, (node) => node.tag === 'button' && content(node) === 'Next'))
-    expect(names(mounted.root)[0]).toBe('Giessen storage 8')
+    expect(names(mounted.root)[0]).toBe('Giessen storage 5')
 
     // A search starts again on its first page.
     ;(element(mounted.root, (node) => node.tag === 'input').props['onUpdate:modelValue'] as (value: string) => void)('storage 1')
     await flush()
-    expect(names(mounted.root)).toEqual(Array.from({ length: 8 }, (_, index) => `Giessen storage ${index ? 9 + index : 1}`))
+    expect(names(mounted.root)).toEqual(['Giessen storage 1', 'Giessen storage 10', 'Giessen storage 11', 'Giessen storage 12', 'Giessen storage 13'])
     ;(element(mounted.root, (node) => node.tag === 'input').props['onUpdate:modelValue'] as (value: string) => void)('marburg')
     await flush()
     expect(names(mounted.root).every((name) => Number(name.split(' ').pop()) % 2 === 0)).toBe(true)
     mounted.app.unmount()
   })
 
-  it('turns a busy CPU meter amber', async () => {
-    const mounted = await mountApp(NodeTable, { props: { nodes: [realmNode(8)] } })
-    expect(nodes(mounted.root).some((node) => String(node.props.class ?? '').includes('bg-amber-500'))).toBe(true)
+  it('lights up the row of the node hovered on the topology and reports its own hover', async () => {
+    const mounted = await mountApp(NodeTable, { props: { nodes: many(3), highlight: 'node-1' } })
+    expect(String(row(mounted.root, 'Giessen storage 1').props.class)).toContain('bg-muted/60')
+    expect(String(row(mounted.root, 'Giessen storage 2').props.class ?? '')).not.toContain('bg-muted/60')
     mounted.app.unmount()
+
+    const onHover = vi.fn()
+    const hovering = await mountApp(NodeTable, { props: { nodes: many(3), onHover } })
+    ;(row(hovering.root, 'Giessen storage 2').props.onMouseenter as () => void)()
+    expect(onHover).toHaveBeenLastCalledWith('node-2')
+    ;(row(hovering.root, 'Giessen storage 2').props.onMouseleave as () => void)()
+    expect(onHover).toHaveBeenLastCalledWith(null)
+    hovering.app.unmount()
   })
 })

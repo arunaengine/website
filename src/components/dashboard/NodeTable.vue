@@ -1,26 +1,32 @@
 <script setup lang="ts">
-// The realm's nodes as a table that scales: name, location, role, stored data, CPU, what runs there and
-// the state, one word each. This computer leads in the desktop. Eight rows a page, a search above
-// once there are more. A row opens the node's page.
+// The realm's nodes as a table: name, location, type, stored data, CPU, what runs there and the
+// state. This computer leads in the desktop, offline nodes come first. Five rows a page under a
+// search. A row opens the node's page; hovering one lights up its node on the topology.
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import Badge from '@/components/ui/Badge.vue'
+import FilterChips from '@/components/ui/FilterChips.vue'
+import IconTile from '@/components/ui/IconTile.vue'
 import Input from '@/components/ui/Input.vue'
 import Pagination from '@/components/ui/Pagination.vue'
+import StatusMark from '@/components/ui/StatusMark.vue'
+import StatusPill from '@/components/ui/StatusPill.vue'
 import { nodeActivity, nodeName, nodeOnline, roleLabel } from '@/components/nodes/node-display'
 import { computerName } from '@/composables/useRealmNodes'
 import type { RealmNodeInfo } from '@/lib/api'
 import { LOCATION_AFFINITY_KEY } from '@/lib/placement'
-import { formatBytes } from '@/lib/utils'
-import { Download } from '@lucide/vue'
+import { formatBytes, relativeTime } from '@/lib/utils'
+import { Download, Laptop, MapPin, Server, WifiOff } from '@lucide/vue'
 
 const props = defineProps<{
   nodes: RealmNodeInfo[]
   /** This computer's own device record in the desktop, listed first. */
   computer?: RealmNodeInfo | null
+  /** The node lit up on the topology. */
+  highlight?: string | null
 }>()
+const emit = defineEmits<{ hover: [nodeId: string | null] }>()
 
-const PAGE_SIZE = 8
+const PAGE_SIZE = 5
 
 const router = useRouter()
 const query = ref('')
@@ -46,14 +52,26 @@ const rows = computed<Row[]>(() => [
     return { node, name: nodeName(node), place, location: at && at !== place ? at : null, here: false }
   }),
 ])
+// The desktop lists this computer too, so it can show only the nodes or only the devices.
+const kind = ref('all')
+const kinds = computed(() => [
+  { value: 'all', label: 'All', count: rows.value.length },
+  { value: 'nodes', label: 'Nodes', count: props.nodes.length },
+  { value: 'devices', label: 'Devices', count: props.computer ? 1 : 0 },
+])
 const shown = computed(() => {
   const term = query.value.trim().toLowerCase()
-  if (!term) return rows.value
-  return rows.value.filter((row) => [row.name, row.place ?? '', row.location ?? '', roleLabel[row.node.kind]].some((text) => text.toLowerCase().includes(term)))
+  return rows.value
+    .filter((row) => kind.value === 'all' || row.here === (kind.value === 'devices'))
+    .filter((row) => !term || [row.name, row.place ?? '', row.location ?? '', roleLabel[row.node.kind]].some((text) => text.toLowerCase().includes(term)))
+    .sort((a, b) => Number(nodeOnline(a.node)) - Number(nodeOnline(b.node)))
 })
+// A location column only says something when the nodes stand in more than one place.
+const where = (row: Row) => [row.place, row.location].filter(Boolean).join(', ')
+const onePlace = computed(() => new Set(rows.value.filter((row) => !row.here).map(where)).size <= 1)
 const pageCount = computed(() => Math.max(1, Math.ceil(shown.value.length / PAGE_SIZE)))
 const pageRows = computed(() => shown.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE))
-watch(query, () => (page.value = 1))
+watch([query, kind], () => (page.value = 1))
 watch(pageCount, (count) => {
   if (page.value > count) page.value = count
 })
@@ -63,70 +81,93 @@ const cpu = (node: RealmNodeInfo) => {
   return permille === undefined ? null : Math.round(permille / 10)
 }
 const open = (row: Row) => void router.push({ name: 'node', params: { nodeId: row.node.node_id } })
+const typeLabel = (row: Row) => `${roleLabel[row.node.kind].charAt(0).toUpperCase()}${roleLabel[row.node.kind].slice(1)}`
+// When an offline node was last heard of: a device by its last contact, a node by its heartbeat.
+function lastSeen(node: RealmNodeInfo): string | null {
+  const ms = node.kind === 'user' ? node.last_seen_ms : node.info?.utilization.heartbeat_at_ms
+  return ms ? relativeTime(new Date(ms).toISOString()) : null
+}
 </script>
 
 <template>
-  <!-- The table fits its own width: a narrow card folds role, location and then the work into a
-       small line under the name; the state always stays. -->
-  <div class="@container min-w-0">
-    <div v-if="rows.length > PAGE_SIZE" class="px-4 pt-3">
-      <Input v-model="query" placeholder="Find a node" aria-label="Find a node" class="h-8 max-w-xs text-xs" />
+  <div class="flex min-w-0 flex-col">
+    <div class="flex flex-wrap items-center gap-2 border-b border-border-subtle px-4 py-3">
+      <Input
+        v-model="query"
+        :placeholder="computer ? 'Find a node or device' : 'Find a node'"
+        :aria-label="computer ? 'Find a node or device' : 'Find a node'"
+        class="h-8 max-w-xs text-xs"
+      />
+      <FilterChips v-if="computer" v-model="kind" :options="kinds" aria-label="Show" />
     </div>
     <div class="overflow-x-auto">
-      <table class="data-table">
+      <table class="data-table data-table-tall">
         <thead>
           <tr>
-            <th class="px-3 py-2 pl-4">Node</th>
-            <th class="hidden px-3 py-2 @min-[40rem]:table-cell">Location</th>
-            <th class="hidden px-3 py-2 @min-[48rem]:table-cell">Role</th>
-            <th class="num px-3 py-2">Stored</th>
-            <th class="num px-3 py-2">CPU</th>
-            <th class="hidden px-3 py-2 @min-[32rem]:table-cell">Activity</th>
-            <th class="px-3 py-2 pr-4 text-right">State</th>
+            <th class="pl-4">Node</th>
+            <th v-if="!onePlace" class="hidden 2xl:table-cell">Location</th>
+            <th class="hidden sm:table-cell lg:hidden xl:table-cell">Type</th>
+            <th class="num">Stored</th>
+            <th class="num hidden md:table-cell">CPU</th>
+            <th class="hidden 2xl:table-cell">Activity</th>
+            <th class="pr-4 text-right">State</th>
           </tr>
         </thead>
         <tbody>
           <tr
             v-for="row in pageRows"
             :key="row.node.node_id"
-            class="cursor-pointer border-t border-border hover:bg-muted/40"
+            class="cursor-pointer"
+            :class="highlight === row.node.node_id ? 'bg-muted/60' : ''"
+            tabindex="0"
             @click="open(row)"
+            @keydown.enter="open(row)"
+            @mouseenter="emit('hover', row.node.node_id)"
+            @mouseleave="emit('hover', null)"
+            @focusin="emit('hover', row.node.node_id)"
+            @focusout="emit('hover', null)"
           >
-            <td class="w-full max-w-0 px-3 py-2.5 pl-4">
-              <RouterLink :to="{ name: 'node', params: { nodeId: row.node.node_id } }" class="block truncate font-medium text-foreground hover:underline" :title="`${row.name} (${row.node.node_id})`" @click.stop>
-                {{ row.name }}
-              </RouterLink>
-              <span class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground @min-[48rem]:hidden">
-                <span>{{ roleLabel[row.node.kind] }}<template v-if="row.here || row.place || row.location"><span class="@min-[40rem]:hidden">, {{ row.here ? 'this computer' : [row.place, row.location].filter(Boolean).join(', ') }}</span></template></span>
-                <Badge v-if="nodeActivity(row.node)" variant="sky" size="sm" class="gap-1 @min-[32rem]:hidden"><Download class="h-3 w-3" /> {{ nodeActivity(row.node) }}</Badge>
-              </span>
-            </td>
-            <td class="hidden whitespace-nowrap px-3 py-2.5 text-xs @min-[40rem]:table-cell">
-              <span v-if="row.here" class="text-muted-foreground">this computer</span>
-              <span v-else class="inline-flex items-center gap-1.5">
-                <span v-if="row.place" class="text-foreground">{{ row.place }}</span>
-                <Badge v-if="row.location" variant="outline" size="sm">{{ row.location }}</Badge>
-              </span>
-            </td>
-            <td class="hidden whitespace-nowrap px-3 py-2.5 text-xs text-muted-foreground @min-[48rem]:table-cell">{{ roleLabel[row.node.kind] }}</td>
-            <td class="num whitespace-nowrap px-3 py-2.5 text-foreground">{{ row.node.info ? formatBytes(row.node.info.utilization.storage_bytes_used) : '' }}</td>
-            <td class="num whitespace-nowrap px-3 py-2.5">
-              <span v-if="cpu(row.node) !== null" class="inline-flex items-center gap-2" :title="`1-minute load at ${cpu(row.node)}% of the CPU cores`">
-                <span class="hidden h-1.5 w-8 overflow-hidden rounded-full bg-muted @min-[40rem]:inline-block">
-                  <span
-                    class="block h-full rounded-full"
-                    :class="cpu(row.node)! > 70 ? 'bg-amber-500' : 'bg-aruna-royal'"
-                    :style="{ width: `${Math.min(100, cpu(row.node)!)}%` }"
-                  />
+            <td class="w-full min-w-48 max-w-0 pl-4">
+              <span class="flex items-center gap-3">
+                <IconTile :icon="row.here ? Laptop : Server" :tone="row.here ? 'aqua' : nodeOnline(row.node) ? 'royal' : 'muted'" size="sm" />
+                <span class="min-w-0">
+                  <RouterLink
+                    :to="{ name: 'node', params: { nodeId: row.node.node_id } }"
+                    class="block truncate font-medium text-foreground hover:underline max-sm:whitespace-normal"
+                    :title="`${row.name} (${row.node.node_id})`"
+                    @click.stop
+                  >
+                    {{ row.name }}
+                  </RouterLink>
+                  <!-- What the hidden columns would say, in a small line under the name. -->
+                  <span class="flex flex-wrap gap-x-2 text-[11px] text-muted-foreground">
+                    <span class="sm:hidden lg:inline xl:hidden">{{ typeLabel(row) }}</span>
+                    <span v-if="row.here">This computer</span>
+                    <span v-else-if="!onePlace && where(row)" class="2xl:hidden">{{ where(row) }}</span>
+                    <span v-if="nodeActivity(row.node)" class="inline-flex items-center gap-1 whitespace-nowrap text-sky-700 dark:text-aruna-aqua 2xl:hidden">
+                      <Download class="h-3 w-3" />{{ nodeActivity(row.node) }}
+                    </span>
+                    <span v-if="!nodeOnline(row.node) && lastSeen(row.node)">Last seen {{ lastSeen(row.node) }}</span>
+                  </span>
                 </span>
-                {{ cpu(row.node) }}%
               </span>
             </td>
-            <td class="hidden whitespace-nowrap px-3 py-2.5 text-xs @min-[32rem]:table-cell">
-              <Badge v-if="nodeActivity(row.node)" variant="sky" size="sm" class="gap-1"><Download class="h-3 w-3" /> {{ nodeActivity(row.node) }}</Badge>
+            <td v-if="!onePlace" class="hidden whitespace-nowrap text-xs 2xl:table-cell">
+              <span v-if="row.here" class="text-muted-foreground">This computer</span>
+              <span v-else-if="where(row)" class="inline-flex items-center gap-1.5 text-foreground"><MapPin class="h-3 w-3 text-muted-foreground" />{{ where(row) }}</span>
             </td>
-            <td class="whitespace-nowrap px-3 py-2.5 pr-4 text-right text-xs" :class="nodeOnline(row.node) ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'">
-              {{ nodeOnline(row.node) ? 'online' : 'offline' }}
+            <td class="hidden whitespace-nowrap text-xs text-muted-foreground sm:table-cell lg:hidden xl:table-cell">{{ typeLabel(row) }}</td>
+            <td class="num whitespace-nowrap">{{ row.node.info ? formatBytes(row.node.info.utilization.storage_bytes_used) : '' }}</td>
+            <td class="num hidden whitespace-nowrap md:table-cell" :title="cpu(row.node) !== null ? `1-minute load at ${cpu(row.node)}% of the CPU cores` : undefined">
+              <template v-if="cpu(row.node) !== null">{{ cpu(row.node) }}%</template>
+              <span v-else class="text-muted-foreground">-</span>
+            </td>
+            <td class="hidden whitespace-nowrap 2xl:table-cell">
+              <span v-if="nodeActivity(row.node)" class="inline-flex items-center gap-1 text-xs text-sky-700 dark:text-aruna-aqua"><Download class="h-3 w-3" />{{ nodeActivity(row.node) }}</span>
+            </td>
+            <td class="pr-4 text-right">
+              <StatusMark v-if="nodeOnline(row.node)" label="Online" />
+              <StatusPill v-else state="Offline" tone="failed" :icon="WifiOff" />
             </td>
           </tr>
           <tr v-if="!pageRows.length">
@@ -135,9 +176,8 @@ const open = (row: Row) => void router.push({ name: 'node', params: { nodeId: ro
         </tbody>
       </table>
     </div>
-    <div class="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-2 text-xs text-muted-foreground">
-      <span>Click a node for details.</span>
-      <Pagination v-if="pageCount > 1" v-model:page="page" :page-count="pageCount" :has-next="page < pageCount" />
+    <div v-if="pageCount > 1" class="mt-auto flex justify-end border-t border-border-subtle px-4 py-2">
+      <Pagination v-model:page="page" :page-count="pageCount" :has-next="page < pageCount" />
     </div>
   </div>
 </template>
