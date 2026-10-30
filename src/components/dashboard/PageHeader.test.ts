@@ -80,6 +80,10 @@ describe('page header docs links', () => {
     expect(nav).toContain(`href="${JSON.stringify({ name: 'dashboard' }).replace(/"/g, '&quot;')}"`)
     expect(html).not.toContain('Portal')
     expect(html).toContain('class="type-page-title"')
+    // The title wraps beside actions that never shrink; on a phone the actions go below it.
+    expect(html).toContain('class="flex flex-col items-start gap-4 sm:flex-row sm:justify-between"')
+    expect(html).toContain('class="min-w-0 flex-1"')
+    expect(html).toContain('class="flex shrink-0 flex-wrap items-center gap-2"')
     // The docs link is a 36 px icon button whose label is its name and tooltip.
     expect(html).toContain('#nodes-and-the-realm')
     expect(html).toContain('aria-label="Read the docs"')

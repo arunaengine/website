@@ -67,8 +67,9 @@ const trail = computed(() => [...(section.value ? [section.value] : []), ...prop
         </template>
         <span v-if="$slots.breadcrumbs" class="ml-1 inline-flex flex-wrap items-center gap-1.5"><slot name="breadcrumbs" /></span>
       </nav>
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div class="min-w-0">
+      <!-- The title takes the room and wraps; the actions keep their row, and go below it on a phone. -->
+      <div class="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
+        <div class="min-w-0 flex-1">
           <h1 class="type-page-title">
             <slot name="title">{{ title }}</slot>
           </h1>
@@ -76,7 +77,7 @@ const trail = computed(() => [...(section.value ? [section.value] : []), ...prop
             <slot name="description">{{ description }}</slot>
           </p>
         </div>
-        <div v-if="$slots.actions || docs" class="flex flex-wrap items-center gap-2">
+        <div v-if="$slots.actions || docs" class="flex shrink-0 flex-wrap items-center gap-2">
           <slot name="actions" />
           <DocsLink v-if="docs" :topic="docs.topic" :section="docs.section" :label="docs.label ?? 'Read the docs'" button />
         </div>
