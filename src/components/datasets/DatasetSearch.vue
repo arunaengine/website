@@ -33,8 +33,5 @@ defineExpose({ focus: () => searchBox.value?.focus() })
       <Spinner v-if="busy" label="Searching…" class="absolute right-3 top-1/2 -translate-y-1/2 text-primary" />
     </div>
     <DatasetFilters v-model="filterModel" :group-options="groupOptions" class="mt-3" />
-    <p class="mt-2 text-[11px] text-muted-foreground">
-      Purpose classifies each RO-Crate as dataset, Profile, or Process Run. Profile and group filters are applied by the node.
-    </p>
   </div>
 </template>

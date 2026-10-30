@@ -70,7 +70,6 @@ const { realm } = useAruna()
         <DatasetCard
           v-if="line.doc"
           :doc="line.doc"
-          purpose
           :score="textQuery ? line.hit.score : undefined"
           :favourite="isFavourite(line.doc.ulid)"
           :busy="favBusy.has(line.doc.ulid)"

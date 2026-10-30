@@ -1,0 +1,28 @@
+<script setup lang="ts">
+// The labeled facts of one dataset in a row or card; a fact the summary lacks shows a dash.
+import { computed } from 'vue'
+import { useAruna } from '@/composables/useAruna'
+import { useRealmNodes } from '@/composables/useRealmNodes'
+import { listFacts } from '@/lib/datasetFacts'
+import { truncateMiddle } from '@/lib/utils'
+import type { MetadataDoc } from '@/data/types'
+
+const props = defineProps<{ doc: MetadataDoc }>()
+const { myGroups } = useAruna()
+const { displayName } = useRealmNodes()
+const facts = computed(() =>
+  listFacts(props.doc, {
+    group: (id) => myGroups.value.find((group) => group.id === id)?.name ?? truncateMiddle(id),
+    node: (id) => displayName(id),
+  }),
+)
+</script>
+
+<template>
+  <dl class="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-4">
+    <div v-for="fact in facts" :key="fact.label" class="min-w-0">
+      <dt class="text-[11px] text-muted-foreground">{{ fact.label }}</dt>
+      <dd class="truncate text-xs" :class="fact.value ? 'text-foreground' : 'text-muted-foreground'" :title="fact.title">{{ fact.value || '-' }}</dd>
+    </div>
+  </dl>
+</template>

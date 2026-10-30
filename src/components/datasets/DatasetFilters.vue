@@ -1,9 +1,10 @@
 <script setup lang="ts">
-// Facet config for the Datasets filter row: purpose, profile, group, and the
+// Facet config for the Datasets filter row: type, profile, group, and the
 // favourites toggle a signed-in user gets.
 import { computed } from 'vue'
 import SearchFilterBar, { type Facet, type FilterModel } from '@/components/search/SearchFilterBar.vue'
 import { useAruna } from '@/composables/useAruna'
+import { CRATE_TYPES } from '@/lib/crateType'
 import { truncateMiddle } from '@/lib/utils'
 import { Star } from '@lucide/vue'
 
@@ -33,11 +34,7 @@ const profileFacetOptions = computed(() => {
   }
   return options
 })
-const typeFacetOptions = [
-  { value: 'dataset', label: 'Dataset' },
-  { value: 'profile', label: 'Profile' },
-  { value: 'process-run', label: 'Process Run' },
-]
+const typeFacetOptions = CRATE_TYPES.map((entry) => ({ value: entry.value, label: entry.label }))
 const groupFacetOptions = computed(() => props.groupOptions.map((option) => ({ value: option.id, label: option.label })))
 
 // Extensible filter config: one entry per facet. Adding a facet means pushing
@@ -45,7 +42,7 @@ const groupFacetOptions = computed(() => props.groupOptions.map((option) => ({ v
 // template changes. The favourites toggle only appears for a signed-in user.
 const filterFacets = computed<Facet[]>(() => {
   const facets: Facet[] = [
-    { key: 'type', label: 'Purpose', options: typeFacetOptions },
+    { key: 'type', label: 'Type', options: typeFacetOptions, multi: true },
     { key: 'profile', label: 'Profile', options: profileFacetOptions.value },
   ]
   facets.push({ key: 'group', label: 'Group', options: groupFacetOptions.value })

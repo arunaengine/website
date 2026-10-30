@@ -119,6 +119,7 @@ export function portalRoutes(): RouteRecordRaw[] {
         // Dataset catalog plus search, with SPARQL in expert mode.
         { path: 'datasets', name: 'datasets', component: () => import('@/views/SearchView.vue') },
         { path: 'datasets/new', name: 'dataset-new', component: () => import('@/views/DatasetEditorView.vue') },
+        { path: 'datasets/presets', name: 'presets', component: () => import('@/views/PresetsView.vue') },
         { path: 'datasets/:id', name: 'dataset', component: () => import('@/views/MetadataView.vue') },
         { path: 'datasets/:id/edit', name: 'dataset-edit', component: () => import('@/views/DatasetEditorView.vue') },
         { path: 'search', redirect: { name: 'datasets' } },

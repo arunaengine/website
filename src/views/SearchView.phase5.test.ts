@@ -24,28 +24,20 @@ describe('Datasets purpose filters', () => {
     expect(datasetPurposeMatches({ type: 'Dataset', conformsToIds: [] }, 'profile')).toBe(false)
   })
 
-  it('uses the decided visible labels and fixed purpose options', () => {
+  it('uses the decided visible labels and the four type options', () => {
     expect(datasetPurposeLabel('dataset')).toBe('Dataset')
     expect(datasetPurposeLabel('profile')).toBe('Profile')
     expect(datasetPurposeLabel('process-run')).toBe('Process Run')
     expect(datasetPurposeLabel('unknown')).toBe('Purpose unknown')
 
     const filters = read('../components/datasets/DatasetFilters.vue')
-    const card = read('../components/datasets/DatasetCard.vue')
     const hits = read('../components/datasets/DatasetHits.vue')
     const search = read('../composables/useDatasetSearch.ts')
-    const sources = [filters, card, hits, search].join('\n')
 
-    expect(filters).toContain("{ value: 'dataset', label: 'Dataset' }")
-    expect(filters).toContain("{ value: 'profile', label: 'Profile' }")
-    expect(filters).toContain("{ value: 'process-run', label: 'Process Run' }")
-    expect(card).toContain('datasetPurposeLabel(datasetPurposeOf(doc))')
+    expect(filters).toContain("{ key: 'type', label: 'Type', options: typeFacetOptions, multi: true }")
     expect(hits).toContain('text-muted-foreground">Purpose unknown</span>')
-    expect(sources).not.toContain('class="w-fit text-[10px] uppercase">Dataset</Badge>')
-    expect(sources).not.toContain('class="w-fit text-[10px] uppercase">Profile</Badge>')
-    expect(sources).not.toContain('class="w-fit text-[10px] uppercase">Process Run</Badge>')
     expect(search).toContain('profileReferenceIri(profile)')
-    expect(sources).not.toContain("document_path.startsWith('profiles/')")
+    expect(search).not.toContain("document_path.startsWith('profiles/')")
   })
 })
 
@@ -53,30 +45,18 @@ describe('Datasets page layout', () => {
   const view = read('./SearchView.vue')
   const actions = view.slice(view.indexOf('<template #actions>'), view.indexOf('</PageHeader>'))
 
-  it('keeps only Refresh and one actions menu in the header', () => {
+  it('leads the header with New dataset, Presets and Import, the rest in one menu', () => {
+    expect(actions).toContain("name: 'dataset-new'")
+    expect(actions).toContain("name: 'presets'")
+    expect(actions).toContain('Import an RO-Crate, a repository record or a dataset from another realm')
     expect(actions).toContain('<RefreshButton')
     expect(actions).toContain('aria-label="More actions"')
-    expect(actions).toContain('Import an RO-Crate or a repository record')
     expect(actions).toContain('SPARQL workbench')
-    expect(actions).not.toContain("name: 'dataset-new'")
-    expect(view).not.toContain('description="Browse every visible RO-Crate')
   })
 
-  it('opens searches on the datasets tab, run records only when asked in the URL', () => {
-    expect(view).toContain("useRouteTab(['records', 'datasets'], 'datasets')")
-    expect(read('./MetadataView.vue')).toContain("{ label: 'Run records', to: { name: 'datasets', query: { tab: 'records' } } }")
-    expect(view).toContain('title="Run records"')
-    expect(view).toContain('<DatasetBrowse v-else :state="state" skip-runs />')
-  })
-
-  it('keeps the run records pages reachable when a page holds no record', () => {
-    expect(view).toContain('v-if="records.length || browsePage > 1 || hasNextPage"')
-  })
-
-  it('reports a failed run records page instead of an empty one', () => {
-    const records = view.slice(view.indexOf('aria-labelledby="run-records-heading"'), view.indexOf('<template v-else-if="!expertMode">'))
-    expect(records).toContain('<div v-if="keptBrowse"')
-    expect(records).toContain('<ErrorPanel v-else-if="browseError && !keptBrowse"')
-    expect(records.indexOf('<ErrorPanel')).toBeLessThan(records.indexOf('<EmptyState'))
+  it('shows run records in the one list and turns their old tab into a type filter', () => {
+    expect(view).toContain("type: 'process-run,workflow-run'")
+    expect(view).toContain('<DatasetBrowse v-else :state="state" />')
+    expect(read('./MetadataView.vue')).not.toContain("tab: 'records'")
   })
 })

@@ -119,7 +119,7 @@ const pageTitle = computed(() => current.value?.title || fetchedSummary.value?.d
 const crumbs = computed(() => {
   if (!current.value) return []
   const kind = purpose.value === 'process-run'
-    ? [{ label: 'Run records', to: { name: 'datasets', query: { tab: 'records' } } }]
+    ? [{ label: 'Run records', to: { name: 'datasets', query: { type: 'process-run,workflow-run' } } }]
     : purpose.value === 'profile' ? [{ label: KINDS.profile, to: { name: 'profiles' } }] : []
   return [...kind, { label: pageTitle.value }]
 })

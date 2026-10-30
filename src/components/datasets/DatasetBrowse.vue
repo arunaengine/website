@@ -8,17 +8,18 @@ import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import ListSkeleton from '@/components/ui/ListSkeleton.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import ViewToggle from '@/components/ui/ViewToggle.vue'
+import OptionToggle from '@/components/ui/OptionToggle.vue'
 import DatasetCard from '@/components/datasets/DatasetCard.vue'
+import DatasetRow from '@/components/datasets/DatasetRow.vue'
 import DatasetTable from '@/components/datasets/DatasetTable.vue'
-import { computed } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import type { DatasetSearchState } from '@/composables/useDatasetSearch'
 import { useViewMode } from '@/composables/useViewMode'
-import { FileJson2, ListChecks, Play, Plus } from '@lucide/vue'
+import { formatCount } from '@/lib/formatCount'
+import { LayoutGrid, List, Plus, Table } from '@lucide/vue'
 
-// `skipRuns`: the run records have their own tab, so only datasets and profiles show here.
-const props = defineProps<{ state: DatasetSearchState; skipRuns?: boolean }>()
+// One list of every dataset, run records and profiles included; the type filter narrows it.
+const props = defineProps<{ state: DatasetSearchState }>()
 const {
   browsePage,
   browseSource,
@@ -32,7 +33,6 @@ const {
   hasNextPage,
   pageCount,
   hits,
-  catalogSplit,
   favBusy,
 } = props.state
 const { goToPage, retryBrowse, clearFilters, isFavourite, toggleFav } = props.state
@@ -40,13 +40,12 @@ const { goToPage, retryBrowse, clearFilters, isFavourite, toggleFav } = props.st
 const router = useRouter()
 const { realm, currentUser, error, bootstrapped, refresh } = useAruna()
 
-// Each section keeps its own cards or table choice.
-const views = { datasets: useViewMode('datasets'), profiles: useViewMode('profiles'), runs: useViewMode('runs') }
-const sections = computed(() => [
-  { key: 'datasets' as const, title: filtering.value ? 'Matching datasets' : 'Datasets', icon: FileJson2, docs: catalogSplit.value.datasets },
-  { key: 'profiles' as const, title: 'Profiles', icon: ListChecks, docs: catalogSplit.value.profiles },
-  { key: 'runs' as const, title: 'Process Runs', icon: Play, docs: catalogSplit.value.runs },
-].filter((section) => section.docs.length && !(props.skipRuns && section.key === 'runs')))
+const view = useViewMode('datasets', 'list')
+const VIEWS = [
+  { value: 'cards', label: 'Cards', icon: LayoutGrid },
+  { value: 'table', label: 'Table', icon: Table },
+  { value: 'list', label: 'List', icon: List },
+]
 </script>
 
 <template>
@@ -76,39 +75,46 @@ const sections = computed(() => [
     <!-- Paging keeps the outgoing page on screen; it dims and is marked
          busy so it never reads as the page that was just requested. -->
     <div
-      v-if="sections.length"
-      class="space-y-6 transition-opacity"
+      v-if="hits.length"
+      class="space-y-3 transition-opacity"
       :class="browseStale ? 'opacity-40' : ''"
       :aria-busy="browseBusy"
     >
-      <section v-for="section in sections" :key="section.key">
-        <div class="mb-3 flex items-center justify-between gap-2">
-          <div class="flex items-center gap-2">
-            <component :is="section.icon" class="h-4 w-4 text-primary" />
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ section.title }}</h2>
-            <span class="text-xs text-muted-foreground">{{ section.docs.length }}</span>
-          </div>
-          <ViewToggle v-model="views[section.key].value" />
-        </div>
-        <DatasetTable
-          v-if="views[section.key].value === 'table'"
-          :docs="section.docs"
-          :can-favourite="Boolean(currentUser)"
-          :is-favourite="isFavourite"
-          :busy="favBusy"
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <p class="text-sm text-muted-foreground">
+          <span class="tabular-nums text-foreground">{{ formatCount(hits.length) }}</span>
+          {{ filtering ? (hits.length === 1 ? 'matching dataset' : 'matching datasets') : hits.length === 1 ? 'dataset' : 'datasets' }}
+        </p>
+        <OptionToggle :model-value="view" :options="VIEWS" aria-label="Show as" @update:model-value="(value: string) => (view = value as typeof view)" />
+      </div>
+      <DatasetTable
+        v-if="view === 'table'"
+        :docs="hits"
+        :can-favourite="Boolean(currentUser)"
+        :is-favourite="isFavourite"
+        :busy="favBusy"
+        @toggle-favourite="toggleFav"
+      />
+      <ul v-else-if="view === 'list'" class="space-y-3">
+        <DatasetRow
+          v-for="doc in hits"
+          :key="doc.ulid"
+          :doc="doc"
+          :favourite="isFavourite(doc.ulid)"
+          :busy="favBusy.has(doc.ulid)"
           @toggle-favourite="toggleFav"
         />
-        <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <DatasetCard
-            v-for="doc in section.docs"
-            :key="doc.ulid"
-            :doc="doc"
-            :favourite="isFavourite(doc.ulid)"
-            :busy="favBusy.has(doc.ulid)"
-            @toggle-favourite="toggleFav"
-          />
-        </div>
-      </section>
+      </ul>
+      <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <DatasetCard
+          v-for="doc in hits"
+          :key="doc.ulid"
+          :doc="doc"
+          :favourite="isFavourite(doc.ulid)"
+          :busy="favBusy.has(doc.ulid)"
+          @toggle-favourite="toggleFav"
+        />
+      </div>
     </div>
 
     <!-- Past the end: the estimate can under- or over-count, so a page

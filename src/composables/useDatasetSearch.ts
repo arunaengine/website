@@ -16,7 +16,8 @@ import { useMetadataSearch } from '@/composables/useMetadataSearch'
 import { coverageComplete, useUnifiedSearch } from '@/composables/useUnifiedSearch'
 import { useSearchSettings } from '@/composables/useSearchSettings'
 import { useCatalogBrowse, type CatalogPageParams } from '@/composables/useCatalogBrowse'
-import { datasetPurposeMatches, datasetPurposeOf, type DatasetPurpose } from '@/lib/datasetPurpose'
+import { datasetPurposeOf } from '@/lib/datasetPurpose'
+import { crateTypeOf, isCrateType } from '@/lib/crateType'
 import { errorMessage, formatNumber, truncateMiddle } from '@/lib/utils'
 import { isHiddenBucket } from '@/lib/workspaces'
 import { pageRange } from '@/lib/objectListing'
@@ -81,11 +82,14 @@ function queryFilter(value: unknown): string | null {
   return queryString(value) || null
 }
 
-function queryPurposeFilter(value: unknown): DatasetPurpose | null {
-  const purpose = queryString(value)
-  return purpose === 'dataset' || purpose === 'profile' || purpose === 'process-run'
-    ? purpose
-    : null
+// The type filter as a sorted comma list of crate types, so the URL and the ref compare as text.
+function queryTypeFilter(value: unknown): string | null {
+  const types = [...new Set(queryString(value).split(',').filter(isCrateType))].sort()
+  return types.length ? types.join(',') : null
+}
+
+function typeMatches(doc: MetadataDoc, filter: string | null): boolean {
+  return !filter || filter.split(',').includes(crateTypeOf(doc))
 }
 
 function queryPage(value: unknown): number {
@@ -122,8 +126,8 @@ export function useDatasetSearch(searchBox: Ref<{ focus: () => void } | null>) {
   // filter to conforms_to when it resolves to a local profile IRI. Browsing with a
   // group filter pages a group-scoped listing instead of the shared catalog.
   const groupFilter = ref<string | null>(queryFilter(route.query.group))
-  // Dataset purpose is classified client-side from the semantic P0-5 fields.
-  const typeFilter = ref<DatasetPurpose | null>(queryPurposeFilter(route.query.type))
+  // The crate type is classified client-side from conformsTo and the root type.
+  const typeFilter = ref<string | null>(queryTypeFilter(route.query.type))
   const favouritesOnly = ref(false)
   // 1-based browse page, kept in the URL so a page can be shared and the browser
   // back button steps through it.
@@ -192,7 +196,7 @@ export function useDatasetSearch(searchBox: Ref<{ focus: () => void } | null>) {
       queryString(route.query.q) === nq &&
       queryFilter(route.query.profile) === np &&
       queryFilter(route.query.group) === ng &&
-      queryPurposeFilter(route.query.type) === nt &&
+      queryTypeFilter(route.query.type) === nt &&
       (queryString(route.query.expert) === '1') === ne &&
       queryPage(route.query.page) === npage
     ) {
@@ -218,7 +222,7 @@ export function useDatasetSearch(searchBox: Ref<{ focus: () => void } | null>) {
       q.value = queryString(query.q)
       profileFilter.value = queryFilter(query.profile)
       groupFilter.value = queryFilter(query.group)
-      typeFilter.value = queryPurposeFilter(query.type)
+      typeFilter.value = queryTypeFilter(query.type)
       expertMode.value = queryString(query.expert) === '1'
       browsePage.value = queryPage(query.page)
     },
@@ -425,7 +429,7 @@ export function useDatasetSearch(searchBox: Ref<{ focus: () => void } | null>) {
     browseSource.value.filter((doc) => {
       if (profileFilter.value && !(doc.profileIds ?? []).includes(profileFilter.value)) return false
       if (groupFilter.value && doc.realmId !== groupFilter.value) return false
-      if (!datasetPurposeMatches(doc, typeFilter.value)) return false
+      if (!typeMatches(doc, typeFilter.value)) return false
       if (favouritesOnly.value && !favouriteIds.value.includes(doc.ulid)) return false
       return true
     }),
@@ -468,15 +472,13 @@ export function useDatasetSearch(searchBox: Ref<{ focus: () => void } | null>) {
   const filterModel = computed<FilterModel>({
     get: () => ({
       profile: profileFilter.value,
-      type: typeFilter.value,
+      type: typeFilter.value ? typeFilter.value.split(',') : [],
       group: groupFilter.value,
       favourites: favouritesOnly.value,
     }),
     set: (next) => {
       profileFilter.value = typeof next.profile === 'string' ? next.profile : null
-      typeFilter.value = next.type === 'dataset' || next.type === 'profile' || next.type === 'process-run'
-        ? next.type
-        : null
+      typeFilter.value = queryTypeFilter(Array.isArray(next.type) ? next.type.join(',') : next.type)
       groupFilter.value = typeof next.group === 'string' ? next.group : null
       favouritesOnly.value = next.favourites === true
       // A different filter means a different listing; page numbers do not carry.
@@ -490,7 +492,7 @@ export function useDatasetSearch(searchBox: Ref<{ focus: () => void } | null>) {
     searchResults.value.filter((line) => {
       if (favouritesOnly.value && !favouriteIds.value.includes(line.hit.document_id)) return false
       if (profileFilter.value && !profilePushedDown.value && !(line.doc?.profileIds ?? []).includes(profileFilter.value)) return false
-      if (!datasetPurposeMatches(line.doc, typeFilter.value)) return false
+      if (line.doc && !typeMatches(line.doc, typeFilter.value)) return false
       return true
     }),
   )
