@@ -33,7 +33,7 @@ import { provideRunFormBridge } from '@/composables/useAssistantRunForm'
 import { createRunFormBridge } from '@/lib/runFormBridge'
 import { defaultPlacement, isNativeBlocked, tesFormToExecutionRequest } from '@/lib/nativeSubmit'
 import { submitJob } from '@/lib/jobs'
-import { holderNode, nativeInput, taskBuckets, type TesTask } from '@/lib/tes'
+import { TES_GROUP_TAG, holderNode, nativeInput, taskBuckets, type TesTask } from '@/lib/tes'
 import { errorMessage } from '@/lib/utils'
 
 const router = useRouter()
@@ -144,13 +144,16 @@ async function submitLocally(draft: TesTask): Promise<boolean> {
 // A listing that keeps a failed node in its cursor ends only once that node answered.
 const HOLDER_PAGES = 10
 
-/** Every node holding a bucket of this name, read to the last page. */
-async function bucketHolders(name: string): Promise<string[]> {
+/** Every node holding a bucket of this name, of one group when given, read to the last page. */
+async function bucketHolders(name: string, groupId?: string): Promise<string[]> {
   const nodes = new Set<string>()
   let cursor: string | undefined
   for (let page = 0; page < HOLDER_PAGES; page += 1) {
-    const found = await searchBuckets(name, { limit: 50, cursor })
-    for (const hit of found.hits) if (hit.bucket === name && isTarget(hit.node_id)) nodes.add(hit.node_id)
+    const found = await searchBuckets(name, { limit: 50, cursor, groupId })
+    // Older nodes ignore the group filter, so it is applied here as well.
+    for (const hit of found.hits) {
+      if (hit.bucket === name && isTarget(hit.node_id) && (!groupId || hit.group_id === groupId)) nodes.add(hit.node_id)
+    }
     cursor = found.next_cursor ?? undefined
     if (!cursor) return [...nodes]
   }
@@ -161,7 +164,10 @@ async function bucketHolders(name: string): Promise<string[]> {
 async function holderBase(draft: TesTask): Promise<string | undefined> {
   const { inputs, outputs } = taskBuckets(draft)
   const names = [...new Set([...inputs, ...outputs])]
-  const holders = new Map(await Promise.all(names.map(async (name) => [name, await bucketHolders(name)] as const)))
+  // Results are written to a bucket of the run's own group.
+  const group = draft.tags?.[TES_GROUP_TAG]
+  const holders = new Map(await Promise.all(names.map(async (name) =>
+    [name, await bucketHolders(name, outputs.includes(name) ? group : undefined)] as const)))
   const missing = names.find((name) => !holders.get(name)?.length)
   if (missing) throw new Error(`No node holds bucket ${missing}, so the run was not started.`)
   const node = holderNode(draft, holders, localNodeId.value)

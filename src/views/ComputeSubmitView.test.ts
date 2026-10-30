@@ -144,7 +144,11 @@ const DialogStub = defineComponent({
 })
 
 // Bucket holders the federated search answers; this node unless a test says otherwise.
-const searchBuckets = vi.fn(async (q: string, _options?: { cursor?: string }) => ({ hits: [{ bucket: q, node_id: 'node-id' }], nodes_failed: 0, next_cursor: null as string | null }))
+const searchBuckets = vi.fn(async (q: string, _options?: { cursor?: string; groupId?: string }) => ({
+  hits: [{ bucket: q, node_id: 'node-id', group_id: 'group-id' }] as Array<{ bucket: string; node_id: string; group_id: string }>,
+  nodes_failed: 0,
+  next_cursor: null as string | null,
+}))
 const useArunaModule = {
   useAruna: () => ({
     searchBuckets,
@@ -499,7 +503,7 @@ describe('run page', () => {
   })
 
   it('sends the run to the node holding its buckets', async () => {
-    searchBuckets.mockImplementationOnce(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-b' }], nodes_failed: 0 }))
+    searchBuckets.mockImplementationOnce(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-b', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
     const mounted = await mount(ComputeSubmitView, '/app/compute/new')
     await fillValidRun(mounted.root)
 
@@ -507,14 +511,14 @@ describe('run page', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     await flush()
 
-    expect(searchBuckets).toHaveBeenCalledWith('results', { limit: 50 })
+    expect(searchBuckets).toHaveBeenCalledWith('results', { limit: 50, groupId: 'group-id' })
     expect(createTask).toHaveBeenCalledWith(expect.anything(), 'https://node-b.example.org/api/v1')
     mounted.app.unmount()
   })
 
   it('follows the bucket search to its last page before routing', async () => {
     searchBuckets.mockImplementationOnce(async () => ({ hits: [], nodes_failed: 0, next_cursor: 'page-2' }))
-    searchBuckets.mockImplementationOnce(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-b' }], nodes_failed: 0, next_cursor: null }))
+    searchBuckets.mockImplementationOnce(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-b', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
     const mounted = await mount(ComputeSubmitView, '/app/compute/new')
     await fillValidRun(mounted.root)
 
@@ -522,7 +526,24 @@ describe('run page', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     await flush()
 
-    expect(searchBuckets).toHaveBeenLastCalledWith('results', { limit: 50, cursor: 'page-2' })
+    expect(searchBuckets).toHaveBeenLastCalledWith('results', { limit: 50, cursor: 'page-2', groupId: 'group-id' })
+    expect(createTask).toHaveBeenCalledWith(expect.anything(), 'https://node-b.example.org/api/v1')
+    mounted.app.unmount()
+  })
+
+  it('writes results only to a bucket of the run\'s own group', async () => {
+    searchBuckets.mockImplementationOnce(async (q: string) => ({
+      hits: [{ bucket: q, node_id: 'node-id', group_id: 'other-group' }, { bucket: q, node_id: 'node-b', group_id: 'group-id' }],
+      nodes_failed: 0,
+      next_cursor: null,
+    }))
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
+    await fillValidRun(mounted.root)
+
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
     expect(createTask).toHaveBeenCalledWith(expect.anything(), 'https://node-b.example.org/api/v1')
     mounted.app.unmount()
   })
@@ -537,7 +558,7 @@ describe('run page', () => {
     await flush()
     expect(content(mounted.root)).toContain('search is down')
 
-    searchBuckets.mockImplementationOnce(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-c' }], nodes_failed: 0, next_cursor: null }))
+    searchBuckets.mockImplementationOnce(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-c', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
     await click(runButton(mounted.root))
     await new Promise((resolve) => setTimeout(resolve, 0))
     await flush()
