@@ -377,9 +377,22 @@ function onSearchFocusOut(event: FocusEvent) {
   if (!next || (!wrapperEl.value?.contains(next) && !portaledSelect)) showResults.value = false
 }
 
-onMounted(() => window.addEventListener('popstate', onPopState))
+// The search shortcut: Command K on a Mac, Ctrl K elsewhere, named as such beside the field.
+const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)
+const shortcut = mac ? '⌘K' : 'Ctrl K'
+function onShortcut(event: KeyboardEvent) {
+  if (event.key.toLowerCase() !== 'k' || !(mac ? event.metaKey : event.ctrlKey) || event.altKey || event.shiftKey) return
+  event.preventDefault()
+  inputEl.value?.focus()
+}
+
+onMounted(() => {
+  window.addEventListener('popstate', onPopState)
+  window.addEventListener('keydown', onShortcut)
+})
 onBeforeUnmount(() => {
   window.removeEventListener('popstate', onPopState)
+  window.removeEventListener('keydown', onShortcut)
   // Unmounting while open (a route change closes the layout) would otherwise
   // strand the pushed entry and make the next Back a no-op.
   if (ownsHistoryEntry) {
@@ -465,7 +478,7 @@ onBeforeUnmount(() => {
                 aria-hidden="true"
                 class="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded border border-border bg-muted/70 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-flex"
               >
-                ⌘K
+                {{ shortcut }}
               </kbd>
             </div>
             <Popover v-if="authToken" align="end">
