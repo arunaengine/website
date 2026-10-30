@@ -19,6 +19,7 @@ import * as References from '@/lib/crate/references'
 import * as Pickers from '@/lib/crate/pickers'
 import * as Uri from '@/lib/profiles/uri'
 import * as Utils from '@/lib/utils'
+import * as Licenses from '@/lib/licenses'
 import * as Grid from './grid'
 import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
@@ -75,6 +76,7 @@ const ValueInput = compileClientComponent(new URL('./ValueInput.vue', import.met
   '@/components/ui/Input.vue': moduleDefault(FieldStub('input')),
   '@/components/ui/Textarea.vue': moduleDefault(FieldStub('textarea')),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
+  '@/lib/licenses': Licenses,
 })
 
 const ReferenceValue = compileClientComponent(new URL('./ReferenceValue.vue', import.meta.url), {
@@ -433,17 +435,17 @@ describe('PropertyRow', () => {
     const draft = Editor.setProperty(seeded(), './', 'license', [{ kind: 'url', value: 'https://example.org/l' }])
     const kindsOf = (root: HostNode) => labels(root).filter((label) => label === 'URL' || label === 'Reference')
     const plain = await mount('license', [], draft)
-    expect(kindsOf(plain.root)).toEqual(['Reference', 'URL', 'Reference', 'URL'])
+    expect(kindsOf(plain.root)).toEqual(['Reference', 'URL'])
     plain.app.unmount()
 
     const url = await mount('license', [], draft, { rule: licenseRule({ kind: 'url' }) })
-    expect(kindsOf(url.root)).toEqual(['URL', 'Reference', 'URL', 'Reference'])
+    expect(kindsOf(url.root)).toEqual(['URL', 'Reference'])
     url.app.unmount()
 
     const reuse = await mount('license', [], draft, {
       rule: licenseRule({ kind: 'entity', entityTypes: ['http://schema.org/CreativeWork'], entitySources: ['existing-external'] }),
     })
-    expect(kindsOf(reuse.root)).toEqual(['URL', 'Reference', 'URL', 'Reference'])
+    expect(kindsOf(reuse.root)).toEqual(['URL', 'Reference'])
     reuse.app.unmount()
   })
 
@@ -478,16 +480,18 @@ describe('PropertyRow', () => {
     mounted.app.unmount()
   })
 
-  it('adds another entry of the only kind the property takes', async () => {
-    const updates: Editor.CrateDraft[] = []
-    const mounted = await mount('name', updates)
+  it('offers another entry on a list property', async () => {
+    const draft = Editor.setProperty(seeded(), './', 'keywords', [{ kind: 'text', value: 'soil' }])
+    const mounted = await mount('keywords', [], draft)
 
-    await click(button(mounted.root, 'Add entry'))
+    expect(labels(mounted.root)).toContain('Add entry')
+    mounted.app.unmount()
+  })
 
-    expect(updates[0].entities[0].properties.name).toEqual([
-      { kind: 'text', value: 'Example dataset' },
-      { kind: 'text', value: '' },
-    ])
+  it('offers no further entry on a single-valued property', async () => {
+    const mounted = await mount('name', [])
+
+    expect(() => button(mounted.root, 'Add entry')).toThrow()
     mounted.app.unmount()
   })
 
@@ -514,6 +518,21 @@ describe('PropertyRow', () => {
       { kind: 'url', value: 'https://creativecommons.org/publicdomain/zero/1.0/' },
     ])
     mounted.app.unmount()
+  })
+
+  it('recognises a license given by its SPDX id or link', async () => {
+    const preset = async (value: string, kind: Editor.DraftValueKind) => {
+      const draft = Editor.setProperty(seeded(), './', 'license', [{ kind, value }])
+      const mounted = await mount('license', [], draft)
+      const choice = element(mounted.root, (node) => node.props['aria-label'] === 'License preset').props.value
+      mounted.app.unmount()
+      return choice
+    }
+
+    expect(await preset('https://spdx.org/licenses/CC-BY-4.0.html', 'url')).toBe('https://creativecommons.org/licenses/by/4.0/')
+    expect(await preset('https://spdx.org/licenses/Apache-2.0', 'reference')).toBe('https://www.apache.org/licenses/LICENSE-2.0')
+    expect(await preset('MIT', 'text')).toBe('https://spdx.org/licenses/MIT.html')
+    expect(await preset('https://example.org/own', 'url')).toBe('other')
   })
 
   it('gives the parts row a menu and the data picker', async () => {

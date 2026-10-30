@@ -4,6 +4,7 @@ import Input from '@/components/ui/Input.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import Select from '@/components/ui/Select.vue'
 import type { DraftValue } from '@/lib/crate/editor'
+import { spdxId } from '@/lib/licenses'
 
 const props = defineProps<{
   modelValue: DraftValue
@@ -35,7 +36,7 @@ const presetting = computed(() =>
   && (props.modelValue.kind === 'text' || props.modelValue.kind === 'url' || props.modelValue.kind === 'reference'))
 
 // The same license is written in more than one way; a preset matches its
-// value whatever the scheme, case, trailing slash or .html page.
+// value whatever the scheme, case, trailing slash or .html page, or its SPDX id or link.
 function presetKey(value: string): string {
   return value.trim().toLowerCase().replace(/^http:/, 'https:').replace(/\.html$/, '').replace(/\/+$/, '')
 }
@@ -47,7 +48,9 @@ const presetOptions = computed(() => [
 
 const presetChoice = computed(() => {
   const key = presetKey(props.modelValue.value)
-  const match = key ? props.presets?.find((preset) => presetKey(preset.value) === key) : undefined
+  const spdx = key ? spdxId(props.modelValue.value)?.toLowerCase() : undefined
+  const match = key ? props.presets?.find((preset) => presetKey(preset.value) === key
+    || (spdx && spdxId(preset.value)?.toLowerCase() === spdx)) : undefined
   if (match) return match.value
   return props.modelValue.value || freeText.value ? OTHER : ''
 })

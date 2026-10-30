@@ -19,6 +19,7 @@ import * as References from '@/lib/crate/references'
 import * as Pickers from '@/lib/crate/pickers'
 import * as Uri from '@/lib/profiles/uri'
 import * as Utils from '@/lib/utils'
+import * as Licenses from '@/lib/licenses'
 import * as Grid from './grid'
 import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
 
@@ -70,6 +71,7 @@ const ValueInput = compileClientComponent(new URL('./ValueInput.vue', import.met
   '@/components/ui/Input.vue': moduleDefault(FieldStub('input')),
   '@/components/ui/Textarea.vue': moduleDefault(FieldStub('textarea')),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
+  '@/lib/licenses': Licenses,
 })
 
 const ReferenceValue = compileClientComponent(new URL('./ReferenceValue.vue', import.meta.url), {

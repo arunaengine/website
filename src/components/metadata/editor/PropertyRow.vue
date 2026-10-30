@@ -64,6 +64,12 @@ const emit = defineEmits<{
   (e: 'select', entityId: string): void
 }>()
 
+const LIST_PROPERTIES = new Set([
+  'keywords', 'identifier', 'measurementTechnique', 'variableMeasured', 'hasPart', 'author', 'creator',
+  'contributor', 'funder', 'maintainer', 'citation', 'mentions', 'about', 'instrument', 'contentLocation',
+  'spatialCoverage', 'isBasedOn', 'conformsTo', 'sameAs',
+])
+
 const linkFor = ref(-1)
 const createFor = ref(-1)
 const filesOpen = ref(false)
@@ -94,6 +100,12 @@ const stored = computed(() => props.entity.properties[props.property] ?? [])
 // The blank row an always-shown field offers before anything is typed.
 const blank = computed<DraftValue>(() => defaultValue(kinds.value.find((kind) => kind !== 'reference') ?? 'text'))
 const values = computed(() => (stored.value.length || !props.always ? stored.value : [blank.value]))
+// Add entry belongs to list-like properties; a single-valued one offers it only once it holds more.
+const multiple = computed(() => {
+  if (stored.value.length > 1) return true
+  if (props.rule) return Boolean(props.rule.multipleValues)
+  return LIST_PROPERTIES.has(props.property) || stored.value.some((value) => value.kind === 'reference')
+})
 
 function set(index: number, value: string) {
   if (!stored.value.length) {
@@ -209,7 +221,7 @@ function created(next: CrateDraft, entityId: string) {
       <div v-for="(value, index) in values" :key="index" class="flex items-start gap-1">
         <div class="relative min-w-0 flex-1">
           <ValueInput
-            v-if="value.kind === 'reference' && !value.value.trim() && presets"
+            v-if="value.kind === 'reference' && presets && (!value.value.trim() || isExternalReference(draft, value))"
             :model-value="value"
             :label="label"
             :presets="presets"
@@ -291,7 +303,7 @@ function created(next: CrateDraft, entityId: string) {
         </DropdownMenu>
       </div>
 
-      <div v-if="stored.length">
+      <div v-if="stored.length && multiple">
         <Button v-if="kinds.length === 1" variant="ghost" size="sm" class="h-7 px-2 text-xs" @click="addEntry(kinds[0])">
           <Plus class="h-3.5 w-3.5" /> Add entry
         </Button>
