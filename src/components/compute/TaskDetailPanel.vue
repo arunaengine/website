@@ -60,8 +60,11 @@ import { objectHref } from '@/lib/assistant/objectLinks'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import { errorMessage, formatBytes, formatClock, formatDateTime, formatDuration, formatNumber, formatResourceGb, relativeTime, truncateMiddle } from '@/lib/utils'
 import {
+  Activity,
   ArrowLeftRight,
   Ban,
+  ChevronDown,
+  Code,
   CircleCheck,
   Container,
   Download,
@@ -74,6 +77,8 @@ import {
   Folder,
   Hourglass,
   Info,
+  LogIn,
+  MapPinned,
   Maximize2,
   Play,
   RotateCcw,
@@ -415,15 +420,10 @@ const stayedBytes = computed(() =>
 // The line and the run's facts already say what moved and where it ran.
 const placementInfo = 'Estimated at planning time, not measured.'
 
-const attemptLine = computed(() => {
-  const count = nativeJob.value?.attempts || task.value?.logs?.length || 0
-  if (!count) return 'Not started yet'
+const attemptCount = computed(() => nativeJob.value?.attempts || task.value?.logs?.length || 0)
+const executorLabel = computed(() => {
   const kind = executorKind.value
-  return kind ? `Attempt ${count} on ${kind.charAt(0).toUpperCase()}${kind.slice(1)}` : `Attempt ${count}`
-})
-const exitLine = computed(() => {
-  if (exitCode.value !== undefined) return `Exit code ${exitCode.value}`
-  return active.value ? 'Still running' : 'No exit code recorded'
+  return kind ? `${kind.charAt(0).toUpperCase()}${kind.slice(1)}` : 'Not recorded'
 })
 function executorDetails(i: number): Detail[] {
   const executor = task.value?.executors?.[i]
@@ -877,7 +877,7 @@ async function confirmDelete() {
 </script>
 
 <template>
-  <DetailDialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
+  <DetailDialog :open="props.open" content-class="max-w-4xl" fit @update:open="(v: boolean) => emit('update:open', v)">
     <template #header>
       <DialogTitle class="sr-only">Run details</DialogTitle>
       <TaskHeader v-if="task" :title="headerTitle" :state="task.state" :subtitle="headerSubtitle" />
@@ -927,7 +927,7 @@ async function confirmDelete() {
         <JobKeyWait v-if="awaitingKey" :waits="nativeJob?.awaiting_keys ?? []" />
         <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Refresh failed, retrying.</p>
 
-        <DetailList :items="facts" class="grid-cols-2">
+        <DetailList :items="facts" class="grid-cols-2 md:grid-cols-4">
           <template #node>
             <RouterLink v-if="runNode" :to="{ name: 'node', params: { nodeId: runNode } }" class="text-primary hover:underline">{{ displayName(runNode) }}</RouterLink>
             <template v-else>{{ facts[1]!.value }}</template>
@@ -939,7 +939,7 @@ async function confirmDelete() {
         </DetailList>
 
         <section>
-          <h3 class="mb-3 type-card-title">Progress</h3>
+          <h3 class="mb-3 flex items-center gap-2 type-card-title"><Activity class="size-4 text-muted-foreground" aria-hidden="true" />Progress</h3>
           <ol class="flex">
             <li v-for="(stage, i) in stages" :key="stage.key" class="relative flex min-w-0 flex-1 flex-col items-center text-center">
               <!-- The connector leaves a small gap before this icon and the next one. -->
@@ -959,75 +959,30 @@ async function confirmDelete() {
           </ol>
         </section>
 
+        <div class="grid items-start gap-6 lg:grid-cols-2">
         <section>
-          <h3 class="mb-2 flex items-center gap-2 type-card-title">
-            Placement
-            <Tooltip :label="placementInfo">
-              <span class="inline-flex text-muted-foreground" tabindex="0" :aria-label="placementInfo"><Info class="size-4" aria-hidden="true" /></span>
-            </Tooltip>
-          </h3>
-          <template v-if="nativeFamily?.placement">
-            <p class="flex items-center gap-1.5 text-sm tabular-nums text-foreground">
-              <CircleCheck v-if="!movedBytes" class="size-4 shrink-0 text-status-ok" aria-hidden="true" />
-              <ArrowLeftRight v-else class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              {{ formatBytes(stayedBytes) }} stayed, {{ formatBytes(movedBytes) }} moved
-            </p>
-            <details v-if="placementInputs.length" class="mt-3 text-sm">
-              <summary class="cursor-pointer font-medium text-foreground">
-                {{ formatNumber(placementInputs.length) }} {{ placementInputs.length === 1 ? 'input file' : 'input files' }}, {{ formatBytes(stayedBytes + movedBytes) }}
-              </summary>
-              <ul class="mt-2 divide-y divide-border-subtle rounded-lg border border-border-subtle">
-                <li v-for="(input, i) in placementInputs.slice(0, INPUTS_SHOWN)" :key="`${input.destination_key}:${i}`" class="flex items-center gap-3 px-3 py-2.5">
-                  <FileIcon class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  <span class="min-w-0 flex-1 truncate font-mono text-xs text-foreground" :title="input.destination_key">{{ input.destination_key }}</span>
-                  <RouterLink v-if="input.source_node_id" :to="{ name: 'node', params: { nodeId: input.source_node_id } }" class="shrink-0 text-xs text-primary hover:underline">
-                    from {{ displayName(input.source_node_id) }}
-                  </RouterLink>
-                  <span class="shrink-0 text-xs tabular-nums text-muted-foreground">{{ formatBytes(input.bytes) }}</span>
-                </li>
-              </ul>
-              <p v-if="placementInputs.length > INPUTS_SHOWN" class="mt-2 text-xs text-muted-foreground">
-                {{ placementInputs.length - INPUTS_SHOWN }} more under For developers.
-              </p>
-            </details>
-          </template>
-          <p v-else-if="nativeDetailUnavailable" class="text-xs text-muted-foreground">
-            Distributed execution detail could not be loaded.
-          </p>
-          <p v-else class="text-xs text-muted-foreground">No placement record for this run yet.</p>
-        </section>
-
-        <section data-tutorial="run-executors">
-          <h3 class="mb-2 type-card-title">Execution</h3>
-          <div class="rounded-lg border border-border-subtle">
-            <div class="flex flex-wrap items-center gap-3 px-4 py-3">
-              <Server class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <div class="min-w-0 flex-1">
-                <p class="text-sm font-medium text-foreground">{{ attemptLine }}</p>
-                <p class="text-xs text-muted-foreground">{{ exitLine }}</p>
-              </div>
-              <template v-for="(_, i) in task.executors" :key="i">
-                <Button v-if="executorStdout(i) || executorStderr(i) || systemLogLines.length" variant="outline" size="sm" @click="openLog(i)">
-                  <SquareTerminal class="h-3.5 w-3.5" /> Logs<template v-if="task.executors.length > 1"> {{ i + 1 }}</template>
-                </Button>
-              </template>
-            </div>
-            <div v-if="executorStdout(0) || stderrSummary(0)" class="space-y-2 border-t border-border-subtle px-4 py-3">
-              <div v-if="executorStdout(0)" class="relative">
-                <p class="type-label">
-                  {{ executorStderr(0) ? 'stdout' : 'output' }}<span v-if="hidden(executorStdout(0))">, last {{ tail(executorStdout(0)).length }} lines</span>
-                </p>
-                <pre class="mt-1 overflow-x-auto whitespace-pre rounded-md bg-muted/50 p-3 font-mono text-xs leading-relaxed">{{ tail(executorStdout(0)).join('\n') }}</pre>
-              </div>
-              <p v-if="stderrSummary(0)" class="truncate font-mono text-xs text-destructive" :title="executorStderr(0)">
-                stderr: {{ stderrSummary(0) }}
-              </p>
-            </div>
+          <h3 class="mb-2 flex items-center gap-2 type-card-title"><LogIn class="size-4 text-muted-foreground" aria-hidden="true" />Inputs</h3>
+          <div v-if="task.inputs?.length" class="overflow-x-auto rounded-lg border border-border-subtle">
+            <table class="w-full text-sm">
+              <thead class="border-b border-border-subtle bg-muted/40 text-xs text-muted-foreground">
+                <tr><th scope="col" class="h-9 px-3 text-left font-medium">Input</th><th scope="col" class="h-9 px-3 text-left font-medium">From</th></tr>
+              </thead>
+              <tbody class="divide-y divide-border-subtle">
+                <tr v-for="(input, i) in task.inputs" :key="`${input.path}:${i}`" class="h-10 text-xs">
+                  <td class="max-w-0 px-3 py-1.5"><span class="block truncate font-mono text-foreground" :title="input.path">{{ input.path }}</span></td>
+                  <td class="max-w-0 px-3 py-1.5">
+                    <RouterLink v-if="inputLink(input.url)" :to="inputLink(input.url)!" class="block truncate font-mono text-primary hover:underline" :title="input.url">{{ input.url }}</RouterLink>
+                    <span v-else-if="input.url" class="block truncate font-mono text-muted-foreground" :title="input.url">{{ input.url }}</span>
+                    <span v-else class="text-muted-foreground">Inline content</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
+          <p v-else class="text-xs text-muted-foreground">This run reads no input files.</p>
         </section>
-
         <section data-tutorial="run-artifacts">
-          <h3 class="mb-2 type-card-title">Results</h3>
+          <h3 class="mb-2 flex items-center gap-2 type-card-title"><Folder class="size-4 text-muted-foreground" aria-hidden="true" />Results</h3>
           <div class="divide-y divide-border-subtle overflow-hidden rounded-lg border border-border-subtle">
             <component
               :is="resultsFolder ? RouterLink : 'div'"
@@ -1125,6 +1080,82 @@ async function confirmDelete() {
           </details>
         </section>
 
+        <section data-tutorial="run-executors">
+          <h3 class="mb-2 flex items-center gap-2 type-card-title"><Server class="size-4 text-muted-foreground" aria-hidden="true" />Execution</h3>
+          <div class="overflow-x-auto rounded-lg border border-border-subtle">
+            <table class="w-full text-sm">
+              <thead class="border-b border-border-subtle bg-muted/40 text-xs text-muted-foreground">
+                <tr>
+                  <th scope="col" class="h-9 px-3 text-left font-medium">Attempt</th>
+                  <th scope="col" class="h-9 px-3 text-left font-medium">Executor</th>
+                  <th scope="col" class="h-9 px-3 text-right font-medium">Exit code</th>
+                  <th scope="col" class="h-9 w-px px-3"><span class="sr-only">Logs</span></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-border-subtle">
+                <tr v-for="(_, i) in task.executors" :key="i" class="h-10">
+                  <td class="px-3 py-1.5 tabular-nums">{{ attemptCount || '-' }}</td>
+                  <td class="px-3 py-1.5">{{ executorLabel }}<span v-if="task.executors.length > 1" class="text-muted-foreground">, step {{ i + 1 }}</span></td>
+                  <td class="px-3 py-1.5 text-right tabular-nums">{{ executorExit(i) ?? (active ? 'Running' : '-') }}</td>
+                  <td class="w-px whitespace-nowrap px-3 py-1.5 text-right">
+                    <IconButton v-if="executorStdout(i) || executorStderr(i) || systemLogLines.length" label="Show logs" @click="openLog(i)"><SquareTerminal class="h-4 w-4" /></IconButton>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-if="executorStdout(0) || stderrSummary(0)" class="mt-3 space-y-2">
+            <div v-if="executorStdout(0)" class="relative">
+              <p class="type-label">
+                {{ executorStderr(0) ? 'stdout' : 'output' }}<span v-if="hidden(executorStdout(0))">, last {{ tail(executorStdout(0)).length }} lines</span>
+              </p>
+              <pre class="mt-1 overflow-x-auto whitespace-pre rounded-md bg-muted/50 p-3 font-mono text-xs leading-relaxed">{{ tail(executorStdout(0)).join('\n') }}</pre>
+            </div>
+            <p v-if="stderrSummary(0)" class="truncate font-mono text-xs text-destructive" :title="executorStderr(0)">
+              stderr: {{ stderrSummary(0) }}
+            </p>
+          </div>
+        </section>
+        <section>
+          <h3 class="mb-2 flex items-center gap-2 type-card-title">
+            <MapPinned class="size-4 text-muted-foreground" aria-hidden="true" />Placement
+            <Tooltip :label="placementInfo">
+              <span class="inline-flex text-muted-foreground" tabindex="0" :aria-label="placementInfo"><Info class="size-4" aria-hidden="true" /></span>
+            </Tooltip>
+          </h3>
+          <template v-if="nativeFamily?.placement">
+            <p class="flex items-center gap-1.5 text-sm tabular-nums text-foreground">
+              <CircleCheck v-if="!movedBytes" class="size-4 shrink-0 text-status-ok" aria-hidden="true" />
+              <ArrowLeftRight v-else class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              {{ formatBytes(stayedBytes) }} stayed, {{ formatBytes(movedBytes) }} moved
+            </p>
+            <details v-if="placementInputs.length" class="mt-3 text-sm">
+              <summary class="cursor-pointer font-medium text-foreground">
+                {{ formatNumber(placementInputs.length) }} {{ placementInputs.length === 1 ? 'input file' : 'input files' }}, {{ formatBytes(stayedBytes + movedBytes) }}
+              </summary>
+              <ul class="mt-2 divide-y divide-border-subtle rounded-lg border border-border-subtle">
+                <li v-for="(input, i) in placementInputs.slice(0, INPUTS_SHOWN)" :key="`${input.destination_key}:${i}`" class="flex items-center gap-3 px-3 py-2.5">
+                  <FileIcon class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <span class="min-w-0 flex-1 truncate font-mono text-xs text-foreground" :title="input.destination_key">{{ input.destination_key }}</span>
+                  <RouterLink v-if="input.source_node_id" :to="{ name: 'node', params: { nodeId: input.source_node_id } }" class="shrink-0 text-xs text-primary hover:underline">
+                    from {{ displayName(input.source_node_id) }}
+                  </RouterLink>
+                  <span class="shrink-0 text-xs tabular-nums text-muted-foreground">{{ formatBytes(input.bytes) }}</span>
+                </li>
+              </ul>
+              <p v-if="placementInputs.length > INPUTS_SHOWN" class="mt-2 text-xs text-muted-foreground">
+                {{ placementInputs.length - INPUTS_SHOWN }} more under For developers.
+              </p>
+            </details>
+          </template>
+          <p v-else-if="nativeDetailUnavailable" class="text-xs text-muted-foreground">
+            Distributed execution detail could not be loaded.
+          </p>
+          <p v-else class="text-xs text-muted-foreground">No placement record for this run yet.</p>
+        </section>
+
+        </div>
+
         <section>
           <h3 class="mb-2 type-card-title">What ran</h3>
           <div class="space-y-4">
@@ -1133,22 +1164,11 @@ async function confirmDelete() {
                 <code class="block whitespace-pre-wrap break-all rounded-md bg-muted/50 px-3 py-2 font-mono text-xs leading-relaxed">{{ executor.command.join(' ') }}</code>
               </template>
             </DetailList>
-            <div v-if="task.inputs?.length">
-              <p class="type-label">Inputs</p>
-              <ul class="mt-1 divide-y divide-border-subtle rounded-lg border border-border-subtle">
-                <li v-for="(input, i) in task.inputs" :key="`${input.path}:${i}`" class="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-2.5 text-xs">
-                  <span class="min-w-0 flex-1 truncate font-mono text-foreground" :title="input.path">{{ input.path }}</span>
-                  <RouterLink v-if="inputLink(input.url)" :to="inputLink(input.url)!" class="min-w-0 truncate font-mono text-primary hover:underline" :title="input.url">{{ input.url }}</RouterLink>
-                  <span v-else-if="input.url" class="min-w-0 truncate font-mono text-muted-foreground" :title="input.url">{{ input.url }}</span>
-                  <span v-else class="text-muted-foreground">Inline content</span>
-                </li>
-              </ul>
-            </div>
           </div>
         </section>
 
         <details data-tutorial="run-details" class="text-sm">
-          <summary class="cursor-pointer font-medium text-muted-foreground">For developers</summary>
+          <summary class="flex cursor-pointer list-none items-center gap-2 type-card-title"><Code class="size-4 text-muted-foreground" aria-hidden="true" />For developers<ChevronDown class="size-4 text-muted-foreground" aria-hidden="true" /></summary>
           <div class="mt-4 space-y-6">
             <DetailList :items="developerIds">
               <template #runId="{ item }">
@@ -1197,8 +1217,8 @@ async function confirmDelete() {
       <div class="space-y-2">
         <div class="flex flex-wrap items-center gap-2">
           <Button v-if="!active" variant="outline" size="sm" title="Starts a new run prefilled from this one" @click="rerun"><RotateCcw class="h-3.5 w-3.5" /> Run again</Button>
-          <Button v-if="!active" variant="outline" size="sm" @click="saveOpen = true"><Star class="h-3.5 w-3.5" /> Save as my run</Button>
-          <span v-if="savedRun" role="status" class="text-xs text-muted-foreground max-sm:sr-only">Saved to My runs.</span>
+          <Button v-if="!active" variant="outline" size="sm" @click="saveOpen = true"><Star class="h-3.5 w-3.5" /> Save as run template</Button>
+          <span v-if="savedRun" role="status" class="text-xs text-muted-foreground max-sm:sr-only">Saved to run templates.</span>
           <SaveRunDialog v-model:open="saveOpen" :task="task" @saved="savedRun = true" />
           <template v-if="canCancel">
             <template v-if="!confirmingCancel">
