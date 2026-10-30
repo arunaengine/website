@@ -178,16 +178,18 @@ async function bucketHolders(name: string, groupId?: string): Promise<{ nodes: s
   return { nodes: [...nodes], partial }
 }
 
-/** Every current version below a key prefix on one node, read page by page. */
-async function listedVersions(bucket: string, prefix: string, nodeId: string): Promise<{ key: string; versionId: string }[]> {
+/** Every current version below a key prefix on one node; `stale` when a lagging copy answered. */
+async function listedVersions(bucket: string, prefix: string, nodeId: string) {
   const files: { key: string; versionId: string }[] = []
+  let stale = false
   let cursor: string | undefined
   do {
     const page = await listBucketObjects(bucket, { prefix, cursor, limit: 1000 }, isLocalNode(nodeId) ? null : nodeId)
     files.push(...page.objects.map((item) => ({ key: item.key, versionId: item.version_id })))
+    if (page.stale_ranges?.length) stale = true
     cursor = page.next_cursor ?? undefined
   } while (cursor)
-  return files
+  return { files, stale }
 }
 
 /** An input of another node, named by the exact versions it reads there; a folder becomes its files. */
@@ -197,12 +199,16 @@ async function pinInput(input: TesInput, holders: ReadonlyMap<string, readonly s
   if (!node) throw new Error(`No node holds bucket ${bucket}, so the run was not started.`)
   const pinned = (file: { key: string; versionId: string }) => versionObjectId(realmId, node, bucket, file.key, file.versionId)
   if (input.type !== 'DIRECTORY' && !key.endsWith('/')) {
-    const file = (await listedVersions(bucket, key, node)).find((entry) => entry.key === key)
+    const file = (await listedVersions(bucket, key, node)).files.find((entry) => entry.key === key)
     if (!file) throw new Error(`${bucket}/${key} was not found on ${displayName(node)}, so the run was not started.`)
     return [{ ...input, url: pinned(file) }]
   }
   const prefix = key.endsWith('/') ? key : `${key}/`
-  const files = await listedVersions(bucket, prefix, node)
+  const { files, stale } = await listedVersions(bucket, prefix, node)
+  // A copy that lags may miss recent files, so the folder is not taken as complete.
+  if (stale) {
+    throw new Error(`Part of ${bucket}/${prefix} on ${displayName(node)} is listed from a copy that may miss recent files, so the run was not started. Try again later, or pick its files.`)
+  }
   if (!files.length) throw new Error(`The folder ${bucket}/${prefix} is empty on ${displayName(node)}, so the run was not started.`)
   const base = input.path.replace(/\/+$/, '')
   return files.map((file) => {

@@ -156,6 +156,7 @@ const getBucketDistribution = vi.fn(async (_bucket: string, _signal?: AbortSigna
 const listBucketObjects = vi.fn(async (_bucket: string, _query: { prefix?: string }, _nodeId?: string | null) => ({
   objects: [] as Array<{ key: string; version_id: string }>,
   next_cursor: null as string | null,
+  stale_ranges: undefined as unknown[] | undefined,
 }))
 const sessionEpoch = ref(0)
 const useArunaModule = {
@@ -779,6 +780,39 @@ describe('run page', () => {
     searchBuckets.mockReset()
     searchBuckets.mockImplementation(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-id', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
     useSavedRuns().remove('r4')
+    mounted.app.unmount()
+  })
+
+  it('refuses to expand a folder of another node listed from a lagging copy', async () => {
+    searchBuckets.mockImplementation(async (q: string) => ({
+      hits: [{ bucket: q, node_id: q === 'refs' ? 'node-c' : 'node-b', group_id: 'group-id' }],
+      nodes_failed: 0,
+      next_cursor: null,
+    }))
+    listBucketObjects.mockResolvedValueOnce({ objects: [{ key: 'db/a.tsv', version_id: '01K8W1B3D5F7H9KMQ1S3V5X7Z1' }], next_cursor: null, stale_ranges: [{}] })
+    createTask.mockClear()
+    useSavedRuns().save({
+      id: 'r5', name: 'Stale', savedAt: '2026-10-30T10:00:00Z',
+      task: {
+        name: 'Stale',
+        executors: [{ image: 'alpine:3.20', command: ['ls', '/work/in/db'] }],
+        inputs: [{ name: 'db', path: '/work/in/db', url: 's3://refs/db/', type: 'DIRECTORY' }],
+        outputs: [{ url: 's3://results/stale/', path: '/work/out/', type: 'DIRECTORY' }],
+      },
+      ask: { inputs: [], results: false },
+    })
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?saved=r5')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    expect(createTask).not.toHaveBeenCalled()
+    expect(content(mounted.root)).toContain('listed from a copy that may miss recent files')
+    searchBuckets.mockReset()
+    searchBuckets.mockImplementation(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-id', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
+    useSavedRuns().remove('r5')
     mounted.app.unmount()
   })
 
