@@ -13,6 +13,7 @@ import { CRATE_POLL_DELAYS_MS, CrateNotReadyError, invalidateCrate, loadRoCrate 
 import {
   acceptedProfileItems,
   assertCurrentSession,
+  datasetChanges,
   fullCrates,
   metadataItems,
   profileItems,
@@ -111,6 +112,7 @@ export async function replaceMetadataRoCrate(
     const wasCached = documentId in fullCrates.value
     invalidateCrate(documentId)
     await awaitCrateMaterialized(documentId)
+    datasetChanges.value = [...datasetChanges.value, documentId]
     // A document someone had on screen must come back as the new full crate,
     // not as a summary-parsed downgrade of it; re-prime before the catalog
     // refresh remaps. The update is accepted at this point, so neither a
@@ -128,6 +130,7 @@ export async function deleteMetadataDocument(documentId: string): Promise<void> 
   saving.value = true
   try {
     await request<void>(`/metadata/${encodeURIComponent(documentId)}`, { method: 'DELETE' })
+    datasetChanges.value = [...datasetChanges.value, documentId]
     invalidateCrate(documentId)
     metadataItems.value = metadataItems.value.filter((item) => item.document_id !== documentId)
     profileItems.value = profileItems.value.filter((item) => item.document_id !== documentId)

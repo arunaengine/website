@@ -18,9 +18,11 @@ const complete = ref(true)
 // The session the state belongs to; a load of an earlier session never blocks a new one.
 let stateEpoch = -1
 let runs = 0
+// How many dataset changes the last read started after.
+let changesRead = 0
 
 export function useDatabases() {
-  const { searchBuckets, sessionEpoch, authToken } = useAruna()
+  const { searchBuckets, sessionEpoch, authToken, datasetChanges } = useAruna()
   const { localNodeId, isTarget } = useRealmNodes()
 
   const rows = computed(() => (listedEpoch.value === sessionEpoch.value ? listed.value : []))
@@ -29,6 +31,7 @@ export function useDatabases() {
     const run = ++runs
     const epoch = sessionEpoch.value
     stateEpoch = epoch
+    changesRead = datasetChanges.value.length
     if (!authToken.value) {
       listed.value = []
       state.value = 'idle'
@@ -60,15 +63,21 @@ export function useDatabases() {
     }
   }
 
-  /** Reads the list once for this session; later calls only reread after `reload`. */
-  function ensure() {
-    if (state.value === 'loading' && stateEpoch === sessionEpoch.value) return
-    if (state.value === 'idle' || listedEpoch.value !== sessionEpoch.value) void load()
+  // A database whose dataset changed since the list was read shows an old description.
+  const changed = () => {
+    const ids = new Set(datasetChanges.value.slice(changesRead))
+    return listed.value.some((row) => row.datasetId !== null && ids.has(row.datasetId))
   }
 
-  // A list in use is read again for the new session.
+  /** Reads the list once for this session; later calls reread after `reload` or a dataset change. */
+  function ensure() {
+    if (state.value === 'loading' && stateEpoch === sessionEpoch.value) return
+    if (state.value === 'idle' || listedEpoch.value !== sessionEpoch.value || changed()) void load()
+  }
+
+  // A list in use is read again for the new session or after a change of a dataset it shows.
   watch(
-    () => sessionEpoch.value,
+    () => [sessionEpoch.value, datasetChanges.value.length],
     () => {
       if (state.value !== 'idle') ensure()
     },

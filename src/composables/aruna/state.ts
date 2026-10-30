@@ -65,6 +65,8 @@ export const profileValidationStatusLoads = new Map<
 >()
 let profileValidationCapabilitiesLoad: Promise<ProfileValidationCapabilitiesResponse> | null = null
 export const recentlyCreatedMetadataIds = new Set<string>()
+// Each accepted change of a dataset, in order, so the database list rereads the ones it shows.
+export const datasetChanges = ref<string[]>([])
 export const acceptedProfileItems = new Map<string, MetadataDocumentListItem>()
 export const bootstrapped = ref(false)
 // Monotonic identity counter: bumped whenever the token or API base changes,

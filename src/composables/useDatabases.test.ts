@@ -6,6 +6,7 @@ const aruna = vi.hoisted(() => ({
   sessionEpoch: { value: 1 },
   authToken: { value: 'token' },
   searchBuckets: vi.fn(),
+  datasetChanges: { value: [] as string[] },
 }))
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
 vi.mock('@/composables/useRealmNodes', () => ({ useRealmNodes: () => ({ localNodeId: ref('n1'), isTarget: (id: string) => id !== 'device-1' }) }))
@@ -59,6 +60,25 @@ describe('databases', () => {
     answer(page([view('lab'), view('spire')]))
     await reading
     expect(databases.rows.value.map((row) => row.bucket)).toEqual(['lab', 'spire'])
+    scope.stop()
+  })
+
+  it('reads the list again once the dataset of a listed database changed', async () => {
+    aruna.searchBuckets.mockResolvedValueOnce(page([view('lab')]))
+    const { databases, scope } = start()
+    databases.ensure()
+    await vi.waitFor(() => expect(databases.state.value).toBe('ready'))
+
+    aruna.datasetChanges.value = [...aruna.datasetChanges.value, 'd-other']
+    databases.ensure()
+    expect(aruna.searchBuckets).toHaveBeenCalledOnce()
+
+    aruna.searchBuckets.mockResolvedValueOnce(page([view('lab', 'Lab renamed')]))
+    aruna.datasetChanges.value = [...aruna.datasetChanges.value, 'd-lab']
+    databases.ensure()
+    await vi.waitFor(() => expect(databases.find('lab', null, null)?.title).toBe('Lab renamed'))
+    databases.ensure()
+    expect(aruna.searchBuckets).toHaveBeenCalledTimes(2)
     scope.stop()
   })
 
