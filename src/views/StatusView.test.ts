@@ -36,6 +36,7 @@ let StatusView: Component
 beforeAll(async () => {
   vi.doMock('vue-router', () => ({
     useRoute: () => ({ query: {} }),
+    useRouter: () => ({ push: vi.fn() }),
     RouterLink: defineComponent((_, { slots }) => () => h('a', slots.default?.())),
   }))
   vi.doMock('@/composables/useAruna', () => ({
@@ -54,7 +55,7 @@ beforeAll(async () => {
   vi.doMock('@/components/placement/LocationAggregates.vue', () => ({ default: AggregatesStub }))
   vi.doMock('@/composables/useNodeNames', () => ({ useNodeNames: () => ({ renameNode: vi.fn() }) }))
   vi.doMock('@/composables/useDeviceStatus', () => ({ useDeviceStatus: () => ({ identity: ref(null) }) }))
-  vi.doMock('@/components/dashboard/FederationPanel.vue', () => ({
+  vi.doMock('@/components/dashboard/RealmTopology.vue', () => ({
     default: defineComponent({ props: { nodes: Array }, setup: (props) => () => h('div', `node map ${props.nodes?.length}`) }),
   }))
   StatusView = (await import('./StatusView.vue')).default

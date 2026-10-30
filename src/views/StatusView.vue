@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
-import FederationPanel from '@/components/dashboard/FederationPanel.vue'
+import RealmTopology from '@/components/dashboard/RealmTopology.vue'
 import NodeCards from '@/components/dashboard/NodeCards.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import OverviewCell from '@/components/dashboard/OverviewCell.vue'
@@ -11,6 +11,7 @@ import SectionHeading from '@/components/ui/SectionHeading.vue'
 import StatusPill from '@/components/ui/StatusPill.vue'
 import Notice from '@/components/ui/Notice.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
+import InfoHint from '@/components/ui/InfoHint.vue'
 import ListSkeleton from '@/components/ui/ListSkeleton.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import LocalNodeDetails from '@/components/nodes/LocalNodeDetails.vue'
@@ -26,7 +27,7 @@ import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { onWake, POLL_SLOW_MS } from '@/lib/poll'
 import { aggregateByLocation } from '@/lib/placement'
-import { errorMessage, formatBytes, formatClock, formatNumber, relativeTime, truncateMiddle } from '@/lib/utils'
+import { errorMessage, formatBytes, formatClock, formatNumber, relativeTime } from '@/lib/utils'
 import type { RealmNodeInfo } from '@/lib/api'
 import type { RealmView } from '@/composables/aruna/realm'
 import { isDesktop } from '@/lib/desktop'
@@ -36,6 +37,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 
 const route = useRoute()
+const router = useRouter()
 const { realm, realmInfo, nodeInfo, usageInfo, apiBaseUrl, currentUser, loadInfo, sessionEpoch, loadRealmView, isRealmAdmin } = useAruna()
 const { renameNode } = useNodeNames()
 const rename = computed(() => (isRealmAdmin.value ? renameNode : undefined))
@@ -267,6 +269,10 @@ async function showNode(id: string) {
     ?.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' })
 }
 
+// A realm node opens its details below; this computer has no card, so its own page opens.
+const pickNode = (id: string) =>
+  cardNodes.value.some((node) => node.node_id === id) ? void showNode(id) : void router.push({ name: 'node', params: { nodeId: id } })
+
 // A link from elsewhere names the node in the query; a node chosen on the map opens directly.
 watch(
   [targetNodeId, cardNodes] as const,
@@ -286,7 +292,8 @@ watch(
       <template #description>
         <span class="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span v-if="realm.description && realm.description !== realm.name">{{ realm.description }}</span>
-          <span class="inline-flex items-center gap-1.5 font-mono text-xs" :title="realm.id">{{ truncateMiddle(realm.id, 12, 8) }}<CopyButton :value="realm.id" label="Copy realm id" /></span>
+          <span v-if="localPeerId" class="inline-flex items-center gap-1.5"><Server class="size-4" />Served by <RouterLink :to="{ name: 'node', params: { nodeId: localPeerId } }" class="hover:underline"><NodeLabel :node-id="localPeerId" /></RouterLink></span>
+          <span class="inline-flex items-center gap-1.5">Realm id<InfoHint :label="realm.id" name="Realm id" /><CopyButton :value="realm.id" label="Copy realm id" /></span>
           <span class="inline-flex items-center gap-1.5 tabular-nums"><Clock class="size-4" />Updated {{ lastUpdatedLabel }}</span>
         </span>
       </template>
@@ -333,6 +340,7 @@ watch(
         <OverviewCell label="Locations" :icon="MapPinned" tone="sky">
           <template #value>{{ formatNumber(mappedLocationCount) }}</template>
           <template #unit>{{ mappedLocationCount === 1 ? 'location' : 'locations' }}</template>
+          <span v-for="place in locationAggregates.filter((a) => a.mapped).slice(0, 3)" :key="place.location"><MapPinned />{{ place.location }}, <b>{{ place.nodeCount }}</b> {{ place.nodeCount === 1 ? 'node' : 'nodes' }}</span>
         </OverviewCell>
         <OverviewCell v-if="deviceNodes.length" label="Devices" :icon="Laptop" tone="aqua" info="Devices do not announce themselves; activity is what this node last heard from them.">
           <template #value>{{ formatNumber(deviceNodes.length) }}</template>
@@ -352,12 +360,15 @@ watch(
 
       <section v-if="currentUser" aria-labelledby="status-map-heading">
         <SectionHeading id="status-map-heading" title="Node map" :icon="Network" info="Pick a node to see its details below." />
-        <FederationPanel
-          :nodes="panelInfra"
-          :local-peer-id="(realmView?.info ?? nodeInfo)?.node.peer_id"
-          :computer="computer"
-          @select="showNode"
-        />
+        <div class="relative h-[300px] overflow-hidden rounded-xl border border-border-subtle bg-background shadow-sm dark:shadow-none">
+          <RealmTopology
+            :nodes="panelInfra"
+            :local-peer-id="(realmView?.info ?? nodeInfo)?.node.peer_id"
+            :computer="computer"
+            :highlight="expandedId || null"
+            @select="pickNode"
+          />
+        </div>
       </section>
 
       <section aria-labelledby="status-nodes-heading">

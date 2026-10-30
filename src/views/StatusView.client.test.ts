@@ -50,9 +50,9 @@ const DetailStub = defineComponent({ props: { node: { type: Object, required: tr
 
 const StatusView = compileClientComponent(new URL('./StatusView.vue', import.meta.url), {
   vue: VueRuntime,
-  'vue-router': { RouterLink: Plain, useRoute: () => ({ query: {} }) },
+  'vue-router': { RouterLink: Plain, useRoute: () => ({ query: {} }), useRouter: () => ({ push: vi.fn() }) },
   '@/components/dashboard/PageHeader.vue': moduleDefault(Plain),
-  '@/components/dashboard/FederationPanel.vue': moduleDefault(MapStub),
+  '@/components/dashboard/RealmTopology.vue': moduleDefault(MapStub),
   '@/components/dashboard/NodeCards.vue': moduleDefault(CardsStub),
   '@/components/ui/RefreshButton.vue': moduleDefault(Empty),
   '@/components/dashboard/OverviewCell.vue': moduleDefault(Empty),
@@ -61,6 +61,7 @@ const StatusView = compileClientComponent(new URL('./StatusView.vue', import.met
   '@/components/ui/StatusPill.vue': moduleDefault(Empty),
   '@/components/ui/Notice.vue': moduleDefault(Plain),
   '@/components/ui/CopyButton.vue': moduleDefault(Empty),
+  '@/components/ui/InfoHint.vue': moduleDefault(Empty),
   '@/components/ui/ListSkeleton.vue': moduleDefault(Empty),
   '@/components/ui/NodeLabel.vue': moduleDefault(Empty),
   '@/components/nodes/LocalNodeDetails.vue': moduleDefault(LocalStub),
