@@ -1408,6 +1408,22 @@ describe('distributed job detail components', () => {
     mounted.app.unmount()
   })
 
+  it('opens the results at the folder holding the files', async () => {
+    const declared = { url: 's3://laptop/results/run/out', path: '/work/out/*' }
+    const written = { url: 's3://laptop/results/run/out/a.paf', path: '/work/out/a.paf', size_bytes: '10' }
+    const folderText = async (logs: unknown[]) => {
+      const getTask = vi.fn(async () => ({ id: 'done', state: 'COMPLETE', executors: [], inputs: [], outputs: [declared], logs, tags: {} }))
+      const mounted = await mount(taskPanel(getTask, vi.fn(async () => ({ family: null }))), { taskId: 'done', open: true })
+      const folders = findAll(mounted.root, (node) => node.tag === 'p' && String(node.props.class).includes('font-mono')).map(content)
+      mounted.app.unmount()
+      return folders
+    }
+
+    expect(await folderText([])).toContain('laptop/results/run/out/')
+    expect(await folderText([{ outputs: [written] }])).toContain('laptop/results/run/out/')
+    expect(await folderText([])).not.toContain('laptop/results/run/')
+  })
+
   it('stays on a run that already holds its placement', async () => {
     const key = { 'aruna-engine.org/idempotency-key': 'submission-key' }
     const getTask = vi.fn(async () => ({ id: 'canonical-job', state: 'RUNNING', executors: [], inputs: [], outputs: [], logs: [], tags: key }))

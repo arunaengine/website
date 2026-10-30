@@ -650,11 +650,13 @@ const outputRows = computed<OutRow[]>(() => {
 const capturedCount = computed(() => outputRows.value.filter((row) => row.captured).length)
 const capturedBytes = computed(() =>
   outputRows.value.reduce((sum, row) => (row.captured && row.size !== undefined && !Number.isNaN(row.size) ? sum + row.size : sum), 0))
-// The folder of the first output in a bucket; the file list below names every destination.
+// The folder holding the first written file in a bucket; the file list below names every destination.
 const resultsFolder = computed(() => {
-  const row = outputRows.value.find((entry) => entry.link.kind === 's3')
+  const row = outputRows.value.find((entry) => entry.captured && entry.link.kind === 's3') ?? outputRows.value.find((entry) => entry.link.kind === 's3')
   if (!row || row.link.kind !== 's3') return null
-  const { bucketId, prefix } = row.link
+  const { bucketId } = row.link
+  // A declared folder capture names the folder itself, not a file in it.
+  const prefix = !row.captured && /[/*]$/.test(row.path) ? row.link.objectKey.replace(/\/+$/, '') : row.link.prefix
   return {
     path: `${bucketId}/${prefix ? `${prefix}/` : ''}`,
     to: { name: 'bucket', params: { bucketId }, query: prefix ? { prefix } : {} },
