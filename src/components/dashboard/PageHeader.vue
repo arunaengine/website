@@ -24,10 +24,12 @@ const props = withDefaults(
     eyebrow?: string
     crumbs?: Crumb[]
     class?: string
+    /** Classes for the inner column, such as a centered reading width. */
+    contentClass?: string
     /** The manual page this surface belongs to. */
     docs?: { topic: string; section?: string; label?: string }
   }>(),
-  { description: undefined, eyebrow: undefined, crumbs: () => [], class: undefined, docs: undefined },
+  { description: undefined, eyebrow: undefined, crumbs: () => [], class: undefined, contentClass: undefined, docs: undefined },
 )
 
 provide(IN_PAGE_HEADER, true)
@@ -56,7 +58,7 @@ const trail = computed(() => [...(section.value ? [section.value] : []), ...prop
       class="grid-faint pointer-events-none absolute inset-0 opacity-60 [mask-image:radial-gradient(ellipse_at_50%_0%,black_20%,transparent_75%)]"
     />
     <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0 opacity-60" />
-    <div class="w-full px-4 sm:px-6 relative flex flex-col gap-2 pb-6 pt-6">
+    <div :class="cn('w-full px-4 sm:px-6 relative flex flex-col gap-2 pb-6 pt-6', contentClass)">
       <nav aria-label="Breadcrumb" class="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] leading-[18px] text-muted-foreground">
         <Globe class="size-3.5 shrink-0" aria-hidden="true" />
         <RouterLink :to="{ name: 'dashboard' }" class="truncate hover:text-foreground hover:underline" :title="realmId">{{ realmDisplayName }}</RouterLink>
