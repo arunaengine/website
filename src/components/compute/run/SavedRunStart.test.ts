@@ -16,6 +16,10 @@ const SelectStub = defineComponent({
   emits: ['update:modelValue'],
   setup: (_, { emit }) => () => h('select', { onChange: (value: string) => emit('update:modelValue', value) }),
 })
+const HomeStub = defineComponent({
+  emits: ['choose'],
+  setup: (_, { emit }) => () => h('button', { onClick: () => emit('choose', 'linked', 'runs/') }, 'Linked folder'),
+})
 const IMAGE = 'harbor.computational.bio.uni-giessen.de/aruna/bakta-rs@sha256:2bf286e66203f8cd5dac0e5b08a7f75156f986330d437d6eef937a3b900f32cc'
 
 function custom() {
@@ -47,7 +51,7 @@ const component = compileClientComponent(new URL('./SavedRunStart.vue', import.m
   '@/components/ui/IconTile.vue': moduleDefault(Empty),
   '@/components/ui/SectionHeading.vue': moduleDefault(Empty),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
-  '@/components/compute/run/ResultsHome.vue': moduleDefault(Empty),
+  '@/components/compute/run/ResultsHome.vue': moduleDefault(HomeStub),
   '@/components/compute/TesDataRefDialog.vue': moduleDefault(Empty),
   '@/composables/useCustomRun': { injectCustomRun: custom, outputDestination: () => '' },
   '@/lib/tes': Tes,
@@ -124,6 +128,18 @@ describe('saved run start', () => {
     await VueRuntime.nextTick()
 
     expect(chooseResults).toHaveBeenLastCalledWith('laptop', '')
+    askResults = false
+  })
+
+  it('shows a chosen linked folder in the bucket and folder fields', async () => {
+    askResults = true
+    const { root } = await mountApp(component)
+    const home = nodes(root).find((node) => node.tag === 'button' && content(node) === 'Linked folder')!
+    ;(home.props.onClick as () => void)()
+    await VueRuntime.nextTick()
+
+    expect(chooseResults).toHaveBeenLastCalledWith('linked', 'runs/')
+    expect(nodes(root).find((node) => node.tag === 'select')!.props.modelValue).toBe('linked')
     askResults = false
   })
 })

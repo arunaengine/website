@@ -72,6 +72,12 @@ const resultsFolder = ref('')
 watch([resultsBucket, resultsFolder], ([bucket, folder]) => {
   if (bucket) chooseResults(bucket, folder)
 })
+// A linked results folder fills the same fields, so they always show where the results go.
+function chooseHome(bucket: string, folder: string) {
+  resultsBucket.value = bucket
+  resultsFolder.value = folder
+  chooseResults(bucket, folder)
+}
 </script>
 
 <template>
@@ -131,7 +137,7 @@ watch([resultsBucket, resultsFolder], ([bucket, folder]) => {
       <SectionHeading title="Results" :icon="Folder" />
       <div id="saved-results" class="surface space-y-4 p-5">
         <template v-if="run.ask.results">
-          <ResultsHome @choose="chooseResults" />
+          <ResultsHome @choose="chooseHome" />
           <div class="grid gap-4 sm:grid-cols-2">
             <label class="block">
               <span class="text-xs font-medium text-muted-foreground">Bucket</span>
