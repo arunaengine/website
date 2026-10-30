@@ -386,7 +386,7 @@ const pageDescription = computed(() =>
               :icon="Workflow"
               tone="ok"
               :to="{ name: 'compute' }"
-              :info="scope === 'realm' ? 'The realm counts no runs of its own; these are the runs of your groups.' : undefined"
+              info="Runs of your groups. The realm counts no runs of its own."
             >
               <template #value>{{ groupsUsage.processRuns != null ? formatCount(groupsUsage.processRuns) : 'Unknown' }}</template>
               <span v-if="runsLine?.running"><LoaderCircle /><b>{{ runsLine.atLeast ? 'at least ' : '' }}{{ formatCount(runsLine.running) }}</b> running</span>

@@ -491,7 +491,7 @@ onUnmounted(() => {
         <template #value>{{ stats.active }}</template>
         <span><Hourglass /><b>{{ stats.waiting }}</b> waiting to start</span>
       </OverviewCell>
-      <OverviewCell label="Compute time" :icon="Timer" tone="sky" info="The time the started runs ran, added up.">
+      <OverviewCell label="Compute time" :icon="Timer" tone="sky">
         <template #value>{{ stats.time }}</template>
         <span><Workflow /><b>{{ stats.started }}</b> {{ stats.started === 1 ? 'run' : 'runs' }} started</span>
       </OverviewCell>

@@ -99,8 +99,8 @@ const PageHeaderStub = defineComponent({
 const RouterLinkStub = defineComponent((_, { attrs, slots }) => () => h('a', attrs, slots.default?.()))
 const SkeletonStub = defineComponent(() => () => h('span', 'loading'))
 const OverviewCellStub = defineComponent({
-  props: { label: String },
-  setup: (props, { slots }) => () => h('div', [h('span', props.label), slots.value?.(), ' ', slots.unit?.(), ' ', slots.default?.()]),
+  props: { label: String, info: String },
+  setup: (props, { slots }) => () => h('div', { 'data-info': props.info }, [h('span', props.label), slots.value?.(), ' ', slots.unit?.(), ' ', slots.default?.()]),
 })
 // The realm's database list; its count shows once the list was read.
 const databaseRows = ref<unknown[]>([])
@@ -524,6 +524,17 @@ describe('authenticated dashboard scope', () => {
     expect(text).toMatch(/row node-a\s+row node-b/)
     expect(text).not.toContain('group quota cards')
     expect(text).not.toContain('my stats cards')
+  })
+
+  it('gives the Runs card the same hint in every scope', async () => {
+    signedInRealm()
+    groupsAggregate.value = { datasets: 0, processRuns: 4 }
+    const hint = async () => /data-info="([^"]*)"[^>]*><span>Runs</.exec(await renderToString(createSSRApp(DashboardView)))?.[1]
+
+    scope.value = 'personal'
+    expect(await hint()).toBe('Runs of your groups. The realm counts no runs of its own.')
+    scope.value = 'realm'
+    expect(await hint()).toBe('Runs of your groups. The realm counts no runs of its own.')
   })
 
   it('switches the section through the stored scope', async () => {

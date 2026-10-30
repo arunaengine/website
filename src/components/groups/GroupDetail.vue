@@ -519,7 +519,7 @@ async function leave() {
           <template #value>{{ purposeCountLabel(purposeCounts.datasets) }}</template>
           <span v-if="purposeCounts.profiles != null"><ListChecks /><b>{{ formatCount(purposeCounts.profiles) }}</b> {{ purposeCounts.profiles === 1 ? 'profile' : 'profiles' }}</span>
         </OverviewCell>
-        <OverviewCell label="Runs" :icon="Workflow" tone="ok" info="Process runs this group has recorded.">
+        <OverviewCell label="Runs" :icon="Workflow" tone="ok">
           <template #value>{{ purposeCountLabel(purposeCounts.runs) }}</template>
           <span v-if="groupRuns.length && recentRuns.state.value === 'ready'"><CircleCheck class="text-status-ok" /><b>{{ completedRuns }}/{{ groupRuns.length }}</b> recent completed</span>
         </OverviewCell>
@@ -597,7 +597,7 @@ async function leave() {
             </section>
 
             <section class="flex flex-col" aria-labelledby="group-datasets-heading">
-              <SectionHeading id="group-datasets-heading" title="Datasets" :icon="FileJson2" :info="docsEstimate !== null ? `About ${formatNumber(docsEstimate)} in this group.` : undefined">
+              <SectionHeading id="group-datasets-heading" title="Datasets" :icon="FileJson2" :count="docs ? docsCountLabel : undefined">
                 <template #actions>
                   <Button variant="outline" size="sm" as-child>
                     <RouterLink :to="{ name: 'datasets', query: { group: group.group_id } }"><ArrowRight class="h-3.5 w-3.5" /> All datasets</RouterLink>
@@ -669,7 +669,7 @@ async function leave() {
 
         <TabsContent value="members" :force-mount="canManage && joinRequestsEnabled" :class="tab === 'members' ? 'mt-0 space-y-8' : 'mt-0 hidden'">
           <section v-if="canManage && joinRequestsEnabled" aria-label="Join requests">
-            <SectionHeading title="Join requests" :icon="Inbox" info="Approve a request to assign roles, or deny it with an optional reason.">
+            <SectionHeading title="Join requests" :icon="Inbox">
               <template #actions>
                 <Badge v-if="joinRequestCount !== null" :variant="joinRequestCount > 0 ? 'warn' : 'outline'" size="count" aria-label="Pending access requests">{{ joinRequestCount }}</Badge>
               </template>

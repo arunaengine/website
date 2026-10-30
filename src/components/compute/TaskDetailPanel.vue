@@ -412,11 +412,8 @@ const movedBytes = computed(() =>
     : (nativeFamily.value?.placement?.estimated_transfer_bytes ?? 0))
 const stayedBytes = computed(() =>
   placementInputs.value.reduce((sum, input) => (input.source_node_id ? sum : sum + input.bytes), 0))
-const placementInfo = computed(() => {
-  const where = runNode.value ? ` The work ran on ${displayName(runNode.value)}.` : ''
-  const how = movedBytes.value ? 'Some data was copied to the compute.' : 'Compute went to the data.'
-  return `${how}${where} Estimated at planning time, not measured.`
-})
+// The line and the run's facts already say what moved and where it ran.
+const placementInfo = 'Estimated at planning time, not measured.'
 
 const attemptLine = computed(() => {
   const count = nativeJob.value?.attempts || task.value?.logs?.length || 0
