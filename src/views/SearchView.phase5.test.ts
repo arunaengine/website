@@ -72,4 +72,11 @@ describe('Datasets page layout', () => {
   it('keeps the run records pages reachable when a page holds no record', () => {
     expect(view).toContain('v-if="records.length || browsePage > 1 || hasNextPage"')
   })
+
+  it('reports a failed run records page instead of an empty one', () => {
+    const records = view.slice(view.indexOf('aria-labelledby="run-records-heading"'), view.indexOf('<template v-else-if="!expertMode">'))
+    expect(records).toContain('<div v-if="keptBrowse"')
+    expect(records).toContain('<ErrorPanel v-else-if="browseError && !keptBrowse"')
+    expect(records.indexOf('<ErrorPanel')).toBeLessThan(records.indexOf('<EmptyState'))
+  })
 })

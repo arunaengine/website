@@ -16,6 +16,7 @@ import Pagination from '@/components/ui/Pagination.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
 import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
@@ -58,6 +59,8 @@ const {
   searchBusy,
   catalogSplit,
   browseBusy,
+  browseError,
+  keptBrowse,
   browsePage,
   pageCount,
   hasNextPage,
@@ -135,8 +138,14 @@ function askAi() {
           <div class="flex flex-wrap items-center gap-2 border-b border-border-subtle px-5 py-3">
             <Input v-model="recordFilter" class="h-8 max-w-xs text-xs" placeholder="Find a record" aria-label="Find a record" />
           </div>
+          <!-- Kept records: the failed refresh reports next to them. -->
+          <div v-if="keptBrowse" class="flex flex-wrap items-center justify-center gap-2 border-b border-border-subtle px-5 py-2 text-xs text-destructive">
+            {{ browseError }}
+            <Button variant="outline" size="sm" @click="state.retryBrowse">Try again</Button>
+          </div>
           <RunRecordTable v-if="records.length" :docs="records" :group-names="groupNames" />
           <p v-else-if="browseBusy" class="px-5 py-10 text-center text-sm text-muted-foreground">Loading run records…</p>
+          <ErrorPanel v-else-if="browseError && !keptBrowse" :message="browseError" class="rounded-none border-0 shadow-none" @retry="state.retryBrowse" />
           <EmptyState v-else :title="recordFilter.trim() ? 'No record matches' : 'No run records on this page'" description="A run writes its record once it finishes." class="rounded-none border-0 shadow-none" />
           <div v-if="records.length || browsePage > 1 || hasNextPage" class="flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle px-5 py-2 text-xs tabular-nums text-muted-foreground">
             <!-- One page holds every record only when no page follows; otherwise the page is named. -->
