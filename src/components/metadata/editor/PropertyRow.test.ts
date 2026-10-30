@@ -372,7 +372,7 @@ describe('PropertyRow', () => {
     const mounted = await mount('name', [])
 
     expect(element(mounted.root, (node) => node.props.class === Grid.ROW_GRID)).toBeDefined()
-    expect(element(mounted.root, (node) => node.props.class === Grid.ROW_ACTIONS)).toBeDefined()
+    expect(element(mounted.root, (node) => node.props.class === Grid.ROW_VALUE)).toBeDefined()
     mounted.app.unmount()
   })
 
