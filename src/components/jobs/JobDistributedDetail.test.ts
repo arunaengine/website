@@ -1376,6 +1376,8 @@ describe('distributed job detail components', () => {
 
     const mounted = await mount(taskPanel(getTask, getJob), { taskId: 'live-run', open: true })
     expect(getJob).toHaveBeenCalledTimes(1)
+    expect(getTask).toHaveBeenCalledTimes(1)
+    expect(followSpy.mock.calls[0]![1]()).toBe(Poll.POLL_ACTIVE_MS)
     await tick?.()
     expect(getTask).toHaveBeenCalledTimes(2)
     expect(getJob).toHaveBeenCalledTimes(2)

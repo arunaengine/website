@@ -38,7 +38,7 @@ import { resolveObjectUrl } from '@/composables/s3/endpoints'
 import { downloadCrateJson } from '@/lib/crateImport'
 import { getLocalRunCrate, requireDevice } from '@/lib/deviceApi'
 import { deleteErrorMessage, formatJobProgress, type JobStatusResponse } from '@/lib/jobs'
-import { POLL_IDLE_MS, follow, onWake } from '@/lib/poll'
+import { POLL_ACTIVE_MS, follow, onWake } from '@/lib/poll'
 import {
   TES_GROUP_TAG,
   TES_IDEMPOTENCY_TAG,
@@ -145,7 +145,8 @@ function stopPolling() {
 }
 function startPolling() {
   stopPolling()
-  stopFollow = follow(poll, () => POLL_IDLE_MS)
+  // Polling runs only while the run is active, so it takes the active beat.
+  stopFollow = follow(poll, () => POLL_ACTIVE_MS)
   stopWake = onWake(() => void poll())
 }
 async function poll() {
