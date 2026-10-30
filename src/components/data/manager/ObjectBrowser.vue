@@ -1058,7 +1058,10 @@ async function onDrop(event: DragEvent) {
             </IconButton>
           </div>
         </div>
-        <SelectionBar v-if="selectedCount" bottom :manager="manager" class="hidden @max-[600px]:block" @action="onBarAction" />
+        <template v-if="selectedCount">
+          <div class="hidden h-16 @max-[600px]:block md:!hidden" aria-hidden="true" />
+          <SelectionBar bottom :manager="manager" class="hidden @max-[600px]:flex" @action="onBarAction" />
+        </template>
         </template>
         <button
           v-if="!wholeBucket && searchText.trim().length >= 2"

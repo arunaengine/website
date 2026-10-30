@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The actions for the ticked rows. Wide, they replace the table's header row; on a phone they are
-// a bar at the bottom of the list. Below about 760 px Copy, Move and Share keep only their icons.
+// one row of icons above the bottom navigation. Below about 600 px the header keeps only icons.
 import Button from '@/components/ui/Button.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
@@ -31,8 +31,8 @@ const {
 
 const blocker = (action: SelectionAction) => actionBlocker(action, selectedObjectKeys.value.size, selectedPrefixes.value.size)
 const MOVES = [
-  { id: 'copy', label: 'Copy to', short: 'Copy', icon: Copy },
-  { id: 'move', label: 'Move to', short: 'Move', icon: FolderInput },
+  { id: 'copy', label: 'Copy to', icon: Copy },
+  { id: 'move', label: 'Move to', icon: FolderInput },
 ] as const
 </script>
 
@@ -55,14 +55,14 @@ const MOVES = [
       <div class="flex min-w-0 items-center gap-1.5">
         <span class="mr-1.5 whitespace-nowrap font-medium">{{ formatCount(selectedCount) }} selected</span>
         <IconButton label="Download" variant="outline" size="icon" class="h-8 w-auto px-2.5" :disabled-reason="blocker('download')" @click="emit('action', 'download')">
-          <Download class="size-3.5" /><span>Download</span>
+          <Download class="size-3.5" /><span class="@max-[600px]:hidden">Download</span>
         </IconButton>
         <IconButton v-for="move in MOVES" :key="move.id" :label="move.label" variant="outline" size="icon" class="h-8 w-auto px-2.5" @click="emit('action', move.id)">
-          <component :is="move.icon" class="size-3.5" /><span class="@max-[760px]:hidden">{{ move.label }}</span>
+          <component :is="move.icon" class="size-3.5" /><span class="@max-[600px]:hidden">{{ move.label }}</span>
         </IconButton>
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
-            <Button variant="outline" size="sm" title="Share" aria-label="Share"><Share2 class="size-3.5" /><span class="@max-[760px]:hidden">Share</span></Button>
+            <Button variant="outline" size="sm" title="Share" aria-label="Share"><Share2 class="size-3.5" /><span class="@max-[600px]:hidden">Share</span></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             <DropdownMenuItem @click="emit('action', 'share')"><Link2 class="h-3.5 w-3.5" /> Copy links</DropdownMenuItem>
@@ -70,47 +70,39 @@ const MOVES = [
           </DropdownMenuContent>
         </DropdownMenu>
         <IconButton label="Delete" variant="outline" size="icon" class="h-8 w-auto px-2.5 text-destructive hover:text-destructive" @click="emit('action', 'delete')">
-          <Trash2 class="size-3.5" /><span>Delete</span>
+          <Trash2 class="size-3.5" /><span class="@max-[600px]:hidden">Delete</span>
         </IconButton>
-        <button type="button" class="ml-auto shrink-0 text-primary hover:underline" @click="clearSelection">Clear</button>
+        <Button variant="ghost" size="sm" class="ml-auto shrink-0 px-2.5" @click="clearSelection"><X class="size-3.5" /> Clear</Button>
       </div>
     </th>
   </tr>
-  <div v-else class="sticky bottom-0 z-10 border-t border-aruna-royal/30 bg-aruna-royal/15 backdrop-blur" role="region" aria-label="Selected files">
-    <div class="flex items-center justify-between px-3 pt-1.5 text-sm">
-      <label class="flex min-h-11 items-center gap-3">
-        <input
-          type="checkbox"
-          class="h-4 w-4 rounded border-border accent-primary"
-          :checked="allListedSelected"
-          :indeterminate="someListedSelected && !allListedSelected"
-          :disabled="selectableListedCount === 0 || listLoading"
-          aria-label="Select all listed folders and files"
-          @change="setAllListedSelected(($event.target as HTMLInputElement).checked)"
-        />
-        <span class="font-medium">{{ formatCount(selectedCount) }} selected</span>
-      </label>
-      <IconButton label="Clear selection" variant="outline" size="icon" class="h-9 w-9" @click="clearSelection"><X class="size-4" /></IconButton>
-    </div>
-    <div class="flex justify-around px-1 pb-2 text-[11px]">
-      <button type="button" class="flex min-h-11 min-w-14 flex-col items-center gap-0.5 disabled:opacity-50" :disabled="Boolean(blocker('download'))" :title="blocker('download') ?? undefined" @click="emit('action', 'download')">
-        <Download class="size-4" /> Download
-      </button>
-      <button v-for="move in MOVES" :key="move.id" type="button" class="flex min-h-11 min-w-14 flex-col items-center gap-0.5" @click="emit('action', move.id)">
-        <component :is="move.icon" class="size-4" /> {{ move.short }}
-      </button>
-      <DropdownMenu>
-        <DropdownMenuTrigger as-child>
-          <button type="button" class="flex min-h-11 min-w-14 flex-col items-center gap-0.5"><Share2 class="size-4" /> Share</button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="center" side="top">
-          <DropdownMenuItem @click="emit('action', 'share')"><Link2 class="h-3.5 w-3.5" /> Copy links</DropdownMenuItem>
-          <DropdownMenuItem v-if="activeGroupId" @click="emit('action', 'access')"><Globe class="h-3.5 w-3.5" /> Make public</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <button type="button" class="flex min-h-11 min-w-14 flex-col items-center gap-0.5 text-destructive" @click="emit('action', 'delete')">
-        <Trash2 class="size-4" /> Delete
-      </button>
-    </div>
+  <!-- Fixed above the phone's bottom navigation, whose height it adds to the safe area. -->
+  <div
+    v-else
+    class="sticky bottom-0 z-30 flex items-center gap-1 border-t border-border bg-popover px-3 py-2 text-sm shadow-lg max-md:fixed max-md:inset-x-0 max-md:bottom-[calc(3.5625rem+max(env(safe-area-inset-bottom),0.5rem))]"
+    role="region"
+    aria-label="Selected files"
+  >
+    <span class="mr-auto whitespace-nowrap font-medium">{{ formatCount(selectedCount) }} selected</span>
+    <IconButton label="Download" variant="outline" size="icon" class="size-11" :disabled-reason="blocker('download')" @click="emit('action', 'download')"><Download class="size-4" /></IconButton>
+    <DropdownMenu>
+      <DropdownMenuTrigger as-child>
+        <Button variant="outline" size="icon" class="size-11" title="Copy or move" aria-label="Copy or move"><Copy class="size-4" /></Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" side="top">
+        <DropdownMenuItem v-for="move in MOVES" :key="move.id" @click="emit('action', move.id)"><component :is="move.icon" class="h-3.5 w-3.5" /> {{ move.label }}</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+    <DropdownMenu>
+      <DropdownMenuTrigger as-child>
+        <Button variant="outline" size="icon" class="size-11" title="Share" aria-label="Share"><Share2 class="size-4" /></Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" side="top">
+        <DropdownMenuItem @click="emit('action', 'share')"><Link2 class="h-3.5 w-3.5" /> Copy links</DropdownMenuItem>
+        <DropdownMenuItem v-if="activeGroupId" @click="emit('action', 'access')"><Globe class="h-3.5 w-3.5" /> Make public</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+    <IconButton label="Delete" variant="outline" size="icon" class="size-11 text-destructive hover:text-destructive" @click="emit('action', 'delete')"><Trash2 class="size-4" /></IconButton>
+    <IconButton label="Clear selection" variant="ghost" size="icon" class="size-11" @click="clearSelection"><X class="size-4" /></IconButton>
   </div>
 </template>

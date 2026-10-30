@@ -94,7 +94,7 @@ describe('object browser row actions', () => {
       nodes(row)
         .filter((node) => node.tag === 'button' && node.props['aria-label'])
         .map((node) => String(node.props['aria-label'])),
-    ).toEqual(['Preview', 'Download', 'More actions'])
+    ).toEqual(['Preview', 'Download', 'Actions for reads.fastq'])
     expect(menuLabels(row)).toEqual(['Preview', 'Download', 'Rename', 'Copy to', 'Move to', 'Share', 'Make public', 'Delete', 'Delete permanently…'])
     // Icon only: the label is the accessible name, not visible text.
     expect(content(action(root, 'Preview')).trim()).toBe('')
@@ -562,14 +562,19 @@ describe('object browser selection', () => {
     expect(all[0].props.indeterminate).toBe(true)
   })
 
-  it('offers the selection as a bar at the bottom of the list on a phone', async () => {
+  it('offers the selection as one row of icons above the phone navigation', async () => {
     const root = await render()
     await tick(checkbox(root, `Select ${listedObject.name}`), true)
     const bar = element(root, (node) => node.props['aria-label'] === 'Selected files')
 
-    expect(String(bar.props.class)).toContain('hidden @max-[600px]:block')
-    expect(String(bar.props.class)).toContain('sticky bottom-0')
-    expect(content(bar).replace(/\s+/g, ' ')).toMatch(/Download Copy Move Share .*Delete/)
+    expect(String(bar.props.class)).toContain('hidden @max-[600px]:flex')
+    expect(String(bar.props.class)).toContain('max-md:fixed max-md:inset-x-0')
+    expect(content(bar)).toContain('1 selected')
+    const labels = nodes(bar).filter((node) => node.tag === 'button' && node.props['aria-label']).map((node) => String(node.props['aria-label']))
+    expect(labels).toEqual(['Download', 'Copy or move', 'Share', 'Delete', 'Clear selection'])
+    // Copy and move share one button; both stay in its menu.
+    expect(content(bar)).toContain('Copy to')
+    expect(content(bar)).toContain('Move to')
     expect(String(element(root, (node) => node.tag === 'thead').props.class)).toContain('@max-[600px]:hidden')
   })
 
@@ -700,7 +705,7 @@ describe('object browser selection', () => {
   it('fits a 320 px phone: no page size, one borderless menu button and a box wide enough for Search', async () => {
     const root = await render()
     const row = element(root, (node) => node.tag === 'tr' && content(node).includes('reads.fastq'))
-    const more = element(row, (node) => node.props['aria-label'] === 'More actions')
+    const more = element(row, (node) => node.props['aria-label'] === 'Actions for reads.fastq')
 
     expect(String(element(root, (node) => node.tag === 'select').props.class)).toContain('@max-[600px]:hidden')
     expect(String(more.props.class)).toContain('@max-[600px]:size-11 @max-[600px]:border-transparent')
@@ -853,7 +858,7 @@ describe('object browser run filter', () => {
 describe('object browser order', () => {
   const big = { ...listedObject, key: 'raw/a-big.fastq', name: 'a-big.fastq', size: 9000, lastModified: new Date('2026-01-01T00:00:00Z') }
   const names = (root: HostNode) =>
-    nodes(element(root, (node) => node.tag === 'tbody')).filter((node) => node.tag === 'button' && node.props.title?.toString().endsWith('.fastq')).map((node) => content(node))
+    nodes(element(root, (node) => node.tag === 'tbody')).filter((node) => node.tag === 'button' && node.props.title?.toString().endsWith('.fastq') && !node.props['aria-label']).map((node) => content(node))
 
   it('sorts by a column header and turns the order on a second click', async () => {
     const objects = ref([listedObject, big])

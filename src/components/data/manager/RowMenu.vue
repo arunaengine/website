@@ -9,7 +9,7 @@ import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import type { RowAction } from '@/lib/objectListing'
 import { computed } from 'vue'
-import { Copy, Download, Eye, Folder, FolderInput, Globe, Info, MoreHorizontal, Pencil, Share2, Trash2 } from '@lucide/vue'
+import { Copy, Download, Eye, Folder, FolderInput, Globe, Info, Ellipsis, Pencil, Share2, Trash2 } from '@lucide/vue'
 
 const props = defineProps<{
   name: string
@@ -52,8 +52,8 @@ function blocked(action: RowAction): boolean {
   <DropdownMenu>
     <DropdownMenuTrigger as-child>
       <!-- A phone shows only this button, borderless, with a full touch target. -->
-      <Button variant="outline" size="icon" class="h-8 w-8 @max-[600px]:size-11 @max-[600px]:border-transparent @max-[600px]:bg-transparent @max-[600px]:shadow-none" title="More actions" aria-label="More actions" @click.stop>
-        <MoreHorizontal class="size-3.5" />
+      <Button variant="outline" size="icon" class="h-8 w-8 @max-[600px]:size-11 @max-[600px]:border-transparent @max-[600px]:bg-transparent @max-[600px]:shadow-none" :title="`Actions for ${name}`" :aria-label="`Actions for ${name}`" @click.stop>
+        <Ellipsis class="size-3.5" />
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end">
