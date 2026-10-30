@@ -188,6 +188,12 @@ export function transferChoice(bucket: DistributedBucket, range: DistributedRang
   return { offered, refused }
 }
 
+/** Why no range can move now, or null. A move needs another member with a ready copy of the range. */
+export function transferBlock(bucket: DistributedBucket): string | null {
+  if (bucket.ranges.some((range) => transferChoice(bucket, range).offered.length)) return null
+  return 'No other member holds a copy of a range yet, so no range can move.'
+}
+
 /** Why a member cannot be removed now, or null. */
 export function leaveBlock(bucket: DistributedBucket, member: DistributedMember): string | null {
   if (member.state === 'leaving') return 'Is leaving already'

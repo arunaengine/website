@@ -2,12 +2,13 @@
 // Actions for group admins. Everyone else sees why they are missing.
 import { computed, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
+import InfoHint from '@/components/ui/InfoHint.vue'
 import Notice from '@/components/ui/Notice.vue'
 import JoinDialog from '@/components/distributed/JoinDialog.vue'
 import LeaveDialog from '@/components/distributed/LeaveDialog.vue'
 import SettingsDialog from '@/components/distributed/SettingsDialog.vue'
 import TransferDialog from '@/components/distributed/TransferDialog.vue'
-import { isDeleting, type DistributedBucket } from '@/lib/distribution'
+import { isDeleting, transferBlock, type DistributedBucket } from '@/lib/distribution'
 import { ArrowRightLeft, Plus, SlidersHorizontal, UserMinus } from '@lucide/vue'
 
 const props = defineProps<{ bucket: DistributedBucket; admin: boolean }>()
@@ -22,6 +23,7 @@ const blocked = computed(() => {
   if (props.bucket.live?.pending) return 'The bucket is pending. Retry the admission first.'
   return ''
 })
+const noMove = computed(() => transferBlock(props.bucket))
 
 function done(message: string) {
   result.value = `Mock, nothing changed: ${message}`
@@ -38,7 +40,10 @@ function changed() {
     <div v-if="admin" class="flex flex-wrap gap-2">
       <Button variant="outline" size="sm" :disabled="Boolean(blocked)" @click="dialog = 'join'"><Plus class="size-3.5" /> Add node</Button>
       <Button variant="outline" size="sm" :disabled="Boolean(blocked)" @click="dialog = 'leave'"><UserMinus class="size-3.5" /> Remove node</Button>
-      <Button variant="outline" size="sm" :disabled="Boolean(blocked)" @click="dialog = 'transfer'"><ArrowRightLeft class="size-3.5" /> Move a range</Button>
+      <span class="inline-flex items-center gap-1.5">
+        <Button variant="outline" size="sm" :disabled="Boolean(blocked || noMove)" @click="dialog = 'transfer'"><ArrowRightLeft class="size-3.5" /> Move a range</Button>
+        <InfoHint v-if="noMove" :label="noMove" name="Why no range can move" />
+      </span>
       <Button v-if="bucket.live" variant="outline" size="sm" :disabled="isDeleting(bucket)" @click="dialog = 'settings'"><SlidersHorizontal class="size-3.5" /> Settings</Button>
     </div>
     <p v-if="admin && blocked" class="text-xs text-muted-foreground">{{ blocked }}</p>

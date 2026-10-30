@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { BucketSearchHit, DistributedResponse } from '@/lib/api'
 import { defaultSettings, type Placement, type PresetId } from '@/lib/distributedMock'
-import { createRequest, defaultDraft, degradedRanges, distinctCount, draftProblem, fromStatus, isDeleting, leaveBlock, mergeSets, openTransfers, placementProblem, settingsBody, transferChoice } from './distribution'
+import { createRequest, defaultDraft, degradedRanges, distinctCount, draftProblem, fromStatus, isDeleting, leaveBlock, mergeSets, openTransfers, placementProblem, settingsBody, transferBlock, transferChoice } from './distribution'
 
 const NODE_A = 'a'.repeat(64)
 const NODE_B = 'b'.repeat(64)
@@ -155,6 +155,13 @@ describe('changes of a set', () => {
       ['m5', 'Keeps no full copy'],
     ])
     expect(transferChoice(bucket, bucket.ranges[1]).offered).toEqual([])
+  })
+
+  it('lets a range move only while another member holds a ready copy of one', () => {
+    expect(transferBlock(fromStatus(base()))).toBeNull()
+    const copyless = fromStatus(base({ ranges: [{ range_id: 'r2', lower: '', coordinator: 'm1', epoch: 1, replicas: [], degraded: false }] }))
+
+    expect(transferBlock(copyless)).toBe('No other member holds a copy of a range yet, so no range can move.')
   })
 
   it('keeps the lineage of a split range', () => {
