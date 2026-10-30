@@ -2,7 +2,9 @@
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
-import Badge from '@/components/ui/Badge.vue'
+import IconTile from '@/components/ui/IconTile.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
+import StatusPill from '@/components/ui/StatusPill.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ListShell from '@/components/ui/ListShell.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -17,7 +19,7 @@ import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { parseWatchPath, watchEventLabel, WATCH_DELIVERY_NOTE } from '@/lib/watches'
 import { errorMessage, relativeTime, truncateMiddle } from '@/lib/utils'
 import type { ApiWatch } from '@/lib/api'
-import { ArrowLeft, Eye, Trash2 } from '@lucide/vue'
+import { Eye, EyeOff, FileJson2, Folder, Trash2 } from '@lucide/vue'
 
 const { bootstrapped, currentUser, myGroups, discoverableGroups } = useAruna()
 const { available, watches, listLoaded, listLoading, listError, deletingIds, loadWatches, ensureLoaded, deleteWatch } =
@@ -73,16 +75,13 @@ watch(currentUser, () => void ensureLoaded())
 
 <template>
   <div>
-    <PageHeader title="Watched resources" :description="WATCH_DELIVERY_NOTE" :docs="{ topic: 'portal-tour', section: 'The top bar' }">
+    <PageHeader title="Watched resources" :crumbs="[{ label: 'Watched resources' }]" :description="WATCH_DELIVERY_NOTE" :docs="{ topic: 'portal-tour', section: 'The top bar' }">
       <template #actions>
-        <RefreshButton :busy="spinning" @click="onRefresh" />
-        <Button variant="outline" size="sm" as-child>
-          <RouterLink :to="{ name: 'settings' }"><ArrowLeft class="h-4 w-4" /> Settings</RouterLink>
-        </Button>
+        <RefreshButton :busy="spinning" size="default" @click="onRefresh" />
       </template>
     </PageHeader>
 
-    <div class="w-full px-4 sm:px-6 space-y-6 py-8">
+    <div class="w-full space-y-6 px-4 py-6 sm:px-6">
       <template v-if="!bootstrapped">
         <Skeleton class="h-20" />
         <Skeleton class="h-40" />
@@ -100,7 +99,17 @@ watch(currentUser, () => void ensureLoaded())
         description="This node does not serve watch subscriptions for your session."
       />
 
-      <template v-else>
+      <section v-else aria-labelledby="watches-heading">
+        <SectionHeading
+          id="watches-heading"
+          title="Your watches"
+          :icon="Eye"
+          info="A data watch covers a bucket folder on one node and everything uploaded below it. A dataset watch tells you when a new dataset appears under a catalog path. Up to 50 per account."
+        >
+          <template #actions>
+            <span v-if="watches.length" class="text-sm text-muted-foreground"><b class="font-medium text-foreground">{{ watches.length }}</b> of 50</span>
+          </template>
+        </SectionHeading>
         <ListShell
           :state="shellState"
           :error="listError || undefined"
@@ -110,28 +119,22 @@ watch(currentUser, () => void ensureLoaded())
           @retry="loadWatches"
         >
           <template #icon><Eye class="h-6 w-6" /></template>
-          <template #filters>
-            <h2 class="text-sm font-semibold text-foreground">Your watches</h2>
-          </template>
-          <template #tools>
-            <Badge variant="outline" size="count">{{ watches.length }}</Badge>
-          </template>
 
-          <ul class="divide-y divide-border">
-            <li v-for="{ w, info, authorized, groupName } in rows" :key="w.id" class="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+          <ul class="divide-y divide-border-subtle">
+            <li v-for="{ w, info, authorized, groupName } in rows" :key="w.id" class="flex flex-wrap items-center gap-3 px-5 py-3">
               <!-- An unauthorized row withholds its details, so it can only be deleted. -->
+              <IconTile :icon="!authorized ? EyeOff : info?.namespace === 'meta' ? FileJson2 : Folder" :tone="authorized ? 'muted' : 'warn'" size="sm" />
               <div v-if="!authorized" class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
-                  <Badge variant="warn" size="sm" class="uppercase">stopped</Badge>
                   <span class="truncate text-sm font-medium text-foreground">No longer delivering: read access was removed</span>
+                  <StatusPill state="Stopped" tone="attention" />
                 </div>
-                <p class="mt-0.5 text-[11px] text-muted-foreground">
+                <p class="mt-0.5 text-xs text-muted-foreground">
                   Delete it to free one of your 50 watches.
                 </p>
               </div>
               <div v-else class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary" size="sm" class="uppercase">{{ info?.namespace === 'meta' ? 'dataset' : info?.namespace === 's3' ? 'data' : 'watch' }}</Badge>
                   <RouterLink
                     v-if="info?.link"
                     :to="info.link"
@@ -140,7 +143,7 @@ watch(currentUser, () => void ensureLoaded())
                   >{{ info.label }}</RouterLink>
                   <span v-else class="truncate text-sm font-medium text-foreground" :title="w.path_prefix">{{ info?.label ?? w.path_prefix }}</span>
                 </div>
-                <p class="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+                <p class="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
                   <span>
                     <span v-for="(event, i) in w.events" :key="event">{{ i ? ', ' : '' }}{{ watchEventLabel(event) }}</span>
                     <span v-if="groupName"> · {{ groupName }}</span>
@@ -154,9 +157,8 @@ watch(currentUser, () => void ensureLoaded())
                 </p>
               </div>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                class="text-destructive hover:text-destructive"
                 :disabled="deletingIds.includes(w.id) || writesDisabled"
                 :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
                 :aria-label="authorized ? `Stop watching ${info?.label ?? w.path_prefix}` : 'Delete the watch that stopped delivering'"
@@ -167,14 +169,7 @@ watch(currentUser, () => void ensureLoaded())
             </li>
           </ul>
         </ListShell>
-
-        <!-- What each watch kind actually covers. -->
-        <div class="surface-muted space-y-1.5 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
-          <p><span class="font-medium text-foreground">Data watches</span> cover a bucket folder on one node: every object uploaded under it, your own uploads included, across all folders below, triggers a notification; a sync out of that folder can be watched as well.</p>
-          <p><span class="font-medium text-foreground">Dataset watches</span> cover a catalog path: you are notified when a new dataset is created under it, never when an existing dataset is edited.</p>
-          <p>Delivery can lag a few seconds. Each account can hold up to 50 watches; hover a watch to see its technical path.</p>
-        </div>
-      </template>
+      </section>
     </div>
   </div>
 </template>
