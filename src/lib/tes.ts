@@ -2,6 +2,7 @@ import type { BadgeVariant } from '@/components/nodes/node-display'
 import { stateVariant } from './stateBadge'
 import type { PlacementLike } from '@/lib/jobs'
 import { versionObjectId } from './contentIdentity'
+import { parseArunaArn } from './sync'
 
 // ── GA4GH TES v1.1 ───────────────────────────────────────────────────────────
 // Verified against the Aruna TES facade (api/src/routes/tes.rs, aruna #425).
@@ -479,6 +480,14 @@ export function pickedEntries(
 export function resultsKey(prefix: string, slug: string, tail: string): string {
   const folder = prefix && !prefix.endsWith('/') ? `${prefix}/` : prefix
   return `${folder}results/${slug}/${tail}`
+}
+
+/** An input as people read it: bucket and path, and the node an ARN names. The URL stays in the request. */
+export function inputPlace(url: string): { text: string; nodeId: string | null } {
+  const arn = parseArunaArn(url)
+  if (arn) return { text: `${arn.bucket}/${arn.prefix.replace(/@[0-9A-Z]{26}$/, '')}`, nodeId: arn.nodeId }
+  const s3 = /^s3:\/\/(.+)$/i.exec(url)
+  return { text: s3 ? s3[1]! : url, nodeId: null }
 }
 
 /** The container path of a picked input, without a trailing slash. */

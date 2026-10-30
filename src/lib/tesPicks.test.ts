@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { answerEntries, badReference, expandDataRefEntry, nativeInput, pickedEntries, resultsKey } from './tes'
+import { answerEntries, badReference, expandDataRefEntry, inputPlace, nativeInput, pickedEntries, resultsKey } from './tes'
 
 const V1 = '01K8W1B3D5F7H9KMQ1S3V5X7Z1'
 const V2 = '01K8W1B3D5F7H9KMQ1S3V5X7Z2'
@@ -86,5 +86,14 @@ describe('broken version references', () => {
     expect(badReference(input)).toBe(true)
     expect(badReference({ path: '/in/b', url: `arn:aruna:realm:node-b:s3/db/x/ok.fna@${V1}` })).toBe(false)
     expect(badReference({ path: '/in/c', url: 's3://lab/c' })).toBe(false)
+  })
+})
+
+describe('input place', () => {
+  it('reads a pinned input as bucket and path with its node, and a plain one as bucket and path', () => {
+    expect(inputPlace('arn:aruna:realm:node-2:s3/laptop/my-genome/genome.fasta@01M63MFX9Q31P8EJCRN24YRYE0'))
+      .toEqual({ text: 'laptop/my-genome/genome.fasta', nodeId: 'node-2' })
+    expect(inputPlace('s3://laptop/my-genome/genome.fasta')).toEqual({ text: 'laptop/my-genome/genome.fasta', nodeId: null })
+    expect(inputPlace('https://example.org/a.txt')).toEqual({ text: 'https://example.org/a.txt', nodeId: null })
   })
 })

@@ -58,7 +58,7 @@ const component = compileClientComponent(new URL('./SavedRunStart.vue', import.m
   '@/lib/tes': Tes,
   '@/lib/sync': Sync,
   '@/composables/useDatabases': { useDatabases: () => ({ rows: databaseRows, ensure: () => {} }) },
-  '@/composables/useRealmNodes': { useRealmNodes: () => ({ localNodeId: ref('node-1') }) },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ localNodeId: ref('node-1'), displayName: (id: string) => `Node ${id}` }) },
   '@/lib/savedRuns': { isSecretName: () => false },
   '@lucide/vue': new Proxy({}, { get: () => Empty }),
 })
@@ -118,6 +118,16 @@ describe('saved run start', () => {
     const labels = nodes(root).filter((node) => node.tag === 'p' && String(node.props.class).includes('font-medium')).map(content)
 
     expect(labels).toEqual(['genome.fasta', 'db', 'Reference genome', 'notes.txt'])
+    extraInputs = []
+  })
+
+  it('shows a pinned input by bucket and path with its node, not by its identifier', async () => {
+    extraInputs = [{ kind: 'file', url: 'arn:aruna:realm:node-2:s3/refs/k12.fna.gz@01M63XSAS2Z5M6YM4ZV9B55R08', path: '/work/in/ref/k12.fna.gz', name: 'k12.fna.gz' }]
+    const { root } = await mountApp(component)
+    const text = content(root)
+
+    expect(text).toContain('refs/k12.fna.gz on Node node-2')
+    expect(text).not.toContain('arn:aruna')
     extraInputs = []
   })
 

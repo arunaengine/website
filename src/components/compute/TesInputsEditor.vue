@@ -5,8 +5,8 @@ import Input from '@/components/ui/Input.vue'
 import Badge from '@/components/ui/Badge.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
 import InputLocalityHint from '@/components/compute/InputLocalityHint.vue'
-import type { TesDataRefEntry } from '@/lib/tes'
-import { truncateMiddle } from '@/lib/utils'
+import { useRealmNodes } from '@/composables/useRealmNodes'
+import { inputPlace, type TesDataRefEntry } from '@/lib/tes'
 import { Folder, ListPlus, X } from '@lucide/vue'
 
 // Input row editor (aruna#290): never mutates the prop; every change emits a
@@ -18,6 +18,11 @@ const props = defineProps<{ modelValue: TesDataRefEntry[]; disabled?: boolean }>
 const emit = defineEmits<{ (e: 'update:modelValue', v: TesDataRefEntry[]): void }>()
 
 const dialogOpen = ref(false)
+const { displayName, isLocalNode } = useRealmNodes()
+const nodeOf = (url: string) => {
+  const node = inputPlace(url).nodeId
+  return node && !isLocalNode(node) ? displayName(node) : ''
+}
 
 function addEntry(entry: TesDataRefEntry) {
   emit('update:modelValue', [...props.modelValue, entry])
@@ -72,7 +77,8 @@ function remove(i: number) {
           </template>
           <template v-else>
             <div class="min-w-0 flex-1">
-              <div class="truncate font-mono text-[11px] text-foreground" :title="entry.url">{{ truncateMiddle(entry.url || '', 20, 16) }}</div>
+              <div class="truncate font-mono text-[11px] text-foreground" :title="entry.url">{{ inputPlace(entry.url || '').text }}</div>
+              <div v-if="nodeOf(entry.url || '')" class="truncate text-[11px] text-muted-foreground">on {{ nodeOf(entry.url || '') }}</div>
             </div>
             <Badge variant="outline">FILE</Badge>
             <div class="w-full sm:w-64">

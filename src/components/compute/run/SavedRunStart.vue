@@ -12,7 +12,7 @@ import { injectCustomRun, outputDestination, outputFolder } from '@/composables/
 import { useDatabases } from '@/composables/useDatabases'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { parseArunaArn } from '@/lib/sync'
-import { atOrBelow, entryPath, parseS3Url, type TesDataRefEntry } from '@/lib/tes'
+import { atOrBelow, entryPath, inputPlace, parseS3Url, type TesDataRefEntry } from '@/lib/tes'
 import { isSecretName } from '@/lib/savedRuns'
 import { Container, Database, File as FileIcon, Folder, KeyRound, Laptop, Lock, LogIn, Package, Pencil, Star } from '@lucide/vue'
 
@@ -31,13 +31,18 @@ const asked = computed(() => run.value?.ask.inputs ?? [])
 const secrets = computed(() => envRows.value.filter((row) => isSecretName(row.key)))
 const fixed = computed(() => inputs.value.filter((entry) => !asked.value.some((path) => atOrBelow(entry, path))))
 const pickOf = (path: string) => inputs.value.find((entry) => atOrBelow(entry, path))
-const pickText = (entry: TesDataRefEntry) => (entry.kind === 'file' ? entry.url : `${entry.bucket}/${entry.prefix}`)
+const pickText = (entry: TesDataRefEntry) => (entry.kind === 'file' ? inputPlace(entry.url).text : `${entry.bucket}/${entry.prefix}`)
+// The node a pick of another node names, in muted text after its path.
+const pickNode = (entry: TesDataRefEntry) => {
+  const node = entry.kind === 'file' ? inputPlace(entry.url).nodeId : null
+  return node && node !== localNodeId.value ? displayName(node) : ''
+}
 
 // A fixed input read from a database names it by title and release. The database must be held
 // by the node the input names: its ARN's node, else this node for a local reference.
 const databases = useDatabases()
 databases.ensure()
-const { localNodeId } = useRealmNodes()
+const { localNodeId, displayName } = useRealmNodes()
 function databaseOf(entry: TesDataRefEntry): { title: string; release: string | null } | null {
   const arn = entry.kind === 'file' ? parseArunaArn(entry.url) : null
   const bucket = entry.kind === 'folder' ? entry.bucket : (arn?.bucket ?? parseS3Url(entry.url)?.bucket)
@@ -107,6 +112,7 @@ function chooseHome(bucket: string, folder: string) {
             <p class="text-sm font-medium text-foreground">{{ labelOf(path) }}</p>
             <p v-if="pickOf(path)" class="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
               <Package class="h-3 w-3 shrink-0" /><span class="truncate font-mono">{{ pickText(pickOf(path)!) }}</span>
+              <span v-if="pickNode(pickOf(path)!)" class="shrink-0">on {{ pickNode(pickOf(path)!) }}</span>
             </p>
             <p v-else class="truncate font-mono text-xs text-muted-foreground">{{ path }}</p>
           </div>
@@ -116,12 +122,12 @@ function chooseHome(bucket: string, folder: string) {
           <IconTile :icon="database ? Database : FileIcon" :tone="database ? 'royal' : 'muted'" size="sm" />
           <div v-if="database" class="min-w-0 flex-1" :title="entryPath(entry)">
             <p class="text-sm font-medium text-foreground">{{ database.title }}<template v-if="database.release">, release {{ database.release }}</template></p>
-            <p class="truncate font-mono text-xs text-muted-foreground">{{ pickText(entry) }}</p>
+            <p class="truncate font-mono text-xs text-muted-foreground">{{ pickText(entry) }}<span v-if="pickNode(entry)" class="font-sans"> on {{ pickNode(entry) }}</span></p>
           </div>
           <div v-else class="min-w-0 flex-1">
             <p class="text-sm font-medium text-foreground">{{ entry.name || fileName(entryPath(entry)) }}</p>
             <p class="truncate font-mono text-xs text-muted-foreground">{{ entryPath(entry) }}</p>
-            <p class="truncate font-mono text-xs text-muted-foreground">{{ pickText(entry) }}</p>
+            <p class="truncate font-mono text-xs text-muted-foreground">{{ pickText(entry) }}<span v-if="pickNode(entry)" class="font-sans"> on {{ pickNode(entry) }}</span></p>
           </div>
           <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground max-sm:basis-full max-sm:pl-11"><Lock class="h-3.5 w-3.5" />Set by the saved run</span>
         </div>

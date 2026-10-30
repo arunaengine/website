@@ -10,7 +10,7 @@ import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
 import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
-import { validContainerDir, validContainerFilePath, type TesDataRefEntry } from '@/lib/tes'
+import { inputPlace, validContainerDir, validContainerFilePath, type TesDataRefEntry } from '@/lib/tes'
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -155,7 +155,7 @@ const model = computed(() => {
         files: entry.directory ? undefined : entry.files.map((file) => file.name),
       })
     } else {
-      place(entry.path, { kind: 'in', dir: false, index, raw: entry.path, secondary: entry.url })
+      place(entry.path, { kind: 'in', dir: false, index, raw: entry.path, secondary: inputPlace(entry.url).text })
     }
   })
   props.outputs.forEach((entry, index) => {
