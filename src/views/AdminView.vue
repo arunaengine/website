@@ -15,6 +15,7 @@ import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ComputeAdminPanel from '@/components/compute-admin/ComputeAdminPanel.vue'
+import JobsPanel from '@/components/jobs/JobsPanel.vue'
 import PlacementAdminPanel from '@/components/placement/PlacementAdminPanel.vue'
 import DataPlacementPanel from '@/components/storage/DataPlacementPanel.vue'
 import PoliciesSection from '@/components/policies/PoliciesSection.vue'
@@ -42,7 +43,7 @@ import {
 } from '@/views/adminQuota'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
-import { ChevronDown, Cpu, Database, Files, Gauge, Globe, HardDrive, Layers, Link2, Boxes, MapPinned, Server, Save, Plus, ServerCog, ShieldAlert, Trash2, ShieldCheck, SlidersHorizontal, Users, UserCog, Workflow } from '@lucide/vue'
+import { ChevronDown, Cpu, Database, Files, Gauge, Globe, HardDrive, Layers, Link2, ListTodo, Boxes, MapPinned, Server, Save, Plus, ServerCog, ShieldAlert, Trash2, ShieldCheck, SlidersHorizontal, Users, UserCog, Workflow } from '@lucide/vue'
 
 const router = useRouter()
 const realmNodeCount = computed(() => (realmInfo.value?.nodes ?? []).filter((node) => node.kind !== 'user').length)
@@ -60,10 +61,11 @@ const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
 const placementAdminEnabled = featureEnabled('placementAdmin')
 const policiesEnabled = featureEnabled('policies')
 
-const tabs = adminTabs({ placement: placementAdminEnabled, policies: policiesEnabled })
+const tabs = adminTabs({ placement: placementAdminEnabled, policies: policiesEnabled, jobs: featureEnabled('jobs') })
 const TAB_ICONS: Record<string, unknown> = {
   realm: Gauge,
   compute: Cpu,
+  jobs: ListTodo,
   placement: Workflow,
   'data-placement': MapPinned,
   policies: ShieldAlert,
@@ -300,6 +302,8 @@ async function save() {
       </div>
 
       <TabsContent value="compute" class="mt-0"><ComputeAdminPanel /></TabsContent>
+
+      <TabsContent v-if="tabs.some((entry) => entry.id === 'jobs')" value="jobs" class="mt-0 w-full px-4 py-6 sm:px-6"><JobsPanel in-place /></TabsContent>
 
       <TabsContent v-if="placementAdminEnabled" value="placement" class="mt-0"><PlacementAdminPanel /></TabsContent>
 

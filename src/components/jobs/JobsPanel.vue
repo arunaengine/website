@@ -28,19 +28,24 @@ import { ChevronRight, ListTodo } from '@lucide/vue'
 // System-jobs section of the unified Compute view. ComputeView gates the
 // feature flag and sign-in, but useJobsList tracks the session itself so a late
 // or lost login never strands the list in its pre-fetch state.
+const props = defineProps<{ refreshRevision?: number; inPlace?: boolean }>()
 const router = useRouter()
 const route = useRoute()
 
 // Deep-linkable detail drawer driven by the :jobId route param, so the back
 // button closes it.
-const openJobId = computed(() =>
-  route.name === 'job' && route.params.jobId ? String(route.params.jobId) : '',
-)
+// With `inPlace` (the Admin Jobs tab) the open job is the ?job= query of the current page.
+const openJobId = computed(() => {
+  if (props.inPlace) return typeof route.query.job === 'string' ? route.query.job : ''
+  return route.name === 'job' && route.params.jobId ? String(route.params.jobId) : ''
+})
 function openJob(job: JobStatusResponse) {
-  void router.push({ name: 'job', params: { jobId: job.job_id } })
+  if (props.inPlace) void router.push({ query: { ...route.query, job: job.job_id } })
+  else void router.push({ name: 'job', params: { jobId: job.job_id } })
 }
 function closeJob() {
-  void router.push({ name: 'compute', query: { tab: 'jobs' } })
+  if (props.inPlace) void router.push({ query: { ...route.query, job: undefined } })
+  else void router.push({ name: 'compute', query: { tab: 'jobs' } })
 }
 
 const list = useJobsList()
@@ -96,7 +101,6 @@ function reload() {
 
 const { refresh: onReload } = useRefresh(reload)
 // The page header's refresh reads the system jobs again.
-const props = defineProps<{ refreshRevision?: number }>()
 watch(() => props.refreshRevision, () => void onReload())
 
 // One placeholder until the first page has answered; later loads refresh in place.

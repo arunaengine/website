@@ -159,6 +159,7 @@ export function portalRoutes(): RouteRecordRaw[] {
         // Realm admin: usage, quota policy and placement (tabs of one view)
         { path: 'admin', name: 'admin', component: () => import('@/views/AdminView.vue') },
         { path: 'admin/placement', redirect: { path: '/app/admin', query: { tab: 'placement' } } },
+        { path: 'admin/jobs', redirect: { path: '/app/admin', query: { tab: 'jobs' } } },
         // Realm admin: read-only user directory
         { path: 'admin/users', name: 'admin-users', component: () => import('@/views/AdminUsersView.vue') },
         // Realm admin: node onboarding secrets (management nodes only)
