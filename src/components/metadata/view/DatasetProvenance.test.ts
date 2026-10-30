@@ -16,6 +16,8 @@ const component = compileClientComponent(new URL('./DatasetProvenance.vue', impo
   vue: VueRuntime,
   '@/components/data/ProvenanceView.vue': moduleDefault(ViewStub),
   '@/components/ui/Skeleton.vue': moduleDefault(defineComponent(() => () => h('div', 'waiting'))),
+  '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent({ props: { title: String }, setup: (props) => () => h('h2', props.title) })),
+  '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => null) }),
 })
 
 function state(entities: boolean, loading = false): DatasetViewState {

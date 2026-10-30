@@ -3,7 +3,9 @@
 // records its exact version.
 import { computed } from 'vue'
 import ProvenanceView from '@/components/data/ProvenanceView.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import { GitBranch } from '@lucide/vue'
 import type { DatasetViewState } from '@/composables/useDatasetView'
 import type { ProvenanceStart } from '@/lib/provenance'
 
@@ -20,9 +22,12 @@ const start = computed<ProvenanceStart>(() => ({
 </script>
 
 <template>
-  <section class="surface space-y-3 px-5 py-4">
-    <ProvenanceView v-if="crateHasEntities" :start="start" />
-    <Skeleton v-else-if="loadingCrate" class="h-40" />
-    <p v-else class="py-6 text-center text-sm text-muted-foreground">There is nothing to follow until the dataset's metadata has loaded.</p>
+  <section aria-labelledby="provenance-heading">
+    <SectionHeading id="provenance-heading" title="Where it came from" :icon="GitBranch" />
+    <div class="surface space-y-3 px-5 py-4">
+      <ProvenanceView v-if="crateHasEntities" :start="start" />
+      <Skeleton v-else-if="loadingCrate" class="h-40" />
+      <p v-else class="py-6 text-center text-sm text-muted-foreground">There is nothing to follow until the dataset's metadata has loaded.</p>
+    </div>
   </section>
 </template>
