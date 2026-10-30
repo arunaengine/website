@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aboutFacts, bylineOf, citationText } from './datasetAbout'
+import { aboutFacts, bylineOf, citationText, referencesTo } from './datasetAbout'
 import { formatDate } from './utils'
 
 describe('aboutFacts', () => {
@@ -62,5 +62,21 @@ describe('bylineOf', () => {
   it('names the authors once each, or a run by its agents', () => {
     expect(bylineOf(crate).map((entry) => entry.name)).toEqual(['Ada Lovelace', 'Grace Hopper'])
     expect(bylineOf(crate, { agent: { '@id': 'https://orcid.org/0000-0001' } })).toHaveLength(1)
+  })
+})
+
+describe('referencesTo', () => {
+  it('lists each entity and property that points at the id, never the id itself', () => {
+    const crate = {
+      '@graph': [
+        { '@id': './', name: 'Root', hasPart: [{ '@id': 'a.txt' }], mentions: { '@id': '#run' } },
+        { '@id': '#run', '@type': 'CreateAction', object: [{ '@id': 'a.txt' }], result: 'a.txt' },
+        { '@id': 'a.txt', '@type': 'File', isBasedOn: { '@id': 'a.txt' } },
+      ],
+    }
+    expect(referencesTo(crate, 'a.txt')).toEqual([
+      { id: './', name: 'Root', property: 'Has part' },
+      { id: '#run', name: 'run', property: 'Object' },
+    ])
   })
 })

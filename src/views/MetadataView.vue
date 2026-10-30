@@ -493,6 +493,7 @@ function jumpTo(entityId: string) {
       :crate="fullCrates[detailId] ?? current?.roCrate"
       :entity-id="infoEntityId"
       :profile="currentProfile"
+      :document-id="detailId"
       @jump="jumpTo"
     />
 

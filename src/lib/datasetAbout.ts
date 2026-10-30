@@ -1,5 +1,6 @@
 import { crateGraph, crateRootId, stringProp, typesOf } from '@/lib/dataEntities'
 import { toArray } from '@/lib/contextualEntities'
+import { prettifyKey } from '@/lib/cratePresenter'
 import { readableIri } from '@/lib/identifiers'
 import { formatBinary, formatDate, isHttpUrl } from '@/lib/utils'
 
@@ -85,4 +86,20 @@ export function bylineOf(crate: unknown, action?: Record<string, unknown>): Arra
     const name = stringProp(entity?.name) || (value && typeof value === 'object' ? '' : id)
     return [{ id, name: name || readableIri(id) }]
   })
+}
+
+/** The crate's entities that point at one id, with the property that does it. */
+export function referencesTo(crate: unknown, id: string): Array<{ id: string; name: string; property: string }> {
+  const out: Array<{ id: string; name: string; property: string }> = []
+  for (const entity of crateGraph(crate)) {
+    const from = String(entity['@id'])
+    if (from === id || from === 'ro-crate-metadata.json') continue
+    for (const [key, value] of Object.entries(entity)) {
+      if (key.startsWith('@')) continue
+      if (toArray(value).some((entry) => entry && typeof entry === 'object' && stringProp(entry) === id)) {
+        out.push({ id: from, name: stringProp(entity.name) || readableIri(from), property: prettifyKey(key) })
+      }
+    }
+  }
+  return out
 }

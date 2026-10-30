@@ -14,8 +14,12 @@ import ScrollArea from '@/components/ui/ScrollArea.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import DetailList, { type Detail } from '@/components/ui/DetailList.vue'
 import EntityFieldList from '@/components/metadata/EntityFieldList.vue'
-import { ArrowLeft, Check, Copy, File as FileIcon, Folder, Info } from '@lucide/vue'
+import ListPager from '@/components/ui/ListPager.vue'
+import { ArrowLeft, Check, Copy, File as FileIcon, Folder, Info, Search } from '@lucide/vue'
+import { useCrateReferences } from '@/composables/useCrateReferences'
+import { usePagedList } from '@/composables/usePagedList'
 import { useS3 } from '@/composables/useS3'
+import { referencesTo } from '@/lib/datasetAbout'
 import { objectLocation, objectRoute, parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { presentDataEntity } from '@/lib/cratePresenter'
 import { formatContentSize } from '@/lib/dataEntities'
@@ -23,8 +27,8 @@ import { termNameFromUri } from '@/lib/profiles/uri'
 import { copyToClipboard, isHttpUrl } from '@/lib/utils'
 import type { MetadataProfile } from '@/data/types'
 
-// Full metadata of one data entity (file or sub-dataset), opened from an info
-// icon next to a file row. Stacks above whatever dialog hosts it: the later
+// Full metadata of one entity (a file, sub-dataset, person, run or any other), opened from a row,
+// a name or a reference. A data entity adds where its bytes are and Open in Data. Stacks above whatever dialog hosts it: the later
 // mounted radix portal paints on top and owns Escape and focus. In-dialog
 // references drill down on an internal stack instead of nesting more dialogs;
 // ids outside the graph bubble up as a jump so the page can take over.
@@ -33,6 +37,8 @@ const props = defineProps<{
   crate: unknown
   entityId: string
   profile?: MetadataProfile | null
+  /** The dataset this crate belongs to, left out of the other datasets that reference a file. */
+  documentId?: string
 }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
@@ -80,10 +86,18 @@ const typeChips = computed(() =>
 const s3 = useS3()
 const identity = computed(() => (entity.value ? parseDataIdentity(entity.value, s3.endpoint.value) : null))
 
+// Only a file or a folder has a size, format and location; a person or a run has none.
+const isData = computed(() => {
+  const current = entity.value
+  if (!current) return false
+  return Boolean(current.contentUrl || current.contentSize || current.encodingFormat)
+    || current.types.some((type) => type === 'File' || type === 'Dataset' || type === 'MediaObject')
+})
+
 // The content address and the S3 path stand apart; any other contentUrl stays a plain location.
 const details = computed<Detail[]>(() => {
   const found = identity.value
-  if (!entity.value || !found) return []
+  if (!entity.value || !found || !isData.value) return []
   return [
     { key: 'size', label: 'Size', value: formatContentSize(entity.value.contentSize) },
     { key: 'format', label: 'Format', value: entity.value.encodingFormat || '-' },
@@ -91,8 +105,24 @@ const details = computed<Detail[]>(() => {
     found.s3
       ? { key: 's3', label: 'S3 path', value: objectLocation(found.s3.bucket, found.s3.key), mono: true }
       : { key: 'location', label: 'Location', value: entity.value.contentUrl || '-' },
+    ...(found.global ? [{ key: 'version', label: 'Version', value: found.global.versionId, mono: true }] : []),
   ]
 })
+
+// Who points at this entity: the crate's own entities, then other loaded datasets that list the file.
+const { referencesFor } = useCrateReferences()
+const references = computed(() => {
+  if (!entity.value) return []
+  const inside = referencesTo(props.crate, currentId.value).map((ref) => ({ ...ref, key: `${ref.id}|${ref.property}`, dataset: '' }))
+  const seen = new Set<string>()
+  const outside = [currentId.value, entity.value.contentUrl ?? '']
+    .filter(Boolean)
+    .flatMap((url) => referencesFor(url))
+    .filter((ref) => ref.documentId !== props.documentId && !seen.has(ref.documentId) && seen.add(ref.documentId))
+    .map((ref) => ({ id: ref.documentId, name: ref.title, property: 'Other dataset', key: `doc|${ref.documentId}`, dataset: ref.documentId }))
+  return [...inside, ...outside]
+})
+const { page, pageSize, shown, total, paged } = usePagedList(references)
 
 const copied = ref(false)
 let copyTimer: number | undefined
@@ -108,11 +138,19 @@ async function copyId() {
   <Dialog :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
     <DialogContent class="max-h-[calc(100vh-2rem)] max-w-xl overflow-hidden">
       <DialogHeader>
-        <DialogTitle class="flex min-w-0 items-center gap-2">
+        <DialogTitle class="flex min-w-0 items-center gap-2 pr-10">
           <Info class="h-4 w-4 shrink-0 text-primary" />
-          <span class="truncate">{{ entity?.name ?? 'File metadata' }}</span>
+          <span class="min-w-0 truncate">{{ entity?.name ?? 'Entity' }}</span>
+          <RouterLink
+            v-if="entity"
+            :to="{ name: 'datasets', query: { q: entity.name } }"
+            class="ml-auto inline-flex shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="Search datasets with this"
+            title="Search datasets with this"
+            @click="emit('update:open', false)"
+          ><Search class="size-4" /></RouterLink>
         </DialogTitle>
-        <DialogDescription class="sr-only">All stored metadata of this data entity.</DialogDescription>
+        <DialogDescription class="sr-only">All stored metadata of this entity.</DialogDescription>
       </DialogHeader>
 
       <div v-if="entity" class="space-y-3">
@@ -175,11 +213,34 @@ async function copyId() {
         <ScrollArea class="max-h-[45vh] pr-1">
           <EntityFieldList v-if="entity.fields.length" :fields="entity.fields" @jump="drill" />
           <p v-else class="py-2 text-xs text-muted-foreground">This entity carries no further metadata.</p>
+
+          <div v-if="references.length" class="mt-4 space-y-1">
+            <h3 class="text-sm font-medium">Referenced by <span class="font-normal tabular-nums text-muted-foreground">{{ references.length }}</span></h3>
+            <table class="w-full text-sm">
+              <thead class="border-b border-border text-xs text-muted-foreground">
+                <tr><th class="py-1.5 pr-3 text-left font-medium">Name</th><th class="py-1.5 text-left font-medium">Through</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="ref in shown" :key="ref.key" class="border-b border-border-subtle last:border-0">
+                  <td class="max-w-0 py-1.5 pr-3">
+                    <RouterLink v-if="ref.dataset" :to="{ name: 'dataset', params: { id: ref.dataset } }" class="block truncate underline decoration-border underline-offset-4 hover:decoration-foreground" @click="emit('update:open', false)">{{ ref.name }}</RouterLink>
+                    <button v-else type="button" class="max-w-full truncate text-left underline decoration-border underline-offset-4 hover:decoration-foreground" :title="ref.id" @click="drill(ref.id)">{{ ref.name }}</button>
+                  </td>
+                  <td class="py-1.5 text-muted-foreground">{{ ref.property }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <ListPager v-if="paged" v-model:page="page" v-model:page-size="pageSize" :total="total" />
+            <p v-if="references.some((ref) => ref.dataset)" class="text-xs text-muted-foreground">Loaded datasets only: other datasets come from the pages already read.</p>
+          </div>
         </ScrollArea>
       </div>
       <p v-else class="py-6 text-sm text-muted-foreground">This entity is not part of the loaded dataset.</p>
 
       <DialogFooter>
+        <Button v-if="identity?.s3" variant="outline" size="sm" as-child>
+          <RouterLink :to="objectRoute(identity.s3.bucket, identity.s3.key)" @click="emit('update:open', false)">Open in Data</RouterLink>
+        </Button>
         <DialogClose as-child><Button variant="outline" size="sm">Close</Button></DialogClose>
       </DialogFooter>
     </DialogContent>
