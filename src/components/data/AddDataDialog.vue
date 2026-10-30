@@ -54,6 +54,7 @@ const basket = useBuilderBasket({
   bucket: toRef(props, 'bucket'),
   prefix: toRef(props, 'prefix'),
   groupId: toRef(props, 'groupId'),
+  nodeId: toRef(props, 'nodeId'),
   existingKeys,
 })
 

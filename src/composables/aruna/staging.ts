@@ -20,8 +20,8 @@ export async function stageBlob(input: StageBlobSubmission): Promise<StageBlobRe
 
 // Batch staging (agreed contract): many items/prefixes through one connector in
 // one call. Older nodes answer 404/501; callers fall back to per-item staging.
-export async function stageBatch(input: StagingBatchRequest): Promise<StagingBatchResponse> {
-  return request<StagingBatchResponse>('/data/staging/batch', { method: 'POST', body: JSON.stringify(input) })
+export async function stageBatch(input: StagingBatchRequest, nodeId?: string | null): Promise<StagingBatchResponse> {
+  return request<StagingBatchResponse>('/data/staging/batch', { method: 'POST', body: JSON.stringify(input) }, nodeId)
 }
 
 /** The staging jobs of one node, this one unless named. */

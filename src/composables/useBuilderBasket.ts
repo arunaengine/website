@@ -94,6 +94,8 @@ export function useBuilderBasket(ctx: {
   bucket: Ref<string>
   prefix: Ref<string>
   groupId: Ref<string | null>
+  /** The node holding the bucket; staging requests go there. */
+  nodeId?: Ref<string | null | undefined>
   /** Keys already present in the caller's listing; uploads targeting one are marked as overwriting. */
   existingKeys?: Ref<ReadonlySet<string>>
 }) {
@@ -317,10 +319,10 @@ export function useBuilderBasket(ctx: {
     return new Promise((resolve) => window.setTimeout(resolve, 1_000))
   }
 
-  async function runLegacyBatch(batch: BuilderRow[], body: StagingBatchRequest): Promise<void> {
+  async function runLegacyBatch(batch: BuilderRow[], body: StagingBatchRequest, nodeId: string | null): Promise<void> {
     if (!batchUnsupported) {
       try {
-        applyBatchResponse(batch, await stageBatch(body))
+        applyBatchResponse(batch, await stageBatch(body, nodeId))
         return
       } catch (err) {
         if (!stagingEndpointMissing(err)) throw err
@@ -358,24 +360,26 @@ export function useBuilderBasket(ctx: {
     }
     if (!body.items?.length) delete body.items
     if (!body.prefixes?.length) delete body.prefixes
+    // Captured once so a later node change cannot split the job across nodes.
+    const nodeId = ctx.nodeId?.value ?? null
     try {
       if (jobsUnsupported) {
-        await runLegacyBatch(batch, body)
+        await runLegacyBatch(batch, body, nodeId)
         return
       }
       let created
       try {
-        created = await createStagingJob(body)
+        created = await createStagingJob(body, nodeId)
       } catch (err) {
         if (!stagingEndpointMissing(err)) throw err
         jobsUnsupported = true
-        await runLegacyBatch(batch, body)
+        await runLegacyBatch(batch, body, nodeId)
         return
       }
       for (const row of batch) row.jobId = created.job_id
       while (true) {
         if (disposed) return
-        const job = await getStagingJob(created.job_id)
+        const job = await getStagingJob(created.job_id, nodeId)
         applyJobProgress(batch, job)
         if (job.state === 'done' || job.state === 'failed') {
           finishJob(batch, job)
