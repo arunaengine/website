@@ -8,12 +8,11 @@ import type { ProfileValidationPreviewResponse } from '@/lib/api'
 import { collectIssues, type WriteIssue } from '@/lib/crate/issues'
 import { displayName, entityName, findEntity, rootId, type CrateDraft } from '@/lib/crate/editor'
 import { truncateMiddle } from '@/lib/utils'
-import { Check, RefreshCw, Send, TriangleAlert } from '@lucide/vue'
+import { Check, RefreshCw, TriangleAlert } from '@lucide/vue'
 
 // The node validates the draft exactly as a save would, without saving. It runs
 // on demand and once more before every save. Only its verdict (or a refused
-// write) blocks; advisory findings never do.
-
+// write) blocks; advisory findings never do. Save itself lives in the issue bar.
 
 const props = defineProps<{
   draft: CrateDraft
@@ -23,8 +22,6 @@ const props = defineProps<{
   profileLoading?: boolean
   /** The picked profile's rules failed to load; the form runs without them. */
   profileError?: string | null
-  /** Why the save is unavailable, shown beside the disabled button. */
-  blocked?: string | null
   previewResult?: ProfileValidationPreviewResponse | null
   previewRunning?: boolean
   /** The node could not answer yet and the check is being retried. */
@@ -32,16 +29,10 @@ const props = defineProps<{
   previewError?: string | null
   previewUnavailable?: boolean
   writeIssues?: WriteIssue[]
-  submitError?: string | null
-  saving?: boolean
-  canSave?: boolean
-  actionLabel?: string
-  busyLabel?: string
 }>()
 const emit = defineEmits<{
   (e: 'preview'): void
   (e: 'retry-profile'): void
-  (e: 'save'): void
   (e: 'jump', entityId: string): void
 }>()
 
@@ -194,14 +185,5 @@ function groupName(entityId: string): string {
     </div>
 
     <slot />
-    <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
-    <div class="flex flex-wrap items-center justify-end gap-3">
-      <p v-if="blocked && !saving" class="min-w-0 text-xs text-muted-foreground">{{ blocked }}</p>
-      <Button data-tour="editor-save" data-tutorial="dataset-save" :disabled="!canSave || saving" @click="emit('save')">
-        <Spinner v-if="saving" class="text-current" aria-hidden="true" />
-        <Send v-else class="h-4 w-4" />
-        {{ saving ? (busyLabel ?? 'Creating') : (actionLabel ?? 'Create dataset') }}
-      </Button>
-    </div>
   </section>
 </template>

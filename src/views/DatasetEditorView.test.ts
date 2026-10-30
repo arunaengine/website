@@ -229,7 +229,8 @@ const DrawerStub = defineComponent({
     issues: { type: Array, default: () => [] },
     nodeIssues: { type: Array, default: () => [] },
   },
-  setup: (props) => () => h('div', [
+  setup: (props, { slots }) => () => h('div', [
+    slots.default?.(),
     h('p', `Drawer issues ${(props.issues as unknown[]).length}`),
     h('p', `Drawer says ${(props.issues as Array<{ message: string }>).map((issue) => issue.message).join(' | ')}`),
     h('p', `Node issues ${(props.nodeIssues as Array<{ message: string }>).map((issue) => issue.message).join(', ')}`),
@@ -249,23 +250,16 @@ const WithdrawStub = defineComponent({
 })
 const NodeCheckStub = defineComponent({
   props: {
-    canSave: Boolean,
-    actionLabel: String,
     profileName: { type: String, default: '' },
     profileLoading: Boolean,
     profileError: { type: String, default: '' },
-    blocked: { type: String, default: '' },
-    submitError: { type: String, default: '' },
   },
-  emits: ['save', 'retry-profile'],
+  emits: ['retry-profile'],
   setup: (props, { emit, slots }) => () => h('div', [
     h('p', `Checking ${props.profileName || 'no profile'}${props.profileLoading ? ', loading its rules' : ''}`),
     h('p', `Rules ${props.profileError || 'fine'}`),
-    h('p', `Blocked ${props.blocked || 'not'}`),
-    h('p', `Save error ${props.submitError || 'none'}`),
     slots.default?.(),
     h('button', { onClick: () => emit('retry-profile') }, 'Retry profile rules'),
-    h('button', { disabled: !props.canSave, onClick: () => emit('save') }, props.actionLabel),
   ]),
 })
 const InputStub = defineComponent({
@@ -320,6 +314,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/components/ui/Skeleton.vue': moduleDefault(EmptyStub),
+  '@/components/ui/Spinner.vue': moduleDefault(EmptyStub),
   '@/components/ui/ErrorPanel.vue': moduleDefault(EmptyStub),
   '@/components/ui/DiscardDraftConfirm.vue': moduleDefault(DiscardStub),
   '@/components/groups/CreateGroupDialog.vue': moduleDefault(EmptyStub),
@@ -955,7 +950,8 @@ describe('DatasetEditorView', () => {
     await click(button(mounted.root, 'Seed dataset'))
 
     await click(button(mounted.root, 'Create dataset'))
-    await click(button(mounted.root, 'Create dataset'))
+    expect(button(mounted.root, 'Creating').props.disabled).toBe(true)
+    await click(button(mounted.root, 'Creating'))
     expect(verify).toHaveBeenCalledTimes(1)
 
     verdict.resolve(true)
@@ -992,6 +988,19 @@ describe('DatasetEditorView', () => {
     pending.resolve(true)
     await flush()
     expect(createMetadata).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('counts the open issues at the top and opens the next one', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    await click(element(mounted.root, (node) => node.props.role === 'tab' && content(node).trim() === 'Graph'))
+
+    await click(element(mounted.root, (node) => node.tag === 'button' && /^\d+ to fix/.test(content(node).trim())))
+
+    expect(content(mounted.root)).not.toContain('Graph pane')
+    expect(content(mounted.root)).toContain('Seed dataset')
+    await click(button(mounted.root, 'Seed dataset'))
+    expect(button(mounted.root, '1 to consider')).toBeTruthy()
     mounted.app.unmount()
   })
 
@@ -1055,7 +1064,7 @@ describe('DatasetEditorView', () => {
     await click(button(mounted.root, 'Save changes'))
     await flush()
 
-    expect(content(mounted.root)).toContain('Save error This dataset changed after you opened it.')
+    expect(content(mounted.root)).toContain('This dataset changed after you opened it.')
     expect(content(mounted.root)).not.toContain('Precondition failed')
     expect(routerPush).not.toHaveBeenCalled()
 
@@ -1071,7 +1080,7 @@ describe('DatasetEditorView', () => {
     await click(button(mounted.root, 'Save changes'))
     await click(button(mounted.root, 'Seed dataset'))
     await flush()
-    expect(content(mounted.root)).toContain('Save error This dataset changed after you opened it.')
+    expect(content(mounted.root)).toContain('This dataset changed after you opened it.')
     mounted.app.unmount()
   })
 
@@ -1185,7 +1194,7 @@ describe('DatasetEditorView', () => {
     answer.reject(new Api.ApiError(412, 'Precondition failed', 'Precondition failed', { error: 'Precondition failed' }))
     await flush()
 
-    expect(content(mounted.root)).toContain('Save error none')
+    expect(content(mounted.root)).not.toContain('This dataset changed after you opened it.')
     mounted.app.unmount()
   })
 
@@ -1341,7 +1350,7 @@ describe('DatasetEditorView', () => {
     await name(mounted.root, 'Reads 2026')
 
     expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
-    expect(content(mounted.root)).toContain('Blocked Fix')
+    expect(content(mounted.root)).toContain('before saving.')
     await click(button(mounted.root, 'Create dataset'))
     expect(verify).not.toHaveBeenCalled()
     expect(createMetadata).not.toHaveBeenCalled()
@@ -1349,7 +1358,7 @@ describe('DatasetEditorView', () => {
     await click(button(mounted.root, 'Seed dataset'))
 
     expect(button(mounted.root, 'Create dataset').props.disabled).toBe(false)
-    expect(content(mounted.root)).toContain('Blocked not')
+    expect(content(mounted.root)).not.toContain('before saving.')
     mounted.app.unmount()
   })
 
@@ -1603,7 +1612,7 @@ describe('DatasetEditorView', () => {
     await click(button(mounted.root, 'Choose Genomics'))
 
     expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
-    expect(content(mounted.root)).toContain('Blocked Fix')
+    expect(content(mounted.root)).toContain('before saving.')
     mounted.app.unmount()
   })
 

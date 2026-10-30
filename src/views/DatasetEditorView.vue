@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import DiscardDraftConfirm from '@/components/ui/DiscardDraftConfirm.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
@@ -45,6 +46,7 @@ import {
   findEntity,
   fromRoCrate,
   isDataType,
+  issueCountsBySeverity,
   liveIssues,
   newDraft,
   partIds,
@@ -59,7 +61,7 @@ import {
 } from '@/lib/crate/editor'
 import { addFilePart } from '@/lib/crate/references'
 import { looksLikePart } from '@/lib/linkedPart'
-import { FileJson2, FolderTree, X } from '@lucide/vue'
+import { CircleAlert, CircleCheck, FileJson2, FolderTree, Send, TriangleAlert, X } from '@lucide/vue'
 
 // The graph carries Vue Flow and dagre; only the Graph tab pays for them.
 const CrateGraph = defineAsyncComponent(() => import('@/components/metadata/CrateGraph.vue'))
@@ -318,6 +320,25 @@ const preview = useProfilePreview({
 const writeIssues = computed(() => [...rejectionIssues(preview.rejection.value), ...saveIssues.value])
 const nodeIssues = computed(() => collectIssues(preview.result.value, writeIssues.value, draft.value))
 const blockers = computed(() => issues.value.filter((issue) => issue.severity === 'error'))
+const issueCounts = computed(() => issueCountsBySeverity(issues.value))
+const issueCountText = computed(() => [
+  issueCounts.value.error ? `${issueCounts.value.error} to fix` : '',
+  issueCounts.value.warning ? `${issueCounts.value.warning} to consider` : '',
+].filter(Boolean).join(', '))
+
+// Each click opens the next open issue in entity order and scrolls to its message.
+let issueIndex = -1
+async function nextIssue() {
+  const order = new Map(draft.value.entities.map((entity, index) => [entity.id, index]))
+  const list = [...issues.value].sort((a, b) => (order.get(a.entityId) ?? 0) - (order.get(b.entityId) ?? 0))
+  if (!list.length) return
+  issueIndex = (issueIndex + 1) % list.length
+  const issue = list[issueIndex]
+  open(issue.entityId)
+  await nextTick()
+  if (typeof document === 'undefined') return
+  document.querySelector(`[data-issue="${CSS.escape(issue.key)}"]`)?.scrollIntoView({ block: 'center' })
+}
 const violations = computed(() => nodeIssues.value.filter((issue) => issue.severity === 'violation'))
 
 // A profiled draft is only saved once the node could check it.
@@ -595,6 +616,13 @@ const canGrantPublic = ref(false)
 const grantBusy = ref(false)
 const grantError = ref<string | null>(null)
 const grantUnresolved = ref<RestrictedFile[]>([])
+// Save sits in the bottom bar, so the warning it raises above is brought into view.
+const publicWarning = ref<HTMLElement | null>(null)
+watch([restrictedFiles, publicUnchecked], async ([files, unchecked]) => {
+  if (!files.length && !unchecked) return
+  await nextTick()
+  publicWarning.value?.scrollIntoView?.({ block: 'center' })
+})
 const owningGroups = computed(() => [...new Set(restrictedFiles.value.flatMap((file) => file.group_id ? [file.group_id] : []))])
 let publicationGeneration = 0
 watch([crate, () => draft.value.visibility, () => draft.value.groupId, () => draft.value.path, apiBaseUrl, authToken], () => {
@@ -758,6 +786,14 @@ async function save(anyway = false) {
         </span>
       </template>
       <template #actions>
+        <Button v-if="issues.length" variant="outline" size="sm" title="Go to the next open issue" @click="nextIssue">
+          <CircleAlert v-if="issueCounts.error" class="h-3.5 w-3.5 text-destructive" />
+          <TriangleAlert v-else class="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+          {{ issueCountText }}
+        </Button>
+        <span v-else class="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+          <CircleCheck class="h-3.5 w-3.5 text-status-ok" /> No open issues
+        </span>
         <AskAiButton size="sm" prompt="Help me describe this dataset." :subject="assistantSubject" />
         <Button variant="outline" size="sm" @click="locationOpen = true">
           <FolderTree class="h-3.5 w-3.5" /> Location
@@ -832,46 +868,42 @@ async function save(anyway = false) {
                 :preview-error="preview.error.value"
                 :preview-unavailable="preview.unavailable.value"
                 :write-issues="writeIssues"
-                :submit-error="staleSave ? STALE_SAVE : submitError"
-                :saving="saving || submitting"
-                :can-save="canSave"
-                :action-label="mode === 'edit' ? 'Save changes' : 'Create dataset'"
-                :busy-label="mode === 'edit' ? 'Saving' : 'Creating'"
                 @preview="preview.previewNow(crate)"
                 @retry-profile="retryProfileRules"
-                @save="save()"
                 @jump="open"
               >
-                <Notice v-if="restrictedFiles.length || publicUnchecked" tone="warning" :title="restrictedFiles.length ? 'Not everyone can read these files' : 'Some file access could not be checked'">
-                  <p v-if="restrictedFiles.length">The dataset is public, but these files are not publicly readable. Readers will see them listed and cannot download them.</p>
-                  <p v-if="publicUnchecked">Some files could not be checked. Retry the check, or save anyway knowing that readers may not be able to download all files.</p>
-                  <ul class="mt-1 list-disc space-y-0.5 pl-4 font-mono text-[11px]">
-                    <li v-for="file in restrictedFiles" :key="file.entity_id" class="break-all">{{ fileLabel(file) }}</li>
-                  </ul>
-                  <p v-if="grantUnresolved.length" class="mt-1">
-                    Access could not be granted for these files. An administrator of each owning group can change their roles.
-                  </p>
-                  <p v-else-if="!canGrantPublic" class="mt-1">
-                    A group administrator can add a public role with read access to these files under the group's roles.
-                  </p>
-                  <p v-if="grantError" class="mt-1 text-destructive">{{ grantError }}</p>
-                  <span class="mt-2 flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" :disabled="grantBusy" @click="restrictedFiles = []; publicUnchecked = false">Back</Button>
-                    <Button
-                      v-if="canGrantPublic && !grantUnresolved.length"
-                      variant="outline"
-                      size="sm"
-                      :disabled="grantBusy"
-                      @click="makePublic"
-                    >
-                      {{ grantBusy ? 'Granting access' : 'Make the data public' }}
-                    </Button>
-                    <Button v-for="groupId in !canGrantPublic || grantUnresolved.length ? owningGroups : []" :key="groupId" variant="outline" size="sm" as-child>
-                      <RouterLink :to="{ name: 'group', params: { id: groupId }, query: { tab: 'roles' } }">{{ groups.find((group) => group.id === groupId)?.name ?? 'Owning group' }} roles</RouterLink>
-                    </Button>
-                    <Button size="sm" :disabled="grantBusy" @click="save(true)">Save anyway</Button>
-                  </span>
-                </Notice>
+                <div v-if="restrictedFiles.length || publicUnchecked" ref="publicWarning">
+                  <Notice tone="warning" :title="restrictedFiles.length ? 'Not everyone can read these files' : 'Some file access could not be checked'">
+                    <p v-if="restrictedFiles.length">The dataset is public, but these files are not publicly readable. Readers will see them listed and cannot download them.</p>
+                    <p v-if="publicUnchecked">Some files could not be checked. Retry the check, or save anyway knowing that readers may not be able to download all files.</p>
+                    <ul class="mt-1 list-disc space-y-0.5 pl-4 font-mono text-[11px]">
+                      <li v-for="file in restrictedFiles" :key="file.entity_id" class="break-all">{{ fileLabel(file) }}</li>
+                    </ul>
+                    <p v-if="grantUnresolved.length" class="mt-1">
+                      Access could not be granted for these files. An administrator of each owning group can change their roles.
+                    </p>
+                    <p v-else-if="!canGrantPublic" class="mt-1">
+                      A group administrator can add a public role with read access to these files under the group's roles.
+                    </p>
+                    <p v-if="grantError" class="mt-1 text-destructive">{{ grantError }}</p>
+                    <span class="mt-2 flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" :disabled="grantBusy" @click="restrictedFiles = []; publicUnchecked = false">Back</Button>
+                      <Button
+                        v-if="canGrantPublic && !grantUnresolved.length"
+                        variant="outline"
+                        size="sm"
+                        :disabled="grantBusy"
+                        @click="makePublic"
+                      >
+                        {{ grantBusy ? 'Granting access' : 'Make the data public' }}
+                      </Button>
+                      <Button v-for="groupId in !canGrantPublic || grantUnresolved.length ? owningGroups : []" :key="groupId" variant="outline" size="sm" as-child>
+                        <RouterLink :to="{ name: 'group', params: { id: groupId }, query: { tab: 'roles' } }">{{ groups.find((group) => group.id === groupId)?.name ?? 'Owning group' }} roles</RouterLink>
+                      </Button>
+                      <Button size="sm" :disabled="grantBusy" @click="save(true)">Save anyway</Button>
+                    </span>
+                  </Notice>
+                </div>
                 <label class="grid gap-1.5 text-sm">
                   <span class="font-medium text-foreground">Version message <span class="font-normal text-muted-foreground">(optional)</span></span>
                   <Input v-model="versionMessage" placeholder="Describe this change, for example: Add the LC-MS run 42 files" />
@@ -894,7 +926,15 @@ async function save(anyway = false) {
         </div>
       </div>
 
-      <IssueDrawer :draft="draft" :issues="issues" :node-issues="nodeIssues" @jump="open" />
+      <IssueDrawer :draft="draft" :issues="issues" :node-issues="nodeIssues" @jump="open">
+        <p v-if="staleSave || submitError" class="min-w-0 text-xs text-destructive">{{ staleSave ? STALE_SAVE : submitError }}</p>
+        <p v-else-if="saveBlocked && !(saving || submitting)" class="min-w-0 text-xs text-muted-foreground">{{ saveBlocked }}</p>
+        <Button data-tour="editor-save" data-tutorial="dataset-save" :disabled="!canSave || saving || submitting" @click="void save()">
+          <Spinner v-if="saving || submitting" class="text-current" aria-hidden="true" />
+          <Send v-else class="h-4 w-4" />
+          {{ saving || submitting ? (mode === 'edit' ? 'Saving' : 'Creating') : (mode === 'edit' ? 'Save changes' : 'Create dataset') }}
+        </Button>
+      </IssueDrawer>
     </template>
 
     <DatasetLocationDialog

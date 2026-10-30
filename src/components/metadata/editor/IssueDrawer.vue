@@ -11,10 +11,11 @@ import {
   type LiveIssue,
 } from '@/lib/crate/editor'
 import type { CheckIssue } from '@/lib/crate/issues'
-import { ChevronDown, ChevronUp } from '@lucide/vue'
+import { ChevronDown, ChevronUp, CircleCheck } from '@lucide/vue'
 
 // Everything outstanding in one place: the editor's own advisory checks and
-// what the node answered (a rejected preview or write), each with a jump.
+// what the node answered (a rejected preview or write), each with a jump. The
+// default slot holds the save action at the end of the bar.
 const props = defineProps<{ draft: CrateDraft; issues: LiveIssue[]; nodeIssues?: CheckIssue[] }>()
 const emit = defineEmits<{ (e: 'jump', entityId: string): void }>()
 
@@ -65,8 +66,8 @@ const counts = computed(() => {
 })
 const summary = computed(() => {
   const total = entries.value.length
-  if (!total) return 'No issues found'
-  return total === 1 ? '1 issue' : `${total} issues`
+  if (!total) return 'No open issues'
+  return total === 1 ? '1 open issue' : `${total} open issues`
 })
 
 const groups = computed(() => {
@@ -111,21 +112,26 @@ function jump(entityId: string) {
     </div>
 
     <div data-tutorial="dataset-issues" class="w-full px-4 sm:px-6 flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
-      <button
-        type="button"
-        class="flex flex-1 items-center gap-2 text-left text-xs font-medium text-foreground"
-        :aria-expanded="expanded"
-        @click="expanded = !expanded"
-      >
-        <ChevronDown v-if="expanded" class="h-3.5 w-3.5" />
-        <ChevronUp v-else class="h-3.5 w-3.5" />
-        {{ summary }}
-      </button>
-      <Badge v-if="counts.rejected" variant="destructive" size="sm">{{ counts.rejected }} rejected by the node</Badge>
-      <Badge v-if="counts.error" variant="destructive" size="sm">{{ counts.error }} to fix</Badge>
-      <Badge v-if="counts.warning" variant="warn" size="sm">{{ counts.warning }} to consider</Badge>
-      <Badge v-if="counts.advisory" variant="secondary" size="sm">{{ counts.advisory }} advisory</Badge>
-      <Badge v-if="!entries.length" variant="success" size="sm">No issues</Badge>
+      <template v-if="entries.length">
+        <button
+          type="button"
+          class="flex items-center gap-2 text-left text-xs font-medium text-foreground"
+          :aria-expanded="expanded"
+          @click="expanded = !expanded"
+        >
+          <ChevronDown v-if="expanded" class="h-3.5 w-3.5" />
+          <ChevronUp v-else class="h-3.5 w-3.5" />
+          {{ summary }}
+        </button>
+        <Badge v-if="counts.rejected" variant="destructive" size="sm">{{ counts.rejected }} rejected by the node</Badge>
+        <Badge v-if="counts.error" variant="destructive" size="sm">{{ counts.error }} to fix</Badge>
+        <Badge v-if="counts.warning" variant="warn" size="sm">{{ counts.warning }} to consider</Badge>
+        <Badge v-if="counts.advisory" variant="secondary" size="sm">{{ counts.advisory }} advisory</Badge>
+      </template>
+      <span v-else class="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
+        <CircleCheck class="h-3.5 w-3.5 text-status-ok" /> {{ summary }}
+      </span>
+      <span class="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2"><slot /></span>
     </div>
   </section>
 </template>

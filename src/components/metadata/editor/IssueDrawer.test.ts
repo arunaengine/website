@@ -29,9 +29,9 @@ function seeded() {
 }
 
 function mount(draft: Editor.CrateDraft, jumps: string[] = []) {
-  return mountApp(IssueDrawer, {
-    props: { draft, issues: Editor.liveIssues(draft), onJump: (id: string) => jumps.push(id) },
-  })
+  const props = { draft, issues: Editor.liveIssues(draft), onJump: (id: string) => jumps.push(id) }
+  // The view puts its save action into the bar's slot.
+  return mountApp(defineComponent(() => () => h(IssueDrawer, props, { default: () => h('button', 'Save changes') })))
 }
 
 describe('IssueDrawer', () => {
@@ -39,8 +39,9 @@ describe('IssueDrawer', () => {
     const mounted = await mount(seeded())
     const text = content(mounted.root)
 
-    expect(text).toContain('issues')
+    expect(text).toContain('open issues')
     expect(text).not.toContain('has no name')
+    expect(text).toContain('Save changes')
     mounted.app.unmount()
   })
 
@@ -93,7 +94,8 @@ describe('IssueDrawer', () => {
     )
     const mounted = await mount(complete)
 
-    expect(content(mounted.root)).toContain('No issues')
+    expect(content(mounted.root)).toContain('No open issues')
+    expect(content(mounted.root)).toContain('Save changes')
     mounted.app.unmount()
   })
 })

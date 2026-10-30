@@ -54,7 +54,7 @@ function verdict(overrides: Partial<ProfileValidationPreviewResponse> = {}): Pro
 
 function mount(props: Record<string, unknown>) {
   return mountApp(NodeCheckPanel, {
-    props: { draft: draft(), rocrate: { '@graph': [] }, canSave: true, ...props },
+    props: { draft: draft(), rocrate: { '@graph': [] }, ...props },
   })
 }
 
@@ -201,14 +201,6 @@ describe('NodeCheckPanel', () => {
 
     expect(content(mounted.root)).toContain('Validating')
     expect(content(mounted.root)).not.toContain('would reject')
-    mounted.app.unmount()
-  })
-
-  it('disables the action while the dataset cannot be saved', async () => {
-    const mounted = await mount({ canSave: false, blocked: 'Fix 2 problems before saving.' })
-
-    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
-    expect(content(mounted.root)).toContain('Fix 2 problems before saving.')
     mounted.app.unmount()
   })
 

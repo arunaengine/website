@@ -289,6 +289,7 @@ const EntityEditor = compileClientComponent(url('components/metadata/editor/Enti
   ...editorShared,
   './RootForm.vue': moduleDefault(RootForm),
   './EntityHeader.vue': moduleDefault(GenericStub),
+  './IssueMark.vue': moduleDefault(GenericStub),
   './PropertyEditor.vue': moduleDefault(PropertyEditorStub),
   './AddPropertyDialog.vue': moduleDefault(GenericStub),
   './AddFilesDialog.vue': moduleDefault(GenericStub),
