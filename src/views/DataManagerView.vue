@@ -11,7 +11,12 @@ import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import Notice from '@/components/ui/Notice.vue'
-import Popover from '@/components/ui/Popover.vue'
+import DropdownMenu from '@/components/ui/DropdownMenu.vue'
+import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
+import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
+import DropdownMenuLabel from '@/components/ui/DropdownMenuLabel.vue'
+import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
+import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import Sheet from '@/components/ui/Sheet.vue'
 import SheetContent from '@/components/ui/SheetContent.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
@@ -47,7 +52,7 @@ import { computed, ref, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import { RouterLink } from 'vue-router'
 import type { ObjectSearchHit } from '@/lib/api'
-import { ChevronDown, KeyRound, LogIn, ShieldAlert } from '@lucide/vue'
+import { ChevronDown, KeyRound, LogIn, Server, ShieldAlert } from '@lucide/vue'
 
 const { bootstrapped, currentUser, myGroups } = useAruna()
 const s3 = useS3()
@@ -246,6 +251,9 @@ const knownOrdinary = computed(() => manager.allBuckets.hits.value.some((hit) =>
 const distribution = useBucketDistribution(bucket, remoteNodeId, knownOrdinary)
 const storedBucket = computed(() => exampleBucket.value ?? distribution.view.value ?? undefined)
 const spreadNodes = computed(() => storedBucket.value?.members.map((member) => member.nodeId) ?? [])
+// The nodes named next to the bucket name: every node of a spread bucket, else its one node.
+const headerNodes = computed(() => (spreadNodes.value.length > 1 ? spreadNodes.value : requiredNodeId.value ? [requiredNodeId.value] : []))
+const NODE_CHIP = 'inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-border-subtle px-2 py-0.5 font-sans text-xs font-normal tracking-normal text-muted-foreground hover:border-primary/40 hover:text-foreground'
 const bucketSetId = computed(() => distribution.view.value?.live?.setId ?? (distribution.state.value === 'ordinary' ? null : undefined))
 // Without a session the example buckets still show, from static data.
 const mockOnly = computed(
@@ -348,7 +356,7 @@ async function createFolder() {
     >
       <template #title>
         <!-- A narrow screen puts the node below the name instead of cutting the name short. -->
-        <span class="flex min-w-0 flex-wrap items-baseline gap-x-2">
+        <span class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           <button
             v-if="narrow && listReachable && bucket"
             type="button"
@@ -361,43 +369,34 @@ async function createFolder() {
             <ChevronDown class="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
           </button>
           <span v-else class="max-w-full truncate" :title="headerTitle">{{ headerTitle }}</span>
-          <span
-            v-if="route.name === 'bucket' && !notebooksView && spreadNodes.length > 1"
-            class="max-w-full truncate text-sm font-normal text-muted-foreground"
-          >
-            on
-            <Popover :tooltip="`Spread over ${spreadNodes.map((id) => realmNodes.displayName(id)).join(', ')}`" align="start">
-              <button type="button" class="text-foreground/90 hover:underline">{{ spreadNodes.length }} nodes</button>
-              <template #content>
-                <p class="text-xs font-medium text-foreground">Spread over</p>
-                <ul class="mt-1 space-y-1 text-sm">
-                  <li v-for="id in spreadNodes" :key="id">
-                    <RouterLink :to="{ name: 'node', params: { nodeId: id } }" class="text-primary hover:underline">{{ realmNodes.displayName(id) }}</RouterLink>
-                  </li>
-                </ul>
-              </template>
-            </Popover>
-          </span>
-          <span
-            v-else-if="route.name === 'bucket' && !notebooksView && requiredNodeId"
-            class="max-w-full truncate text-sm font-normal text-muted-foreground"
-            :title="headerPlace.title"
-          >
-            on <RouterLink :to="{ name: 'node', params: { nodeId: requiredNodeId } }" class="text-primary hover:underline">{{ headerPlace.name }}</RouterLink>
+          <!-- Up to two nodes by name; more collapse into one menu so the header stays short. -->
+          <span v-if="route.name === 'bucket' && !notebooksView && headerNodes.length" class="inline-flex flex-wrap items-center gap-1.5" aria-label="Stored on">
+            <template v-if="headerNodes.length <= 2">
+              <RouterLink
+                v-for="id in headerNodes"
+                :key="id"
+                :to="{ name: 'node', params: { nodeId: id } }"
+                :class="NODE_CHIP"
+                :title="headerNodes.length === 1 ? headerPlace.title : `Open ${realmNodes.displayName(id)}`"
+              >{{ headerNodes.length === 1 ? headerPlace.name : realmNodes.displayName(id) }}</RouterLink>
+            </template>
+            <DropdownMenu v-else>
+              <DropdownMenuTrigger as-child>
+                <button type="button" :class="NODE_CHIP">{{ headerNodes.length }}&nbsp;nodes <ChevronDown class="h-3 w-3" aria-hidden="true" /></button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" class="w-56">
+                <DropdownMenuLabel>Stored on {{ headerNodes.length }}&nbsp;nodes</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem v-for="id in headerNodes" :key="id" as-child>
+                  <RouterLink :to="{ name: 'node', params: { nodeId: id } }"><Server class="h-3.5 w-3.5" /> {{ realmNodes.displayName(id) }}</RouterLink>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </span>
         </span>
       </template>
       <template #description>{{ headerDescription }}</template>
       <template #actions>
-        <!-- The group is the top bar's context; the tooltip only names it. -->
-        <NodePicker
-          v-if="currentUser && s3.connectedEndpoint.value"
-          button
-          :tooltip="`Showing buckets of the group ${selectedGroupName || 'none'} on ${bucketNodeChoice ? realmNodes.displayName(bucketNodeChoice) : 'all nodes'}`"
-          :model-value="bucketNodeChoice"
-          :recent="recentNodes"
-          @update:model-value="pickNode"
-        />
         <RefreshButton v-if="contextReady" :busy="refreshSpinning" :sr-label="phone ? 'Refresh' : undefined" @click="onRefresh" />
       </template>
     </PageHeader>

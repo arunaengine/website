@@ -26,24 +26,22 @@ describe('Data view group selection', () => {
     expect(template).not.toContain('Session active')
   })
 
-  it('shows the group without a second picker', () => {
+  it('shows the group without a group or node picker in the header', () => {
     const actions = template.slice(template.indexOf('<template #actions>'), template.indexOf('</PageHeader>'))
-    // The node choice is one outline button in the header; its tooltip names the top bar's group.
-    expect(actions).toContain('<NodePicker')
-    expect(actions).toContain('button')
-    expect(actions).toContain('Showing buckets of the group ${selectedGroupName')
+    // The bucket list's filter picks a node; the header keeps only Refresh.
+    expect(actions).not.toContain('<NodePicker')
     expect(template).not.toContain('Showing buckets of</span>')
     expect(template).not.toContain('groupOptions')
-    expect(template).not.toContain('DropdownMenu')
   })
 
   it('names the open bucket node in the heading and keeps Refresh on the right', () => {
     const title = template.slice(template.indexOf('<template #title>'), template.indexOf('<template #description>'))
-    // The node of the open bucket stays named in the heading, linked to its page.
-    expect(title).toContain(`on <RouterLink :to="{ name: 'node', params: { nodeId: requiredNodeId } }" class="text-primary hover:underline">{{ headerPlace.name }}</RouterLink>`)
-    expect(title).toContain(':title="headerPlace.title"')
-    // A spread bucket names its node count and links each node from the popover.
-    expect(title).toContain('{{ spreadNodes.length }} nodes')
+    // Up to two nodes are chips linked to their pages; the one node keeps its place name and title.
+    expect(title).not.toContain('on <RouterLink')
+    expect(title).toContain('v-if="headerNodes.length <= 2"')
+    expect(title).toContain(':title="headerNodes.length === 1 ? headerPlace.title')
+    // Three or more collapse into one "N nodes" menu that links each node.
+    expect(title).toContain('{{ headerNodes.length }}&nbsp;nodes')
     expect(title).toContain(":to=\"{ name: 'node', params: { nodeId: id } }\"")
     const actions = template.slice(template.indexOf('<template #actions>'), template.indexOf('</PageHeader>'))
     expect(actions).toContain('<RefreshButton')
