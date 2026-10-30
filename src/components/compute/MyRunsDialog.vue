@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Manage my runs: remove a saved run, export all as a file, or import a file from someone else.
+// Manage run templates: remove a saved run, export all as a file, or import a file from someone else.
 import { ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -53,7 +53,7 @@ async function chosen(event: Event) {
   <Dialog :open="open" @update:open="(value: boolean) => emit('update:open', value)">
     <DialogContent class="max-w-lg">
       <DialogHeader>
-        <DialogTitle>My runs</DialogTitle>
+        <DialogTitle>Run templates</DialogTitle>
         <DialogDescription>Saved only on this computer. Export them as a file to use them elsewhere.</DialogDescription>
       </DialogHeader>
       <ul v-if="saved.runs.value.length" class="divide-y divide-border rounded-md border border-border">
@@ -65,7 +65,7 @@ async function chosen(event: Event) {
           <Button size="sm" variant="ghost" class="text-destructive hover:text-destructive" @click="remove(run.id, run.name)">Remove</Button>
         </li>
       </ul>
-      <p v-else class="text-sm text-muted-foreground">No saved runs yet. Use "Save as my run" on a run.</p>
+      <p v-else class="text-sm text-muted-foreground">No run templates yet. Use "Save as run template" on a run.</p>
       <Notice v-if="failure || saved.failure.value" tone="error">{{ failure || saved.failure.value }}</Notice>
       <p v-else-if="done" role="status" class="text-xs text-muted-foreground">{{ done }}</p>
       <div class="flex gap-2">

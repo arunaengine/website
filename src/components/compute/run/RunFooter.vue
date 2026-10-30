@@ -90,9 +90,9 @@ const noOutputs = computed(() => outputRows.value.length === 0)
           <Braces class="size-3.5" /> Show request
         </Button>
         <Button variant="outline" size="sm" @click="emit('cancel')"><ArrowLeft class="size-3.5" /> Back to runs</Button>
-        <Button variant="outline" size="sm" class="col-span-2" @click="emit('save')"><Star class="size-3.5" /> Save as my run</Button>
+        <Button variant="outline" size="sm" class="col-span-2" @click="emit('save')"><Star class="size-3.5" /> Save as run template</Button>
       </div>
-      <p v-if="saved" role="status" class="text-center text-xs text-muted-foreground">Saved to My runs.</p>
+      <p v-if="saved" role="status" class="text-center text-xs text-muted-foreground">Saved to run templates.</p>
     </div>
   </aside>
 

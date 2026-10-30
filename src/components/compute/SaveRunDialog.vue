@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// "Save as my run": keeps a run request on this computer. The person picks what is asked again at
+// "Save as run template": keeps a run request on this computer. The person picks what is asked again at
 // each start; image, command and resources stay as they are.
 import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
@@ -55,7 +55,7 @@ function save() {
   <Dialog :open="open" @update:open="(value: boolean) => emit('update:open', value)">
     <DialogContent class="max-w-md">
       <DialogHeader>
-        <DialogTitle>Save as my run</DialogTitle>
+        <DialogTitle>Save as run template</DialogTitle>
         <DialogDescription>
           Image, command and resources are kept as they are now. Saved only on this computer. You can export it as a file to share it.
         </DialogDescription>

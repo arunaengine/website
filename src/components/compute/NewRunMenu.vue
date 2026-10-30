@@ -45,7 +45,7 @@ function open(template: string) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" class="w-80 p-1.5">
         <template v-if="saved.runs.value.length">
-          <DropdownMenuLabel class="px-2.5 text-xs text-muted-foreground">My runs</DropdownMenuLabel>
+          <DropdownMenuLabel class="px-2.5 text-xs text-muted-foreground">Run templates</DropdownMenuLabel>
           <DropdownMenuItem
             v-for="run in saved.runs.value"
             :key="run.id"
@@ -59,7 +59,7 @@ function open(template: string) {
             </span>
           </DropdownMenuItem>
         </template>
-        <DropdownMenuItem class="cursor-pointer px-2.5 py-1.5 text-xs text-muted-foreground" @click="managing = true">Manage my runs…</DropdownMenuItem>
+        <DropdownMenuItem class="cursor-pointer px-2.5 py-1.5 text-xs text-muted-foreground" @click="managing = true">Manage run templates…</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           v-for="entry in TEMPLATES"
