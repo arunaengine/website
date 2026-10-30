@@ -89,6 +89,15 @@ const UploadStub = defineComponent({
   }, 'Pick files'),
 })
 
+// The source select as one button per option; other selects render nothing.
+const SelectStub = defineComponent({
+  props: { options: { type: Array, default: () => [] } },
+  emits: ['update:modelValue'],
+  setup: (props, { attrs, emit }) => () => attrs['aria-label'] === 'Source'
+    ? h('div', (props.options as Array<{ value: string; label: string }>).map((option) =>
+      h('button', { onClick: () => emit('update:modelValue', option.value) }, `Source ${option.label}`)))
+    : null,
+})
 const AddFilesDialog = compileClientComponent(new URL('./AddFilesDialog.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
@@ -103,11 +112,7 @@ const AddFilesDialog = compileClientComponent(new URL('./AddFilesDialog.vue', im
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
   '@/components/ui/Progress.vue': moduleDefault(EmptyStub),
   '@/components/ui/Spinner.vue': moduleDefault(EmptyStub),
-  '@/components/ui/Select.vue': moduleDefault(EmptyStub),
-  '@/components/ui/Tabs.vue': moduleDefault(Passthrough),
-  '@/components/ui/TabsList.vue': moduleDefault(Passthrough),
-  '@/components/ui/TabsTrigger.vue': moduleDefault(Passthrough),
-  '@/components/ui/TabsContent.vue': moduleDefault(Passthrough),
+  '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/data/ObjectBrowserPanel.vue': moduleDefault(BrowserStub),
   '@/components/data/add/UploadTab.vue': moduleDefault(UploadStub),
   '@/components/data/add/DatabasesTab.vue': moduleDefault(defineComponent({
@@ -156,6 +161,10 @@ const AddFilesDialog = compileClientComponent(new URL('./AddFilesDialog.vue', im
 
 const ROOT_TARGET = { entityId: './', property: 'hasPart' }
 
+async function source(root: Parameters<typeof button>[0], label: string) {
+  await click(button(root, `Source ${label}`))
+}
+
 function mount(updates: Editor.CrateDraft[], props: Record<string, unknown> = {}) {
   return mountApp(AddFilesDialog, {
     props: {
@@ -186,6 +195,17 @@ beforeEach(() => {
 const NESTED = 'arn:aruna:realm-1:node-1:s3/reads/raw/nested/'
 
 describe('AddFilesDialog', () => {
+  it('shows only the pane of the chosen source', async () => {
+    const mounted = await mount([])
+
+    expect(content(mounted.root)).toContain('A folder is added as one part')
+    expect(() => element(mounted.root, (node) => node.props['aria-label'] === 'External URL')).toThrow()
+    await source(mounted.root, 'External URL')
+    expect(element(mounted.root, (node) => node.props['aria-label'] === 'External URL')).toBeTruthy()
+    expect(content(mounted.root)).not.toContain('A folder is added as one part')
+    mounted.app.unmount()
+  })
+
   it('names a picked object by its content and its place by contentUrl', async () => {
     const updates: Editor.CrateDraft[] = []
     const mounted = await mount(updates)
@@ -311,6 +331,7 @@ describe('AddFilesDialog', () => {
   it('adds files of a database on another node with that node in their ids', async () => {
     const updates: Editor.CrateDraft[] = []
     const mounted = await mount(updates)
+    await source(mounted.root, 'From a database')
 
     await click(button(mounted.root, 'Choose a database'))
     expect(content(mounted.root)).toContain('Choose another database')
@@ -410,6 +431,7 @@ describe('AddFilesDialog', () => {
       name: 'stray.csv',
     }).draft
     const mounted = await mount(updates, { draft })
+    await source(mounted.root, 'Already in this dataset')
 
     await click(button(mounted.root, 'stray.csv'))
 
@@ -435,6 +457,7 @@ describe('AddFilesDialog', () => {
     }
     const updates: Editor.CrateDraft[] = []
     const mounted = await mount(updates, { draft })
+    await source(mounted.root, 'Already in this dataset')
     expect(content(mounted.root)).not.toContain('Ada Lovelace')
     expect(content(mounted.root)).not.toContain('Example Institute')
     expect(content(mounted.root)).toContain('file.csv')
@@ -453,6 +476,7 @@ describe('AddFilesDialog', () => {
   it('records a file that lives outside this node by its address', async () => {
     const updates: Editor.CrateDraft[] = []
     const mounted = await mount(updates)
+    await source(mounted.root, 'External URL')
     const url = element(mounted.root, (node) => node.props['aria-label'] === 'External URL')
 
     await typeValue(url, 'https://example.org/reads.fastq.gz')
@@ -468,6 +492,7 @@ describe('AddFilesDialog', () => {
   it('references an upload only once the node holds it', async () => {
     const updates: Editor.CrateDraft[] = []
     const mounted = await mount(updates)
+    await source(mounted.root, 'Upload to a bucket')
     await flush()
 
     await click(button(mounted.root, 'Pick files'))
@@ -498,6 +523,7 @@ describe('AddFilesDialog', () => {
     bucketNames = ['reads', 'lab']
     getStorageLocation.mockResolvedValue({ bucket: 'lab', prefix: 'p/d1/', default: false })
     const mounted = await mount([], { draft: { ...Editor.newDraft(), documentId: 'd1' } })
+    await source(mounted.root, 'Upload to a bucket')
     await flush()
 
     await click(button(mounted.root, 'Pick files'))
@@ -513,6 +539,7 @@ describe('AddFilesDialog', () => {
     bucketNames = ['reads', 'lab']
     getGroup.mockResolvedValue({ dataset_location: { bucket: 'lab', prefix: 'projects/' } })
     const mounted = await mount([])
+    await source(mounted.root, 'Upload to a bucket')
     await flush()
 
     await click(button(mounted.root, 'Pick files'))
@@ -528,6 +555,7 @@ describe('AddFilesDialog', () => {
     bucketNames = ['reads']
     getGroup.mockResolvedValue({ dataset_location: { bucket: 'lab', prefix: 'projects/' } })
     const mounted = await mount([])
+    await source(mounted.root, 'Upload to a bucket')
     await flush()
 
     expect(content(mounted.root)).toContain('The storage location bucket lab is not available to this session.')
@@ -539,6 +567,7 @@ describe('AddFilesDialog', () => {
   it('asks for a bucket when the storage location is unknown', async () => {
     getGroup.mockRejectedValue(new Error('offline'))
     const mounted = await mount([])
+    await source(mounted.root, 'Upload to a bucket')
     await flush()
 
     expect(content(mounted.root)).toContain('Choose a bucket to upload to.')

@@ -12,10 +12,6 @@ import Notice from '@/components/ui/Notice.vue'
 import Progress from '@/components/ui/Progress.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Select from '@/components/ui/Select.vue'
-import Tabs from '@/components/ui/Tabs.vue'
-import TabsList from '@/components/ui/TabsList.vue'
-import TabsTrigger from '@/components/ui/TabsTrigger.vue'
-import TabsContent from '@/components/ui/TabsContent.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import UploadTab from '@/components/data/add/UploadTab.vue'
 import DatabasesTab from '@/components/data/add/DatabasesTab.vue'
@@ -90,6 +86,14 @@ const FORMATS: Readonly<Record<string, string>> = {
 }
 
 const tab = ref('bucket')
+const SOURCES = [
+  { value: 'bucket', label: 'From a bucket' },
+  { value: 'database', label: 'From a database' },
+  { value: 'upload', label: 'Upload to a bucket' },
+  { value: 'dataset', label: 'Another dataset' },
+  { value: 'crate', label: 'Already in this dataset' },
+  { value: 'url', label: 'External URL' },
+]
 const bucket = ref('')
 const prefix = ref('')
 const buckets = ref<Array<{ value: string; label: string }>>([])
@@ -401,9 +405,7 @@ function addUrl() {
       <DialogHeader>
         <DialogTitle>Add files</DialogTitle>
         <DialogDescription>
-          Reference objects stored in a bucket, upload new ones, link another dataset, or point at
-          something already here. Everything added becomes a part of
-          {{ targetName ? targetName : 'this dataset' }}.
+          Everything you add becomes a part of {{ targetName ? targetName : 'this dataset' }}.
         </DialogDescription>
       </DialogHeader>
 
@@ -418,134 +420,129 @@ function addUrl() {
         Name the sources here only if the readers of this dataset may see where those files are stored.
         <Button size="sm" variant="outline" class="mt-2" @click="addSources">Name the sources</Button>
       </Notice>
-      <Tabs v-model="tab">
-        <TabsList>
-          <TabsTrigger value="bucket">From a bucket</TabsTrigger>
-          <TabsTrigger value="database">From a database</TabsTrigger>
-          <TabsTrigger value="upload">Upload to a bucket</TabsTrigger>
-          <TabsTrigger value="dataset">Another dataset</TabsTrigger>
-          <TabsTrigger value="crate">In this dataset</TabsTrigger>
-          <TabsTrigger value="url">External URL</TabsTrigger>
-        </TabsList>
+      <label class="block text-xs font-medium text-foreground sm:w-64">
+        Source
+        <Select v-model="tab" :options="SOURCES" class="mt-1" aria-label="Source" />
+      </label>
 
-        <TabsContent value="bucket">
-          <ObjectBrowserPanel selectable @add="addObjects" />
-        </TabsContent>
+      <div v-if="tab === 'bucket'" class="space-y-2">
+        <ObjectBrowserPanel selectable @add="addObjects" />
+        <p class="text-xs text-muted-foreground">A folder is added as one part with everything in it.</p>
+      </div>
 
-        <TabsContent value="database" class="space-y-3">
-          <template v-if="database">
-            <div class="flex items-center gap-2 text-xs">
-              <span class="min-w-0 flex-1 truncate font-mono text-foreground">{{ database.bucket }}</span>
-              <Button variant="ghost" size="sm" @click="database = null">Choose another database</Button>
-            </div>
-            <ObjectBrowserPanel
-              :key="`${database.nodeId ?? 'local'}/${database.groupId}/${database.bucket}`"
-              selectable
-              :bucket="database.bucket"
-              :node-id="database.nodeId"
-              :group-id="database.groupId"
-              @add="(selection: { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[] }) => addObjects(selection, database?.nodeId ?? null)"
+      <div v-else-if="tab === 'database'" class="space-y-3">
+        <template v-if="database">
+          <div class="flex items-center gap-2 text-xs">
+            <span class="min-w-0 flex-1 truncate font-mono text-foreground">{{ database.bucket }}</span>
+            <Button variant="ghost" size="sm" @click="database = null">Choose another database</Button>
+          </div>
+          <ObjectBrowserPanel
+            :key="`${database.nodeId ?? 'local'}/${database.groupId}/${database.bucket}`"
+            selectable
+            :bucket="database.bucket"
+            :node-id="database.nodeId"
+            :group-id="database.groupId"
+            @add="(selection: { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[] }) => addObjects(selection, database?.nodeId ?? null)"
+          />
+        </template>
+        <DatabasesTab v-else bucket="" @choose="chooseDatabase" />
+      </div>
+
+      <div v-else-if="tab === 'upload'" class="space-y-3">
+        <Notice v-if="bucketError" tone="warning">{{ bucketError }}</Notice>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label class="text-xs font-medium text-foreground">Bucket</label>
+            <Select
+              :model-value="bucket"
+              :options="buckets"
+              class="mt-1"
+              placeholder="Choose a bucket"
+              aria-label="Upload bucket"
+              @update:model-value="(value: string) => (bucket = value)"
             />
-          </template>
-          <DatabasesTab v-else bucket="" @choose="chooseDatabase" />
-        </TabsContent>
-
-        <TabsContent value="upload" class="space-y-3">
-          <Notice v-if="bucketError" tone="warning">{{ bucketError }}</Notice>
-          <div class="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label class="text-xs font-medium text-foreground">Bucket</label>
-              <Select
-                :model-value="bucket"
-                :options="buckets"
-                class="mt-1"
-                placeholder="Choose a bucket"
-                aria-label="Upload bucket"
-                @update:model-value="(value: string) => (bucket = value)"
-              />
-            </div>
-            <div>
-              <label class="text-xs font-medium text-foreground">Folder</label>
-              <Input v-model="prefix" class="mt-1" aria-label="Upload folder" placeholder="raw/reads" />
-            </div>
           </div>
-          <Notice v-if="missingBucket">
-            The storage location bucket {{ missingBucket }} is not available to this session. Choose a bucket to upload to.
-          </Notice>
-          <UploadTab v-if="bucket" @add="upload" />
-          <p v-else-if="!missingBucket" class="text-xs text-muted-foreground">Choose a bucket to upload to.</p>
-          <ul v-if="uploads.length" class="divide-y divide-border rounded-md border border-border">
-            <li v-for="item in uploads" :key="item.id" class="space-y-1 px-3 py-2">
-              <div class="flex items-center gap-2 text-xs">
-                <span class="min-w-0 flex-1 truncate text-foreground">{{ item.name }}</span>
-                <span class="text-muted-foreground">{{ formatBytes(item.size) }}</span>
-                <span class="text-muted-foreground">{{ item.state }}</span>
-              </div>
-              <Progress v-if="item.state === 'uploading'" :value="item.progress" />
-              <Spinner
-                v-if="item.state === 'uploading' && item.finishing"
-                :label="UPLOAD_FINISHING_MESSAGE"
-                show-label
-                class="text-[11px]"
-              />
-              <p v-if="item.error" class="text-[11px] text-destructive">{{ item.error }}</p>
-            </li>
-          </ul>
-        </TabsContent>
-
-        <TabsContent value="dataset" class="space-y-3">
-          <p class="text-xs text-muted-foreground">
-            A linked dataset is referenced as its own RO-Crate, not copied into this one.
-          </p>
-          <Button variant="outline" size="sm" @click="datasetsOpen = true">
-            <FileJson2 class="h-3.5 w-3.5" /> Choose a dataset
-          </Button>
-        </TabsContent>
-
-        <TabsContent value="crate" class="space-y-2">
-          <Input v-model="query" aria-label="Search this dataset" placeholder="Search this dataset" />
-          <ul v-if="listed.length" class="max-h-64 divide-y divide-border overflow-y-auto rounded-md border border-border">
-            <li v-for="entity in listed" :key="entity.id">
-              <button
-                type="button"
-                class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-muted/40"
-                @click="linkExisting(entity)"
-              >
-                <span class="min-w-0 flex-1 truncate font-medium text-foreground">{{ displayName(entity) }}</span>
-                <span class="shrink-0 text-muted-foreground">{{ entity.types.map(typeLabel).join(', ') }}</span>
-              </button>
-            </li>
-          </ul>
-          <p v-else class="px-1 py-2 text-xs text-muted-foreground">
-            Nothing else in this dataset can be added here yet.
-          </p>
-        </TabsContent>
-
-        <TabsContent value="url" class="space-y-3">
-          <p class="text-xs text-muted-foreground">
-            A file that lives outside this node stays where it is; only its address is recorded.
-          </p>
-          <div class="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label class="text-xs font-medium text-foreground">Address</label>
-              <Input
-                v-model="url"
-                class="mt-1"
-                aria-label="External URL"
-                placeholder="https://example.org/reads.fastq.gz"
-                :invalid="urlInvalid ? 'error' : undefined"
-                @keydown.enter="addUrl"
-              />
-            </div>
-            <div>
-              <label class="text-xs font-medium text-foreground">Name</label>
-              <Input v-model="urlName" class="mt-1" aria-label="External file name" placeholder="Optional" />
-            </div>
+          <div>
+            <label class="text-xs font-medium text-foreground">Folder</label>
+            <Input v-model="prefix" class="mt-1" aria-label="Upload folder" placeholder="raw/reads" />
           </div>
-          <p v-if="urlInvalid" class="text-[11px] text-destructive">That is not an absolute URL.</p>
-          <Button size="sm" :disabled="!url.trim() || urlInvalid" @click="addUrl">Add file</Button>
-        </TabsContent>
-      </Tabs>
+        </div>
+        <Notice v-if="missingBucket">
+          The storage location bucket {{ missingBucket }} is not available to this session. Choose a bucket to upload to.
+        </Notice>
+        <UploadTab v-if="bucket" @add="upload" />
+        <p v-else-if="!missingBucket" class="text-xs text-muted-foreground">Choose a bucket to upload to.</p>
+        <ul v-if="uploads.length" class="divide-y divide-border rounded-md border border-border">
+          <li v-for="item in uploads" :key="item.id" class="space-y-1 px-3 py-2">
+            <div class="flex items-center gap-2 text-xs">
+              <span class="min-w-0 flex-1 truncate text-foreground">{{ item.name }}</span>
+              <span class="text-muted-foreground">{{ formatBytes(item.size) }}</span>
+              <span class="text-muted-foreground">{{ item.state }}</span>
+            </div>
+            <Progress v-if="item.state === 'uploading'" :value="item.progress" />
+            <Spinner
+              v-if="item.state === 'uploading' && item.finishing"
+              :label="UPLOAD_FINISHING_MESSAGE"
+              show-label
+              class="text-[11px]"
+            />
+            <p v-if="item.error" class="text-[11px] text-destructive">{{ item.error }}</p>
+          </li>
+        </ul>
+      </div>
+
+      <div v-else-if="tab === 'dataset'" class="space-y-3">
+        <p class="text-xs text-muted-foreground">
+          A linked dataset is referenced as its own RO-Crate, not copied into this one.
+        </p>
+        <Button variant="outline" size="sm" @click="datasetsOpen = true">
+          <FileJson2 class="h-3.5 w-3.5" /> Choose a dataset
+        </Button>
+      </div>
+
+      <div v-else-if="tab === 'crate'" class="space-y-2">
+        <Input v-model="query" aria-label="Search this dataset" placeholder="Search this dataset" />
+        <ul v-if="listed.length" class="max-h-64 divide-y divide-border overflow-y-auto rounded-md border border-border">
+          <li v-for="entity in listed" :key="entity.id">
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-muted/40"
+              @click="linkExisting(entity)"
+            >
+              <span class="min-w-0 flex-1 truncate font-medium text-foreground">{{ displayName(entity) }}</span>
+              <span class="shrink-0 text-muted-foreground">{{ entity.types.map(typeLabel).join(', ') }}</span>
+            </button>
+          </li>
+        </ul>
+        <p v-else class="px-1 py-2 text-xs text-muted-foreground">
+          Nothing else in this dataset can be added here yet.
+        </p>
+      </div>
+
+      <div v-else class="space-y-3">
+        <p class="text-xs text-muted-foreground">
+          A file that lives outside this node stays where it is; only its address is recorded.
+        </p>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label class="text-xs font-medium text-foreground">Address</label>
+            <Input
+              v-model="url"
+              class="mt-1"
+              aria-label="External URL"
+              placeholder="https://example.org/reads.fastq.gz"
+              :invalid="urlInvalid ? 'error' : undefined"
+              @keydown.enter="addUrl"
+            />
+          </div>
+          <div>
+            <label class="text-xs font-medium text-foreground">Name</label>
+            <Input v-model="urlName" class="mt-1" aria-label="External file name" placeholder="Optional" />
+          </div>
+        </div>
+        <p v-if="urlInvalid" class="text-[11px] text-destructive">That is not an absolute URL.</p>
+        <Button size="sm" :disabled="!url.trim() || urlInvalid" @click="addUrl">Add file</Button>
+      </div>
 
       <DialogFooter>
         <Button variant="outline" @click="emit('update:open', false)">Done</Button>
