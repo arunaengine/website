@@ -1271,7 +1271,7 @@ describe('distributed job detail components', () => {
     expect(text).toContain('line 13')
     expect(text).not.toContain('line 12')
     expect(text).toContain('stderr: 2 lines, last: warn two')
-    expect(text).toContain('Open full log')
+    expect(text).toContain('Logs')
     mounted.app.unmount()
   })
 
@@ -1334,8 +1334,9 @@ describe('distributed job detail components', () => {
 
       expect(mounted.errors).toEqual([])
       expect(text.indexOf('Progress')).toBeLessThan(text.indexOf('Placement'))
-      expect(text.indexOf('Placement')).toBeLessThan(text.indexOf('Executions'))
-      expect(text.indexOf('Executions')).toBeLessThan(text.indexOf('Log'))
+      expect(text.indexOf('Placement')).toBeLessThan(text.indexOf('Execution'))
+      expect(text.indexOf('Execution')).toBeLessThan(text.indexOf('What ran'))
+      expect(text.indexOf('What ran')).toBeLessThan(text.indexOf('Files'))
       expect(text.indexOf('Files')).toBeLessThan(text.indexOf('Request'))
       expect(text).toContain('2 cores')
       mounted.app.unmount()
@@ -1390,7 +1391,11 @@ describe('the run facts', () => {
       logs: [{ start_time: start, end_time: '2026-10-29T12:38:12Z', logs: [{ exit_code: 0 }], outputs: [] }],
       tags: {},
     }))
-    const getJob = vi.fn(async () => ({ family: { ...family, placement: { ...family.placement, target_node_id: 'node-giessen' } } }))
+    const inputs = [
+      { destination_key: 'in/reads.fq.gz', bytes: 1288490188, source_node_id: null, transfer_ms: 0 },
+      { destination_key: 'in/reference.fa', bytes: 314572800, source_node_id: 'node-bielefeld', transfer_ms: 4000 },
+    ]
+    const getJob = vi.fn(async () => ({ family: { ...family, placement: { ...family.placement, target_node_id: 'node-giessen', inputs } } }))
     const mounted = await mount(taskPanel(getTask, getJob), { taskId: 'run', open: true })
     await flushPanel()
     const text = content(mounted.root)
@@ -1400,6 +1405,9 @@ describe('the run facts', () => {
     expect(text).toContain('Nodenode-giessen')
     expect(text).toContain('Resources4 CPU, 12 GB')
     expect(text).not.toContain('Completed in')
+    expect(text).toContain('1.2 GB stayed, 300 MB moved')
+    expect(text).toContain('2 inputs, 1.5 GB')
+    expect(text).toContain('from node-bielefeld')
     mounted.app.unmount()
     wake.mockRestore()
     followSpy.mockRestore()

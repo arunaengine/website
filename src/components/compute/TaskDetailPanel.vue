@@ -55,7 +55,26 @@ import { sessionRuntime } from '@/lib/notebook/submit'
 import { objectHref } from '@/lib/assistant/objectLinks'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import { errorMessage, formatBytes, formatDuration, formatResourceGb, relativeTime, truncateMiddle } from '@/lib/utils'
-import { Ban, Container, Download, Eye, ExternalLink as ExternalLinkIcon, FileText, Flag, Hourglass, Maximize2, Play, RotateCcw, Trash2 } from '@lucide/vue'
+import {
+  ArrowLeftRight,
+  Ban,
+  CircleCheck,
+  Container,
+  Download,
+  Eye,
+  ExternalLink as ExternalLinkIcon,
+  File as FileIcon,
+  FileText,
+  Flag,
+  Hourglass,
+  Info,
+  Maximize2,
+  Play,
+  RotateCcw,
+  Server,
+  SquareTerminal,
+  Trash2,
+} from '@lucide/vue'
 
 const NODE_LABEL_KEY = 'aruna-engine.org/node'
 const NODE_LABEL_TAG = `${TES_LABEL_TAG_PREFIX}${NODE_LABEL_KEY}`
@@ -349,6 +368,47 @@ async function downloadRunRecord() {
   } catch (cause) {
     recordError.value = errorMessage(cause)
   }
+}
+
+// The plan's input record wins over its totals; an older node sends only the estimate.
+const INPUTS_SHOWN = 20
+const placementInputs = computed(() => nativeFamily.value?.placement?.inputs ?? [])
+const movedBytes = computed(() =>
+  placementInputs.value.length
+    ? placementInputs.value.reduce((sum, input) => (input.source_node_id ? sum + input.bytes : sum), 0)
+    : (nativeFamily.value?.placement?.estimated_transfer_bytes ?? 0))
+const stayedBytes = computed(() =>
+  placementInputs.value.reduce((sum, input) => (input.source_node_id ? sum : sum + input.bytes), 0))
+const placementInfo = computed(() => {
+  const where = runNode.value ? ` The work ran on ${displayName(runNode.value)}.` : ''
+  const how = movedBytes.value ? 'Some data was copied to the compute.' : 'Compute went to the data.'
+  return `${how}${where} Estimated at planning time, not measured.`
+})
+
+const attemptLine = computed(() => {
+  const count = nativeJob.value?.attempts || task.value?.logs?.length || 0
+  if (!count) return 'Not started yet'
+  return executorKind.value ? `Attempt ${count} on ${executorKind.value}` : `Attempt ${count}`
+})
+const exitLine = computed(() => {
+  if (exitCode.value !== undefined) return `Exit code ${exitCode.value}`
+  return active.value ? 'Still running' : 'No exit code recorded'
+})
+function executorDetails(i: number): Detail[] {
+  const executor = task.value?.executors?.[i]
+  if (!executor) return []
+  return [
+    { key: 'image', label: task.value!.executors.length > 1 ? `Image ${i + 1}` : 'Image', value: executor.image, mono: true },
+    { key: 'command', label: 'Command', value: executor.command.join(' '), mono: true },
+  ]
+}
+// An input from a bucket opens the folder it came from.
+function inputLink(url: string | undefined) {
+  if (!url) return null
+  const link = resolveUrl(url)
+  return link.kind === 's3'
+    ? { name: 'bucket', params: { bucketId: link.bucketId }, query: link.prefix ? { prefix: link.prefix } : {} }
+    : null
 }
 
 // The one line that says what happened; the badge, the stages and this line
@@ -825,70 +885,97 @@ async function confirmDelete() {
           </ol>
         </section>
 
-        <section class="space-y-3">
-          <h3 class="font-display text-sm font-semibold text-aruna-navy">Placement</h3>
-          <JobPlacementFigure v-if="nativeFamily" :placement="nativeFamily.placement" />
+        <section>
+          <h3 class="mb-2 flex items-center gap-2 type-card-title">
+            Placement
+            <Tooltip :label="placementInfo">
+              <span class="inline-flex text-muted-foreground" tabindex="0" :aria-label="placementInfo"><Info class="size-4" aria-hidden="true" /></span>
+            </Tooltip>
+          </h3>
+          <template v-if="nativeFamily?.placement">
+            <p class="flex items-center gap-1.5 text-sm tabular-nums text-foreground">
+              <CircleCheck v-if="!movedBytes" class="size-4 shrink-0 text-status-ok" aria-hidden="true" />
+              <ArrowLeftRight v-else class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              {{ formatBytes(stayedBytes) }} stayed, {{ formatBytes(movedBytes) }} moved
+            </p>
+            <details v-if="placementInputs.length" class="mt-3 text-sm">
+              <summary class="cursor-pointer font-medium text-foreground">
+                {{ placementInputs.length }} {{ placementInputs.length === 1 ? 'input' : 'inputs' }}, {{ formatBytes(stayedBytes + movedBytes) }}
+              </summary>
+              <ul class="mt-2 divide-y divide-border-subtle rounded-lg border border-border-subtle">
+                <li v-for="(input, i) in placementInputs.slice(0, INPUTS_SHOWN)" :key="`${input.destination_key}:${i}`" class="flex items-center gap-3 px-3 py-2.5">
+                  <FileIcon class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <span class="min-w-0 flex-1 truncate font-mono text-xs text-foreground" :title="input.destination_key">{{ input.destination_key }}</span>
+                  <RouterLink v-if="input.source_node_id" :to="{ name: 'node', params: { nodeId: input.source_node_id } }" class="shrink-0 text-xs text-primary hover:underline">
+                    from {{ displayName(input.source_node_id) }}
+                  </RouterLink>
+                  <span class="shrink-0 text-xs tabular-nums text-muted-foreground">{{ formatBytes(input.bytes) }}</span>
+                </li>
+              </ul>
+              <p v-if="placementInputs.length > INPUTS_SHOWN" class="mt-2 text-xs text-muted-foreground">
+                {{ placementInputs.length - INPUTS_SHOWN }} more under For developers.
+              </p>
+            </details>
+          </template>
           <p v-else-if="nativeDetailUnavailable" class="text-xs text-muted-foreground">
             Distributed execution detail could not be loaded.
           </p>
           <p v-else class="text-xs text-muted-foreground">No placement record for this run yet.</p>
         </section>
 
-        <section v-if="nativeFamily" class="space-y-3">
-          <h3 class="font-display text-sm font-semibold text-aruna-navy">Executions</h3>
-          <JobExecutionsTable :family="nativeFamily" />
-        </section>
+        <!-- The tutorial points at what ran and what it printed together. -->
+        <div data-tutorial="run-executors" class="space-y-6">
+          <section>
+            <h3 class="mb-2 type-card-title">Execution</h3>
+            <div class="rounded-lg border border-border-subtle">
+              <div class="flex flex-wrap items-center gap-3 px-4 py-3">
+                <Server class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-medium text-foreground">{{ attemptLine }}</p>
+                  <p class="text-xs text-muted-foreground">{{ exitLine }}</p>
+                </div>
+                <template v-for="(_, i) in task.executors" :key="i">
+                  <Button v-if="executorStdout(i) || executorStderr(i) || systemLogLines.length" variant="outline" size="sm" @click="openLog(i)">
+                    <SquareTerminal class="h-3.5 w-3.5" /> Logs<template v-if="task.executors.length > 1"> {{ i + 1 }}</template>
+                  </Button>
+                </template>
+              </div>
+              <div v-if="executorStdout(0) || stderrSummary(0)" class="space-y-2 border-t border-border-subtle px-4 py-3">
+                <div v-if="executorStdout(0)" class="relative">
+                  <p class="type-label">
+                    {{ executorStderr(0) ? 'stdout' : 'output' }}<span v-if="hidden(executorStdout(0))">, last {{ tail(executorStdout(0)).length }} lines</span>
+                  </p>
+                  <pre class="mt-1 overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-muted/50 p-3 font-mono text-xs leading-relaxed">{{ tail(executorStdout(0)).join('\n') }}</pre>
+                </div>
+                <p v-if="stderrSummary(0)" class="truncate font-mono text-xs text-destructive" :title="executorStderr(0)">
+                  stderr: {{ stderrSummary(0) }}
+                </p>
+              </div>
+            </div>
+          </section>
 
-        <section data-tutorial="run-executors" class="space-y-3">
-          <h3 class="font-display text-sm font-semibold text-aruna-navy">Log</h3>
-          <p v-if="!task.logs?.length && !nativeResult" class="text-xs text-muted-foreground">Nothing captured yet.</p>
-          <div v-for="(executor, i) in task.executors" :key="i" class="surface space-y-3 p-4">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0 space-y-0.5">
-                <div class="font-mono text-[11px] text-foreground">{{ executor.image }}</div>
-                <div class="whitespace-pre-wrap break-all font-mono text-[11px] text-muted-foreground">{{ executor.command.join(' ') }}</div>
-              </div>
-              <Badge
-                v-if="executorExit(i) !== undefined"
-                :variant="executorExit(i) === 0 ? 'success' : 'destructive'"
-                class="shrink-0"
-              >
-                exit {{ executorExit(i) }}
-              </Badge>
-            </div>
-            <div v-if="executorLog(i)?.start_time || executorLog(i)?.end_time" class="text-[11px] text-muted-foreground">
-              <span v-if="executorLog(i)!.start_time">started {{ relativeTime(executorLog(i)!.start_time!) }}</span>
-              <span v-if="executorLog(i)!.end_time">, ended {{ relativeTime(executorLog(i)!.end_time!) }}</span>
-            </div>
-            <template v-if="executorStdout(i) || executorStderr(i)">
-              <div v-if="executorStdout(i)">
-                <div class="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {{ executorStderr(i) ? 'stdout' : 'output' }}<span v-if="hidden(executorStdout(i))">, last {{ tail(executorStdout(i)).length }} lines</span>
-                </div>
-                <div class="relative mt-1">
-                  <pre class="overflow-x-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-3 font-mono text-[11px] leading-relaxed">{{ tail(executorStdout(i)).join('\n') }}</pre>
-                  <div
-                    v-if="hidden(executorStdout(i))"
-                    aria-hidden="true"
-                    class="pointer-events-none absolute inset-x-0 top-0 h-8 rounded-t bg-gradient-to-b from-muted to-transparent"
-                  />
-                </div>
-              </div>
-              <p v-if="stderrSummary(i)" class="truncate font-mono text-[11px] text-destructive" :title="executorStderr(i)">
-                stderr: {{ stderrSummary(i) }}
-              </p>
-            </template>
-            <p v-else-if="executorLog(i) || nativeResult" class="text-[11px] text-muted-foreground">No output captured.</p>
-            <Button
-              v-if="executorStdout(i) || executorStderr(i) || systemLogLines.length"
-              variant="outline"
-              size="sm"
-              @click="openLog(i)"
-            >
-              <FileText class="h-3.5 w-3.5" /> Open full log
-            </Button>
+          <section>
+            <h3 class="mb-2 type-card-title">What ran</h3>
+            <div class="space-y-4">
+              <DetailList v-for="(executor, i) in task.executors" :key="i" :items="executorDetails(i)">
+                <template #command>
+                  <code class="block whitespace-pre-wrap break-all rounded-md bg-muted/50 px-3 py-2 font-mono text-xs leading-relaxed">{{ executor.command.join(' ') }}</code>
+                </template>
+              </DetailList>
+              <div v-if="task.inputs?.length">
+                <p class="type-label">Inputs</p>
+                <ul class="mt-1 divide-y divide-border-subtle rounded-lg border border-border-subtle">
+                  <li v-for="(input, i) in task.inputs" :key="`${input.path}:${i}`" class="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-2.5 text-xs">
+                    <span class="min-w-0 flex-1 truncate font-mono text-foreground" :title="input.path">{{ input.path }}</span>
+                    <RouterLink v-if="inputLink(input.url)" :to="inputLink(input.url)!" class="min-w-0 truncate font-mono text-primary hover:underline" :title="input.url">{{ input.url }}</RouterLink>
+                    <span v-else-if="input.url" class="min-w-0 truncate font-mono text-muted-foreground" :title="input.url">{{ input.url }}</span>
+                    <span v-else class="text-muted-foreground">Inline content</span>
+                  </li>
+                </ul>
+        </div>
           </div>
         </section>
+        </div>
 
         <!-- Outputs and the run dataset -->
         <section data-tutorial="run-artifacts" class="space-y-3">
@@ -985,6 +1072,12 @@ async function confirmDelete() {
         </section>
 
         <section data-tutorial="run-details" class="space-y-3">
+          <template v-if="nativeFamily">
+            <h3 class="font-display text-sm font-semibold text-aruna-navy">Placement plan</h3>
+            <JobPlacementFigure :placement="nativeFamily.placement" />
+            <h3 class="font-display text-sm font-semibold text-aruna-navy">Executions</h3>
+            <JobExecutionsTable :family="nativeFamily" />
+          </template>
           <h3 class="font-display text-sm font-semibold text-aruna-navy">Request</h3>
           <DetailList :items="requestDetails">
             <template #constraints><CountedList :items="constraintList" noun="constraint" /></template>
