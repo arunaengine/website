@@ -690,6 +690,7 @@ async function leave() {
         </TabsContent>
 
         <TabsContent value="roles" class="mt-0">
+          <SectionHeading title="Roles" :icon="ShieldCheck" info="Each role is a set of access rules on part of this group. Assign roles to members in the Members tab." />
           <div class="surface overflow-hidden">
             <GroupRoles :group="group" :can-manage="canManage" @changed="reload" />
           </div>
