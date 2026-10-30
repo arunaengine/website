@@ -153,10 +153,10 @@ const searchBuckets = vi.fn(async (q: string, _options?: { cursor?: string; grou
 const getBucketDistribution = vi.fn(async (_bucket: string, _signal?: AbortSignal, _nodeId?: string | null) => ({
   members: [] as Array<{ node_id: string; state: string }>,
 }))
-const listBucketObjects = vi.fn(async (_bucket: string, _query: { prefix?: string }, _nodeId?: string | null) => ({
-  objects: [] as Array<{ key: string; version_id: string }>,
-  next_cursor: null as string | null,
-  stale_ranges: undefined as unknown[] | undefined,
+type ObjectPage = { objects: Array<{ key: string; version_id: string }>; next_cursor: string | null; stale_ranges?: unknown[] }
+const listBucketObjects = vi.fn(async (_bucket: string, _query: { prefix?: string }, _nodeId?: string | null): Promise<ObjectPage> => ({
+  objects: [],
+  next_cursor: null,
 }))
 const sessionEpoch = ref(0)
 const useArunaModule = {
