@@ -947,13 +947,14 @@ async function confirmDelete() {
           <h3 class="mb-3 type-card-title">Progress</h3>
           <ol class="flex">
             <li v-for="(stage, i) in stages" :key="stage.key" class="relative flex min-w-0 flex-1 flex-col items-center text-center">
+              <!-- The connector runs from this icon's right edge to the next icon's left edge. -->
               <span
                 v-if="i < stages.length - 1"
                 aria-hidden="true"
-                class="absolute left-1/2 top-4 h-0.5 w-full"
+                class="absolute left-[calc(50%+1rem)] top-[15px] h-0.5 w-[calc(100%-2rem)]"
                 :class="stage.state === 'done' && stages[i + 1]!.state !== 'pending' ? 'bg-status-ok/40' : 'bg-border'"
               />
-              <span class="relative grid size-8 place-items-center rounded-full ring-4 ring-background" :class="STAGE_LOOK[stage.state]">
+              <span class="relative grid size-8 place-items-center rounded-full" :class="STAGE_LOOK[stage.state]">
                 <component :is="stage.icon" class="size-4" aria-hidden="true" />
               </span>
               <span class="mt-2 text-[13px] font-medium" :class="stage.state === 'pending' ? 'text-muted-foreground' : 'text-foreground'">{{ stage.label }}</span>
