@@ -343,7 +343,9 @@ function openBucketSettings() {
 }
 
 const dragActive = ref(false)
-const PAGE_SIZE_OPTIONS = PAGE_SIZES.map((size) => ({ value: String(size), label: String(size) }))
+// 10 to 100 rows; a larger size chosen earlier stays listed while it is in use.
+const PAGE_SIZE_OPTIONS = computed(() => PAGE_SIZES.filter((size) => size <= 100 || size === pageSize.value)
+  .map((size) => ({ value: String(size), label: String(size) })))
 
 function objectReason(key: string): string | null {
   return s3.canWrite(bucket.value, key, remoteNodeId.value)
@@ -1096,21 +1098,26 @@ async function onDrop(event: DragEvent) {
         </table>
         <div v-if="!isEmpty || page > 1 || nextToken" class="flex flex-wrap items-center justify-between gap-3 px-4 py-2 text-xs text-muted-foreground @max-[600px]:px-3">
           <span class="tabular-nums">{{ rangeText }}</span>
-          <div class="flex items-center gap-2">
-            <Select
-              :model-value="String(pageSize)"
-              :options="PAGE_SIZE_OPTIONS"
-              aria-label="Files per page"
-              title="Files per page"
-              class="h-8 w-20 text-xs text-foreground @max-[600px]:hidden"
-              @update:model-value="(value: string) => setPageSize(Number(value))"
-            />
-            <IconButton label="Previous page" variant="outline" size="icon" class="h-8 w-8" :disabled="page <= 1 || listLoading" @click="previousPage">
-              <ChevronLeft class="size-3.5" />
-            </IconButton>
-            <IconButton label="Next page" variant="outline" size="icon" class="h-8 w-8" :disabled="!nextToken || listLoading" @click="nextPage">
-              <ChevronRight class="size-3.5" />
-            </IconButton>
+          <!-- Rows per page and the pager show once there is more than one page. -->
+          <div v-if="page > 1 || nextToken" class="flex flex-wrap items-center gap-3">
+            <label class="flex items-center gap-2 @max-[600px]:hidden">
+              Rows per page
+              <Select
+                :model-value="String(pageSize)"
+                :options="PAGE_SIZE_OPTIONS"
+                aria-label="Rows per page"
+                class="h-8 w-20 text-xs text-foreground"
+                @update:model-value="(value: string) => setPageSize(Number(value))"
+              />
+            </label>
+            <span class="flex items-center gap-2">
+              <IconButton label="Previous page" variant="outline" size="icon" class="h-8 w-8" :disabled="page <= 1 || listLoading" @click="previousPage">
+                <ChevronLeft class="size-3.5" />
+              </IconButton>
+              <IconButton label="Next page" variant="outline" size="icon" class="h-8 w-8" :disabled="!nextToken || listLoading" @click="nextPage">
+                <ChevronRight class="size-3.5" />
+              </IconButton>
+            </span>
           </div>
         </div>
         <template v-if="selectedCount">

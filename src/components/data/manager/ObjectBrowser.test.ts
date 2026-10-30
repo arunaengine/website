@@ -728,11 +728,11 @@ describe('object browser selection', () => {
   })
 
   it('fits a 320 px phone: no page size, one borderless menu button and a box wide enough for Search', async () => {
-    const root = await render()
+    const root = await render({ nextToken: ref('t2') })
     const row = element(root, (node) => node.tag === 'tr' && content(node).includes('reads.fastq'))
     const more = element(row, (node) => node.props['aria-label'] === 'Actions for reads.fastq')
 
-    expect(String(element(root, (node) => node.tag === 'select').props.class)).toContain('@max-[600px]:hidden')
+    expect(String(element(root, (node) => node.tag === 'label' && content(node).includes('Rows per page')).props.class)).toContain('@max-[600px]:hidden')
     expect(String(more.props.class)).toContain('@max-[600px]:size-11 @max-[600px]:border-transparent')
     expect(String(element(root, (node) => node.tag === 'form').props.class)).toContain('min-w-[5.5rem]')
   })
@@ -810,6 +810,17 @@ describe('object browser pages', () => {
     expect(action(last, 'Next page').props.disabled).toBe(true)
     await click(action(last, 'Previous page'))
     expect(previousPage).toHaveBeenCalled()
+  })
+
+  it('shows rows per page and the pager only when there is more than one page', async () => {
+    const two = ref([listedObject, { ...listedObject, key: 'raw/b.fastq', name: 'b.fastq' }])
+    const one = await render({ pageSize: ref(25), objects: two, visibleObjects: two })
+    expect(content(one)).not.toContain('Rows per page')
+    expect(nodes(one).some((node) => node.props.label === 'Next page')).toBe(false)
+
+    const more = await render({ nextToken: ref('t2'), pageSize: ref(2), objects: two, visibleObjects: two })
+    expect(content(more)).toContain('Rows per page')
+    expect(element(more, (node) => node.tag === 'select').props['aria-label']).toBe('Rows per page')
   })
 })
 
