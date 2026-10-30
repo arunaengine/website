@@ -91,23 +91,6 @@ describe('topology', () => {
   })
 })
 
-describe('the small map of the landing view', () => {
-  it('drops the heading and footnote, colors rings by state and arcs only an importing node', async () => {
-    desktop = false
-    const offline = { ...realmNode('bbbb-server-2222', 'server', 'Giessen storage 1'), present: false }
-    const importing = { ...realmNode('cccc-server-3333', 'server', 'Giessen storage 2'), info: { utilization: { heartbeat_at_ms: Date.now(), imports_running: 1, load_permille: 900 } } }
-    const nodes = [realmNode('aaaa-mgmt-1111', 'management', 'Giessen management'), offline, importing]
-    const html = await renderToString(createSSRApp({ render: () => h(FederationPanel, { nodes, localPeerId: 'aaaa-mgmt-1111', compact: true }) }))
-
-    expect(html).not.toContain('Node map')
-    expect(html).not.toContain('Edges show connections')
-    expect(html).toContain('stroke="#10b981" stroke-width="1.5"')
-    expect(html).toContain('stroke="hsl(var(--muted-foreground))" stroke-width="1.5"')
-    // One arc, for the import; a busy CPU alone draws none here.
-    expect(html.match(/stroke="#55C4DE" stroke-width="2"/g)).toHaveLength(1)
-  })
-})
-
 describe('this computer', () => {
   const nodes = [realmNode('aaaa-mgmt-1111', 'management'), realmNode('bbbb-server-2222', 'server')]
   const render = (computer: unknown) =>

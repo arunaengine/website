@@ -6,7 +6,7 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import DashboardScopeToggle from '@/components/dashboard/DashboardScopeToggle.vue'
 import GroupQuotaCards from '@/components/dashboard/GroupQuotaCards.vue'
 import MyStatsCards from '@/components/dashboard/MyStatsCards.vue'
-import FederationPanel from '@/components/dashboard/FederationPanel.vue'
+import RealmTopology from '@/components/dashboard/RealmTopology.vue'
 import NodeTable from '@/components/dashboard/NodeTable.vue'
 import RecentDatasetsCard from '@/components/dashboard/RecentDatasetsCard.vue'
 import RecentRunsCard from '@/components/dashboard/RecentRunsCard.vue'
@@ -226,6 +226,8 @@ const mapComputer = computed(() => {
 })
 const openNode = (nodeId: string) => void router.push({ name: 'node', params: { nodeId } })
 const groupView = useViewMode('dashboard-groups')
+// The node under the pointer, lit up on the topology and in the table together.
+const hoveredNode = ref<string | null>(null)
 
 const replication = computed(() => {
   const factor = realmInfo.value?.metadata_replication.default_replication_factor
@@ -419,16 +421,17 @@ const pageDescription = computed(() =>
           </template>
         </SectionHeading>
         <div class="grid overflow-hidden rounded-xl border border-border-subtle bg-card shadow-sm dark:shadow-none lg:grid-cols-[minmax(480px,34%)_minmax(0,1fr)]">
-          <div class="relative border-b border-border/60 bg-background lg:border-b-0 lg:border-r">
-            <FederationPanel
-              compact
+          <div class="relative h-[360px] overflow-hidden border-b border-border/60 bg-background lg:h-auto lg:min-h-[280px] lg:border-b-0 lg:border-r">
+            <RealmTopology
               :nodes="infraNodes"
               :local-peer-id="(realmView?.info ?? nodeInfo)?.node.peer_id"
               :computer="mapComputer"
+              :highlight="hoveredNode"
               @select="openNode"
+              @hover="hoveredNode = $event"
             />
           </div>
-          <NodeTable :nodes="infraNodes" :computer="desktop ? deviceRecord : null" />
+          <NodeTable :nodes="infraNodes" :computer="desktop ? deviceRecord : null" :highlight="hoveredNode" @hover="hoveredNode = $event" />
         </div>
       </section>
 

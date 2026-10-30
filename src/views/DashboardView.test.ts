@@ -47,11 +47,11 @@ const renameNode = vi.fn(async () => undefined)
 const nodeNamesStub = { useNodeNames: () => ({ renameNode }) }
 // The map and the node table render what they were handed.
 const MapStub = defineComponent({
-  props: { nodes: { type: Array, default: () => [] }, compact: Boolean, computer: Object },
-  emits: ['select'],
+  props: { nodes: { type: Array, default: () => [] }, computer: Object, highlight: String },
+  emits: ['select', 'hover'],
   setup: (props) => () =>
     h('div', [
-      `map compact=${props.compact}`,
+      'topology',
       ...(props.nodes as Array<{ node_id: string; info?: { utilization?: { heartbeat_at_ms?: number } } }>).map((node) =>
         h('span', ` ${node.node_id} beat ${node.info?.utilization?.heartbeat_at_ms} `)),
     ]),
@@ -210,7 +210,7 @@ beforeAll(async () => {
   vi.doMock('@/composables/useNodeNames', () => nodeNamesStub)
   vi.doMock('@/composables/useRecentRuns', () => recentRunsStub)
   vi.doMock('@/composables/useMyGroupsUsage', () => groupsUsageStub)
-  vi.doMock('@/components/dashboard/FederationPanel.vue', () => ({ default: MapStub }))
+  vi.doMock('@/components/dashboard/RealmTopology.vue', () => ({ default: MapStub }))
   vi.doMock('@/components/dashboard/NodeTable.vue', () => ({ default: TableStub }))
   vi.doMock('@/composables/useViewMode', () => ({ useViewMode: () => ref('cards') }))
   vi.doMock('@/components/dashboard/RecentRunsCard.vue', () => ({ default: RunsCardStub }))
@@ -291,7 +291,7 @@ beforeAll(async () => {
     '@/composables/useNodeNames': nodeNamesStub,
     '@/composables/useRecentRuns': recentRunsStub,
     '@/composables/useMyGroupsUsage': groupsUsageStub,
-    '@/components/dashboard/FederationPanel.vue': moduleDefault(MapStub),
+    '@/components/dashboard/RealmTopology.vue': moduleDefault(MapStub),
     '@/components/dashboard/NodeTable.vue': moduleDefault(TableStub),
     '@/components/ui/ViewToggle.vue': moduleDefault(EmptyStub),
     '@/composables/useViewMode': { useViewMode: () => ref('cards') },
@@ -467,7 +467,7 @@ describe('authenticated dashboard scope', () => {
     expect(text.indexOf('Realm 2 nodes 1/2 online')).toBeGreaterThan(text.indexOf('Runs Unknown'))
     expect(text.indexOf('Groups A bucket stored on several nodes counts once. Cards Table All groups group quota cards')).toBeGreaterThan(realmCard)
     expect(text).toContain('scope toggle personal')
-    expect(text).not.toContain('map compact=true')
+    expect(text).not.toContain('topology')
     expect(text).not.toContain('row node-a')
     // Refresh is the only page action; creating sits in the top bar.
     expect(text).not.toContain('Create dataset')
@@ -516,7 +516,7 @@ describe('authenticated dashboard scope', () => {
     const waiting = await renderedText()
     expect(waiting).not.toContain('Runs 1')
     // The realm scope lists the nodes instead of the groups.
-    expect(text).toContain('Realm Status map compact=true')
+    expect(text).toContain('Realm Status topology')
     expect(text).toMatch(/row node-a\s+row node-b/)
     expect(text).not.toContain('group quota cards')
     expect(text).not.toContain('my stats cards')
@@ -717,7 +717,7 @@ describe('realm nodes in the overview', () => {
     }
     const mounted = await mountApp(DashboardClient)
     await flush()
-    expect(content(mounted.root)).toContain('map compact=true')
+    expect(content(mounted.root)).toContain('topology')
     expect(content(mounted.root)).toContain('mgmt-node beat 1000')
     mounted.app.unmount()
   })
