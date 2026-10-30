@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import PageHeader from '@/components/dashboard/PageHeader.vue'
-import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import WhereDataLivesFigure from '@/components/docs/WhereDataLivesFigure.vue'
@@ -77,7 +76,6 @@ import {
   docsScreenshots,
   docsTopicBySlug,
   docsTopics,
-  docsVersion,
   sectionId,
   type DocsFigure,
   type DocsTopicKind,
@@ -215,43 +213,22 @@ function glossaryLink(anchor: string) {
 <template>
   <div>
     <PageHeader
-      :title="topic?.title ?? `Docs ${docsVersion}`"
+      :title="topic?.title ?? 'Docs'"
+      :crumbs="topic ? [{ label: topic.title }] : []"
       :description="topic?.summary ?? 'Guides for the common workflows and a wiki for every term the portal uses.'"
     >
-      <template #breadcrumbs>
-        <Badge variant="outline">{{ docsVersion }}</Badge>
-        <template v-if="topic">
-          <Badge variant="secondary">{{ topic.kind }}</Badge>
-        </template>
-      </template>
-      <template v-if="topic" #actions>
-        <Button variant="outline" as-child>
+      <template #actions>
+        <Button v-if="topic" variant="outline" as-child>
           <RouterLink :to="{ name: 'docs' }"><ChevronLeft class="h-4 w-4" /> All topics</RouterLink>
+        </Button>
+        <Button variant="outline" as-child>
+          <RouterLink :to="{ name: 'api-reference' }"><Braces class="h-4 w-4" /> API reference</RouterLink>
         </Button>
       </template>
     </PageHeader>
 
-    <!-- These pages document the portal; the node's REST surface has its own reference. -->
-    <div class="w-full px-4 sm:px-6 pt-6">
-      <div
-        class="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-border bg-muted/40 px-4 py-2.5 text-xs leading-relaxed text-muted-foreground"
-      >
-        <BookOpen class="h-3.5 w-3.5 shrink-0 text-primary" />
-        <p class="min-w-0 flex-1">
-          <span class="font-medium text-foreground">This is the portal documentation.</span>
-          The node also serves a full REST API reference for every endpoint.
-        </p>
-        <RouterLink
-          :to="{ name: 'api-reference' }"
-          class="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-        >
-          Open the API reference <ArrowRight class="h-3 w-3" />
-        </RouterLink>
-      </div>
-    </div>
-
     <!-- A guide either narrates the real controls or offers the tutorial. -->
-    <div v-if="tour.length || tutorial" class="w-full px-4 sm:px-6 pt-4">
+    <div v-if="tour.length || tutorial" class="w-full px-4 sm:px-6 pt-6">
       <div
         class="flex flex-wrap items-center gap-4 rounded-lg border border-primary/25 bg-gradient-to-r from-primary/10 via-primary/[0.04] to-transparent px-4 py-3.5"
       >

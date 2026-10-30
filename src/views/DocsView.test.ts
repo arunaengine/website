@@ -109,12 +109,12 @@ describe('versioned in-portal Docs', () => {
     expect(html.indexOf('How-to guides')).toBeLessThan(html.indexOf('Concepts &amp; glossary'))
   })
 
-  it('banners the API reference', async () => {
-    // Both the home and every topic carry the portal-vs-REST banner.
+  it('offers the API reference in the header', async () => {
+    // Both the home and every topic link the node's REST reference.
     for (const slug of ['', 'datasets']) {
       const html = await renderTopic(slug)
-      expect(html).toContain('This is the portal documentation.')
-      expect(html).toContain('Open the API reference')
+      expect(html).toContain('API reference')
+      expect(html).not.toContain('This is the portal documentation.')
     }
     expect(await renderTopic('')).toContain('REST API')
   })
