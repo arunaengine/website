@@ -249,8 +249,8 @@ async function runPrunePass() {
       :docs="{ topic: 'where-data-lives', section: 'Syncs' }"
     >
       <template #actions>
-        <RefreshButton :busy="spinning" :disabled="!ready" size="default" @click="onRefresh" />
-        <Button variant="outline" class="text-destructive hover:text-destructive" :disabled="!ready" @click="openPrune">
+        <RefreshButton :busy="spinning" :disabled="!ready" @click="onRefresh" />
+        <Button size="sm" variant="outline" class="text-destructive hover:text-destructive" :disabled="!ready" @click="openPrune">
           <Trash2 class="h-4 w-4" /> Prune acknowledged
         </Button>
       </template>
@@ -290,7 +290,7 @@ async function runPrunePass() {
               v-model="topicDraft"
               type="datasets"
               placeholder="Filter by hex sync topic"
-              class="font-mono"
+              class="h-8 font-mono"
             />
             <p v-if="topicInvalid" class="mt-1 text-xs text-amber-700 dark:text-amber-300">
               Topics are even-length hex strings; the filter is not applied.

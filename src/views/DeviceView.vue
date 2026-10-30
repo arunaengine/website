@@ -52,7 +52,7 @@ function onEnrolled() {
       :docs="{ topic: 'realm-nodes-groups', section: 'Nodes and the realm' }"
     >
       <template #actions>
-        <Button v-if="status?.nodeId" variant="outline" as-child>
+        <Button v-if="status?.nodeId" size="sm" variant="outline" as-child>
           <RouterLink :to="{ name: 'node', params: { nodeId: status.nodeId } }"><Server class="h-4 w-4" /> Node details</RouterLink>
         </Button>
       </template>

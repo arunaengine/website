@@ -47,7 +47,7 @@ async function submit() {
 
 <template>
   <form v-if="editing" class="flex min-w-0 flex-wrap items-center gap-1.5" @submit.prevent="submit">
-    <Input v-model="draft" :aria-label="`New name for ${name}`" placeholder="Empty resets the name" maxlength="64" class="h-7 w-44 text-xs" />
+    <Input v-model="draft" :aria-label="`New name for ${name}`" placeholder="Empty resets the name" maxlength="64" class="h-8 w-44 text-xs" />
     <Button type="submit" size="sm" :disabled="busy">Save</Button>
     <Button type="button" variant="ghost" size="sm" :disabled="busy" @click="editing = false">Cancel</Button>
     <p v-if="error" role="alert" class="basis-full text-[11px] text-destructive">{{ error }}</p>
@@ -57,11 +57,10 @@ async function submit() {
     <IconButton
       :label="`Rename ${name}`"
       :variant="outline ? 'outline' : undefined"
-      :size="outline ? 'icon' : undefined"
       :class="quiet ? 'opacity-0 focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100' : undefined"
       @click="start"
     >
-      <Pencil class="h-3 w-3" />
+      <Pencil :class="outline ? 'size-4' : 'h-3 w-3'" />
     </IconButton>
   </span>
 </template>

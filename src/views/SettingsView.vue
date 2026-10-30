@@ -245,11 +245,11 @@ const createGroupOpen = ref(false)
   <div>
     <PageHeader title="Settings" :docs="{ topic: 'storage-access' }">
       <template #actions>
-        <RefreshButton :busy="refreshBusy" size="default" @click="onRefresh" />
-        <Button v-if="watchesAvailable && shown('watches')" variant="outline" size="default" as-child>
+        <RefreshButton :busy="refreshBusy" @click="onRefresh" />
+        <Button v-if="watchesAvailable && shown('watches')" variant="outline" size="sm" as-child>
           <RouterLink :to="{ name: 'settings-watches' }"><Eye class="h-4 w-4" /> Watched resources</RouterLink>
         </Button>
-        <Button v-if="tab === 'profile'" :disabled="!currentUser || saving || !profileDirty" @click="saveProfile"><Save class="h-4 w-4" /> Save profile</Button>
+        <Button v-if="tab === 'profile'" size="sm" :disabled="!currentUser || saving || !profileDirty" @click="saveProfile"><Save class="h-4 w-4" /> Save profile</Button>
       </template>
     </PageHeader>
 

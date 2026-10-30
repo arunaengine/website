@@ -312,7 +312,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
       :docs="{ topic: 'profiles-conformance', section: 'Profiles define minimum requirements' }"
     >
       <template #actions>
-        <Button @click="openCreate" :disabled="!currentUser">
+        <Button size="sm" @click="openCreate" :disabled="!currentUser">
           <Plus class="h-4 w-4" /> New profile
         </Button>
       </template>

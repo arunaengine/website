@@ -91,8 +91,8 @@ const askPrompt = computed(() =>
         </span>
       </template>
       <template #actions>
-        <AskAiButton :prompt="askPrompt" :subject="`user ${userId}`" size="default" />
-        <Button v-if="isSelf" variant="outline" as-child>
+        <AskAiButton :prompt="askPrompt" :subject="`user ${userId}`" />
+        <Button v-if="isSelf" size="sm" variant="outline" as-child>
           <RouterLink :to="{ name: 'settings', query: { tab: 'profile' } }"><Pencil class="h-4 w-4" /> Edit profile</RouterLink>
         </Button>
       </template>

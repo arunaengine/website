@@ -8,6 +8,7 @@ import Dialog from './Dialog.vue'
 import DialogClose from './DialogClose.vue'
 import DialogContent from './DialogContent.vue'
 import { cn } from '@/lib/utils'
+import { buttonVariants } from './button'
 import { X } from '@lucide/vue'
 
 /** `contentClass` only carries layering; `fit` lets a short view take only the height it needs. */
@@ -30,13 +31,11 @@ const classes = computed(() => cn(
   <Dialog :open="open" @update:open="(v) => emit('update:open', v)">
     <!-- Focus goes to the dialog itself on open, so no button shows a focus ring unasked. -->
     <DialogContent hide-close :class="classes" @open-auto-focus="focusSelf">
-      <div class="flex shrink-0 items-start justify-between gap-3 border-b border-border px-6 py-4">
-        <div class="min-w-0 flex-1"><slot name="header" /></div>
-        <DialogClose
-          class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-input bg-background text-foreground shadow-sm ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label="Close"
-        >
-          <X class="h-4 w-4" />
+      <div class="flex shrink-0 items-start justify-between gap-2 border-b border-border px-6 py-4">
+        <div class="min-w-0 flex-1 pr-1"><slot name="header" /></div>
+        <div v-if="$slots.actions" class="flex flex-wrap items-center justify-end gap-2"><slot name="actions" /></div>
+        <DialogClose :class="cn(buttonVariants({ variant: 'outline', size: 'icon-sm' }), 'shrink-0')" aria-label="Close">
+          <X class="size-4" />
         </DialogClose>
       </div>
 

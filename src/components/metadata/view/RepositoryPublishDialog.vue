@@ -383,7 +383,7 @@ async function submit() {
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
     <DialogContent class="flex max-h-[88vh] max-w-xl flex-col">
-      <DialogHeader class="pr-8">
+      <DialogHeader>
         <DialogTitle class="flex items-center gap-2"><Send class="h-4 w-4 text-primary" /> Publish to {{ label === 'the repository' ? 'a repository' : label }}</DialogTitle>
         <DialogDescription>
           Publishing to a repository such as Zenodo is how this dataset gets a DOI. The repository mints it.

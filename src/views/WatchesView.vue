@@ -77,7 +77,7 @@ watch(currentUser, () => void ensureLoaded())
   <div>
     <PageHeader title="Watched resources" :crumbs="[{ label: 'Watched resources' }]" :description="WATCH_DELIVERY_NOTE" :docs="{ topic: 'portal-tour', section: 'The top bar' }">
       <template #actions>
-        <RefreshButton :busy="spinning" size="default" @click="onRefresh" />
+        <RefreshButton :busy="spinning" @click="onRefresh" />
       </template>
     </PageHeader>
 

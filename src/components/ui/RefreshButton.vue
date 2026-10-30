@@ -2,7 +2,7 @@
 // The one refresh affordance in the portal: an outline button whose icon spins
 // while the reload runs. `srLabel` makes it icon-only and names it for
 // assistive tech; the button stays disabled and `aria-busy` while busy. In a page header it is a
-// 36 px icon button with its label in the tooltip.
+// 32 px icon button with its label in the tooltip.
 import { computed, inject } from 'vue'
 import { RefreshCw } from '@lucide/vue'
 import Button from '@/components/ui/Button.vue'
@@ -49,7 +49,7 @@ const buttonClasses = computed(() =>
   <Tooltip v-if="inHeader && !srLabel" :label="label">
     <Button
       :variant="variant"
-      size="icon"
+      size="icon-sm"
       :class="props.class"
       :disabled="disabled || busy"
       :aria-busy="busy"

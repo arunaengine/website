@@ -11,6 +11,7 @@ import { computed } from 'vue'
 import { X } from '@lucide/vue'
 import { allowAssistantFocus, insideFloatingLayer } from '@/components/ui/layers'
 import { cn } from '@/lib/utils'
+import { buttonVariants } from './button'
 
 const props = defineProps<DialogContentProps & { class?: string; hideClose?: boolean }>()
 const emits = defineEmits<{
@@ -50,10 +51,10 @@ allowAssistantFocus()
       <slot />
       <DialogClose
         v-if="!hideClose"
-        class="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
+        :class="cn(buttonVariants({ variant: 'outline', size: 'icon-sm' }), 'absolute right-4 top-4')"
         aria-label="Close"
       >
-        <X class="h-4 w-4" />
+        <X class="size-4" />
       </DialogClose>
     </DialogContent>
   </DialogPortal>

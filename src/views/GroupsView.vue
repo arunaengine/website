@@ -180,8 +180,8 @@ const emptyGroupsMessage = computed(() =>
     <template v-else>
       <PageHeader title="Groups" :docs="{ topic: 'first-group', section: 'Groups own your work' }">
         <template #actions>
-          <RefreshButton :busy="spinning" size="default" @click="onRefresh" />
-          <Button data-tour="groups-create" :disabled="!currentUser" @click="createGroupOpen = true">
+          <RefreshButton :busy="spinning" @click="onRefresh" />
+          <Button size="sm" data-tour="groups-create" :disabled="!currentUser" @click="createGroupOpen = true">
             <Plus class="h-4 w-4" /> Create group
           </Button>
         </template>
@@ -251,7 +251,7 @@ const emptyGroupsMessage = computed(() =>
         <section v-if="discoverableGroups.length" aria-labelledby="other-groups-heading">
           <SectionHeading id="other-groups-heading" title="Other groups" :icon="Globe" info="Groups in this realm you are not in. Request access from their admins.">
             <template #actions>
-              <Input v-model="groupQuery" class="h-9 w-full sm:w-64" placeholder="Find a group" aria-label="Search other groups" />
+              <Input v-model="groupQuery" class="h-8 w-full sm:w-64" placeholder="Find a group" aria-label="Search other groups" />
             </template>
           </SectionHeading>
           <div class="surface overflow-hidden">

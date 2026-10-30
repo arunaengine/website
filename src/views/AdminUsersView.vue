@@ -214,8 +214,8 @@ const sharedGroups = computed(() => {
   <div>
     <PageHeader title="Realm users" :docs="{ topic: 'realm-nodes-groups' }">
       <template #actions>
-        <RefreshButton :busy="spinning" :disabled="!ready" size="default" @click="onRefresh" />
-        <Button variant="outline" as-child>
+        <RefreshButton :busy="spinning" :disabled="!ready" @click="onRefresh" />
+        <Button size="sm" variant="outline" as-child>
           <RouterLink :to="{ name: 'admin' }"><ShieldCheck class="h-4 w-4" /> Admin</RouterLink>
         </Button>
       </template>
@@ -249,7 +249,7 @@ const sharedGroups = computed(() => {
               id="user-directory-search"
               v-model="query"
               type="datasets"
-              class="h-9 w-full sm:w-72"
+              class="h-8 w-full sm:w-72"
               placeholder="Find by name or email"
             />
           </template>

@@ -51,7 +51,7 @@ function choose(nodeId: string | null) {
 
 <template>
   <Popover v-model:open="open" :tooltip="tooltip">
-    <Button v-if="button" variant="outline" class="min-w-0 max-w-[16rem]" :aria-label="tooltip ?? 'Node'">
+    <Button v-if="button" variant="outline" size="sm" class="min-w-0 max-w-[16rem]" :aria-label="tooltip ?? 'Node'">
       <Server class="h-4 w-4" aria-hidden="true" />
       <span class="min-w-0 truncate">{{ modelValue ? displayName(modelValue) : 'All nodes' }}</span>
       <ChevronDown class="h-3.5 w-3.5 opacity-60" aria-hidden="true" />

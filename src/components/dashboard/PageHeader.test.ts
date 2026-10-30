@@ -83,7 +83,7 @@ describe('page header docs links', () => {
     // The docs link is a 36 px icon button whose label is its name and tooltip.
     expect(html).toContain('#nodes-and-the-realm')
     expect(html).toContain('aria-label="Read the docs"')
-    expect(html).toContain('size-9')
+    expect(html).toContain('size-8')
     expect(html.replace(/<[^>]+>/g, ' ')).not.toContain('Read the docs')
 
     const bare = await renderToString(createSSRApp({ render: () => h(PageHeader, { title: 'Docs', eyebrow: 'Manual' }) }))

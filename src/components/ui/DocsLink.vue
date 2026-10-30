@@ -2,7 +2,7 @@
 // The one way a surface points at the manual: a link to a docs section that
 // exists. `section` names a section title and resolves to the anchor DocsView
 // renders for it, so a moved heading breaks the link test instead of the page.
-// `icon` keeps the target and drops the label into aria-label and title; `button` is the 36 px
+// `icon` keeps the target and drops the label into aria-label and title; `button` is the 32 px
 // icon button of a page header, with the label in its tooltip.
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -31,7 +31,7 @@ const target = computed(() => ({
     <RouterLink
       :to="target"
       :aria-label="text"
-      class="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-input bg-background text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      class="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-input bg-background text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <BookOpen class="size-4" aria-hidden="true" />
     </RouterLink>

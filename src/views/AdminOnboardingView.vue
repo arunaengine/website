@@ -337,7 +337,7 @@ const secretRows = computed<SecretRow[]>(() =>
       :docs="{ topic: 'realm-nodes-groups', section: 'Nodes and the realm' }"
     >
       <template #actions>
-        <Button variant="outline" as-child>
+        <Button size="sm" variant="outline" as-child>
           <RouterLink :to="{ name: 'status' }"><Activity class="h-4 w-4" /> Status</RouterLink>
         </Button>
       </template>

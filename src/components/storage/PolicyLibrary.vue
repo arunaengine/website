@@ -128,7 +128,7 @@ async function look(policy: PolicyRefBody = lookup.value) {
           v-if="ownerOptions.length > 2"
           v-model="ownerFilter"
           :options="ownerOptions"
-          class="max-w-xs"
+          class="h-8 max-w-xs"
           label="Owner"
           aria-label="Filter the policies by owner"
         />

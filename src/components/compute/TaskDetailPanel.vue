@@ -880,17 +880,15 @@ async function confirmDelete() {
   <DetailDialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
     <template #header>
       <DialogTitle class="sr-only">Run details</DialogTitle>
-      <div v-if="task" class="flex items-start justify-between gap-3">
-        <TaskHeader :title="headerTitle" :state="task.state" :subtitle="headerSubtitle" />
-        <div class="flex shrink-0 items-center gap-1">
-          <RefreshButton :busy="refreshing" sr-label="Refresh this run" @click="onRefresh" />
-          <IconButton v-if="runCrate" label="Open as page" variant="outline" size="icon" as-child>
-            <RouterLink :to="{ name: 'dataset', params: { id: runCrate.document_id } }"><Maximize2 class="h-4 w-4" /></RouterLink>
-          </IconButton>
-          <AskAiButton :prompt="askPrompt" :subject="`run ${taskId}`" icon-only />
-        </div>
-      </div>
+      <TaskHeader v-if="task" :title="headerTitle" :state="task.state" :subtitle="headerSubtitle" />
       <Skeleton v-else-if="loadState === 'loading'" class="h-6 w-2/3" />
+    </template>
+    <template v-if="task" #actions>
+      <RefreshButton :busy="refreshing" sr-label="Refresh this run" @click="onRefresh" />
+      <IconButton v-if="runCrate" label="Open as page" variant="outline" as-child>
+        <RouterLink :to="{ name: 'dataset', params: { id: runCrate.document_id } }"><Maximize2 class="h-4 w-4" /></RouterLink>
+      </IconButton>
+      <AskAiButton :prompt="askPrompt" :subject="`run ${taskId}`" icon-only />
     </template>
 
     <div>

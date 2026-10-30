@@ -34,9 +34,9 @@ function select(value: string) {
       :key="option.value"
       size="sm"
       variant="ghost"
-      :class="modelValue === option.value
+      :class="cn('h-[26px]', modelValue === option.value
         ? 'bg-card text-foreground shadow-sm hover:bg-card hover:text-foreground dark:shadow-none'
-        : 'text-muted-foreground hover:bg-transparent hover:text-foreground'"
+        : 'text-muted-foreground hover:bg-transparent hover:text-foreground')"
       :aria-pressed="modelValue === option.value"
       @click="select(option.value)"
     >

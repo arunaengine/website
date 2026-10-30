@@ -52,7 +52,7 @@ import { stateVariant } from '@/lib/stateBadge'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { ArrowLeftRight, Eye, Globe, ListTree, Lock, NotebookPen } from '@lucide/vue'
+import { ArrowLeftRight, Eye, FolderOpen, Globe, ListTree, Lock, NotebookPen } from '@lucide/vue'
 
 const props = defineProps<{
   open: boolean
@@ -318,36 +318,29 @@ const generalItems = computed<Detail[]>(() => [
     @update:open="(value: boolean) => emit('update:open', value)"
   >
     <template #header>
-      <div class="flex min-w-0 items-start justify-between gap-3">
-        <div class="min-w-0">
-          <DialogTitle class="truncate text-base font-semibold text-foreground" :title="props.name">
-            {{ props.name || props.objectKey || 'File' }}
-          </DialogTitle>
-          <p class="mt-0.5 font-mono text-[11px] text-muted-foreground">
-            <span class="break-all">{{ props.bucket }}/{{ props.objectKey }}</span>
-          </p>
-        </div>
-        <div class="flex flex-wrap items-center justify-end gap-2">
-          <RouterLink
-            v-if="props.browseHref"
-            :to="props.browseHref"
-            class="text-xs font-medium text-primary hover:underline"
-            @click="openBrowser"
-          >Open in the data browser</RouterLink>
-          <Button v-if="notebookLink && !previewMode" variant="outline" size="sm" as-child>
-            <RouterLink :to="notebookLink" @click="leave"><NotebookPen class="h-4 w-4" /> Open notebook</RouterLink>
-          </Button>
-          <Button
-            v-if="!props.folder && !mock"
-            variant="outline"
-            size="sm"
-            @click="emit('update:tab', previewMode ? 'general' : 'preview')"
-          >
-            <component :is="previewMode ? ListTree : Eye" class="h-4 w-4" />
-            {{ previewMode ? 'Details' : 'Preview' }}
-          </Button>
-        </div>
-      </div>
+      <DialogTitle class="truncate text-base font-semibold text-foreground" :title="props.name">
+        {{ props.name || props.objectKey || 'File' }}
+      </DialogTitle>
+      <p class="mt-0.5 font-mono text-[11px] text-muted-foreground">
+        <span class="break-all">{{ props.bucket }}/{{ props.objectKey }}</span>
+      </p>
+    </template>
+    <template #actions>
+      <Button v-if="props.browseHref" variant="outline" size="sm" as-child>
+        <RouterLink :to="props.browseHref" @click="openBrowser"><FolderOpen class="h-4 w-4" /> Open in the data browser</RouterLink>
+      </Button>
+      <Button v-if="notebookLink && !previewMode" variant="outline" size="sm" as-child>
+        <RouterLink :to="notebookLink" @click="leave"><NotebookPen class="h-4 w-4" /> Open notebook</RouterLink>
+      </Button>
+      <Button
+        v-if="!props.folder && !mock"
+        variant="outline"
+        size="sm"
+        @click="emit('update:tab', previewMode ? 'general' : 'preview')"
+      >
+        <component :is="previewMode ? ListTree : Eye" class="h-4 w-4" />
+        {{ previewMode ? 'Details' : 'Preview' }}
+      </Button>
     </template>
 
     <div v-if="previewMode" class="flex h-full min-h-[60dvh] flex-col gap-3">

@@ -134,7 +134,7 @@ watch(() => props.documentId, reset)
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
     <DialogContent class="flex max-h-[88vh] max-w-xl flex-col">
-      <DialogHeader class="pr-8">
+      <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <FileArchive class="h-4 w-4 text-primary" />
           Export RO-Crate archive

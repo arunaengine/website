@@ -251,11 +251,11 @@ async function save() {
   <div>
     <PageHeader title="Realm administration" :docs="{ topic: 'data-to-compute', section: 'Placement policies and record placement' }">
       <template #actions>
-        <RefreshButton :busy="refreshBusy" size="default" @click="onRefresh" />
+        <RefreshButton :busy="refreshBusy" @click="onRefresh" />
         <!-- The other admin pages in one menu, so the header keeps few controls. -->
         <DropdownMenu v-if="isRealmAdmin && (canInspectUsers || canManageOnboarding || canManageQuarantine)">
           <DropdownMenuTrigger as-child>
-            <Button variant="outline"><ShieldCheck class="h-4 w-4" /> Admin pages <ChevronDown class="h-4 w-4" /></Button>
+            <Button size="sm" variant="outline"><ShieldCheck class="h-4 w-4" /> Admin pages <ChevronDown class="h-4 w-4" /></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" class="w-56 p-1.5">
             <DropdownMenuItem v-if="isRealmAdmin && canInspectUsers" class="cursor-pointer" @click="router.push({ name: 'admin-users' })"><Users class="h-4 w-4" /> Users</DropdownMenuItem>

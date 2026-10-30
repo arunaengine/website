@@ -102,7 +102,7 @@ async function toggleFav() {
 <template>
   <label
     v-if="offlineShown"
-    class="flex cursor-pointer items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground"
+    class="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-border px-2.5 text-xs text-muted-foreground"
   >
     <Switch
       :checked="offlineSelected"
@@ -115,7 +115,7 @@ async function toggleFav() {
   <Button
     v-if="current && currentUser"
     variant="outline"
-    size="icon"
+    size="icon-sm"
     :disabled="favBusy"
     :aria-label="isFav ? 'Remove from favourites' : 'Add to favourites'"
     :title="isFav ? 'Remove from favourites' : 'Add to favourites'"
@@ -127,6 +127,7 @@ async function toggleFav() {
     v-if="docState === 'found'"
     ref="watcher"
     surface="dataset"
+    size="sm"
     :path-prefix="watchPathPrefix"
     :group-id="current?.realmId ?? null"
     :resource-label="currentPath"
@@ -134,18 +135,18 @@ async function toggleFav() {
   />
   <template v-if="!run">
     <AskAiButton v-if="current" :prompt="askPrompt" :subject="`dataset ${current.ulid}`" icon-only />
-    <Button v-if="docState === 'found' && currentUser" :disabled="exporting" @click="exportCrate">
+    <Button v-if="docState === 'found' && currentUser" size="sm" :disabled="exporting" @click="exportCrate">
       <Download class="h-4 w-4" /> {{ exporting ? 'Exporting…' : 'Export as crate' }}
     </Button>
-    <Button v-if="current && canWrite" variant="outline" @click="router.push({ name: 'dataset-edit', params: { id: detailId } })"><Pencil class="h-4 w-4" /> Edit</Button>
+    <Button v-if="current && canWrite" variant="outline" size="sm" @click="router.push({ name: 'dataset-edit', params: { id: detailId } })"><Pencil class="h-4 w-4" /> Edit</Button>
   </template>
-  <Button v-else-if="results" as-child>
+  <Button v-else-if="results" size="sm" as-child>
     <RouterLink :to="results"><FolderOpen class="h-4 w-4" /> Show results</RouterLink>
   </Button>
   <!-- The other transfers, the raw crate and Delete, each named by what it moves. -->
   <DropdownMenu v-if="docState === 'found'">
     <DropdownMenuTrigger as-child>
-      <Button variant="outline" size="icon" :aria-label="run ? 'More actions' : 'More'" :title="run ? 'More actions' : 'More'">
+      <Button variant="outline" size="icon-sm" :aria-label="run ? 'More actions' : 'More'" :title="run ? 'More actions' : 'More'">
         <Ellipsis class="h-4 w-4" />
       </Button>
     </DropdownMenuTrigger>

@@ -64,8 +64,8 @@ function setTab(next: string) {
     <PageHeader :title="pageTitle" :docs="{ topic: 'compute-run', section: 'Follow the run' }">
       <!-- One Run entry point; the menu explains the two ways to start one. -->
       <template v-if="currentUser && anyEnabled" #actions>
-        <RefreshButton :busy="refreshBusy" size="default" @click="onRefresh" />
-        <NewRunMenu v-if="tesEnabled" />
+        <RefreshButton :busy="refreshBusy" @click="onRefresh" />
+        <NewRunMenu v-if="tesEnabled" size="sm" />
       </template>
     </PageHeader>
 

@@ -166,7 +166,7 @@ const browserLink = computed(() => ({
       :docs="{ topic: 'where-data-lives', section: 'Buckets' }"
     >
       <template #actions>
-        <Button variant="outline" as-child>
+        <Button size="sm" variant="outline" as-child>
           <RouterLink :to="browserLink"><ChevronLeft class="size-4" /> Back to the files</RouterLink>
         </Button>
       </template>

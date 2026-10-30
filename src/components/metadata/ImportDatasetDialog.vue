@@ -44,7 +44,7 @@ watch(repositoryAvailable, (available) => {
 <template>
   <Dialog v-model:open="open">
     <DialogContent class="flex max-h-[88vh] max-w-2xl flex-col">
-      <DialogHeader class="pr-8">
+      <DialogHeader>
         <DialogTitle class="flex items-center gap-2"><Import class="h-4 w-4 text-primary" /> Import a dataset</DialogTitle>
         <DialogDescription>Choose where the dataset comes from.</DialogDescription>
       </DialogHeader>

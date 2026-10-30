@@ -187,27 +187,25 @@ const bucketLink = (hit: BucketSearchHit) => ({
 <template>
   <DetailDialog :open="true" @update:open="(open) => open || emit('close')">
     <template #header>
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div class="min-w-0">
-          <DialogTitle class="inline-flex flex-wrap items-center gap-2.5 leading-normal">
-            {{ name }}
-            <template v-if="node">
-              <StatusMark v-if="nodeOnline(node)" label="Online" />
-              <StatusMark v-else label="Offline" offline />
-            </template>
-          </DialogTitle>
-          <p v-if="node" class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span class="inline-flex items-center gap-1.5"><component :is="node.kind === 'user' ? Laptop : Server" class="size-4" />{{ TYPE[node.kind] }}</span>
-            <span v-if="place" class="inline-flex items-center gap-1.5"><MapPin class="size-4" />{{ place }}</span>
-            <span v-if="nodeActivity(node)" class="inline-flex items-center gap-1 text-xs text-sky-700 dark:text-aruna-aqua"><Download class="h-3 w-3" />{{ nodeActivity(node) }}</span>
-          </p>
-        </div>
-        <div class="flex shrink-0 items-center gap-2">
-          <RefreshButton :busy="refreshBusy" @click="onRefresh" />
-          <!-- A draft belongs to one node and one session; another node starts a fresh editor. -->
-          <NodeNameEdit v-if="node && rename" :key="`${sessionEpoch}/${node.node_id}`" :name="name" :value="node.display_name" :save="rename" outline><span class="sr-only">{{ name }}</span></NodeNameEdit>
-        </div>
+      <div class="min-w-0">
+        <DialogTitle class="inline-flex flex-wrap items-center gap-2.5 leading-normal">
+          {{ name }}
+          <template v-if="node">
+            <StatusMark v-if="nodeOnline(node)" label="Online" />
+            <StatusMark v-else label="Offline" offline />
+          </template>
+        </DialogTitle>
+        <p v-if="node" class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          <span class="inline-flex items-center gap-1.5"><component :is="node.kind === 'user' ? Laptop : Server" class="size-4" />{{ TYPE[node.kind] }}</span>
+          <span v-if="place" class="inline-flex items-center gap-1.5"><MapPin class="size-4" />{{ place }}</span>
+          <span v-if="nodeActivity(node)" class="inline-flex items-center gap-1 text-xs text-sky-700 dark:text-aruna-aqua"><Download class="h-3 w-3" />{{ nodeActivity(node) }}</span>
+        </p>
       </div>
+    </template>
+    <template #actions>
+      <RefreshButton :busy="refreshBusy" @click="onRefresh" />
+      <!-- A draft belongs to one node and one session; another node starts a fresh editor. -->
+      <NodeNameEdit v-if="node && rename" :key="`${sessionEpoch}/${node.node_id}`" :name="name" :value="node.display_name" :save="rename" outline><span class="sr-only">{{ name }}</span></NodeNameEdit>
     </template>
 
     <div class="space-y-8">

@@ -218,10 +218,10 @@ function glossaryLink(anchor: string) {
       :description="topic?.summary ?? 'Guides for the common workflows and a wiki for every term the portal uses.'"
     >
       <template #actions>
-        <Button v-if="topic" variant="outline" as-child>
+        <Button v-if="topic" size="sm" variant="outline" as-child>
           <RouterLink :to="{ name: 'docs' }"><ChevronLeft class="h-4 w-4" /> All topics</RouterLink>
         </Button>
-        <Button variant="outline" as-child>
+        <Button size="sm" variant="outline" as-child>
           <RouterLink :to="{ name: 'api-reference' }"><Braces class="h-4 w-4" /> API reference</RouterLink>
         </Button>
       </template>

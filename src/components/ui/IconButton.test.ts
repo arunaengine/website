@@ -108,3 +108,11 @@ describe('icon button', () => {
     expect(element(root, (node) => node.tag === 'button').props.disabled).toBe(false)
   })
 })
+
+describe('button sizes', () => {
+  it('gives a small icon button the height of a small text button', async () => {
+    const { buttonVariants } = await import('./button')
+    expect(buttonVariants({ size: 'sm' })).toContain('h-8')
+    expect(buttonVariants({ size: 'icon-sm' })).toContain('size-8')
+  })
+})

@@ -447,7 +447,7 @@ async function submit() {
       :docs="{ topic: 'build-a-profile', section: 'The root dataset shape' }"
     >
       <template #actions>
-        <AskAiButton size="default" prompt="Help me build this profile." subject="the profile form" />
+        <AskAiButton prompt="Help me build this profile." subject="the profile form" />
       </template>
     </PageHeader>
 
