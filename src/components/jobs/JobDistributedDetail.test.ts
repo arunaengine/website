@@ -269,6 +269,7 @@ function taskPanel(
     '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
     '@/components/ui/Button.vue': moduleDefault(ButtonStub),
     '@/components/ui/IconButton.vue': moduleDefault(ButtonStub),
+    '@/components/ui/IconTile.vue': moduleDefault(PassThroughStub),
     '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
     '@/components/ui/Skeleton.vue': moduleDefault(PassThroughStub),
     '@/components/ui/ErrorPanel.vue': moduleDefault(ErrorPanelStub),
@@ -1095,7 +1096,8 @@ describe('distributed job detail components', () => {
     await flushPanel()
 
     expect(lookup).toHaveBeenCalledWith('runs/run')
-    expect(content(mounted.root)).toMatch(/Run record: Open\s+Export as crate/)
+    expect(content(mounted.root)).toContain('Open the run record')
+    expect(content(mounted.root)).toContain('Export as crate')
     mounted.app.unmount()
     wake.mockRestore()
     followSpy.mockRestore()
@@ -1143,7 +1145,7 @@ describe('distributed job detail components', () => {
     await flushPanel()
 
     expect(getFileOrigin).toHaveBeenCalledWith('reads', { key: 'out/count.txt', version_id: 'v1' }, undefined, 'owner-node')
-    expect(content(mounted.root)).toMatch(/Run record: Open/)
+    expect(content(mounted.root)).toContain('Open the run record')
     mounted.app.unmount()
     wake.mockRestore()
     followSpy.mockRestore()
@@ -1336,8 +1338,9 @@ describe('distributed job detail components', () => {
       expect(text.indexOf('Progress')).toBeLessThan(text.indexOf('Placement'))
       expect(text.indexOf('Placement')).toBeLessThan(text.indexOf('Execution'))
       expect(text.indexOf('Execution')).toBeLessThan(text.indexOf('What ran'))
-      expect(text.indexOf('What ran')).toBeLessThan(text.indexOf('Files'))
-      expect(text.indexOf('Files')).toBeLessThan(text.indexOf('Request'))
+      expect(text.indexOf('What ran')).toBeLessThan(text.indexOf('Results'))
+      expect(text.indexOf('Results')).toBeLessThan(text.indexOf('For developers'))
+      expect(text.indexOf('For developers')).toBeLessThan(text.indexOf('Request'))
       expect(text).toContain('2 cores')
       mounted.app.unmount()
     }

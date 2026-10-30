@@ -302,6 +302,8 @@ const TaskDetailPanel = compileClientComponent(url('components/compute/TaskDetai
   ...ui,
   '@/components/ui/DetailDialog.vue': moduleDefault(DetailDialogStub),
   '@/components/ui/DialogTitle.vue': moduleDefault(PassThroughStub),
+  '@/components/ui/IconTile.vue': moduleDefault(GenericStub),
+  '@/components/ui/CopyButton.vue': moduleDefault(GenericStub),
   '@/components/ui/DetailList.vue': moduleDefault(
     compileClientComponent(url('components/ui/DetailList.vue'), { vue: VueRuntime }),
   ),

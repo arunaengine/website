@@ -5,6 +5,8 @@ import DetailDialog from '@/components/ui/DetailDialog.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Badge from '@/components/ui/Badge.vue'
 import IconButton from '@/components/ui/IconButton.vue'
+import IconTile from '@/components/ui/IconTile.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
@@ -63,9 +65,11 @@ import {
   Download,
   Eye,
   ExternalLink as ExternalLinkIcon,
+  ChevronRight,
   File as FileIcon,
   FileText,
   Flag,
+  Folder,
   Hourglass,
   Info,
   Maximize2,
@@ -73,6 +77,7 @@ import {
   RotateCcw,
   Server,
   SquareTerminal,
+  Star,
   Trash2,
 } from '@lucide/vue'
 
@@ -615,6 +620,28 @@ const outputRows = computed<OutRow[]>(() => {
   return rows
 })
 const capturedCount = computed(() => outputRows.value.filter((row) => row.captured).length)
+const capturedBytes = computed(() =>
+  outputRows.value.reduce((sum, row) => (row.captured && row.size !== undefined && !Number.isNaN(row.size) ? sum + row.size : sum), 0))
+// The folder of the first output in a bucket; the file list below names every destination.
+const resultsFolder = computed(() => {
+  const row = outputRows.value.find((entry) => entry.link.kind === 's3')
+  if (!row || row.link.kind !== 's3') return null
+  const { bucketId, prefix } = row.link
+  return {
+    path: `${bucketId}/${prefix ? `${prefix}/` : ''}`,
+    to: { name: 'bucket', params: { bucketId }, query: prefix ? { prefix } : {} },
+  }
+})
+const outputSummary = computed(() => {
+  const total = outputRows.value.length
+  return `${total} ${total === 1 ? 'output' : 'outputs'}, ${capturedCount.value} captured`
+})
+const resultsTitle = computed(() => {
+  const count = capturedCount.value
+  if (count) return `${count} ${count === 1 ? 'file' : 'files'}`
+  if (active.value) return 'Results are written when the run ends'
+  return outputRows.value.length ? 'No files captured yet' : 'No files captured for this run'
+})
 
 // A run may capture hundreds of files, so the table pages.
 const OUTPUT_PAGE = 8
@@ -662,6 +689,19 @@ async function findRunCrate() {
 watch([crateJob, () => isTerminalTesState(task.value?.state)], ([job, done], [previousJob, wasDone]) => {
   if (props.open && !runCrate.value && (job !== previousJob || (done && !wasDone))) void findRunCrate()
 })
+
+const recordState = computed(() => {
+  if (runCrate.value) return 'Inputs, results and where they came from'
+  if (localRecordJob.value) return 'Kept on this computer until you publish the run'
+  if (sessionRuntime(task.value?.tags) !== null) return 'None, a notebook session keeps its report instead'
+  if (runCrateLoading.value) return 'Looking for it'
+  if (active.value) return 'Written once the run completes'
+  return 'Not written yet, Refresh checks again'
+})
+const developerIds = computed<Detail[]>(() => [
+  { key: 'runId', label: 'Run id', value: task.value?.id || props.taskId },
+  { key: 'api', label: 'API path', value: `/ga4gh/tes/v1/tasks/${task.value?.id || props.taskId}` },
+])
 
 const exporting = ref(false)
 const exportError = ref<string | null>(null)
@@ -809,7 +849,7 @@ async function confirmDelete() {
         <TaskHeader :title="headerTitle" :state="task.state" :subtitle="headerSubtitle" />
         <div class="flex shrink-0 items-center gap-1">
           <RefreshButton :busy="refreshing" sr-label="Refresh this run" @click="onRefresh" />
-          <IconButton v-if="runCrate" label="Open as page" size="icon" as-child>
+          <IconButton v-if="runCrate" label="Open as page" variant="outline" size="icon" as-child>
             <RouterLink :to="{ name: 'dataset', params: { id: runCrate.document_id } }"><Maximize2 class="h-4 w-4" /></RouterLink>
           </IconButton>
           <AskAiButton :prompt="askPrompt" :subject="`run ${taskId}`" icon-only />
@@ -854,7 +894,7 @@ async function confirmDelete() {
         <JobKeyWait v-if="awaitingKey" :waits="nativeJob?.awaiting_keys ?? []" />
         <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Refresh failed, retrying.</p>
 
-        <DetailList :items="facts">
+        <DetailList :items="facts" class="grid-cols-2">
           <template #node>
             <RouterLink v-if="runNode" :to="{ name: 'node', params: { nodeId: runNode } }" class="text-primary hover:underline">{{ displayName(runNode) }}</RouterLink>
             <template v-else>{{ facts[1]!.value }}</template>
@@ -977,114 +1017,148 @@ async function confirmDelete() {
         </section>
         </div>
 
-        <!-- Outputs and the run dataset -->
-        <section data-tutorial="run-artifacts" class="space-y-3">
-          <h3 class="font-display text-sm font-semibold text-aruna-navy">Files</h3>
-
-          <div v-if="outputRows.length" class="space-y-1.5">
-            <div class="overflow-x-auto rounded-md border border-border">
-              <table class="w-full min-w-[48rem] text-left text-[11px]">
-                <thead class="bg-muted/50 text-muted-foreground">
-                  <tr>
-                    <th scope="col" class="px-3 py-2 font-medium">File</th>
-                    <th scope="col" class="px-3 py-2 font-medium">Path in the container</th>
-                    <th scope="col" class="px-3 py-2 font-medium">Destination</th>
-                    <th scope="col" class="px-3 py-2 text-right font-medium">Size</th>
-                    <th scope="col" class="px-3 py-2 font-medium">Status</th>
-                    <th scope="col" class="px-3 py-2"><span class="sr-only">Actions</span></th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                  <tr v-for="(row, i) in outputsShown" :key="row.url + i">
-                    <td class="max-w-64 break-all px-3 py-2 font-mono text-foreground">
-                      {{ objectName(row.link.kind === 's3' ? row.link.objectKey : row.path) }}
-                    </td>
-                    <td class="px-3 py-2 font-mono text-muted-foreground">{{ row.path }}</td>
-                    <td class="px-3 py-2">
-                      <RouterLink v-if="row.link.kind === 's3'" class="break-all font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
-                      <span v-else-if="row.link.kind === 'drs'" class="inline-flex items-center gap-1">
-                        <a class="font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.url, 24, 12) }}</a>
-                        <Tooltip label="Download this output">
-                          <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" aria-label="Download this output"><Download class="h-3.5 w-3.5" /></a>
-                        </Tooltip>
-                      </span>
-                      <ExternalLink v-else :href="row.url" :label="row.url" class="break-all font-mono text-muted-foreground hover:text-primary" />
-                    </td>
-                    <td class="whitespace-nowrap px-3 py-2 text-right text-foreground">
-                      {{ row.size !== undefined && !Number.isNaN(row.size) ? formatBytes(row.size) : '' }}
-                    </td>
-                    <td class="px-3 py-2">
-                      <Badge size="sm" :variant="row.captured ? 'success' : 'secondary'">{{ row.captured ? 'Captured' : 'Declared' }}</Badge>
-                    </td>
-                    <td class="px-3 py-2 text-right">
-                      <Button
-                        v-if="row.captured && row.link.kind === 's3'"
-                        variant="ghost"
-                        size="sm"
-                        class="h-6 px-1.5"
-                        :aria-label="`Preview ${objectName(row.link.objectKey)}`"
-                        @click="openPreview(row)"
-                      >
-                        <Eye class="h-3.5 w-3.5" /> Preview
-                      </Button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-[11px] text-muted-foreground">
-                {{ outputRange }}<template v-if="capturedCount">. Captured files are in the run dataset.</template>
-              </span>
-              <Pagination
-                v-if="outputRows.length > OUTPUT_PAGE"
-                :page="outputPage"
-                :page-count="outputPages"
-                :has-next="outputPage < outputPages"
-                @update:page="(page: number) => (outputPage = page)"
-              />
-            </div>
+        <section data-tutorial="run-artifacts">
+          <h3 class="mb-2 type-card-title">Results</h3>
+          <div class="divide-y divide-border-subtle overflow-hidden rounded-lg border border-border-subtle">
+            <component
+              :is="resultsFolder ? RouterLink : 'div'"
+              :to="resultsFolder?.to"
+              class="flex items-center gap-3 px-4 py-3"
+              :class="resultsFolder ? 'transition-colors hover:bg-muted/40' : ''"
+            >
+              <IconTile :icon="Folder" tone="aqua" size="sm" />
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-foreground">
+                  {{ resultsTitle }}<span v-if="capturedBytes" class="ml-2 text-xs font-normal tabular-nums text-muted-foreground">{{ formatBytes(capturedBytes) }}</span>
+                </p>
+                <p v-if="resultsFolder" class="truncate font-mono text-xs text-muted-foreground">{{ resultsFolder.path }}</p>
+              </div>
+              <ChevronRight v-if="resultsFolder" class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            </component>
+            <component
+              :is="runCrate ? RouterLink : 'div'"
+              :to="runCrate ? { name: 'dataset', params: { id: runCrate.document_id } } : undefined"
+              class="flex items-center gap-3 px-4 py-3"
+              :class="runCrate ? 'transition-colors hover:bg-muted/40' : ''"
+            >
+              <IconTile :icon="FileText" :tone="runCrate ? 'royal' : 'muted'" size="sm" />
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-foreground">{{ runCrate ? 'Open the run record' : 'Run record' }}</p>
+                <p class="text-xs text-muted-foreground">{{ recordState }}</p>
+              </div>
+              <ChevronRight v-if="runCrate" class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            </component>
           </div>
-          <p v-else class="text-xs text-muted-foreground">No files captured for this run.</p>
+          <details v-if="outputRows.length" class="mt-3 text-sm">
+            <summary class="cursor-pointer font-medium text-foreground">{{ outputSummary }}</summary>
+            <div class="mt-2 space-y-1.5">
+              <div class="overflow-x-auto rounded-lg border border-border-subtle">
+                <table class="w-full min-w-[48rem] text-left text-[11px]">
+                  <thead class="bg-muted/50 text-muted-foreground">
+                    <tr>
+                      <th scope="col" class="px-3 py-2 font-medium">File</th>
+                      <th scope="col" class="px-3 py-2 font-medium">Path in the container</th>
+                      <th scope="col" class="px-3 py-2 font-medium">Destination</th>
+                      <th scope="col" class="px-3 py-2 text-right font-medium">Size</th>
+                      <th scope="col" class="px-3 py-2 font-medium">Status</th>
+                      <th scope="col" class="px-3 py-2"><span class="sr-only">Actions</span></th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-border">
+                    <tr v-for="(row, i) in outputsShown" :key="row.url + i">
+                      <td class="max-w-64 break-all px-3 py-2 font-mono text-foreground">
+                        {{ objectName(row.link.kind === 's3' ? row.link.objectKey : row.path) }}
+                      </td>
+                      <td class="px-3 py-2 font-mono text-muted-foreground">{{ row.path }}</td>
+                      <td class="px-3 py-2">
+                        <RouterLink v-if="row.link.kind === 's3'" class="break-all font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
+                        <span v-else-if="row.link.kind === 'drs'" class="inline-flex items-center gap-1">
+                          <a class="font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.url, 24, 12) }}</a>
+                          <Tooltip label="Download this output">
+                            <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" aria-label="Download this output"><Download class="h-3.5 w-3.5" /></a>
+                          </Tooltip>
+                        </span>
+                        <ExternalLink v-else :href="row.url" :label="row.url" class="break-all font-mono text-muted-foreground hover:text-primary" />
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-2 text-right text-foreground">
+                        {{ row.size !== undefined && !Number.isNaN(row.size) ? formatBytes(row.size) : '' }}
+                      </td>
+                      <td class="px-3 py-2">
+                        <Badge size="sm" :variant="row.captured ? 'success' : 'secondary'">{{ row.captured ? 'Captured' : 'Declared' }}</Badge>
+                      </td>
+                      <td class="px-3 py-2 text-right">
+                        <Button
+                          v-if="row.captured && row.link.kind === 's3'"
+                          variant="ghost"
+                          size="sm"
+                          class="h-6 px-1.5"
+                          :aria-label="`Preview ${objectName(row.link.objectKey)}`"
+                          @click="openPreview(row)"
+                        >
+                          <Eye class="h-3.5 w-3.5" /> Preview
+                        </Button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span v-if="outputRows.length > OUTPUT_PAGE" class="text-xs text-muted-foreground">{{ outputRange }}</span>
+                <Pagination
+                  v-if="outputRows.length > OUTPUT_PAGE"
+                  :page="outputPage"
+                  :page-count="outputPages"
+                  :has-next="outputPage < outputPages"
+                  @update:page="(page: number) => (outputPage = page)"
+                />
+              </div>
+            </div>
+          </details>
+        </section>
 
-          <div class="flex flex-wrap items-center gap-2 text-xs">
-            <span class="text-muted-foreground">Run record:</span>
-            <template v-if="runCrate">
-              <RouterLink class="inline-flex items-center gap-1.5 text-primary hover:underline" :to="{ name: 'dataset', params: { id: runCrate.document_id } }">
-                <FileText class="h-3.5 w-3.5" /> Open
-              </RouterLink>
-              <Button variant="outline" size="sm" :disabled="exporting" @click="exportCrate">
+        <details data-tutorial="run-details" class="text-sm">
+          <summary class="cursor-pointer font-medium text-muted-foreground">For developers</summary>
+          <div class="mt-4 space-y-6">
+            <DetailList :items="developerIds">
+              <template #runId="{ item }">
+                <span class="flex min-w-0 items-center gap-1">
+                  <span class="min-w-0 truncate font-mono text-[12.5px]" :title="item.value">{{ item.value }}</span>
+                  <CopyButton :value="item.value" label="Copy run id" />
+                </span>
+              </template>
+              <template #api="{ item }">
+                <span class="flex min-w-0 items-center gap-1">
+                  <span class="min-w-0 truncate font-mono text-[12.5px]" :title="item.value">{{ item.value }}</span>
+                  <CopyButton :value="item.value" label="Copy API path" />
+                </span>
+              </template>
+            </DetailList>
+            <div v-if="runCrate || localRecordJob" class="flex flex-wrap items-center gap-2 text-xs">
+              <Button v-if="runCrate" variant="outline" size="sm" :disabled="exporting" @click="exportCrate">
                 <Download class="h-3.5 w-3.5" /> {{ exporting ? 'Exporting…' : 'Export as crate' }}
               </Button>
-              <span v-if="exportError" class="text-destructive">{{ exportError }}</span>
+              <Button v-else variant="outline" size="sm" @click="downloadRunRecord"><Download class="h-3.5 w-3.5" /> Download the run record</Button>
+              <span v-if="exportError || recordError" class="text-destructive">{{ exportError || recordError }}</span>
               <span v-else-if="exported" role="status" class="text-muted-foreground">Saved as {{ exported }}.</span>
-            </template>
-            <template v-else-if="localRecordJob">
-              <Button variant="outline" size="sm" @click="downloadRunRecord"><Download class="h-3.5 w-3.5" /> Run record</Button>
-              <span class="text-muted-foreground">The run record stays on this computer until you publish the run.</span>
-              <span v-if="recordError" class="text-destructive">{{ recordError }}</span>
-            </template>
-            <span v-else-if="sessionRuntime(task?.tags) !== null" class="text-muted-foreground">none, a notebook session keeps its report instead</span>
-            <span v-else-if="runCrateLoading" class="text-muted-foreground">looking for it</span>
-            <span v-else-if="active" class="text-muted-foreground">written once the run completes</span>
-            <span v-else class="text-muted-foreground">not written yet, Refresh checks again</span>
+            </div>
+            <section v-if="nativeFamily" class="space-y-2">
+              <h4 class="type-card-title">Placement plan</h4>
+              <JobPlacementFigure :placement="nativeFamily.placement" />
+            </section>
+            <section v-if="nativeFamily" class="space-y-2">
+              <h4 class="type-card-title">Executions</h4>
+              <JobExecutionsTable :family="nativeFamily" />
+            </section>
+            <section class="space-y-2">
+              <h4 class="type-card-title">Request</h4>
+              <DetailList :items="requestDetails">
+                <template #constraints><CountedList :items="constraintList" noun="constraint" /></template>
+                <template #volumes><CountedList :items="volumeList" noun="volume" mono /></template>
+                <template #tags><CountedList :items="tagList" noun="tag" mono /></template>
+              </DetailList>
+            </section>
           </div>
-        </section>
-
-        <section data-tutorial="run-details" class="space-y-3">
-          <template v-if="nativeFamily">
-            <h3 class="font-display text-sm font-semibold text-aruna-navy">Placement plan</h3>
-            <JobPlacementFigure :placement="nativeFamily.placement" />
-            <h3 class="font-display text-sm font-semibold text-aruna-navy">Executions</h3>
-            <JobExecutionsTable :family="nativeFamily" />
-          </template>
-          <h3 class="font-display text-sm font-semibold text-aruna-navy">Request</h3>
-          <DetailList :items="requestDetails">
-            <template #constraints><CountedList :items="constraintList" noun="constraint" /></template>
-            <template #volumes><CountedList :items="volumeList" noun="volume" mono /></template>
-            <template #tags><CountedList :items="tagList" noun="tag" mono /></template>
-          </DetailList>
-        </section>
+        </details>
       </div>
     </div>
 
@@ -1092,8 +1166,8 @@ async function confirmDelete() {
       <div class="space-y-2">
         <div class="flex flex-wrap items-center gap-2">
           <Button v-if="!active" variant="outline" size="sm" title="Starts a new run prefilled from this one" @click="rerun"><RotateCcw class="h-3.5 w-3.5" /> Run again</Button>
-          <Button v-if="!active" variant="outline" size="sm" @click="saveOpen = true">Save as my run</Button>
-          <span v-if="savedRun" role="status" class="text-xs text-muted-foreground">Saved to My runs.</span>
+          <Button v-if="!active" variant="outline" size="sm" @click="saveOpen = true"><Star class="h-3.5 w-3.5" /> Save as my run</Button>
+          <span v-if="savedRun" role="status" class="text-xs text-muted-foreground max-sm:sr-only">Saved to My runs.</span>
           <SaveRunDialog v-model:open="saveOpen" :task="task" @saved="savedRun = true" />
           <template v-if="canCancel">
             <template v-if="!confirmingCancel">
@@ -1106,8 +1180,8 @@ async function confirmDelete() {
           </template>
           <div v-if="!canCancel" class="ml-auto flex items-center gap-2">
             <template v-if="!confirmingDelete">
-              <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="deleteBusy" @click="requestDelete">
-                <Trash2 class="h-3.5 w-3.5" /> Delete
+              <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive max-sm:w-8 max-sm:px-0" aria-label="Delete" :disabled="deleteBusy" @click="requestDelete">
+                <Trash2 class="h-3.5 w-3.5" /><span class="max-sm:sr-only">Delete</span>
               </Button>
             </template>
             <template v-else>
