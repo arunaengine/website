@@ -83,8 +83,8 @@ export const docsTopics: DocsTopic[] = [
       {
         route: '/app',
         anchor: 'top-create-dataset',
-        title: 'Create dataset',
-        body: 'Create dataset jumps straight into the dataset editor.',
+        title: 'Add',
+        body: 'Add uploads files and creates buckets, runs, datasets and groups.',
         desktop: false,
       },
       {
@@ -417,7 +417,7 @@ export const docsTopics: DocsTopic[] = [
         route: '/app',
         anchor: 'top-create-dataset',
         title: 'Create dataset',
-        body: 'The top bar opens a fresh, unsaved dataset in the editor.',
+        body: 'Add, then Create dataset in the top bar opens a fresh, unsaved dataset in the editor.',
         desktop: false,
       },
       {
@@ -453,7 +453,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Describe the dataset',
         icon: 'PencilLine',
         steps: [
-          'Choose [Create dataset](page:dataset-new) in the top bar.',
+          'Choose Add, then [Create dataset](page:dataset-new) in the top bar.',
           'Add a name and a description of what it contains and how it was made.',
           'Pick a license and keywords; both drive discovery.',
           'Optionally pick a [Profile](concept:profiles-conformance), public or from the dataset\'s group; preview findings advise, never block.',

@@ -17,6 +17,7 @@ const assistantAvailable = ref(false)
 const assistantWarning = ref('')
 const openAssistant = vi.fn()
 const ensureProviders = vi.fn()
+const tes = ref(true)
 
 const Passthrough = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 const Marker = (text: string) => defineComponent(() => () => h('div', text))
@@ -79,6 +80,8 @@ const TopBar = compileClientComponent(new URL('./TopBar.vue', import.meta.url), 
     }),
   },
   '@/composables/assistantState': { assistantAvailable, assistantUnread: ref(0), assistantWarning },
+  '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
+  '@/lib/config': { featureEnabled: (flag: string) => flag === 'tes' && tes.value },
   '@/lib/utils': Utils,
 })
 
@@ -90,6 +93,7 @@ beforeEach(() => {
   assistantAvailable.value = false
   assistantWarning.value = ''
   openAssistant.mockClear()
+  tes.value = true
 })
 
 function launcher(root: Parameters<typeof content>[0]) {
@@ -97,16 +101,42 @@ function launcher(root: Parameters<typeof content>[0]) {
 }
 
 describe('portal chrome', () => {
-  it('keeps the context switcher and the dataset shortcut', async () => {
+  it('keeps the context switcher and offers every create action in one Add menu', async () => {
     const mounted = await mountApp(TopBar)
     const html = content(mounted.root)
 
     expect(html).toContain('context switcher')
-    expect(html).toContain('Create dataset')
     expect(html).toContain('datasets')
     expect(watchNode).not.toHaveBeenCalled()
-    await click(button(mounted.root, 'Create dataset'))
-    expect(push).toHaveBeenCalledWith({ name: 'dataset-new' })
+    expect(element(mounted.root, (node) => node.props['aria-label'] === 'Add').tag).toBe('button')
+    const targets: [string, unknown][] = [
+      ['Upload files', { name: 'buckets', query: { addData: '1' } }],
+      ['New bucket', { name: 'buckets', query: { create: 'bucket' } }],
+      ['New run', { name: 'compute-new' }],
+      ['Create dataset', { name: 'dataset-new' }],
+      ['Create group', { name: 'groups', query: { create: 'group' } }],
+    ]
+    for (const [label, target] of targets) {
+      await click(button(mounted.root, label))
+      expect(push).toHaveBeenLastCalledWith(target)
+    }
+    mounted.app.unmount()
+  })
+
+  it('leaves New run out without the run service', async () => {
+    tes.value = false
+    const mounted = await mountApp(TopBar)
+
+    expect(content(mounted.root)).toContain('New bucket')
+    expect(content(mounted.root)).not.toContain('New run')
+    mounted.app.unmount()
+  })
+
+  it('offers no Add menu without a user', async () => {
+    currentUser.value = null
+    const mounted = await mountApp(TopBar)
+
+    expect(nodes(mounted.root).some((node) => node.props['aria-label'] === 'Add')).toBe(false)
     mounted.app.unmount()
   })
 
@@ -164,7 +194,7 @@ describe('desktop chrome', () => {
     const mounted = await mountApp(TopBar, { props: { variant: 'desktop' } })
     const html = content(mounted.root)
 
-    expect(html).not.toContain('Create dataset')
+    expect(html).toContain('Create dataset')
     expect(html).toContain('online')
     expect(html.indexOf('online')).toBeLessThan(html.indexOf('context switcher'))
     expect(html).not.toContain('Testrealm')

@@ -12,7 +12,7 @@ import ContextSwitcher from '@/components/layout/ContextSwitcher.vue'
 import NotificationBell from '@/components/dashboard/NotificationBell.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
 import SearchOverlay from '@/components/dashboard/SearchOverlay.vue'
-import { ChevronDown, CircleCheck, CircleX, LoaderCircle, MessageSquare, Plus, TriangleAlert, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw } from '@lucide/vue'
+import { ChevronDown, CircleCheck, CircleX, FileJson2, FolderPlus, LoaderCircle, MessageSquare, Play, Plus, TriangleAlert, Upload, User, Users, LogIn, LogOut, Key, Moon, Sun, RefreshCw } from '@lucide/vue'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useRealm } from '@/composables/useRealm'
@@ -23,9 +23,10 @@ import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { assistantAvailable, assistantUnread, assistantWarning } from '@/composables/assistantState'
 import { statusTone } from '@/components/nodes/node-display'
 import { homeRealmLabel } from '@/composables/useFederation'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
+import { featureEnabled } from '@/lib/config'
 
-// 'desktop' is the Aruna Desktop chrome: no dataset shortcut, and this
-// computer's own node leads, before the group switcher.
+// 'desktop' is the Aruna Desktop chrome: this computer's own node leads, before the group switcher.
 const props = withDefaults(defineProps<{ variant?: 'portal' | 'desktop' }>(), { variant: 'portal' })
 
 const { realm, role } = useRealm()
@@ -37,6 +38,9 @@ const route = useRoute()
 const router = useRouter()
 
 const desktop = computed(() => props.variant === 'desktop')
+const { shown } = usePortalFeatures()
+// New run starts a TES run, so it follows the same gates as the Compute entry.
+const canRun = computed(() => featureEnabled('tes') && shown('compute'))
 // A user of another realm shows that home realm next to the name.
 const homeRealm = computed(() => (currentUser.value ? homeRealmLabel(currentUser.value.id, realm.value.id) : null))
 
@@ -131,18 +135,28 @@ async function handleSignOut() {
         />
       </Button>
 
-      <Button
-        v-if="currentUser && !desktop"
-        data-tour="top-create-dataset"
-        variant="outline"
-        size="sm"
-        class="hidden h-9 shrink-0 md:inline-flex"
-        aria-label="Create dataset"
-        title="Create dataset"
-        @click="router.push({ name: 'dataset-new' })"
-      >
-        <Plus class="h-4 w-4" /><span class="hidden lg:inline">Create dataset</span>
-      </Button>
+      <DropdownMenu v-if="currentUser">
+        <DropdownMenuTrigger as-child>
+          <Button
+            data-tour="top-create-dataset"
+            variant="outline"
+            size="sm"
+            class="h-9 shrink-0 max-sm:w-9 max-sm:px-0"
+            aria-label="Add"
+            title="Add"
+          >
+            <Plus class="h-4 w-4" /><span class="hidden sm:inline">Add</span><ChevronDown class="hidden h-3.5 w-3.5 sm:block" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" class="w-56">
+          <DropdownMenuItem @click="router.push({ name: 'buckets', query: { addData: '1' } })"><Upload class="h-3.5 w-3.5" /> Upload files</DropdownMenuItem>
+          <DropdownMenuItem @click="router.push({ name: 'buckets', query: { create: 'bucket' } })"><FolderPlus class="h-3.5 w-3.5" /> New bucket</DropdownMenuItem>
+          <DropdownMenuItem v-if="canRun" @click="router.push({ name: 'compute-new' })"><Play class="h-3.5 w-3.5" /> New run</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem @click="router.push({ name: 'dataset-new' })"><FileJson2 class="h-3.5 w-3.5" /> Create dataset</DropdownMenuItem>
+          <DropdownMenuItem @click="router.push({ name: 'groups', query: { create: 'group' } })"><Users class="h-3.5 w-3.5" /> Create group</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <NotificationBell />
 
@@ -164,13 +178,13 @@ async function handleSignOut() {
             class="flex h-9 items-center gap-2 rounded-md border border-transparent px-1.5 text-sm hover:border-border hover:bg-muted"
           >
             <Avatar :user="currentUser" size="sm" class="ring-0" />
-            <div class="hidden min-w-0 max-w-40 flex-col text-left leading-none sm:flex">
+            <div class="hidden min-w-0 max-w-40 flex-col text-left leading-none xl:flex">
               <div class="truncate text-[13px] font-medium leading-none text-foreground">{{ currentUser.name }}</div>
               <div class="mt-0.5 truncate text-[11px] leading-none text-muted-foreground">
                 {{ homeRealm ?? `${realm.shortName}, ${role.replace('realm-', '')}` }}
               </div>
             </div>
-            <ChevronDown class="hidden h-3.5 w-3.5 shrink-0 text-muted-foreground sm:block" />
+            <ChevronDown class="hidden h-3.5 w-3.5 shrink-0 text-muted-foreground xl:block" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" class="w-60">
