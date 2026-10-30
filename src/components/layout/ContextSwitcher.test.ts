@@ -104,7 +104,7 @@ describe('ContextSwitcher', () => {
   it('names the active group and switches to another', async () => {
     const { root } = await mountApp(ContextSwitcher)
     expect(content(root)).toContain('Water quality')
-    expect(content(root)).toContain('Demo realmWater quality')
+    expect(content(root)).toContain('Demo realm· realm-1Water quality')
 
     await click(element(root, (node) => content(node).includes('Soil archive') && node.tag === 'button'))
 
@@ -154,24 +154,24 @@ describe('ContextSwitcher', () => {
       .toEqual({ name: 'groups' })
   })
 
-  it('keeps the realm name above the group in sentence case, with its id only in the tooltip', async () => {
+  it('keeps the realm name and short id above the group', async () => {
     realm.value = { ...realm.value, id: 'AbCdEfGh-full-realm-id' }
     const { root } = await mountApp(ContextSwitcher)
 
     const label = element(root, (node) => content(node).includes('Water quality') && node.tag === 'span'
       && String(node.props.class ?? '').includes('flex-col'))
     expect(String(label.props.class)).not.toContain('hidden')
-    const name = element(label, (node) => node.tag === 'span' && content(node).trim() === 'Demo realm')
-    expect(name.props.title).toBe('AbCdEfGh-full-realm-id')
-    expect(String(name.props.class)).toContain('truncate')
-    expect(String(name.props.class)).not.toContain('uppercase')
-    expect(content(label)).not.toContain('AbCdEfGh')
+    const line = element(label, (node) => node.props.title === 'AbCdEfGh-full-realm-id')
+    expect(String(line.props.class)).toContain('uppercase')
+    expect(content(line)).toContain('Demo realm')
+    expect(content(line)).toContain('· AbCdEfGh')
+    expect(content(line)).not.toContain('full-realm-id')
   })
 
-  it('draws no coloured dot or square for the realm', async () => {
+  it('shows the realm in its own colour', async () => {
     const { root } = await mountApp(ContextSwitcher)
-    expect(nodes(root).some((node) => String(node.props.style ?? '').includes('background'))).toBe(false)
-    expect(nodes(root).some((node) => typeof node.props.style === 'object' && node.props.style && 'backgroundColor' in (node.props.style as object))).toBe(false)
+    expect(nodes(root).some((node) => typeof node.props.style === 'object' && node.props.style
+      && (node.props.style as Record<string, string>).backgroundColor === '#336699')).toBe(true)
   })
 
   it('falls back to the realm without a membership', async () => {

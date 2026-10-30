@@ -16,6 +16,7 @@ import Spinner from '@/components/ui/Spinner.vue'
 import CoverageIcon from '@/components/search/CoverageIcon.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDatabases } from '@/composables/useDatabases'
+import { useRealm } from '@/composables/useRealm'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSearchSettings } from '@/composables/useSearchSettings'
 import { OBJECT_SEARCH_MODE_LABELS, useUnifiedSearch } from '@/composables/useUnifiedSearch'
@@ -67,6 +68,7 @@ const inputEl = ref<HTMLInputElement | null>(null)
 const panelEl = ref<HTMLElement | null>(null)
 const wrapperEl = ref<HTMLElement | null>(null)
 const isNarrowSearch = useMediaQuery(`(max-width: ${TOP_BAR_SEARCH_COLLAPSE_PX - 0.02}px)`)
+const { realm } = useRealm()
 const { authToken } = useAruna()
 const { displayName: nodeDisplayName, isLocalNode } = useRealmNodes()
 const router = useRouter()
@@ -465,8 +467,8 @@ onBeforeUnmount(() => {
                 :aria-busy="quickPending"
                 :aria-activedescendant="activeKey ? 'qs-' + activeKey : undefined"
                 class="h-9 w-full rounded-md border border-input bg-field pl-8 pr-8 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:pr-16"
-                placeholder="Search data, datasets and runs"
-                title="Search data, datasets and runs"
+                :placeholder="`Search ${realm.shortName}, data, datasets and runs`"
+                :title="`Search ${realm.shortName}, data, datasets and runs`"
                 @focus="showResults = true"
                 @keydown="onInputKeydown"
               />

@@ -112,6 +112,7 @@ const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.me
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Spinner.vue': moduleDefault(SpinnerStub),
   '@/composables/useAruna': { useAruna: () => ({ authToken }) },
+  '@/composables/useRealm': { useRealm: () => ({ realm: ref({ shortName: 'Demo' }) }) },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
       displayName: (nodeId: string) => nodeId === 'node-b' ? 'Storage node B' : nodeId,

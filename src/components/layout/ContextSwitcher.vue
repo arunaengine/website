@@ -26,7 +26,7 @@ import { RouterLink } from 'vue-router'
 import { ArrowLeftRight, Check, ChevronsUpDown, Globe2, Users } from '@lucide/vue'
 
 const { currentUser, myGroups } = useAruna()
-const { realmDisplayName, realmId, activeRealmId, accessibleRealms, myMemberships, setRealm } = useRealm()
+const { realm, realmDisplayName, realmId, activeRealmId, accessibleRealms, myMemberships, setRealm } = useRealm()
 
 const activeGroup = computed(() => myGroups.value.find((group) => group.id === activeGroupId.value))
 
@@ -55,14 +55,20 @@ function roleOf(id: string) {
         class="inline-flex h-9 min-w-0 items-center gap-2 rounded-md border border-border bg-card px-2 text-left text-sm shadow-sm transition-colors hover:border-primary/40"
         aria-label="Switch group or realm"
       >
-        <!-- One tile for the group (or the realm without one), not a colour: the bar shows no dots. -->
-        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-aruna-royal/15 text-primary">
-          <component :is="hasGroups ? Users : Globe2" class="h-4 w-4" aria-hidden="true" />
+        <span
+          class="grid h-6 w-6 shrink-0 place-items-center rounded text-white"
+          :style="{ backgroundColor: realm.color }"
+        >
+          <Globe2 class="h-3.5 w-3.5" aria-hidden="true" />
         </span>
-        <!-- The realm name stays visible above the group, also on a narrow bar; its id is the tooltip. -->
+        <!-- The realm name and short id stay visible next to the group, also on a narrow bar. -->
         <span class="flex min-w-0 flex-col leading-none">
-          <span class="max-w-28 truncate text-xs leading-4 text-muted-foreground sm:max-w-40" :title="realmId">
-            {{ hasGroups ? realmDisplayName : 'Realm' }}
+          <span
+            class="flex max-w-28 gap-1 text-[9px] font-semibold uppercase leading-none tracking-wider text-muted-foreground sm:max-w-40"
+            :title="realmId"
+          >
+            <span class="min-w-0 truncate">{{ hasGroups ? realmDisplayName : 'Realm' }}</span>
+            <span class="shrink-0">{{ hasGroups ? `· ${realmId.slice(0, 8)}` : realmId.slice(0, 8) }}</span>
           </span>
           <span
             class="mt-0.5 max-w-28 truncate text-[13px] font-semibold leading-none text-foreground sm:max-w-40"
