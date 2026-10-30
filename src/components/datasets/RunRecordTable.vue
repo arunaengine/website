@@ -14,8 +14,9 @@ import { ChevronRight, Clock, Container, Users } from '@lucide/vue'
 const props = defineProps<{ docs: MetadataDoc[]; groupNames: ReadonlyMap<string, string> }>()
 const router = useRouter()
 
+// Newest first, by the last change of each record.
 const rows = computed(() =>
-  props.docs.map((doc) => {
+  [...props.docs].sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).map((doc) => {
     const run = parseRunCrate(doc.roCrate, '')
     const outputs = run?.outputs.length || doc.linkedObjects.length
     return {

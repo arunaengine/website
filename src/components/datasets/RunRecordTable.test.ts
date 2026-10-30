@@ -31,6 +31,12 @@ function doc(extra: Partial<MetadataDoc>): MetadataDoc {
 const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
 
 describe('run record table', () => {
+  it('lists the newest record first', async () => {
+    const docs = [doc({ ulid: 'old', title: 'Prepare Bakta DB', updatedAt: '2026-10-29T09:00:00Z' }), doc({ ulid: 'new', title: 'Annotate a genome', updatedAt: '2026-10-29T11:00:00Z' })]
+    const html = text(await renderToString(createSSRApp(RunRecordTable, { docs, groupNames: new Map() })))
+    expect(html.indexOf('Annotate a genome')).toBeLessThan(html.indexOf('Prepare Bakta DB'))
+  })
+
   it('names the tool, group, result count and license, and links the record and its group', async () => {
     const html = await renderToString(createSSRApp(RunRecordTable, { docs: [doc({})], groupNames: new Map([['g-demo', 'demo']]) }))
 
