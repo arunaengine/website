@@ -40,7 +40,7 @@ import type { BucketSearchHit } from '@/lib/api'
 
 const router = useRouter()
 const { tesEnabled, busy, createTask, getTask } = useTes()
-const { currentUser, myGroups, nodeInfo, searchBuckets, getBucketDistribution, listBucketObjects } = useAruna()
+const { currentUser, myGroups, nodeInfo, searchBuckets, getBucketDistribution, listBucketObjects, sessionEpoch } = useAruna()
 const { realm } = useRealm()
 const { nodes, nodeById, localNodeId, isTarget, isLocalNode, displayName } = useRealmNodes()
 // Desktop only: this computer can run the container itself.
@@ -250,6 +250,12 @@ async function run() {
   }
   submitError.value = null
   submitting.value = true
+  // The draft belongs to the session it was started in; another account must not send it.
+  const epoch = sessionEpoch.value
+  const sessionChanged = () => epoch !== sessionEpoch.value
+  const fence = () => {
+    if (sessionChanged()) throw new Error('The session changed while the run was being prepared, so it was not started.')
+  }
   try {
     let draft = task.value
     const [scriptUpload, dependencyUpload] = await Promise.all([
@@ -285,6 +291,7 @@ async function run() {
       }
       draft = { ...draft, inputs: localInputs }
     }
+    fence()
     if (await submitLocally(draft)) return
     // The uploads sit on the connected node; another node must read exactly those versions.
     draft = pinUploads(draft, [
@@ -292,12 +299,13 @@ async function run() {
       dependencyUpload && { key: dependencyConfigKey.value, versionId: dependencyUpload.versionId },
     ])
     const routed = await routeRun(draft)
+    fence()
     const created = await createTask(routed.draft, routed.base)
     void router.push({ name: 'task', params: { taskId: created.id } })
   } catch (err) {
-    submitError.value = isTesUnsupported(err)
-      ? `This node does not accept runs. ${errorMessage(err)}`
-      : errorMessage(err)
+    // A lookup cancelled by the session change is reported as that change.
+    if (sessionChanged()) submitError.value = 'The session changed while the run was being prepared, so it was not started.'
+    else submitError.value = isTesUnsupported(err) ? `This node does not accept runs. ${errorMessage(err)}` : errorMessage(err)
   } finally {
     submitting.value = false
   }

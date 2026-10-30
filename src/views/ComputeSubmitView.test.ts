@@ -157,8 +157,10 @@ const listBucketObjects = vi.fn(async (_bucket: string, _query: { prefix?: strin
   objects: [] as Array<{ key: string; version_id: string }>,
   next_cursor: null as string | null,
 }))
+const sessionEpoch = ref(0)
 const useArunaModule = {
   useAruna: () => ({
+    sessionEpoch,
     searchBuckets,
     getBucketDistribution,
     listBucketObjects,
@@ -602,6 +604,31 @@ describe('run page', () => {
     await flush()
     expect(content(mounted.root)).toContain('No node holds bucket results')
     expect(createTask).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('sends nothing for a session that changed while the holder was looked up', async () => {
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
+    await fillValidRun(mounted.root)
+
+    searchBuckets.mockImplementationOnce(async () => {
+      sessionEpoch.value += 1
+      throw new DOMException('The operation was aborted.', 'AbortError')
+    })
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    expect(content(mounted.root)).toContain('The session changed while the run was being prepared')
+
+    searchBuckets.mockImplementationOnce(async (q: string) => {
+      sessionEpoch.value += 1
+      return { hits: [{ bucket: q, node_id: 'node-id', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }
+    })
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    expect(createTask).not.toHaveBeenCalled()
+    expect(content(mounted.root)).toContain('The session changed while the run was being prepared')
     mounted.app.unmount()
   })
 
