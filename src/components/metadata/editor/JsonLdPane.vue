@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -10,20 +10,30 @@ import { Check } from '@lucide/vue'
 
 // The crate the editor writes, as text. Apply reads it back only when it is a valid RO-Crate.
 const props = defineProps<{ rocrate: unknown }>()
-const emit = defineEmits<{ (e: 'apply', crate: unknown): void }>()
+const emit = defineEmits<{
+  (e: 'apply', crate: unknown): void
+  (e: 'changed', changed: boolean): void
+}>()
 
-const text = ref(JSON.stringify(props.rocrate, null, 2))
+const original = JSON.stringify(props.rocrate, null, 2)
+const text = ref(original)
 const error = ref('')
+const changed = computed(() => text.value !== original)
+watch(changed, (value) => emit('changed', value))
 
-function apply() {
+/** Applies the text and says whether it was a valid RO-Crate. */
+function apply(): boolean {
   try {
     const { crate } = analyzeCrateJson(text.value, 'ro-crate-metadata.json')
     error.value = ''
     emit('apply', crate)
+    return true
   } catch (cause) {
     error.value = errorMessage(cause)
+    return false
   }
 }
+defineExpose({ apply })
 </script>
 
 <template>

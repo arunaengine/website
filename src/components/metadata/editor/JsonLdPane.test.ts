@@ -40,8 +40,10 @@ const crate = {
   ],
 }
 
-async function mount(applied: unknown[]) {
-  const mounted = await mountApp(JsonLdPane, { props: { rocrate: crate, onApply: (next: unknown) => applied.push(next) } })
+async function mount(applied: unknown[], changes: boolean[] = []) {
+  const mounted = await mountApp(JsonLdPane, {
+    props: { rocrate: crate, onApply: (next: unknown) => applied.push(next), onChanged: (value: boolean) => changes.push(value) },
+  })
   const field = element(mounted.root, (node) => node.tag === 'textarea')
   return { ...mounted, field }
 }
@@ -70,6 +72,18 @@ describe('JsonLdPane', () => {
     expect(applied).toEqual([])
     expect(content(root)).toContain('The JSON-LD could not be read')
     expect(content(root)).toContain('Not valid JSON')
+    app.unmount()
+  })
+
+  it('says when the text differs from the editor', async () => {
+    const changes: boolean[] = []
+    const { field, app } = await mount([], changes)
+    const original = String(field.props.value)
+
+    await typeValue(field, `${original} `)
+    await typeValue(field, original)
+
+    expect(changes).toEqual([true, false])
     app.unmount()
   })
 })

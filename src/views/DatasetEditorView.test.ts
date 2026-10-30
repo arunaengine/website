@@ -229,18 +229,34 @@ const EditorStub = defineComponent({
   },
 })
 const GraphStub = defineComponent(() => () => h('p', 'Graph pane'))
-// The JSON-LD pane, reduced to one applied crate that renames the dataset.
+// The JSON-LD pane, reduced to an edit and one applied crate that renames the dataset.
 const JsonStub = defineComponent({
-  emits: ['apply'],
-  setup: (_, { emit }) => () => h('button', {
-    onClick: () => emit('apply', {
-      '@context': 'https://w3id.org/ro/crate/1.2/context',
-      '@graph': [
-        { '@id': 'ro-crate-metadata.json', '@type': 'CreativeWork', about: { '@id': './' } },
-        { '@id': './', '@type': 'Dataset', name: 'Edited as JSON' },
-      ],
-    }),
-  }, 'Apply JSON'),
+  emits: ['apply', 'changed'],
+  setup: (_, { emit, expose }) => {
+    const apply = () => {
+      emit('apply', {
+        '@context': 'https://w3id.org/ro/crate/1.2/context',
+        '@graph': [
+          { '@id': 'ro-crate-metadata.json', '@type': 'CreativeWork', about: { '@id': './' } },
+          { '@id': './', '@type': 'Dataset', name: 'Edited as JSON' },
+        ],
+      })
+      return true
+    }
+    expose({ apply })
+    return () => h('div', [
+      h('button', { onClick: () => emit('changed', true) }, 'Edit JSON'),
+      h('button', { onClick: apply }, 'Apply JSON'),
+    ])
+  },
+})
+const JsonConfirmStub = defineComponent({
+  props: { open: Boolean },
+  emits: ['answer'],
+  setup: (props, { emit }) => () => props.open
+    ? h('div', ['Apply your JSON-LD changes?', ...(['apply', 'discard', 'cancel'] as const)
+      .map((choice) => h('button', { onClick: () => emit('answer', choice) }, `Answer ${choice}`))])
+    : null,
 })
 const DrawerStub = defineComponent({
   props: {
@@ -343,6 +359,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/components/metadata/CrateGraph.vue': moduleDefault(GraphStub),
   '@/components/metadata/editor/IssueDrawer.vue': moduleDefault(DrawerStub),
   '@/components/metadata/editor/JsonLdPane.vue': moduleDefault(JsonStub),
+  '@/components/metadata/editor/JsonLdConfirm.vue': moduleDefault(JsonConfirmStub),
   '@/components/metadata/editor/NodeCheckPanel.vue': moduleDefault(NodeCheckStub),
   '@/components/metadata/PidWithdraw.vue': moduleDefault(WithdrawStub),
   '@/composables/useAruna': {
@@ -1046,6 +1063,46 @@ describe('DatasetEditorView', () => {
     expect(content(mounted.root)).toContain('Seed dataset')
     expect(content(mounted.root)).toContain('Edited as JSON')
     expect(content(mounted.root)).toContain('Research group')
+    mounted.app.unmount()
+  })
+
+  it('asks before leaving edited JSON-LD on another tab', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    const tabNamed = (name: string) =>
+      element(mounted.root, (node) => node.props.role === 'tab' && content(node).trim() === name)
+    await click(tabNamed('JSON-LD'))
+    await click(button(mounted.root, 'Edit JSON'))
+
+    await click(tabNamed('Graph'))
+    expect(content(mounted.root)).toContain('Apply your JSON-LD changes?')
+    await click(button(mounted.root, 'Answer cancel'))
+    expect(content(mounted.root)).toContain('Edit JSON')
+
+    await click(tabNamed('Graph'))
+    await click(button(mounted.root, 'Answer discard'))
+    expect(content(mounted.root)).toContain('Graph pane')
+    expect(content(mounted.root)).not.toContain('Edited as JSON')
+
+    await click(tabNamed('JSON-LD'))
+    await click(button(mounted.root, 'Edit JSON'))
+    await click(tabNamed('Graph'))
+    await click(button(mounted.root, 'Answer apply'))
+    expect(content(mounted.root)).toContain('Graph pane')
+    expect(content(mounted.root)).toContain('Edited as JSON')
+    mounted.app.unmount()
+  })
+
+  it('asks about edited JSON-LD before leaving the page', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    await click(element(mounted.root, (node) => node.props.role === 'tab' && content(node).trim() === 'JSON-LD'))
+    await click(button(mounted.root, 'Edit JSON'))
+
+    const leaving = leaveGuard!()
+    await flush()
+    expect(content(mounted.root)).toContain('Apply your JSON-LD changes?')
+    await click(button(mounted.root, 'Answer cancel'))
+
+    expect(await leaving).toBe(false)
     mounted.app.unmount()
   })
 

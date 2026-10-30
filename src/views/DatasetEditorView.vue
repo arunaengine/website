@@ -17,6 +17,7 @@ import EntityBrowser from '@/components/metadata/editor/EntityBrowser.vue'
 import EntityEditor from '@/components/metadata/editor/EntityEditor.vue'
 import IssueDrawer from '@/components/metadata/editor/IssueDrawer.vue'
 import JsonLdPane from '@/components/metadata/editor/JsonLdPane.vue'
+import JsonLdConfirm from '@/components/metadata/editor/JsonLdConfirm.vue'
 import NodeCheckPanel from '@/components/metadata/editor/NodeCheckPanel.vue'
 import PidWithdraw from '@/components/metadata/PidWithdraw.vue'
 import { profileReferenceIri, useAruna } from '@/composables/useAruna'
@@ -416,7 +417,36 @@ function update(next: CrateDraft) {
 
 function open(entityId: string) {
   selected.value = entityId
-  tab.value = 'editor'
+  void switchTab('editor')
+}
+
+// Edited JSON-LD is never dropped or applied silently: leaving it asks first.
+const jsonPane = ref<{ apply: () => boolean } | null>(null)
+const jsonChanged = ref(false)
+const jsonAsking = ref(false)
+let jsonAnswer: ((go: boolean) => void) | null = null
+
+/** True once nothing unapplied is left behind; false when the user stays. */
+function settleJson(): Promise<boolean> {
+  if (tab.value !== 'json' || !jsonChanged.value) return Promise.resolve(true)
+  jsonAnswer?.(false)
+  return new Promise<boolean>((resolve) => {
+    jsonAnswer = resolve
+    jsonAsking.value = true
+  })
+}
+
+function answerJson(choice: 'apply' | 'discard' | 'cancel') {
+  jsonAsking.value = false
+  const go = choice === 'discard' || (choice === 'apply' && Boolean(jsonPane.value?.apply()))
+  if (go) jsonChanged.value = false
+  jsonAnswer?.(go)
+  jsonAnswer = null
+}
+
+async function switchTab(next: 'editor' | 'graph' | 'json') {
+  if (next === tab.value || !(await settleJson())) return
+  tab.value = next
 }
 
 function imported(next: CrateDraft) {
@@ -440,6 +470,7 @@ function imported(next: CrateDraft) {
 // Edited JSON-LD replaces the draft as an import does, keeping the stored dataset it belongs to.
 function applyJson(next: unknown) {
   imported({ ...fromRoCrate(next), documentId: draft.value.documentId })
+  jsonChanged.value = false
   tab.value = 'editor'
 }
 
@@ -549,7 +580,8 @@ const confirmDiscardOpen = ref(false)
 const allowLeave = ref(false)
 let leave: ((allowed: boolean) => void) | null = null
 
-function askBeforeLeaving(): Promise<boolean> {
+async function askBeforeLeaving(): Promise<boolean> {
+  if (!allowLeave.value && !(await settleJson())) return false
   return new Promise<boolean>((resolve) => {
     if (allowLeave.value || !dirty.value) {
       resolve(true)
@@ -607,7 +639,7 @@ function discardDraft() {
 
 // A reload or a closed tab would drop the draft just as silently.
 function warnUnload(event: BeforeUnloadEvent) {
-  if (dirty.value) event.preventDefault()
+  if (dirty.value || (tab.value === 'json' && jsonChanged.value)) event.preventDefault()
 }
 onMounted(() => {
   if (typeof window !== 'undefined') window.addEventListener('beforeunload', warnUnload)
@@ -688,6 +720,7 @@ async function makePublic() {
 // here and the panel shows what it found. A public draft with files not
 // everyone can read pauses for a choice unless it is saved anyway.
 async function save(anyway = false) {
+  if (!(await settleJson())) return
   if (!canSave.value || saving.value || submitting.value) return
   const generation = publicationGeneration
   const base = loadGeneration
@@ -847,7 +880,7 @@ async function save(anyway = false) {
                 class="rounded-[3px] px-3 py-1 text-xs font-medium"
                 :class="tab === pane ? 'bg-primary/10 text-foreground' : 'text-muted-foreground hover:text-foreground'"
                 :aria-selected="tab === pane"
-                @click="tab = pane"
+                @click="void switchTab(pane)"
               >
                 {{ { editor: 'Editor', graph: 'Graph', json: 'JSON-LD' }[pane] }}
               </button>
@@ -923,7 +956,13 @@ async function save(anyway = false) {
               </NodeCheckPanel>
               <PidWithdraw v-if="mode === 'edit'" :document-id="documentId" />
             </template>
-            <JsonLdPane v-else-if="tab === 'json'" :rocrate="crate" @apply="applyJson" />
+            <JsonLdPane
+              v-else-if="tab === 'json'"
+              ref="jsonPane"
+              :rocrate="crate"
+              @apply="applyJson"
+              @changed="(value: boolean) => (jsonChanged = value)"
+            />
             <CrateGraph
               v-else
               :source="draft"
@@ -971,6 +1010,7 @@ async function save(anyway = false) {
     />
     <ImportCrateDialog v-if="mode === 'create'" v-model:open="importOpen" @imported="imported" />
     <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (groupId = group.group_id)" />
+    <JsonLdConfirm :open="jsonAsking" @answer="answerJson" />
     <DiscardDraftConfirm :open="confirmDiscardOpen" @keep="keepDraft" @discard="discardDraft" />
   </div>
 </template>

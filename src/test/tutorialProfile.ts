@@ -313,6 +313,7 @@ const DatasetEditorView = compileClientComponent(url('views/DatasetEditorView.vu
   '@/components/metadata/editor/EntityEditor.vue': moduleDefault(EntityEditor),
   '@/components/metadata/editor/IssueDrawer.vue': moduleDefault(IssueDrawer),
   '@/components/metadata/editor/JsonLdPane.vue': moduleDefault(GenericStub),
+  '@/components/metadata/editor/JsonLdConfirm.vue': moduleDefault(GenericStub),
   '@/components/metadata/editor/NodeCheckPanel.vue': moduleDefault(NodeCheckWithCrate),
   '@/components/metadata/CrateGraph.vue': moduleDefault(GenericStub),
   '@/components/metadata/PidWithdraw.vue': moduleDefault(GenericStub),
