@@ -5,6 +5,7 @@ import type { TesTask } from '@/lib/tes'
 import { RUN_STAGE_MS, TUTORIAL_TASK_ID, defaultTutorialTask } from '../fixtures/run'
 import { exitTutorial, setTutorialClock, startTutorial, tutorialData } from '../session'
 import { tutorialApi } from './tutorialApi'
+import { nodeInfo } from '@/composables/aruna/state'
 
 const fetchSpy = vi.fn()
 // Virtual time: the run's stage timers are scheduled together, so the test
@@ -107,5 +108,16 @@ describe('tutorial API', () => {
     exitTutorial()
 
     await expect(apiRequest('/ga4gh/tes/v1/tasks')).rejects.toThrow()
+  })
+})
+
+describe('tutorial bucket search', () => {
+  it('places the tutorial buckets on the connected node, so a run stays there', async () => {
+    nodeInfo.value = { node: { peer_id: 'here' } } as never
+    const found = (await tutorialApi('/search/buckets', { query: { q: 'tutorial-results', group_id: 'g1' } })) as {
+      hits: Array<{ bucket: string; node_id: string; group_id: string }>
+    }
+    expect(found.hits).toEqual([expect.objectContaining({ bucket: 'tutorial-results', node_id: 'here', group_id: 'g1' })])
+    nodeInfo.value = null
   })
 })

@@ -11,7 +11,9 @@ import {
   tutorialJob,
   tutorialTask,
 } from '../fixtures/run'
+import { TUTORIAL_BUCKETS } from '../fixtures/data'
 import { scheduleTutorial, setTutorialData, tutorialData } from '../session'
+import { nodeInfo } from '@/composables/aruna/state'
 
 const TES_ROOT = '/ga4gh/tes/v1'
 
@@ -85,6 +87,15 @@ export function tutorialApi(path: string, options: ApiRequestOptions = {}): Prom
     return Promise.resolve({ documents: [], limit: 1, offset: 0, total_returned: 0 })
   }
   if (path === '/data/staging/references') return Promise.resolve({ entries: [] })
+  // The tutorial buckets sit on the connected node, so a run stays there.
+  if (path === '/search/buckets') {
+    const q = String(options.query?.q ?? '')
+    const groupId = String(options.query?.group_id ?? '')
+    const hits = TUTORIAL_BUCKETS.filter((entry) => entry.name.includes(q)).map((entry) => ({
+      arn: '', bucket: entry.name, node_id: nodeInfo.value?.node.peer_id ?? '', group_id: groupId, created_at: '',
+    }))
+    return Promise.resolve({ hits, nodes_queried: 1, nodes_failed: 0, failed_nodes: [] })
+  }
 
   return null
 }

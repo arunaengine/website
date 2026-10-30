@@ -21,6 +21,7 @@ import * as QuickRuntimes from '@/lib/quickRuntimes'
 import * as RunTargetLib from '@/lib/runTarget'
 import * as Shellwords from '@/lib/shellwords'
 import * as BucketName from '@/lib/bucketName'
+import * as ContentIdentity from '@/lib/contentIdentity'
 import * as RunPaths from '@/lib/runPaths'
 import * as TesLib from '@/lib/tes'
 import * as Utils from '@/lib/utils'
@@ -29,6 +30,7 @@ import * as JobsLib from '@/lib/jobs'
 import * as VueUse from '@vueuse/core'
 import * as TutorialFixtures from '@/lib/tutorial/fixtures/data'
 import * as TutorialRun from '@/lib/tutorial/fixtures/run'
+import { nodeInfo } from '@/composables/aruna/state'
 import * as TutorialApi from '@/lib/tutorial/services/tutorialApi'
 import * as TutorialJobClient from '@/lib/tutorial/services/tutorialJobClient'
 import * as TutorialS3 from '@/lib/tutorial/services/tutorialS3'
@@ -121,6 +123,9 @@ const arunaModule = {
     currentUser,
     myGroups: ref([]),
     sessionEpoch: ref(1),
+    // The run page looks up its bucket holders; the tutorial answers for its own buckets.
+    searchBuckets: (q: string, options: { groupId?: string } = {}) =>
+      TutorialApi.tutorialApi('/search/buckets', { query: { q, group_id: options.groupId } }),
     metadataAtPath: async () => null,
     realm: ref({ id: 'realm-id', name: 'Test realm', shortName: 'Test realm' }),
     userInfo: ref(null),
@@ -259,6 +264,7 @@ const RequestDialog = compileClientComponent(url('components/compute/run/Request
 const ComputeSubmitView = compileClientComponent(url('views/ComputeSubmitView.vue'), {
   vue: VueRuntime,
   'vue-router': RouterRuntime,
+  '@/lib/contentIdentity': ContentIdentity,
   '@lucide/vue': icons,
   ...ui,
   '@/components/compute/run/RunBasics.vue': card('components/compute/run/RunBasics.vue'),
@@ -282,7 +288,16 @@ const ComputeSubmitView = compileClientComponent(url('views/ComputeSubmitView.vu
   '@/composables/useAruna': arunaModule,
   '@/composables/useComputeDataView': { useComputeDataView: () => ref('tree') },
   '@/composables/useS3': S3,
-  '@/composables/useRealmNodes': { useRealmNodes: () => ({ nodes: ref([]) }) },
+  '@/composables/useRealmNodes': {
+    useRealmNodes: () => ({
+      nodes: ref([]),
+      localNodeId: computed(() => nodeInfo.value?.node.peer_id ?? null),
+      isTarget: () => true,
+      isLocalNode: (id: string) => id === nodeInfo.value?.node.peer_id,
+      nodeById: () => null,
+      displayName: (id: string) => id,
+    }),
+  },
   '@/composables/useRealm': { useRealm: () => ({ realm: ref({ shortName: 'Test realm' }) }) },
   '@/composables/useRunTarget': runTargetModule,
   '@/composables/useAssistantRunForm': { provideRunFormBridge: () => {} },
@@ -335,7 +350,7 @@ const TaskDetailPanel = compileClientComponent(url('components/compute/TaskDetai
   '@/composables/s3/endpoints': { resolveObjectUrl: () => null },
   '@/lib/crateImport': { downloadCrateJson: () => undefined },
   '@/lib/deviceApi': { getLocalRunCrate: async () => null, requireDevice: () => ({}) },
-  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id }) },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id, targets: ref([]) }) },
   '@/components/ui/NodeLabel.vue': moduleDefault(GenericStub),
   '@/lib/assistant/objectLinks': ObjectLinks,
   '@/lib/chunk-recovery': ChunkRecovery,
