@@ -163,7 +163,10 @@ watch([nodeId, sessionEpoch, currentUser, revision], async () => {
   moreBuckets.value = Boolean(cursor) || failed
 }, { immediate: true })
 const databases = useDatabases()
-databases.ensure()
+// A stored session may restore after the page opened, and the list needs it.
+watch(currentUser, (user) => {
+  if (user) databases.ensure()
+}, { immediate: true })
 // A database by the realm's database list, as the Data view's bucket list finds it.
 const databaseOf = (hit: BucketSearchHit) => {
   const row = databases.rows.value.find((entry) => entry.bucket === hit.bucket && entry.places.some((place) => place.nodeId === hit.node_id))
