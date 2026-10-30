@@ -1,4 +1,5 @@
 import { crateGraph, crateRootId, stringProp, typesOf } from '@/lib/dataEntities'
+import { unlistedFiles } from '@/lib/bucketLayout'
 import { toArray } from '@/lib/contextualEntities'
 import { prettifyKey } from '@/lib/cratePresenter'
 import { readableIri } from '@/lib/identifiers'
@@ -13,7 +14,7 @@ export interface AboutFacts {
   published: string
   modified: string
   size: string
-  /** File entities the crate lists; zero means none listed, not an empty dataset. */
+  /** Files the crate lists or its folders declare; zero means none known, not an empty dataset. */
   files: number
   identifiers: IdentifierLink[]
   /** The DOI link a citation leads with, when the crate gives one. */
@@ -52,7 +53,7 @@ export function aboutFacts(crate: unknown): AboutFacts {
     published: dateOf(root?.datePublished),
     modified: dateOf(root?.dateModified),
     size: sizeText && Number.isFinite(Number(sizeText)) ? formatBinary(Number(sizeText)) : sizeText,
-    files: graph.filter((entity) => typesOf(entity).some((type) => type === 'File' || type.endsWith('MediaObject'))).length,
+    files: graph.filter((entity) => typesOf(entity).some((type) => type === 'File' || type.endsWith('MediaObject'))).length + unlistedFiles(crate),
     identifiers,
     doi: identifiers.find((link) => link.href?.startsWith('https://doi.org/'))?.href,
   }
