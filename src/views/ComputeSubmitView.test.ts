@@ -735,6 +735,24 @@ describe('run page', () => {
     mounted.app.unmount()
   })
 
+  it('names an uploaded script by its version on the node it was uploaded to', async () => {
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?template=python')
+    await click(button(mounted.root, 'Add output'))
+    await typeValue(input(mounted.root, 'aria-label', 'Container path to capture'), '/work/out/result.txt')
+    await typeValue(input(mounted.root, 'aria-label', 'Destination key'), 'runs/result.txt')
+    await flush()
+
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    expect(s3.putTextObject).toHaveBeenCalled()
+    const [submitted] = createTask.mock.calls.at(-1) as unknown as [Tes.TesTask]
+    const script = submitted.inputs?.find((entry) => entry.path.endsWith('script.py'))
+    expect(script?.url).toMatch(/^arn:aruna:realm:node-id:s3\/results\/.+script\.py@v1$/)
+    mounted.app.unmount()
+  })
+
   it('sends a local run to this device with the local target', async () => {
     runTargetAvailable.value = true
     const mounted = await mount(ComputeSubmitView, '/app/compute/new')

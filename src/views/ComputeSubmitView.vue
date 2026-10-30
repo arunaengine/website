@@ -202,6 +202,20 @@ async function pinInput(input: TesInput, holders: ReadonlyMap<string, readonly s
   })
 }
 
+/** Inputs read from objects this page uploaded, bound to those versions on the upload node. */
+function pinUploads(draft: TesTask, uploads: Array<{ key: string; versionId: string | null } | null>): TesTask {
+  const done = uploads.filter((upload) => upload !== null)
+  if (!done.length) return draft
+  const realmId = nodeInfo.value?.node.realm_id
+  const nodeId = s3.nodeIdFor()
+  if (!realmId || !nodeId || done.some((upload) => !upload.versionId)) {
+    throw new Error('The uploaded script has no exact version on its node, so the run was not started.')
+  }
+  const bucket = stagingBucket.value.trim()
+  const pinned = new Map(done.map((upload) => [`s3://${bucket}/${upload.key}`, versionObjectId(realmId, nodeId, bucket, upload.key, upload.versionId!)]))
+  return { ...draft, inputs: (draft.inputs ?? []).map((input) => (input.url && pinned.has(input.url) ? { ...input, url: pinned.get(input.url) } : input)) }
+}
+
 /** The run as the receiving node reads it, and that node's API; undefined keeps the connected node. */
 async function routeRun(draft: TesTask): Promise<{ draft: TesTask; base: string | undefined }> {
   const { inputs, outputs } = taskBuckets(draft)
@@ -272,6 +286,11 @@ async function run() {
       draft = { ...draft, inputs: localInputs }
     }
     if (await submitLocally(draft)) return
+    // The uploads sit on the connected node; another node must read exactly those versions.
+    draft = pinUploads(draft, [
+      scriptUpload && { key: normalizedScriptKey.value, versionId: scriptUpload.versionId },
+      dependencyUpload && { key: dependencyConfigKey.value, versionId: dependencyUpload.versionId },
+    ])
     const routed = await routeRun(draft)
     const created = await createTask(routed.draft, routed.base)
     void router.push({ name: 'task', params: { taskId: created.id } })
