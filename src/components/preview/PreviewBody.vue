@@ -13,7 +13,7 @@ import KeyedReadNotice from '@/components/storage/KeyedReadNotice.vue'
 import { useKeyedRead } from '@/composables/useKeyedRead'
 import { useObjectPreview } from '@/composables/useObjectPreview'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
-import { Download, Link2, ShieldAlert } from '@lucide/vue'
+import { Download, ShieldAlert } from '@lucide/vue'
 
 const props = defineProps<{
   active: boolean
@@ -179,7 +179,6 @@ function pdfLocked(url: string) {
         v-if="props.referencedFrom || preview.referenced.value"
         class="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground"
       >
-        <Link2 class="h-3 w-3 shrink-0 text-primary/70" />
         <span v-if="props.referencedFrom" class="truncate" :title="`Referenced from ${props.referencedFrom.label}`">
           Referenced from
           <RouterLink

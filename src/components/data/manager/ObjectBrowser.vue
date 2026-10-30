@@ -233,6 +233,15 @@ const referencedSource = computed(() => {
   const groups = referenceStats.value.groups
   return groups.length === 1 ? referenceGroupLabel(groups[0]!) : groups.length > 1 ? `${groups.length} sources` : null
 })
+// One source links its connector or the node it came from, as in the breakdown.
+const referencedLink = computed(() => {
+  const groups = referenceStats.value.groups
+  const group = groups.length === 1 ? groups[0]! : null
+  if (group?.connectorId && activeGroupId.value && shown('connectors')) {
+    return { name: 'group', params: { id: activeGroupId.value }, query: { tab: 'sources', connector: group.connectorId } }
+  }
+  return group?.originNodeId ? { name: 'status', query: { node: group.originNodeId } } : null
+})
 // Why nothing can be added here; Upload and New folder stay in place, disabled, with this hint.
 const addReason = computed(() =>
   remoteBlocked.value ? 'This node cannot be browsed from here, so nothing can be added.'
@@ -628,7 +637,11 @@ async function onDrop(event: DragEvent) {
           </span>
         </template>
         <span v-if="usage" class="tabular-nums">{{ usageText(usage) }}</span>
-        <span v-if="referencedBucket && referencedSource" class="inline-flex items-center gap-1.5"><Link2 class="h-3.5 w-3.5" aria-hidden="true" />Referenced from {{ referencedSource }}</span>
+        <span v-if="referencedBucket && referencedSource">
+          Referenced from
+          <RouterLink v-if="referencedLink" :to="referencedLink" class="text-primary hover:underline">{{ referencedSource }}</RouterLink>
+          <template v-else>{{ referencedSource }}</template>
+        </span>
         <span v-if="activeGroupId" class="inline-flex items-center gap-1.5">
           <Users class="h-3.5 w-3.5" aria-hidden="true" />
           <RouterLink :to="{ name: 'group', params: { id: activeGroupId } }" class="text-primary hover:underline">{{ selectedGroupName || activeGroupId }}</RouterLink>

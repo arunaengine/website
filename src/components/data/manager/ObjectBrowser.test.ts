@@ -358,10 +358,13 @@ describe('object browser link a local folder', () => {
   it('keeps Upload and New folder usable on a bucket of referenced files and names their source', async () => {
     bucketUsage.value.value = { objects: 3, logical_bytes: 300, referenced_bytes: 300 } as never
     try {
-      const root = await render({ referenceStats: computed(() => ({ count: 3, bytes: 300, groups: [{ key: 'ncbi' }] })), referenceGroupLabel: () => 'ftp.ncbi.nlm.nih.gov' })
+      const root = await render({ referenceStats: computed(() => ({ count: 3, bytes: 300, groups: [{ key: 'ncbi', originNodeId: 'n9' }] })), referenceGroupLabel: () => 'ftp.ncbi.nlm.nih.gov' })
       expect(action(root, 'Upload').props.disabled).toBeFalsy()
       expect(action(root, 'New folder').props.disabled).toBeFalsy()
       expect(content(root)).toContain('Referenced from ftp.ncbi.nlm.nih.gov')
+      // The source is a plain link to the node it came from.
+      const source = element(root, (node) => content(node).trim() === 'ftp.ncbi.nlm.nih.gov' && Boolean(node.props.to))
+      expect(source.props.to).toEqual({ name: 'status', query: { node: 'n9' } })
     } finally {
       bucketUsage.value.value = null
     }

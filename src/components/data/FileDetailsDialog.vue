@@ -194,6 +194,12 @@ const fileTarget = computed<PublicTarget>(() => ({
   bucket: props.bucket,
   key: props.objectKey,
 }))
+// The source of a referenced file links its connector, or the node it came from.
+const sourceLink = computed(() => {
+  const from = props.referencedFrom
+  if (from?.connectorId && from.groupId) return { name: 'group', params: { id: from.groupId }, query: { tab: 'sources', connector: from.connectorId } }
+  return from?.originNodeId ? { name: 'status', query: { node: from.originNodeId } } : null
+})
 const filePublic = computed(() => access.isPublic(props.nodeId ?? null, fileTarget.value))
 const publicOpen = ref(false)
 const fileUrl = computed(() => {
@@ -497,7 +503,9 @@ const generalItems = computed<Detail[]>(() => [
           :target="{ bucket: props.bucket, key: props.objectKey, folder: true, node: null }"
         />
         <p v-if="props.referencedFrom" class="mt-3 text-xs text-muted-foreground">
-          Referenced from {{ props.referencedFrom.label }}.
+          Referenced from
+          <RouterLink v-if="sourceLink" :to="sourceLink" class="text-primary hover:underline">{{ props.referencedFrom.label }}</RouterLink>
+          <template v-else>{{ props.referencedFrom.label }}</template>.
         </p>
         <p v-if="headError" class="mt-3 text-xs text-muted-foreground">{{ headError }}</p>
         <p v-if="props.folder" class="mt-3 text-xs text-muted-foreground">
