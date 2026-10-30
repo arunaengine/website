@@ -39,9 +39,9 @@ describe('bucket chooser', () => {
     const html = await renderToString(createSSRApp(BucketChooser, { manager: manager(null) }))
     const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
 
-    expect(text).toContain('laptop 16 files, 69.7 MB, On name-n2')
-    // A database names its title; files and place stay in its own header.
-    expect(text).toContain('refseq NCBI RefSeq genomes')
+    expect(text).toContain('laptop 16 files, 69.7 MB, on name-n2')
+    // A database leads with its title, then the same facts as any bucket.
+    expect(text).toContain('refseq NCBI RefSeq genomes, on name-n2')
     expect(html).toContain(JSON.stringify({ name: 'bucket', params: { bucketId: 'laptop' }, query: { node: 'n2', group: 'g1' } }).replaceAll('"', '&quot;'))
     expect(ensure).toHaveBeenCalledWith([{ bucket: 'laptop', nodeId: 'n2' }, { bucket: 'refseq', nodeId: 'n2' }])
   })
@@ -50,7 +50,7 @@ describe('bucket chooser', () => {
     const html = await renderToString(createSSRApp(BucketChooser, { manager: manager('home') }))
     const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
 
-    expect(text).toContain('only-here On name-home')
+    expect(text).toContain('only-here on name-home')
     expect(text).not.toContain('laptop')
   })
 })

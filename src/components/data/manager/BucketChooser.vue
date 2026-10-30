@@ -31,10 +31,11 @@ const tiles = computed<Tile[]>(() =>
 watch(tiles, (list) => usage.ensure(list.map(({ bucket, nodeId }) => ({ bucket, nodeId }))), { immediate: true })
 
 const databaseOf = (tile: Tile) => databases.find(tile.bucket, tile.nodeId, tile.setId)
+// One line for every tile: a database's title, the files and size, then where it is.
 function lineOf(tile: Tile): string {
   const facts = usage.textOf(tile.bucket, tile.nodeId)
-  const place = tile.nodes.length > 1 ? `Spread over ${tile.nodes.length} nodes` : `On ${realmNodes.displayName(tile.nodeId ?? realmNodes.localNodeId.value)}`
-  return databaseOf(tile)?.title || [facts, place].filter(Boolean).join(', ')
+  const place = tile.nodes.length > 1 ? `spread over ${tile.nodes.length} nodes` : `on ${realmNodes.displayName(tile.nodeId ?? realmNodes.localNodeId.value)}`
+  return [databaseOf(tile)?.title, facts, place].filter(Boolean).join(', ')
 }
 const target = (tile: Tile) => ({
   name: 'bucket',
