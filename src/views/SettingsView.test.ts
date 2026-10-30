@@ -255,6 +255,8 @@ const SettingsView = compileClientComponent(new URL('./SettingsView.vue', import
   '@/components/ui/Avatar.vue': moduleDefault(Empty),
   '@/components/ui/AccessBadge.vue': moduleDefault(Empty),
   '@/components/ui/Skeleton.vue': moduleDefault(Empty),
+  '@/components/ui/IconTile.vue': moduleDefault(Empty),
+  '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent((_, { slots }) => () => h('div', slots.actions?.()))),
   '@/components/ui/Separator.vue': moduleDefault(Empty),
   '@/components/ui/CopyButton.vue': moduleDefault(Empty),
   '@/components/ui/SectionSkeleton.vue': moduleDefault(Empty),
@@ -289,6 +291,7 @@ async function mount(query: string) {
       { path: '/app/settings/watches', name: 'settings-watches', component: RouteStub },
       { path: '/app/profiles', name: 'profiles', component: RouteStub },
       { path: '/app/groups/:id', name: 'group', component: RouteStub },
+      { path: '/app/users/:id', name: 'user', component: RouteStub },
     ],
   })
   await router.push(`/app/settings${query}`)

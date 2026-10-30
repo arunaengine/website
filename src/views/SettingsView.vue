@@ -2,11 +2,12 @@
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
-import Badge from '@/components/ui/Badge.vue'
 import Input from '@/components/ui/Input.vue'
 import Avatar from '@/components/ui/Avatar.vue'
 import AccessBadge from '@/components/ui/AccessBadge.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import IconTile from '@/components/ui/IconTile.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import DevicesPanel from '@/components/onboarding/DevicesPanel.vue'
 import SessionsPanel from '@/components/settings/SessionsPanel.vue'
@@ -37,7 +38,7 @@ import { apiOrigin } from '@/lib/api'
 import { isDesktop } from '@/lib/desktop'
 import { errorMessage } from '@/lib/utils'
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
-import { ChevronRight, Code2, ExternalLink, Eye, Palette, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, Plus, Save } from '@lucide/vue'
+import { ChevronRight, CircleCheck, Code2, ExternalLink, Eye, KeyRound, Laptop, Lock, Palette, Moon, Sun, Monitor, ListChecks, LogIn, Plus, Save, Sparkles, UserRound, Users } from '@lucide/vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { SETTINGS_TAB_ANCHORS } from '@/components/layout/nav'
 import { asyncChunkError } from '@/lib/chunk-recovery'
@@ -80,13 +81,13 @@ const { available: watchesAvailable } = useWatches()
 const { shown } = usePortalFeatures()
 
 const settingsTabs = [
-  { id: 'profile', label: 'Profile' },
-  { id: 'groups', label: 'Groups' },
-  { id: 'access', label: 'Access' },
-  { id: 'devices', label: 'Devices' },
-  { id: 'assistant', label: 'Assistant' },
-  { id: 'keys', label: 'Vault' },
-  { id: 'appearance', label: 'Appearance' },
+  { id: 'profile', label: 'Profile', icon: UserRound },
+  { id: 'groups', label: 'Groups', icon: Users },
+  { id: 'access', label: 'Access', icon: KeyRound },
+  { id: 'devices', label: 'Devices', icon: Laptop },
+  { id: 'assistant', label: 'Assistant', icon: Sparkles },
+  { id: 'keys', label: 'Vault', icon: Lock },
+  { id: 'appearance', label: 'Appearance', icon: Palette },
 ] as const
 // Links and bookmarks still carry the ids of the tabs merged into `access`.
 const legacyTabs: Record<string, string> = { sessions: 'access', connection: 'access' }
@@ -237,7 +238,7 @@ const createGroupOpen = ref(false)
 
 <template>
   <div>
-    <PageHeader title="Settings" description="Your account, groups, access keys and this browser's connection to the realm." :docs="{ topic: 'storage-access' }">
+    <PageHeader title="Settings" :docs="{ topic: 'storage-access' }">
       <template #actions>
         <RefreshButton :busy="refreshBusy" size="default" @click="onRefresh" />
         <Button v-if="watchesAvailable && shown('watches')" variant="outline" size="default" as-child>
@@ -255,19 +256,20 @@ const createGroupOpen = ref(false)
             :key="entry.id"
             :value="entry.id"
             :data-tour="SETTINGS_TAB_ANCHORS[entry.id]"
+            class="gap-1.5"
           >
-            {{ entry.label }}
+            <component :is="entry.icon" class="h-3.5 w-3.5" /> {{ entry.label }}
           </TabsTrigger>
         </TabsList>
       </div>
 
-      <div v-if="!painted" class="w-full px-4 sm:px-6 space-y-5 py-6">
+      <div v-if="!painted" class="w-full px-4 sm:px-6 space-y-8 py-6">
         <SectionSkeleton :lines="4" />
         <SectionSkeleton :lines="3" />
       </div>
 
       <template v-else>
-      <TabsContent value="access" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-5 py-6">
+      <TabsContent value="access" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-8 py-6">
         <ConnectTools v-if="desktop" />
         <section v-if="authPending || !isAuthenticated" class="surface">
           <!-- While the stored session restores, show a placeholder instead of
@@ -358,24 +360,28 @@ const createGroupOpen = ref(false)
 
       </TabsContent>
 
-      <TabsContent value="devices" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-5 py-6">
+      <TabsContent value="devices" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-8 py-6">
         <section class="surface overflow-hidden">
           <DevicesPanel />
         </section>
       </TabsContent>
 
-      <TabsContent value="profile" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-5 py-6">
+      <TabsContent value="profile" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-8 py-6">
         <LinkAccount />
-        <section class="surface">
-          <header class="border-b border-border px-5 py-4">
-            <h3 class="font-display text-sm font-semibold text-aruna-navy">Profile</h3>
-            <p class="text-xs text-muted-foreground">Choose which profile fields other signed-in users in this realm can see and search.</p>
-          </header>
+        <section aria-labelledby="settings-profile-heading">
+          <SectionHeading id="settings-profile-heading" title="Profile" :icon="UserRound" info="Choose which fields other signed-in users in this realm can see and search.">
+            <template v-if="currentUser" #actions>
+              <Button variant="outline" size="sm" as-child>
+                <RouterLink :to="{ name: 'user', params: { id: currentUser.id } }"><Eye class="h-3.5 w-3.5" /> View public profile</RouterLink>
+              </Button>
+            </template>
+          </SectionHeading>
+          <div class="surface">
           <div v-if="currentUser" class="flex items-center gap-4 border-b border-border px-5 py-5">
             <Avatar :user="currentUser" size="lg" />
             <div>
               <div class="font-medium text-foreground">{{ currentUser.name }}</div>
-              <div v-if="currentUser.email" class="text-[11px] text-muted-foreground">{{ currentUser.email }}</div>
+              <div v-if="currentUser.email" class="text-xs text-muted-foreground">{{ currentUser.email }}</div>
             </div>
           </div>
           <div v-else class="border-b border-border px-5 py-5 text-sm text-muted-foreground">No authenticated user loaded.</div>
@@ -386,8 +392,8 @@ const createGroupOpen = ref(false)
             <div><label class="text-xs font-medium text-foreground">ORCID</label><Input v-model="orcid" placeholder="0000-0000-0000-0000" class="mt-1" /></div>
           </div>
           <div class="border-t border-border px-5 py-4">
-            <h4 class="text-sm font-medium text-foreground">Public profile fields</h4>
-            <p class="mt-1 text-xs text-muted-foreground">Your name is public by default. Other fields stay private unless selected. Private fields remain available to you and authorized realm administrators.</p>
+            <h4 class="text-sm font-medium text-foreground">Public fields</h4>
+            <p class="mt-1 text-xs text-muted-foreground">Your name is always public. Realm admins see every field.</p>
             <div class="mt-3 flex flex-wrap gap-x-6 gap-y-3">
               <label v-for="field in profileFields" :key="field" class="flex items-center gap-2 text-sm">
                 <input v-model="visibility[field]" type="checkbox" :aria-label="`Make ${fieldLabels[field] ?? field} public`" class="accent-primary" :disabled="!currentUser || saving" />
@@ -403,81 +409,90 @@ const createGroupOpen = ref(false)
               <Save class="h-3.5 w-3.5" /> {{ saving ? 'Saving…' : 'Save profile' }}
             </Button>
           </div>
+          </div>
         </section>
 
-        <section class="surface">
-          <header class="flex items-center justify-between border-b border-border px-5 py-4">
-            <div class="flex items-center gap-2"><ListChecks class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Default profile</h3></div>
-            <Button v-if="shown('profiles')" variant="outline" size="sm" as-child><RouterLink :to="{ name: 'profiles' }">Browse profiles <ArrowRight class="h-3.5 w-3.5" /></RouterLink></Button>
-          </header>
+        <section aria-labelledby="settings-default-profile-heading">
+          <SectionHeading id="settings-default-profile-heading" title="Default profile" :icon="ListChecks" info="New datasets start with this profile.">
+            <template v-if="shown('profiles')" #actions>
+              <Button variant="outline" size="sm" as-child><RouterLink :to="{ name: 'profiles' }"><ListChecks class="h-3.5 w-3.5" /> Browse profiles</RouterLink></Button>
+            </template>
+          </SectionHeading>
+          <div class="surface">
           <div class="grid gap-2 p-5 sm:grid-cols-2">
             <button v-for="profile in defaultProfiles" :key="profile.id" type="button" class="flex items-start gap-3 rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-primary/40" :class="preferredProfileId === profile.id ? 'border-primary/60 ring-1 ring-primary/30' : ''" @click="preferredProfileId = profile.id">
               <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" :style="{ backgroundColor: profile.iconColor }"><ListChecks class="h-4 w-4" /></span>
-              <div class="min-w-0 flex-1"><div class="flex items-center gap-2"><span class="text-sm font-medium text-foreground">{{ profile.name }}</span><Badge v-if="preferredProfileId === profile.id" size="sm" variant="accent" class="uppercase">default</Badge></div><p class="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{{ profile.description }}</p></div>
+              <div class="min-w-0 flex-1"><div class="flex items-center gap-2"><span class="text-sm font-medium text-foreground">{{ profile.name }}</span><CircleCheck v-if="preferredProfileId === profile.id" class="size-4 shrink-0 text-status-ok" aria-label="Default" /></div><p class="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{{ profile.description }}</p></div>
             </button>
             <div v-if="!defaultProfiles.length" class="text-sm text-muted-foreground">No profile you can use is visible to you.</div>
           </div>
-          <p v-if="hiddenProfiles" class="px-5 pb-3 text-[11px] text-muted-foreground">
+          <p v-if="hiddenProfiles" class="px-5 pb-3 text-xs text-muted-foreground">
             {{ PROFILE_SCOPE_REASON }} {{ hiddenProfiles }} {{ hiddenProfiles === 1 ? 'profile is' : 'profiles are' }} not listed here.
           </p>
-          <div v-if="preferredProfile" class="border-t border-border bg-muted/20 px-5 py-3 text-[11px] text-muted-foreground">Selected: <span class="font-medium text-foreground">{{ preferredProfile.name }}</span><span v-if="profileDirty">, apply with "Save profile" above.</span></div>
+          <div v-if="preferredProfile" class="border-t border-border bg-muted/20 px-5 py-3 text-xs text-muted-foreground">Selected: <span class="font-medium text-foreground">{{ preferredProfile.name }}</span><span v-if="profileDirty">, apply with "Save profile" above.</span></div>
+          </div>
         </section>
         <LinkedLogins />
       </TabsContent>
 
-      <TabsContent value="groups" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-5 py-6">
-        <section class="surface overflow-hidden">
-          <header class="flex items-center justify-between border-b border-border px-5 py-4">
-            <div class="flex items-center gap-2"><h3 class="font-display text-sm font-semibold text-aruna-navy">Groups &amp; roles</h3><Badge variant="outline" class="tabular-nums">{{ myGroups.length }} groups</Badge></div>
-            <Button size="sm" :disabled="!currentUser" @click="createGroupOpen = true"><Plus class="h-3.5 w-3.5" /> Create group</Button>
-          </header>
-          <ul class="divide-y divide-border">
+      <TabsContent value="groups" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-8 py-6">
+        <section aria-labelledby="settings-groups-heading">
+          <SectionHeading id="settings-groups-heading" title="Your groups" :icon="Users">
+            <template #actions>
+              <Button variant="outline" size="sm" :disabled="!currentUser" @click="createGroupOpen = true"><Plus class="h-3.5 w-3.5" /> Create group</Button>
+            </template>
+          </SectionHeading>
+          <EmptyState v-if="!myGroups.length" title="You are not in a group yet.">
+            <template #icon><Users class="size-6" /></template>
+            <Button v-if="currentUser" variant="outline" size="sm" @click="createGroupOpen = true">
+              <Plus class="h-3.5 w-3.5" /> Create group
+            </Button>
+          </EmptyState>
+          <ul v-else class="surface divide-y divide-border-subtle overflow-hidden">
             <li v-for="group in myGroups" :key="group.id">
               <RouterLink :to="{ name: 'group', params: { id: group.id } }" class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40">
-                <span class="h-2 w-2 shrink-0 rounded-full bg-primary" />
-                <div class="min-w-0 flex-1"><div class="truncate text-sm font-medium text-foreground">{{ group.name }}</div><div class="truncate font-mono text-[10px] text-muted-foreground">{{ group.id }}</div></div>
-                <Badge v-if="group.memberCount !== undefined" variant="outline" class="shrink-0 tabular-nums">{{ group.memberCount }} {{ group.memberCount === 1 ? 'member' : 'members' }}</Badge>
+                <IconTile :icon="Users" size="sm" />
+                <div class="min-w-0 flex-1">
+                  <div class="truncate text-sm font-medium text-foreground">{{ group.name }}</div>
+                  <div class="flex flex-wrap items-center gap-x-4 text-xs text-muted-foreground">
+                    <span class="truncate font-mono">{{ group.id }}</span>
+                    <span v-if="group.memberCount !== undefined" class="inline-flex items-center gap-1.5"><Users class="size-3.5" /><b class="font-medium text-foreground">{{ group.memberCount }}</b> {{ group.memberCount === 1 ? 'member' : 'members' }}</span>
+                  </div>
+                </div>
                 <div class="flex flex-wrap justify-end gap-1"><AccessBadge v-for="role in group.tags" :key="role" :access="role" /></div>
-                <ChevronRight class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <ChevronRight class="h-4 w-4 shrink-0 text-muted-foreground" />
               </RouterLink>
             </li>
-            <li v-if="!myGroups.length" class="p-3">
-              <EmptyState compact title="You are not a member of any group yet, create one to get started.">
-                <Button v-if="currentUser" variant="outline" size="sm" @click="createGroupOpen = true">
-                  <Plus class="h-3.5 w-3.5" /> Create group
-                </Button>
-              </EmptyState>
+          </ul>
+        </section>
+        <section v-if="discoverableGroups.length" aria-labelledby="settings-other-groups-heading">
+          <SectionHeading id="settings-other-groups-heading" title="Other groups" :icon="Users" info="Their admins manage membership. Request access on the group's page." />
+          <ul class="surface divide-y divide-border-subtle overflow-hidden">
+            <li v-for="group in discoverableGroups" :key="group.id">
+              <RouterLink :to="{ name: 'group', params: { id: group.id } }" class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40">
+                <IconTile :icon="Users" tone="muted" size="sm" />
+                <div class="min-w-0 flex-1"><div class="truncate text-sm font-medium text-foreground">{{ group.name }}</div><div class="truncate font-mono text-xs text-muted-foreground">{{ group.id }}</div></div>
+                <ChevronRight class="h-4 w-4 shrink-0 text-muted-foreground" />
+              </RouterLink>
             </li>
           </ul>
-          <div v-if="discoverableGroups.length" class="border-t border-border">
-            <h2 class="px-5 pb-1 pt-4 font-display text-sm font-semibold text-aruna-navy">Other groups in this realm</h2>
-            <ul class="divide-y divide-border">
-              <li v-for="group in discoverableGroups" :key="group.id">
-                <RouterLink :to="{ name: 'group', params: { id: group.id } }" class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40">
-                  <span class="h-2 w-2 shrink-0 rounded-full bg-border" />
-                  <div class="min-w-0 flex-1"><div class="truncate text-sm font-medium text-foreground">{{ group.name }}</div><div class="truncate font-mono text-[10px] text-muted-foreground">{{ group.id }}</div></div>
-                  <span class="shrink-0 text-[11px] text-muted-foreground">Membership is managed by the group's admins.</span>
-                </RouterLink>
-              </li>
-            </ul>
-          </div>
-          <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => router.push({ name: 'group', params: { id: group.group_id } })" />
         </section>
+        <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => router.push({ name: 'group', params: { id: group.group_id } })" />
       </TabsContent>
 
-      <TabsContent value="assistant" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-5 py-6">
+      <TabsContent value="assistant" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-8 py-6">
         <AssistantProviders />
         <McpConnect />
       </TabsContent>
 
-      <TabsContent value="keys" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-5 py-6">
+      <TabsContent value="keys" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-8 py-6">
         <VaultSettings />
       </TabsContent>
 
-      <TabsContent value="appearance" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-5 py-6">
-        <section class="surface">
-          <header class="flex items-center justify-between border-b border-border px-5 py-4"><div class="flex items-center gap-2"><Palette class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Appearance</h3></div></header>
-          <div class="grid gap-3 p-5 md:grid-cols-3">
+      <TabsContent value="appearance" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-8 py-6">
+        <section aria-labelledby="settings-appearance-heading">
+          <SectionHeading id="settings-appearance-heading" title="Appearance" :icon="Palette" />
+          <div class="surface grid gap-3 p-5 md:grid-cols-3">
             <button v-for="option in themeOptions" :key="option.id" class="flex items-center gap-3 rounded-lg border border-border bg-background/70 p-3 text-left transition-colors hover:border-primary/40" :class="appearance === option.id ? 'border-primary/60 ring-1 ring-primary/30' : ''" @click="setTheme(option.id)"><span class="grid h-12 w-16 shrink-0 place-items-center rounded-md border border-border shadow-inner" :style="{ background: option.preview }"><component :is="option.icon" class="h-4 w-4 text-primary" /></span><div><div class="text-sm font-medium text-foreground">{{ option.title }}</div></div></button>
           </div>
         </section>
