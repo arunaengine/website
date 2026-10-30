@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import { computed, ref, toRaw, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import StrategyEditor from '@/components/placement/StrategyEditor.vue'
@@ -23,7 +24,7 @@ import {
   knownLocations as computeKnownLocations,
   type RealmPlacementConfigResponse,
 } from '@/lib/placement'
-import { Layers, Link2, Plus, SlidersHorizontal } from '@lucide/vue'
+import { Layers, Link2, MapPinned, Plus, SlidersHorizontal } from '@lucide/vue'
 
 // Realm-admin access is gated by the parent AdminView; this panel only guards
 // the placement feature flag.
@@ -274,29 +275,28 @@ watch(
       </section>
     </div>
 
-    <div v-else class="w-full px-4 sm:px-6 space-y-5 py-6">
+    <div v-else class="w-full space-y-8 px-4 py-6 sm:px-6">
       <div class="surface flex flex-wrap items-center justify-between gap-3 px-5 py-4">
         <p class="max-w-3xl text-sm text-muted-foreground">
           Record placement decides which nodes hold dataset records and system jobs. It never
           decides where files are stored: that is the storage backend of the node taking the upload,
           and the placement policies the bucket carries.
         </p>
-        <RouterLink :to="{ name: 'status' }" class="text-xs font-medium text-primary hover:underline">
-          See the realm locations on Status
-        </RouterLink>
+        <Button variant="outline" size="sm" as-child>
+          <RouterLink :to="{ name: 'status' }"><MapPinned class="h-3.5 w-3.5" /> Locations on Status</RouterLink>
+        </Button>
       </div>
 
       <NodeAttributesSection />
 
       <div class="space-y-5">
-        <section id="strategies" class="surface scroll-mt-24">
-          <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-4">
-            <div class="flex items-center gap-2">
-              <SlidersHorizontal class="h-4 w-4 text-primary" />
-              <h3 class="font-display text-sm font-semibold text-aruna-navy">Record placement rules</h3>
-            </div>
-            <RefreshButton :busy="spinning" :disabled="busy" label="Reload" @click="onReload" />
-          </header>
+        <section id="strategies" class="scroll-mt-24">
+          <SectionHeading title="Record placement rules" :icon="SlidersHorizontal" :level="3">
+            <template #actions>
+              <RefreshButton :busy="spinning" :disabled="busy" label="Reload" @click="onReload" />
+            </template>
+          </SectionHeading>
+          <div class="surface">
           <div class="space-y-4 p-5">
             <template v-if="loading && !config">
               <Skeleton class="h-8" />
@@ -352,13 +352,12 @@ watch(
               </template>
             </template>
           </div>
+          </div>
         </section>
 
-        <section id="group-bindings" class="surface scroll-mt-24">
-          <header class="flex items-center gap-2 border-b border-border px-5 py-4">
-            <Link2 class="h-4 w-4 text-primary" />
-            <h3 class="font-display text-sm font-semibold text-aruna-navy">Group bindings</h3>
-          </header>
+        <section id="group-bindings" class="scroll-mt-24">
+          <SectionHeading title="Group bindings" :icon="Link2" :level="3" />
+          <div class="surface">
           <div class="space-y-4 p-5">
             <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
               <Input v-model="bindingGroupId" class="font-mono" placeholder="Group id" :disabled="busy || !config" />
@@ -380,6 +379,7 @@ watch(
                 <Button variant="ghost" size="sm" :disabled="busy" @click="removeGroupBinding(binding)">Remove</Button>
               </li>
             </ul>
+          </div>
           </div>
         </section>
       </div>

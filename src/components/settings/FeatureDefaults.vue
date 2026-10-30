@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import { ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -6,7 +7,7 @@ import Switch from '@/components/ui/Switch.vue'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { FEATURE_GROUPS } from '@/lib/features'
 import { errorMessage } from '@/lib/utils'
-import { Save } from '@lucide/vue'
+import { Save, SlidersHorizontal } from '@lucide/vue'
 
 const { realmDefaults, defaultsLoading, saveDefaults } = usePortalFeatures()
 
@@ -41,14 +42,13 @@ async function save() {
 </script>
 
 <template>
-  <section class="surface">
-    <header class="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
-      <div>
-        <h3 class="font-display text-sm font-semibold text-aruna-navy">Portal features</h3>
-        <p class="text-xs text-muted-foreground">Defaults for members without their own choice. Admins see all features.</p>
-      </div>
-      <Button size="sm" :disabled="saving || defaultsLoading" @click="save"><Save class="h-3.5 w-3.5" /> Save</Button>
-    </header>
+  <section>
+    <SectionHeading title="Portal features" :icon="SlidersHorizontal" :level="3" info="Defaults for members without their own choice. Admins see all features.">
+      <template #actions>
+        <Button size="sm" :disabled="saving || defaultsLoading" @click="save"><Save class="h-3.5 w-3.5" /> Save</Button>
+      </template>
+    </SectionHeading>
+    <div class="surface">
     <div class="grid gap-x-8 gap-y-5 p-5 lg:grid-cols-2">
       <div v-for="group in FEATURE_GROUPS" :key="group.label">
         <h4 class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{{ group.label }}</h4>
@@ -70,6 +70,7 @@ async function save() {
     </div>
     <div v-if="error || message" class="border-t border-border px-5 py-3">
       <Notice :tone="error ? 'error' : 'success'">{{ error ?? message }}</Notice>
+    </div>
     </div>
   </section>
 </template>

@@ -2,6 +2,7 @@
 // Realm federation settings: who can find this realm and who may log in from other realms.
 // A save replaces all settings, so it names the loaded ones by their ETag; the node refuses
 // it when they changed meanwhile.
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import { computed, onMounted, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
@@ -19,7 +20,7 @@ import {
 } from '@/lib/api'
 import { checkRealm, knownRealm } from '@/lib/federation/realms'
 import { assertCurrentSession, refreshContext, sessionEpoch } from '@/composables/aruna/state'
-import { Plus, Save, X } from '@lucide/vue'
+import { Globe, Plus, Save, X } from '@lucide/vue'
 
 const { realm } = useAruna()
 
@@ -131,11 +132,9 @@ async function save() {
 </script>
 
 <template>
-  <section class="surface overflow-hidden" aria-labelledby="federation-settings-title">
-    <header class="border-b border-border px-5 py-4">
-      <h3 id="federation-settings-title" class="font-display text-sm font-semibold text-aruna-navy">Federation</h3>
-      <p class="text-xs text-muted-foreground">Let people from other realms find and use this realm.</p>
-    </header>
+  <section aria-labelledby="federation-settings-title">
+    <SectionHeading id="federation-settings-title" title="Federation" :icon="Globe" :level="3" info="Let people from other realms find and use this realm." />
+    <div class="surface overflow-hidden">
     <Spinner v-if="loading" show-label label="Loading…" class="p-5 text-sm" />
     <fieldset v-else :disabled="!editable" class="min-w-0 space-y-5 p-5">
       <div class="grid gap-4 sm:grid-cols-2">
@@ -208,5 +207,6 @@ async function save() {
         <Spinner v-if="saving" class="text-current" aria-hidden="true" /><Save v-else class="h-4 w-4" /> Save
       </Button>
     </footer>
+    </div>
   </section>
 </template>

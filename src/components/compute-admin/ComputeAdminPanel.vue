@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import { computed, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -275,14 +276,13 @@ watch(
           <ErrorPanel v-else-if="loadError" :message="loadError" @retry="loadConfig" />
 
           <template v-else-if="draft">
-            <section id="compute-links" class="surface scroll-mt-24">
-              <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-4">
-                <div class="flex items-center gap-2">
-                  <Network class="h-4 w-4 text-primary" />
-                  <h3 class="font-display text-sm font-semibold text-aruna-navy">Directed bandwidth links</h3>
-                </div>
-                <Button size="sm" variant="outline" @click="addLink"><Plus class="h-3.5 w-3.5" /> Add link</Button>
-              </header>
+            <section id="compute-links" class="scroll-mt-24">
+              <SectionHeading title="Directed bandwidth links" :icon="Network" :level="3">
+                <template #actions>
+                  <Button size="sm" variant="outline" @click="addLink"><Plus class="h-3.5 w-3.5" /> Add link</Button>
+                </template>
+              </SectionHeading>
+              <div class="surface">
               <div class="space-y-5 p-5">
                 <div v-if="draft.links.length" class="overflow-x-auto rounded-md border border-border">
                   <table class="w-full min-w-[680px] text-left text-xs">
@@ -358,13 +358,12 @@ watch(
                   </div>
                 </div>
               </div>
+              </div>
             </section>
 
-            <section id="compute-quotas" class="surface scroll-mt-24">
-              <header class="flex items-center gap-2 border-b border-border px-5 py-4">
-                <Gauge class="h-4 w-4 text-primary" />
-                <h3 class="font-display text-sm font-semibold text-aruna-navy">Compute quotas</h3>
-              </header>
+            <section id="compute-quotas" class="scroll-mt-24">
+              <SectionHeading title="Compute quotas" :icon="Gauge" :level="3" />
+              <div class="surface">
               <div class="space-y-6 p-5">
                 <div>
                   <h4 class="text-xs font-semibold text-foreground">Realm default quota</h4>
@@ -415,18 +414,17 @@ watch(
                   <Button variant="ghost" :disabled="!dirty || saving" @click="resetConfig">Reset</Button>
                 </div>
               </div>
+              </div>
             </section>
           </template>
 
-          <section id="compute-snapshots" class="surface scroll-mt-24">
-            <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-4">
-              <div class="flex items-center gap-2">
-                <Activity class="h-4 w-4 text-primary" />
-                <h3 class="font-display text-sm font-semibold text-aruna-navy">Approximate replicated view</h3>
-                <Badge v-if="snapshots?.approximate ?? true" variant="warn">approximate</Badge>
-              </div>
-              <RefreshButton :busy="snapshotSpinning" @click="onReloadSnapshots" />
-            </header>
+          <section id="compute-snapshots" class="scroll-mt-24">
+            <SectionHeading title="Replicated view" :icon="Activity" :level="3" info="Approximate: each node reports on its own schedule.">
+              <template #actions>
+                <RefreshButton :busy="snapshotSpinning" @click="onReloadSnapshots" />
+              </template>
+            </SectionHeading>
+            <div class="surface">
             <div class="space-y-5 p-5">
               <p class="text-[11px] text-muted-foreground">
                 Reserved resources are physical per-node capacity; group demand is logical admitted work. They are separate controls and are never summed.
@@ -518,13 +516,12 @@ watch(
               </template>
               <div v-else-if="snapshotLoading" class="space-y-2"><Skeleton class="h-20" /><Skeleton class="h-20" /></div>
             </div>
+            </div>
           </section>
 
-          <section id="compute-drain" class="surface scroll-mt-24">
-            <header class="flex items-center gap-2 border-b border-border px-5 py-4">
-              <ServerCog class="h-4 w-4 text-primary" />
-              <h3 class="font-display text-sm font-semibold text-aruna-navy">This node's compute drain</h3>
-            </header>
+          <section id="compute-drain" class="scroll-mt-24">
+            <SectionHeading title="This node's compute drain" :icon="ServerCog" :level="3" />
+            <div class="surface">
             <div class="space-y-3 p-5">
               <label class="inline-flex items-center gap-2 text-sm font-medium text-foreground">
                 <Switch :checked="snapshots?.operator_draining ?? false" :disabled="drainBusy || !snapshots" aria-label="Drain this node's compute plane" @update:checked="setDrain" />
@@ -535,6 +532,7 @@ watch(
               </p>
               <p v-if="drainError" class="text-xs text-destructive">{{ drainError }}</p>
               <p v-else-if="drainMessage" class="text-xs text-emerald-700 dark:text-emerald-300">{{ drainMessage }}</p>
+            </div>
             </div>
           </section>
         </div>

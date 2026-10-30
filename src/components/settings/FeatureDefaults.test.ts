@@ -40,6 +40,7 @@ beforeAll(async () => {
     vue: VueRuntime,
     '@lucide/vue': new Proxy({}, { get: () => IconStub }),
     '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
+    '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent((_, { slots }) => () => h('div', [slots.actions?.(), slots.default?.()]))),
     '@/components/ui/Notice.vue': moduleDefault(Slotted('p')),
     '@/components/ui/Switch.vue': moduleDefault(SwitchStub),
     '@/composables/usePortalFeatures': composable,

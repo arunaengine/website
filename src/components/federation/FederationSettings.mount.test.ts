@@ -18,6 +18,7 @@ const Settings = compileClientComponent(new URL('./FederationSettings.vue', impo
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => Empty }),
   '@/components/ui/Button.vue': moduleDefault(Button),
+  '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent((_, { slots }) => () => h('div', [slots.actions?.(), slots.default?.()]))),
   '@/components/ui/Input.vue': moduleDefault(Input),
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
   '@/components/ui/Spinner.vue': moduleDefault(Empty),

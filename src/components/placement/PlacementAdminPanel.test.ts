@@ -131,6 +131,7 @@ const PlacementAdminPanel = compileClientComponent(
     '@/components/placement/StrategyEditor.vue': moduleDefault(StrategyEditor),
     '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
     '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+    '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent({ props: { title: String }, setup: (p, { slots }) => () => h('div', [p.title, slots.actions?.()]) })),
     '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
     '@/components/ui/EmptyState.vue': moduleDefault(EmptyStateStub),
     '@/components/ui/ErrorPanel.vue': moduleDefault(ErrorPanelStub),

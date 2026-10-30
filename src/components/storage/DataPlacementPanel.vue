@@ -2,6 +2,7 @@
 // Realm admin view of the rules that govern where copies of data may be
 // stored. Record placement, which decides where dataset records and system
 // jobs live, is a different tab and a different machine.
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
@@ -14,7 +15,7 @@ import PlacementRuleEditor from '@/components/storage/PlacementRuleEditor.vue'
 import PolicyLibrary from '@/components/storage/PolicyLibrary.vue'
 import { useAruna } from '@/composables/useAruna'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
-import { ShieldCheck } from '@lucide/vue'
+import { Package, ShieldCheck } from '@lucide/vue'
 
 const { bootstrapped, currentUser, isRealmAdmin } = useAruna()
 const { placementAdminEnabled, loadPolicyPage } = usePlacementPolicies()
@@ -63,20 +64,18 @@ watch(
 
       <PolicyLibrary />
 
-      <section class="surface">
-        <header class="flex items-center gap-2 border-b border-border px-5 py-4">
-          <ShieldCheck class="size-4 text-primary" />
-          <h2 class="font-display text-sm font-semibold text-aruna-navy">Publish a policy for the realm</h2>
-        </header>
+      <section>
+        <SectionHeading title="Publish a policy for the realm" :icon="ShieldCheck" :level="3" />
+        <div class="surface">
         <div class="p-5">
           <PlacementRuleEditor :owner-group-id="null" owner-label="Realm" />
         </div>
+        </div>
       </section>
 
-      <section class="surface">
-        <header class="flex items-center gap-2 border-b border-border px-5 py-4">
-          <h2 class="font-display text-sm font-semibold text-aruna-navy">Attach a policy to a bucket</h2>
-        </header>
+      <section>
+        <SectionHeading title="Attach a policy to a bucket" :icon="Package" :level="3" />
+        <div class="surface">
         <div class="space-y-2 px-5 py-4">
           <p class="text-xs text-muted-foreground">
             A bucket carries its rules on its own Storage page, together with what this node
@@ -93,6 +92,7 @@ watch(
             </Button>
             <span v-else class="text-xs text-muted-foreground">Name a bucket to open its Storage page.</span>
           </div>
+        </div>
         </div>
       </section>
 
