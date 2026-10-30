@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   ListChecks,
   MessageSquare,
-  NotebookPen,
   Settings,
   ShieldCheck,
   Users,
@@ -76,8 +75,10 @@ export function navEntries(options: NavOptions): NavEntry[] {
     { to: '/app/buckets', icon: Boxes, label: 'Data', primary: true },
     { to: '/app/datasets', icon: FileJson2, label: 'Datasets', match: ['/app/datasets'], primary: true },
     ...(shown('profiles') ? [{ to: '/app/profiles', icon: ListChecks, label: 'Profiles' }] : []),
-    ...(computeEnabled() && shown('compute') ? [{ to: '/app/compute', icon: Workflow, label: 'Compute', primary: true }] : []),
-    ...(featureEnabled('tes') && shown('notebooks') ? [{ to: '/app/notebooks', icon: NotebookPen, label: 'Notebooks' }] : []),
+    // Notebooks live in Compute, so either switch keeps the one entry.
+    ...((computeEnabled() && shown('compute')) || (featureEnabled('tes') && shown('notebooks'))
+      ? [{ to: '/app/compute', icon: Workflow, label: 'Compute', match: ['/app/compute', '/app/notebooks'], primary: true }]
+      : []),
     ...(options.assistant ? [{ to: '/app/assistant', icon: MessageSquare, label: 'Assistant' }] : []),
     navSeparator,
     // A folder page belongs to This computer, where its folder is listed.
@@ -106,8 +107,8 @@ export function navAnchor(label: string): string {
 
 /** True while the route sits on the entry's own destination or below it. */
 export function navItemActive(item: NavItem, path: string, notebooks = false): boolean {
-  // The notebooks flavour of the data view belongs to Notebooks, not to Data.
-  if (notebooks) return item.to === '/app/notebooks'
+  // The notebooks flavour of the data view belongs to Compute, not to Data.
+  if (notebooks) return item.to === '/app/compute'
   const under = (prefix: string) => path === prefix || path.startsWith(`${prefix}/`)
   // An exact entry is still active on the paths it also matches.
   if (item.exact) return path === item.to || (item.match ?? []).some(under)

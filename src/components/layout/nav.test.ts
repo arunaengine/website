@@ -57,6 +57,15 @@ describe('navigation feature switches', () => {
   })
 
   it('keeps every entry without switches', () => {
-    expect(paths()).toEqual(expect.arrayContaining(['/app/profiles', '/app/compute', '/app/notebooks']))
+    expect(paths()).toEqual(expect.arrayContaining(['/app/profiles', '/app/compute']))
+  })
+
+  it('folds Notebooks into the one Compute entry', () => {
+    expect(paths()).not.toContain('/app/notebooks')
+    const compute = navEntries({ desktop: false, isRealmAdmin: false, canInspectUsers: false })
+      .filter((item): item is NavItem => !('separator' in item))
+      .find((item) => item.to === '/app/compute')!
+    expect(navItemActive(compute, '/app/notebooks/n-1')).toBe(true)
+    expect(navItemActive(compute, '/app/buckets', true)).toBe(true)
   })
 })

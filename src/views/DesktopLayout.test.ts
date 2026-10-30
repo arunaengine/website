@@ -195,7 +195,6 @@ describe('desktop shell', () => {
       '/app/datasets',
       '/app/profiles',
       '/app/compute',
-      '/app/notebooks',
       '/app/device',
       '/app/groups',
       '/app/status',
@@ -262,7 +261,7 @@ describe('desktop shell', () => {
 
     expect(idle).toHaveBeenCalledOnce()
     expect(resolveRoute).toHaveBeenCalledWith('/app/device')
-    expect(pageLoader).toHaveBeenCalledTimes(11)
+    expect(pageLoader).toHaveBeenCalledTimes(10)
     desktop.app.unmount()
 
     desktopMode = false
