@@ -221,7 +221,7 @@ describe('device summary', () => {
     expect(text).toContain('eu-west=1')
     expect(text).not.toContain('(not in placement map)')
     // A plain line instead of the DHT term, with the replication beside it.
-    expect(text).toContain('1/1 online All reachable Replication ×2')
+    expect(text).toContain('1/1 online All reachable Metadata on 2 nodes')
     expect(text).not.toContain('present in DHT')
   })
 

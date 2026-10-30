@@ -203,10 +203,11 @@ const sortedNodes = computed(() =>
 
 // Online as the cards say it: the node is present in the realm.
 const onlineCount = computed(() => cardNodes.value.filter((node) => node.present).length)
-const replicationLabel = computed(() => {
+// Only metadata is copied automatically; the factor says nothing about data copies.
+const metadataCopies = computed(() => {
   const factor = realmInfo.value?.metadata_replication.default_replication_factor
-  if (factor === null) return 'all eligible nodes'
-  return factor === undefined ? 'unknown' : `×${factor}`
+  if (factor === null) return 'Metadata on all eligible nodes'
+  return factor === undefined ? null : `Metadata on ${factor} ${factor === 1 ? 'node' : 'nodes'}`
 })
 
 // Placement location aggregates over the live /info/realm data (aruna#269). Pure
@@ -335,7 +336,7 @@ watch(
           <template #unit>online</template>
           <span v-if="onlineCount === cardNodes.length && cardNodes.length"><CircleCheck class="text-status-ok" />All reachable</span>
           <span v-else-if="cardNodes.length" class="text-status-warn"><TriangleAlert /><b>{{ cardNodes.length - onlineCount }}</b> offline</span>
-          <span><Copy />Replication {{ replicationLabel }}</span>
+          <span v-if="metadataCopies"><Copy />{{ metadataCopies }}</span>
         </OverviewCell>
         <OverviewCell label="Locations" :icon="MapPinned" tone="sky">
           <template #value>{{ formatNumber(mappedLocationCount) }}</template>

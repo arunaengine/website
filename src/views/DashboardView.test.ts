@@ -565,6 +565,16 @@ describe('authenticated dashboard scope', () => {
     expect(text).toContain('row server-node')
     expect(text).not.toContain('row owned-device')
   })
+
+  it('names the metadata copies and claims no data replication', async () => {
+    currentUser.value = { id: 'user-id', name: 'Ada Lovelace' }
+    realmInfo.value = { metadata_replication: { default_replication_factor: 3 }, nodes: [{ node_id: 'server-node', kind: 'server', present: true }] }
+
+    const text = await renderedText()
+
+    expect(text).toContain('Metadata on 3 nodes')
+    expect(text).not.toContain('Replication')
+  })
 })
 
 describe('welcome card', () => {

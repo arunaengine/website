@@ -235,9 +235,11 @@ const groupView = useViewMode('dashboard-groups')
 // The node under the pointer, lit up on the topology and in the table together.
 const hoveredNode = ref<string | null>(null)
 
-const replication = computed(() => {
+// Only metadata is copied automatically; the factor says nothing about data copies.
+const metadataCopies = computed(() => {
   const factor = realmInfo.value?.metadata_replication.default_replication_factor
-  return factor === null ? 'Replication on all eligible nodes' : factor === undefined ? null : `Replication ×${factor}`
+  if (factor === null) return 'Metadata on all eligible nodes'
+  return factor === undefined ? null : `Metadata on ${factor} ${factor === 1 ? 'node' : 'nodes'}`
 })
 
 const publicOverview = computed(() => realmInfo.value?.public_overview)
@@ -409,7 +411,7 @@ const pageDescription = computed(() =>
               </span>
               <span v-else><CircleCheck class="text-status-ok" /><b>{{ onlineNodes }}/{{ infraNodes.length }}</b> online</span>
             </template>
-            <span v-if="replication"><Copy />{{ replication }}</span>
+            <span v-if="metadataCopies"><Copy />{{ metadataCopies }}</span>
           </OverviewCell>
         </div>
       </section>
