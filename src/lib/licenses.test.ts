@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { licenseLabelOf, wellKnownLicense } from './licenses'
+import { licenseLabelOf, licenseText, wellKnownLicense } from './licenses'
 
 describe('wellKnownLicense', () => {
   it('maps cc licenses', () => {
@@ -42,5 +42,15 @@ describe('licenseLabelOf', () => {
   it('falls back readable', () => {
     expect(licenseLabelOf('https://example.org/terms/internal-license/')).toBe('internal-license')
     expect(licenseLabelOf('urn:example:license:closed')).toBe('urn:example:license:closed')
+  })
+})
+
+describe('license text', () => {
+  it('reads SPDX Creative Commons ids and IRIs the same way', () => {
+    expect(licenseText('CC-BY-4.0')).toBe('CC BY 4.0')
+    expect(licenseText('CC-BY-SA-4.0')).toBe('CC BY-SA 4.0')
+    expect(licenseText('CC0-1.0')).toBe('CC0 1.0')
+    expect(licenseText('https://creativecommons.org/licenses/by/4.0/')).toBe('CC BY 4.0')
+    expect(licenseText('MIT')).toBe('MIT')
   })
 })

@@ -31,6 +31,15 @@ export function wellKnownLicense(iri: string): string | undefined {
   return spdx ? spdx[1] : undefined
 }
 
+/** A license as people read it: an SPDX Creative Commons id or IRI reads "CC BY 4.0", the rest as given. */
+export function licenseText(value: string): string {
+  const spdx = /^CC-(BY(?:-NC)?(?:-SA|-ND)?)-(\d\.\d)$/i.exec(value.trim())
+  if (spdx) return `CC ${spdx[1]!.toUpperCase()} ${spdx[2]}`
+  const zero = /^CC0-(\d\.\d)$/i.exec(value.trim())
+  if (zero) return `CC0 ${zero[1]}`
+  return wellKnownLicense(value) ?? value
+}
+
 // Display label chain for a license IRI; `entityName` is the in-crate license
 // entity's name when the crate describes one (an IRI echoed as name is noise).
 export function licenseLabelOf(iri: string, entityName?: string): string {

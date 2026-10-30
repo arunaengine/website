@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button.vue'
 import IconTile from '@/components/ui/IconTile.vue'
 import InfoHint from '@/components/ui/InfoHint.vue'
 import { useDatabases } from '@/composables/useDatabases'
+import { licenseText } from '@/lib/licenses'
 import { cn, isHttpUrl } from '@/lib/utils'
 import { Database, ExternalLink, FileText, FolderSync, Package, Scale } from '@lucide/vue'
 
@@ -62,7 +63,7 @@ const license = computed(() => entry.value?.metadata.license ?? '')
       <Button v-if="license && isHttpUrl(license)" size="sm" variant="outline" as-child>
         <a :href="license" target="_blank" rel="noopener noreferrer" aria-label="Open the license"><Scale class="h-4 w-4" /> License <ExternalLink class="h-3.5 w-3.5" /></a>
       </Button>
-      <span v-else-if="license" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Scale class="h-3.5 w-3.5" aria-hidden="true" />{{ license }}</span>
+      <span v-else-if="license" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Scale class="h-3.5 w-3.5" aria-hidden="true" />{{ licenseText(license) }}</span>
       <Button v-if="entry?.datasetId" size="sm" variant="outline" as-child>
         <RouterLink :to="{ name: 'dataset', params: { id: entry.datasetId } }"><FileText class="h-4 w-4" /> Open the dataset</RouterLink>
       </Button>
