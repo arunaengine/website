@@ -165,8 +165,7 @@ const emptyGroupLabel = computed(() => {
 })
 const chipOptions = computed(() => [
   { value: 'all', label: 'All', count: placedTasks.value.length },
-  // Completed runs are counted on the Runs card above, so they get no chip of their own.
-  ...(Object.keys(GROUP_LABELS) as StateFilterGroup[]).filter((group) => group !== 'done').map((group) => ({
+  ...(Object.keys(GROUP_LABELS) as StateFilterGroup[]).map((group) => ({
     value: group,
     label: GROUP_LABELS[group],
     count: placedTasks.value.filter((task) => inGroup(task, group)).length,
