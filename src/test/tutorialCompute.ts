@@ -22,6 +22,7 @@ import * as RunTargetLib from '@/lib/runTarget'
 import * as Shellwords from '@/lib/shellwords'
 import * as BucketName from '@/lib/bucketName'
 import * as ContentIdentity from '@/lib/contentIdentity'
+import * as ApiLib from '@/lib/api'
 import * as RunPaths from '@/lib/runPaths'
 import * as TesLib from '@/lib/tes'
 import * as Utils from '@/lib/utils'
@@ -265,6 +266,7 @@ const ComputeSubmitView = compileClientComponent(url('views/ComputeSubmitView.vu
   vue: VueRuntime,
   'vue-router': RouterRuntime,
   '@/lib/contentIdentity': ContentIdentity,
+  '@/lib/api': ApiLib,
   '@lucide/vue': icons,
   ...ui,
   '@/components/compute/run/RunBasics.vue': card('components/compute/run/RunBasics.vue'),

@@ -36,7 +36,7 @@ import { submitJob } from '@/lib/jobs'
 import { TES_GROUP_TAG, nativeInput, parseS3Url, runRoute, taskBuckets, type TesInput, type TesTask } from '@/lib/tes'
 import { versionObjectId } from '@/lib/contentIdentity'
 import { errorMessage } from '@/lib/utils'
-import type { BucketSearchHit } from '@/lib/api'
+import { ApiError, type BucketSearchHit } from '@/lib/api'
 
 const router = useRouter()
 const { tesEnabled, busy, createTask, getTask } = useTes()
@@ -122,11 +122,17 @@ function jumpTo(section: string, field: string) {
   })
 }
 
+/** One press of Run: whether its request left the page, and whether its session still holds. */
+interface Submission {
+  sent: boolean
+  current: () => boolean
+}
+
 /**
  * Sends the run to this computer as a native job, which is the only surface
  * that accepts a local target. Answers false when the realm is the target.
  */
-async function submitLocally(draft: TesTask): Promise<boolean> {
+async function submitLocally(draft: TesTask, submission: Submission): Promise<boolean> {
   const client = runTarget.localClient.value
   if (!client) return false
   const mapping = tesFormToExecutionRequest({
@@ -138,8 +144,9 @@ async function submitLocally(draft: TesTask): Promise<boolean> {
     submitError.value = mapping.blocked
     return true
   }
+  submission.sent = true
   const created = await submitJob({ ...mapping.request, target: 'local' }, client)
-  void router.push({ name: 'run', params: { jobId: created.job_id } })
+  if (submission.current()) void router.push({ name: 'run', params: { jobId: created.job_id } })
   return true
 }
 
@@ -267,9 +274,9 @@ async function run() {
   submitting.value = true
   // The draft belongs to the session it was started in; another account must not send it.
   const epoch = sessionEpoch.value
-  const sessionChanged = () => epoch !== sessionEpoch.value
+  const submission: Submission = { sent: false, current: () => epoch === sessionEpoch.value }
   const fence = () => {
-    if (sessionChanged()) throw new Error('The session changed while the run was being prepared, so it was not started.')
+    if (!submission.current()) throw new Error('The session changed while the run was being prepared, so it was not started.')
   }
   try {
     let draft = task.value
@@ -304,7 +311,7 @@ async function run() {
       draft = { ...draft, inputs: localInputs }
     }
     fence()
-    if (await submitLocally(draft)) return
+    if (await submitLocally(draft, submission)) return
     // The uploads sit on the connected node; another node must read exactly those versions.
     draft = pinUploads(draft, target, [
       scriptUpload && { key: target.scriptKey, versionId: scriptUpload.versionId },
@@ -312,12 +319,21 @@ async function run() {
     ])
     const routed = await routeRun(draft)
     fence()
+    submission.sent = true
     const created = await createTask(routed.draft, routed.base)
-    void router.push({ name: 'task', params: { taskId: created.id } })
+    if (submission.current()) void router.push({ name: 'task', params: { taskId: created.id } })
   } catch (err) {
-    // A lookup cancelled by the session change is reported as that change.
-    if (sessionChanged()) submitError.value = 'The session changed while the run was being prepared, so it was not started.'
-    else submitError.value = isTesUnsupported(err) ? `This node does not accept runs. ${errorMessage(err)}` : errorMessage(err)
+    // A sent request of an earlier session is not this page's to report.
+    if (!submission.current()) {
+      if (!submission.sent) submitError.value = 'The session changed while the run was being prepared, so it was not started.'
+      return
+    }
+    // Only a node's refusal says a sent run did not start; anything else leaves it unknown.
+    if (submission.sent && !(err instanceof ApiError && err.status < 500)) {
+      submitError.value = `The run was sent, but its answer did not arrive (${errorMessage(err)}). It may have started: check the run list before starting it again.`
+      return
+    }
+    submitError.value = isTesUnsupported(err) ? `This node does not accept runs. ${errorMessage(err)}` : errorMessage(err)
   } finally {
     submitting.value = false
   }

@@ -342,6 +342,7 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
   },
   '@/composables/useAruna': useArunaModule,
   '@/lib/contentIdentity': ContentIdentity,
+  '@/lib/api': Api,
   '@/composables/useComputeDataView': { useComputeDataView: () => ref('table') },
   '@/composables/useS3': { useS3: () => s3, s3ErrorMessage: (error: unknown) => String(error) },
   '@/composables/useRealmNodes': {
@@ -636,6 +637,29 @@ describe('run page', () => {
     await flush()
     expect(createTask).not.toHaveBeenCalled()
     expect(content(mounted.root)).toContain('The session changed while the run was being prepared')
+    mounted.app.unmount()
+  })
+
+  it('calls a sent run unknown when its answer is lost, and quiet after the session changed', async () => {
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
+    await fillValidRun(mounted.root)
+
+    createTask.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    expect(content(mounted.root)).toContain('It may have started: check the run list')
+    expect(content(mounted.root)).not.toContain('not started')
+
+    createTask.mockImplementationOnce(async () => {
+      sessionEpoch.value += 1
+      return { id: 'stale-task' }
+    })
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    expect(mounted.router!.currentRoute.value.fullPath).toBe('/app/compute/new')
+    expect(content(mounted.root)).not.toContain('session changed')
     mounted.app.unmount()
   })
 
