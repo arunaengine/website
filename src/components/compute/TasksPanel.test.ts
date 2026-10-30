@@ -255,8 +255,22 @@ describe('the run figures', () => {
 
     expect(cards).toContain('Runs 3 2/3 completed')
     expect(cards).toContain('Active 1 0 waiting to start')
+    expect(cards).toContain('Compute time Unknown 3 runs started')
     expect(cards.find((card) => card.startsWith('Nodes used'))).toBe('Nodes used 2 name of node-1name of node-2')
     realmNodes.value = []
+    mounted.app.unmount()
+  })
+})
+
+describe('the compute time', () => {
+  it('adds up the timed runs as a lower bound while a started run has no timing', async () => {
+    const timed = { ...realmRun, logs: [{ start_time: '2026-01-01T00:00:00Z', end_time: '2026-01-01T00:01:00Z' }] }
+    listTasks.mockReset().mockResolvedValue({ tasks: [localRun, timed, { ...localRun, id: 'J4', state: 'QUEUED' }] })
+    const mounted = await mountApp(TasksPanel)
+    await flush()
+    const cards = nodes(mounted.root).filter((node) => node.tag === 'section').map((node) => content(node).replace(/\s+/g, ' '))
+
+    expect(cards).toContain('Compute time at least 1m 00s 2 runs started')
     mounted.app.unmount()
   })
 })

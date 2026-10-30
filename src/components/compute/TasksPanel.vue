@@ -263,14 +263,17 @@ function taskDuration(task: TesTask): string {
 const stats = computed(() => {
   const list = shownTasks.value
   const times = list.map(runMs).filter((ms): ms is number => ms !== null)
+  const started = list.filter((task) => taskLog(task)?.start_time || !NOT_STARTED.includes(task.state)).length
+  // A started run without timing makes the sum a lower bound; none timed leaves it unknown.
+  const sum = formatDuration(times.reduce((total, ms) => total + ms, 0)) || '0s'
   const nodes = [...new Set(list.map(nodeOf).filter((id): id is string => Boolean(id)))]
   return {
     total: list.length,
     completed: list.filter((task) => task.state === 'COMPLETE').length,
     active: list.filter((task) => isActiveTesState(task.state)).length,
     waiting: list.filter((task) => task.state === 'QUEUED' || task.state === 'INITIALIZING').length,
-    time: formatDuration(times.reduce((sum, ms) => sum + ms, 0)),
-    timed: times.length,
+    time: !started ? '0s' : !times.length ? 'Unknown' : times.length < started ? `at least ${sum}` : sum,
+    started,
     nodes,
     local: list.filter((task) => isLocalRun(task.tags)).length,
   }
@@ -487,8 +490,8 @@ onUnmounted(() => {
         <span><Hourglass /><b>{{ stats.waiting }}</b> waiting to start</span>
       </OverviewCell>
       <OverviewCell label="Compute time" :icon="Timer" tone="sky" info="The time the started runs ran, added up.">
-        <template #value>{{ stats.time || '0s' }}</template>
-        <span><Workflow /><b>{{ stats.timed }}</b> {{ stats.timed === 1 ? 'run' : 'runs' }} started</span>
+        <template #value>{{ stats.time }}</template>
+        <span><Workflow /><b>{{ stats.started }}</b> {{ stats.started === 1 ? 'run' : 'runs' }} started</span>
       </OverviewCell>
       <OverviewCell v-if="desktop" label="On this computer" :icon="Laptop" tone="royal">
         <template #value>{{ stats.local }}</template>
