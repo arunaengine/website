@@ -26,7 +26,6 @@ const { getBucketMetadata, putBucketMetadata, sessionEpoch } = useAruna()
 const databases = useDatabases()
 
 const EMPTY: BucketMetadata = { database: false }
-// The stored metadata stays on screen while it is read again.
 const stored = ref<BucketMetadata | null>(null)
 const described = ref<DatasetDescription | null>(null)
 const unavailable = ref<string | null>(null)
@@ -65,15 +64,22 @@ async function load() {
   }
 }
 
-watch(() => [props.bucket, props.nodeId], () => {
+// Another bucket, account or realm shows nothing of the previous one; its answers are dropped.
+watch(() => [props.bucket, props.nodeId, sessionEpoch.value], () => {
+  ++runs
   state.value = 'loading'
   stored.value = null
   described.value = null
+  unavailable.value = null
+  failure.value = null
+  draftDatabase.value = false
+  draftParser.value = undefined
   editingRules.value = false
   choosing.value = null
+  busy.value = false
+  savedNow.value = false
   void load()
 }, { immediate: true })
-watch(() => sessionEpoch.value, () => void load())
 
 const current = computed(() => stored.value ?? EMPTY)
 const datasetId = computed(() => current.value.dataset ?? null)
@@ -104,7 +110,7 @@ async function store(next: BucketMetadata) {
   } catch (cause) {
     if (run === runs) failure.value = apiErrorMessage(cause)
   } finally {
-    busy.value = false
+    if (run === runs) busy.value = false
   }
 }
 

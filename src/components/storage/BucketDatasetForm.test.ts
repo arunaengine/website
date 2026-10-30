@@ -5,7 +5,7 @@ import * as Databases from '@/lib/databases'
 import { button, click, compileClientComponent, content, element, flush, mountApp, moduleDefault, typeValue } from '@/test/clientRender'
 
 const DATASET = '01M63099Q2000108CB51QQDB2P'
-const aruna = vi.hoisted(() => ({ describeBucket: vi.fn(), putBucketMetadata: vi.fn() }))
+const aruna = vi.hoisted(() => ({ describeBucket: vi.fn(), putBucketMetadata: vi.fn(), sessionEpoch: { value: 1 } }))
 
 const Slotted = (tag: string) =>
   defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()) })
@@ -83,5 +83,21 @@ describe('describe or link a bucket dataset', () => {
     expect(aruna.putBucketMetadata).toHaveBeenCalledWith('reads', { database: false, parser: null, dataset: DATASET }, null)
     expect(content(root)).toContain('you may not read it')
     expect(onLinked).not.toHaveBeenCalled()
+  })
+
+  it('hands back no answer that arrives after the account or realm changed', async () => {
+    let answer: (value: unknown) => void = () => {}
+    aruna.putBucketMetadata.mockReturnValueOnce(new Promise((resolve) => { answer = resolve }))
+    const onLinked = vi.fn()
+    const { root } = await mountApp(component, { props: { mode: 'link', bucket: 'reads', nodeId: null, metadata: { database: false }, onLinked } })
+
+    await typeValue(field(root, 'dataset-link'), DATASET)
+    const linking = click(button(root, 'Link the dataset'))
+    aruna.sessionEpoch.value = 2
+    answer({ metadata: { database: false, dataset: DATASET }, description: null })
+    await linking
+
+    expect(onLinked).not.toHaveBeenCalled()
+    aruna.sessionEpoch.value = 1
   })
 })

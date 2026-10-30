@@ -16,6 +16,8 @@ const aruna = vi.hoisted(() => ({
   sessionEpoch: { value: 1 },
 }))
 
+const epoch = ref(1)
+
 const Slotted = (tag: string) =>
   defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()) })
 const RULES = { rules: [{ name: 'BioSample', pattern: 'SAMN\\d+', url: 'https://example.org/{0}' }] }
@@ -57,7 +59,7 @@ const component = compileClientComponent(new URL('./BucketMetadataSection.vue', 
   '@/components/ui/Switch.vue': moduleDefault(SwitchStub),
   '@/lib/licenses': Licenses,
   '@lucide/vue': { FileJson2: Slotted('i'), FilePlus2: Slotted('i'), FileText: Slotted('i'), Link2: Slotted('i'), Pencil: Slotted('i') },
-  '@/composables/useAruna': { useAruna: () => ({ ...aruna, sessionEpoch: ref(1) }) },
+  '@/composables/useAruna': { useAruna: () => ({ ...aruna, sessionEpoch: epoch }) },
   '@/composables/useDatabases': { useDatabases: () => ({ reload: vi.fn() }) },
   '@/lib/api': { apiErrorMessage: (cause: unknown) => (cause as Error).message },
   '@/lib/databases': Databases,
@@ -133,5 +135,32 @@ describe('bucket description from its dataset', () => {
     expect(aruna.putBucketMetadata).toHaveBeenCalledOnce()
     expect(aruna.putBucketMetadata.mock.calls[0][1]).toEqual({ database: true, dataset: DATASET, parser: RULES })
     expect(content(root)).toContain('Saved.')
+  })
+
+  it('shows nothing of the previous account and drops its answers after a session change', async () => {
+    // Other tests' sections still watch the shared epoch, so only this bucket's reads are queued.
+    const answers: Promise<unknown>[] = [Promise.resolve(linkedAnswer)]
+    aruna.getBucketMetadata.mockReset().mockImplementation((bucket: string) =>
+      bucket === 'session-reads' ? answers.shift() : new Promise(() => {}))
+    let earlier: (value: unknown) => void = () => {}
+    let later: (value: unknown) => void = () => {}
+    answers.push(new Promise((resolve) => { earlier = resolve }), new Promise((resolve) => { later = resolve }))
+    const { root } = await mountApp(component, { props: { bucket: 'session-reads', nodeId: null, canAdmin: true } })
+    await flush()
+    expect(content(root)).toContain('Annotation database')
+
+    epoch.value += 1
+    await flush()
+    expect(content(root)).not.toContain('Annotation database')
+    expect(element(root, (node) => String(node.props.label).startsWith('Reading the description'))).toBeTruthy()
+
+    epoch.value += 1
+    await flush()
+    later({ metadata: null, description: null })
+    await flush()
+    earlier(linkedAnswer)
+    await flush()
+    expect(content(root)).toContain('No dataset describes this bucket yet')
+    expect(content(root)).not.toContain('Annotation database')
   })
 })

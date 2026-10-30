@@ -16,7 +16,7 @@ import { datasetIdOf, pageIdentifier } from '@/lib/databases'
 const props = defineProps<{ mode: 'describe' | 'link'; bucket: string; nodeId: string | null; metadata: BucketMetadata }>()
 const emit = defineEmits<{ (event: 'linked', answer: BucketMetadataAnswer): void; (event: 'close'): void }>()
 
-const { describeBucket, putBucketMetadata } = useAruna()
+const { describeBucket, putBucketMetadata, sessionEpoch } = useAruna()
 
 const draft = ref({ title: props.bucket, description: '', version: '', license: '', page: '', public: false })
 const linkText = ref('')
@@ -33,6 +33,7 @@ const ready = computed(() =>
 )
 
 async function submit() {
+  const epoch = sessionEpoch.value
   busy.value = true
   failure.value = null
   try {
@@ -46,12 +47,15 @@ async function submit() {
         identifiers: page ? [page] : [],
         public: draft.value.public,
       }, props.nodeId)
+      if (epoch !== sessionEpoch.value) return
       emit('linked', { metadata: created.metadata, description: created.description, description_unavailable: null })
     } else {
-      emit('linked', await putBucketMetadata(props.bucket, { ...props.metadata, dataset: linkId.value }, props.nodeId))
+      const answer = await putBucketMetadata(props.bucket, { ...props.metadata, dataset: linkId.value }, props.nodeId)
+      if (epoch !== sessionEpoch.value) return
+      emit('linked', answer)
     }
   } catch (cause) {
-    failure.value = apiErrorMessage(cause)
+    if (epoch === sessionEpoch.value) failure.value = apiErrorMessage(cause)
   } finally {
     busy.value = false
   }
