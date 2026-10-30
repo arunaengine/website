@@ -108,10 +108,12 @@ function add() {
         <Folder class="h-3.5 w-3.5 shrink-0 text-primary" />
         <button type="button" class="truncate font-mono hover:underline" @click="open(path)">{{ tail(path) }}/</button>
       </li>
-      <li v-for="item in objects" :key="item.key" class="flex items-center gap-2 px-3 py-1.5">
-        <input type="checkbox" :checked="chosenFiles.has(item.key)" :aria-label="`Select ${tail(item.key)}`" @change="toggleFile(item)" />
-        <FileText class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        <span class="truncate font-mono">{{ tail(item.key) }}</span>
+      <li v-for="item in objects" :key="item.key">
+        <label class="flex cursor-pointer items-center gap-2 px-3 py-1.5 hover:bg-muted/40">
+          <input type="checkbox" :checked="chosenFiles.has(item.key)" :aria-label="`Select ${tail(item.key)}`" @change="toggleFile(item)" />
+          <FileText class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span class="truncate font-mono">{{ tail(item.key) }}</span>
+        </label>
       </li>
       <li v-if="!loading && !objects.length && !prefixes.length && !failure" class="px-3 py-3 text-muted-foreground">This folder is empty.</li>
     </ul>
@@ -119,7 +121,8 @@ function add() {
     <div class="flex items-center gap-2">
       <Button v-if="cursor" size="sm" variant="ghost" :disabled="loading" @click="load(true)">Show more</Button>
       <Spinner v-if="loading" />
-      <Button size="sm" class="ml-auto" :disabled="!count || busy" @click="add">Add {{ count || '' }} selected</Button>
+      <span v-if="!count" class="ml-auto text-[11px] text-muted-foreground">Select files or folders to add them</span>
+      <Button size="sm" :class="count ? 'ml-auto' : ''" :disabled="!count || busy" @click="add">Add {{ count || '' }} selected</Button>
     </div>
   </div>
 </template>

@@ -1,7 +1,7 @@
 import { defineComponent, h } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { button, click, compileClientComponent, content, flush, mountApp, moduleDefault } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, flush, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 
 const listBucketObjects = vi.fn()
 
@@ -28,5 +28,19 @@ describe('remote object picker', () => {
     expect(content(root)).toContain('node busy')
     expect(content(root)).not.toContain('top.tsv')
     expect(content(root)).not.toContain('Show more')
+  })
+
+  it('selects a file by its name and says how to enable Add', async () => {
+    listBucketObjects.mockResolvedValueOnce({ bucket: 'laptop', objects: [{ key: 'genome.fasta', version_id: 'v' }], prefixes: [] })
+    const { root } = await mountApp(component, { props: { bucket: 'laptop', nodeId: 'n2' } })
+    await flush()
+    expect(content(root)).toContain('Select files or folders to add them')
+
+    const label = nodes(root).find((node) => node.tag === 'label' && content(node).includes('genome.fasta'))!
+    const box = nodes(label).find((node) => node.tag === 'input')!
+    ;(box.props.onChange as () => void)()
+    await flush()
+    expect(content(root)).toContain('Add 1 selected')
+    expect(content(root)).not.toContain('Select files or folders to add them')
   })
 })
