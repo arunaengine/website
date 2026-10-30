@@ -1,43 +1,32 @@
 <script setup lang="ts">
-// Identity of one run: its name, its state, its id and the placement tags the
-// node reported for it.
-import CopyButton from '@/components/ui/CopyButton.vue'
-import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
-import TesPlacementTags from '@/components/compute/TesPlacementTags.vue'
-import type { TesState } from '@/lib/tes'
-import { truncateMiddle } from '@/lib/utils'
+// Identity of one run: a tile, its name with its state, and one line on what ran.
+import { computed } from 'vue'
+import { Workflow } from '@lucide/vue'
+import IconTile from '@/components/ui/IconTile.vue'
+import StatusMark from '@/components/ui/StatusMark.vue'
+import StatusPill from '@/components/ui/StatusPill.vue'
+import { TES_STATE_META, type TesState } from '@/lib/tes'
 
-withDefaults(
-  defineProps<{
-    title: string
-    runId: string
-    state?: TesState
-    tags?: Record<string, string>
-    description?: string
-    compact?: boolean
-  }>(),
-  { state: undefined, tags: undefined, description: '', compact: false },
-)
+const props = withDefaults(defineProps<{ title: string; state?: TesState; subtitle?: string }>(), {
+  state: undefined,
+  subtitle: '',
+})
+
+const label = computed(() => TES_STATE_META[props.state ?? 'UNKNOWN'].label)
 </script>
 
 <template>
-  <div class="min-w-0 space-y-2">
-    <div class="flex flex-wrap items-center gap-2">
-      <component
-        :is="compact ? 'h3' : 'h2'"
-        :class="compact ? 'text-sm font-semibold text-foreground' : 'font-display text-lg font-semibold text-aruna-navy'"
-      >
+  <div class="flex min-w-0 items-start gap-3">
+    <IconTile :icon="Workflow" />
+    <div class="min-w-0 flex-1">
+      <h2 class="type-section-title break-words">
         {{ title }}
-      </component>
-      <TaskStateBadge :state="state" />
-      <slot name="badges" />
+        <span class="ml-1 inline-flex align-[-2px]">
+          <StatusMark v-if="state === 'COMPLETE'" :label="label" />
+          <StatusPill v-else :state="label" />
+        </span>
+      </h2>
+      <p v-if="subtitle" class="mt-1 break-words text-[13px] leading-[18px] text-muted-foreground">{{ subtitle }}</p>
     </div>
-    <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
-      <span class="font-mono" :title="runId">{{ truncateMiddle(runId) }}</span>
-      <CopyButton :value="runId" label="Copy run id" />
-      <slot name="meta" />
-    </div>
-    <p v-if="description" class="text-sm text-muted-foreground">{{ description }}</p>
-    <TesPlacementTags :tags="tags" />
   </div>
 </template>

@@ -4,6 +4,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import DetailDialog from '@/components/ui/DetailDialog.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Badge from '@/components/ui/Badge.vue'
+import IconButton from '@/components/ui/IconButton.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
@@ -23,7 +24,7 @@ import RunLogDialog, { type LogStream } from '@/components/compute/RunLogDialog.
 import TaskHeader from '@/components/compute/TaskHeader.vue'
 import SaveRunDialog from '@/components/compute/SaveRunDialog.vue'
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
-import ClaimWatchStep, { type WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
+import type { WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useJobs } from '@/composables/useJobs'
 import { useAruna } from '@/composables/useAruna'
@@ -54,7 +55,7 @@ import { sessionRuntime } from '@/lib/notebook/submit'
 import { objectHref } from '@/lib/assistant/objectLinks'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import { errorMessage, formatBytes, formatDuration, formatResourceGb, relativeTime, truncateMiddle } from '@/lib/utils'
-import { Ban, Download, Eye, ExternalLink as ExternalLinkIcon, FileText, RotateCcw, Trash2 } from '@lucide/vue'
+import { Ban, Container, Download, Eye, ExternalLink as ExternalLinkIcon, FileText, Flag, Hourglass, Maximize2, Play, RotateCcw, Trash2 } from '@lucide/vue'
 
 const NODE_LABEL_KEY = 'aruna-engine.org/node'
 const NODE_LABEL_TAG = `${TES_LABEL_TAG_PREFIX}${NODE_LABEL_KEY}`
@@ -176,6 +177,13 @@ onUnmounted(stopPolling)
 
 // ── Derived ──────────────────────────────────────────────────────────────────
 const headerTitle = computed(() => task.value?.name || truncateMiddle(props.taskId))
+// What ran in one line: the tool and its version, then what the run says about itself.
+const headerSubtitle = computed(() => {
+  const image = task.value?.executors?.[0]?.image ?? ''
+  const [name, version] = (image.split('/').pop() ?? '').split(/[:@]/)
+  const notebook = sessionRuntime(task.value?.tags) !== null ? 'notebook session' : ''
+  return [name && [name, version].filter(Boolean).join(' '), task.value?.description, notebook].filter(Boolean).join(', ')
+})
 const askPrompt = computed(
   () => `Explain this compute run ${task.value?.id || props.taskId}: its current state, placement verdict, and outputs.`,
 )
@@ -299,6 +307,33 @@ const runDuration = computed(() => {
 
 const failed = computed(() => task.value?.state === 'EXECUTOR_ERROR' || task.value?.state === 'SYSTEM_ERROR')
 
+// The node that ran the work, as the plan or the node constraint names it.
+const runNode = computed(() => nativeFamily.value?.placement?.target_node_id ?? nodeConstraint.value)
+const resourceShort = computed(() => {
+  const r = task.value?.resources
+  const parts = [r?.cpu_cores != null ? `${r.cpu_cores} CPU` : '', r?.ram_gb != null ? formatResourceGb(r.ram_gb) : '']
+  return parts.filter(Boolean).join(', ')
+})
+function when(iso: string | undefined): string {
+  const at = iso ? Date.parse(iso) : NaN
+  return Number.isFinite(at) ? new Date(at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : ''
+}
+function clock(iso: string | undefined): string {
+  const at = iso ? Date.parse(iso) : NaN
+  return Number.isFinite(at) ? new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : ''
+}
+const facts = computed<Detail[]>(() => {
+  const done = isTerminalTesState(task.value?.state)
+  return [
+    { key: 'duration', label: 'Duration', value: runDuration.value ?? 'Not started yet' },
+    { key: 'node', label: 'Node', value: runNode.value ? displayName(runNode.value) : done ? 'Not recorded' : 'Not placed yet' },
+    { key: 'resources', label: 'Resources', value: resourceShort.value || 'No limits requested' },
+    { key: 'group', label: 'Group', value: groupTagLabel.value ?? 'Not recorded' },
+    { key: 'started', label: 'Started', value: when(latestLog.value?.start_time) || 'Not yet' },
+    { key: 'finished', label: 'Finished', value: when(latestLog.value?.end_time) || (done ? 'Not recorded' : 'Not yet') },
+  ]
+})
+
 // A finished run of this computer keeps its own run record here until it is published.
 const { deviceClient } = useDeviceStatus()
 const localRecordJob = computed(() =>
@@ -412,20 +447,24 @@ function stagesFor(state: TesState | undefined): WatchStage[] {
       return s('pending', 'pending', 'pending', 'pending') // UNKNOWN / undefined
   }
 }
+// Each stage with its icon and, where the run records one, the time it was reached.
+const STAGE_ICONS = [Hourglass, Container, Play, Flag]
 const stages = computed(() => {
-  const list = stagesFor(task.value?.state)
-  const where = [
-    nodeConstraint.value ? `node ${displayName(nodeConstraint.value)}` : '',
-    executorKind.value ? `executor ${executorKind.value}` : '',
-  ]
-    .filter(Boolean)
-    .join(', ')
-  const queued = list[0]
-  const running = list[2]
-  if (queued && queued.state !== 'pending') queued.detail = where || 'any node with an executor'
-  if (running && running.state !== 'pending' && where) running.detail = [where, running.detail].filter(Boolean).join(', ')
-  return list
+  const times = [task.value?.creation_time, undefined, latestLog.value?.start_time, latestLog.value?.end_time]
+  return stagesFor(task.value?.state).map((stage, i) => ({
+    ...stage,
+    icon: STAGE_ICONS[i]!,
+    time: stage.state === 'pending' ? '' : clock(times[i]),
+  }))
 })
+const STAGE_LOOK: Record<WatchStage['state'], string> = {
+  done: 'bg-status-ok/10 text-status-ok',
+  active: 'bg-status-running/10 text-status-running',
+  failed: 'bg-status-failed/10 text-status-failed',
+  pending: 'bg-muted text-muted-foreground',
+}
+// Only a state the header does not already say gets a line of its own.
+const showSummary = computed(() => failed.value || active.value || awaitingKey.value)
 
 // ── Output links ─────────────────────────────────────────────────────────────
 type ResolvedLink =
@@ -707,19 +746,12 @@ async function confirmDelete() {
     <template #header>
       <DialogTitle class="sr-only">Run details</DialogTitle>
       <div v-if="task" class="flex items-start justify-between gap-3">
-        <TaskHeader
-          :title="headerTitle"
-          :run-id="task.id || taskId"
-          :state="task.state"
-          :tags="task.tags"
-          :description="task.description"
-        >
-          <template v-if="sessionRuntime(task.tags) !== null" #badges>
-            <Badge variant="sky" size="sm" title="An interactive notebook kernel, not a batch run">Notebook session</Badge>
-          </template>
-        </TaskHeader>
-        <div class="flex shrink-0 items-center gap-2">
+        <TaskHeader :title="headerTitle" :state="task.state" :subtitle="headerSubtitle" />
+        <div class="flex shrink-0 items-center gap-1">
           <RefreshButton :busy="refreshing" sr-label="Refresh this run" @click="onRefresh" />
+          <IconButton v-if="runCrate" label="Open as page" size="icon" as-child>
+            <RouterLink :to="{ name: 'dataset', params: { id: runCrate.document_id } }"><Maximize2 class="h-4 w-4" /></RouterLink>
+          </IconButton>
           <AskAiButton :prompt="askPrompt" :subject="`run ${taskId}`" icon-only />
         </div>
       </div>
@@ -738,9 +770,9 @@ async function confirmDelete() {
 
       <ErrorPanel v-else-if="loadState === 'error'" :message="loadError || 'Failed to load the run.'" @retry="initialLoad" />
 
-      <div v-else-if="task" class="space-y-8">
+      <div v-else-if="task" class="space-y-6">
         <!-- What happened, in one place -->
-        <Notice v-if="summary" :tone="summary.tone" class="space-y-2 px-4 py-3">
+        <Notice v-if="summary && showSummary" :tone="summary.tone" class="space-y-2 px-4 py-3">
           <p class="text-sm font-semibold">{{ summary.headline }}</p>
           <p v-if="failed" class="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed">{{ failureMessage }}</p>
           <div v-if="failed || nodeConstraint" class="flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -762,9 +794,35 @@ async function confirmDelete() {
         <JobKeyWait v-if="awaitingKey" :waits="nativeJob?.awaiting_keys ?? []" />
         <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Refresh failed, retrying.</p>
 
-        <section class="space-y-3">
-          <h3 class="font-display text-sm font-semibold text-aruna-navy">Progress</h3>
-          <ClaimWatchStep :stages="stages" />
+        <DetailList :items="facts">
+          <template #node>
+            <RouterLink v-if="runNode" :to="{ name: 'node', params: { nodeId: runNode } }" class="text-primary hover:underline">{{ displayName(runNode) }}</RouterLink>
+            <template v-else>{{ facts[1]!.value }}</template>
+          </template>
+          <template #group>
+            <RouterLink v-if="groupTagId" :to="{ name: 'group', params: { id: groupTagId } }" class="text-primary hover:underline">{{ groupTagLabel }}</RouterLink>
+            <template v-else>{{ facts[3]!.value }}</template>
+          </template>
+        </DetailList>
+
+        <section>
+          <h3 class="mb-3 type-card-title">Progress</h3>
+          <ol class="flex">
+            <li v-for="(stage, i) in stages" :key="stage.key" class="relative flex min-w-0 flex-1 flex-col items-center text-center">
+              <span
+                v-if="i < stages.length - 1"
+                aria-hidden="true"
+                class="absolute left-1/2 top-4 h-0.5 w-full"
+                :class="stage.state === 'done' && stages[i + 1]!.state !== 'pending' ? 'bg-status-ok/40' : 'bg-border'"
+              />
+              <span class="relative grid size-8 place-items-center rounded-full ring-4 ring-background" :class="STAGE_LOOK[stage.state]">
+                <component :is="stage.icon" class="size-4" aria-hidden="true" />
+              </span>
+              <span class="mt-2 text-[13px] font-medium" :class="stage.state === 'pending' ? 'text-muted-foreground' : 'text-foreground'">{{ stage.label }}</span>
+              <span v-if="stage.detail" class="text-xs text-muted-foreground">{{ stage.detail }}</span>
+              <span v-if="stage.time" class="text-xs tabular-nums text-muted-foreground">{{ stage.time }}</span>
+            </li>
+          </ol>
         </section>
 
         <section class="space-y-3">

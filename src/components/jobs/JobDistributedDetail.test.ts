@@ -268,6 +268,7 @@ function taskPanel(
     '@/components/ui/Notice.vue': moduleDefault(PassThroughStub),
     '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
     '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+    '@/components/ui/IconButton.vue': moduleDefault(ButtonStub),
     '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
     '@/components/ui/Skeleton.vue': moduleDefault(PassThroughStub),
     '@/components/ui/ErrorPanel.vue': moduleDefault(ErrorPanelStub),
@@ -978,7 +979,7 @@ describe('distributed job detail components', () => {
     const text = content(mounted.root)
 
     expect(mounted.errors).toEqual([])
-    expect(text).toContain('Finished the script failed')
+    expect(text).toMatch(/Finished\s*the script failed/)
     expect(text).toContain('The script exited with code 2')
     expect(text).not.toContain('executor error')
     mounted.app.unmount()
@@ -1020,7 +1021,7 @@ describe('distributed job detail components', () => {
     expect(text).toContain('2 attempts')
     expect(text).toContain('output')
     expect(text).not.toContain('no stderr captured')
-    expect(text).toContain('Queued node node-2')
+    expect(text).toContain('node-2')
     mounted.app.unmount()
   })
 
@@ -1046,8 +1047,6 @@ describe('distributed job detail components', () => {
         {},
         'Running for 5m',
       ],
-      [{ state: 'COMPLETE' }, {}, 'Completed'],
-      [{ state: 'CANCELED' }, {}, 'Cancelled'],
       [
         { state: 'EXECUTOR_ERROR', logs: [{ logs: [{ exit_code: 2, stderr: 'Traceback\nValueError: bad input' }], outputs: [] }] },
         {},
@@ -1373,5 +1372,36 @@ describe('distributed job detail components', () => {
     wake.mockRestore()
     followSpy.mockRestore()
     mounted.app.unmount()
+  })
+})
+
+describe('the run facts', () => {
+  it('names the node, the resources and the times once, without a success notice', async () => {
+    const wake = vi.spyOn(Poll, 'onWake').mockImplementation(() => () => {})
+    const followSpy = vi.spyOn(Poll, 'follow').mockImplementation(() => () => {})
+    const start = '2026-10-29T12:17:00Z'
+    const getTask = vi.fn(async () => ({
+      id: 'run',
+      state: 'COMPLETE',
+      resources: { cpu_cores: 4, ram_gb: 12 },
+      executors: [{ image: 'harbor.example.org/aruna/bakta-rs:0.1.1', command: ['bakta'] }],
+      inputs: [],
+      outputs: [],
+      logs: [{ start_time: start, end_time: '2026-10-29T12:38:12Z', logs: [{ exit_code: 0 }], outputs: [] }],
+      tags: {},
+    }))
+    const getJob = vi.fn(async () => ({ family: { ...family, placement: { ...family.placement, target_node_id: 'node-giessen' } } }))
+    const mounted = await mount(taskPanel(getTask, getJob), { taskId: 'run', open: true })
+    await flushPanel()
+    const text = content(mounted.root)
+
+    expect(mounted.errors).toEqual([])
+    expect(text).toContain('Duration21m 12s')
+    expect(text).toContain('Nodenode-giessen')
+    expect(text).toContain('Resources4 CPU, 12 GB')
+    expect(text).not.toContain('Completed in')
+    mounted.app.unmount()
+    wake.mockRestore()
+    followSpy.mockRestore()
   })
 })
