@@ -26,6 +26,8 @@ export interface Box {
   identifiers: OriginIdentifier[]
   /** A run's crate document, a source link or a database's dataset. */
   link?: { label: string; document?: string; url?: string }
+  /** A database release: the database's name and the release label, for a box of its files. */
+  release?: { name: string; label: string }
   /** The boxes this one came from. */
   from: string[]
   pending: Hop[]
@@ -114,6 +116,7 @@ function fileBox(graph: Graph, parent: string | null, id: string, asked: string,
       const upstream = release.upstream[0]
       const named = box(`release:${release.crate_version}`, 'database', 'Database release', `${title} ${release.label}`, {
         detail: unchecked,
+        release: { name: title, label: release.label },
         ...(upstream ? { link: { label: upstream.name === 'DOI' ? `doi:${upstream.value}` : upstream.value, url: upstream.url } } : {}),
       })
       add(graph, id, named)

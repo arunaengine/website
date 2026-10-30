@@ -231,7 +231,16 @@ function shown(card: ChainCard): Shown {
   if (items.length > 1) {
     const release = item.from.map((id) => graph.boxes[id]).find((each) => each?.kind === 'database')
     const open = openFolds.value.has(card.node.key)
-    return { ...base, icon: Files, role: item.role, title: release ? `${items.length} files of ${release.title}` : `${items.length} files`, detail: repeat, fold: { key: card.node.key, open } }
+    const files = `${items.length} files`
+    const fold = { key: card.node.key, open }
+    // The files of one database read as that database, with its release and their count, unless
+    // the database is drawn beside them.
+    if (release && !layout.value.cards.some((each) => each.node.ids.includes(release.id))) {
+      const facts = release.release ? `Release ${release.release.label}, ${files}` : files
+      return { ...base, icon: Database, role: 'Database', title: release.release?.name ?? release.title, detail: [facts, repeat].filter(Boolean).join('. '), fold }
+    }
+    const of = release?.release ? `Release ${release.release.label}` : release ? `Of ${release.title}` : ''
+    return { ...base, icon: Files, role: item.role, title: files, detail: [of, repeat].filter(Boolean).join('. '), fold }
   }
   const document = item.link?.document
   const run = item.kind === 'run' ? item.id.replace(/^run:/, '') : ''
@@ -360,6 +369,12 @@ const LEGEND = [
   { icon: Database, label: 'Database' },
   { icon: Workflow, label: 'Run' },
 ]
+// The legend names only what the graph draws; the arrow is always drawn.
+const legend = computed(() => {
+  const drawn = new Set(layout.value.cards.map((card) => shown(card).icon))
+  if (drawn.has(Files) || drawn.has(FileText)) drawn.add(File)
+  return LEGEND.filter((item) => item.icon === MoveRight || drawn.has(item.icon))
+})
 </script>
 
 <template>
@@ -428,7 +443,7 @@ const LEGEND = [
         </ul>
       </div>
       <div v-if="!narrow && start.kind === 'dataset'" class="flex flex-wrap gap-x-5 gap-y-1 border-t border-border-subtle px-5 py-3 text-xs text-muted-foreground">
-        <span v-for="item in LEGEND" :key="item.label" class="inline-flex items-center gap-1.5"><component :is="item.icon" class="h-3.5 w-3.5" aria-hidden="true" />{{ item.label }}</span>
+        <span v-for="item in legend" :key="item.label" class="inline-flex items-center gap-1.5"><component :is="item.icon" class="h-3.5 w-3.5" aria-hidden="true" />{{ item.label }}</span>
         <span class="inline-flex items-center gap-1.5"><span class="inline-block h-2.5 w-3.5 rounded-sm border-2 border-aruna-aqua" aria-hidden="true" />This record</span>
       </div>
     </div>

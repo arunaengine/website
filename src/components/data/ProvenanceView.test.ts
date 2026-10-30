@@ -155,11 +155,14 @@ describe('provenance view', () => {
       })
     })
     const root = await render()
+    // Directly, the database's files read as the database with its release and file count.
+    await vi.waitFor(() => expect(content(root)).toContain('Bakta database (light)Show the filesRelease 6.0 light, 66 files'))
+    expect(content(root)).not.toContain('Source')
     await click(button(root, 'Full chain'))
     await vi.waitFor(() => expect(content(root)).toContain('zenodo.org'))
     const text = content(root)
 
-    expect(text).toContain('66 files of Bakta database (light) 6.0 light')
+    expect(text).toContain('66 filesShow the filesRelease 6.0 light')
     expect(text).toContain('genome.fasta')
     expect(text).not.toContain('work/in/genome.fasta')
     expect(nodes(root).some((node) => node.props.title === 'work/in/genome.fasta')).toBe(true)
@@ -197,7 +200,7 @@ describe('provenance view', () => {
     await vi.waitFor(() => expect(content(root)).toContain('Where these came from is shown elsewhere.'))
     const text = content(root)
 
-    expect(text.split('2 files of Bakta database (light) 6.0 light')).toHaveLength(3)
+    expect(text.split('Release 6.0 light')).toHaveLength(3)
     expect(text.split('Database release')).toHaveLength(2)
   })
 
