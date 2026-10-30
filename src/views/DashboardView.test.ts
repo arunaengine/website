@@ -468,7 +468,7 @@ describe('authenticated dashboard scope', () => {
     expect(text.indexOf('Runs Unknown')).toBeGreaterThan(text.indexOf('my stats cards'))
     // One state signal: an offline node turns the online count into a warning.
     expect(text.indexOf('Realm 2 nodes 1/2 online')).toBeGreaterThan(text.indexOf('Runs Unknown'))
-    expect(text.indexOf('Groups A bucket stored on several nodes counts once. Cards Table All groups group quota cards')).toBeGreaterThan(realmCard)
+    expect(text.indexOf('Groups A bucket stored on several nodes counts once. Cards Table group quota cards')).toBeGreaterThan(realmCard)
     expect(text).toContain('scope toggle personal')
     expect(text).not.toContain('topology')
     expect(text).not.toContain('row node-a')

@@ -421,7 +421,6 @@ const pageDescription = computed(() =>
         <SectionHeading id="dashboard-groups-heading" title="Groups" :icon="Users" info="A bucket stored on several nodes counts once.">
           <template #actions>
             <ViewToggle v-model="groupView" />
-            <Button variant="outline" size="sm" as-child><RouterLink :to="{ name: 'groups' }">All groups</RouterLink></Button>
           </template>
         </SectionHeading>
         <GroupQuotaCards :refresh-revision="cardsRevision" :view="groupView" />
