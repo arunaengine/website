@@ -227,7 +227,7 @@ function sectioned<R extends Named>(rows: R[], pinned: (row: R) => boolean, data
   const pins = rows.filter(pinned).sort(byName)
   const bases = rows.filter((row) => !pinned(row) && database(row)).sort(byName)
   const rest = rows.filter((row) => !pinned(row) && !database(row)).sort(byName)
-  return [{ label: 'Pinned', rows: pins }, { label: 'Databases', rows: bases }, { label: 'Other buckets', rows: rest }].filter((section) => section.rows.length)
+  return [{ label: 'Pinned', rows: pins }, { label: 'Databases', rows: bases }, { label: 'Buckets', rows: rest }].filter((section) => section.rows.length)
 }
 const rowNodeId = (row: AllRow) => row.hit?.node_id ?? row.nodeId
 const allSections = computed(() => sectioned(pageRows.value, (row) => row.pinned, (row) => Boolean(databaseOf(row.bucket, rowNodeId(row)))))

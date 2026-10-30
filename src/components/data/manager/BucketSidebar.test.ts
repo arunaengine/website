@@ -925,7 +925,7 @@ describe('Bucket sidebar sections', () => {
       const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
       await flush()
 
-      expect(labels(root)).toEqual(['Pinned', 'Databases', 'Other buckets'])
+      expect(labels(root)).toEqual(['Pinned', 'Databases', 'Buckets'])
       expect(order(root)).toEqual(['images', 'bakta-database', 'laptop'])
       expect(nodes(root).filter((node) => node.props['data-testid'] === 'row-facts').map((node) => content(node))).toEqual(['laptop: 16 files, 50.2 MB'])
       expect(nodes(root).filter((node) => node.props['data-testid'] === 'row-sync').map((node) => content(node))).toEqual(['laptop: laptop-device'])
@@ -953,7 +953,7 @@ describe('Bucket sidebar sections', () => {
     allBuckets.hits.value = [{ bucket: 'laptop', node_id: 'node-2', group_id: 'g1' }]
     const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
     await flush()
-    expect(labels(root)).toEqual(['Other buckets'])
+    expect(labels(root)).toEqual(['Buckets'])
     allBuckets.hits.value = []
   })
 })
