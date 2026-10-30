@@ -35,12 +35,13 @@ import { defaultPlacement, isNativeBlocked, tesFormToExecutionRequest } from '@/
 import { submitJob } from '@/lib/jobs'
 import { TES_GROUP_TAG, holderNode, nativeInput, taskBuckets, type TesTask } from '@/lib/tes'
 import { errorMessage } from '@/lib/utils'
+import type { BucketSearchHit } from '@/lib/api'
 
 const router = useRouter()
 const { tesEnabled, busy, createTask, getTask } = useTes()
-const { currentUser, myGroups, searchBuckets } = useAruna()
+const { currentUser, myGroups, searchBuckets, getBucketDistribution } = useAruna()
 const { realm } = useRealm()
-const { nodes, nodeById, localNodeId, isTarget, displayName } = useRealmNodes()
+const { nodes, nodeById, localNodeId, isTarget, isLocalNode, displayName } = useRealmNodes()
 // Desktop only: this computer can run the container itself.
 const runTarget = useRunTarget()
 const s3 = useS3()
@@ -147,17 +148,24 @@ const HOLDER_PAGES = 10
 /** Every node holding a bucket of this name, of one group when given, read to the last page. */
 async function bucketHolders(name: string, groupId?: string): Promise<string[]> {
   const nodes = new Set<string>()
+  const sets: BucketSearchHit[] = []
   let cursor: string | undefined
-  for (let page = 0; page < HOLDER_PAGES; page += 1) {
+  let pages = 0
+  do {
+    if (pages++ === HOLDER_PAGES) throw new Error(`Not every node answered, so the node holding bucket ${name} is unknown. Try again.`)
     const found = await searchBuckets(name, { limit: 50, cursor, groupId })
     // Older nodes ignore the group filter, so it is applied here as well.
-    for (const hit of found.hits) {
-      if (hit.bucket === name && isTarget(hit.node_id) && (!groupId || hit.group_id === groupId)) nodes.add(hit.node_id)
-    }
+    const hits = found.hits.filter((hit) => hit.bucket === name && isTarget(hit.node_id) && (!groupId || hit.group_id === groupId))
+    for (const hit of hits) nodes.add(hit.node_id)
+    sets.push(...hits.filter((hit) => hit.set_id))
     cursor = found.next_cursor ?? undefined
-    if (!cursor) return [...nodes]
+  } while (cursor)
+  // The search shows a distributed bucket once; its node names every ready member.
+  for (const hit of new Map(sets.map((entry) => [entry.set_id, entry])).values()) {
+    const status = await getBucketDistribution(name, undefined, isLocalNode(hit.node_id) ? null : hit.node_id)
+    for (const member of status.members) if (member.state === 'ready' && isTarget(member.node_id)) nodes.add(member.node_id)
   }
-  throw new Error(`Not every node answered, so the node holding bucket ${name} is unknown. Try again.`)
+  return [...nodes]
 }
 
 /** The API of the node holding the run's buckets; undefined keeps the connected node. */

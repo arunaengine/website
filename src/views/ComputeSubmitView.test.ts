@@ -145,13 +145,17 @@ const DialogStub = defineComponent({
 
 // Bucket holders the federated search answers; this node unless a test says otherwise.
 const searchBuckets = vi.fn(async (q: string, _options?: { cursor?: string; groupId?: string }) => ({
-  hits: [{ bucket: q, node_id: 'node-id', group_id: 'group-id' }] as Array<{ bucket: string; node_id: string; group_id: string }>,
+  hits: [{ bucket: q, node_id: 'node-id', group_id: 'group-id' }] as Array<{ bucket: string; node_id: string; group_id: string; set_id?: string }>,
   nodes_failed: 0,
   next_cursor: null as string | null,
+}))
+const getBucketDistribution = vi.fn(async (_bucket: string, _signal?: AbortSignal, _nodeId?: string | null) => ({
+  members: [] as Array<{ node_id: string; state: string }>,
 }))
 const useArunaModule = {
   useAruna: () => ({
     searchBuckets,
+    getBucketDistribution,
     apiBaseUrl: ref('https://node.example.org/api/v1'),
     authToken: ref('realm-token'),
     bootstrapped: ref(true),
@@ -336,6 +340,7 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
       nodes: realmNodes,
       localNodeId: ref('node-id'),
       isTarget: () => true,
+      isLocalNode: (id: string) => id === 'node-id',
       nodeById: (id: string | null) => (id === 'node-b' ? { apiBase: 'https://node-b.example.org/api/v1' } : id === 'node-c' ? { apiBase: null } : null),
       displayName: (id: string) => `Node ${id}`,
     }),
@@ -528,6 +533,26 @@ describe('run page', () => {
 
     expect(searchBuckets).toHaveBeenLastCalledWith('results', { limit: 50, cursor: 'page-2', groupId: 'group-id' })
     expect(createTask).toHaveBeenCalledWith(expect.anything(), 'https://node-b.example.org/api/v1')
+    mounted.app.unmount()
+  })
+
+  it('counts every ready member of a distributed bucket the search shows once', async () => {
+    // The search answers one hit per set, from the member that sorts first.
+    searchBuckets.mockImplementationOnce(async (q: string) => ({
+      hits: [{ bucket: q, node_id: 'node-b', group_id: 'group-id', set_id: 'set-1' }],
+      nodes_failed: 0,
+      next_cursor: null,
+    }))
+    getBucketDistribution.mockResolvedValueOnce({ members: [{ node_id: 'node-b', state: 'ready' }, { node_id: 'node-id', state: 'ready' }] })
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
+    await fillValidRun(mounted.root)
+
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    expect(getBucketDistribution).toHaveBeenCalledWith('results', undefined, 'node-b')
+    expect(createTask).toHaveBeenCalledWith(expect.anything(), undefined)
     mounted.app.unmount()
   })
 
