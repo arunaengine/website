@@ -21,7 +21,13 @@ const shown = computed(() => crumbs.value.slice(-2))
 
 <template>
   <nav aria-label="Folder path" class="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground" :class="singleLine ? 'flex-nowrap' : 'flex-wrap'">
+    <!-- The bucket root is plain text where it is open, a link only inside a folder. -->
+    <span v-if="!parts.length" class="inline-flex min-w-0 shrink items-center gap-1.5 text-foreground" aria-current="page" :title="bucket">
+      <component :is="icon ?? Home" class="h-3.5 w-3.5 shrink-0" />
+      <span class="truncate">{{ bucket }}</span>
+    </span>
     <button
+      v-else
       type="button"
       class="inline-flex min-w-0 shrink items-center gap-1.5 text-primary hover:underline"
       :title="bucket"

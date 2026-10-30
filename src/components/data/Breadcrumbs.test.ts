@@ -44,7 +44,13 @@ describe('breadcrumbs', () => {
   })
 
   it('starts with the bucket\'s own icon', async () => {
-    const { root } = await mount('', defineComponent(() => () => h('i', 'bucket icon')))
+    const { root } = await mount('bakta', defineComponent(() => () => h('i', 'bucket icon')))
     expect(content(element(root, (node) => node.tag === 'button'))).toContain('bucket icon')
+  })
+
+  it('names the open bucket root as plain text, not a link', async () => {
+    const { root } = await mount('')
+    expect(nodes(root).some((node) => node.tag === 'button')).toBe(false)
+    expect(content(element(root, (node) => node.props['aria-current'] === 'page')).trim()).toBe('laptop')
   })
 })
