@@ -162,8 +162,8 @@ async function removeMember(member: GroupMember, roleId?: string) {
 
 <template>
   <div>
-    <table class="w-full text-sm">
-      <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground">
+    <table class="data-table">
+      <thead>
         <tr>
           <th scope="col" class="px-5 py-2 text-left font-semibold">Member</th>
           <th scope="col" class="px-5 py-2 text-left font-semibold">Roles</th>

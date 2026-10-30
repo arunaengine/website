@@ -103,10 +103,28 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
       listGroupConnectors,
       listGroupBackends,
       leaveGroup,
+      searchBuckets: vi.fn(),
+      toMetadataDoc: () => ({ title: '' }),
       saving: ref(false),
       currentUser: ref({ id: 'user-1' }),
     }),
   },
+  '@/components/dashboard/PageHeader.vue': moduleDefault(
+    defineComponent((_, { slots }) => () => h('header', [h('h1', slots.title?.()), slots.description?.(), h('div', slots.actions?.())])),
+  ),
+  '@/components/dashboard/OverviewCell.vue': moduleDefault(Empty),
+  '@/components/dashboard/RecentRunsCard.vue': moduleDefault(Empty),
+  '@/components/ui/CopyButton.vue': moduleDefault(Empty),
+  '@/components/ui/IconTile.vue': moduleDefault(Empty),
+  '@/components/ui/Notice.vue': moduleDefault(Passthrough),
+  '@/components/ui/SectionHeading.vue': moduleDefault(Passthrough),
+  '@/composables/useBucketCount': { listBuckets: vi.fn(async () => ({ hits: [], complete: true })) },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ isLocalNode: () => true }) },
+  '@/composables/useRealmSnapshot': { useRealmSnapshot: () => ({ realm: ref(null) }) },
+  '@/composables/useRecentRuns': { useRecentRuns: () => ({ runs: ref([]), state: ref('off'), load: vi.fn(async () => undefined) }) },
+  '@/components/nodes/node-display': { nodeName: () => 'node' },
+  '@/lib/formatCount': { formatCount: String },
+  '@/lib/tes': { TES_GROUP_TAG: 'aruna-engine.org/group' },
   '@/components/ui/Button.vue': moduleDefault(Passthrough),
   '@/components/ui/Badge.vue': moduleDefault(Passthrough),
   '@/components/ui/QuotaBar.vue': moduleDefault(Empty),
@@ -330,7 +348,7 @@ describe('Group notifications', () => {
     const leave = element(header, (node) => content(node).trim() === 'Leave group' && node.props.variant === 'outline')
     expect(notice.parent).toBe(leave.parent)
     expect(notice.parent?.children.indexOf(notice)).toBe((leave.parent?.children.indexOf(leave) ?? 0) - 1)
-    expect(all.indexOf(notice)).toBeGreaterThan(all.indexOf(element(header, (node) => node.tag === 'h4')))
+    expect(all.indexOf(notice)).toBeGreaterThan(all.indexOf(element(header, (node) => node.tag === 'h1')))
     expect(all.indexOf(notice)).toBeLessThan(all.indexOf(tabs))
     expect(notice.props.variant).toBe('outline')
     expect(notice.props.size).toBe('sm')

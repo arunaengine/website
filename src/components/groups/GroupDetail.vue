@@ -1,5 +1,12 @@
 <script setup lang="ts">
+import PageHeader from '@/components/dashboard/PageHeader.vue'
+import OverviewCell from '@/components/dashboard/OverviewCell.vue'
+import RecentRunsCard from '@/components/dashboard/RecentRunsCard.vue'
 import Button from '@/components/ui/Button.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
+import IconTile from '@/components/ui/IconTile.vue'
+import Notice from '@/components/ui/Notice.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Badge from '@/components/ui/Badge.vue'
 import QuotaBar from '@/components/ui/QuotaBar.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -27,7 +34,7 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { ArrowRight, Cable, ChartArea, Database, FileJson2, HardDrive, Inbox, LogOut, Pencil, ShieldAlert, ShieldCheck, Trash2, Users } from '@lucide/vue'
+import { ArrowRight, Boxes, Cable, ChartArea, ChevronRight, CircleCheck, Clock, Copy, Database, FileJson2, Files, FolderOpen, Globe, HardDrive, Inbox, LayoutDashboard, Link, ListChecks, Lock, LogOut, Package, Pencil, Server, ShieldAlert, ShieldCheck, Trash2, Users, Workflow } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
@@ -37,9 +44,17 @@ import { featureEnabled } from '@/lib/config'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { errorMessage, formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 import { useRouteTab } from '@/composables/useRouteTab'
+import { listBuckets } from '@/composables/useBucketCount'
+import { useRealmNodes } from '@/composables/useRealmNodes'
+import { useRealmSnapshot } from '@/composables/useRealmSnapshot'
+import { useRecentRuns } from '@/composables/useRecentRuns'
+import { nodeName } from '@/components/nodes/node-display'
+import { formatCount } from '@/lib/formatCount'
+import { TES_GROUP_TAG } from '@/lib/tes'
 import {
   ApiError,
   type GroupDetailResponse,
+  type BucketSearchHit,
   type GroupBackendResponse,
   type GroupMember,
   type MetadataDocumentListItem,
@@ -47,7 +62,7 @@ import {
   type UsageResponse,
 } from '@/lib/api'
 
-const props = defineProps<{ groupId: string }>()
+const props = defineProps<{ groupId: string; name?: string }>()
 const emit = defineEmits<{ (e: 'left'): void; (e: 'deleted'): void }>()
 
 const {
@@ -59,6 +74,8 @@ const {
   listGroupConnectors,
   listGroupBackends,
   leaveGroup,
+  searchBuckets,
+  toMetadataDoc,
   saving,
   currentUser,
 } = useAruna()
@@ -114,11 +131,6 @@ const objectCounts = computed(() => {
   const stored = typeof value.stored_blobs === 'number' ? value.stored_blobs : null
   return { total: value.objects, physicalBlobs: stored }
 })
-const purposeCounts = computed(() => [
-  { label: 'Datasets', value: usage.value?.dataset_count },
-  { label: 'Profiles', value: usage.value?.profile_count },
-  { label: 'Process runs', value: usage.value?.process_run_count },
-])
 function purposeCountLabel(value: number | null | undefined): string {
   return value == null ? 'Unknown' : formatNumber(value)
 }
@@ -277,6 +289,10 @@ async function reload() {
   }
   loadingDetail.value = false
   void loadTabCounts()
+  if (isMember.value) {
+    void loadBuckets()
+    void recentRuns.load()
+  }
   // Independent usage-history endpoint, gated; no-op when off.
   void loadHistory()
   // The storage section renders only after getGroup + getGroupUsage resolve, so
@@ -329,6 +345,48 @@ watch(
 )
 watch(historyRange, () => void loadHistory())
 
+// The group's buckets as the realm search lists them, one row per bucket with the nodes holding it.
+const buckets = ref<BucketSearchHit[] | null>(null)
+const bucketsComplete = ref(true)
+const bucketsError = ref<string | null>(null)
+let bucketRound = 0
+async function loadBuckets() {
+  const mine = ++bucketRound
+  const groupId = props.groupId
+  buckets.value = null
+  bucketsError.value = null
+  try {
+    const listing = await listBuckets(searchBuckets, groupId, () => mine === bucketRound)
+    if (mine !== bucketRound) return
+    buckets.value = listing.hits
+    bucketsComplete.value = listing.complete
+  } catch (err) {
+    if (mine === bucketRound) bucketsError.value = errorMessage(err)
+  }
+}
+const bucketRows = computed(() => {
+  const rows = new Map<string, BucketSearchHit[]>()
+  for (const hit of buckets.value ?? []) rows.set(hit.bucket, [...(rows.get(hit.bucket) ?? []), hit])
+  return [...rows].map(([bucket, hits]) => ({ bucket, hits })).sort((a, b) => a.bucket.localeCompare(b.bucket))
+})
+const { realm } = useRealmSnapshot()
+const { isLocalNode } = useRealmNodes()
+function nodeLabel(nodeId: string): string {
+  const record = realm.value?.nodes?.find((entry) => entry.node_id === nodeId)
+  return record ? nodeName(record) : nodeId
+}
+const bucketLink = (hit: BucketSearchHit) => ({
+  name: 'bucket',
+  params: { bucketId: hit.bucket },
+  query: { group: hit.group_id, ...(isLocalNode(hit.node_id) ? {} : { node: hit.node_id }) },
+})
+const datasetTitle = (doc: MetadataDocumentListItem) => toMetadataDoc(doc).title || doc.document_path
+
+// The recent runs the caller can see that this group owns.
+const recentRuns = useRecentRuns()
+const groupRuns = computed(() => recentRuns.runs.value.filter((run) => run.task.tags?.[TES_GROUP_TAG] === props.groupId))
+const completedRuns = computed(() => groupRuns.value.filter((run) => run.task.state === 'COMPLETE').length)
+
 const askPrompt = computed(() => {
   const detail = group.value
   if (!detail) return 'Summarize this group: its datasets, members, and usage.'
@@ -351,30 +409,33 @@ async function leave() {
 </script>
 
 <template>
-  <div class="rounded-lg border border-border bg-background/60">
-    <GroupDetailSkeleton v-if="loadingDetail && !group" />
-    <div v-else-if="loadError" class="px-5 py-6 text-center text-xs text-destructive">{{ loadError }}</div>
-    <template v-else-if="group">
-      <header class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-        <div class="min-w-0">
-          <div class="flex items-center gap-2">
-            <h4 class="truncate text-sm font-semibold text-foreground">{{ group.display_name }}</h4>
-            <Button
-              v-if="canAdminGroup"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Rename group"
-              title="Rename group"
-              @click="renameOpen = true"
-            >
-              <Pencil class="h-3.5 w-3.5" />
-            </Button>
-            <Badge v-if="canManage" size="sm" variant="royal" class="uppercase"><ShieldCheck class="mr-0.5 h-3 w-3" /> admin</Badge>
-            <Badge v-else-if="isMember" size="sm" variant="secondary" class="uppercase">member</Badge>
-          </div>
-          <div class="truncate font-mono text-[10px] text-muted-foreground">{{ group.group_id }}</div>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
+  <div>
+    <PageHeader :title="group?.display_name ?? name ?? groupId" :crumbs="[{ label: group?.display_name ?? name ?? groupId }]" :docs="{ topic: 'first-group', section: 'Groups own your work' }">
+      <template #title>
+        <span class="inline-flex flex-wrap items-center gap-2">
+          {{ group?.display_name ?? name ?? groupId }}
+          <Button
+            v-if="group && canAdminGroup"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Rename group"
+            title="Rename group"
+            @click="renameOpen = true"
+          >
+            <Pencil class="h-3.5 w-3.5" />
+          </Button>
+        </span>
+      </template>
+      <template v-if="group" #description>
+        <span class="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span v-if="canManage" class="inline-flex items-center gap-1.5"><ShieldCheck class="size-4" />Admin</span>
+          <span v-else-if="isMember" class="inline-flex items-center gap-1.5"><Users class="size-4" />Member</span>
+          <span v-if="!membersHidden" class="inline-flex items-center gap-1.5"><Users class="size-4" /><b class="font-medium text-foreground">{{ formatCount(members.length) }}</b> {{ members.length === 1 ? 'member' : 'members' }}</span>
+          <span class="inline-flex items-center gap-1.5 font-mono text-xs" :title="group.group_id">{{ group.group_id }}<CopyButton :value="group.group_id" label="Copy group id" /></span>
+        </span>
+      </template>
+      <template #actions>
+        <template v-if="group">
           <AskAiButton :prompt="askPrompt" :subject="`group ${groupId}`" />
           <Button
             v-if="tab === 'stats' && canManage && joinRequestsEnabled && !joinRequestError && joinRequestCount !== null && joinRequestCount > 0"
@@ -400,10 +461,16 @@ async function leave() {
           >
             <Trash2 class="h-3.5 w-3.5" /> Delete group
           </Button>
-          <JoinRequestButton v-if="group" :group-id="group.group_id" :group-name="group.display_name" />
-        </div>
-      </header>
-      <div v-if="leaveError" class="border-b border-border px-5 py-2 text-xs text-destructive">{{ leaveError }}</div>
+          <JoinRequestButton :group-id="group.group_id" :group-name="group.display_name" />
+        </template>
+      </template>
+    </PageHeader>
+
+    <div class="w-full space-y-8 px-4 py-6 sm:px-6">
+    <GroupDetailSkeleton v-if="loadingDetail && !group" />
+    <EmptyState v-else-if="loadError" :title="loadError" />
+    <template v-else-if="group">
+      <Notice v-if="leaveError" tone="error">{{ leaveError }}</Notice>
       <RenameGroupDialog
         v-model:open="renameOpen"
         :group-id="group.group_id"
@@ -412,10 +479,52 @@ async function leave() {
       />
       <DeleteGroupDialog v-model:open="deleteOpen" :group-id="group.group_id" @deleted="emit('deleted')" />
 
+      <div v-if="usage" class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <OverviewCell id="storage-use" class="scroll-mt-24" label="Storage" :icon="HardDrive" info="Stored data counts against the quota; referenced data stays at its source.">
+          <template #value>{{ formatBytes(usedBytes) }}</template>
+          <template #unit>{{ quotaStatus?.quota_bytes != null ? `of ${formatBytes(quotaStatus.quota_bytes)}` : 'stored' }}</template>
+          <span v-if="referenceBytes"><Link /><b>{{ formatBytes(referenceBytes) }}</b> referenced</span>
+          <span v-if="quotaStatus && quotaStatus.quota_bytes == null">No quota</span>
+          <span v-else-if="!quotaStatus">Quota unknown</span>
+          <span v-if="quotaStatus?.ceiling_bytes != null"><ShieldAlert /><b>{{ formatBytes(quotaStatus.ceiling_bytes) }}</b> hard cap</span>
+          <template v-if="quotaStatus?.quota_bytes != null" #action>
+            <QuotaBar
+              class="w-full"
+              :used="usedBytes"
+              :quota="quotaStatus.quota_bytes"
+              :ceiling="quotaStatus.ceiling_bytes"
+              :referenced="referenceBytes"
+              :warn="quotaStatus.warning"
+              :show-labels="false"
+              label="Group storage"
+            />
+          </template>
+        </OverviewCell>
+        <OverviewCell label="Objects" :icon="Files" tone="sky" :to="isMember ? { name: 'buckets', query: { group: group.group_id } } : undefined">
+          <template #value>{{ objectCounts ? formatCount(objectCounts.total) : 'Unknown' }}</template>
+          <span v-if="buckets !== null"><Package /><b>{{ bucketsComplete ? '' : 'at least ' }}{{ formatCount(bucketRows.length) }}</b> {{ bucketRows.length === 1 ? 'bucket' : 'buckets' }}</span>
+          <span v-if="objectCounts?.physicalBlobs != null"><Copy /><b>{{ formatCount(objectCounts.physicalBlobs) }}</b> {{ objectCounts.physicalBlobs === 1 ? "stored copy" : "stored copies" }}</span>
+        </OverviewCell>
+        <OverviewCell label="Datasets" :icon="FileJson2" tone="aqua" :to="{ name: 'datasets', query: { group: group.group_id } }">
+          <template #value>{{ purposeCountLabel(usage.dataset_count) }}</template>
+          <span v-if="usage.profile_count != null"><ListChecks /><b>{{ formatCount(usage.profile_count) }}</b> {{ usage.profile_count === 1 ? 'profile' : 'profiles' }}</span>
+        </OverviewCell>
+        <OverviewCell label="Runs" :icon="Workflow" tone="ok" info="Process runs this group has recorded.">
+          <template #value>{{ purposeCountLabel(usage.process_run_count) }}</template>
+          <span v-if="groupRuns.length && recentRuns.state.value === 'ready'"><CircleCheck class="text-status-ok" /><b>{{ completedRuns }}/{{ groupRuns.length }}</b> recent completed</span>
+        </OverviewCell>
+      </div>
+      <Notice v-if="quotaAssessment.state === 'over-quota'" tone="warning">
+        Over the quota. Writes are accepted until the hard cap; above it the node rejects uploads.
+      </Notice>
+      <Notice v-else-if="quotaAssessment.state === 'over-ceiling'" tone="error">
+        The node rejects uploads for this group. Free storage or ask a realm admin to raise the quota.
+      </Notice>
+
       <Tabs v-model="tab">
-        <div data-tour="group-tabs" class="border-b border-border px-5 py-2">
+        <div data-tour="group-tabs" class="mb-6">
           <TabsList class="h-auto flex-wrap">
-            <TabsTrigger value="stats" class="gap-1.5"><ChartArea class="h-3.5 w-3.5" /> Stats</TabsTrigger>
+            <TabsTrigger value="stats" class="gap-1.5"><LayoutDashboard class="h-3.5 w-3.5" /> Overview</TabsTrigger>
             <TabsTrigger value="members" class="gap-1.5">
               <Users class="h-3.5 w-3.5" /> Members
               <Badge v-if="!membersHidden" variant="outline" size="count">{{ members.length }}</Badge>
@@ -443,221 +552,188 @@ async function leave() {
           </TabsList>
         </div>
 
-        <TabsContent value="stats" class="mt-0">
-      <div v-if="usage" class="border-b border-border">
-        <div class="flex items-center gap-2 px-5 pb-1 pt-4">
-          <FileJson2 class="h-3.5 w-3.5 text-primary" />
-          <h2 class="font-display text-sm font-semibold text-aruna-navy">Live datasets</h2>
-        </div>
-        <dl class="grid grid-cols-3 gap-3 px-5 py-3">
-          <div v-for="count in purposeCounts" :key="count.label" class="rounded-md border border-border bg-background px-3 py-2">
-            <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{{ count.label }}</dt>
-            <dd class="mt-1 font-mono text-sm font-semibold tabular-nums text-foreground">{{ purposeCountLabel(count.value) }}</dd>
-          </div>
-        </dl>
-      </div>
-      <div v-if="usage" id="storage-use" class="scroll-mt-24 border-b border-border">
-        <div class="flex items-center gap-2 px-5 pb-1 pt-4">
-          <HardDrive class="h-3.5 w-3.5 text-primary" />
-          <h2 class="font-display text-sm font-semibold text-aruna-navy">Storage use</h2>
-          <Badge v-if="quotaBadge" size="sm" :variant="quotaBadge.variant" class="uppercase">{{ quotaBadge.label }}</Badge>
-        </div>
-        <div class="px-5 py-3">
-          <!-- Old backend: usage but no quota block. Do NOT claim unlimited. -->
-          <div v-if="!quotaStatus" class="flex items-center justify-between text-[11px]">
-            <span class="font-medium text-muted-foreground">Group storage</span>
-            <span class="tabular-nums text-foreground/80">
-              {{ formatBytes(usedBytes) }}<template v-if="referenceBytes"> · {{ formatBytes(referenceBytes) }} referenced (not counted)</template>
-            </span>
-          </div>
-          <QuotaBar
-            v-else-if="quotaStatus.quota_bytes == null"
-            :used="usedBytes"
-            :quota="null"
-            :referenced="referenceBytes"
-            label="Group storage"
-          />
-          <QuotaBar
-            v-else
-            :used="usedBytes"
-            :quota="quotaStatus.quota_bytes"
-            :ceiling="quotaStatus.ceiling_bytes"
-            :referenced="referenceBytes"
-            :warn="quotaStatus.warning"
-            label="Group storage"
-          />
-          <p v-if="objectCounts" class="mt-1 text-[11px] tabular-nums text-muted-foreground">
-            Objects: {{ formatNumber(objectCounts.total) }} total<template v-if="objectCounts.physicalBlobs !== null">
-              · {{ formatNumber(objectCounts.physicalBlobs) }} physical blob locations</template>
-          </p>
-          <p v-if="quotaStatus && quotaStatus.ceiling_bytes != null" class="mt-1 text-[11px] text-muted-foreground">
-            Hard cap {{ formatBytes(quotaStatus.ceiling_bytes) }}.
-          </p>
-          <p v-if="quotaAssessment.state === 'over-quota'" class="mt-1 text-[11px] text-muted-foreground">
-            Writes are accepted until the hard cap; above it the node rejects uploads (QuotaExceeded).
-          </p>
-          <p v-else-if="quotaAssessment.state === 'over-ceiling'" class="mt-1 text-[11px] text-destructive">
-            The node is rejecting uploads for this group (QuotaExceeded). Free storage or ask a realm admin to raise the quota.
-          </p>
-        </div>
-      </div>
+        <TabsContent value="stats" class="mt-0 space-y-8">
+          <div class="grid gap-6 lg:grid-cols-2">
+            <section v-if="isMember" class="flex flex-col" aria-labelledby="group-buckets-heading">
+              <SectionHeading id="group-buckets-heading" title="Buckets" :icon="Boxes">
+                <template #actions>
+                  <Button variant="outline" size="sm" as-child>
+                    <RouterLink :to="{ name: 'buckets', query: { group: group.group_id } }"><FolderOpen class="h-3.5 w-3.5" /> Open in Data</RouterLink>
+                  </Button>
+                </template>
+              </SectionHeading>
+              <div class="surface relative min-h-48 flex-1 overflow-hidden">
+                <div class="overflow-y-auto lg:absolute lg:inset-0">
+                  <p v-if="bucketsError" class="px-5 py-4 text-xs text-destructive">{{ bucketsError }}</p>
+                  <p v-else-if="buckets === null" class="px-5 py-4 text-xs text-muted-foreground">Reading the group's buckets…</p>
+                  <p v-else-if="!bucketRows.length" class="px-5 py-4 text-xs text-muted-foreground">{{ bucketsComplete ? 'No buckets yet.' : 'Not every node answered, so buckets may be missing.' }}</p>
+                  <ul v-else class="divide-y divide-border-subtle">
+                    <li v-for="row in bucketRows" :key="row.bucket" class="flex items-center gap-3 px-5 py-3 hover:bg-muted/40">
+                      <IconTile :icon="Package" tone="muted" size="sm" />
+                      <span class="min-w-0 flex-1">
+                        <RouterLink :to="bucketLink(row.hits[0]!)" class="block truncate text-sm font-medium text-foreground hover:underline">{{ row.bucket }}</RouterLink>
+                        <span class="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
+                          <Server class="size-3.5 shrink-0" aria-hidden="true" />
+                          <template v-for="(hit, index) in row.hits" :key="hit.node_id">
+                            <RouterLink :to="{ name: 'node', params: { nodeId: hit.node_id } }" class="hover:text-foreground hover:underline">{{ nodeLabel(hit.node_id) }}</RouterLink><span v-if="index < row.hits.length - 1">,</span>
+                          </template>
+                        </span>
+                      </span>
+                      <RouterLink :to="bucketLink(row.hits[0]!)" :aria-label="`Open ${row.bucket}`"><ChevronRight class="h-4 w-4 shrink-0 text-muted-foreground" /></RouterLink>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </section>
 
-      <div v-if="usageHistoryEnabled" class="border-b border-border">
-        <div class="flex flex-wrap items-center justify-between gap-2 px-5 pb-1 pt-4">
-          <div class="flex items-center gap-2">
-            <ChartArea class="h-3.5 w-3.5 text-primary" />
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">Usage history</h2>
+            <section class="flex flex-col" aria-labelledby="group-datasets-heading">
+              <SectionHeading id="group-datasets-heading" title="Datasets" :icon="FileJson2" :info="docsEstimate !== null ? `About ${formatNumber(docsEstimate)} in this group.` : undefined">
+                <template #actions>
+                  <Button variant="outline" size="sm" as-child>
+                    <RouterLink :to="{ name: 'datasets', query: { group: group.group_id } }"><ArrowRight class="h-3.5 w-3.5" /> All datasets</RouterLink>
+                  </Button>
+                </template>
+              </SectionHeading>
+              <div class="surface relative min-h-48 flex-1 overflow-hidden">
+                <div class="overflow-y-auto lg:absolute lg:inset-0">
+                  <p v-if="docsError" class="px-5 py-4 text-xs text-destructive">{{ docsError }}</p>
+                  <p v-else-if="docs && !docs.length" class="px-5 py-4 text-xs text-muted-foreground">No datasets yet.</p>
+                  <ul v-else-if="docs" class="divide-y divide-border-subtle">
+                    <li v-for="doc in docs.slice(0, DOC_LIMIT)" :key="doc.document_id">
+                      <RouterLink :to="{ name: 'dataset', params: { id: doc.document_id } }" class="flex items-center gap-3 px-5 py-3 hover:bg-muted/40">
+                        <IconTile :icon="FileJson2" tone="muted" size="sm" />
+                        <span class="min-w-0 flex-1">
+                          <span class="block truncate text-sm font-medium text-foreground">{{ datasetTitle(doc) }}</span>
+                          <span class="flex flex-wrap items-center gap-x-4 text-xs text-muted-foreground">
+                            <span class="inline-flex items-center gap-1.5"><component :is="doc.public ? Globe : Lock" class="size-3.5" />{{ doc.public ? 'Public' : 'Private' }}</span>
+                            <span class="inline-flex items-center gap-1.5"><Clock class="size-3.5" />Updated {{ relativeTime(doc.updated_at) }}</span>
+                          </span>
+                        </span>
+                        <ChevronRight class="h-4 w-4 shrink-0 text-muted-foreground" />
+                      </RouterLink>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </section>
           </div>
-          <div class="flex gap-1">
-            <Button
-              v-for="range in (['7d', '30d', '90d'] as const)"
-              :key="range"
-              size="sm"
-              :variant="historyRange === range ? 'default' : 'outline'"
-              @click="historyRange = range"
-            >
-              {{ range }}
-            </Button>
-          </div>
-        </div>
-        <div class="px-5 py-3">
-          <Skeleton v-if="historyLoading && !historyPoints" class="h-36" />
-          <div
-            v-else-if="historyUnsupported"
-            class="rounded-md border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground"
-          >
-            This backend does not serve usage history yet. The chart appears once snapshot recording ships (aruna#250).
-          </div>
-          <ErrorPanel v-else-if="historyError" :message="historyError" @retry="loadHistory" />
-          <EmptyState
-            v-else-if="!historyPoints || historyPoints.length < 2"
-            title="No usage history yet"
-            description="Snapshots appear once the node starts recording them."
-          />
-          <template v-else>
-            <div :class="historyLoading ? 'opacity-60 transition-opacity' : ''">
-              <UsageHistoryChart
-                :points="historyPoints"
-                :quota-bytes="quotaStatus?.quota_bytes"
-                :ceiling-bytes="quotaStatus?.ceiling_bytes"
-              />
+
+          <RecentRunsCard v-if="isMember && recentRuns.state.value !== 'off'" :runs="groupRuns" :state="recentRuns.state.value" />
+
+          <section v-if="usageHistoryEnabled" aria-labelledby="usage-history-heading">
+            <SectionHeading id="usage-history-heading" title="Usage history" :icon="ChartArea">
+              <template #actions>
+                <div class="flex gap-1">
+                  <Button
+                    v-for="range in (['7d', '30d', '90d'] as const)"
+                    :key="range"
+                    size="sm"
+                    :variant="historyRange === range ? 'default' : 'outline'"
+                    @click="historyRange = range"
+                  >
+                    {{ range }}
+                  </Button>
+                </div>
+              </template>
+            </SectionHeading>
+            <div class="surface p-5">
+              <Skeleton v-if="historyLoading && !historyPoints" class="h-36" />
+              <p v-else-if="historyUnsupported" class="text-xs text-muted-foreground">This node does not serve usage history yet.</p>
+              <ErrorPanel v-else-if="historyError" :message="historyError" @retry="loadHistory" />
+              <p v-else-if="!historyPoints || historyPoints.length < 2" class="text-xs text-muted-foreground">No usage history yet.</p>
+              <template v-else>
+                <div :class="historyLoading ? 'opacity-60 transition-opacity' : ''">
+                  <UsageHistoryChart
+                    :points="historyPoints"
+                    :quota-bytes="quotaStatus?.quota_bytes"
+                    :ceiling-bytes="quotaStatus?.ceiling_bytes"
+                  />
+                </div>
+                <p class="mt-2 text-xs text-muted-foreground">Logical bytes, the counter quotas are enforced against.</p>
+              </template>
             </div>
-            <p class="mt-2 text-[11px] text-muted-foreground">Logical bytes, the counter quotas are enforced against.</p>
-          </template>
-        </div>
-      </div>
+          </section>
 
-      <div>
-        <div class="flex items-center gap-2 px-5 pb-1 pt-4">
-          <FileJson2 class="h-3.5 w-3.5 text-primary" />
-          <h2 class="font-display text-sm font-semibold text-aruna-navy">Datasets</h2>
-          <Badge
-            v-if="docs"
-            variant="outline"
-            class="tabular-nums"
-            :title="docsEstimate !== null ? 'Approximate: the node estimates this count per group.' : undefined"
-          >
-            {{ docsCountLabel }}
-          </Badge>
-        </div>
-        <div class="px-5 py-3">
-          <p v-if="docsError" class="text-xs text-destructive">{{ docsError }}</p>
-          <p v-else-if="docs && !docs.length" class="text-xs text-muted-foreground">This group has no datasets yet.</p>
-          <ul v-else-if="docs" class="space-y-1">
-            <li v-for="doc in docs.slice(0, DOC_LIMIT)" :key="doc.document_id">
-              <RouterLink :to="{ name: 'dataset', params: { id: doc.document_id } }" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50">
-                <span class="min-w-0 flex-1 truncate font-mono text-xs text-foreground/80">{{ doc.document_path }}</span>
-                <Badge size="sm" :variant="doc.public ? 'success' : 'secondary'" class="shrink-0 uppercase">{{ doc.public ? 'public' : 'private' }}</Badge>
-                <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime(doc.updated_at) }}</span>
-              </RouterLink>
-            </li>
-          </ul>
-          <RouterLink
-            v-if="moreDocs"
-            :to="{ name: 'datasets', query: { group: group.group_id } }"
-            class="mt-2 inline-flex text-xs font-medium text-primary hover:underline"
-          >
-            View all in Discover{{ docsEstimate !== null ? ` (about ${formatNumber(docsEstimate)})` : '' }} <ArrowRight class="inline h-3 w-3 align-[-1px]" aria-hidden="true" />
-          </RouterLink>
-        </div>
-      </div>
-          <GroupLocationSection v-if="isMember && !canAdminStorage" :group="group" :can-admin="false" class="border-t border-border" />
+          <GroupLocationSection v-if="isMember && !canAdminStorage" :group="group" :can-admin="false" class="surface" />
         </TabsContent>
 
-        <TabsContent value="members" :force-mount="canManage && joinRequestsEnabled" :class="tab === 'members' ? 'mt-0' : 'mt-0 hidden'">
-      <section
-        v-if="canManage && joinRequestsEnabled"
-        aria-label="Join requests"
-        class="border-b border-border"
-      >
-        <div class="flex items-center gap-2 px-5 pt-4">
-          <Inbox class="h-4 w-4 text-primary" />
-          <h2 class="font-display text-sm font-semibold text-aruna-navy">Join requests</h2>
-          <Badge v-if="joinRequestCount !== null" :variant="joinRequestCount > 0 ? 'warn' : 'outline'" size="count" aria-label="Pending access requests">{{ joinRequestCount }}</Badge>
-        </div>
-        <p class="px-5 pt-1 text-xs text-muted-foreground">Review requests to join this group. Approve a request to assign roles, or deny it with an optional reason.</p>
-        <JoinRequestsInbox
-          :group-id="group.group_id"
-          :roles="group.roles"
-          @changed="reload"
-          @count="joinRequestCount = $event"
-          @load-error="joinRequestError = $event"
-        />
-      </section>
-          <div>
-            <div v-if="membersHidden" class="px-5 py-4 text-xs text-muted-foreground">
-              The member list is only visible to group members.
+        <TabsContent value="members" :force-mount="canManage && joinRequestsEnabled" :class="tab === 'members' ? 'mt-0 space-y-8' : 'mt-0 hidden'">
+          <section v-if="canManage && joinRequestsEnabled" aria-label="Join requests">
+            <SectionHeading title="Join requests" :icon="Inbox" info="Approve a request to assign roles, or deny it with an optional reason.">
+              <template #actions>
+                <Badge v-if="joinRequestCount !== null" :variant="joinRequestCount > 0 ? 'warn' : 'outline'" size="count" aria-label="Pending access requests">{{ joinRequestCount }}</Badge>
+              </template>
+            </SectionHeading>
+            <div class="surface overflow-hidden">
+              <JoinRequestsInbox
+                :group-id="group.group_id"
+                :roles="group.roles"
+                @changed="reload"
+                @count="joinRequestCount = $event"
+                @load-error="joinRequestError = $event"
+              />
             </div>
-            <GroupMembers
-              v-else
+          </section>
+          <section aria-labelledby="group-members-heading">
+            <SectionHeading id="group-members-heading" title="Members" :icon="Users" />
+            <EmptyState v-if="membersHidden" title="Only group members see the member list." />
+            <div v-else class="surface overflow-x-auto">
+              <GroupMembers
+                :group-id="group.group_id"
+                :members="members"
+                :roles="group.roles"
+                :can-manage="canManage"
+                @changed="reload"
+              />
+            </div>
+          </section>
+        </TabsContent>
+
+        <TabsContent value="roles" class="mt-0">
+          <div class="surface overflow-hidden">
+            <GroupRoles :group="group" :can-manage="canManage" @changed="reload" />
+          </div>
+        </TabsContent>
+
+        <TabsContent v-if="isMember" value="sources" class="mt-0">
+          <div class="surface overflow-hidden">
+            <ConnectorsSection
+              v-if="shown('connectors') || !sourcesVisible || connectorLinked"
               :group-id="group.group_id"
-              :members="members"
-              :roles="group.roles"
-              :can-manage="canManage"
-              @changed="reload"
+              :can-write="canWriteData"
+              @count="connectorCount = $event"
+            />
+            <RepositoriesSection
+              v-if="shown('repositories') || !sourcesVisible"
+              :group-id="group.group_id"
+              :can-write="canWriteMeta"
             />
           </div>
         </TabsContent>
 
-        <TabsContent value="roles" class="mt-0">
-          <GroupRoles :group="group" :can-manage="canManage" @changed="reload" />
-        </TabsContent>
-
-        <TabsContent v-if="isMember" value="sources" class="mt-0">
-          <ConnectorsSection
-            v-if="shown('connectors') || !sourcesVisible || connectorLinked"
-            :group-id="group.group_id"
-            :can-write="canWriteData"
-            @count="connectorCount = $event"
-          />
-          <RepositoriesSection
-            v-if="shown('repositories') || !sourcesVisible"
-            :group-id="group.group_id"
-            :can-write="canWriteMeta"
-          />
-        </TabsContent>
-
         <TabsContent v-if="policiesTabVisible" value="policies" class="mt-0">
-          <div class="space-y-8 px-5 py-4">
+          <div class="surface space-y-8 p-5">
             <PoliciesSection scope="group" :group-id="group.group_id" :can-admin="canAdminGroup" />
             <EffectivePolicies :group-id="group.group_id" />
           </div>
         </TabsContent>
 
         <TabsContent v-if="canAdminStorage" value="storage" class="mt-0">
-          <StorageSection
-            class="border-b border-border"
-            :group-id="group.group_id"
-            :group-name="group.display_name"
-            :dataset-bucket="group.dataset_location?.bucket ?? null"
-            :can-admin="canAdminStorage"
-            :focus-link="typeof route.query.link === 'string' ? route.query.link : null"
-            @count="backendCount = $event"
-            @backends="(groupBackends = $event), storageTick++"
-          />
-          <GroupLocationSection :group="group" can-admin :reload="storageTick" class="border-t border-border" @changed="group = $event" />
+          <div class="surface overflow-hidden">
+            <StorageSection
+              :group-id="group.group_id"
+              :group-name="group.display_name"
+              :dataset-bucket="group.dataset_location?.bucket ?? null"
+              :can-admin="canAdminStorage"
+              :focus-link="typeof route.query.link === 'string' ? route.query.link : null"
+              @count="backendCount = $event"
+              @backends="(groupBackends = $event), storageTick++"
+            />
+            <GroupLocationSection :group="group" can-admin :reload="storageTick" class="border-t border-border" @changed="group = $event" />
+          </div>
         </TabsContent>
       </Tabs>
     </template>
+    </div>
   </div>
 </template>

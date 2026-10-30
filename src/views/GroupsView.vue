@@ -3,9 +3,13 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
-import Badge from '@/components/ui/Badge.vue'
-import AccessBadge from '@/components/ui/AccessBadge.vue'
-import ListShell from '@/components/ui/ListShell.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import IconTile from '@/components/ui/IconTile.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
+import StatusMark from '@/components/ui/StatusMark.vue'
+import StatusPill from '@/components/ui/StatusPill.vue'
+import ViewToggle from '@/components/ui/ViewToggle.vue'
+import GroupQuotaCards from '@/components/dashboard/GroupQuotaCards.vue'
 import ListSkeleton from '@/components/ui/ListSkeleton.vue'
 import SectionSkeleton from '@/components/ui/SectionSkeleton.vue'
 import Spinner from '@/components/ui/Spinner.vue'
@@ -18,12 +22,13 @@ import { useJoinRequests } from '@/composables/useJoinRequests'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { reloadGroups } from '@/composables/useGroupSelection'
 import { useRefresh } from '@/composables/useRefresh'
+import { useViewMode } from '@/composables/useViewMode'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 import { providePageContext } from '@/composables/usePageContext'
 import type { PageContext } from '@/lib/assistant/prompt'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { Inbox, Plus, Users } from '@lucide/vue'
+import { Clock, Globe, Inbox, Plus, Users, X } from '@lucide/vue'
 import { errorMessage, relativeTime } from '@/lib/utils'
 import type { JoinRequest } from '@/lib/api'
 
@@ -72,7 +77,13 @@ async function refreshGroups() {
     joinRequestsEnabled.value && currentUser.value ? loadOwnRequests() : Promise.resolve(),
   ])
 }
-const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refreshGroups)
+const groupView = useViewMode('groups')
+// A refresh also reloads the group cards' usage.
+const cardsRevision = ref(0)
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(async () => {
+  cardsRevision.value++
+  await refreshGroups()
+})
 function onDeleted() {
   void router.push({ name: 'groups' })
   void refreshGroups()
@@ -95,9 +106,6 @@ onMounted(reloadGroups)
 // A post-mount sign-in must also load the requests.
 watch(currentUser, loadOwnJoinRequests)
 
-const pendingRequestCount = computed(
-  () => ownRequests.value.filter((r) => r.status === 'pending').length,
-)
 
 // Prefer a name the portal already knows; fall back to the echoed name, then id.
 function groupNameFor(req: JoinRequest): string {
@@ -136,32 +144,15 @@ watch(
   { immediate: true },
 )
 
-function toggleGroup(groupId: string) {
-  void router.push(
-    selectedGroupId.value === groupId
-      ? { name: 'groups' }
-      : { name: 'group', params: { id: groupId } },
-  )
-}
 
 const selectedGroup = computed(() =>
   [...myGroups.value, ...discoverableGroups.value].find((group) => group.id === selectedGroupId.value),
-)
-const pageTitle = computed(() =>
-  route.name === 'group' ? (selectedGroup.value?.name ?? selectedGroupId.value) : 'Groups',
 )
 
 providePageContext((): PageContext => (selectedGroupId.value
   ? { kind: 'group', title: selectedGroup.value?.name ?? selectedGroupId.value, details: { id: selectedGroupId.value } }
   : { kind: 'groups page', title: 'Groups', details: { 'groups joined': String(myGroups.value.length) } }))
 
-// While a stored session restores, keep the signed-in copy so the sign-in
-// hint never flashes for users who are actually signed in.
-const description = computed(() =>
-  currentUser.value || authPending.value
-    ? 'Your groups in this realm, manage members, roles and permissions.'
-    : 'Groups in this realm. Sign in from the top bar to create and manage groups.',
-)
 
 const emptyGroupsMessage = computed(() =>
   currentUser.value
@@ -169,151 +160,118 @@ const emptyGroupsMessage = computed(() =>
     : 'Sign in to see the groups you belong to.',
 )
 
-// After the first paint a refresh never shows the shell's own wait again.
-const shellState = computed<'loading' | 'empty' | 'ready'>(() => {
-  if (myGroups.value.length) return 'ready'
-  return painted.value ? 'empty' : 'loading'
-})
 </script>
 
 <template>
   <div>
-    <PageHeader :title="pageTitle" :description="description" :docs="{ topic: 'first-group', section: 'Groups own your work' }">
-      <template #actions>
-        <RefreshButton :busy="spinning" size="default" @click="onRefresh" />
-        <Button data-tour="groups-create" :disabled="!currentUser" @click="createGroupOpen = true">
-          <Plus class="h-4 w-4" /> Create group
-        </Button>
-      </template>
-    </PageHeader>
-
-    <div v-if="!painted" class="w-full px-4 sm:px-6 space-y-6 py-8">
-      <ListSkeleton header :rows="3" label="Loading groups" />
-      <SectionSkeleton :lines="2" />
+    <!-- The group waits for the session, so its rights and lists read for the signed-in user. -->
+    <div v-if="selectedGroupId && !painted" class="w-full px-4 py-6 sm:px-6">
+      <SectionSkeleton :lines="4" />
     </div>
+    <GroupDetail
+      v-else-if="selectedGroupId"
+      :key="`${sessionEpoch}/${selectedGroupId}`"
+      :group-id="selectedGroupId"
+      :name="selectedGroup?.name"
+      @left="router.push({ name: 'groups' })"
+      @deleted="onDeleted"
+    />
 
-    <div v-else class="w-full px-4 sm:px-6 space-y-6 py-8">
-      <ListShell :state="shellState" :rows="3" :empty-title="emptyGroupsMessage">
-        <template #icon><Users class="h-6 w-6" /></template>
-        <template #empty-actions>
-          <Button v-if="currentUser" variant="outline" size="sm" @click="createGroupOpen = true">
-            <Plus class="h-3.5 w-3.5" /> Create group
+    <template v-else>
+      <PageHeader title="Groups" :docs="{ topic: 'first-group', section: 'Groups own your work' }">
+        <template #actions>
+          <RefreshButton :busy="spinning" size="default" @click="onRefresh" />
+          <Button data-tour="groups-create" :disabled="!currentUser" @click="createGroupOpen = true">
+            <Plus class="h-4 w-4" /> Create group
           </Button>
         </template>
-        <template #filters>
-          <Users class="h-4 w-4 text-primary" />
-          <h2 class="font-display text-sm font-semibold text-aruna-navy">Your groups</h2>
-          <Badge variant="outline" size="count">{{ myGroups.length }}</Badge>
-        </template>
+      </PageHeader>
 
-        <ul class="divide-y divide-border">
-          <li v-for="group in myGroups" :key="group.id">
-            <button
-              type="button"
-              class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40"
-              :class="selectedGroupId === group.id ? 'bg-muted/30' : ''"
-              @click="toggleGroup(group.id)"
-            >
-              <span class="h-2 w-2 shrink-0 rounded-full bg-primary" />
-              <div class="min-w-0 flex-1">
-                <div class="truncate text-sm font-medium text-foreground">{{ group.name }}</div>
-                <div class="truncate font-mono text-[10px] text-muted-foreground">{{ group.id }}</div>
-              </div>
-              <Badge v-if="group.memberCount !== undefined" variant="outline" class="shrink-0 tabular-nums">
-                {{ group.memberCount }} {{ group.memberCount === 1 ? 'member' : 'members' }}
-              </Badge>
-              <div class="flex flex-wrap justify-end gap-1">
-                <AccessBadge v-for="role in group.tags" :key="role" :access="role" />
-              </div>
-            </button>
-            <div v-if="selectedGroupId === group.id" class="border-t border-border bg-muted/10 p-4">
-              <GroupDetail :group-id="group.id" @left="router.push({ name: 'groups' })" @deleted="onDeleted" />
-            </div>
-          </li>
-        </ul>
-      </ListShell>
+      <div v-if="!painted" class="w-full space-y-8 px-4 py-6 sm:px-6">
+        <ListSkeleton header :rows="3" label="Loading groups" />
+        <SectionSkeleton :lines="2" />
+      </div>
 
-      <section
-        v-if="joinRequestsEnabled && currentUser && (visibleOwnRequests.length || ownRequestsError)"
-        id="join-requests"
-        class="surface overflow-hidden scroll-mt-20"
-      >
-        <header class="flex items-center justify-between border-b border-border px-5 py-4">
-          <div class="flex items-center gap-2">
-            <Inbox class="h-4 w-4 text-primary" />
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">Your join requests</h2>
-            <Badge variant="outline" class="tabular-nums">{{ pendingRequestCount }} pending</Badge>
-          </div>
-        </header>
-        <p v-if="ownRequestsError" class="px-5 py-3 text-xs text-destructive">{{ ownRequestsError }}</p>
-        <ul v-if="visibleOwnRequests.length" class="divide-y divide-border">
-          <li
-            v-for="req in visibleOwnRequests"
-            :key="req.request_id"
-            class="flex flex-wrap items-center gap-3 px-5 py-3"
-          >
-            <div class="min-w-0 flex-1">
-              <div class="truncate text-sm font-medium text-foreground">{{ groupNameFor(req) }}</div>
-              <div class="truncate font-mono text-[10px] text-muted-foreground">{{ req.group_id }}</div>
-              <p
-                v-if="req.status === 'denied' && req.decision_reason"
-                class="mt-0.5 text-xs text-muted-foreground"
-              >
-                {{ req.decision_reason }}
-              </p>
-            </div>
-            <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime(req.created_at) }}</span>
-            <Badge v-if="req.status === 'pending'" size="sm" variant="warn" class="shrink-0 uppercase">pending</Badge>
-            <Badge v-else-if="req.status === 'approved'" size="sm" variant="success" class="shrink-0 uppercase">approved</Badge>
-            <Badge v-else size="sm" variant="destructive" class="shrink-0 uppercase">denied</Badge>
-            <Button
-              v-if="req.status === 'pending'"
-              variant="ghost"
-              size="sm"
-              class="shrink-0"
-              :disabled="busy || withdrawing !== null"
-              :aria-busy="withdrawing === req.request_id"
-              @click="withdraw(req)"
-            >
-              <Spinner v-if="withdrawing === req.request_id" label="Withdrawing the request" class="text-current" /> Withdraw
+      <div v-else class="w-full space-y-8 px-4 py-6 sm:px-6">
+        <section aria-labelledby="your-groups-heading">
+          <SectionHeading id="your-groups-heading" title="Your groups" :icon="Users" info="A bucket stored on several nodes counts once.">
+            <template v-if="myGroups.length" #actions>
+              <ViewToggle v-model="groupView" />
+            </template>
+          </SectionHeading>
+          <GroupQuotaCards v-if="myGroups.length" :refresh-revision="cardsRevision" :view="groupView" />
+          <EmptyState v-else :title="emptyGroupsMessage">
+            <template #icon><Users class="size-6" /></template>
+            <Button v-if="currentUser" variant="outline" size="sm" @click="createGroupOpen = true">
+              <Plus class="h-3.5 w-3.5" /> Create group
             </Button>
-          </li>
-        </ul>
-      </section>
+          </EmptyState>
+        </section>
 
-      <section v-if="discoverableGroups.length" class="surface overflow-hidden">
-        <header class="border-b border-border px-5 py-4">
-          <h2 class="font-display text-sm font-semibold text-aruna-navy">Other groups in this realm</h2>
-          <p class="text-xs text-muted-foreground">Search for a group and request access from its admins.</p>
-          <Input v-model="groupQuery" class="mt-3 max-w-md" placeholder="Search groups" aria-label="Search other groups" />
-        </header>
-        <p v-if="!matchingGroups.length" class="px-5 py-4 text-sm text-muted-foreground">No groups match your search.</p>
-        <ul class="divide-y divide-border">
-          <li v-for="group in matchingGroups" :key="group.id">
-            <div class="flex items-center">
-              <button
-                type="button"
-                class="flex min-w-0 flex-1 items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40"
-                :class="selectedGroupId === group.id ? 'bg-muted/30' : ''"
-                @click="toggleGroup(group.id)"
-              >
-                <span class="h-2 w-2 shrink-0 rounded-full bg-border" />
+        <section
+          v-if="joinRequestsEnabled && currentUser && (visibleOwnRequests.length || ownRequestsError)"
+          id="join-requests"
+          class="scroll-mt-20"
+          aria-labelledby="join-requests-heading"
+        >
+          <SectionHeading id="join-requests-heading" title="Your join requests" :icon="Inbox" />
+          <div class="surface overflow-hidden">
+            <p v-if="ownRequestsError" class="px-5 py-3 text-xs text-destructive">{{ ownRequestsError }}</p>
+            <ul v-if="visibleOwnRequests.length" class="divide-y divide-border-subtle">
+              <li v-for="req in visibleOwnRequests" :key="req.request_id" class="flex flex-wrap items-center gap-3 px-5 py-3">
+                <IconTile :icon="Users" tone="muted" size="sm" />
                 <div class="min-w-0 flex-1">
-                  <div class="truncate text-sm font-medium text-foreground">{{ group.name }}</div>
-                  <div class="truncate font-mono text-[10px] text-muted-foreground">{{ group.id }}</div>
+                  <RouterLink :to="{ name: 'group', params: { id: req.group_id } }" class="block truncate text-sm font-medium text-foreground hover:underline">
+                    {{ groupNameFor(req) }}
+                  </RouterLink>
+                  <p class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span class="inline-flex items-center gap-1.5"><Clock class="size-3.5" />Sent {{ relativeTime(req.created_at) }}</span>
+                    <span v-if="req.status === 'denied' && req.decision_reason">{{ req.decision_reason }}</span>
+                  </p>
                 </div>
-              </button>
-              <div v-if="joinRequestsEnabled" class="shrink-0 pr-5">
-                <JoinRequestButton :group-id="group.id" :group-name="group.name" />
-              </div>
-            </div>
-            <div v-if="selectedGroupId === group.id" class="border-t border-border bg-muted/10 p-4">
-              <GroupDetail :group-id="group.id" @deleted="onDeleted" />
-            </div>
-          </li>
-        </ul>
-      </section>
-    </div>
+                <StatusPill v-if="req.status === 'pending'" state="Pending" tone="attention" :icon="Clock" />
+                <StatusMark v-else-if="req.status === 'approved'" label="Approved" />
+                <StatusPill v-else state="Denied" tone="failed" />
+                <Button
+                  v-if="req.status === 'pending'"
+                  variant="outline"
+                  size="sm"
+                  class="shrink-0"
+                  :disabled="busy || withdrawing !== null"
+                  :aria-busy="withdrawing === req.request_id"
+                  @click="withdraw(req)"
+                >
+                  <Spinner v-if="withdrawing === req.request_id" label="Withdrawing the request" class="text-current" /><X v-else class="h-3.5 w-3.5" /> Withdraw
+                </Button>
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section v-if="discoverableGroups.length" aria-labelledby="other-groups-heading">
+          <SectionHeading id="other-groups-heading" title="Other groups" :icon="Globe" info="Groups in this realm you are not in. Request access from their admins.">
+            <template #actions>
+              <Input v-model="groupQuery" class="h-9 w-full sm:w-64" placeholder="Find a group" aria-label="Search other groups" />
+            </template>
+          </SectionHeading>
+          <div class="surface overflow-hidden">
+            <p v-if="!matchingGroups.length" class="px-5 py-4 text-sm text-muted-foreground">No groups match your search.</p>
+            <ul v-else class="divide-y divide-border-subtle">
+              <li v-for="group in matchingGroups" :key="group.id" class="flex items-center gap-3 px-5 py-3">
+                <RouterLink :to="{ name: 'group', params: { id: group.id } }" class="flex min-w-0 flex-1 items-center gap-3 hover:underline">
+                  <IconTile :icon="Users" tone="muted" size="sm" />
+                  <span class="min-w-0">
+                    <span class="block truncate text-sm font-medium text-foreground">{{ group.name }}</span>
+                    <span class="block truncate font-mono text-xs text-muted-foreground">{{ group.id }}</span>
+                  </span>
+                </RouterLink>
+                <JoinRequestButton v-if="joinRequestsEnabled" :group-id="group.id" :group-name="group.name" />
+              </li>
+            </ul>
+          </div>
+        </section>
+      </div>
+    </template>
 
     <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => router.push({ name: 'group', params: { id: group.group_id } })" />
   </div>
