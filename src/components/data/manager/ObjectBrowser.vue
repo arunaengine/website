@@ -78,7 +78,6 @@ import {
   Eye,
   FolderOpen,
   FolderPlus,
-  FlaskConical,
   FolderSync,
   Globe,
   Info,
@@ -201,9 +200,10 @@ const usage = useBucketUsage(bucket, remoteNodeId)
 // The path starts with the bucket's own icon, as in the bucket list.
 const databases = useDatabases()
 const bucketIcon = computed(() => (databases.find(bucket.value, remoteNodeId.value, props.setId) ? Database : Package))
-const { byKey: originOf, shared: sharedOrigin, mixed: mixedOrigins } = useFolderOrigin(bucket, remoteNodeId, visibleObjects)
+// The run that wrote a file only filters the list here; file details name it.
+const { byKey: originOf } = useFolderOrigin(bucket, remoteNodeId, visibleObjects)
 // The spacer column of a wide view counts too; a span over a hidden column does no harm.
-const columns = computed(() => (mixedOrigins.value ? 7 : 6))
+const columns = 6
 // The other nodes this bucket syncs with, each named once.
 const syncPartners = computed(() => {
   const own = remoteNodeId.value ?? realmNodes.localNodeId.value
@@ -786,14 +786,6 @@ async function onDrop(event: DragEvent) {
           </p>
           <Button variant="outline" size="sm" @click="showWholeFolder"><FolderOpen class="h-4 w-4" /> Show the whole folder</Button>
         </div>
-        <p v-else-if="sharedOrigin && !wholeBucket && !remoteBlocked" class="flex min-w-0 items-center gap-1.5 px-4 pb-2.5 text-sm text-muted-foreground @max-[600px]:px-3">
-          <FlaskConical class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span v-if="sharedOrigin.verb" class="truncate">{{ sharedOrigin.verb }} {{ relativeTime(sharedOrigin.time) }}</span>
-          <span v-else class="truncate">{{ relativeTime(sharedOrigin.time) }} by
-            <RouterLink v-if="sharedOrigin.to" :to="sharedOrigin.to" class="text-primary hover:underline">{{ sharedOrigin.label }}</RouterLink>
-            <template v-else>{{ sharedOrigin.label }}</template>
-          </span>
-        </p>
         <MetadataSearch
           v-if="wholeBucket"
           ref="bucketSearch"
@@ -855,7 +847,6 @@ async function onDrop(event: DragEvent) {
             <col class="@min-[1280px]:w-[40rem]" />
             <col class="w-24" />
             <col class="w-24 @max-[720px]:w-0" />
-            <col v-if="mixedOrigins" class="w-40 @max-[720px]:w-0" />
             <col class="hidden @min-[1280px]:table-column" />
             <col class="w-[132px]" />
           </colgroup>
@@ -890,7 +881,6 @@ async function onDrop(event: DragEvent) {
                   Modified <component :is="sort.descending ? ArrowDown : ArrowUp" v-if="sort.key === 'modified'" class="h-3 w-3" />
                 </button>
               </th>
-              <th v-if="mixedOrigins" class="overflow-hidden px-3 py-2 text-left font-medium @max-[720px]:p-0"><span class="@max-[720px]:hidden">Origin</span></th>
               <th class="hidden @min-[1280px]:table-cell"></th>
               <th class="p-0"><span class="sr-only">Actions</span></th>
             </tr>
@@ -940,7 +930,6 @@ async function onDrop(event: DragEvent) {
               </td>
               <td class="@max-[600px]:hidden"></td>
               <td class="@max-[600px]:hidden"></td>
-              <td v-if="mixedOrigins" class="@max-[600px]:hidden"></td>
               <td class="hidden @min-[1280px]:table-cell"></td>
               <td class="px-2 @max-[600px]:block">
                 <div class="flex items-center justify-end gap-1">
@@ -1024,12 +1013,6 @@ async function onDrop(event: DragEvent) {
               <td class="overflow-hidden whitespace-nowrap px-3 py-2 text-muted-foreground @max-[720px]:p-0 @max-[600px]:hidden">
                 <span class="@max-[720px]:hidden">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '' }}</span>
               </td>
-              <td v-if="mixedOrigins" class="overflow-hidden whitespace-nowrap px-3 py-2 text-muted-foreground @max-[720px]:p-0 @max-[600px]:hidden">
-                <span v-if="originOf.get(object.key)" class="block truncate @max-[720px]:hidden">
-                  <RouterLink v-if="originOf.get(object.key)!.to" :to="originOf.get(object.key)!.to!" class="text-primary hover:underline" @click.stop>{{ originOf.get(object.key)!.label }}</RouterLink>
-                  <template v-else>{{ originOf.get(object.key)!.label }}</template>
-                </span>
-              </td>
               <td class="hidden @min-[1280px]:table-cell"></td>
               <td class="px-2 @max-[600px]:block">
                 <div class="flex items-center justify-end gap-1">
@@ -1062,7 +1045,6 @@ async function onDrop(event: DragEvent) {
               <td class="overflow-hidden whitespace-nowrap px-3 py-2 @max-[720px]:p-0 @max-[600px]:hidden">
                 <span class="@max-[720px]:hidden">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '' }}</span>
               </td>
-              <td v-if="mixedOrigins" class="@max-[600px]:hidden"></td>
               <td class="hidden @min-[1280px]:table-cell"></td>
               <td class="px-2 @max-[600px]:block">
                 <div class="flex items-center justify-end gap-1">

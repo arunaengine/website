@@ -832,30 +832,19 @@ describe('object browser file origins', () => {
     folderOrigin.byKey.value = new Map()
   })
 
-  it('names one shared origin once above the list, with the run linked', async () => {
+  it('names the run of a file neither above the list nor in a column', async () => {
     folderOrigin.shared.value = run
-    const root = await render()
-    const line = element(root, (node) => node.tag === 'p' && content(node).includes('by'))
-
-    expect(content(line).replace(/\s+/g, ' ').trim()).toBe('2h ago by Annotate my genome with Bakta')
-    expect(element(line, (node) => node.tag === 'a').props.to).toEqual(run.to)
-    expect(nodes(root).some((node) => node.tag === 'th' && content(node).includes('Origin'))).toBe(false)
-  })
-
-  it('adds an Origin column when the files came from different places, and keeps the actions last', async () => {
     folderOrigin.mixed.value = true
-    folderOrigin.byKey.value = new Map([[listedObject.key, { ...run, key: 'upload', label: 'an upload', to: null }]])
+    folderOrigin.byKey.value = new Map([[listedObject.key, run]])
     const root = await render({ folders: ref([listedFolder]) })
-    const header = element(root, (node) => node.tag === 'thead')
     const row = element(root, (node) => node.tag === 'tr' && content(node).includes('reads.fastq'))
 
-    // A seventh, empty column takes the spare width of a wide view.
-    expect(nodes(header).filter((node) => node.tag === 'th')).toHaveLength(7)
-    expect(nodes(element(root, (node) => node.tag === 'colgroup')).filter((node) => node.tag === 'col')).toHaveLength(7)
-    expect(row.children.filter((node) => node.tag === 'td')).toHaveLength(7)
-    expect(content(row.children.filter((node) => node.tag === 'td')[4])).toContain('an upload')
+    expect(content(root)).not.toContain('Annotate my genome with Bakta')
+    expect(nodes(root).some((node) => node.tag === 'th' && content(node).includes('Origin'))).toBe(false)
+    // Six columns, the empty one taking the spare width of a wide view.
+    expect(row.children.filter((node) => node.tag === 'td')).toHaveLength(6)
     const folderRow = element(root, (node) => node.tag === 'tr' && content(node).includes('genomes'))
-    expect(folderRow.children.filter((node) => node.tag === 'td')).toHaveLength(7)
+    expect(folderRow.children.filter((node) => node.tag === 'td')).toHaveLength(6)
   })
 })
 

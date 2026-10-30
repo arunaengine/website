@@ -35,7 +35,9 @@ const link = computed(() => {
     <a v-else-if="origin.kind === 'copy' && link" :href="link.href" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Copy of another version</a>
     <a v-else-if="origin.kind === 'sync' && link" :href="link.href" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Synced from {{ origin.sync.includes(' to ') ? origin.sync.split(' ')[0] : 'another bucket' }}</a>
     <template v-else-if="origin.kind === 'storage'">Registered from storage folder {{ origin.folder }}</template>
-    <RouterLink v-else-if="origin.kind === 'job'" :to="{ name: 'compute', query: { tab: 'jobs' } }" class="text-primary hover:underline">Result of a run</RouterLink>
+    <template v-else-if="origin.kind === 'job'">
+      Written by the run <RouterLink :to="{ name: 'compute', query: { tab: 'jobs' } }" class="font-mono text-primary hover:underline">{{ origin.run }}</RouterLink>
+    </template>
   </p>
   <div v-else class="space-y-0.5">
     <p v-if="origin.kind === 'upload'">
