@@ -5,6 +5,7 @@
 import { computed } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import { injectCustomRun, outputFolder } from '@/composables/useCustomRun'
+import { atOrBelow } from '@/lib/tes'
 import { ArrowLeft, Braces, CircleCheck, CircleDashed, Play, Star, TriangleAlert } from '@lucide/vue'
 
 const props = defineProps<{ running?: boolean; saved?: boolean }>()
@@ -27,12 +28,19 @@ const {
   image,
   placementSummary,
   unassignedPaths,
+  savedStart,
 } = injectCustomRun()
 
 const what = computed(() => (hasScript.value ? language.value.file : image.value.trim().split('/').pop() || 'custom image'))
+// A saved run lists each asked input once, picked or not, and its fixed inputs below.
+const inputCount = computed(() => {
+  const asked = savedStart.value?.run.ask.inputs
+  if (!asked) return inputs.value.length
+  return asked.length + inputs.value.filter((entry) => !asked.some((path) => atOrBelow(entry, path))).length
+})
 const summary = computed(() => [
   { label: 'Tool', value: what.value },
-  { label: 'Inputs', value: String(inputs.value.length) },
+  { label: 'Inputs', value: String(inputCount.value) },
   { label: 'Outputs', value: String(outputRows.value.length) },
   { label: 'Resources', value: `${String(cpuCores.value).trim() || '?'} CPU, ${String(ramGb.value).trim() || '?'} GB` },
   { label: 'Node', value: placementSummary.value },
