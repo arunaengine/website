@@ -109,7 +109,7 @@ describe('realm node cards', () => {
 
     const text = await renderedText()
 
-    expect(text).toContain('Giessen storage this node eu-west online 2 KB stored Details')
+    expect(text).toContain('Giessen storage This node eu-west 2 KB stored Details')
     expect(text).not.toMatch(/connected/i)
     expect(text).not.toContain('SERVER')
     // Labels wait behind Details.
@@ -137,7 +137,7 @@ describe('node outage presentation', () => {
     expect(predicate).not.toContain('node.configured')
     expect(predicate).not.toContain('connection_status')
     expect(source).toContain('The browser API probe failed')
-    expect(source).toContain('nodes\'} online')
+    expect(source).toContain('const onlineCount = computed(() => cardNodes.value.filter((node) => node.present).length)')
   })
 })
 
@@ -166,12 +166,9 @@ describe('this node storage', () => {
     const text = await renderedText()
 
     expect(text).toContain('This node')
-    expect(text).toMatch(/Objects 12/)
-    expect(text).toContain('7 physical blob locations')
-    expect(text).toMatch(/Stored data 2 KB/)
-    expect(text).toContain('Aggregate blob storage on this node')
-    expect(text).toMatch(/Buckets 4/)
-    expect(text).toContain('Node-reported total')
+    expect(text).toMatch(/This node 2 KB stored/)
+    expect(text).toContain('12 objects')
+    expect(text).toContain('4 buckets')
   })
 
   it('keeps the block for a node that reports usage but no info yet', async () => {
@@ -180,7 +177,7 @@ describe('this node storage', () => {
     const text = await renderedText()
 
     expect(text).toContain('This node')
-    expect(text).toMatch(/Objects 2/)
+    expect(text).toContain('2 objects')
   })
 })
 
@@ -214,19 +211,16 @@ describe('device summary', () => {
     const text = await renderedText()
 
     expect(text).toContain('Devices')
-    expect(text).toContain('2 enrolled, 1 active')
-    expect(text).toContain('last seen 4m ago')
-    expect(text).toContain('Devices do not announce themselves to the realm')
-    expect(text).toContain('1 yours')
+    expect(text).toContain('2 enrolled 1 active 1 yours Seen 4m ago')
     // The realm node is one card; devices are only counted.
-    expect(text).toContain('Realm nodes 1 Unnamed node eu-west online')
+    expect(text).toContain('Nodes Unnamed node eu-west')
     expect(text).not.toContain('laptop-')
     expect(text).not.toContain('user-2')
     // Devices are owner-bound computers: they stay out of the placement buckets.
     expect(text).toContain('eu-west=1')
     expect(text).not.toContain('(not in placement map)')
     // A plain line instead of the DHT term, with the replication beside it.
-    expect(text).toContain('1 of 1 node online, replication ×2')
+    expect(text).toContain('1/1 online All reachable Replication ×2')
     expect(text).not.toContain('present in DHT')
   })
 
@@ -241,8 +235,8 @@ describe('device summary', () => {
 
     const text = await renderedText()
 
-    expect(text).toContain('1 enrolled, 0 active')
-    expect(text).not.toContain('last seen')
+    expect(text).toContain('1 enrolled 0 active')
+    expect(text).not.toContain('Seen')
   })
 
   it('renders no device summary for a realm without devices', async () => {

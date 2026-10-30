@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import FederationPanel from '@/components/dashboard/FederationPanel.vue'
 import NodeCards from '@/components/dashboard/NodeCards.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
-import Badge from '@/components/ui/Badge.vue'
+import OverviewCell from '@/components/dashboard/OverviewCell.vue'
+import Button from '@/components/ui/Button.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
+import StatusPill from '@/components/ui/StatusPill.vue'
 import Notice from '@/components/ui/Notice.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import ListSkeleton from '@/components/ui/ListSkeleton.vue'
@@ -28,7 +31,7 @@ import type { RealmNodeInfo } from '@/lib/api'
 import type { RealmView } from '@/composables/aruna/realm'
 import { isDesktop } from '@/lib/desktop'
 import { computerName } from '@/composables/useRealmNodes'
-import { Boxes, Globe2, HardDrive, Laptop, MapPinned } from '@lucide/vue'
+import { Activity, Boxes, CircleCheck, Clock, Copy, Files, HardDrive, Laptop, MapPinned, Network, Package, Server, TriangleAlert, UserRound } from '@lucide/vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 
@@ -197,11 +200,7 @@ const sortedNodes = computed(() =>
 )
 
 // Online as the cards say it: the node is present in the realm.
-const realmLine = computed(() => {
-  const online = cardNodes.value.filter((node) => node.present).length
-  const total = cardNodes.value.length
-  return `${online} of ${total} ${total === 1 ? 'node' : 'nodes'} online, replication ${replicationLabel.value}`
-})
+const onlineCount = computed(() => cardNodes.value.filter((node) => node.present).length)
 const replicationLabel = computed(() => {
   const factor = realmInfo.value?.metadata_replication.default_replication_factor
   if (factor === null) return 'all eligible nodes'
@@ -283,14 +282,20 @@ watch(
 
 <template>
   <div>
-    <PageHeader title="Status" description="Realm topology and this node's health, refreshed every minute." :docs="{ topic: 'realm-nodes-groups', section: 'Nodes and the realm' }">
+    <PageHeader title="Status" :docs="{ topic: 'realm-nodes-groups', section: 'Nodes and the realm' }">
+      <template #description>
+        <span class="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span v-if="realm.description && realm.description !== realm.name">{{ realm.description }}</span>
+          <span class="inline-flex items-center gap-1.5 font-mono text-xs" :title="realm.id">{{ truncateMiddle(realm.id, 12, 8) }}<CopyButton :value="realm.id" label="Copy realm id" /></span>
+          <span class="inline-flex items-center gap-1.5 tabular-nums"><Clock class="size-4" />Updated {{ lastUpdatedLabel }}</span>
+        </span>
+      </template>
       <template #actions>
-        <span class="text-[11px] tabular-nums text-muted-foreground">Updated {{ lastUpdatedLabel }}</span>
         <RefreshButton :busy="spinning" @click="onRefresh" />
       </template>
     </PageHeader>
 
-    <div class="w-full px-4 sm:px-6 space-y-6 py-8">
+    <div class="w-full space-y-8 px-4 py-6 sm:px-6">
       <template v-if="!painted">
         <SectionSkeleton :lines="3" />
         <SectionSkeleton :lines="2" />
@@ -317,36 +322,35 @@ watch(
         </span>
       </Notice>
 
-      <section class="surface p-5">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-          <div class="flex min-w-0 items-start gap-3">
-            <span
-              class="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-white"
-              :style="{ backgroundColor: realm.color }"
-            >
-              <Globe2 class="h-5 w-5" />
-            </span>
-            <div class="min-w-0">
-              <h2 class="truncate font-display text-lg font-semibold text-aruna-navy">{{ realm.name }}</h2>
-              <p v-if="realm.description && realm.description !== realm.name" class="mt-0.5 text-sm text-muted-foreground">
-                {{ realm.description }}
-              </p>
-              <p v-else-if="!realm.description" class="mt-0.5 text-sm text-muted-foreground">
-                This realm has no description yet.
-              </p>
-              <div class="mt-2 flex items-center gap-1.5">
-                <code class="font-mono text-[11px] text-muted-foreground" :title="realm.id">
-                  {{ truncateMiddle(realm.id, 12, 8) }}
-                </code>
-                <CopyButton :value="realm.id" label="Copy realm id" />
-              </div>
-            </div>
-          </div>
-          <p class="text-xs tabular-nums text-muted-foreground">{{ realmLine }}</p>
-        </div>
-      </section>
+      <div class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <OverviewCell label="Nodes" :icon="Server" tone="ok">
+          <template #value>{{ onlineCount }}/{{ cardNodes.length }}</template>
+          <template #unit>online</template>
+          <span v-if="onlineCount === cardNodes.length && cardNodes.length"><CircleCheck class="text-status-ok" />All reachable</span>
+          <span v-else-if="cardNodes.length" class="text-status-warn"><TriangleAlert /><b>{{ cardNodes.length - onlineCount }}</b> offline</span>
+          <span><Copy />Replication {{ replicationLabel }}</span>
+        </OverviewCell>
+        <OverviewCell label="Locations" :icon="MapPinned" tone="sky">
+          <template #value>{{ formatNumber(mappedLocationCount) }}</template>
+          <template #unit>{{ mappedLocationCount === 1 ? 'location' : 'locations' }}</template>
+        </OverviewCell>
+        <OverviewCell v-if="deviceNodes.length" label="Devices" :icon="Laptop" tone="aqua" info="Devices do not announce themselves; activity is what this node last heard from them.">
+          <template #value>{{ formatNumber(deviceNodes.length) }}</template>
+          <template #unit>enrolled</template>
+          <span><Activity /><b>{{ activeDevices }}</b> active</span>
+          <span v-if="ownedDevices"><UserRound /><b>{{ ownedDevices }}</b> yours</span>
+          <span v-if="deviceLastSeen"><Clock />Seen {{ deviceLastSeen }}</span>
+        </OverviewCell>
+        <OverviewCell v-if="usageInfo" label="This node" :icon="HardDrive" :to="localPeerId ? { name: 'node', params: { nodeId: localPeerId } } : undefined">
+          <template #value>{{ formatBytes(usageInfo.stored_bytes ?? 0) }}</template>
+          <template #unit>stored</template>
+          <span><Files /><b>{{ formatNumber(usageInfo.objects) }}</b> objects</span>
+          <span><Package /><b>{{ formatNumber(usageInfo.buckets) }}</b> buckets</span>
+        </OverviewCell>
+      </div>
 
-      <section v-if="currentUser" aria-label="Realm nodes">
+      <section v-if="currentUser" aria-labelledby="status-map-heading">
+        <SectionHeading id="status-map-heading" title="Node map" :icon="Network" info="Pick a node to see its details below." />
         <FederationPanel
           :nodes="panelInfra"
           :local-peer-id="(realmView?.info ?? nodeInfo)?.node.peer_id"
@@ -355,30 +359,9 @@ watch(
         />
       </section>
 
-      <section class="surface overflow-hidden">
-        <header class="flex items-center justify-between border-b border-border px-5 py-4">
-          <div class="flex items-center gap-2">
-            <MapPinned class="h-4 w-4 text-primary" />
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">Locations</h2>
-          </div>
-          <Badge variant="outline" class="tabular-nums">
-            {{ mappedLocationCount }} {{ mappedLocationCount === 1 ? 'location' : 'locations' }}
-          </Badge>
-        </header>
-        <div class="px-5 py-4">
-          <LocationAggregates :aggregates="locationAggregates" />
-        </div>
-      </section>
-
-      <section class="surface overflow-hidden">
-        <header class="flex items-center justify-between border-b border-border px-5 py-4">
-          <div class="flex items-center gap-2">
-            <Boxes class="h-4 w-4 text-primary" />
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">Realm nodes</h2>
-          </div>
-          <Badge variant="outline" size="count">{{ cardNodes.length }}</Badge>
-        </header>
-        <div v-if="cardNodes.length" class="px-5 py-4">
+      <section aria-labelledby="status-nodes-heading">
+        <SectionHeading id="status-nodes-heading" title="Nodes" :icon="Boxes" />
+        <div v-if="cardNodes.length">
           <NodeCards
             :nodes="cardNodes"
             :devices="[]"
@@ -389,64 +372,38 @@ watch(
             @details="toggleNode"
           />
           <!-- One node's details at a time, below the cards: labels, latency and what it reports. -->
-          <div v-if="expandedNode" :id="`status-node-${expandedNode.node_id}`" class="mt-3 rounded-md border border-border bg-muted/10 px-4 py-4">
+          <div v-if="expandedNode" :id="`status-node-${expandedNode.node_id}`" class="surface mt-3 px-5 py-4">
             <NodeDetailPanel :node="expandedNode" :is-local="isLocal(expandedNode)" :probe="probeFor(expandedNode)" :rename="rename" />
           </div>
         </div>
-        <div v-else-if="!deviceNodes.length" class="p-3">
-          <EmptyState compact title="No nodes reported for this realm yet." />
-        </div>
-        <div v-if="deviceNodes.length" class="border-t border-border px-5 py-3">
-          <div class="flex items-center gap-3 text-sm">
-            <Laptop class="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span class="font-medium text-foreground">Devices</span>
-            <span class="tabular-nums text-muted-foreground">
-              {{ deviceNodes.length }} enrolled, {{ activeDevices }} active
-            </span>
-            <span v-if="deviceLastSeen" class="text-xs tabular-nums text-muted-foreground">
-              last seen {{ deviceLastSeen }}
-            </span>
-            <Badge v-if="ownedDevices" variant="outline" class="tabular-nums">{{ ownedDevices }} yours</Badge>
-          </div>
-          <p class="mt-1 text-xs text-muted-foreground">
-            Devices do not announce themselves to the realm; activity is what this node last heard from them.
-          </p>
+        <EmptyState v-else title="No nodes reported for this realm yet.">
+          <template #icon><Server class="size-6" /></template>
+        </EmptyState>
+      </section>
+
+      <section aria-labelledby="status-locations-heading">
+        <SectionHeading id="status-locations-heading" title="Locations" :icon="MapPinned" />
+        <div class="surface px-5 py-4">
+          <LocationAggregates :aggregates="locationAggregates" />
         </div>
       </section>
 
-      <section v-if="nodeInfo || usageInfo" class="surface overflow-hidden">
-        <header class="flex items-center justify-between border-b border-border px-5 py-4">
-          <div class="flex items-center gap-2">
-            <HardDrive class="h-4 w-4 text-primary" />
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">This node</h2>
-          </div>
-          <!-- A healthy node needs no word; only a problem is named. -->
-          <span
-            v-if="nodeInfo && statusProblem(nodeInfo.node.status)"
-            class="text-[11px]"
-            :class="statusProblem(nodeInfo.node.status)!.failed ? 'text-destructive' : 'text-amber-700 dark:text-amber-300'"
-          >{{ statusProblem(nodeInfo.node.status)!.word }}</span>
-        </header>
-        <div class="space-y-4 p-5">
-          <dl v-if="usageInfo" class="grid gap-3 sm:grid-cols-3">
-            <div class="surface-inline px-3 py-2">
-              <dt class="text-[11px] uppercase tracking-wide text-muted-foreground">Objects</dt>
-              <dd class="mt-0.5 font-display text-lg font-semibold tabular-nums text-aruna-navy">{{ formatNumber(usageInfo.objects) }}</dd>
-              <p class="mt-0.5 text-[11px] text-muted-foreground">{{ formatNumber(usageInfo.stored_blobs ?? 0) }} physical blob locations</p>
-            </div>
-            <div class="surface-inline px-3 py-2">
-              <dt class="text-[11px] uppercase tracking-wide text-muted-foreground">Stored data</dt>
-              <dd class="mt-0.5 font-display text-lg font-semibold tabular-nums text-aruna-navy">{{ formatBytes(usageInfo.stored_bytes ?? 0) }}</dd>
-              <p class="mt-0.5 text-[11px] text-muted-foreground">Aggregate blob storage on this node</p>
-            </div>
-            <div class="surface-inline px-3 py-2">
-              <dt class="text-[11px] uppercase tracking-wide text-muted-foreground">Buckets</dt>
-              <dd class="mt-0.5 font-display text-lg font-semibold tabular-nums text-aruna-navy">{{ formatNumber(usageInfo.buckets) }}</dd>
-              <p class="mt-0.5 text-[11px] text-muted-foreground">Node-reported total; includes every bucket this node serves</p>
-            </div>
-          </dl>
+      <section v-if="nodeInfo" aria-labelledby="status-this-node-heading">
+        <SectionHeading id="status-this-node-heading" title="This node" :icon="HardDrive">
+          <template #actions>
+            <!-- A healthy node needs no word; only a problem is named. -->
+            <StatusPill
+              v-if="statusProblem(nodeInfo.node.status)"
+              :state="statusProblem(nodeInfo.node.status)!.word"
+              :tone="statusProblem(nodeInfo.node.status)!.failed ? 'failed' : 'attention'"
+            />
+            <Button v-if="localPeerId" variant="outline" size="sm" as-child>
+              <RouterLink :to="{ name: 'node', params: { nodeId: localPeerId } }"><Server class="h-3.5 w-3.5" /> Node page</RouterLink>
+            </Button>
+          </template>
+        </SectionHeading>
+        <div class="surface p-5">
           <LocalNodeDetails
-            v-if="nodeInfo"
             :info="nodeInfo"
             :public-api="ownRecord ? nodeApiBase(ownRecord) : null"
             :public-s3="ownRecord?.info?.urls.s3 ?? null"

@@ -49,7 +49,7 @@ describe('topology', () => {
 
   it('shows only the map: no kind counts, label pills, node cards or counts the page states already', async () => {
     const text = (await render()).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
-    expect(text).toContain('Node map')
+    expect(text).not.toContain('Node map')
     for (const gone of ['Kinds', 'Labels', 'present in DHT', 'replication', 'Node status', 'CONNECTED']) {
       expect(text).not.toContain(gone)
     }

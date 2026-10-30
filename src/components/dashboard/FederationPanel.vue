@@ -221,8 +221,6 @@ function loadArc(cx: number, cy: number, permille: number): string {
 
 <template>
   <section>
-    <h2 class="mb-3.5 font-display text-[15px] font-semibold text-foreground/85">Node map</h2>
-
     <div class="surface overflow-hidden rounded-xl p-0">
       <EmptyState v-if="!nodes.length" class="m-5" title="This realm has no nodes yet." />
 

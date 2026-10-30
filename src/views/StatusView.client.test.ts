@@ -50,12 +50,15 @@ const DetailStub = defineComponent({ props: { node: { type: Object, required: tr
 
 const StatusView = compileClientComponent(new URL('./StatusView.vue', import.meta.url), {
   vue: VueRuntime,
-  'vue-router': { useRoute: () => ({ query: {} }) },
+  'vue-router': { RouterLink: Plain, useRoute: () => ({ query: {} }) },
   '@/components/dashboard/PageHeader.vue': moduleDefault(Plain),
   '@/components/dashboard/FederationPanel.vue': moduleDefault(MapStub),
   '@/components/dashboard/NodeCards.vue': moduleDefault(CardsStub),
   '@/components/ui/RefreshButton.vue': moduleDefault(Empty),
-  '@/components/ui/Badge.vue': moduleDefault(Plain),
+  '@/components/dashboard/OverviewCell.vue': moduleDefault(Empty),
+  '@/components/ui/Button.vue': moduleDefault(Plain),
+  '@/components/ui/SectionHeading.vue': moduleDefault(Empty),
+  '@/components/ui/StatusPill.vue': moduleDefault(Empty),
   '@/components/ui/Notice.vue': moduleDefault(Plain),
   '@/components/ui/CopyButton.vue': moduleDefault(Empty),
   '@/components/ui/ListSkeleton.vue': moduleDefault(Empty),

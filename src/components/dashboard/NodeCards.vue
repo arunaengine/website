@@ -1,16 +1,19 @@
 <script setup lang="ts">
-// The realm nodes in calm cards: a readable name, its location, whether it is online and one line of
+// The realm nodes in calm cards: a readable name, its location, an online mark and one line of
 // facts. Devices are summed up in one line, never listed. The Status page adds a Details link.
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import Badge from '@/components/ui/Badge.vue'
+import Button from '@/components/ui/Button.vue'
+import IconTile from '@/components/ui/IconTile.vue'
+import StatusMark from '@/components/ui/StatusMark.vue'
+import StatusPill from '@/components/ui/StatusPill.vue'
 import NodeNameEdit from '@/components/nodes/NodeNameEdit.vue'
 import { nodeActivity, nodeName } from '@/components/nodes/node-display'
 import type { RealmNodeInfo } from '@/lib/api'
 import { formatCount } from '@/lib/formatCount'
 import { LOCATION_AFFINITY_KEY } from '@/lib/placement'
 import { formatBytes } from '@/lib/utils'
-import { Download } from '@lucide/vue'
+import { Download, Info, MapPin, Server, WifiOff } from '@lucide/vue'
 
 const props = defineProps<{
   nodes: RealmNodeInfo[]
@@ -55,32 +58,37 @@ const devicesLine = computed(() => {
 
 <template>
   <div class="space-y-2">
-    <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <li v-for="node in nodes" :key="node.node_id" class="group min-w-0 rounded-md border border-border px-3 py-2.5">
-        <div class="flex min-w-0 items-center gap-2">
-          <NodeNameEdit v-if="rename" quiet :name="nodeName(node)" :value="node.display_name" :save="(name) => rename!(node.node_id, name)">
-            <RouterLink :to="{ name: 'node', params: { nodeId: node.node_id } }" class="truncate text-sm font-medium text-foreground hover:underline" :title="node.node_id">{{ nodeName(node) }}</RouterLink>
-          </NodeNameEdit>
-          <RouterLink v-else :to="{ name: 'node', params: { nodeId: node.node_id } }" class="truncate text-sm font-medium text-foreground hover:underline" :title="node.node_id">{{ nodeName(node) }}</RouterLink>
-          <span v-if="node.node_id === localNodeId" class="text-[11px] text-muted-foreground">this node</span>
-          <Badge v-if="location(node)" variant="outline" size="sm">{{ location(node) }}</Badge>
-          <span class="ml-auto shrink-0 text-[11px]" :class="node.present ? 'text-muted-foreground' : 'text-destructive'">
-            {{ node.present ? 'online' : 'offline' }}
-          </span>
+    <ul class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      <li v-for="node in nodes" :key="node.node_id" class="group surface flex min-w-0 flex-col gap-3 p-4">
+        <div class="flex min-w-0 items-center gap-3">
+          <IconTile :icon="Server" :tone="node.present ? 'royal' : 'muted'" size="sm" />
+          <div class="min-w-0 flex-1">
+            <NodeNameEdit v-if="rename" quiet :name="nodeName(node)" :value="node.display_name" :save="(name) => rename!(node.node_id, name)">
+              <RouterLink :to="{ name: 'node', params: { nodeId: node.node_id } }" class="truncate text-sm font-medium text-foreground hover:underline" :title="node.node_id">{{ nodeName(node) }}</RouterLink>
+            </NodeNameEdit>
+            <RouterLink v-else :to="{ name: 'node', params: { nodeId: node.node_id } }" class="block truncate text-sm font-medium text-foreground hover:underline" :title="node.node_id">{{ nodeName(node) }}</RouterLink>
+            <p class="flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+              <span v-if="node.node_id === localNodeId">This node</span>
+              <span v-if="location(node)" class="inline-flex items-center gap-1"><MapPin class="size-3.5" />{{ location(node) }}</span>
+            </p>
+          </div>
+          <StatusMark v-if="node.present" label="Online" />
+          <StatusPill v-else state="Offline" tone="failed" :icon="WifiOff" />
         </div>
-        <p class="mt-1 truncate text-xs text-muted-foreground">{{ facts(node) }}</p>
-        <Badge v-if="activity(node)" variant="sky" size="sm" class="mt-1.5 gap-1">
+        <p class="text-xs text-muted-foreground">{{ facts(node) }}</p>
+        <p v-if="activity(node)" class="inline-flex items-center gap-1 text-xs text-sky-700 dark:text-aruna-aqua">
           <Download class="h-3 w-3" /> {{ activity(node) }}
-        </Badge>
-        <button
+        </p>
+        <Button
           v-if="details"
-          type="button"
-          class="mt-1 block text-[11px] font-medium text-primary hover:underline"
+          variant="outline"
+          size="sm"
+          class="mt-auto self-start"
           :aria-expanded="openId === node.node_id"
           @click="$emit('details', node.node_id)"
         >
-          {{ openId === node.node_id ? 'Hide details' : 'Details' }}
-        </button>
+          <Info class="h-3.5 w-3.5" /> {{ openId === node.node_id ? 'Hide details' : 'Details' }}
+        </Button>
       </li>
     </ul>
     <p v-if="devicesLine" class="text-xs text-muted-foreground">{{ devicesLine }}</p>
