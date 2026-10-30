@@ -4,6 +4,11 @@ import OverviewCell from '@/components/dashboard/OverviewCell.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Button from '@/components/ui/Button.vue'
+import DropdownMenu from '@/components/ui/DropdownMenu.vue'
+import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
+import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
+import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
+import InfoHint from '@/components/ui/InfoHint.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
@@ -22,7 +27,7 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import { useRouteTab } from '@/composables/useRouteTab'
 import { adminTabs } from '@/views/adminTabs'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useRefresh } from '@/composables/useRefresh'
@@ -37,8 +42,10 @@ import {
 } from '@/views/adminQuota'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
-import { Cpu, Database, Files, Gauge, Globe, HardDrive, Layers, Link2, Boxes, MapPinned, Save, Plus, ServerCog, ShieldAlert, Trash2, ShieldCheck, SlidersHorizontal, Users, UserCog, Workflow } from '@lucide/vue'
+import { ChevronDown, Cpu, Database, Files, Gauge, Globe, HardDrive, Layers, Link2, Boxes, MapPinned, Server, Save, Plus, ServerCog, ShieldAlert, Trash2, ShieldCheck, SlidersHorizontal, Users, UserCog, Workflow } from '@lucide/vue'
 
+const router = useRouter()
+const realmNodeCount = computed(() => (realmInfo.value?.nodes ?? []).filter((node) => node.kind !== 'user').length)
 const { realmInfo, usageInfo, isRealmAdmin, canInspectUsers, canManageOnboarding, canManageQuarantine, setRealmQuota, saving, myGroups, discoverableGroups, searchUsers, refresh } = useAruna()
 const realmBuckets = useRealmBucketCount(computed(() => usageInfo.value?.realm))
 const { isAuthenticated, authPending } = useAuth()
@@ -245,15 +252,17 @@ async function save() {
     <PageHeader title="Realm administration" :docs="{ topic: 'data-to-compute', section: 'Placement policies and record placement' }">
       <template #actions>
         <RefreshButton :busy="refreshBusy" size="default" @click="onRefresh" />
-        <Button v-if="isRealmAdmin && canInspectUsers" variant="outline" as-child>
-          <RouterLink :to="{ name: 'admin-users' }"><Users class="h-4 w-4" /> Users</RouterLink>
-        </Button>
-        <Button v-if="isRealmAdmin && canManageOnboarding" variant="outline" as-child>
-          <RouterLink :to="{ name: 'admin-onboarding' }"><ServerCog class="h-4 w-4" /> Node onboarding</RouterLink>
-        </Button>
-        <Button v-if="isRealmAdmin && canManageQuarantine" variant="outline" as-child>
-          <RouterLink :to="{ name: 'admin-quarantine' }"><ShieldAlert class="h-4 w-4" /> Sync quarantine</RouterLink>
-        </Button>
+        <!-- The other admin pages in one menu, so the header keeps few controls. -->
+        <DropdownMenu v-if="isRealmAdmin && (canInspectUsers || canManageOnboarding || canManageQuarantine)">
+          <DropdownMenuTrigger as-child>
+            <Button variant="outline"><ShieldCheck class="h-4 w-4" /> Admin pages <ChevronDown class="h-4 w-4" /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="w-56 p-1.5">
+            <DropdownMenuItem v-if="isRealmAdmin && canInspectUsers" class="cursor-pointer" @click="router.push({ name: 'admin-users' })"><Users class="h-4 w-4" /> Users</DropdownMenuItem>
+            <DropdownMenuItem v-if="isRealmAdmin && canManageOnboarding" class="cursor-pointer" @click="router.push({ name: 'admin-onboarding' })"><ServerCog class="h-4 w-4" /> Node onboarding</DropdownMenuItem>
+            <DropdownMenuItem v-if="isRealmAdmin && canManageQuarantine" class="cursor-pointer" @click="router.push({ name: 'admin-quarantine' })"><ShieldAlert class="h-4 w-4" /> Sync quarantine</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </template>
     </PageHeader>
 
@@ -309,12 +318,13 @@ async function save() {
         <section id="usage" class="scroll-mt-24" aria-labelledby="admin-usage-heading">
           <SectionHeading id="admin-usage-heading" title="Realm usage" :icon="Gauge" />
           <div v-if="usageInfo?.realm" class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-            <OverviewCell label="Stored data" :icon="HardDrive" info="Physical blob storage on every node. Logical data counts against quotas.">
+            <OverviewCell label="Stored data" :icon="HardDrive" info="Physical blob storage on every node. The logical size of the data counts against quotas.">
               <template #value>{{ formatBytes(usageInfo.realm.stored_bytes ?? 0) }}</template>
-              <span><Layers /><b>{{ formatBytes(usageInfo.realm.logical_bytes) }}</b> logical</span>
+              <span><Layers /><b>{{ formatBytes(usageInfo.realm.logical_bytes) }}</b> counted against quotas</span>
             </OverviewCell>
-            <OverviewCell label="Referenced data" :icon="Link2" tone="aqua" info="Data that stays at its source. It does not count against quotas.">
+            <OverviewCell label="Referenced data" :icon="Link2" tone="aqua" info="Data that stays at its source.">
               <template #value>{{ formatBytes(usageInfo.realm.referenced_bytes) }}</template>
+              <span><ShieldCheck />Not counted against quotas</span>
             </OverviewCell>
             <OverviewCell label="Objects" :icon="Files" tone="sky">
               <template #value>{{ formatNumber(usageInfo.realm.objects) }}</template>
@@ -322,6 +332,7 @@ async function save() {
             </OverviewCell>
             <OverviewCell label="Buckets" :icon="Boxes" tone="ok" info="A bucket stored on several nodes counts once." :to="{ name: 'buckets' }">
               <template #value>{{ realmBuckets ? countText(realmBuckets, formatNumber) : formatNumber(usageInfo.realm.buckets) }}</template>
+              <span v-if="realmNodeCount"><Server />Across <b>{{ formatNumber(realmNodeCount) }}</b> {{ realmNodeCount === 1 ? 'node' : 'nodes' }}</span>
             </OverviewCell>
           </div>
           <EmptyState v-else title="Realm totals need a signed-in session on a quota-aware node." />
@@ -331,7 +342,7 @@ async function save() {
           <SectionHeading id="admin-policy-heading" title="Quota policy" :icon="ShieldCheck" />
           <div class="surface space-y-5 p-5">
             <div>
-              <label class="text-xs font-medium text-foreground">Default group quota</label>
+              <label class="flex items-center gap-1.5 text-xs font-medium text-foreground">Default group quota<InfoHint label="Applies to every group without an override. Unlimited disables byte enforcement." /></label>
               <div class="mt-1.5 flex flex-wrap items-center gap-2">
                 <label class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Switch v-model:checked="draft.defaultQuota.unlimited" /> Unlimited
@@ -342,31 +353,23 @@ async function save() {
                   <span class="text-[11px] text-muted-foreground">= {{ formatBytes(fieldBytes(draft.defaultQuota) ?? 0) }}</span>
                 </template>
               </div>
-              <p class="mt-1 text-[11px] text-muted-foreground">Applies to every group without an override. Unlimited disables byte enforcement.</p>
             </div>
             <div class="grid gap-5 md:grid-cols-2">
               <div>
-                <label class="text-xs font-medium text-foreground">Grace factor (%)</label>
+                <label class="flex items-center gap-1.5 text-xs font-medium text-foreground">Grace factor (%)<InfoHint label="Hard cap = quota × grace factor. Must be at least 100." /></label>
                 <Input v-model="draft.grace" type="number" min="100" class="mt-1" :invalid="graceInvalid ? 'error' : undefined" />
-                <p class="mt-1 text-[11px] text-muted-foreground">Hard cap = quota × grace factor. Must be at least 100.</p>
               </div>
               <div>
-                <label class="text-xs font-medium text-foreground">Warn threshold (%)</label>
+                <label class="flex items-center gap-1.5 text-xs font-medium text-foreground">Warn threshold (%)<InfoHint label="Groups are flagged on their detail page at this share of the quota. 1–100." /></label>
                 <Input v-model="draft.warn" type="number" min="1" max="100" class="mt-1" :invalid="warnInvalid ? 'error' : undefined" />
-                <p class="mt-1 text-[11px] text-muted-foreground">Groups are flagged on their detail page at this share of the quota. 1–100.</p>
               </div>
               <div>
-                <label class="text-xs font-medium text-foreground">Max groups per user</label>
+                <label class="flex items-center gap-1.5 text-xs font-medium text-foreground">Max groups per user<InfoHint label="Empty means unlimited." /></label>
                 <Input v-model="draft.maxGroups" type="number" min="0" placeholder="Unlimited" class="mt-1" />
-                <p class="mt-1 text-[11px] text-muted-foreground">Empty means unlimited.</p>
               </div>
               <div>
-                <label class="text-xs font-medium text-foreground">Max devices per user</label>
+                <label class="flex items-center gap-1.5 text-xs font-medium text-foreground">Max devices per user<InfoHint label="Empty means unlimited; zero is refused. Enrolled devices and outstanding enrollment codes both take a slot." /></label>
                 <Input v-model="draft.maxDevices" type="number" min="1" placeholder="Unlimited" class="mt-1" />
-                <p class="mt-1 text-[11px] text-muted-foreground">
-                  Empty means unlimited; zero is refused. Enrolled devices and outstanding enrollment codes both take a
-                  slot.
-                </p>
               </div>
             </div>
           </div>
