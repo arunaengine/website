@@ -236,8 +236,7 @@ const referencedSource = computed(() => {
 // Why nothing can be added here; Upload and New folder stay in place, disabled, with this hint.
 const addReason = computed(() =>
   remoteBlocked.value ? 'This node cannot be browsed from here, so nothing can be added.'
-    : referencedBucket.value ? 'The files of this bucket are referenced from their source, so none can be added here.'
-      : !canWriteCurrentPrefix.value ? (writeRestrictionMessage.value ?? 'This session cannot add files here.') : null)
+    : !canWriteCurrentPrefix.value ? (writeRestrictionMessage.value ?? 'This session cannot add files here.') : null)
 const hinting = ref(false)
 const hintFolder = computed(() => prefix.value.split('/').at(-1) || bucket.value)
 
