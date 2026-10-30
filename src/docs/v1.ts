@@ -83,8 +83,8 @@ export const docsTopics: DocsTopic[] = [
       {
         route: '/app',
         anchor: 'top-create-dataset',
-        title: 'Add',
-        body: 'Add uploads files and creates buckets, runs, datasets and groups.',
+        title: 'Create',
+        body: 'Create uploads files and creates buckets, runs, datasets and groups.',
         desktop: false,
       },
       {
@@ -126,7 +126,7 @@ export const docsTopics: DocsTopic[] = [
         bullets: [
           'Context switcher: the active [realm](concept:realm-nodes-groups#nodes-and-the-realm) and [group](concept:realm-nodes-groups#groups-own-your-work) everything you create belongs to.',
           'Search: [datasets](concept:datasets), data [objects](concept:glossary#object), groups, and users in one field; Ctrl+K or Cmd+K focuses it anywhere.',
-          '[Create dataset](page:dataset-new): straight into the editor.',
+          'Create: upload files, or start a new bucket, run, [dataset](page:dataset-new) or group.',
           'Bell, theme toggle, and the account menu with profile, tokens, and sign-out.',
         ],
         image: {
@@ -417,7 +417,7 @@ export const docsTopics: DocsTopic[] = [
         route: '/app',
         anchor: 'top-create-dataset',
         title: 'Create dataset',
-        body: 'Add, then Create dataset in the top bar opens a fresh, unsaved dataset in the editor.',
+        body: 'Create, then Create dataset in the top bar opens a fresh, unsaved dataset in the editor.',
         desktop: false,
       },
       {
@@ -453,7 +453,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Describe the dataset',
         icon: 'PencilLine',
         steps: [
-          'Choose Add, then [Create dataset](page:dataset-new) in the top bar.',
+          'Choose Create, then [Create dataset](page:dataset-new) in the top bar.',
           'Add a name and a description of what it contains and how it was made.',
           'Pick a license and keywords; both drive discovery.',
           'Optionally pick a [Profile](concept:profiles-conformance), public or from the dataset\'s group; preview findings advise, never block.',

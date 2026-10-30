@@ -162,7 +162,7 @@ const newBucketOpen = ref(false)
 watch(newBucketOpen, (open) => {
   contextHold.value = open
 })
-// The top bar's Add menu opens the dialog with ?create=bucket; the marker goes once read.
+// The top bar's Create menu opens the dialog with ?create=bucket; the marker goes once read.
 watch(
   () => route.query.create,
   (create) => {

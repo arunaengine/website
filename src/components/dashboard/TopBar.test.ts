@@ -101,14 +101,14 @@ function launcher(root: Parameters<typeof content>[0]) {
 }
 
 describe('portal chrome', () => {
-  it('keeps the context switcher and offers every create action in one Add menu', async () => {
+  it('keeps the context switcher and offers every create action in one Create menu', async () => {
     const mounted = await mountApp(TopBar)
     const html = content(mounted.root)
 
     expect(html).toContain('context switcher')
     expect(html).toContain('datasets')
     expect(watchNode).not.toHaveBeenCalled()
-    expect(element(mounted.root, (node) => node.props['aria-label'] === 'Add').tag).toBe('button')
+    expect(element(mounted.root, (node) => node.props['aria-label'] === 'Create').tag).toBe('button')
     const targets: [string, unknown][] = [
       ['Upload files', { name: 'buckets', query: { addData: '1' } }],
       ['New bucket', { name: 'buckets', query: { create: 'bucket' } }],
@@ -132,11 +132,11 @@ describe('portal chrome', () => {
     mounted.app.unmount()
   })
 
-  it('offers no Add menu without a user', async () => {
+  it('offers no Create menu without a user', async () => {
     currentUser.value = null
     const mounted = await mountApp(TopBar)
 
-    expect(nodes(mounted.root).some((node) => node.props['aria-label'] === 'Add')).toBe(false)
+    expect(nodes(mounted.root).some((node) => node.props['aria-label'] === 'Create')).toBe(false)
     mounted.app.unmount()
   })
 

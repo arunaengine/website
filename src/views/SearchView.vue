@@ -100,7 +100,7 @@ function askAi() {
       </template>
       <template #actions>
         <RefreshButton :busy="browseBusy" @click="state.retryBrowse" />
-        <!-- Create dataset sits in the top bar's Add menu and in the empty Datasets tab. -->
+        <!-- Create dataset sits in the top bar's Create menu and in the empty Datasets tab. -->
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
             <Button variant="outline" size="icon" aria-label="More actions" title="More actions"><Ellipsis class="h-4 w-4" /></Button>

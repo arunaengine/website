@@ -142,10 +142,10 @@ async function handleSignOut() {
             variant="outline"
             size="sm"
             class="h-9 shrink-0 max-sm:w-9 max-sm:px-0"
-            aria-label="Add"
-            title="Add"
+            aria-label="Create"
+            title="Create"
           >
-            <Plus class="h-4 w-4" /><span class="hidden sm:inline">Add</span><ChevronDown class="hidden h-3.5 w-3.5 sm:block" />
+            <Plus class="h-4 w-4" /><span class="hidden sm:inline">Create</span><ChevronDown class="hidden h-3.5 w-3.5 sm:block" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" class="w-56">

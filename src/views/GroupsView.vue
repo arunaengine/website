@@ -59,7 +59,7 @@ const matchingGroups = computed(() => {
   return discoverableGroups.value.filter((group) => `${group.name} ${group.id}`.toLowerCase().includes(query))
 })
 const createGroupOpen = ref(false)
-// The top bar's Add menu opens the dialog with ?create=group; the marker goes once read.
+// The top bar's Create menu opens the dialog with ?create=group; the marker goes once read.
 watch(
   () => route.query.create,
   (create) => {
