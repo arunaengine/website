@@ -202,16 +202,23 @@ async function pinInput(input: TesInput, holders: ReadonlyMap<string, readonly s
   })
 }
 
+/** Where this page uploads the run's files, read once before the upload starts. */
+interface UploadTarget {
+  bucket: string
+  scriptKey: string
+  dependencyKey: string
+  nodeId: string | null
+}
+
 /** Inputs read from objects this page uploaded, bound to those versions on the upload node. */
-function pinUploads(draft: TesTask, uploads: Array<{ key: string; versionId: string | null } | null>): TesTask {
+function pinUploads(draft: TesTask, target: UploadTarget, uploads: Array<{ key: string; versionId: string | null } | null>): TesTask {
   const done = uploads.filter((upload) => upload !== null)
   if (!done.length) return draft
   const realmId = nodeInfo.value?.node.realm_id
-  const nodeId = s3.nodeIdFor()
+  const { bucket, nodeId } = target
   if (!realmId || !nodeId || done.some((upload) => !upload.versionId)) {
     throw new Error('The uploaded script has no exact version on its node, so the run was not started.')
   }
-  const bucket = stagingBucket.value.trim()
   const pinned = new Map(done.map((upload) => [`s3://${bucket}/${upload.key}`, versionObjectId(realmId, nodeId, bucket, upload.key, upload.versionId!)]))
   return { ...draft, inputs: (draft.inputs ?? []).map((input) => (input.url && pinned.has(input.url) ? { ...input, url: pinned.get(input.url) } : input)) }
 }
@@ -258,26 +265,23 @@ async function run() {
   }
   try {
     let draft = task.value
+    // The draft names these keys; an edit while the upload runs must not change what is pinned.
+    const target: UploadTarget = {
+      bucket: stagingBucket.value.trim(),
+      scriptKey: normalizedScriptKey.value,
+      dependencyKey: dependencyConfigKey.value,
+      nodeId: s3.nodeIdFor(),
+    }
     const [scriptUpload, dependencyUpload] = await Promise.all([
       hasScript.value && !reuseSelectedScript.value
-        ? s3.putTextObject(
-            stagingBucket.value.trim(),
-            normalizedScriptKey.value,
-            stagedScript.value,
-            language.value.contentType,
-          )
+        ? s3.putTextObject(target.bucket, target.scriptKey, stagedScript.value, language.value.contentType)
         : Promise.resolve(null),
       dependencyConfig.value
-        ? s3.putTextObject(
-            stagingBucket.value.trim(),
-            dependencyConfigKey.value,
-            dependencyConfig.value,
-            'application/json',
-          )
+        ? s3.putTextObject(target.bucket, target.dependencyKey, dependencyConfig.value, 'application/json')
         : Promise.resolve(null),
     ])
     if (runTarget.local.value) {
-      const sourceNodeId = s3.nodeIdFor()
+      const sourceNodeId = target.nodeId
       if (!sourceNodeId) throw new Error('The realm node for staged inputs is not available.')
       const localInputs = (draft.inputs ?? []).map(nativeInput)
       if (scriptUpload?.versionId && localInputs[0]) {
@@ -294,9 +298,9 @@ async function run() {
     fence()
     if (await submitLocally(draft)) return
     // The uploads sit on the connected node; another node must read exactly those versions.
-    draft = pinUploads(draft, [
-      scriptUpload && { key: normalizedScriptKey.value, versionId: scriptUpload.versionId },
-      dependencyUpload && { key: dependencyConfigKey.value, versionId: dependencyUpload.versionId },
+    draft = pinUploads(draft, target, [
+      scriptUpload && { key: target.scriptKey, versionId: scriptUpload.versionId },
+      dependencyUpload && { key: target.dependencyKey, versionId: dependencyUpload.versionId },
     ])
     const routed = await routeRun(draft)
     fence()

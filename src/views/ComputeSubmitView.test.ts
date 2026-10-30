@@ -780,6 +780,29 @@ describe('run page', () => {
     mounted.app.unmount()
   })
 
+  it('pins the uploaded script by the key it was uploaded under, also after an edit meanwhile', async () => {
+    let finish: (value: { versionId: string }) => void = () => {}
+    s3.putTextObject.mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)))
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?template=python')
+    await click(button(mounted.root, 'Add output'))
+    await typeValue(input(mounted.root, 'aria-label', 'Container path to capture'), '/work/out/result.txt')
+    await typeValue(input(mounted.root, 'aria-label', 'Destination key'), 'runs/result.txt')
+    await flush()
+
+    await click(runButton(mounted.root))
+    await flush()
+    const uploadedKey = (s3.putTextObject.mock.calls.at(-1) as unknown as [string, string])[1]
+    await typeValue(input(mounted.root, 'aria-label', 'Script key'), 'edited/other.py')
+    finish({ versionId: 'v1' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    const [submitted] = createTask.mock.calls.at(-1) as unknown as [Tes.TesTask]
+    const script = submitted.inputs?.find((entry) => entry.path.endsWith('script.py'))
+    expect(script?.url).toBe(`arn:aruna:realm:node-id:s3/results/${uploadedKey}@v1`)
+    mounted.app.unmount()
+  })
+
   it('sends a local run to this device with the local target', async () => {
     runTargetAvailable.value = true
     const mounted = await mount(ComputeSubmitView, '/app/compute/new')
