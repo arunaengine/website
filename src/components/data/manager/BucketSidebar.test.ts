@@ -948,12 +948,12 @@ describe('Bucket sidebar sections', () => {
     }
   })
 
-  it('names no section when every row is an ordinary bucket', async () => {
+  it('labels the section even when every row is an ordinary bucket', async () => {
     nodeChoice.value = null
     allBuckets.hits.value = [{ bucket: 'laptop', node_id: 'node-2', group_id: 'g1' }]
     const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
     await flush()
-    expect(labels(root)).toEqual([])
+    expect(labels(root)).toEqual(['Other buckets'])
     allBuckets.hits.value = []
   })
 })

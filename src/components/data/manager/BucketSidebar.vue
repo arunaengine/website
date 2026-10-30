@@ -235,13 +235,12 @@ function listPlace(nodeId: string | null): RowPlace {
   return other(nodeId) === other(remoteNodeId.value) ? { place: null, placeTitle: null, placeNode: null } : rowPlace(nodeId)
 }
 
-// Pinned rows first, then databases, then the other buckets; a lone group needs no label.
+// Pinned rows first, then databases, then the other buckets, each under its label.
 function sectioned<R>(rows: R[], pinned: (row: R) => boolean, database: (row: R) => boolean): { label: string; rows: R[] }[] {
   const pins = rows.filter(pinned)
   const bases = rows.filter((row) => !pinned(row) && database(row))
   const rest = rows.filter((row) => !pinned(row) && !database(row))
-  const sections = [{ label: 'Pinned', rows: pins }, { label: 'Databases', rows: bases }, { label: 'Other buckets', rows: rest }].filter((section) => section.rows.length)
-  return sections.length === 1 && sections[0].label === 'Other buckets' ? [{ label: '', rows: rest }] : sections
+  return [{ label: 'Pinned', rows: pins }, { label: 'Databases', rows: bases }, { label: 'Other buckets', rows: rest }].filter((section) => section.rows.length)
 }
 const rowNodeId = (row: AllRow) => row.hit?.node_id ?? row.nodeId
 const allSections = computed(() => sectioned(pageRows.value, (row) => row.pinned, (row) => Boolean(databaseOf(row.bucket, rowNodeId(row)))))
@@ -340,9 +339,9 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
       <DialogTitle class="type-section-title">Buckets <span class="text-sm font-normal tabular-nums text-muted-foreground">{{ bucketCount }}</span></DialogTitle>
       <Button size="sm" data-tour="bucket-create" @click="emit('new-bucket')"><FolderPlus class="h-4 w-4" /> New bucket</Button>
     </div>
-    <!-- As tall as the files beside it; the list scrolls inside under the filter. -->
-    <div :class="sheet ? '' : 'relative flex-1 lg:min-h-[24rem]'">
-    <div :class="sheet ? '' : 'surface scrollbar-thin overflow-y-auto lg:absolute lg:inset-0'" :aria-busy="bucketsRefreshing">
+    <!-- At least as tall as the files beside it and as tall as its rows, so none is cut off. -->
+    <div :class="sheet ? '' : 'flex flex-1 flex-col lg:min-h-[24rem]'">
+    <div :class="sheet ? '' : 'surface flex-1'" :aria-busy="bucketsRefreshing">
       <div class="sticky top-0 z-10 flex items-center gap-2 bg-card px-3.5 pb-1 pt-3" :class="sheet ? 'bg-background' : ''">
         <Input
           v-model="bucketNameFilter"
