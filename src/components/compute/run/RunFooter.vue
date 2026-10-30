@@ -4,7 +4,7 @@
 // enabled; with problems it jumps to the first one instead of starting anything.
 import { computed } from 'vue'
 import Button from '@/components/ui/Button.vue'
-import { injectCustomRun } from '@/composables/useCustomRun'
+import { injectCustomRun, outputFolder } from '@/composables/useCustomRun'
 import { ArrowLeft, Braces, CircleCheck, CircleDashed, Play, Star, TriangleAlert } from '@lucide/vue'
 
 const props = defineProps<{ running?: boolean; saved?: boolean }>()
@@ -37,6 +37,7 @@ const summary = computed(() => [
   { label: 'Resources', value: `${String(cpuCores.value).trim() || '?'} CPU, ${String(ramGb.value).trim() || '?'} GB` },
   { label: 'Node', value: placementSummary.value },
 ])
+const resultFolders = computed(() => [...new Set(outputRows.value.filter((row) => row.bucket.trim()).map(outputFolder))])
 const unassigned = computed(() => unassignedPaths.value.length)
 // A warning, not a problem: the run may start and simply store nothing.
 const noOutputs = computed(() => outputRows.value.length === 0)
@@ -69,6 +70,9 @@ const noOutputs = computed(() => outputRows.value.length === 0)
         <dd class="truncate text-right tabular-nums text-foreground" :title="row.value">{{ row.value }}</dd>
       </template>
     </dl>
+    <p v-if="resultFolders.length" class="mt-3 text-xs text-muted-foreground">
+      Results go to <span class="break-all font-mono text-foreground">{{ resultFolders.join(', ') }}</span>
+    </p>
     <div class="mt-4 flex flex-col gap-2">
       <Button data-tutorial="run-submit" class="max-lg:hidden" :disabled="props.running" @click="emit('run')">
         <Play class="size-4" /> {{ props.running ? 'Starting…' : 'Run' }}

@@ -8,7 +8,7 @@ import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Select from '@/components/ui/Select.vue'
 import ResultsHome from '@/components/compute/run/ResultsHome.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
-import { injectCustomRun, outputDestination } from '@/composables/useCustomRun'
+import { injectCustomRun, outputDestination, outputFolder } from '@/composables/useCustomRun'
 import { useDatabases } from '@/composables/useDatabases'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { parseArunaArn } from '@/lib/sync'
@@ -66,6 +66,8 @@ function picked(entry: TesDataRefEntry) {
   batch.push(entry)
 }
 
+// The run's own folder is added below the chosen one, so the exact place shows before Run.
+const resultFolders = computed(() => [...new Set(outputRows.value.map(outputFolder))])
 const resultsBucket = ref('')
 const resultsFolder = ref('')
 // The bucket and folder answer the results question as soon as a bucket is chosen.
@@ -149,6 +151,9 @@ function chooseHome(bucket: string, folder: string) {
               <Input v-model="resultsFolder" class="mt-1 font-mono" placeholder="Folder, such as runs/" aria-label="Results folder" />
             </label>
           </div>
+          <p v-if="resultsBucket" id="saved-results-folder" class="text-xs text-muted-foreground">
+            Results go to <span class="break-all font-mono text-foreground">{{ resultFolders.join(', ') }}</span>
+          </p>
         </template>
         <div v-else class="flex flex-wrap items-center gap-3">
           <p class="min-w-0 flex-1 truncate font-mono text-xs text-foreground">{{ outputDestination(outputRows[0]) }}</p>

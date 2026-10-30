@@ -133,6 +133,12 @@ export function normalizedOutputKey(key: string): string {
 export function outputDestination(row: { bucket: string; key: string }): string {
   return `s3://${row.bucket.trim() || '<bucket>'}/${normalizedOutputKey(row.key) || '<key>'}`
 }
+/** The bucket folder a capture's files land in, as `bucket/folder/`. */
+export function outputFolder(row: OutputRow): string {
+  const key = normalizedOutputKey(row.key)
+  const folder = isDirCapture(row.path) ? key : key.slice(0, key.lastIndexOf('/') + 1)
+  return `${row.bucket.trim() || '<bucket>'}/${folder}`
+}
 /** The run name as a key segment; an unnamed run stages under "run". */
 export function runSlug(name: string): string {
   return name.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || 'run'

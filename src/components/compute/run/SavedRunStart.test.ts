@@ -3,6 +3,7 @@ import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as Sync from '@/lib/sync'
 import * as Tes from '@/lib/tes'
+import { outputFolder } from '@/composables/useCustomRun'
 import { compileClientComponent, content, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 
 const Slotted = (tag: string) =>
@@ -33,7 +34,7 @@ function custom() {
       notes: [],
     }),
     inputs: ref([{ kind: 'folder', bucket: 'bakta-database', prefix: 'db/', name: 'db', basePath: '/work/in/db/', files: [], directory: true }, ...extraInputs]),
-    outputRows: ref(askResults ? [{ path: '/work/out' }] : []),
+    outputRows: ref(askResults ? [{ path: '/work/out/', bucket: 'linked', key: 'runs/results/bakta-annotation/out/' }] : []),
     openInputs: ref([]),
     resultsChosen: ref(false),
     bucketOptions: ref(askResults ? [{ value: 'laptop', label: 'laptop' }] : []),
@@ -53,7 +54,7 @@ const component = compileClientComponent(new URL('./SavedRunStart.vue', import.m
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/compute/run/ResultsHome.vue': moduleDefault(HomeStub),
   '@/components/compute/TesDataRefDialog.vue': moduleDefault(Empty),
-  '@/composables/useCustomRun': { injectCustomRun: custom, outputDestination: () => '' },
+  '@/composables/useCustomRun': { injectCustomRun: custom, outputDestination: () => '', outputFolder },
   '@/lib/tes': Tes,
   '@/lib/sync': Sync,
   '@/composables/useDatabases': { useDatabases: () => ({ rows: databaseRows, ensure: () => {} }) },
@@ -140,6 +141,17 @@ describe('saved run start', () => {
 
     expect(chooseResults).toHaveBeenLastCalledWith('linked', 'runs/')
     expect(nodes(root).find((node) => node.tag === 'select')!.props.modelValue).toBe('linked')
+    askResults = false
+  })
+
+  it('shows the exact folder the results land in before Run', async () => {
+    askResults = true
+    const { root } = await mountApp(component)
+    const home = nodes(root).find((node) => node.tag === 'button' && content(node) === 'Linked folder')!
+    ;(home.props.onClick as () => void)()
+    await VueRuntime.nextTick()
+
+    expect(content(root)).toContain('Results go to linked/runs/results/bakta-annotation/out/')
     askResults = false
   })
 })
