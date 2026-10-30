@@ -942,11 +942,11 @@ async function confirmDelete() {
           <h3 class="mb-3 type-card-title">Progress</h3>
           <ol class="flex">
             <li v-for="(stage, i) in stages" :key="stage.key" class="relative flex min-w-0 flex-1 flex-col items-center text-center">
-              <!-- The connector runs from this icon's right edge to the next icon's left edge. -->
+              <!-- The connector leaves a small gap before this icon and the next one. -->
               <span
                 v-if="i < stages.length - 1"
                 aria-hidden="true"
-                class="absolute left-[calc(50%+1rem)] top-[15px] h-0.5 w-[calc(100%-2rem)]"
+                class="absolute left-[calc(50%+1.5rem)] top-[15px] h-0.5 w-[calc(100%-3rem)]"
                 :class="stage.state === 'done' && stages[i + 1]!.state !== 'pending' ? 'bg-status-ok/40' : 'bg-border'"
               />
               <span class="relative grid size-8 place-items-center rounded-full" :class="STAGE_LOOK[stage.state]">
