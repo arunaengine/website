@@ -59,7 +59,7 @@ import {
 } from '@/lib/crate/editor'
 import { addFilePart } from '@/lib/crate/references'
 import { looksLikePart } from '@/lib/linkedPart'
-import { FileJson2, FolderTree } from '@lucide/vue'
+import { FileJson2, FolderTree, X } from '@lucide/vue'
 
 // The graph carries Vue Flow and dagre; only the Graph tab pays for them.
 const CrateGraph = defineAsyncComponent(() => import('@/components/metadata/CrateGraph.vue'))
@@ -728,7 +728,11 @@ async function save(anyway = false) {
 
 <template>
   <div class="relative">
-    <PageHeader eyebrow="Datasets" :title="title" :docs="{ topic: 'first-dataset', section: 'Describe the dataset' }">
+    <PageHeader
+      :title="title"
+      :crumbs="mode === 'edit' ? [{ label: title, to: { name: 'dataset', params: { id: documentId } } }, { label: 'Edit' }] : [{ label: 'New dataset' }]"
+      :docs="{ topic: 'first-dataset', section: 'Describe the dataset' }"
+    >
       <template #description>
         <span class="inline-flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
           <RouterLink
@@ -751,9 +755,6 @@ async function save(anyway = false) {
           <span>·</span>
           <span>{{ visibilityText }}</span>
           <span v-if="pathTaken" class="text-destructive">already in use</span>
-          <Button variant="link" size="sm" class="h-auto p-0 text-sm" @click="locationOpen = true">
-            Change
-          </Button>
         </span>
       </template>
       <template #actions>
@@ -764,7 +765,7 @@ async function save(anyway = false) {
         <Button v-if="mode === 'create'" variant="outline" size="sm" @click="importOpen = true">
           <FileJson2 class="h-3.5 w-3.5" /> Import an RO-Crate
         </Button>
-        <Button variant="outline" size="sm" @click="discard">Discard</Button>
+        <Button variant="outline" size="sm" @click="discard"><X class="h-3.5 w-3.5" /> Discard</Button>
       </template>
     </PageHeader>
 

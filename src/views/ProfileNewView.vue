@@ -439,11 +439,11 @@ async function submit() {
 <template>
   <div class="relative">
     <PageHeader
-      eyebrow="Profiles"
       :title="isEditing ? 'Edit profile' : 'New profile'"
+      :crumbs="[{ label: isEditing ? 'Edit profile' : 'New profile' }]"
       :description="isEditing
-        ? 'Adjust the profile\'s rules and details; saving replaces the stored profile in place.'
-        : 'Define which RO-Crate entities must, should, or may exist, and the property rules for each, step by step.'"
+        ? 'Saving replaces the stored profile in place.'
+        : 'Which entities a dataset must, should or may carry, and the rules for each.'"
       :docs="{ topic: 'build-a-profile', section: 'The root dataset shape' }"
     >
       <template #actions>
