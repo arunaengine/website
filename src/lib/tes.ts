@@ -220,6 +220,11 @@ export function isLocalRun(tags: Record<string, string> | undefined): boolean {
   return Boolean(placement.jobId) && !placement.logicalState
 }
 
+/** Among runs sharing one submission key, the one the user started: it carries the logical state. */
+export function startedRunId(tasks: readonly TesTask[], id: string): string | null {
+  return tasks.find((task) => task.id && task.id !== id && tesPlacementTags(task.tags).logicalState)?.id ?? null
+}
+
 // The verdict needs both halves: an executor kind without an estimate cannot
 // say whether bytes moved, so it stays unplaced rather than guessing zero.
 export function tesPlacementLike(placement: TesPlacementTags): PlacementLike | null {

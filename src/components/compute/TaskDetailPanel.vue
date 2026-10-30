@@ -41,6 +41,7 @@ import { deleteErrorMessage, formatJobProgress, type JobStatusResponse } from '@
 import { POLL_IDLE_MS, follow, onWake } from '@/lib/poll'
 import {
   TES_GROUP_TAG,
+  TES_IDEMPOTENCY_TAG,
   TES_LABEL_TAG_PREFIX,
   TES_READONLY_TAGS,
   drsDownloadHref,
@@ -49,6 +50,7 @@ import {
   isTerminalTesState,
   parseS3Url,
   isLocalRun,
+  startedRunId,
   tesPlacementTags,
   type TesState,
   type TesTask,
@@ -85,13 +87,18 @@ const NODE_LABEL_KEY = 'aruna-engine.org/node'
 const NODE_LABEL_TAG = `${TES_LABEL_TAG_PREFIX}${NODE_LABEL_KEY}`
 
 const props = defineProps<{ taskId: string; open: boolean }>()
-const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'canceled'): void; (e: 'deleted'): void }>()
+const emit = defineEmits<{
+  (e: 'update:open', v: boolean): void
+  (e: 'canceled'): void
+  (e: 'deleted'): void
+  (e: 'resolved', id: string): void
+}>()
 
 const router = useRouter()
-const { getTask, cancelTask, busy } = useTes()
+const { getTask, cancelTask, listTasks, busy } = useTes()
 const { getJob: getNativeJob, deleteJob } = useJobs()
 const { myGroups, apiBaseUrl, metadataAtPath, downloadProvenanceCrate, getFileOrigin, getRun } = useAruna()
-const { displayName } = useRealmNodes()
+const { displayName, targets: realmTargets } = useRealmNodes()
 const s3 = useS3()
 
 const task = ref<TesTask | null>(null)
@@ -198,6 +205,23 @@ watch(
 )
 
 onUnmounted(stopPolling)
+
+// A run record names the executing node's copy of the run; the started run holds node and placement.
+let startedAsked = ''
+watch([task, nativeJob], ([current, job]) => {
+  const key = current?.tags?.[TES_IDEMPOTENCY_TAG]
+  if (!current?.id || !job || job.family || !key || tesPlacementTags(current.tags).logicalState) return
+  if (startedAsked === current.id) return
+  startedAsked = current.id
+  void findStartedRun(current.id, key, nativeRequestId)
+})
+async function findStartedRun(id: string, key: string, requestId: number) {
+  const bases = [undefined, ...realmTargets.value.filter((node) => !node.isLocal && node.apiBase).map((node) => node.apiBase!)]
+  const pages = await Promise.all(bases.map((base) =>
+    listTasks({ tag_key: TES_IDEMPOTENCY_TAG, tag_value: key, view: 'BASIC' }, base).catch(() => null)))
+  const started = startedRunId(pages.flatMap((page) => page?.tasks ?? []), id)
+  if (started && requestId === nativeRequestId) emit('resolved', started)
+}
 
 // ── Derived ──────────────────────────────────────────────────────────────────
 const headerTitle = computed(() => task.value?.name || truncateMiddle(props.taskId))

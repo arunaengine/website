@@ -646,6 +646,7 @@ onUnmounted(() => {
       :task-id="openTaskId"
       :open="!!openTaskId"
       @update:open="(v) => !v && closeTask()"
+      @resolved="(id) => router.replace({ name: 'task', params: { taskId: id } })"
       @canceled="reload"
       @deleted="onDeleted"
     />

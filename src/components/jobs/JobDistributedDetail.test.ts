@@ -258,6 +258,7 @@ function taskPanel(
   getJob: unknown,
   deleteJob: unknown = vi.fn(),
   metadataAtPath: unknown = vi.fn(async () => null),
+  listTasks: unknown = vi.fn(async () => ({ tasks: [] })),
 ): Component {
   return compileClientComponent(new URL('../compute/TaskDetailPanel.vue', import.meta.url), {
     vue: VueRuntime,
@@ -303,10 +304,15 @@ function taskPanel(
     '@/components/onboarding/ClaimWatchStep.vue': moduleDefault(StagesStub),
     '@/composables/useTes': {
       isTesUnsupported: () => false,
-      useTes: () => ({ getTask, cancelTask: vi.fn(), busy: ref(false) }),
+      useTes: () => ({ getTask, cancelTask: vi.fn(), listTasks, busy: ref(false) }),
     },
     '@/composables/useJobs': { useJobs: () => ({ getJob, deleteJob }) },
-    '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id }) },
+    '@/composables/useRealmNodes': {
+      useRealmNodes: () => ({
+        displayName: (id: string) => id,
+        targets: ref([{ isLocal: false, apiBase: 'https://other.node.test/api/v1' }]),
+      }),
+    },
     '@/composables/useRefresh': { useRefresh },
     '@/composables/useAruna': {
       useAruna: () => ({
@@ -1374,6 +1380,45 @@ describe('distributed job detail components', () => {
     expect(getTask).toHaveBeenCalledTimes(2)
     expect(getJob).toHaveBeenCalledTimes(2)
     expect(mounted.errors).toEqual([])
+    wake.mockRestore()
+    followSpy.mockRestore()
+    mounted.app.unmount()
+  })
+
+  it('opens the started run when a record names the executing copy', async () => {
+    const key = { 'aruna-engine.org/idempotency-key': 'submission-key' }
+    const getTask = vi.fn(async () => ({ id: 'copy', state: 'COMPLETE', executors: [], inputs: [], outputs: [], logs: [], tags: key }))
+    const getJob = vi.fn(async () => ({ job_id: 'copy', state: 'succeeded' }))
+    const listTasks = vi.fn(async (_params: unknown, base?: string) => ({
+      tasks: base
+        ? [{ id: 'copy', tags: key }, { id: 'started', tags: { ...key, 'aruna-engine.org/logical-state': 'succeeded' } }]
+        : [],
+    }))
+    const component = taskPanel(getTask, getJob, vi.fn(), vi.fn(async () => null), listTasks)
+    const onResolved = vi.fn()
+
+    const mounted = await mount(component, { taskId: 'copy', open: true, onResolved })
+    await vi.waitFor(() => expect(onResolved).toHaveBeenCalledWith('started'))
+
+    expect(listTasks).toHaveBeenCalledWith(
+      { tag_key: 'aruna-engine.org/idempotency-key', tag_value: 'submission-key', view: 'BASIC' },
+      'https://other.node.test/api/v1',
+    )
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('stays on a run that already holds its placement', async () => {
+    const key = { 'aruna-engine.org/idempotency-key': 'submission-key' }
+    const getTask = vi.fn(async () => ({ id: 'canonical-job', state: 'RUNNING', executors: [], inputs: [], outputs: [], logs: [], tags: key }))
+    const getJob = vi.fn(async () => ({ job_id: 'canonical-job', state: 'running', family }))
+    const listTasks = vi.fn(async () => ({ tasks: [] }))
+    const wake = vi.spyOn(Poll, 'onWake').mockImplementation(() => () => {})
+    const followSpy = vi.spyOn(Poll, 'follow').mockImplementation(() => () => {})
+
+    const mounted = await mount(taskPanel(getTask, getJob, vi.fn(), vi.fn(async () => null), listTasks), { taskId: 'canonical-job', open: true })
+
+    expect(listTasks).not.toHaveBeenCalled()
     wake.mockRestore()
     followSpy.mockRestore()
     mounted.app.unmount()
