@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// Page-header actions for one dataset: keep it offline, favourite and watch it, export it as a
-// crate, edit it; the other transfers and Delete wait in the More menu. A run record leads with
-// its results instead; watching, export and edit move into the menu.
+// Page-header actions for one dataset: keep it offline, favourite, watch and cite it, export it as
+// a crate, edit it; the other transfers and Delete wait in the More menu. A run record leads with
+// its results; edit, Ask AI and Copy link move into the menu.
 import { computed, ref } from 'vue'
 import { RouterLink, useRouter, type RouteLocationRaw } from 'vue-router'
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
@@ -22,11 +22,12 @@ import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { downloadCrateJson } from '@/lib/crateImport'
 import { assistantAvailable } from '@/composables/assistantState'
 import { copyToClipboard, errorMessage } from '@/lib/utils'
-import { Code2, Download, Ellipsis, Eye, FileArchive, FileJson2, FolderOpen, Link, Pencil, Send, Sparkles, Star, Trash2, Upload } from '@lucide/vue'
+import { Code2, Download, Ellipsis, FileArchive, FileJson2, FolderOpen, Link, Pencil, Quote, Send, Sparkles, Star, Trash2, Upload } from '@lucide/vue'
 
 // `results`: where a run record's results open; set only for a run record.
 const props = defineProps<{ state: DatasetViewState; run?: boolean; results?: RouteLocationRaw | null }>()
 const emit = defineEmits<{
+  (e: 'cite'): void
   (e: 'export'): void
   (e: 'import'): void
   (e: 'publish'): void
@@ -79,7 +80,6 @@ async function exportCrate() {
 }
 
 const locationHref = () => window.location.href
-const watcher = ref<{ show: () => void; watching: boolean; available: boolean } | null>(null)
 function askAi() {
   void import('@/composables/useAssistantChat').then(({ useAssistantChat }) => useAssistantChat().openWith(askPrompt.value, `dataset ${detailId.value}`))
 }
@@ -125,21 +125,18 @@ async function toggleFav() {
   </Button>
   <WatchButton
     v-if="docState === 'found'"
-    ref="watcher"
     surface="dataset"
     size="sm"
     :path-prefix="watchPathPrefix"
     :group-id="current?.realmId ?? null"
     :resource-label="currentPath"
-    :hide-trigger="run"
   />
-  <template v-if="!run">
-    <AskAiButton v-if="current" :prompt="askPrompt" :subject="`dataset ${current.ulid}`" icon-only />
-    <Button v-if="docState === 'found' && currentUser" size="sm" :disabled="exporting" @click="exportCrate">
-      <Download class="h-4 w-4" /> {{ exporting ? 'Exporting…' : 'Export as crate' }}
-    </Button>
-    <Button v-if="current && canWrite" variant="outline" size="sm" @click="router.push({ name: 'dataset-edit', params: { id: detailId } })"><Pencil class="h-4 w-4" /> Edit</Button>
-  </template>
+  <AskAiButton v-if="current && !run" :prompt="askPrompt" :subject="`dataset ${current.ulid}`" icon-only />
+  <Button v-if="docState === 'found'" variant="outline" size="sm" @click="emit('cite')"><Quote class="h-4 w-4" /> Cite</Button>
+  <Button v-if="docState === 'found' && currentUser" variant="outline" size="sm" :disabled="exporting" title="The crate with its provenance as one zip file" @click="exportCrate">
+    <Download class="h-4 w-4" /> {{ exporting ? 'Exporting…' : 'Export' }}
+  </Button>
+  <Button v-if="current && canWrite && !run" variant="outline" size="sm" @click="router.push({ name: 'dataset-edit', params: { id: detailId } })"><Pencil class="h-4 w-4" /> Edit</Button>
   <Button v-else-if="results" size="sm" as-child>
     <RouterLink :to="results"><FolderOpen class="h-4 w-4" /> Show results</RouterLink>
   </Button>
@@ -152,16 +149,6 @@ async function toggleFav() {
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" class="w-80 p-1.5">
       <template v-if="run">
-        <DropdownMenuItem class="cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2" :disabled="!watcher?.available" @click="watcher?.show()">
-          <Eye class="h-4 w-4 shrink-0 text-primary" /> {{ watcher?.watching ? 'Watching' : 'Watch' }}
-        </DropdownMenuItem>
-        <DropdownMenuItem v-if="currentUser" class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5" :disabled="exporting" @click="exportCrate">
-          <Download class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-          <span class="min-w-0">
-            <span class="block text-sm font-medium text-foreground">{{ exporting ? 'Exporting…' : 'Export as RO-Crate' }}</span>
-            <span class="block text-xs leading-relaxed text-muted-foreground">Inputs, tool, command and results with their links.</span>
-          </span>
-        </DropdownMenuItem>
         <DropdownMenuItem class="cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2" @click="copyToClipboard(locationHref())">
           <Link class="h-4 w-4 shrink-0 text-primary" /> Copy link
         </DropdownMenuItem>

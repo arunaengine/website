@@ -47,16 +47,16 @@ function viewState() {
 }
 
 describe('run record actions', () => {
-  it('leads with Show results and keeps watch, export, link and edit in one menu', async () => {
+  it('leads with Show results, keeps Cite and Export beside it and link and edit in the menu', async () => {
     const results = { name: 'bucket', params: { bucketId: 'laptop' }, query: { prefix: 'results/bakta', run: 'r1' } }
     const { root } = await mountApp(component, { props: { state: viewState(), run: true, results } })
     const text = content(root)
 
     expect(element(root, (node) => node.props['aria-label'] === 'More actions')).toBeTruthy()
     expect(element(root, (node) => node.tag === 'a' && content(node).includes('Show results')).props.to).toEqual(results)
-    for (const label of ['Watch', 'Export as RO-Crate', 'Copy link', 'Edit']) expect(text).toContain(label)
-    // Export and Edit no longer sit beside the menu as their own buttons.
-    expect(() => button(root, 'Export as crate')).toThrow()
+    expect(button(root, 'Cite')).toBeTruthy()
+    expect(button(root, 'Export')).toBeTruthy()
+    for (const label of ['Copy link', 'Edit']) expect(text).toContain(label)
   })
 })
 
@@ -76,7 +76,7 @@ describe('dataset crate export', () => {
     }
     const { root } = await mountApp(component, { props: { state } })
 
-    void (button(root, 'Export as crate').props.onClick as () => Promise<void>)()
+    void (button(root, 'Export').props.onClick as () => Promise<void>)()
     detailId.value = 'dataset-b'
     await flush()
     answer(new Blob(['zip']))
