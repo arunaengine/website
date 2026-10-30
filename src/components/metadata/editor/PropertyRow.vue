@@ -76,7 +76,6 @@ const filesOpen = ref(false)
 // An unlink waiting for an answer about the data entity it would strand.
 const stranding = ref<{ index: number; dropRow: boolean; entity: DraftEntity } | null>(null)
 
-const hint = computed(() => props.rule?.description ?? '')
 const invalid = computed(() => issueState(props.issues ?? []))
 const obligation = computed(() => ruleTitle(props.rule))
 const enumOptions = computed(() => (props.rule?.enumOptions ?? []).map((value) => ({ value, label: value })))
@@ -84,6 +83,8 @@ const enumOptions = computed(() => (props.rule?.enumOptions ?? []).map((value) =
 const picker = computed(() => pickerFor(props.property))
 const target = computed(() => ({ entityId: props.entity.id, property: props.property }))
 const term = computed(() => propertyTerm(props.vocab, props.property))
+// The profile's own description of the field leads; the vocabulary's term description is the fallback.
+const about = computed(() => props.rule?.description || term.value?.description || '')
 const label = computed(() => propertyLabel(props.vocab, props.property, props.rule))
 // The whole name for a truncated one, with the key when the name differs.
 const fullName = computed(() => (label.value === props.property ? label.value : `${label.value} (${props.property})`))
@@ -205,7 +206,7 @@ function created(next: CrateDraft, entityId: string) {
   <div :class="ROW_GRID">
     <div :class="ROW_LABEL">
       <span class="truncate" :title="fullName">{{ label }}</span>
-      <Tooltip v-if="term?.description" :label="term.description">
+      <Tooltip v-if="about" :label="about">
         <button
           type="button"
           class="shrink-0 text-muted-foreground hover:text-foreground"
@@ -217,7 +218,6 @@ function created(next: CrateDraft, entityId: string) {
     </div>
 
     <div :class="ROW_VALUE">
-      <p v-if="hint" class="text-[11px] text-muted-foreground">{{ hint }}</p>
       <div v-for="(value, index) in values" :key="index" class="flex items-start gap-1">
         <div class="relative min-w-0 flex-1">
           <ValueInput

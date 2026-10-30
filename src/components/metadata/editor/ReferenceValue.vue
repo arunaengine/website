@@ -5,7 +5,7 @@ import Button from '@/components/ui/Button.vue'
 import { entityIcon } from './icons'
 import { displayName, findEntity, rootId, typeLabel, type CrateDraft } from '@/lib/crate/editor'
 import { isHttpUrl, truncateMiddle } from '@/lib/utils'
-import { ExternalLink, Link2, Plus } from '@lucide/vue'
+import { Link2, Plus } from '@lucide/vue'
 
 // A reference is one of four things: nothing yet, an entity of this crate, a
 // URL outside it, or an identifier nothing answers to.
@@ -67,12 +67,10 @@ const tint = computed(() => {
       :href="value"
       target="_blank"
       rel="noreferrer"
-      class="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border bg-muted/30 px-2.5 hover:bg-muted/60"
-      :class="tint"
+      class="flex h-9 min-w-0 flex-1 items-center px-2.5 text-sm text-primary hover:underline"
       :title="value"
     >
-      <ExternalLink class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      <span class="min-w-0 flex-1 truncate text-sm text-foreground">{{ value }}</span>
+      <span class="min-w-0 truncate">{{ value }}</span>
     </a>
     <p
       v-else

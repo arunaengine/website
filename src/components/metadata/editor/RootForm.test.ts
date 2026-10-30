@@ -66,6 +66,12 @@ const SelectStub = defineComponent({
   },
 })
 
+// The tooltip with its text inline, so a test reads what it says.
+const TooltipStub = defineComponent({
+  props: { label: { type: String, default: '' } },
+  setup: (props, { slots }) => () => h('span', [slots.default?.(), h('span', { role: 'tooltip' }, props.label)]),
+})
+
 const ValueInput = compileClientComponent(new URL('./ValueInput.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/Input.vue': moduleDefault(FieldStub('input')),
@@ -90,7 +96,7 @@ const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.m
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
-  '@/components/ui/Tooltip.vue': moduleDefault(Passthrough),
+  '@/components/ui/Tooltip.vue': moduleDefault(TooltipStub),
   '@/components/ui/DropdownMenu.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuContent.vue': moduleDefault(Passthrough),

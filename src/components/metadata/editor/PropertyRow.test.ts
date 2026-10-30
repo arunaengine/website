@@ -71,6 +71,12 @@ const SelectStub = defineComponent({
   },
 })
 
+// The tooltip with its text inline, so a test reads what it says.
+const TooltipStub = defineComponent({
+  props: { label: { type: String, default: '' } },
+  setup: (props, { slots }) => () => h('span', [slots.default?.(), h('span', { role: 'tooltip' }, props.label)]),
+})
+
 const ValueInput = compileClientComponent(new URL('./ValueInput.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/Input.vue': moduleDefault(FieldStub('input')),
@@ -94,7 +100,7 @@ const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.m
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
-  '@/components/ui/Tooltip.vue': moduleDefault(Passthrough),
+  '@/components/ui/Tooltip.vue': moduleDefault(TooltipStub),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/DropdownMenu.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Passthrough),
@@ -220,7 +226,7 @@ describe('PropertyRow', () => {
     })
     const text = content(mounted.root)
 
-    expect(text).toContain('The paper this dataset belongs to.')
+    expect(content(element(mounted.root, (node) => node.props.role === 'tooltip'))).toBe('The paper this dataset belongs to.')
     expect(text).not.toContain('Recommended')
     expect(element(mounted.root, (node) => node.tag === 'input').props.title).toBe('Recommended')
     mounted.app.unmount()
