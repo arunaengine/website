@@ -52,6 +52,16 @@ describe('bucket distribution', () => {
     scope.stop()
   })
 
+  it('asks nothing for a bucket the caller knows is ordinary', async () => {
+    const scope = effectScope()
+    const distribution = scope.run(() => useBucketDistribution(ref('laptop'), ref('node-2'), ref(true)))!
+    await nextTick()
+
+    expect(distribution.state.value).toBe('ordinary')
+    expect(aruna.getBucketDistribution).not.toHaveBeenCalled()
+    scope.stop()
+  })
+
   it('treats a 404 as an ordinary bucket, not as an error', async () => {
     aruna.getBucketDistribution.mockRejectedValue(new ApiError(404, 'not found'))
     const { distribution, scope } = start('lab')

@@ -239,7 +239,11 @@ const addDataOpen = ref(false)
 // An example bucket of the node mock replaces the object browser.
 const exampleBucket = computed(() => (mockEnabled() ? mockBucket(bucket.value) : undefined))
 // A bucket of this node that is stored on more nodes shows its state above the files.
-const distribution = useBucketDistribution(bucket, remoteNodeId)
+// The realm bucket list names a bucket stored on one node; its node is then not asked.
+const knownOrdinary = computed(() => manager.allBuckets.hits.value.some((hit) =>
+  hit.bucket === bucket.value && !hit.set_id
+  && (remoteNodeId.value ? hit.node_id === remoteNodeId.value : realmNodes.isLocalNode(hit.node_id))))
+const distribution = useBucketDistribution(bucket, remoteNodeId, knownOrdinary)
 const storedBucket = computed(() => exampleBucket.value ?? distribution.view.value ?? undefined)
 const spreadNodes = computed(() => storedBucket.value?.members.map((member) => member.nodeId) ?? [])
 const bucketSetId = computed(() => distribution.view.value?.live?.setId ?? (distribution.state.value === 'ordinary' ? null : undefined))

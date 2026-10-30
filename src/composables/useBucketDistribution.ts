@@ -9,7 +9,8 @@ import { errorMessage } from '@/lib/utils'
 
 export type DistributionState = 'loading' | 'ready' | 'ordinary' | 'unavailable'
 
-export function useBucketDistribution(bucket: Ref<string>, nodeId: Ref<string | null>) {
+// `ordinary`: the caller already knows the bucket is stored on one node, so nothing is asked.
+export function useBucketDistribution(bucket: Ref<string>, nodeId: Ref<string | null>, ordinary?: Ref<boolean>) {
   const { getBucketDistribution, sessionEpoch } = useAruna()
   const view = ref<DistributedBucket | null>(null)
   const state = ref<DistributionState>('loading')
@@ -27,6 +28,12 @@ export function useBucketDistribution(bucket: Ref<string>, nodeId: Ref<string | 
       return
     }
     const current = () => run === runs && epoch === sessionEpoch.value && name === bucket.value
+    if (ordinary?.value) {
+      view.value = null
+      state.value = 'ordinary'
+      error.value = null
+      return
+    }
     try {
       const status = await getBucketDistribution(name, undefined, nodeId.value)
       if (!current()) return
@@ -49,7 +56,7 @@ export function useBucketDistribution(bucket: Ref<string>, nodeId: Ref<string | 
   }
 
   watch(
-    [bucket, nodeId, () => sessionEpoch.value],
+    [bucket, nodeId, () => sessionEpoch.value, () => ordinary?.value],
     () => {
       view.value = null
       state.value = 'loading'
