@@ -27,12 +27,12 @@ describe('Data view group selection', () => {
   })
 
   it('shows the group without a second picker', () => {
-    expect(template).toContain('Showing buckets of')
-    // Below 960 px the line moves into the bucket picker's sheet, so only one shows at a time.
-    expect(template).toContain('v-if="currentUser && s3.connectedEndpoint.value && !narrow"')
-    expect(template).toContain('<span>on</span>')
-    expect(template.indexOf('<NodePicker')).toBeLessThan(template.indexOf('</PageHeader>'))
-    expect(template).toContain('Switch the group in the top bar')
+    const actions = template.slice(template.indexOf('<template #actions>'), template.indexOf('</PageHeader>'))
+    // The node choice is one outline button in the header; its tooltip names the top bar's group.
+    expect(actions).toContain('<NodePicker')
+    expect(actions).toContain('button')
+    expect(actions).toContain('Showing buckets of the group ${selectedGroupName')
+    expect(template).not.toContain('Showing buckets of</span>')
     expect(template).not.toContain('groupOptions')
     expect(template).not.toContain('DropdownMenu')
   })
@@ -42,14 +42,11 @@ describe('Data view group selection', () => {
     // The node of the open bucket stays named in the heading, linked to its page.
     expect(title).toContain(`on <RouterLink :to="{ name: 'node', params: { nodeId: requiredNodeId } }" class="text-primary hover:underline">{{ headerPlace.name }}</RouterLink>`)
     expect(title).toContain(':title="headerPlace.title"')
+    // A spread bucket names its node count and links each node from the popover.
+    expect(title).toContain('{{ spreadNodes.length }} nodes')
+    expect(title).toContain(":to=\"{ name: 'node', params: { nodeId: id } }\"")
     const actions = template.slice(template.indexOf('<template #actions>'), template.indexOf('</PageHeader>'))
     expect(actions).toContain('<RefreshButton')
-    expect(actions).not.toContain('<NodePicker')
-  })
-
-  it('links the shown group to its page', () => {
-    expect(template).toContain(":to=\"{ name: 'group', params: { id: selectedGroupId } }\"")
-    expect(template).toContain('<span v-else class="text-muted-foreground">No group</span>')
   })
 
   it('keeps a route group as the opened one', () => {

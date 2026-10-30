@@ -32,7 +32,7 @@ const NodePicker = compileClientComponent(new URL('./NodePicker.vue', import.met
   '@lucide/vue': new Proxy({}, { get: () => Empty }),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Popover.vue': moduleDefault(Passthrough),
-  '@/components/ui/StatusDot.vue': moduleDefault(Empty),
+  '@/components/ui/Button.vue': moduleDefault(Passthrough),
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
       // A device stays in the realm's node list but is no place to pick.

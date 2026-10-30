@@ -27,6 +27,7 @@ const children = [
   'ui/DialogFooter',
   'ui/DialogClose',
   'ui/Notice',
+  'ui/Popover',
   'data/AddDataDialog',
   'data/DataViewSkeleton',
   'desktop/BindFolderDialog',
@@ -192,19 +193,20 @@ describe('Data view width', () => {
     return { root: mounted.root, lists, sheet, picker, done }
   }
 
-  it('shows the list beside the files and the scope line under the title on a wide view', async () => {
+  it('shows the list beside the files and the node choice in the header on a wide view', async () => {
     const view = await open(1130)
     expect(view.lists()).toHaveLength(1)
     expect(view.lists()[0].props.sheet).toBeUndefined()
     expect(view.picker()).toBeUndefined()
-    expect(content(view.root)).toContain('Showing buckets of')
+    const picker = element(view.root, (node) => node.props['data-stub'] === 'NodePicker')
+    expect(picker.props.button).toBe('')
+    expect(picker.props.tooltip).toContain('Showing buckets of the group')
     expect(view.sheet().props.open).toBe(false)
     view.done()
   })
 
   it('makes the title the bucket picker below 960 px and opens the list in a sheet', async () => {
     const view = await open(800)
-    expect(content(view.root)).not.toContain('Showing buckets of')
     expect(view.lists().filter((list) => list.props.sheet === undefined)).toHaveLength(0)
 
     await click(view.picker()!)

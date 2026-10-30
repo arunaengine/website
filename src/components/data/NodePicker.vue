@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // Node choice of the bucket list: All nodes or one node. The home node comes
 // first, then recently used nodes, then the rest by name.
+import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Popover from '@/components/ui/Popover.vue'
-import StatusDot from '@/components/ui/StatusDot.vue'
 import { useRealmNodes, type RealmNodeDisplay } from '@/composables/useRealmNodes'
-import { Check, ChevronDown } from '@lucide/vue'
+import { Check, ChevronDown, Server } from '@lucide/vue'
 import { computed, ref } from 'vue'
 
 const props = defineProps<{
@@ -13,10 +13,13 @@ const props = defineProps<{
   modelValue: string | null
   /** Node ids, most recently used first. */
   recent?: string[]
+  /** An outline button with a server icon, as in a page header. */
+  button?: boolean
+  tooltip?: string
 }>()
 const emit = defineEmits<{ (e: 'update:modelValue', value: string | null): void }>()
 
-const { targets, displayName, nodeById } = useRealmNodes()
+const { targets, displayName } = useRealmNodes()
 const open = ref(false)
 const filter = ref('')
 // A short list needs no filter field.
@@ -38,7 +41,6 @@ const shown = computed(() => {
     (node) => node.label.toLowerCase().includes(term) || node.nodeId.toLowerCase().startsWith(term),
   )
 })
-const selected = computed(() => (props.modelValue ? nodeById(props.modelValue) : null))
 
 function choose(nodeId: string | null) {
   emit('update:modelValue', nodeId)
@@ -48,17 +50,18 @@ function choose(nodeId: string | null) {
 </script>
 
 <template>
-  <Popover v-model:open="open">
+  <Popover v-model:open="open" :tooltip="tooltip">
+    <Button v-if="button" variant="outline" class="min-w-0 max-w-[16rem]" :aria-label="tooltip ?? 'Node'">
+      <Server class="h-4 w-4" aria-hidden="true" />
+      <span class="min-w-0 truncate">{{ modelValue ? displayName(modelValue) : 'All nodes' }}</span>
+      <ChevronDown class="h-3.5 w-3.5 opacity-60" aria-hidden="true" />
+    </Button>
     <button
+      v-else
       type="button"
       class="inline-flex min-w-0 max-w-[14rem] items-center gap-1 rounded px-1 py-0.5 text-xs font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       aria-label="Node"
     >
-      <StatusDot
-        v-if="selected"
-        :tone="selected.reachable ? 'done' : 'idle'"
-        :label="selected.reachable ? 'Reachable' : 'Not reachable'"
-      />
       <span class="min-w-0 truncate" :title="modelValue ?? undefined">{{ modelValue ? displayName(modelValue) : 'All nodes' }}</span>
       <ChevronDown class="h-3 w-3 shrink-0 opacity-60" />
     </button>
@@ -88,7 +91,6 @@ function choose(nodeId: string | null) {
             :title="node.nodeId"
             @click="choose(node.nodeId)"
           >
-            <StatusDot :tone="node.reachable ? 'done' : 'idle'" :label="node.reachable ? 'Reachable' : 'Not reachable'" />
             <span class="min-w-0 flex-1 truncate">{{ node.label }}</span>
             <span v-if="node.isLocal" class="shrink-0 text-muted-foreground">home</span>
             <span v-else-if="!node.reachable" class="shrink-0 text-muted-foreground">not reachable</span>

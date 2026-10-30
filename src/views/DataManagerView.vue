@@ -11,6 +11,7 @@ import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import Notice from '@/components/ui/Notice.vue'
+import Popover from '@/components/ui/Popover.vue'
 import Sheet from '@/components/ui/Sheet.vue'
 import SheetContent from '@/components/ui/SheetContent.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
@@ -226,6 +227,7 @@ const exampleBucket = computed(() => (mockEnabled() ? mockBucket(bucket.value) :
 // A bucket of this node that is stored on more nodes shows its state above the files.
 const distribution = useBucketDistribution(bucket, remoteNodeId)
 const storedBucket = computed(() => exampleBucket.value ?? distribution.view.value ?? undefined)
+const spreadNodes = computed(() => storedBucket.value?.members.map((member) => member.nodeId) ?? [])
 const bucketSetId = computed(() => distribution.view.value?.live?.setId ?? (distribution.state.value === 'ordinary' ? null : undefined))
 // Without a session the example buckets still show, from static data.
 const mockOnly = computed(
@@ -333,7 +335,24 @@ async function createFolder() {
           </button>
           <span v-else class="max-w-full truncate" :title="headerTitle">{{ headerTitle }}</span>
           <span
-            v-if="route.name === 'bucket' && !notebooksView && requiredNodeId"
+            v-if="route.name === 'bucket' && !notebooksView && spreadNodes.length > 1"
+            class="max-w-full truncate text-sm font-normal text-muted-foreground"
+          >
+            on
+            <Popover :tooltip="`Spread over ${spreadNodes.map((id) => realmNodes.displayName(id)).join(', ')}`" align="start">
+              <button type="button" class="text-foreground/90 hover:underline">{{ spreadNodes.length }} nodes</button>
+              <template #content>
+                <p class="text-xs font-medium text-foreground">Spread over</p>
+                <ul class="mt-1 space-y-1 text-sm">
+                  <li v-for="id in spreadNodes" :key="id">
+                    <RouterLink :to="{ name: 'node', params: { nodeId: id } }" class="text-primary hover:underline">{{ realmNodes.displayName(id) }}</RouterLink>
+                  </li>
+                </ul>
+              </template>
+            </Popover>
+          </span>
+          <span
+            v-else-if="route.name === 'bucket' && !notebooksView && requiredNodeId"
             class="max-w-full truncate text-sm font-normal text-muted-foreground"
             :title="headerPlace.title"
           >
@@ -341,28 +360,17 @@ async function createFolder() {
           </span>
         </span>
       </template>
-      <template #description>
-        {{ headerDescription }}
-        <span
-          v-if="currentUser && s3.connectedEndpoint.value && !narrow"
-          class="mt-2 flex min-w-0 items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground"
-        >
-          <!-- The group is the top bar's context; here it only stays visible. -->
-          <span>Showing buckets of</span>
-          <RouterLink
-            v-if="selectedGroupId"
-            :to="{ name: 'group', params: { id: selectedGroupId } }"
-            class="max-w-[12rem] truncate font-medium text-foreground hover:underline"
-            :title="`${selectedGroupName} (${selectedGroupId}). Switch the group in the top bar`"
-          >
-            {{ selectedGroupName }}
-          </RouterLink>
-          <span v-else class="text-muted-foreground">No group</span>
-          <span>on</span>
-          <NodePicker :model-value="bucketNodeChoice" :recent="recentNodes" @update:model-value="pickNode" />
-        </span>
-      </template>
+      <template #description>{{ headerDescription }}</template>
       <template #actions>
+        <!-- The group is the top bar's context; the tooltip only names it. -->
+        <NodePicker
+          v-if="currentUser && s3.connectedEndpoint.value"
+          button
+          :tooltip="`Showing buckets of the group ${selectedGroupName || 'none'} on ${bucketNodeChoice ? realmNodes.displayName(bucketNodeChoice) : 'all nodes'}`"
+          :model-value="bucketNodeChoice"
+          :recent="recentNodes"
+          @update:model-value="pickNode"
+        />
         <RefreshButton v-if="contextReady" :busy="refreshSpinning" :sr-label="phone ? 'Refresh' : undefined" @click="onRefresh" />
       </template>
     </PageHeader>
@@ -481,15 +489,7 @@ async function createFolder() {
       <SheetContent side="bottom" class="max-h-[85dvh] rounded-t-2xl p-0">
         <DialogTitle class="px-4 pb-1 pt-4 text-base">Switch bucket</DialogTitle>
         <DialogDescription class="sr-only">Pick a bucket to open, or create one.</DialogDescription>
-        <BucketSidebar sheet :manager="manager" @sync-computer="openBindDialog" @new-bucket="newBucketFromPicker">
-          <template #scope>
-            Buckets of
-            <RouterLink v-if="selectedGroupId" :to="{ name: 'group', params: { id: selectedGroupId } }" class="font-medium text-foreground hover:underline">{{ selectedGroupName }}</RouterLink>
-            <span v-else>no group</span>
-            on
-            <NodePicker :model-value="bucketNodeChoice" :recent="recentNodes" @update:model-value="pickNode" />
-          </template>
-        </BucketSidebar>
+        <BucketSidebar sheet :manager="manager" @sync-computer="openBindDialog" @new-bucket="newBucketFromPicker" />
       </SheetContent>
     </Sheet>
 
