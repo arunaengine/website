@@ -29,6 +29,7 @@ import type {
 } from '@/lib/placementPolicies'
 import { formatNumber, truncateMiddle } from '@/lib/utils'
 import { RotateCcw, ShieldAlert } from '@lucide/vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 
 const props = defineProps<{ ready: boolean }>()
 
@@ -99,19 +100,16 @@ async function releaseCopy() {
 </script>
 
 <template>
-  <section class="surface">
-    <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-4">
-      <div class="flex items-center gap-2">
-        <ShieldAlert class="size-4 text-primary" />
-        <h2 class="font-display text-sm font-semibold text-aruna-navy">Placement enforcement on this node</h2>
-      </div>
-      <div class="flex gap-2">
+  <section>
+    <SectionHeading title="Placement enforcement on this node" :icon="ShieldAlert" :level="3">
+      <template #actions>
         <RefreshButton :busy="spinning" label="Reload" @click="onReload" />
-        <Button size="sm" :disabled="busy" @click="revalidateAll">
+        <Button variant="outline" size="sm" :disabled="busy" @click="revalidateAll">
           <RotateCcw class="size-3.5" /> {{ busy ? 'Checking again…' : 'Check every copy again' }}
         </Button>
-      </div>
-    </header>
+      </template>
+    </SectionHeading>
+    <div class="surface">
 
     <div class="space-y-4 px-5 py-4">
       <p class="text-xs text-muted-foreground">
@@ -212,5 +210,6 @@ async function releaseCopy() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </div>
   </section>
 </template>

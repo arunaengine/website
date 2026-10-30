@@ -15,7 +15,8 @@ import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
 import { placementPoliciesErrorMessage, policyOwnerLabel, policyRefKey } from '@/lib/placementPolicies'
 import type { PolicyRefBody, PolicyResponse, SelectorBody } from '@/lib/placementPolicies'
 import { truncateMiddle } from '@/lib/utils'
-import { Search } from '@lucide/vue'
+import { Library, Search } from '@lucide/vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 
 const { myGroups } = useAruna()
 const {
@@ -119,21 +120,21 @@ async function look(policy: PolicyRefBody = lookup.value) {
 </script>
 
 <template>
-  <section class="surface">
-    <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-4">
-      <div class="flex items-center gap-2">
-        <h2 class="font-display text-sm font-semibold text-aruna-navy">Published policies</h2>
-        <Badge variant="outline" size="count">{{ visible.length }}</Badge>
-      </div>
-      <Select
-        v-if="ownerOptions.length > 2"
-        v-model="ownerFilter"
-        :options="ownerOptions"
-        class="max-w-xs"
-        label="Owner"
-        aria-label="Filter the policies by owner"
-      />
-    </header>
+  <section>
+    <SectionHeading title="Published policies" :icon="Library" :level="3">
+      <template #actions>
+        <span class="text-sm text-muted-foreground"><b class="font-medium text-foreground">{{ visible.length }}</b> {{ visible.length === 1 ? 'policy' : 'policies' }}</span>
+        <Select
+          v-if="ownerOptions.length > 2"
+          v-model="ownerFilter"
+          :options="ownerOptions"
+          class="max-w-xs"
+          label="Owner"
+          aria-label="Filter the policies by owner"
+        />
+      </template>
+    </SectionHeading>
+    <div class="surface">
 
     <div class="space-y-4 px-5 py-4">
       <Notice v-if="!listed" tone="warning">
@@ -225,6 +226,7 @@ async function look(policy: PolicyRefBody = lookup.value) {
           <p v-else-if="lookupMessage" class="text-xs text-emerald-700 dark:text-emerald-300">{{ lookupMessage }}</p>
         </div>
       </details>
+    </div>
     </div>
   </section>
 </template>
