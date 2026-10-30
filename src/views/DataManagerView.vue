@@ -189,7 +189,20 @@ function openFound(hit: ObjectSearchHit) {
   })
 }
 
-function onBucketCreated(created: BindSource) {
+// A referenced bucket goes on to the list import of its source address, once the bucket is open.
+const addDataTab = ref<string | undefined>(undefined)
+const addDataLink = ref<string | undefined>(undefined)
+const pendingImport = ref<{ bucket: string; source: string } | null>(null)
+watch([bucket, contextReady, pendingImport], () => {
+  const pending = pendingImport.value
+  if (!pending || bucket.value !== pending.bucket || !contextReady.value) return
+  pendingImport.value = null
+  addDataTab.value = 'list'
+  addDataLink.value = pending.source
+  addDataOpen.value = true
+})
+function onBucketCreated(created: BindSource, source?: string) {
+  pendingImport.value = source ? { bucket: created.bucket, source } : null
   manager.openSearchHit({
     arn: '',
     bucket: created.bucket,
@@ -254,6 +267,7 @@ const headerDescription = computed(() =>
 // own session back once the dialog closes.
 watch(addDataOpen, (open) => {
   contextHold.value = open
+  if (!open) addDataTab.value = addDataLink.value = undefined
 })
 
 // The retired bucket-builder route redirects here with ?addData=1 so old links
@@ -497,6 +511,8 @@ async function createFolder() {
 
     <AddDataDialog
       v-model:open="addDataOpen"
+      :tab="addDataTab"
+      :link="addDataLink"
       :bucket="bucket"
       :prefix="s3Prefix"
       :group-id="activeGroupId"

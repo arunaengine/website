@@ -19,6 +19,13 @@ const InputStub = defineComponent({
   setup: (props, { attrs, emit }) => () =>
     h('input', { ...attrs, invalid: props.invalid, value: props.modelValue, onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value) }),
 })
+const SelectStub = defineComponent({
+  props: { modelValue: String, options: { type: Array, default: () => [] } },
+  emits: ['update:modelValue'],
+  setup: (props, { attrs, emit }) => () =>
+    h('select', { ...attrs, value: props.modelValue, onChange: (value: string) => emit('update:modelValue', value) },
+      (props.options as { value: string; label: string }[]).map((option) => h('option', { value: option.value }, option.label))),
+})
 const StorageStub = defineComponent({ props: { open: Boolean }, setup: (props) => () => h('aside', { 'data-storage': props.open }) })
 const ResultsStub = defineComponent({ props: { open: Boolean, name: String }, setup: (props) => () => h('aside', { 'data-results': props.open }, props.name) })
 
@@ -36,6 +43,7 @@ const Dialog = compileClientComponent(new URL('./CreateBucketDialog.vue', import
   '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => null) }),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
+  '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/RefusalNote.vue': moduleDefault(defineComponent({ props: { message: String }, setup: (props) => () => h('p', { role: 'alert' }, props.message) })),
   '@/components/ui/Spinner.vue': moduleDefault(Slotted('i')),
   '@/components/ui/Dialog.vue': moduleDefault(Slotted('div')),
@@ -59,12 +67,17 @@ async function mount(nodeId: string | null = 'one') {
   const created: unknown[] = []
   const open = ref(true)
   const mounted = await mountApp(defineComponent(() => () =>
-    h(Dialog, { open: open.value, groupId: 'g1', nodeId, onCreated: (bucket: unknown) => created.push(bucket), 'onUpdate:open': (value: boolean) => (open.value = value) })))
+    h(Dialog, { open: open.value, groupId: 'g1', nodeId, onCreated: (bucket: object, source?: string) => created.push(source === undefined ? bucket : { ...bucket, source }), 'onUpdate:open': (value: boolean) => (open.value = value) })))
   await flush()
   const name = () => element(mounted.root, (node) => node.tag === 'input' && node.props['aria-label'] === 'Bucket name')
   const create = () => button(mounted.root, 'Create bucket')
   const radios = () => nodes(mounted.root).filter((node) => node.tag === 'input' && node.props.type === 'radio')
-  return { root: mounted.root, created, open, name, create, radios }
+  const place = () => element(mounted.root, (node) => node.tag === 'select')
+  const pick = async (value: string) => {
+    ;(place().props.onChange as (value: string) => void)(value)
+    await flush()
+  }
+  return { root: mounted.root, created, open, name, create, radios, place, pick }
 }
 
 describe('new bucket dialog', () => {
@@ -78,19 +91,38 @@ describe('new bucket dialog', () => {
   })
 
   it('offers the reachable realm nodes, the open node first, with their free space, and a spread', async () => {
-    const { root, radios } = await mount('one')
-    const labels = radios().map((radio) => content(radio.parent!).replace(/\s+/g, ' ').trim())
-    expect(labels).toEqual(['name-one196 GB free', 'name-two', 'Spread over several nodesfor large data'])
-    expect(radios()[0].props.checked).toBe(true)
+    const { root, place, name } = await mount('one')
+    const labels = nodes(place()).filter((node) => node.tag === 'option').map((option) => content(option))
+    expect(labels).toEqual(['name-one, 196 GB free', 'name-two', 'Spread over several nodes'])
+    expect(place().props.value).toBe('one')
     expect(content(root)).not.toContain('laptop')
+    // Stored data names the node that keeps it; a valid name shows its address.
+    expect(content(root)).toContain('Kept on name-one, counted against quotas.')
+    await typeValue(name(), 'my-results')
+    expect(content(root)).toContain('The address will be s3://my-results')
+  })
+
+  it('needs a source address for a referenced bucket and hands it on after creating it', async () => {
+    s3.activateContext.mockResolvedValueOnce({ issuerNodeId: 'one', accessKeyId: 'k1' })
+    s3.createBucket.mockResolvedValueOnce(undefined)
+    const { root, name, create, radios, created } = await mount('one')
+    await typeValue(name(), 'refseq')
+    ;(radios()[1].props.onChange as () => void)()
+    await flush()
+    expect(create().props.disabled).toBe(true)
+    expect(content(root)).not.toContain('Spread over several nodes')
+
+    await typeValue(element(root, (node) => node.tag === 'input' && node.props['aria-label'] === 'Source address'), 'https://ftp.example.org/genomes/')
+    await click(create())
+    expect(created).toEqual([{ bucket: 'refseq', nodeId: 'one', groupId: 'g1', source: 'https://ftp.example.org/genomes/' }])
   })
 
   it('creates the bucket through a session on the chosen node and opens it', async () => {
     s3.activateContext.mockResolvedValueOnce({ issuerNodeId: 'two', accessKeyId: 'k2' })
     s3.createBucket.mockResolvedValueOnce(undefined)
-    const { name, create, radios, created, open } = await mount('one')
+    const { name, create, pick, created, open } = await mount('one')
     await typeValue(name(), 'assemblies-2026')
-    ;(radios()[1].props.onChange as () => void)()
+    await pick('two')
     await click(create())
 
     expect(s3.activateContext).toHaveBeenCalledWith('two', 'g1')
@@ -111,10 +143,9 @@ describe('new bucket dialog', () => {
 
   it('sets the nodes and copies of a spread bucket before it shows each node\'s answer', async () => {
     s3.activateContext.mockClear()
-    const { root, name, create, radios } = await mount('one')
+    const { root, name, create, pick } = await mount('one')
     await typeValue(name(), 'big-data')
-    ;(radios()[2].props.onChange as () => void)()
-    await flush()
+    await pick('several')
     expect(element(root, (node) => node.tag === 'aside' && 'data-storage' in node.props).props['data-storage']).toBe(true)
 
     await click(create())

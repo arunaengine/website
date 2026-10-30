@@ -1,10 +1,11 @@
 <script setup lang="ts">
-// New bucket on the web: a name and the place that stores it. One realm node holds an ordinary
+// New bucket on the web: a name, where the files live and the node. One realm node holds an ordinary
 // bucket, made through a session on that node; spread over several nodes, the storage dialog sets
-// the copies and each node's answer is shown.
+// the copies and each node's answer is shown. A referenced bucket goes on to the import of its source.
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import Select from '@/components/ui/Select.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -22,14 +23,15 @@ import type { AdmissionResponse } from '@/lib/api'
 import type { BindSource } from '@/lib/bindSource'
 import { BUCKET_NAME_REQUIREMENT, bucketNameProblem } from '@/lib/bucketName'
 import { readFreeSpace } from '@/lib/bucketPlace'
-import { defaultPlacement, placementLabel, type Placement } from '@/lib/distributedMock'
+import { defaultPlacement, type Placement } from '@/lib/distributedMock'
 import { formatBytes } from '@/lib/utils'
-import { FolderPlus, Network, Server } from '@lucide/vue'
+import { FolderPlus, Link, Network, Server } from '@lucide/vue'
 
 const props = defineProps<{ open: boolean; groupId: string | null; nodeId: string | null }>()
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
-  (e: 'created', bucket: BindSource): void
+  /** `source`: the address a referenced bucket reads from, for the import that follows. */
+  (e: 'created', bucket: BindSource, source?: string): void
 }>()
 
 const SPREAD = 'several'
@@ -56,7 +58,34 @@ const places = computed(() =>
 const trimmed = computed(() => name.value.trim())
 const nameProblem = computed(() => (trimmed.value ? bucketNameProblem(trimmed.value) : null))
 const spread = computed(() => choice.value === SPREAD)
-const canCreate = computed(() => Boolean(trimmed.value && props.groupId && choice.value) && !nameProblem.value && !creating.value)
+type Kind = 'stored' | 'referenced'
+const KINDS = [
+  { value: 'stored', label: 'Stored in the realm', icon: Server, line: '' },
+  { value: 'referenced', label: 'Referenced from a source', icon: Link, line: 'Files stay at their source, for example an FTP site. Aruna reads them in place.' },
+] as const
+const kind = ref<Kind>('stored')
+const source = ref('')
+const nameHint = computed(() => nameProblem.value ?? (trimmed.value ? `The address will be s3://${trimmed.value}` : BUCKET_NAME_REQUIREMENT))
+// The nodes the files are kept on, as the chosen place says; never a number it does not know.
+const storedLine = computed(() =>
+  spread.value && placement.value.members.length
+    ? `Kept on ${placement.value.members.length} nodes, counted against quotas.`
+    : spread.value
+      ? 'Kept on several nodes, counted against quotas.'
+      : choice.value
+        ? `Kept on ${realmNodes.displayName(choice.value)}, counted against quotas.`
+        : 'Counted against quotas.')
+const placeOptions = computed(() => [
+  ...places.value.map((entry) => ({ value: entry.nodeId, label: [realmNodes.displayName(entry.nodeId), freeLabel(entry.nodeId)].filter(Boolean).join(', ') })),
+  ...(kind.value === 'stored' ? [{ value: SPREAD, label: 'Spread over several nodes' }] : []),
+])
+// A referenced bucket lives on one node; the spread stays a choice of stored data.
+function pickKind(value: Kind) {
+  kind.value = value
+  if (value === 'referenced' && spread.value) choice.value = places.value[0]?.nodeId ?? ''
+}
+const canCreate = computed(() =>
+  Boolean(trimmed.value && props.groupId && choice.value && (kind.value === 'stored' || source.value.trim())) && !nameProblem.value && !creating.value)
 
 function freeLabel(id: string): string {
   if (!free.value.has(id)) return ''
@@ -84,6 +113,8 @@ watch(
     generation++
     if (!open) return
     name.value = ''
+    kind.value = 'stored'
+    source.value = ''
     error.value = null
     creating.value = false
     placement.value = defaultPlacement()
@@ -126,7 +157,7 @@ async function submit() {
     const reference = { nodeId: session.issuerNodeId, groupId: target.groupId, accessKeyId: session.accessKeyId }
     await s3.createBucket(target.bucket, session.issuerNodeId, reference)
     if (!current()) return
-    emit('created', target)
+    emit('created', target, kind.value === 'referenced' ? source.value.trim() : undefined)
     emit('update:open', false)
   } catch (err) {
     if (current()) error.value = s3ErrorMessage(err, target.bucket)
@@ -145,54 +176,57 @@ function spreadCreated(outcome: AdmissionResponse) {
 
 <template>
   <Dialog :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
-    <DialogContent class="max-w-md">
+    <DialogContent class="max-w-xl">
       <DialogHeader>
         <DialogTitle>New bucket</DialogTitle>
       </DialogHeader>
 
       <div class="space-y-4">
         <label class="block">
-          <span class="text-xs text-muted-foreground">Name</span>
+          <span class="text-xs font-medium text-muted-foreground">Name</span>
           <Input
             v-model="name"
             class="mt-1"
-            placeholder="bucket-name"
+            placeholder="my-results"
             aria-label="Bucket name"
             :invalid="nameProblem ? 'error' : undefined"
             @keyup.enter="submit"
           />
-          <span class="mt-1 block text-xs" :class="nameProblem ? 'text-destructive' : 'text-muted-foreground'">{{ nameProblem ?? BUCKET_NAME_REQUIREMENT }}</span>
+          <span class="mt-1 block text-xs" :class="nameProblem ? 'text-destructive' : 'text-muted-foreground'">{{ nameHint }}</span>
         </label>
 
         <fieldset>
-          <legend class="text-xs text-muted-foreground">Stored on</legend>
+          <legend class="text-xs font-medium text-muted-foreground">Where the files live</legend>
           <div class="mt-1 grid gap-1.5">
             <label
-              v-for="entry in places"
-              :key="entry.nodeId"
-              class="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-md border px-3 text-sm"
-              :class="choice === entry.nodeId ? 'border-primary' : 'border-input hover:bg-muted/50'"
+              v-for="option in KINDS"
+              :key="option.value"
+              class="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-md border px-3 py-2 text-sm"
+              :class="kind === option.value ? 'border-primary' : 'border-input hover:bg-muted/50'"
             >
-              <input type="radio" name="bucket-place" class="accent-primary" :checked="choice === entry.nodeId" @change="pick(entry.nodeId)" />
-              <Server class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span class="min-w-0 flex-1 truncate">{{ realmNodes.displayName(entry.nodeId) }}</span>
-              <span class="shrink-0 text-xs tabular-nums text-muted-foreground">{{ freeLabel(entry.nodeId) }}</span>
-            </label>
-            <label
-              class="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-md border px-3 text-sm"
-              :class="spread ? 'border-primary' : 'border-input hover:bg-muted/50'"
-            >
-              <input type="radio" name="bucket-place" class="accent-primary" :checked="spread" @change="pick(SPREAD)" />
-              <Network class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span class="min-w-0 flex-1 truncate">Spread over several nodes</span>
-              <span class="shrink-0 text-xs text-muted-foreground">for large data</span>
+              <input type="radio" name="bucket-kind" class="accent-primary" :checked="kind === option.value" @change="pickKind(option.value)" />
+              <component :is="option.icon" class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span class="min-w-0 flex-1">
+                <span class="block font-medium text-foreground">{{ option.label }}</span>
+                <span class="block text-xs text-muted-foreground">{{ option.value === 'stored' ? storedLine : option.line }}</span>
+              </span>
             </label>
           </div>
-          <p v-if="!places.length" class="mt-1 text-xs text-muted-foreground">No reachable realm node is known yet.</p>
-          <button v-if="spread" type="button" class="mt-1.5 text-xs text-primary hover:underline" @click="storageOpen = true">
-            {{ placementLabel(placement) }}: change the nodes and copies
-          </button>
         </fieldset>
+
+        <label v-if="kind === 'referenced'" class="block">
+          <span class="text-xs font-medium text-muted-foreground">Source address</span>
+          <Input v-model="source" class="mt-1" placeholder="https://ftp.ncbi.nlm.nih.gov/genomes/refseq/" aria-label="Source address" />
+        </label>
+
+        <div class="flex flex-wrap items-end gap-2">
+          <label class="block min-w-[12rem] flex-1">
+            <span class="text-xs font-medium text-muted-foreground">Node</span>
+            <Select :model-value="choice" :options="placeOptions" aria-label="Node" class="mt-1" @update:model-value="pick" />
+          </label>
+          <Button v-if="spread" variant="outline" @click="storageOpen = true"><Network class="h-4 w-4" /> Change the nodes and copies</Button>
+        </div>
+        <p v-if="!places.length" class="text-xs text-muted-foreground">No reachable realm node is known yet.</p>
 
         <RefusalNote v-if="error" :message="error" />
       </div>

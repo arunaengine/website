@@ -19,7 +19,7 @@ import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import type { BucketSearchHit, StagingReferenceEntry } from '@/lib/api'
 import { mockEnabled } from '@/lib/distributedMock'
 import { mockBucket } from '@/lib/distributedMockData'
-import { computed, ref, toRef } from 'vue'
+import { computed, ref, toRef, watch } from 'vue'
 import { Boxes, CloudDownload, Database, Library, ListChecks, Upload } from '@lucide/vue'
 
 // The ONE "Add data" entry point: a basket dialog for local files/folders
@@ -36,6 +36,8 @@ const props = defineProps<{
   existingReferences?: readonly StagingReferenceEntry[]
   /** The tab the dialog opens on. */
   tab?: string
+  /** A link the list import starts from. */
+  link?: string
 }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
@@ -71,7 +73,12 @@ const { groupSel, registerOpen, onConnectorSaved } = connectorSource
 const { shown } = usePortalFeatures()
 // Whole collections register into a bucket stored on several nodes (node mock).
 const collection = computed(() => mockEnabled() && Boolean(mockBucket(props.bucket)))
-const tab = ref(props.tab === 'connector' && !shown('connectors') ? 'local' : props.tab ?? 'local')
+const firstTab = () => ((props.tab === 'connector' || props.tab === 'list') && !shown('connectors') ? 'local' : props.tab ?? 'local')
+const tab = ref(firstTab())
+// Each opening starts on the tab asked for, as the dialog stays mounted.
+watch(() => props.open, (open) => {
+  if (open && props.tab) tab.value = firstTab()
+})
 
 // A chosen database is the source of the Other buckets tab.
 function chooseDatabase(name: string, nodeId: string, groupId: string) {
@@ -124,7 +131,7 @@ function onImportsCreated() {
       </TabsContent>
 
       <TabsContent v-if="shown('connectors')" value="list" class="space-y-3">
-        <ListImportTab :bucket="bucket" :source="connectorSource" @started="emit('staged')" />
+        <ListImportTab :bucket="bucket" :source="connectorSource" :link="link" @started="emit('staged')" />
       </TabsContent>
 
       <TabsContent value="other" class="space-y-3">

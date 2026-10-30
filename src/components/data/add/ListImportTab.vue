@@ -17,7 +17,7 @@ import {
 import { errorMessage } from '@/lib/utils'
 import { ArrowRight, FileUp } from '@lucide/vue'
 
-const props = defineProps<{ bucket: string; source: ConnectorSource }>()
+const props = defineProps<{ bucket: string; source: ConnectorSource; link?: string }>()
 const emit = defineEmits<{ started: [jobId: string] }>()
 
 const { createStagingJob } = useAruna()
@@ -26,7 +26,7 @@ const { groupSel, connectorSel, connectorOptions } = props.source
 
 const SOURCES = [{ value: 'link', label: 'Link' }, { value: 'bucket', label: 'Bucket' }, { value: 'upload', label: 'Upload' }]
 const from = ref<'link' | 'bucket' | 'upload'>('link')
-const link = ref('')
+const link = ref(props.link ?? '')
 const listBucket = ref(props.bucket)
 const listKey = ref('')
 const file = ref<File | null>(null)
