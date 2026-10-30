@@ -1,16 +1,17 @@
 <script setup lang="ts">
-// The end of the form: what the run still needs or what it will do, the request
-// behind it, and Run. Run is always enabled; with problems it jumps to the
-// first one instead of starting anything.
+// The summary beside the form: what the run still needs or what it will do, the request
+// behind it, and Run; on narrow screens Run sits in a bar at the bottom. Run is always
+// enabled; with problems it jumps to the first one instead of starting anything.
 import { computed } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import { injectCustomRun } from '@/composables/useCustomRun'
-import { Braces, Play } from '@lucide/vue'
+import { ArrowLeft, Braces, CircleCheck, CircleDashed, Play, Star, TriangleAlert } from '@lucide/vue'
 
-const props = defineProps<{ running?: boolean }>()
+const props = defineProps<{ running?: boolean; saved?: boolean }>()
 const emit = defineEmits<{
   (e: 'run'): void
   (e: 'cancel'): void
+  (e: 'save'): void
   (e: 'show-request'): void
   (e: 'jump', section: string, field: string): void
 }>()
@@ -29,62 +30,66 @@ const {
 } = injectCustomRun()
 
 const what = computed(() => (hasScript.value ? language.value.file : image.value.trim().split('/').pop() || 'custom image'))
-const summary = computed(() =>
-  [
-    what.value,
-    `${inputs.value.length} input${inputs.value.length === 1 ? '' : 's'}`,
-    `${outputRows.value.length} output${outputRows.value.length === 1 ? '' : 's'}`,
-    `${String(cpuCores.value).trim() || '?'} ${String(cpuCores.value).trim() === '1' ? 'core' : 'cores'}, ${String(ramGb.value).trim() || '?'} GB`,
-    placementSummary.value,
-  ].join(', '),
-)
+const summary = computed(() => [
+  { label: 'Tool', value: what.value },
+  { label: 'Inputs', value: String(inputs.value.length) },
+  { label: 'Outputs', value: String(outputRows.value.length) },
+  { label: 'Resources', value: `${String(cpuCores.value).trim() || '?'} CPU, ${String(ramGb.value).trim() || '?'} GB` },
+  { label: 'Node', value: placementSummary.value },
+])
 const unassigned = computed(() => unassignedPaths.value.length)
 // A warning, not a problem: the run may start and simply store nothing.
 const noOutputs = computed(() => outputRows.value.length === 0)
 </script>
 
 <template>
-  <div class="surface flex flex-wrap items-center gap-2.5 px-5 py-3">
-    <!-- On a narrow screen the status takes its own line above the buttons. -->
-    <div class="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-1.5 text-xs text-muted-foreground sm:basis-0" aria-live="polite">
-      <template v-if="problems.length">
-        <span class="font-semibold text-amber-700 dark:text-amber-300">
-          {{ problems.length }} thing{{ problems.length === 1 ? '' : 's' }} still needed:
-        </span>
-        <button
-          v-for="problem in problems"
-          :key="problem.text"
-          type="button"
-          class="rounded-full border border-border px-2 py-0.5 text-[11px] text-foreground/70 hover:text-foreground"
-          @click="emit('jump', problem.section, problem.field)"
-        >
-          {{ problem.text }}
+  <aside class="surface p-5 lg:sticky lg:top-20" aria-labelledby="run-summary-heading">
+    <h2 id="run-summary-heading" class="flex items-center gap-2 type-card-title">
+      <Play class="size-4 text-muted-foreground" aria-hidden="true" />{{ problems.length ? 'Almost ready' : 'Ready to run' }}
+    </h2>
+    <ul class="mt-3 space-y-2" aria-live="polite">
+      <li v-for="problem in problems" :key="problem.text">
+        <button type="button" class="flex items-start gap-2 text-left text-sm text-foreground hover:underline" @click="emit('jump', problem.section, problem.field)">
+          <CircleDashed class="mt-0.5 h-4 w-4 shrink-0 text-status-warn" aria-hidden="true" />{{ problem.text }}
         </button>
+      </li>
+      <li v-if="!problems.length" class="flex items-start gap-2 text-sm text-muted-foreground">
+        <CircleCheck class="mt-0.5 h-4 w-4 shrink-0 text-status-ok" aria-hidden="true" />Everything the run needs is set
+      </li>
+      <li v-if="!problems.length && unassigned" class="flex items-start gap-2 text-sm text-foreground">
+        <TriangleAlert class="mt-0.5 h-4 w-4 shrink-0 text-status-warn" aria-hidden="true" />{{ unassigned }} path{{ unassigned === 1 ? '' : 's' }} not assigned
+      </li>
+      <li v-if="noOutputs" class="flex items-start gap-2 text-sm text-foreground">
+        <TriangleAlert class="mt-0.5 h-4 w-4 shrink-0 text-status-warn" aria-hidden="true" />No output captured: this run stores nothing but the logs.
+      </li>
+    </ul>
+    <dl class="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 border-t border-border-subtle pt-4 text-sm">
+      <template v-for="row in summary" :key="row.label">
+        <dt class="text-muted-foreground">{{ row.label }}</dt>
+        <dd class="truncate text-right tabular-nums text-foreground" :title="row.value">{{ row.value }}</dd>
       </template>
-      <template v-else>
-        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/20">
-          <span class="size-1.5 rounded-full bg-current" /> Ready
-        </span>
-        <span class="min-w-0 truncate" :title="summary">{{ summary }}</span>
-        <span v-if="unassigned" class="text-amber-700 dark:text-amber-300">
-          {{ unassigned }} path{{ unassigned === 1 ? '' : 's' }} not assigned
-        </span>
-      </template>
-      <span
-        v-if="noOutputs"
-        class="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 ring-1 ring-inset ring-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-400/20"
-      >
-        No output captured: this run stores nothing but the logs.
-      </span>
-    </div>
-    <div class="ml-auto flex items-center gap-2.5">
-      <Button data-tutorial="run-request" variant="outline" @click="emit('show-request')">
-        <Braces class="size-3.5" /> Show request
+    </dl>
+    <div class="mt-4 flex flex-col gap-2">
+      <Button data-tutorial="run-submit" class="max-lg:hidden" :disabled="props.running" @click="emit('run')">
+        <Play class="size-4" /> {{ props.running ? 'Starting…' : 'Run' }}
       </Button>
-      <Button variant="outline" @click="emit('cancel')">Cancel</Button>
-      <Button data-tutorial="run-submit" :disabled="props.running" @click="emit('run')">
-        <Play class="size-3.5" /> {{ props.running ? 'Starting…' : 'Run' }}
-      </Button>
+      <div class="flex flex-wrap gap-2">
+        <Button data-tutorial="run-request" variant="outline" class="flex-1" @click="emit('show-request')">
+          <Braces class="size-4" /> Show request
+        </Button>
+        <Button variant="outline" class="flex-1" @click="emit('cancel')"><ArrowLeft class="size-4" /> Back to runs</Button>
+      </div>
+      <Button variant="outline" @click="emit('save')"><Star class="size-4" /> Save as my run</Button>
+      <p v-if="saved" role="status" class="text-center text-xs text-muted-foreground">Saved to My runs.</p>
     </div>
+  </aside>
+
+  <!-- Narrow screens: Run stays in reach above the mobile navigation. -->
+  <div class="fixed inset-x-0 bottom-[4.5rem] z-30 flex items-center gap-3 border-t border-border/80 bg-background/90 px-4 py-3 backdrop-blur-xl md:bottom-0 lg:hidden">
+    <span class="flex-1 text-sm text-muted-foreground">{{ problems.length ? `${problems.length} still needed` : 'Ready to run' }}</span>
+    <Button class="min-w-28" :disabled="props.running" @click="emit('run')">
+      <Play class="size-4" /> {{ props.running ? 'Starting…' : 'Run' }}
+    </Button>
   </div>
+  <div class="h-20 lg:hidden" aria-hidden="true" />
 </template>

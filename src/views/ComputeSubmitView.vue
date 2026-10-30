@@ -1,10 +1,9 @@
 <script setup lang="ts">
-// The one run page: every part of a run on one form, with the footer at its
-// end. No steps and no review page; the request is a dialog away.
+// The one run page: every part of a run on one form, with its summary beside it.
+// No steps and no review page; the request is a dialog away.
 import { computed, nextTick, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
-import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import ComputeGates from '@/components/compute/ComputeGates.vue'
@@ -36,7 +35,6 @@ import { defaultPlacement, isNativeBlocked, tesFormToExecutionRequest } from '@/
 import { submitJob } from '@/lib/jobs'
 import { nativeInput, type TesTask } from '@/lib/tes'
 import { errorMessage } from '@/lib/utils'
-import { ArrowLeft } from '@lucide/vue'
 
 const router = useRouter()
 const { tesEnabled, busy, createTask, getTask } = useTes()
@@ -200,14 +198,9 @@ async function run() {
 
 <template>
   <div>
-    <PageHeader eyebrow="Compute" title="New run" :docs="{ topic: 'compute-run', section: 'One page, six sections' }">
+    <PageHeader title="New run" :crumbs="[{ label: 'New run' }]" :docs="{ topic: 'compute-run', section: 'One page, six sections' }">
       <template #actions>
-        <AskAiButton size="default" prompt="Help me set up this run." subject="the run form" />
-        <span v-if="savedRun" role="status" class="self-center text-xs text-muted-foreground">Saved to My runs.</span>
-        <Button variant="outline" size="default" @click="saveOpen = true">Save as my run</Button>
-        <Button variant="outline" size="default" as-child>
-          <RouterLink :to="{ name: 'compute' }"><ArrowLeft class="h-4 w-4" /> Back to Compute</RouterLink>
-        </Button>
+        <AskAiButton prompt="Help me set up this run." subject="the run form" icon-only />
       </template>
     </PageHeader>
 
@@ -218,32 +211,36 @@ async function run() {
       sign-in-description="Starting a run is an authenticated operation."
       redirect-to="/app/compute/new"
     >
-      <div class="w-full px-4 sm:px-6 max-w-5xl space-y-4 py-8">
-        <RerunPrefillNote
-          :loading="rerunLoading"
-          :error="rerunError"
-          :source="rerunSource"
-          :notes="rerunNotes"
-          @dismiss="dismissRerun"
-        />
+      <div class="grid w-full items-start gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div class="min-w-0 space-y-6">
+          <RerunPrefillNote
+            :loading="rerunLoading"
+            :error="rerunError"
+            :source="rerunSource"
+            :notes="rerunNotes"
+            @dismiss="dismissRerun"
+          />
 
-        <Notice v-if="savedError" tone="error">{{ savedError }}</Notice>
-        <SavedRunStart v-if="savedStart" />
-        <template v-else>
-          <RunBasics />
-          <ExecutorCard />
-          <ScriptCard v-if="hasScript" />
-          <FilesystemCard />
-          <ResourcesCard ref="resourcesCard" />
-        </template>
-        <PlacementCard ref="placementCard" />
+          <Notice v-if="savedError" tone="error">{{ savedError }}</Notice>
+          <SavedRunStart v-if="savedStart" />
+          <template v-else>
+            <RunBasics />
+            <ExecutorCard />
+            <ScriptCard v-if="hasScript" />
+            <FilesystemCard />
+            <ResourcesCard ref="resourcesCard" />
+          </template>
+          <PlacementCard ref="placementCard" />
 
-        <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
+          <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
+        </div>
 
         <RunFooter
           :running="submitting || busy"
+          :saved="savedRun"
           @run="run"
           @cancel="router.push({ name: 'compute' })"
+          @save="saveOpen = true"
           @show-request="requestOpen = true"
           @jump="jumpTo"
         />
