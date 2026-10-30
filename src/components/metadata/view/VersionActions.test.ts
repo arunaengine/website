@@ -73,7 +73,7 @@ describe('version actions', () => {
     await bubbleClick(element(mounted.root, (node) => node.props['data-label'] === 'Preview'))
     await flush()
 
-    expect(content(mounted.root)).toContain('above the 2\u00a0MB preview limit. Download it instead.')
+    expect(content(mounted.root)).toContain('above the 2\u00a0MiB preview limit. Download it instead.')
   })
 
   it('shows a refused download in the row', async () => {

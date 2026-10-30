@@ -23,7 +23,7 @@ const render = (aggregate: LocationAggregate) =>
 describe('location totals', () => {
   it('reads partial sums as a lower bound with the reporting share', async () => {
     const html = await render({ ...base, reportingCount: 1 })
-    expect(html).toContain('at least 2\u00a0KB stored')
+    expect(html).toContain('at least 2\u00a0KiB stored')
     expect(html).toContain('1/3 reporting')
   })
 

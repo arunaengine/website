@@ -22,15 +22,15 @@ const render = async (value: GroupUsageEntry) => {
 describe('group storage line', () => {
   it('draws the bar only for a group with a quota', async () => {
     const limited = await render(entry(10_000, 500))
-    expect(limited.text).toContain('2 KB of 9.8 KB, 20%')
+    expect(limited.text).toContain('2 KiB of 9.8 KiB, 20%')
     expect(limited.text).toContain('500 B referenced')
     expect(limited.html).toContain('role="meter"')
     // The bar names its share in a tooltip that the keyboard reaches too.
     expect(limited.html).toContain('tabindex="0"')
-    expect(limited.html.replace(/\u00a0/g, ' ')).toContain('aria-label="2 KB of 9.8 KB used, 20%"')
+    expect(limited.html.replace(/\u00a0/g, ' ')).toContain('aria-label="2 KiB of 9.8 KiB used, 20%"')
 
     const free = await render(entry(null))
-    expect(free.text).toContain('2 KB stored, no quota')
+    expect(free.text).toContain('2 KiB stored, no quota')
     expect(free.text).not.toContain('referenced')
     expect(free.html).not.toContain('role="meter"')
   })

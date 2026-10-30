@@ -50,8 +50,8 @@ describe('node cards', () => {
 
   it('marks an online node with a check and names only an offline one, with one line of facts', async () => {
     const shown = await text([node({ load: 790 }), node({ node_id: 'b', present: false, api: 'https://api.node-3.example.org' })])
-    expect(shown).toContain('node-2 2 KB stored, CPU 79%')
-    expect(shown).toContain('node-3 Offline 2 KB stored')
+    expect(shown).toContain('node-2 2 KiB stored, CPU 79%')
+    expect(shown).toContain('node-3 Offline 2 KiB stored')
     expect(shown).not.toMatch(/connected/i)
   })
 
@@ -60,9 +60,9 @@ describe('node cards', () => {
       node({ labels: { 'aruna-engine.org/location': 'Giessen' } }),
       node({ node_id: 'm', kind: 'management', placement: { location: 'default', weight: 1, full: false, draining: false }, api: 'https://api.mgmt.example.org' }),
     ])
-    expect(shown).toContain('node-2 Giessen 2 KB stored')
+    expect(shown).toContain('node-2 Giessen 2 KiB stored')
     // The header keeps only name and state, so a long name has room.
-    expect(shown).toContain('mgmt Management node, 2 KB stored')
+    expect(shown).toContain('mgmt Management node, 2 KiB stored')
     expect(shown).not.toContain('default')
     expect(shown).not.toContain('server')
   })
@@ -75,10 +75,10 @@ describe('node cards', () => {
       node({ node_id: 'c', api: 'https://api.node-4.example.org', jobs: 0, imports: 0 }),
       node({ node_id: 'd', api: 'https://api.node-5.example.org' }),
     ], devices)
-    expect(shown).toContain('node-2 2 KB stored Importing, 8 jobs')
-    expect(shown).toContain('node-3 2 KB stored Busy, 1 job')
+    expect(shown).toContain('node-2 2 KiB stored Importing, 8 jobs')
+    expect(shown).toContain('node-3 2 KiB stored Busy, 1 job')
     // No count, or a zero, shows nothing.
-    expect(shown).toContain('node-4 2 KB stored node-5')
+    expect(shown).toContain('node-4 2 KiB stored node-5')
     expect(shown.match(/Importing|Busy/g)).toHaveLength(2)
     expect(shown).toContain('2 devices, 1 active')
   })
@@ -89,8 +89,8 @@ describe('node cards', () => {
     expect(await text([full, other])).not.toContain('Details')
 
     const shown = await text([full, other], [], { details: true, localNodeId: '12D3KooWHashHashHash' })
-    expect(shown).toContain('node-2 This node 2 KB stored, full, draining Details')
-    expect(shown).toContain('node-3 2 KB stored Details')
+    expect(shown).toContain('node-2 This node 2 KiB stored, full, draining Details')
+    expect(shown).toContain('node-3 2 KiB stored Details')
   })
 
   it('offers a rename on each card only when renaming is allowed', async () => {

@@ -76,7 +76,7 @@ describe('the realm node table', () => {
     const text = (name: string) => content(row(mounted.root, name)).replace(/\s+/g, '')
 
     expect(text('Giessen storage 0')).toContain('MarburgManagement')
-    expect(text('Giessen storage 3')).toContain('Giessenstorage3StorageGiessenImporting,2jobsGiessenStorage3KB30%Importing,2jobsOnline')
+    expect(text('Giessen storage 3')).toContain('Giessenstorage3StorageGiessenImporting,2jobsGiessenStorage3KiB30%Importing,2jobsOnline')
     // A node's state is an icon only, never a pill; no bar for the CPU.
     expect(nodes(row(mounted.root, 'Giessen storage 3')).some((node) => node.props['data-mark'] === 'Online')).toBe(true)
     expect(nodes(row(mounted.root, 'Giessen storage 4')).some((node) => node.props['data-mark'] === 'Offline')).toBe(true)

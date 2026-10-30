@@ -184,12 +184,12 @@ describe('the data entity tree', () => {
 
 describe('content size formatting', () => {
   it('formats a numeric string as bytes', () => {
-    expect(formatContentSize('3755160')).toBe('3.6\u00a0MB')
+    expect(formatContentSize('3755160')).toBe('3.6\u00a0MiB')
     expect(formatContentSize('0')).toBe('0\u00a0B')
   })
 
   it('passes a non-numeric value through verbatim', () => {
-    expect(formatContentSize('12\u00a0MB')).toBe('12\u00a0MB')
+    expect(formatContentSize('12\u00a0MiB')).toBe('12\u00a0MiB')
     expect(formatContentSize('unspecified')).toBe('unspecified')
   })
 

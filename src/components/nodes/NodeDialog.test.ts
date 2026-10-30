@@ -96,7 +96,7 @@ const NodeDialog = compileClientComponent(new URL('./NodeDialog.vue', import.met
     useDatabases: () => ({ ensure: () => {}, rows: ref([{ bucket: 'refseq', title: 'NCBI RefSeq genomes', metadata: {}, places: [{ nodeId: 'store-1' }] }]) }),
   },
   '@/composables/useBucketUsage': {
-    useListedUsage: () => ({ ensure: () => {}, textOf: (bucket: string) => (bucket === 'refseq' ? '21 files, 1.8 GB' : null) }),
+    useListedUsage: () => ({ ensure: () => {}, textOf: (bucket: string) => (bucket === 'refseq' ? '21 files, 1.8 GiB' : null) }),
   },
   '@/composables/useRecentRuns': { useRecentRuns: () => ({ runs: recentRuns, state: runsState, load: loadRuns }) },
   '@/composables/useRefresh': { useRefresh: (run: () => unknown) => ({ busy: ref(false), refresh: run }) },
@@ -139,7 +139,7 @@ describe('node dialog', () => {
     expect(text).toContain('Giessen storage 1')
     expect(nodes(mounted.root).some((node) => node.props['data-mark'] === 'Online')).toBe(true)
     expect(text).toContain('Storage nodeGiessenImporting, 1 job')
-    expect(card('Stored')).toBe('Stored 2 KB 1 bucket')
+    expect(card('Stored')).toBe('Stored 2 KiB 1 bucket')
     expect(card('CPU')).toBe('CPU 34%')
     // Only the runs that ran on this node count, among the recent ones.
     expect(card('Runs')).toBe('Runs 2 recent 2/2 completed')
@@ -191,7 +191,7 @@ describe('node dialog', () => {
     const mounted = await mountApp(NodeView)
     await flush()
 
-    expect(content(mounted.root)).toContain('refseqNCBI RefSeq genomes, 21 files, 1.8 GB')
+    expect(content(mounted.root)).toContain('refseqNCBI RefSeq genomes, 21 files, 1.8 GiB')
     expect(content(mounted.root)).not.toContain('elsewhere')
     const link = element(mounted.root, (node) => node.tag === 'a' && content(node).includes('refseq'))
     expect(JSON.parse(String(link.props['data-to']))).toEqual({ name: 'bucket', params: { bucketId: 'refseq' }, query: { group: 'g1', node: 'store-1' } })

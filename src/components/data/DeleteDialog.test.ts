@@ -419,7 +419,7 @@ describe('delete dialog', () => {
       key: 'a.txt',
       bytes: 1024,
     })
-    expect(content(root)).toContain('keeps using 1\u00a0KB of your quota')
+    expect(content(root)).toContain('keeps using 1\u00a0KiB of your quota')
 
     await click(confirmButton(root))
 
@@ -560,7 +560,7 @@ describe('delete dialog', () => {
 
     const text = content(root)
     expect(text).toContain('4,210 files with all 4,388 versions')
-    expect(text).toContain('Your storage holds 4,206 files (288.7\u00a0GB)')
+    expect(text).toContain('Your storage holds 4,206 files (288.7\u00a0GiB)')
     expect(text).toContain('4 files in your storage stay because other links or files still use them.')
     expect(text).toContain('This cannot be undone.')
     expect(getDeleteImpact).toHaveBeenCalledWith(

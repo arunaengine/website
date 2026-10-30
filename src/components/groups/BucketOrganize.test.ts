@@ -130,7 +130,7 @@ describe('BucketOrganize rename plan', () => {
     await click(buttonIn(step(root, 'step-renames')[0], 'Review…'))
     const plan = content(step(root, 'rename-plan')[0]).replace(/\s+/g, ' ')
     expect(plan).toContain('This rename will')
-    expect(plan).toContain('rename 3,877 files (826 GB) in your storage')
+    expect(plan).toContain('rename 3,877 files (826 GiB) in your storage')
     expect(plan).toContain('copy them inside your storage, not through Aruna')
     expect(plan).toContain('leave 297,137 files as they are')
     expect(plan).toContain('Large renames can take hours. They run on the server, so you can close this window.')
@@ -142,7 +142,7 @@ describe('BucketOrganize rename plan', () => {
     const { root } = await mount()
     await click(buttonIn(step(root, 'step-renames')[0], 'Review…'))
     const plan = content(step(root, 'rename-plan')[0])
-    expect(plan).toContain('copy 12 files (3\u00a0GB) through Aruna and the rest inside your storage')
+    expect(plan).toContain('copy 12 files (3\u00a0GiB) through Aruna and the rest inside your storage')
     expect(plan).not.toContain('not through Aruna')
   })
 

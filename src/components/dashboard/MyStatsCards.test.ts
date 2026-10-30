@@ -93,7 +93,7 @@ describe('personal statistics tiles', () => {
 
     const text = await renderedText()
 
-    expect(text).toContain('Storage 9 KB total 6 KB stored 3 KB referenced')
+    expect(text).toContain('Storage 9 KiB total 6 KiB stored 3 KiB referenced')
     expect(await renderToString(createSSRApp(MyStatsCards))).toContain('aria-label="Stored data counts against quotas. Referenced data stays at its source."')
     expect(text).toContain('Objects 12 3 buckets')
     expect(text).not.toContain('at least')
@@ -138,7 +138,7 @@ describe('personal statistics tiles', () => {
     const text = await renderedText()
 
     expect(text).not.toContain('physical')
-    expect(text).not.toContain('87.9 KB')
+    expect(text).not.toContain('87.9 KiB')
   })
 
   it('answers unknown, never zero, when a group could not be read', async () => {

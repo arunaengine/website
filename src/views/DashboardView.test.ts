@@ -505,7 +505,7 @@ describe('authenticated dashboard scope', () => {
     const text = await renderedText()
 
     expect(text).toContain('scope toggle realm')
-    expect(text).toContain('Storage 2.1 KB total 2 KB stored 64 B referenced')
+    expect(text).toContain('Storage 2.1 KiB total 2 KiB stored 64 B referenced')
     // The database list holds only what this caller may read, so it is no realm total.
     expect(text).toContain('Objects 11 3 buckets')
     expect(text).not.toContain('database')

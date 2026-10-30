@@ -71,7 +71,7 @@ describe('crateGraph', () => {
     }
 
     expect(nodeById(crate, 'images/')).toMatchObject({ kind: 'dataset', facts: '2 parts' })
-    expect(nodeById(crate, 'images/a.png')).toMatchObject({ kind: 'file', facts: '1\u00a0KB' })
+    expect(nodeById(crate, 'images/a.png')).toMatchObject({ kind: 'file', facts: '1\u00a0KiB' })
     expect(nodeById(crate, 'images/b.png')).toMatchObject({ kind: 'file', facts: '' })
     expect(nodeById(crate, './')).toMatchObject({ kind: 'root', facts: '1 part' })
   })
@@ -80,7 +80,7 @@ describe('crateGraph', () => {
     const draft = seeded()
 
     expect(nodeById(draft, './')?.facts).toBe('1 part')
-    expect(nodeById(draft, 's3://bucket/reads.csv')?.facts).toBe('2\u00a0KB, text/csv')
+    expect(nodeById(draft, 's3://bucket/reads.csv')?.facts).toBe('2\u00a0KiB, text/csv')
     expect(nodeById(draft, '#ada-lovelace')?.facts).toBe('Person')
     expect(nodeById(draft, 'https://ror.org/03yrm5c26')?.facts).toBe('ror.org')
   })

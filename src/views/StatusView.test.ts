@@ -110,7 +110,7 @@ describe('realm node cards', () => {
 
     const text = await renderedText()
 
-    expect(text).toContain('Giessen storage This node eu-west 2 KB stored Details')
+    expect(text).toContain('Giessen storage This node eu-west 2 KiB stored Details')
     expect(text).not.toMatch(/connected/i)
     expect(text).not.toContain('SERVER')
     // Labels wait behind Details.
@@ -167,7 +167,7 @@ describe('this node storage', () => {
     const text = await renderedText()
 
     expect(text).toContain('This node')
-    expect(text).toMatch(/This node 2 KB stored/)
+    expect(text).toMatch(/This node 2 KiB stored/)
     expect(text).toContain('12 objects')
     expect(text).toContain('4 buckets')
   })

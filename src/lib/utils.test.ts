@@ -32,7 +32,7 @@ describe('formatResourceGb', () => {
 
 describe('formatBytes', () => {
   it('keeps the figure and its unit on one line', () => {
-    expect(formatBytes(39 * 1024 ** 4)).toBe('39\u00a0TB')
+    expect(formatBytes(39 * 1024 ** 4)).toBe('39\u00a0TiB')
     expect(formatBytes(0)).toBe('0\u00a0B')
   })
 })
