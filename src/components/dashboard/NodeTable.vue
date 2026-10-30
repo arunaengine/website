@@ -9,13 +9,12 @@ import IconTile from '@/components/ui/IconTile.vue'
 import Input from '@/components/ui/Input.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import StatusMark from '@/components/ui/StatusMark.vue'
-import StatusPill from '@/components/ui/StatusPill.vue'
 import { nodeActivity, nodeName, nodeOnline, roleLabel } from '@/components/nodes/node-display'
 import { computerName } from '@/composables/useRealmNodes'
 import type { RealmNodeInfo } from '@/lib/api'
 import { LOCATION_AFFINITY_KEY } from '@/lib/placement'
 import { formatBytes, relativeTime } from '@/lib/utils'
-import { Download, Laptop, MapPin, Server, WifiOff } from '@lucide/vue'
+import { Download, Laptop, MapPin, Server } from '@lucide/vue'
 
 const props = defineProps<{
   nodes: RealmNodeInfo[]
@@ -167,7 +166,7 @@ function lastSeen(node: RealmNodeInfo): string | null {
             </td>
             <td class="pr-4 text-right">
               <StatusMark v-if="nodeOnline(row.node)" label="Online" />
-              <StatusPill v-else state="Offline" tone="failed" :icon="WifiOff" />
+              <StatusMark v-else label="Offline" offline />
             </td>
           </tr>
           <tr v-if="!pageRows.length">

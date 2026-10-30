@@ -30,7 +30,6 @@ const ChipsStub = defineComponent({
       h('button', { 'aria-pressed': option.value === props.modelValue, onClick: () => emit('update:modelValue', option.value) }, `${option.label} ${option.count}`))),
 })
 const MarkStub = defineComponent({ props: { label: String }, setup: (props) => () => h('span', { 'data-mark': props.label }, props.label) })
-const PillStub = defineComponent({ props: { state: String }, setup: (props) => () => h('span', { 'data-pill': props.state }, props.state) })
 
 const NodeTable = compileClientComponent(new URL('./NodeTable.vue', import.meta.url), {
   vue: VueRuntime,
@@ -40,7 +39,6 @@ const NodeTable = compileClientComponent(new URL('./NodeTable.vue', import.meta.
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Pagination.vue': moduleDefault(PagerStub),
   '@/components/ui/StatusMark.vue': moduleDefault(MarkStub),
-  '@/components/ui/StatusPill.vue': moduleDefault(PillStub),
   '@/components/nodes/node-display': NodeDisplay,
   '@/composables/useRealmNodes': { computerName: (node: RealmNodeInfo) => node.display_name ?? 'This computer' },
   '@/lib/placement': Placement,
@@ -79,9 +77,9 @@ describe('the realm node table', () => {
 
     expect(text('Giessen storage 0')).toContain('MarburgManagement')
     expect(text('Giessen storage 3')).toContain('Giessenstorage3StorageGiessenImporting,2jobsGiessenStorage3KB30%Importing,2jobsOnline')
-    // A fine node is a check, an offline one a pill; no bar for the CPU.
+    // A node's state is an icon only, never a pill; no bar for the CPU.
     expect(nodes(row(mounted.root, 'Giessen storage 3')).some((node) => node.props['data-mark'] === 'Online')).toBe(true)
-    expect(nodes(row(mounted.root, 'Giessen storage 4')).some((node) => node.props['data-pill'] === 'Offline')).toBe(true)
+    expect(nodes(row(mounted.root, 'Giessen storage 4')).some((node) => node.props['data-mark'] === 'Offline')).toBe(true)
     expect(nodes(mounted.root).some((node) => String(node.props.class ?? '').includes('bg-amber-500'))).toBe(false)
     mounted.app.unmount()
   })

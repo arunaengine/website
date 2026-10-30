@@ -510,7 +510,8 @@ describe('authenticated dashboard scope', () => {
     expect(text).toContain('Objects 11 3 buckets')
     expect(text).not.toContain('database')
     // The realm counts no runs apart, so the card counts the groups' runs and says so.
-    expect(text).toContain('Runs 4 in your groups')
+    expect(text).toContain('Runs 4')
+    expect(text).not.toContain('in your groups')
     expect(text).not.toContain('completed')
     expect(text).not.toContain('9 datasets')
 
@@ -540,7 +541,7 @@ describe('authenticated dashboard scope', () => {
     groupsAggregate.value = { datasets: 1, processRuns: 2 }
     scope.value = 'realm'
     await flush()
-    expect(content(mounted.root)).toMatch(/Runs\s*2\s*in your groups/)
+    expect(content(mounted.root)).toMatch(/Runs\s*2/)
     expect(content(mounted.root)).not.toContain('my stats cards')
     mounted.app.unmount()
     vi.unstubAllGlobals()

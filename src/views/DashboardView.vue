@@ -378,10 +378,15 @@ const pageDescription = computed(() =>
           <!-- Totals wait for every group, so a partial sum never reads as the count. -->
           <template v-if="currentUser">
             <Skeleton v-if="groupsUsage.pending" class="h-[132px] rounded-xl" />
-            <OverviewCell v-else label="Runs" :icon="Workflow" tone="ok" :to="{ name: 'compute' }">
+            <OverviewCell
+              v-else
+              label="Runs"
+              :icon="Workflow"
+              tone="ok"
+              :to="{ name: 'compute' }"
+              :info="scope === 'realm' ? 'The realm counts no runs of its own; these are the runs of your groups.' : undefined"
+            >
               <template #value>{{ groupsUsage.processRuns != null ? formatCount(groupsUsage.processRuns) : 'Unknown' }}</template>
-              <!-- The realm counts no runs on its own, so the realm scope names whose they are. -->
-              <template v-if="scope === 'realm'" #unit>in your groups</template>
               <span v-if="runsLine?.running"><LoaderCircle /><b>{{ runsLine.atLeast ? 'at least ' : '' }}{{ formatCount(runsLine.running) }}</b> running</span>
               <span v-else-if="runsLine">
                 <CircleCheck v-if="runsLine.completed === runsLine.total" class="text-status-ok" />
