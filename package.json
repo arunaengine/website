@@ -48,7 +48,6 @@
     "clsx": "^2.1.1",
     "dagre": "^0.8.5",
     "hash-wasm": "^4.12.0",
-    "leaflet": "^1.9.4",
     "markdown-it": "^15.0.1",
     "mermaid": "11.17.2",
     "n3": "^2.1.1",
@@ -62,7 +61,6 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.2",
     "@types/dagre": "^0.7.54",
-    "@types/leaflet": "^1.9.22",
     "@types/n3": "^1.26.1",
     "@types/node": "^26.1.0",
     "@types/papaparse": "^5.5.2",
