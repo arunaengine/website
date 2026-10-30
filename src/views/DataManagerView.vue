@@ -339,6 +339,7 @@ async function createFolder() {
     <PageHeader
       :title="headerTitle"
       :description="headerDescription"
+      :crumbs="route.name === 'bucket' && !notebooksView && bucket ? [{ label: bucket }] : []"
       :docs="{ topic: 'upload-data', section: 'Create a bucket and upload' }"
     >
       <template #title>
