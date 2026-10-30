@@ -19,7 +19,7 @@ import {
   isDirCapture,
   outputDestination,
 } from '@/composables/useCustomRun'
-import { FileText, Folder, ListPlus, Plus, X } from '@lucide/vue'
+import { FileText, Folder, FolderTree, ListPlus, Plus, X } from '@lucide/vue'
 
 const {
   dataView,
@@ -72,6 +72,7 @@ const checkLabel = computed(() => {
 <template>
   <RunSection
     id="section-data"
+    :icon="FolderTree"
     title="Container filesystem"
     :complete="complete"
     :check-label="checkLabel"

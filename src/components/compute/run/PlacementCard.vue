@@ -10,7 +10,7 @@ import DocsLink from '@/components/ui/DocsLink.vue'
 import RunSection from '@/components/compute/run/RunSection.vue'
 import RunTile from '@/components/compute/run/RunTile.vue'
 import { MAX_LABEL_CONSTRAINTS, injectCustomRun } from '@/composables/useCustomRun'
-import { Plus, X } from '@lucide/vue'
+import { Check, Pencil, Plus, Target, X } from '@lucide/vue'
 
 const {
   runTarget,
@@ -115,20 +115,15 @@ function isCustom(rowId: number): boolean {
 </script>
 
 <template>
-  <RunSection id="section-placement" title="Placement" :complete="complete" :check-label="checkLabel">
+  <RunSection id="section-placement" :icon="Target" title="Placement" :complete="complete" :check-label="checkLabel">
     <template #state>
       Where the run may execute.
       <DocsLink topic="compute-run" label="Docs" />
     </template>
     <template #controls>
-      <Button
-        variant="outline"
-        size="sm"
-        :aria-expanded="editing"
-        :aria-label="editing ? 'Done editing placement' : 'Edit placement'"
-        @click="toggle"
-      >
-        {{ editing ? 'Done' : 'Edit' }}
+      <Button variant="outline" size="sm" :aria-expanded="editing" :aria-label="editing ? 'Done editing placement' : 'Edit placement'" @click="toggle">
+        <template v-if="editing"><Check class="size-3.5" /> Done</template>
+        <template v-else><Pencil class="size-3.5" /> Edit placement</template>
       </Button>
     </template>
 

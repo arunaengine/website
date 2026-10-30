@@ -8,6 +8,7 @@ import DocsLink from '@/components/ui/DocsLink.vue'
 import RunSection from '@/components/compute/run/RunSection.vue'
 import RunTile from '@/components/compute/run/RunTile.vue'
 import AiMark from '@/components/compute/run/AiMark.vue'
+import { Cpu } from '@lucide/vue'
 import {
   DEFAULT_RESOURCES,
   MAX_RESOURCE_GB,
@@ -49,6 +50,7 @@ const checkLabel = computed(() => (resourcesValid.value ? 'Complete' : 'Check th
 <template>
   <RunSection
     id="section-resources"
+    :icon="Cpu"
     title="Resources"
     :complete="resourcesValid"
     :check-label="checkLabel"

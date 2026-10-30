@@ -6,6 +6,7 @@ import GroupSelect from '@/components/groups/GroupSelect.vue'
 import RunSection from '@/components/compute/run/RunSection.vue'
 import AiMark from '@/components/compute/run/AiMark.vue'
 import { injectCustomRun } from '@/composables/useCustomRun'
+import { FileText } from '@lucide/vue'
 
 const { name, description, groupId, groupOptions, hasAi, clearAi } = injectCustomRun()
 
@@ -15,6 +16,7 @@ const complete = computed(() => groupId.value.length > 0)
 <template>
   <RunSection
     id="section-run"
+    :icon="FileText"
     title="Run"
     :complete="complete"
     :check-label="complete ? 'Complete' : 'Needs a group'"

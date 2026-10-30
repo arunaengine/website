@@ -16,7 +16,7 @@ import DependenciesTab from '@/components/compute/run/DependenciesTab.vue'
 import { injectCustomRun } from '@/composables/useCustomRun'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import { bucketNameProblem } from '@/lib/bucketName'
-import { FolderOpen, FolderPlus, KeyRound, Plus, X } from '@lucide/vue'
+import { FileCode2, FolderOpen, FolderPlus, KeyRound, Plus, X } from '@lucide/vue'
 
 // CodeMirror lands on its own async chunk, mounted only with a script.
 const ScriptEditor = defineAsyncComponent({
@@ -90,7 +90,7 @@ function addInputFor(path: string) {
 </script>
 
 <template>
-  <RunSection id="section-script" title="Script" :complete="complete" :check-label="checkLabel">
+  <RunSection id="section-script" :icon="FileCode2" title="Script" :complete="complete" :check-label="checkLabel">
     <template #state>
       <template v-if="!script.trim()">The script is empty.</template>
       <template v-else-if="unassigned">

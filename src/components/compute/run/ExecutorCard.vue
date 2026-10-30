@@ -10,7 +10,7 @@ import RunSection from '@/components/compute/run/RunSection.vue'
 import PathChips from '@/components/compute/run/PathChips.vue'
 import AiMark from '@/components/compute/run/AiMark.vue'
 import { injectCustomRun } from '@/composables/useCustomRun'
-import { FilePlus2, Plus, X } from '@lucide/vue'
+import { Container, FilePlus2, Plus, X } from '@lucide/vue'
 
 const {
   executorMode,
@@ -84,7 +84,7 @@ function addInputFor(path: string) {
 </script>
 
 <template>
-  <RunSection id="section-executor" title="Executor" :complete="complete" :check-label="checkLabel">
+  <RunSection id="section-executor" :icon="Container" title="Executor" :complete="complete" :check-label="checkLabel">
     <template #state>{{ stateText }}</template>
     <template #controls>
       <OptionToggle
