@@ -68,4 +68,8 @@ describe('Datasets page layout', () => {
     expect(view).toContain('title="Run records"')
     expect(view).toContain('<DatasetBrowse v-else :state="state" skip-runs />')
   })
+
+  it('keeps the run records pages reachable when a page holds no record', () => {
+    expect(view).toContain('v-if="records.length || browsePage > 1 || hasNextPage"')
+  })
 })

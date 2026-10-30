@@ -138,7 +138,7 @@ function askAi() {
           <RunRecordTable v-if="records.length" :docs="records" :group-names="groupNames" />
           <p v-else-if="browseBusy" class="px-5 py-10 text-center text-sm text-muted-foreground">Loading run records…</p>
           <EmptyState v-else :title="recordFilter.trim() ? 'No record matches' : 'No run records on this page'" description="A run writes its record once it finishes." class="rounded-none border-0 shadow-none" />
-          <div v-if="records.length || browsePage > 1" class="flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle px-5 py-2 text-xs tabular-nums text-muted-foreground">
+          <div v-if="records.length || browsePage > 1 || hasNextPage" class="flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle px-5 py-2 text-xs tabular-nums text-muted-foreground">
             <!-- One page holds every record only when no page follows; otherwise the page is named. -->
             <span>{{ browsePage === 1 && !hasNextPage ? pageRange(1, records.length, records.length, true) : `Page ${browsePage}` }}</span>
             <Pagination v-if="browsePage > 1 || hasNextPage" :page="browsePage" :page-count="pageCount" :has-next="hasNextPage" :disabled="browseBusy" @update:page="state.goToPage" />
