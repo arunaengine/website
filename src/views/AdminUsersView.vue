@@ -11,6 +11,7 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Input from '@/components/ui/Input.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
@@ -21,7 +22,7 @@ import { useUserDirectory } from '@/composables/useUserDirectory'
 import { errorMessage, truncateMiddle } from '@/lib/utils'
 import type { ApiUser } from '@/lib/api'
 import { useDebounceFn } from '@vueuse/core'
-import { ChevronLeft, ChevronRight, ShieldCheck, Users, UserSearch } from '@lucide/vue'
+import { ChevronLeft, ChevronRight, Search, ShieldCheck, UserRound, Users, UserSearch } from '@lucide/vue'
 
 const { bootstrapped, currentUser, canInspectUsers, apiGroups, listUsers, getUser, searchUsers } = useAruna()
 const { isAuthenticated } = useAuth()
@@ -211,12 +212,12 @@ const sharedGroups = computed(() => {
 
 <template>
   <div>
-    <PageHeader title="Realm users" description="Read-only directory of every user registered in this realm." :docs="{ topic: 'realm-nodes-groups' }">
+    <PageHeader title="Realm users" :docs="{ topic: 'realm-nodes-groups' }">
       <template #actions>
-        <Button variant="outline" size="sm" as-child>
-          <RouterLink :to="{ name: 'admin' }">Admin</RouterLink>
+        <RefreshButton :busy="spinning" :disabled="!ready" size="default" @click="onRefresh" />
+        <Button variant="outline" as-child>
+          <RouterLink :to="{ name: 'admin' }"><ShieldCheck class="h-4 w-4" /> Admin</RouterLink>
         </Button>
-        <RefreshButton :busy="spinning" :disabled="!ready" @click="onRefresh" />
       </template>
     </PageHeader>
 
@@ -239,23 +240,21 @@ const sharedGroups = computed(() => {
       </section>
     </div>
 
-    <div v-else class="w-full px-4 sm:px-6 py-8">
-      <section class="surface">
-        <header class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-          <div class="flex items-center gap-2">
-            <Users class="h-4 w-4 text-primary" />
-            <h3 class="font-display text-sm font-semibold text-aruna-navy">Users</h3>
-          </div>
-          <div class="w-full sm:max-w-xs">
+    <div v-else class="w-full px-4 py-6 sm:px-6">
+      <section aria-labelledby="realm-users-heading">
+        <SectionHeading id="realm-users-heading" title="Users" :icon="Users" info="Every user registered in this realm, read only.">
+          <template #actions>
             <label for="user-directory-search" class="sr-only">Search users by name or email</label>
             <Input
               id="user-directory-search"
               v-model="query"
               type="datasets"
-              placeholder="Search by name or email (min 2 characters)"
+              class="h-9 w-full sm:w-72"
+              placeholder="Find by name or email"
             />
-          </div>
-        </header>
+          </template>
+        </SectionHeading>
+        <div class="surface overflow-hidden">
 
         <div v-if="activeLoading && !visibleRows.length" class="space-y-2 p-5" aria-hidden="true">
           <Skeleton v-for="i in 5" :key="i" class="h-10" />
@@ -282,10 +281,10 @@ const sharedGroups = computed(() => {
         </EmptyState>
 
         <div v-else class="overflow-x-auto">
-          <table class="w-full text-sm">
+          <table class="data-table">
             <caption class="sr-only">Realm users</caption>
             <thead>
-              <tr class="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+              <tr>
                 <th scope="col" class="px-5 py-2.5 font-medium">Name</th>
                 <th scope="col" class="px-5 py-2.5 font-medium">Subjects</th>
                 <th scope="col" class="px-5 py-2.5 font-medium">Attributes</th>
@@ -299,8 +298,8 @@ const sharedGroups = computed(() => {
                 class="border-b border-border/60 last:border-b-0 hover:bg-muted/40"
               >
                 <td class="px-5 py-3">
-                  <div class="font-medium text-foreground">{{ row.user.name || '-' }}</div>
-                  <div class="font-mono text-[10px] text-muted-foreground">{{ truncateMiddle(row.user.user_id, 10, 6) }}</div>
+                  <RouterLink :to="{ name: 'user', params: { id: row.user.user_id } }" class="font-medium text-foreground hover:underline">{{ row.user.name || 'Unnamed user' }}</RouterLink>
+                  <div class="font-mono text-xs text-muted-foreground">{{ truncateMiddle(row.user.user_id, 10, 6) }}</div>
                 </td>
                 <td class="px-5 py-3 tabular-nums text-muted-foreground">
                   {{ row.hydrated ? row.user.subject_ids.length : '-' }}
@@ -318,8 +317,8 @@ const sharedGroups = computed(() => {
                   </span>
                 </td>
                 <td class="px-5 py-3 text-right">
-                  <Button variant="ghost" size="sm" :aria-label="`Inspect ${row.user.name || row.user.user_id}`" @click="inspect(row)">
-                    Inspect
+                  <Button variant="outline" size="sm" :aria-label="`Inspect ${row.user.name || row.user.user_id}`" @click="inspect(row)">
+                    <Search class="h-3.5 w-3.5" /> Inspect
                   </Button>
                 </td>
               </tr>
@@ -362,6 +361,7 @@ const sharedGroups = computed(() => {
         >
           Only the first {{ searchRows.length }} matches are shown, refine the search to narrow it down.
         </footer>
+        </div>
       </section>
     </div>
 
@@ -389,6 +389,9 @@ const sharedGroups = computed(() => {
               <span class="truncate">{{ detail.user_id }}</span>
               <CopyButton :value="detail.user_id" label="Copy user id" />
             </div>
+            <Button variant="outline" size="sm" class="mt-1" as-child>
+              <RouterLink :to="{ name: 'user', params: { id: detail.user_id } }"><UserRound class="h-3.5 w-3.5" /> Open profile</RouterLink>
+            </Button>
             <p v-if="detailError" class="text-[11px] text-amber-700 dark:text-amber-300">
               Refresh failed ({{ detailError }}), showing the last loaded state.
             </p>
