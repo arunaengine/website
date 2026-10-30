@@ -25,9 +25,11 @@ defineProps<{ aggregates: LocationAggregate[] }>()
         <span v-if="a.fullCount > 0" class="text-destructive"><TriangleAlert aria-hidden="true" />{{ a.fullCount }} full</span>
         <span v-if="a.drainingCount > 0" class="text-status-warn"><TriangleAlert aria-hidden="true" />{{ a.drainingCount }} draining</span>
         <template v-if="a.reportingCount > 0">
-          <span><HardDrive aria-hidden="true" />{{ formatBytes(a.storageBytesUsed) }} stored</span>
-          <span v-if="a.documentsHeld !== null"><Files aria-hidden="true" />{{ formatNumber(a.documentsHeld) }} documents</span>
+          <span><HardDrive aria-hidden="true" />{{ a.reportingCount < a.nodeCount ? 'at least ' : '' }}{{ formatBytes(a.storageBytesUsed) }} stored</span>
+          <span v-if="a.documentsHeld !== null"><Files aria-hidden="true" />{{ a.reportingCount < a.nodeCount ? 'at least ' : '' }}{{ formatNumber(a.documentsHeld) }} documents</span>
+          <span v-if="a.reportingCount < a.nodeCount">{{ a.reportingCount }}/{{ a.nodeCount }} reporting</span>
         </template>
+        <span v-else class="text-muted-foreground">No usage reported</span>
       </li>
     </ul>
     <EmptyState v-else compact title="No nodes are mapped to placement locations yet." />
