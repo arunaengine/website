@@ -14,9 +14,9 @@ const Breadcrumbs = compileClientComponent(new URL('./Breadcrumbs.vue', import.m
   '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Slotted('span')),
 })
 
-async function mount(path: string, icon?: unknown) {
+async function mount(path: string) {
   const opened = ref<string[]>([])
-  const mounted = await mountApp(defineComponent(() => () => h(Breadcrumbs, { bucket: 'laptop', path, icon, onNavigate: (to: string) => opened.value.push(to) })))
+  const mounted = await mountApp(defineComponent(() => () => h(Breadcrumbs, { bucket: 'laptop', path, onNavigate: (to: string) => opened.value.push(to) })))
   if (mounted.errors.length) throw mounted.errors[0]
   return { root: mounted.root, opened }
 }
@@ -43,9 +43,11 @@ describe('breadcrumbs', () => {
     expect(element(root, (node) => node.props['aria-current'] === 'page').tag).toBe('span')
   })
 
-  it('starts with the bucket\'s own icon', async () => {
-    const { root } = await mount('bakta', defineComponent(() => () => h('i', 'bucket icon')))
-    expect(content(element(root, (node) => node.tag === 'button'))).toContain('bucket icon')
+  it('names the bucket without an icon in front', async () => {
+    const { root } = await mount('bakta')
+    const crumb = element(root, (node) => node.tag === 'button')
+    expect(content(crumb).trim()).toBe('laptop')
+    expect(crumb.children.some((child) => child.kind === 'element')).toBe(false)
   })
 
   it('names the open bucket root as plain text, not a link', async () => {

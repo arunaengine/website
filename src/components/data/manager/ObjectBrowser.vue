@@ -35,7 +35,6 @@ import { exampleMark } from '@/lib/distributedMockData'
 import type { BindSource } from '@/lib/bindSource'
 import { folderName } from '@/lib/deviceApi'
 import { useBrokenFiles } from '@/composables/useBrokenFiles'
-import { useDatabases } from '@/composables/useDatabases'
 import { useBucketUsage, usageText } from '@/composables/useBucketUsage'
 import { useFolderOrigin } from '@/composables/useFolderOrigin'
 import { useLockedBucket } from '@/composables/useLockedBucket'
@@ -73,7 +72,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CloudOff,
-  Database,
   Download,
   Eye,
   FolderOpen,
@@ -87,7 +85,6 @@ import {
   ListFilter,
   Lock,
   NotebookPen,
-  Package,
   Plus,
   Search,
   Settings,
@@ -197,9 +194,6 @@ const {
 } = props.manager
 
 const usage = useBucketUsage(bucket, remoteNodeId)
-// The path starts with the bucket's own icon, as in the bucket list.
-const databases = useDatabases()
-const bucketIcon = computed(() => (databases.find(bucket.value, remoteNodeId.value, props.setId) ? Database : Package))
 // The run that wrote a file only filters the list here; file details name it.
 const { byKey: originOf } = useFolderOrigin(bucket, remoteNodeId, visibleObjects)
 // The spacer column of a wide view counts too; a span over a hidden column does no harm.
@@ -749,7 +743,7 @@ async function onDrop(event: DragEvent) {
       >
         <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pb-2 pt-2.5 @max-[600px]:px-3">
           <div class="flex min-w-0 max-w-full items-center gap-2">
-            <Breadcrumbs :bucket="bucket" :path="prefix" :icon="bucketIcon" single-line @navigate="openCrumb" />
+            <Breadcrumbs :bucket="bucket" :path="prefix" single-line @navigate="openCrumb" />
             <Spinner v-if="listLoading" label="Loading objects" class="shrink-0" />
             <span role="status" class="shrink-0 text-xs text-muted-foreground">{{ shareNote }}</span>
           </div>
