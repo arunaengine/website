@@ -45,5 +45,6 @@ export function licenseText(value: string): string {
 export function licenseLabelOf(iri: string, entityName?: string): string {
   const name = entityName?.trim()
   if (name && name !== iri.trim()) return name
-  return wellKnownLicense(iri) ?? readableIri(iri)
+  const known = licenseText(iri)
+  return known !== iri ? known : readableIri(iri)
 }

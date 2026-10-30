@@ -52,5 +52,6 @@ describe('license text', () => {
     expect(licenseText('CC0-1.0')).toBe('CC0 1.0')
     expect(licenseText('https://creativecommons.org/licenses/by/4.0/')).toBe('CC BY 4.0')
     expect(licenseText('MIT')).toBe('MIT')
+    expect(licenseLabelOf('CC-BY-4.0')).toBe('CC BY 4.0')
   })
 })
