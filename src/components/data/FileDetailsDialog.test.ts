@@ -27,7 +27,7 @@ const Slotted = (tag: string) =>
 const DetailDialogStub = defineComponent({
   props: { open: Boolean },
   setup: (props, { slots }) => () =>
-    props.open ? h('div', [slots.header?.(), slots.default?.()]) : null,
+    props.open ? h('div', [slots.header?.(), slots.actions?.(), slots.default?.()]) : null,
 })
 const TabsStub = defineComponent({
   props: { modelValue: String },
