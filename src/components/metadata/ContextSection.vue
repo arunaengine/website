@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch, type Component } from 'vue'
+import { computed, watch, type Component } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
-import Button from '@/components/ui/Button.vue'
+import ListPager from '@/components/ui/ListPager.vue'
 import EntityFieldList from '@/components/metadata/EntityFieldList.vue'
 import type { CommentEntry, PresentedEntity } from '@/lib/cratePresenter'
 import type { EntityKind } from '@/lib/contextualEntities'
+import { usePagedList } from '@/composables/usePagedList'
 import { relativeTime } from '@/lib/utils'
 import { AppWindow, BookOpen, MapPin, MessageSquare, Shapes, Tag } from '@lucide/vue'
 
@@ -17,10 +18,8 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ (e: 'jump', id: string): void }>()
 
-const BLOCK_CAP = 10
-const expanded = ref(false)
 const total = computed(() => props.entities.length + props.comments.length)
-const visible = computed(() => (expanded.value ? props.entities : props.entities.slice(0, BLOCK_CAP)))
+const { page, pageSize, shown: visible, total: entityCount, paged } = usePagedList(computed(() => props.entities))
 
 const KIND_ICONS: Partial<Record<EntityKind, Component>> = {
   publications: BookOpen,
@@ -33,11 +32,12 @@ function iconOf(kind: EntityKind): Component {
   return KIND_ICONS[kind] ?? Shapes
 }
 
-// A jump target hidden behind the cap expands the list before scrolling.
+// A jump target on another page turns to that page before scrolling.
 watch(
   () => props.highlightId,
   (id) => {
-    if (id && props.entities.findIndex((entity) => entity.id === id) >= BLOCK_CAP) expanded.value = true
+    const index = id ? props.entities.findIndex((entity) => entity.id === id) : -1
+    if (index >= 0) page.value = Math.floor(index / pageSize.value) + 1
   },
 )
 
@@ -50,7 +50,7 @@ function timeLabel(iso: string): string {
 <template>
   <section v-if="total" class="surface overflow-hidden">
     <div class="flex items-center gap-2 border-b border-border px-5 py-3.5 text-sm font-medium text-foreground">
-      <Shapes class="h-4 w-4 text-primary" /> Context
+      <Shapes class="h-4 w-4 text-primary" /> Other entities
       <span class="text-xs font-normal text-muted-foreground">{{ total }}</span>
     </div>
 
@@ -78,9 +78,7 @@ function timeLabel(iso: string): string {
         </p>
       </div>
 
-      <div v-if="entities.length > BLOCK_CAP && !expanded" class="px-5 py-3">
-        <Button variant="ghost" size="sm" @click="expanded = true">Show all {{ entities.length }}</Button>
-      </div>
+      <ListPager v-if="paged" v-model:page="page" v-model:page-size="pageSize" :total="entityCount" />
 
       <div v-if="comments.length" class="px-5 py-4">
         <h3 class="mb-2 flex items-center gap-1.5 font-display text-sm font-semibold text-aruna-navy">

@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Code2,
   Copy,
+  Download,
   FileJson,
   Upload,
 } from '@lucide/vue'
@@ -18,7 +19,7 @@ import Spinner from '@/components/ui/Spinner.vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError, type MetadataDocumentSummary } from '@/lib/api'
 import { crateGraph } from '@/lib/dataEntities'
-import { analyzeCrateJson, type CrateImportPreview } from '@/lib/crateImport'
+import { analyzeCrateJson, downloadCrateJson, type CrateImportPreview } from '@/lib/crateImport'
 import { copyToClipboard, errorMessage } from '@/lib/utils'
 
 const props = defineProps<{
@@ -158,10 +159,15 @@ async function confirmImport() {
         <Code2 class="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> RO-Crate JSON-LD (raw)
         <span v-if="hasCrate" class="text-xs font-normal text-muted-foreground">{{ entityCount }} {{ entityCount === 1 ? 'entity' : 'entities' }}</span>
       </button>
-      <Button variant="ghost" size="icon-sm" :disabled="!hasCrate" aria-label="Copy JSON-LD to clipboard" title="Copy JSON-LD" @click="copyCrate">
-        <Check v-if="copied" class="size-3.5 text-emerald-600 dark:text-emerald-400" />
-        <Copy v-else class="size-3.5" />
-      </Button>
+      <span class="flex items-center gap-1">
+        <Button variant="ghost" size="icon-sm" :disabled="!hasCrate" aria-label="Copy JSON-LD to clipboard" title="Copy JSON-LD" @click="copyCrate">
+          <Check v-if="copied" class="size-3.5 text-emerald-600 dark:text-emerald-400" />
+          <Copy v-else class="size-3.5" />
+        </Button>
+        <Button variant="ghost" size="icon-sm" :disabled="!hasCrate" aria-label="Download ro-crate-metadata.json" title="Download ro-crate-metadata.json" @click="downloadCrateJson(crate)">
+          <Download class="size-3.5" />
+        </Button>
+      </span>
     </div>
 
     <pre
