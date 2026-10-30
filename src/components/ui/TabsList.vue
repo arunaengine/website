@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 const props = defineProps<{ class?: string }>()
 const classes = computed(() =>
   cn(
-    'inline-flex h-9 items-center justify-center gap-0.5 rounded-lg border border-border-subtle bg-muted p-0.5 text-muted-foreground',
+    'inline-flex h-9 items-center justify-center rounded-lg border border-border-subtle bg-muted p-1 text-muted-foreground',
     props.class,
   ),
 )
