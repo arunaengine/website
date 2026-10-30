@@ -145,45 +145,30 @@ function databaseOf(name: string, nodeId: string | null): { title: string } | nu
   return { title: version && !title.includes(version) ? `${title} ${version}` : title }
 }
 
-// All nodes rows: pins first, then this group's recently browsed buckets, then the rest. A row's
-// node is named only when it is not this node, as the pins are keyed.
+// All nodes rows: pins first, then the rest in the nodes' name order, so opening a bucket never
+// moves a row. A row's node is named only when it is not this node, as the pins are keyed.
 const shortcutNode = (hit: ListedBucket) => (realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id)
 type AllRow = { key: string; bucket: string; nodeId: string | null; hit: ListedBucket | null; pinned: boolean }
-// Recent buckets move up only within the first batch the nodes answered, so a later page never
-// reorders rows already shown; the batch starts over when the list does. A distributed bucket is
-// known by its set, since a member listed later may stand for the merged row.
-const hitKey = (hit: ListedBucket) => (hit.set_id ? `set:${hit.set_id}` : `${hit.node_id}/${hit.bucket}`)
-const firstBatch = ref(new Set<string>())
-watch(
-  () => all.hits.value,
-  (hits, previous) => {
-    if (!previous?.length || hits.length < previous.length) firstBatch.value = new Set(hits.map(hitKey))
-  },
-  { immediate: true },
-)
 const allRows = computed<AllRow[]>(() => {
   const hits = all.hits.value
   const used = new Set<ListedBucket>()
-  // A pin stays a row even before its page was listed; a recent one shows only when listed.
-  const take = (entry: BucketShortcut, pinned: boolean): AllRow[] => {
+  // A pin stays a row even before its page was listed.
+  const take = (entry: BucketShortcut): AllRow[] => {
     const nodeId = entry.nodeId ?? null
     // A distributed bucket is one merged row; a pin on any of its nodes is that row.
     const onNode = (candidate: ListedBucket) =>
       (candidate.set_id ? candidate.nodes : [candidate.node_id]).some((id) => (realmNodes.isLocalNode(id) ? null : id) === nodeId)
-    const hit = hits.find((candidate) => !used.has(candidate) && candidate.bucket === entry.bucket && onNode(candidate)
-      && (pinned || firstBatch.value.has(hitKey(candidate)))) ?? null
-    if (!hit && !pinned) return []
+    const hit = hits.find((candidate) => !used.has(candidate) && candidate.bucket === entry.bucket && onNode(candidate)) ?? null
     if (hit) used.add(hit)
-    return [{ key: `${nodeId ?? ''}/${entry.bucket}`, bucket: entry.bucket, nodeId, hit, pinned }]
+    return [{ key: `${nodeId ?? ''}/${entry.bucket}`, bucket: entry.bucket, nodeId, hit, pinned: true }]
   }
   // A pin passes the same checks as a listed row: no device, and the name being searched.
   const term = bucketNameFilter.value.trim().toLowerCase()
   const shownPin = (entry: BucketShortcut) =>
     !isFolderBucket(entry.bucket) && realmNodes.isTarget(entry.nodeId) && entry.bucket.toLowerCase().includes(term)
-  const pins = shortcuts.pinned.value.filter(shownPin).flatMap((entry) => take(entry, true))
-  const recents = shortcuts.recent.value.filter((entry) => (entry.groupId ?? '') === selectedGroupId.value).flatMap((entry) => take(entry, false))
+  const pins = shortcuts.pinned.value.filter(shownPin).flatMap(take)
   const rest = hits.filter((hit) => !used.has(hit)).map((hit) => ({ key: `${hit.node_id}/${hit.bucket}`, bucket: hit.bucket, nodeId: shortcutNode(hit), hit, pinned: false }))
-  const rows = [...pins, ...recents, ...rest]
+  const rows = [...pins, ...rest]
   return hideDatabases.value ? rows.filter((row) => !databaseOf(row.bucket, row.hit?.node_id ?? row.nodeId)) : rows
 })
 // Pages of 25 rows, the pins on top of the first; the next page is read from the nodes when
@@ -235,11 +220,13 @@ function listPlace(nodeId: string | null): RowPlace {
   return other(nodeId) === other(remoteNodeId.value) ? { place: null, placeTitle: null, placeNode: null } : rowPlace(nodeId)
 }
 
-// Pinned rows first, then databases, then the other buckets, each under its label.
-function sectioned<R>(rows: R[], pinned: (row: R) => boolean, database: (row: R) => boolean): { label: string; rows: R[] }[] {
-  const pins = rows.filter(pinned)
-  const bases = rows.filter((row) => !pinned(row) && database(row))
-  const rest = rows.filter((row) => !pinned(row) && !database(row))
+// Pinned rows first, then databases, then the other buckets, each under its label and by name.
+type Named = { bucket: string; nodeId?: string | null }
+const byName = (a: Named, b: Named) => a.bucket.localeCompare(b.bucket) || (a.nodeId ?? '').localeCompare(b.nodeId ?? '')
+function sectioned<R extends Named>(rows: R[], pinned: (row: R) => boolean, database: (row: R) => boolean): { label: string; rows: R[] }[] {
+  const pins = rows.filter(pinned).sort(byName)
+  const bases = rows.filter((row) => !pinned(row) && database(row)).sort(byName)
+  const rest = rows.filter((row) => !pinned(row) && !database(row)).sort(byName)
   return [{ label: 'Pinned', rows: pins }, { label: 'Databases', rows: bases }, { label: 'Other buckets', rows: rest }].filter((section) => section.rows.length)
 }
 const rowNodeId = (row: AllRow) => row.hit?.node_id ?? row.nodeId

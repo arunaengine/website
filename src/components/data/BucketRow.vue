@@ -5,7 +5,7 @@ import Tooltip from '@/components/ui/Tooltip.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import type { BucketJob } from '@/lib/api'
 import { Database, FolderSync, Network, Package, Pin, Server, TriangleAlert } from '@lucide/vue'
-import { computed, ref, type Component } from 'vue'
+import { computed, onMounted, ref, watch, type Component } from 'vue'
 import { RouterLink } from 'vue-router'
 
 // One shared row for every bucket list (the Data view, the bucket search, the databases): the kind
@@ -114,6 +114,12 @@ const marks = computed<Mark[]>(() => {
 })
 const linkName = (id: string) => (id === (props.placeNode ?? props.nodeId) && props.place ? props.place : realmNodes.displayName(id))
 
+// The open bucket's row scrolls into view when it is opened or listed.
+const rowEl = ref<HTMLElement | null>(null)
+const reveal = () => props.active && rowEl.value?.scrollIntoView?.({ block: 'nearest' })
+onMounted(reveal)
+watch(() => props.active, reveal, { flush: 'post' })
+
 // A press held for half a second pins the row, and the click that follows does not open it.
 let pressTimer: ReturnType<typeof setTimeout> | undefined
 const pressed = ref(false)
@@ -142,6 +148,7 @@ function onClick() {
 
 <template>
   <div
+    ref="rowEl"
     class="group relative flex items-start gap-2.5 border-l-2 py-2 pl-3 pr-2 hover:bg-muted/60 has-[:focus-visible]:bg-muted/60"
     :class="[active ? 'border-primary bg-muted' : 'border-transparent', highlighted && !active ? 'bg-muted/60' : '']"
     @pointerdown="onPointerdown"

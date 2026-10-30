@@ -460,7 +460,7 @@ describe('Bucket sidebar linked buckets', () => {
 
   it('gives every desktop row the same link column, empty where nothing applies', async () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: linkedManager() } })
-    const [raw, test, own] = columns(root)
+    const [own, raw, test] = columns(root)
 
     expect(columns(root)).toHaveLength(3)
     expect(hasNode(raw, linkLabel('raw-reads'))).toBe(true)
@@ -501,8 +501,8 @@ describe('Bucket sidebar linked buckets', () => {
     const places = nodes(root).filter((node) => node.props['data-testid'] === 'row-place')
 
     expect(places.map((node) => content(node))).toEqual([
-      'pinned-home: This computer',
       'pinned-far: name-node-3',
+      'pinned-home: This computer',
       'seen-far: name-node-3',
     ])
     expect(columns(root)).toHaveLength(5)
@@ -559,8 +559,8 @@ describe('Bucket sidebar in the desktop', () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
     const places = nodes(root).filter((node) => node.props['data-testid'] === 'row-place')
 
-    expect(places.map((node) => content(node))).toEqual(['results: node-2 · Giessen', 'notes: This computer'])
-    expect(places[0].props.title).toBe('node-2 · Giessen (server node-2)')
+    expect(places.map((node) => content(node))).toEqual(['notes: This computer', 'results: node-2 · Giessen'])
+    expect(places[1].props.title).toBe('node-2 · Giessen (server node-2)')
   })
 })
 
@@ -674,7 +674,7 @@ describe('Bucket sidebar node choice', () => {
     const text = content(root)
 
     expect(text).toContain('results')
-    expect(places(root)).toEqual(['name-node-2', 'name-home'])
+    expect(places(root)).toEqual(['name-home', 'name-node-2'])
     expect(text).not.toContain('reef-survey')
 
     await click(element(root, (node) => node.props['aria-label'] === 'Open results'))
@@ -875,7 +875,7 @@ describe('Bucket sidebar search keys', () => {
 })
 
 describe('All nodes list order and pins', () => {
-  it('lists pins first, then recently browsed buckets, then the rest, and pins by node', async () => {
+  it('lists pins, then the rest by name, keeps a browsed bucket in place, and pins by node', async () => {
     nodeChoice.value = null
     allBuckets.needsName.value = false
     allBuckets.hits.value = [
@@ -891,7 +891,7 @@ describe('All nodes list order and pins', () => {
     await flush()
     const order = nodes(root).filter((node) => String(node.props['aria-label']).startsWith('Open ')).map((node) => content(node))
 
-    expect(order).toEqual(['zeta', 'gamma', 'mid', 'alpha', 'beta'])
+    expect(order).toEqual(['gamma', 'zeta', 'alpha', 'beta', 'mid'])
     expect(element(root, (node) => node.props['aria-label'] === 'Unpin zeta')).toBeTruthy()
     await click(element(root, (node) => node.props['aria-label'] === 'Pin beta'))
     await click(element(root, (node) => node.props['aria-label'] === 'Pin alpha'))
@@ -1102,7 +1102,7 @@ describe('database buckets in the list', () => {
     allBuckets.hits.value = []
   })
 
-  it('keeps a recent distributed bucket in place when its local member arrives later', async () => {
+  it('keeps a browsed distributed bucket in place when its local member arrives later', async () => {
     nodeChoice.value = null
     allBuckets.needsName.value = false
     const listed = (count: number, from = 0) =>
@@ -1123,7 +1123,7 @@ describe('database buckets in the list', () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
     await flush()
     const before = shown(root)
-    expect(before[0]).toContain('b03')
+    expect(before[3]).toContain('b03')
 
     await click(pager(root, 'Next buckets'))
     await flush()

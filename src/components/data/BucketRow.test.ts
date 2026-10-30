@@ -1,7 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { compileClientComponent, content, moduleDefault, mountApp, nodes } from '@/test/clientRender'
+import { compileClientComponent, content, flush, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 
 const Empty = defineComponent(() => () => null)
 const Label = defineComponent({
@@ -118,5 +118,21 @@ describe('BucketRow lines and marks', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('BucketRow open row', () => {
+  it('scrolls itself into view when it becomes the open bucket, and only then', async () => {
+    const active = VueRuntime.ref(false)
+    const { root } = await mountApp(defineComponent(() => () => h(BucketRow, { bucket: 'genes', active: active.value })))
+    const row = nodes(root).find((node) => node.tag === 'div' && String(node.props.class).includes('border-l-2'))!
+    const scroll = vi.fn()
+    Object.assign(row, { scrollIntoView: scroll })
+    await flush()
+    expect(scroll).not.toHaveBeenCalled()
+
+    active.value = true
+    await flush()
+    expect(scroll).toHaveBeenCalledWith({ block: 'nearest' })
   })
 })
