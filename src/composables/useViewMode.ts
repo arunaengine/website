@@ -1,9 +1,9 @@
 import { ref, watch, type Ref } from 'vue'
 
-export type ViewMode = 'cards' | 'table'
+export type ViewMode = 'cards' | 'table' | 'list'
 
-// Cards or table for one list, remembered per browser; without storage the choice lasts the visit.
-export function useViewMode(list: string): Ref<ViewMode> {
+// Cards, table or list for one list, remembered per browser; without storage the choice lasts the visit.
+export function useViewMode(list: string, fallback: ViewMode = 'cards'): Ref<ViewMode> {
   const key = `aruna.view.${list}`
   let stored: string | null = null
   try {
@@ -11,7 +11,7 @@ export function useViewMode(list: string): Ref<ViewMode> {
   } catch {
     stored = null
   }
-  const view = ref<ViewMode>(stored === 'table' ? 'table' : 'cards')
+  const view = ref<ViewMode>(stored === 'table' || stored === 'cards' || stored === 'list' ? stored : fallback)
   watch(view, (next) => {
     try {
       localStorage.setItem(key, next)
