@@ -39,7 +39,7 @@ const record = (overrides: Partial<RealmNodeInfo> = {}): RealmNodeInfo => ({
 const Plain = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 const HeaderStub = defineComponent({
   props: { title: String, description: String },
-  setup: (props, { slots }) => () => h('header', [h('h1', props.title), h('p', props.description), slots.actions?.()]),
+  setup: (props, { slots }) => () => h('header', [h('h1', slots.title?.() ?? props.title), h('p', slots.description?.() ?? props.description), slots.actions?.()]),
 })
 const LinkStub = defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()) })
 // Each editor keeps its own draft, so a new one shows as a new instance.
@@ -54,22 +54,54 @@ const NameStub = defineComponent({
 })
 const PanelStub = defineComponent({ props: { node: Object, hideName: Boolean, probe: Object }, setup: (props) => () => h('section', `details hideName=${props.hideName}`) })
 
+const CardStub = defineComponent({
+  props: { label: String },
+  setup: (props, { slots }) => () => h('div', { 'data-card': props.label }, [`${props.label} `, slots.value?.(), ' ', slots.unit?.(), ' ', slots.default?.()]),
+})
+const DetailsStub = defineComponent({
+  props: { items: Array },
+  setup: (props, { slots }) => () =>
+    h('dl', (props.items as Array<{ key?: string; label: string; value: string }>).map((item) =>
+      h('div', [h('dt', item.label), h('dd', slots[item.key ?? item.label]?.({ item }) ?? item.value)]))),
+})
+const RunsStub = defineComponent({ props: { runs: Array, hideNode: Boolean }, setup: (props) => () => h('section', `runs ${(props.runs as Array<{ task: { id: string } }>).map((run) => run.task.id).join(',')} hideNode=${props.hideNode}`) })
+const MarkStub = defineComponent({ props: { label: String }, setup: (props) => () => h('i', { 'data-mark': props.label }) })
+const PillStub = defineComponent({ props: { state: String }, setup: (props) => () => h('span', { 'data-pill': props.state }, props.state) })
+const recentRuns = ref<unknown[]>([])
+const runsState = ref('ready')
+const loadRuns = vi.fn(async () => undefined)
+const loadInfo = vi.fn(async () => undefined)
+const task = (id: string, state: string, nodeId: string | null) => ({ task: { id, state }, nodeId })
+
 const NodeView = compileClientComponent(new URL('./NodeView.vue', import.meta.url), {
   vue: VueRuntime,
   // The route reads the params ref on each access, so a test can navigate.
   'vue-router': { RouterLink: LinkStub, useRoute: () => ({ get params() { return params.value } }) },
   '@/components/dashboard/PageHeader.vue': moduleDefault(HeaderStub),
-  '@/components/ui/Badge.vue': moduleDefault(Plain),
+  '@/components/dashboard/OverviewCell.vue': moduleDefault(CardStub),
+  '@/components/dashboard/RecentRunsCard.vue': moduleDefault(RunsStub),
+  '@/components/ui/Button.vue': moduleDefault(Plain),
+  '@/components/ui/CopyButton.vue': moduleDefault(defineComponent(() => () => null)),
+  '@/components/ui/DetailList.vue': moduleDefault(DetailsStub),
+  '@/components/ui/IconTile.vue': moduleDefault(defineComponent(() => () => null)),
+  '@/components/ui/RefreshButton.vue': moduleDefault(defineComponent((_, { attrs }) => () => h('button', attrs, 'Refresh'))),
+  '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent({ props: { title: String }, setup: (props) => () => h('h2', props.title) })),
+  '@/components/ui/StatusMark.vue': moduleDefault(MarkStub),
+  '@/components/ui/StatusPill.vue': moduleDefault(PillStub),
   '@/components/ui/EmptyState.vue': moduleDefault(defineComponent({ props: { title: String }, setup: (props) => () => h('p', props.title) })),
   '@/components/nodes/NodeDetailPanel.vue': moduleDefault(PanelStub),
   '@/components/nodes/NodeNameEdit.vue': moduleDefault(NameStub),
   '@/components/nodes/node-display': NodeDisplay,
   '@/components/nodes/node-probe': { nodeApiBase: (node: RealmNodeInfo) => node.info?.urls.api ?? null, probeNode },
   '@/composables/useAruna': {
-    useAruna: () => ({ currentUser, nodeInfo, usageInfo: ref(null), isRealmAdmin, searchBuckets, sessionEpoch }),
+    useAruna: () => ({ currentUser, myGroups: ref([{ id: 'g1', name: 'demo' }]), nodeInfo, usageInfo: ref(null), isRealmAdmin, searchBuckets, sessionEpoch, loadInfo }),
   },
+  '@/composables/useDatabases': { useDatabases: () => ({ ensure: () => {}, find: (bucket: string) => (bucket === 'refseq' ? { title: 'NCBI RefSeq genomes' } : undefined) }) },
+  '@/composables/useRecentRuns': { useRecentRuns: () => ({ runs: recentRuns, state: runsState, load: loadRuns }) },
+  '@/composables/useRefresh': { useRefresh: (run: () => unknown) => ({ busy: ref(false), refresh: run }) },
+  '@/lib/tes': { isActiveTesState: (state: string) => state === 'RUNNING' },
   '@/composables/useNodeNames': { useNodeNames: () => ({ renameNode, renameDevice }) },
-  '@/composables/useRealmNodes': { computerName: () => 'This computer', useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'mgmt' }) },
+  '@/composables/useRealmNodes': { computerName: () => 'This computer', useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'mgmt', localNodeId: ref('mgmt') }) },
   '@/composables/useRealmSnapshot': { useRealmSnapshot: () => ({ realm }) },
   '@/lib/formatCount': FormatCount,
   '@/lib/placement': Placement,
@@ -83,25 +115,59 @@ beforeEach(() => {
   isRealmAdmin.value = false
   currentUser.value = { id: 'u1' }
   searchBuckets.mockReset().mockResolvedValue({ hits: [] })
+  recentRuns.value = []
+  runsState.value = 'ready'
+  loadRuns.mockClear()
   renameNode.mockClear()
   renameDevice.mockClear()
 })
 
 describe('node page', () => {
-  it('names the node and states its role, place, state, load, work and version once each', async () => {
+  it('heads the node with its state, type, place and work, then stat cards and its details', async () => {
+    recentRuns.value = [task('r1', 'COMPLETE', 'store-1'), task('r2', 'COMPLETE', 'store-1'), task('r3', 'COMPLETE', null)]
+    searchBuckets.mockResolvedValue({ hits: [{ bucket: 'refseq', node_id: 'store-1', group_id: 'g1' }] })
     const mounted = await mountApp(NodeView)
     await flush()
     const text = content(mounted.root)
+    const card = (label: string) => content(element(mounted.root, (node) => node.props['data-card'] === label)).replace(/\s+/g, ' ').trim()
 
     expect(text).toContain('Giessen storage 1')
-    expect(text).toContain('storage, Giessen')
-    expect(text).toContain('Stateonline')
-    expect(text).toContain('Stored2 KB')
-    expect(text).toContain('CPU34%')
-    expect(text).toContain('Importing, 1 job')
-    expect(text).toContain('3.0.0-alpha.140')
+    expect(nodes(mounted.root).some((node) => node.props['data-mark'] === 'Online')).toBe(true)
+    expect(text).toContain('Storage nodeGiessenImporting, 1 job')
+    expect(card('Stored')).toBe('Stored 2 KB 1 bucket')
+    expect(card('CPU')).toBe('CPU 34%')
+    // Only the runs that ran on this node count, among the recent ones.
+    expect(card('Runs')).toBe('Runs 2 recent 2/2 completed')
+    expect(text).toContain('runs r1,r2 hideNode=true')
+    expect(text).toContain('TypeStorage node')
+    expect(text).toContain('LocationGiessen')
+    expect(text).toContain('Version3.0.0-alpha.140')
     expect(text).toContain('details hideName=true')
-    expect(text.match(/online/g)).toHaveLength(1)
+    // The status page opens on this node.
+    const status = element(mounted.root, (node) => node.tag === 'a' && content(node).includes('Open in status'))
+    expect(JSON.parse(String(status.props['data-to']))).toEqual({ name: 'status', query: { node: 'store-1' } })
+    mounted.app.unmount()
+  })
+
+  it('marks an offline node with a pill and says when it was last seen', async () => {
+    realm.value = { nodes: [record({ present: false })] }
+    const mounted = await mountApp(NodeView)
+    await flush()
+    expect(nodes(mounted.root).some((node) => node.props['data-pill'] === 'Offline')).toBe(true)
+    expect(content(mounted.root)).toContain('Last seen')
+    mounted.app.unmount()
+  })
+
+  it('reads the node, its buckets and its runs again on Refresh', async () => {
+    const mounted = await mountApp(NodeView)
+    await flush()
+    const reads = searchBuckets.mock.calls.length
+    loadRuns.mockClear()
+    await click(element(mounted.root, (node) => node.tag === 'button' && content(node) === 'Refresh'))
+    await flush()
+    expect(loadInfo).toHaveBeenCalled()
+    expect(loadRuns).toHaveBeenCalledOnce()
+    expect(searchBuckets.mock.calls.length).toBeGreaterThan(reads)
     mounted.app.unmount()
   })
 
@@ -113,11 +179,10 @@ describe('node page', () => {
     const mounted = await mountApp(NodeView)
     await flush()
 
-    expect(content(mounted.root)).toContain('refseq')
+    expect(content(mounted.root)).toContain('refseqNCBI RefSeq genomes, demo')
     expect(content(mounted.root)).not.toContain('elsewhere')
-    const link = element(mounted.root, (node) => node.tag === 'a' && content(node) === 'refseq')
+    const link = element(mounted.root, (node) => node.tag === 'a' && content(node).includes('refseq'))
     expect(JSON.parse(String(link.props['data-to']))).toEqual({ name: 'bucket', params: { bucketId: 'refseq' }, query: { group: 'g1', node: 'store-1' } })
-    expect(content(mounted.root)).toContain('1 bucket you can open')
     mounted.app.unmount()
   })
 
@@ -141,7 +206,7 @@ describe('node page', () => {
     await flush()
     await click(element(mounted.root, (node) => node.tag === 'button' && content(node).startsWith('Rename')))
     expect(renameDevice).toHaveBeenCalledWith('laptop', 'New name')
-    expect(content(mounted.root)).toContain('Stateonline')
+    expect(nodes(mounted.root).some((node) => node.props['data-mark'] === 'Online')).toBe(true)
     mounted.app.unmount()
   })
 
@@ -180,7 +245,7 @@ describe('node page', () => {
     searchBuckets.mockResolvedValue({ hits: [{ bucket: 'refseq', node_id: 'store-1', group_id: 'g1' }], nodes_failed: 1 })
     const some = await mountApp(NodeView)
     await flush()
-    expect(content(some.root)).toContain('At least 1 bucket you can open.')
+    expect(content(element(some.root, (node) => node.props['data-card'] === 'Stored'))).toContain('at least 1 bucket')
     some.app.unmount()
   })
 })
