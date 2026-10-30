@@ -10,19 +10,26 @@ import DialogContent from './DialogContent.vue'
 import { cn } from '@/lib/utils'
 import { X } from '@lucide/vue'
 
-/** `contentClass` only carries layering, such as opening above the assistant. */
-const props = defineProps<{ open: boolean; contentClass?: string }>()
+/** `contentClass` only carries layering; `fit` lets a short view take only the height it needs. */
+const props = defineProps<{ open: boolean; contentClass?: string; fit?: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
+function focusSelf(event: Event) {
+  event.preventDefault()
+  ;(event.target as HTMLElement | null)?.focus?.()
+}
+
 const classes = computed(() => cn(
-  'flex h-[88dvh] w-[calc(100%-2rem)] max-w-6xl flex-col gap-0 overflow-hidden bg-background p-0 sm:w-[92vw]',
+  'flex w-[calc(100%-2rem)] max-w-6xl flex-col gap-0 overflow-hidden bg-background p-0 sm:w-[92vw]',
+  props.fit ? 'max-h-[88dvh]' : 'h-[88dvh]',
   props.contentClass,
 ))
 </script>
 
 <template>
   <Dialog :open="open" @update:open="(v) => emit('update:open', v)">
-    <DialogContent hide-close :class="classes">
+    <!-- Focus goes to the dialog itself on open, so no button shows a focus ring unasked. -->
+    <DialogContent hide-close :class="classes" @open-auto-focus="focusSelf">
       <div class="flex shrink-0 items-start justify-between gap-3 border-b border-border px-6 py-4">
         <div class="min-w-0 flex-1"><slot name="header" /></div>
         <DialogClose

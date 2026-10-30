@@ -16,6 +16,7 @@ const props = defineProps<{
   preflight: BacklinkPreflightResponse | null
   busy: boolean
   error: string | null
+  quietEmpty?: boolean
 }>()
 const emit = defineEmits<{ (e: 'retry'): void }>()
 
@@ -114,7 +115,8 @@ const badgeClass = computed(() =>
 </script>
 
 <template>
-  <div class="text-xs" aria-live="polite">
+  <!-- `quietEmpty`: nothing looked up, or nothing found by a complete lookup, shows no heading. -->
+  <div v-if="!quietEmpty || busy || error || (preflight && (references.length || partial || hidden))" class="text-xs" aria-live="polite">
     <div class="flex flex-wrap items-center gap-2">
       <Link2 class="h-4 w-4 text-primary" aria-hidden="true" />
       <span class="font-medium text-foreground">Referenced by</span>

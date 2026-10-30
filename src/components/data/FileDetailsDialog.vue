@@ -8,6 +8,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import DetailDialog from '@/components/ui/DetailDialog.vue'
+import DetailList, { type Detail } from '@/components/ui/DetailList.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Tabs from '@/components/ui/Tabs.vue'
@@ -297,18 +298,22 @@ const details = computed(() => props.folder ? [
   { label: 'Folder', value: props.objectKey },
   { label: 'Node', value: nodeName(props.nodeId) },
 ] : [
-  { label: 'Size', value: shownSize.value === undefined ? 'unknown' : formatBytes(shownSize.value) },
-  {
-    label: 'Last modified',
-    value: shownModified.value ? relativeTime(shownModified.value.toISOString()) : 'unknown',
-  },
-  { label: 'Content type', value: head.value?.contentType || 'unknown' },
+  { label: 'Size', value: shownSize.value === undefined ? '' : formatBytes(shownSize.value) },
+  { label: 'Last modified', value: shownModified.value ? relativeTime(shownModified.value.toISOString()) : '' },
+  { label: 'Content type', value: head.value?.contentType || '' },
+])
+// Label above value; a fact the node did not give is left out, never shown as unknown.
+const generalItems = computed<Detail[]>(() => [
+  ...details.value.filter((detail) => detail.value),
+  ...(!props.folder && (headBusy.value || currentVersion.value) ? [{ key: 'version', label: 'Current version', value: currentVersion.value ?? '' }] : []),
+  ...(props.groupId && !mock.value ? [{ key: 'access', label: 'Public access', value: '' }] : []),
 ])
 </script>
 
 <template>
   <DetailDialog
     :open="props.open"
+    :fit="!previewMode"
     :content-class="props.raised ? 'z-[var(--z-assistant-modal)]' : undefined"
     @update:open="(value: boolean) => emit('update:open', value)"
   >
@@ -384,32 +389,41 @@ const details = computed(() => props.folder ? [
 
       <TabsContent value="general" class="surface p-4">
         <MockFileGeneral v-if="mock" :object="mock" />
-        <dl v-else class="space-y-2 text-xs">
-          <div v-for="detail in details" :key="detail.label" class="flex items-baseline justify-between gap-4">
-            <dt class="shrink-0 text-muted-foreground">{{ detail.label }}</dt>
-            <dd class="min-w-0 break-all text-right font-mono text-foreground">{{ detail.value }}</dd>
-          </div>
-          <div v-if="!props.folder" class="flex items-baseline justify-between gap-4">
-            <dt class="shrink-0 text-muted-foreground">Current version</dt>
-            <dd class="flex min-w-0 items-center justify-end gap-1">
-              <Spinner v-if="headBusy" label="Loading the file details" />
-              <template v-else-if="currentVersion">
-                <span class="hash flex min-w-0" :title="currentVersion">
-                  <span class="truncate">{{ currentVersion.slice(0, -8) }}</span>
-                  <span class="shrink-0">{{ currentVersion.slice(-8) }}</span>
+        <template v-else>
+          <DetailList :items="generalItems">
+            <template #version>
+              <span class="flex min-w-0 items-center gap-1">
+                <Spinner v-if="headBusy" label="Loading the file details" />
+                <template v-else-if="currentVersion">
+                  <span class="hash flex min-w-0" :title="currentVersion">
+                    <span class="truncate">{{ currentVersion.slice(0, -8) }}</span>
+                    <span class="shrink-0">{{ currentVersion.slice(-8) }}</span>
+                  </span>
+                  <CopyButton :value="currentVersion" label="Copy version id" />
+                  <Badge v-if="pinnedVersion" :variant="stateVariant('older')" size="sm">Pinned</Badge>
+                </template>
+              </span>
+            </template>
+            <template #access>
+              <span class="flex flex-wrap items-center gap-2">
+                <span class="inline-flex items-center gap-1.5">
+                  <Globe v-if="filePublic" class="size-3.5" aria-hidden="true" /><Lock v-else class="size-3.5" aria-hidden="true" />
+                  {{ filePublic ? 'Public' : 'Private' }}
                 </span>
-                <CopyButton :value="currentVersion" label="Copy version id" />
-                <Badge v-if="pinnedVersion" :variant="stateVariant('older')" size="sm">Pinned</Badge>
-              </template>
-              <span v-else class="text-muted-foreground">unknown</span>
-            </dd>
-          </div>
-          <div v-if="checksums.length" class="border-t border-border/60 pt-2">
-            <dt class="text-muted-foreground">Checksums</dt>
-            <dd class="mt-1 space-y-1">
-              <div v-for="checksum in shownChecksums" :key="checksum.label" class="flex items-baseline justify-between gap-4">
-                <span class="shrink-0 text-muted-foreground">{{ checksum.label }}</span>
-                <span class="flex min-w-0 items-center justify-end gap-1">
+                <Button variant="outline" size="sm" class="h-7" @click="publicOpen = true"><Globe class="h-3.5 w-3.5" /> Access…</Button>
+              </span>
+              <span v-if="fileUrl" class="mt-1 flex min-w-0 items-center gap-1">
+                <a :href="fileUrl" target="_blank" rel="noopener noreferrer" class="min-w-0 truncate font-mono text-[11px] text-primary hover:underline" :title="fileUrl">{{ fileUrl }}</a>
+                <CopyButton :value="fileUrl" label="Copy the public link" />
+              </span>
+            </template>
+          </DetailList>
+          <div v-if="checksums.length" class="mt-4 text-xs">
+            <p class="type-label">Checksums</p>
+            <div class="mt-1 space-y-1">
+              <div v-for="checksum in shownChecksums" :key="checksum.label" class="flex items-baseline gap-4">
+                <span class="w-16 shrink-0 text-muted-foreground">{{ checksum.label }}</span>
+                <span class="flex min-w-0 items-center gap-1">
                   <span class="hash flex min-w-0" :title="checksum.value">
                     <span v-if="checksum.value.length > 8" class="truncate">{{ checksum.value.slice(0, -8) }}</span>
                     <span class="shrink-0">{{ checksum.value.slice(-8) }}</span>
@@ -420,26 +434,9 @@ const details = computed(() => props.folder ? [
               <button v-if="checksums.length > 1" type="button" class="text-primary hover:underline" @click="allChecksums = !allChecksums">
                 {{ allChecksums ? 'Show fewer' : `Show all ${checksums.length}` }}
               </button>
-            </dd>
+            </div>
           </div>
-          <div v-if="props.groupId && !mock" class="flex items-center justify-between gap-4">
-            <dt class="shrink-0 text-muted-foreground">Public access</dt>
-            <dd class="flex min-w-0 items-center justify-end gap-2">
-              <Badge :variant="filePublic ? 'success' : 'secondary'" size="sm" class="uppercase">
-                <Globe v-if="filePublic" class="mr-0.5 size-3" aria-hidden="true" />
-                <Lock v-else class="mr-0.5 size-3" aria-hidden="true" />
-                {{ filePublic ? 'public' : 'private' }}
-              </Badge>
-              <Button variant="outline" size="sm" @click="publicOpen = true">
-                <Globe class="h-3.5 w-3.5" /> Access…
-              </Button>
-            </dd>
-          </div>
-          <div v-if="fileUrl" class="flex min-w-0 items-center justify-end gap-1">
-            <a :href="fileUrl" target="_blank" rel="noopener noreferrer" class="min-w-0 truncate font-mono text-[11px] text-primary hover:underline" :title="fileUrl">{{ fileUrl }}</a>
-            <CopyButton :value="fileUrl" label="Copy the public link" />
-          </div>
-        </dl>
+        </template>
         <div v-if="syncRows.length" class="mt-4 border-t border-border pt-3 text-xs">
           <div class="flex items-center gap-2">
             <ArrowLeftRight class="h-4 w-4 text-primary" aria-hidden="true" />
@@ -483,6 +480,7 @@ const details = computed(() => props.folder ? [
         <ReferencedBy
           v-if="currentUser && !props.folder && !mock"
           class="mt-4 border-t border-border pt-3"
+          quiet-empty
           :preflight="fileReferences"
           :busy="referencesBusy || referencesResolving"
           :error="referencesError"

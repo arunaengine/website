@@ -71,6 +71,7 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/CopyButton.vue': moduleDefault(defineComponent({ props: { value: String }, setup: (props) => () => h('button', { 'data-copy': props.value }) })),
   '@/components/ui/DetailDialog.vue': moduleDefault(DetailDialogStub),
+  '@/components/ui/DetailList.vue': moduleDefault(compileClientComponent(new URL('../ui/DetailList.vue', import.meta.url), { vue: VueRuntime })),
   '@/components/ui/DialogTitle.vue': moduleDefault(Slotted('h2')),
   '@/components/ui/Spinner.vue': moduleDefault(Slotted('i')),
   '@/components/ui/Tabs.vue': moduleDefault(TabsStub),
@@ -376,11 +377,21 @@ describe('file details references', () => {
   })
 })
 
+describe('file details facts', () => {
+  it('leaves out a content type and version the node did not give', async () => {
+    headObject.mockResolvedValueOnce({})
+    const { root } = await mount('general')
+    expect(content(root)).not.toContain('Content type')
+    expect(content(root)).not.toContain('Current version')
+    expect(content(root)).not.toContain('unknown')
+  })
+})
+
 describe('file details public access', () => {
   it('shows the state and opens the public access dialog', async () => {
     filePublic.value = false
     const { root } = await mount('general')
-    expect(content(root)).toContain('private')
+    expect(content(root)).toContain('Private')
     expect(content(root)).not.toContain('public access dialog')
 
     expect(nodes(root).some((node) => String(node.props['data-copy'] ?? '').startsWith('https://'))).toBe(false)
@@ -394,7 +405,7 @@ describe('file details public access', () => {
     filePublic.value = true
     try {
       const { root } = await mount('general')
-      expect(content(root)).toContain('public')
+      expect(content(root)).toContain('Public')
       expect(content(root)).toContain('Access…')
       const copy = element(root, (node) => String(node.props['data-copy'] ?? '').startsWith('https://'))
       expect(copy.props['data-copy']).toBe('https://s3.node-1.example/reef-survey/raw/reads.fastq')
@@ -439,7 +450,7 @@ describe('file details shared state and syncs', () => {
     const shared = { isPublic: () => true, groupName: ref('Reef lab') }
     const { root } = await mount('general', { access: shared })
 
-    expect(content(root)).toContain('public')
+    expect(content(root)).toContain('Public')
     expect(nodes(root).some((node) => String(node.props['data-copy'] ?? '').startsWith('https://'))).toBe(true)
   })
 
