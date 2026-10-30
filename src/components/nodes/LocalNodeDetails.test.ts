@@ -14,10 +14,20 @@ const CopyStub = defineComponent({
   setup: (props) => () => h('button', { 'data-copy': props.value, 'aria-label': props.label }),
 })
 
+const HintStub = defineComponent({ props: { label: { type: String, default: '' } }, setup: (props) => () => h('button', { 'data-hint': props.label }) })
+const icons = Object.fromEntries(['CircleCheck', 'Database', 'ExternalLink', 'HardDrive', 'Network', 'Tag', 'TriangleAlert', 'Users'].map((name) => [name, Slotted('i')]))
+
 const details = compileClientComponent(new URL('./LocalNodeDetails.vue', import.meta.url), {
   vue: VueRuntime,
   './node-display': NodeDisplay,
-  '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
+  '@lucide/vue': icons,
+  '@/components/ui/Button.vue': moduleDefault(Slotted('span')),
+  '@/components/ui/DetailList.vue': moduleDefault(defineComponent({
+    props: { items: { type: Array, default: () => [] } },
+    setup: (props) => () => h('dl', (props.items as { label: string; value: string }[]).map((item) => h('div', [h('dt', item.label), h('dd', item.value)]))),
+  })),
+  '@/components/ui/InfoHint.vue': moduleDefault(HintStub),
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => (id === 'a'.repeat(64) ? 'Microbiology laptop' : `${id.slice(0, 8)}…`) }) },
   '@/components/ui/CopyButton.vue': moduleDefault(CopyStub),
   '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
   '@/components/ui/QuotaBar.vue': moduleDefault(Slotted('div')),
@@ -47,7 +57,7 @@ describe('node interfaces', () => {
     expect(content(row)).toContain('https://api.example.org/oai')
     expect(element(row, (node) => node.props['data-copy'] !== undefined).props['data-copy']).toBe('https://api.example.org/oai')
     expect(element(row, (node) => node.tag === 'a').props.href).toBe('https://api.example.org/oai?verb=Identify')
-    expect(content(root)).toContain('OAI-PMH lets other services collect the metadata of public datasets.')
+    expect(element(root, (node) => node.props['data-hint'] !== undefined).props['data-hint']).toBe('OAI-PMH lets other services collect the metadata of public datasets.')
   })
 
   it('offers no copy or link without a REST url', async () => {
@@ -79,7 +89,7 @@ describe('node interfaces', () => {
     const text = content(root)
 
     expect(text).toContain('Local addresses')
-    expect(text).toContain('Tools on this computer can connect here.')
+    expect(element(root, (node) => node.props['data-hint'] !== undefined).props['data-hint']).toBe('Tools on this computer can connect here.')
     expect(text).toContain('http://127.0.0.1:34116/api/v1')
     expect(content(element(root, (node) => node.tag === 'li' && content(node).includes('Realm API')))).toContain('https://api.mgmt.example.org/api/v1')
     expect(text).not.toContain('OAI-PMH')
@@ -116,5 +126,16 @@ describe('node interfaces', () => {
     expect(more).toHaveLength(0)
     // A plain word, not a pill.
     expect(String(degraded.props.class)).not.toContain('uppercase')
+  })
+
+  it('names an unreachable peer by its node and keeps the raw warning behind a hint', async () => {
+    const warned = info('https://api.example.org/api/v1')
+    const raw = `managed peer ${'a'.repeat(64)} unreachable: DHT error: timeout`
+    warned.warnings = [raw]
+    const { root } = await mountApp(details, { props: { info: warned } })
+
+    expect(content(root)).toContain('Microbiology laptop is unreachable')
+    expect(content(root)).not.toContain('a'.repeat(64))
+    expect(nodes(root).some((node) => node.props['data-hint'] === raw)).toBe(true)
   })
 })

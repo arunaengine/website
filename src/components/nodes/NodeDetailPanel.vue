@@ -36,11 +36,11 @@ defineProps<{
     <!-- Role and online state are on the card or page header already; these are the rest. -->
     <dl class="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
       <div>
-        <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Configured</dt>
+        <dt class="type-label">Configured</dt>
         <dd class="mt-1 text-xs text-foreground/90">{{ node.configured ? 'yes' : 'no' }}</dd>
       </div>
       <div v-if="probe?.latencyMs !== undefined" title="Best of two REST /info round trips measured from this browser">
-        <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Latency</dt>
+        <dt class="type-label">Latency</dt>
         <dd class="mt-1 font-mono text-xs tabular-nums text-foreground/90">{{ Math.round(probe.latencyMs) }} ms</dd>
       </div>
     </dl>
@@ -50,19 +50,19 @@ defineProps<{
       <dl v-if="node.placement" class="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
         <!-- "default" names no place, so only a real location shows. -->
         <div v-if="node.placement.location && node.placement.location !== 'default'">
-          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Location</dt>
+          <dt class="type-label">Location</dt>
           <dd class="mt-0.5 text-xs text-foreground/90">{{ node.placement.location }}</dd>
         </div>
         <div>
-          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Weight</dt>
+          <dt class="type-label">Weight</dt>
           <dd class="mt-0.5 font-mono text-xs tabular-nums text-foreground/90">{{ node.placement.weight }}</dd>
         </div>
         <div>
-          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Full</dt>
+          <dt class="type-label">Full</dt>
           <dd class="mt-0.5 text-xs text-foreground/90">{{ node.placement.full ? 'yes' : 'no' }}</dd>
         </div>
         <div>
-          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Draining</dt>
+          <dt class="type-label">Draining</dt>
           <dd class="mt-0.5 text-xs text-foreground/90">{{ node.placement.draining ? 'yes' : 'no' }}</dd>
         </div>
       </dl>
@@ -97,16 +97,16 @@ defineProps<{
       <h2 class="font-display text-sm font-semibold text-aruna-navy">Storage usage</h2>
       <dl class="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
         <div>
-          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Objects</dt>
+          <dt class="type-label">Objects</dt>
           <dd class="mt-0.5 font-mono text-xs tabular-nums text-foreground/90">{{ formatNumber(probe.usage.objects) }}</dd>
           <dd class="mt-0.5 text-[11px] text-muted-foreground">{{ formatNumber(probe.usage.stored_blobs ?? 0) }} physical blob locations</dd>
         </div>
         <div>
-          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Stored</dt>
+          <dt class="type-label">Stored</dt>
           <dd class="mt-0.5 font-mono text-xs tabular-nums text-foreground/90">{{ formatBytes(probe.usage.stored_bytes ?? 0) }}</dd>
         </div>
         <div>
-          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Buckets</dt>
+          <dt class="type-label">Buckets</dt>
           <dd class="mt-0.5 font-mono text-xs tabular-nums text-foreground/90">{{ formatNumber(probe.usage.buckets) }}</dd>
         </div>
       </dl>
@@ -115,7 +115,7 @@ defineProps<{
     <template v-if="probe?.info">
       <div class="border-t border-border/70 pt-3">
         <div class="mb-2 flex items-center gap-2">
-          <span class="text-[10px] font-semibold uppercase tracking-wider text-primary">{{ isLocal ? 'This node' : 'Node details' }}</span>
+          <span class="type-label text-primary">{{ isLocal ? 'This node' : 'Node details' }}</span>
           <!-- A fine status says nothing; only a problem is named. -->
           <Badge v-if="statusProblem(probe.info.node.status)" size="sm" :variant="statusVariant(probe.info.node.status)" class="uppercase">{{ statusProblem(probe.info.node.status)!.word }}</Badge>
         </div>

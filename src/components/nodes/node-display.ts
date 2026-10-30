@@ -44,6 +44,16 @@ export function nodeName(node: Pick<RealmNodeInfo, 'kind' | 'display_name' | 'in
   return (parts[0] === 'api' ? parts[1] : parts[0]) || (node.kind === 'user' ? 'Device' : 'Unnamed node')
 }
 
+const PEER_ID = /\b[0-9a-f]{64}\b/
+
+/** A node warning for people: a peer id reads as its node's name, the raw text is kept for a hint. */
+export function readableWarning(text: string, name: (nodeId: string) => string): { text: string; raw?: string } {
+  const id = text.match(PEER_ID)?.[0]
+  if (!id) return { text }
+  const head = (text.split(': ')[0] ?? text).replace(/^(managed )?peer\s+/i, '').replace(id, name(id))
+  return { text: head.replace(/\s+unreachable$/, ' is unreachable'), raw: text }
+}
+
 export type { BadgeVariant }
 
 export const kindVariant: Record<RealmNodeInfo['kind'], BadgeVariant> = {

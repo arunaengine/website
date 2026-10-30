@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import Badge from '@/components/ui/Badge.vue'
+import Button from '@/components/ui/Button.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
+import DetailList from '@/components/ui/DetailList.vue'
+import InfoHint from '@/components/ui/InfoHint.vue'
 import QuotaBar from '@/components/ui/QuotaBar.vue'
-import { statusProblem } from './node-display'
+import { readableWarning, statusProblem } from './node-display'
+import { useRealmNodes } from '@/composables/useRealmNodes'
+import { CircleCheck, Database, ExternalLink, HardDrive, Network, Tag, TriangleAlert, Users } from '@lucide/vue'
 import { backendQuota } from '@/lib/storage'
 import { formatBytes } from '@/lib/utils'
 import type { InfoResponse } from '@/lib/api'
@@ -22,13 +26,6 @@ const props = defineProps<{
   realmApi?: string | null
 }>()
 
-interface Detail {
-  label: string
-  value: string
-  // Optional hover tooltip; falls back to the value when omitted.
-  title?: string
-}
-
 const portal = computed(() => props.info.portal)
 
 // Three honest portal states. `installed: false` is the only case where the
@@ -44,14 +41,10 @@ const portalValue = computed(() => {
   return p.version || 'unknown version'
 })
 
-const portalTitle = computed(() =>
-  portal.value ? portalValue.value : 'Portal status not reported for this node',
-)
-
-const details = computed<Detail[]>(() => [
-  { label: 'API version', value: props.info.api_version || '-' },
-  { label: 'Portal', value: portalValue.value, title: portalTitle.value },
-  { label: 'Portal source', value: portal.value?.source || '-' },
+const details = computed(() => [
+  { label: 'API version', value: props.info.api_version || '-', mono: true },
+  { label: 'Portal', value: portalValue.value },
+  ...(portal.value?.source ? [{ label: 'Portal source', value: portal.value.source }] : []),
   { label: 'Connections', value: String(connectionCount.value ?? '-') },
 ])
 
@@ -83,9 +76,10 @@ const interfaces = computed(() => [
 ])
 
 
+const SERVICE = { network: { label: 'Network', icon: Network }, blob: { label: 'Blob storage', icon: HardDrive }, database: { label: 'Database', icon: Database } }
 const services = computed(() =>
   (['network', 'blob', 'database'] as const)
-    .map((name) => ({ name, status: props.info.services[name]?.status }))
+    .map((name) => ({ name, ...SERVICE[name], status: props.info.services[name]?.status }))
     .filter((service) => service.status),
 )
 
@@ -97,19 +91,22 @@ const backends = computed(() =>
     quota: backendQuota(backend),
   })),
 )
+
+// Peer ids in warnings read as node names; the raw text stays behind a hint.
+const { displayName } = useRealmNodes()
+const warnings = computed(() => props.info.warnings.map((text) => readableWarning(text, displayName)))
+const META = 'flex flex-wrap items-center gap-x-5 gap-y-1 type-secondary [&>span]:inline-flex [&>span]:items-center [&>span]:gap-1.5 [&_svg]:size-3.5'
 </script>
 
 <template>
   <div class="space-y-4">
-    <dl class="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-      <div v-for="detail in details" :key="detail.label">
-        <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{{ detail.label }}</dt>
-        <dd class="mt-0.5 truncate font-mono text-xs tabular-nums text-foreground/90" :title="detail.title ?? detail.value">{{ detail.value }}</dd>
-      </div>
-    </dl>
+    <DetailList :items="details" class="sm:grid-cols-4" />
 
     <div>
-      <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ device ? 'Local addresses' : 'Interfaces' }}</h2>
+      <h2 class="flex items-center gap-1.5 font-display text-sm font-semibold text-aruna-navy">
+        {{ device ? 'Local addresses' : 'Interfaces' }}
+        <InfoHint :label="device ? 'Tools on this computer can connect here.' : 'OAI-PMH lets other services collect the metadata of public datasets.'" />
+      </h2>
       <ul class="mt-1.5 space-y-1.5">
         <li
           v-for="iface in interfaces"
@@ -124,27 +121,22 @@ const backends = computed(() =>
           </span>
           <template v-if="'oai' in iface && iface.url">
             <CopyButton :value="iface.url" label="Copy OAI-PMH base URL" />
-            <a :href="`${iface.url}?verb=Identify`" target="_blank" rel="noopener" class="shrink-0 text-xs text-primary hover:underline">Identify</a>
+            <Button variant="outline" size="sm" class="h-7 shrink-0" as-child>
+              <a :href="`${iface.url}?verb=Identify`" target="_blank" rel="noopener"><ExternalLink class="size-3.5" /> Identify</a>
+            </Button>
           </template>
         </li>
       </ul>
-      <p class="mt-1.5 text-[11px] text-muted-foreground">
-        {{ device ? 'Tools on this computer can connect here.' : 'OAI-PMH lets other services collect the metadata of public datasets.' }}
-      </p>
     </div>
 
     <div v-if="services.length">
       <h2 class="font-display text-sm font-semibold text-aruna-navy">Services</h2>
-      <div class="mt-1.5 flex flex-wrap gap-2">
-        <span
-          v-for="service in services"
-          :key="service.name"
-          class="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background/60 px-2 py-1 text-xs text-foreground"
-        >
-          {{ service.name }}
-          <span v-if="statusProblem(service.status)" class="text-[11px] text-destructive">{{ statusProblem(service.status)!.word }}</span>
+      <p :class="['mt-1.5', META]">
+        <span v-for="service in services" :key="service.name">
+          <component :is="service.icon" aria-hidden="true" />{{ service.label }}
+          <span v-if="statusProblem(service.status)" class="text-destructive">{{ statusProblem(service.status)!.word }}</span>
         </span>
-      </div>
+      </p>
     </div>
 
     <div v-if="backends.length">
@@ -155,19 +147,12 @@ const backends = computed(() =>
           :key="backend.name"
           class="rounded-md border border-border/70 bg-background/60 px-2.5 py-1.5"
         >
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-xs font-medium text-foreground">{{ backend.name }}</span>
-            <Badge size="sm" variant="secondary" class="uppercase">{{ backend.backend }}</Badge>
-            <Badge v-if="backend.default" size="sm" variant="royal" class="uppercase">default</Badge>
-            <Badge v-if="backend.class" size="sm" variant="outline">class {{ backend.class }}</Badge>
-            <Badge size="sm"
-              v-if="backend.allow_tenants"
-              variant="accent"
-              class="uppercase"
-              title="Groups can send their uploads to this storage class"
-            >
-              available to groups
-            </Badge>
+          <div :class="META">
+            <span class="font-medium text-foreground">{{ backend.name }}</span>
+            <span><HardDrive aria-hidden="true" />{{ backend.backend === 's3' ? 'S3' : backend.backend.charAt(0).toUpperCase() + backend.backend.slice(1) }}</span>
+            <span v-if="backend.default"><CircleCheck aria-hidden="true" />Default</span>
+            <span v-if="backend.class"><Tag aria-hidden="true" />Class {{ backend.class }}</span>
+            <span v-if="backend.allow_tenants" title="Groups can send their uploads to this storage class"><Users aria-hidden="true" />Available to groups</span>
             <span class="flex-1" />
             <!-- A working backend says nothing; a backend with a problem says it in one word. -->
             <span
@@ -198,7 +183,12 @@ const backends = computed(() =>
 
     <div v-if="info.warnings.length">
       <h2 class="font-display text-sm font-semibold text-aruna-navy">Warnings</h2>
-      <Notice tone="warning" class="mt-1.5" :lines="info.warnings" />
+      <Notice tone="warning" class="mt-1.5">
+        <p v-for="(warning, index) in warnings" :key="index" class="flex items-center gap-1.5">
+          <TriangleAlert class="size-3.5 shrink-0" aria-hidden="true" />{{ warning.text }}
+          <InfoHint v-if="warning.raw" :label="warning.raw" name="Full warning" />
+        </p>
+      </Notice>
     </div>
   </div>
 </template>
