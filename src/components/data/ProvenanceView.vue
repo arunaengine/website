@@ -1,16 +1,15 @@
 <script setup lang="ts">
 // Where a file or dataset came from, one link at a time with the user's own access. Opening it
-// reads the direct inputs; "Full chain" follows every link and can be stopped.
+// reads the direct inputs; each earlier part opens in place and is read then, and reading can stop.
 import { computed, defineComponent, h, reactive, ref, watch, type Component, type PropType, type VNode } from 'vue'
 import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import { useElementSize } from '@vueuse/core'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
-import OptionToggle from '@/components/ui/OptionToggle.vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
-import { ArrowDown, CloudOff, Database, Download, EyeOff, File, FileText, Files, GitBranch, Globe, Info, MoveRight, Plus, RotateCw, Workflow } from '@lucide/vue'
+import { ArrowDown, CloudOff, Database, Download, EyeOff, File, FileText, Files, GitBranch, Globe, Info, Minus, MoveRight, Plus, RotateCw, Workflow } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { apiErrorMessage } from '@/lib/api'
 import { folderRoute, objectRoute } from '@/lib/crate/dataIdentity'
@@ -20,13 +19,12 @@ import {
   drawnChain,
   emptyGraph,
   expand,
-  expandAll,
-  hasPending,
   intoRecord,
   startDataset,
   startFile,
   type Box,
   type ChainCard,
+  type DrawnNode,
   type Graph,
   type ProvenanceStart,
   type Readers,
@@ -48,7 +46,8 @@ const readers: Readers = {
 
 const graph = reactive<Graph>(emptyGraph())
 const walking = ref(false)
-const mode = ref<'direct' | 'full'>('direct')
+// Cards opened or closed by hand, by card id; the rest follow the direct default.
+const opened = ref(new Map<string, boolean>())
 // Each read has its number; a newer read or a stop ends the older one.
 let reading = 0
 let generation = 0
@@ -70,6 +69,7 @@ watch(
     stop()
     went.value = null
     wentState.value = 'idle'
+    opened.value = new Map()
     Object.assign(graph, emptyGraph())
     if (props.start.kind === 'file') startFile(graph, props.start.id, props.start.name, props.start.origin)
     else startDataset(graph, props.start.title, props.start.documentId, props.start.crate)
@@ -77,19 +77,7 @@ watch(
   { immediate: true },
 )
 
-function read() {
-  return mode.value === 'full' ? showAll() : readDirect()
-}
-
-async function showAll() {
-  const current = fenced()
-  const run = ++reading
-  walking.value = true
-  await expandAll(graph, readers, () => run !== reading, current)
-  if (run === reading) walking.value = false
-}
-
-// The open cards of the direct view; a run record's results are not read, its card counts them.
+// The open cards; a run record's results are not read, its card counts them.
 async function readDirect() {
   const current = fenced()
   const run = ++reading
@@ -107,8 +95,6 @@ function stop() {
   reading += 1
   walking.value = false
 }
-
-const more = computed(() => hasPending(graph))
 
 // The export is assembled by the node and saved as one file.
 const exporting = ref(false)
@@ -161,7 +147,7 @@ const PITCH = 120
 const GAP = 48
 
 const chain = computed(() => intoRecord(graph, drawnChain(graph)))
-const layout = computed(() => chainColumns(graph, chain.value, mode.value === 'direct'))
+const layout = computed(() => chainColumns(graph, chain.value, true, opened.value))
 const gridStyle = computed(() => ({
   gridTemplateColumns: Array.from({ length: layout.value.columns }, () => 'minmax(9rem, 16rem)').join(` ${GAP}px `),
   gridTemplateRows: `repeat(${layout.value.rows * 2}, ${PITCH / 2}px)`,
@@ -210,20 +196,36 @@ interface Shown {
   muted: boolean
   fold?: { key: string; open: boolean }
   action?: { label: string; icon: Component; run: () => void }
+  earlier?: { open: boolean; text: string; label: string }
+}
+
+// What a closed card holds back: the cards before it, and whether links there are still unread.
+function before(node: DrawnNode): { count: number; unread: boolean } {
+  const unread = node.ids.some((id) => graph.boxes[id]?.pending.length && graph.boxes[id]!.kind !== 'silent')
+  return node.sources.map(before).reduce((sum, each) => ({ count: sum.count + 1 + each.count, unread: sum.unread || each.unread }), { count: 0, unread })
+}
+
+// Every card but the start opens and closes what came before it, in place.
+function earlierOf(card: ChainCard): Shown['earlier'] {
+  if (!card.into || card.node.repeat) return undefined
+  const { count, unread } = before(card.node)
+  if (!count && !unread) return undefined
+  if (card.open) return { open: true, text: 'Hide', label: 'Hide earlier steps' }
+  const steps = `${count}${unread ? '+' : ''} ${count === 1 && !unread ? 'step' : 'steps'}`
+  return { open: false, text: count ? steps : 'More', label: count ? `Show ${steps} before this` : 'Show earlier steps' }
+}
+
+function toggleEarlier(card: ChainCard) {
+  opened.value = new Map(opened.value).set(card.id, !card.open)
 }
 
 function shown(card: ChainCard): Shown {
   const items = card.node.ids.map((id) => graph.boxes[id]).filter((item): item is Box => Boolean(item))
   const item = items[0]!
   const me = !card.into
-  const waiting = items.some((each) => each.pending.length)
-  const action = item.kind === 'silent'
-    ? { label: 'Try again', icon: RotateCw, run: () => expand(graph, item.id, readers, fenced()) }
-    : waiting && mode.value === 'full' && !walking.value && !(me && props.record)
-      ? { label: items.length > 1 ? 'Show where these came from' : 'Show where this came from', icon: Plus, run: () => expandEach(items) }
-      : undefined
+  const action = item.kind === 'silent' ? { label: 'Try again', icon: RotateCw, run: () => expand(graph, item.id, readers, fenced()) } : undefined
   const repeat = card.node.repeat && item.from.length ? (items.length > 1 ? 'Where these came from is shown elsewhere.' : 'Where it came from is shown elsewhere.') : ''
-  const base = { identifiers: [], me, muted: false, action }
+  const base = { identifiers: [], me, muted: false, action, earlier: earlierOf(card) }
   if (me && props.record && props.start.kind === 'dataset') {
     const files = props.record.files
     return { ...base, icon: Files, role: 'Files', title: `${files} result ${files === 1 ? 'file' : 'files'}`, detail: props.record.path, mono: true, to: props.record.to ?? undefined }
@@ -258,11 +260,6 @@ function shown(card: ChainCard): Shown {
     href: document ? undefined : item.link?.url,
     muted: item.kind === 'hidden' || item.kind === 'unversioned' || item.kind === 'silent',
   }
-}
-
-async function expandEach(items: Box[]) {
-  const current = fenced()
-  for (const item of items) if (current()) await expand(graph, item.id, readers, current)
 }
 
 // Sibling files folded into one card list their names below the chain on request.
@@ -312,6 +309,16 @@ const CardView = defineComponent({
       if (view.action) {
         const action = view.action
         head.push(h('button', { type: 'button', class: 'relative z-10 -my-1 ml-auto inline-flex shrink-0 rounded p-0.5 text-primary hover:bg-muted', title: action.label, 'aria-label': action.label, onClick: action.run }, [h(action.icon, { class: 'h-3.5 w-3.5' }), h('span', { class: 'sr-only' }, action.label)]))
+      } else if (view.earlier) {
+        const earlier = view.earlier
+        head.push(h('button', {
+          type: 'button',
+          class: 'relative z-10 -my-1 ml-auto inline-flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-primary hover:bg-muted',
+          title: earlier.label,
+          'aria-label': earlier.label,
+          'aria-expanded': earlier.open,
+          onClick: () => toggleEarlier(cardProps.card),
+        }, [h(earlier.open ? Minus : Plus, { class: 'h-3.5 w-3.5', 'aria-hidden': 'true' }), earlier.text]))
       }
       return h('div', {
         class: [
@@ -354,13 +361,9 @@ const ListBranch: ReturnType<typeof defineComponent> = defineComponent({
   },
 })
 
-// Reads after every new start and every switch of the scope.
-watch(() => [props.start, sessionEpoch.value, mode.value], () => void read(), { immediate: true })
+// Reads after every new start and every card opened by hand.
+watch(() => [props.start, sessionEpoch.value, opened.value], () => void readDirect(), { immediate: true })
 
-const MODES = [
-  { value: 'direct', label: 'Direct inputs' },
-  { value: 'full', label: 'Full chain' },
-]
 const INFO = 'You only see what you are allowed to read.'
 const LEGEND = [
   { icon: MoveRight, label: 'Flows from source to result' },
@@ -381,7 +384,6 @@ const legend = computed(() => {
   <div class="space-y-4">
     <SectionHeading v-if="start.kind === 'dataset'" id="provenance-heading" title="Where it came from" :icon="GitBranch" :info="INFO">
       <template #actions>
-        <OptionToggle v-model="mode" :options="MODES" aria-label="Graph scope" />
         <Button size="sm" variant="outline" :disabled="exporting" @click="exportCrate"><Download class="h-4 w-4" /> Export as crate</Button>
       </template>
     </SectionHeading>
@@ -389,22 +391,15 @@ const legend = computed(() => {
       <Tooltip :label="INFO">
         <button type="button" class="inline-flex rounded-full text-muted-foreground hover:text-foreground" aria-label="About where it came from"><Info class="size-4" /></button>
       </Tooltip>
-      <OptionToggle v-model="mode" class="ml-auto" :options="MODES" aria-label="Graph scope" />
-      <Button size="sm" variant="outline" :disabled="exporting" @click="exportCrate"><Download class="h-4 w-4" /> Export as crate</Button>
+      <Button size="sm" variant="outline" class="ml-auto" :disabled="exporting" @click="exportCrate"><Download class="h-4 w-4" /> Export as crate</Button>
     </div>
     <Notice v-if="exportError" tone="error">{{ exportError }}</Notice>
     <p v-else-if="exported" role="status" class="text-xs text-muted-foreground">Saved as provenance.zip.</p>
 
     <div :class="start.kind === 'dataset' ? 'surface overflow-hidden' : ''">
-      <div v-if="walking || (mode === 'full' && more)" class="flex flex-wrap items-center gap-2 px-4 pt-3 text-xs text-muted-foreground">
-        <template v-if="walking">
-          Reading: {{ graph.steps }} steps read
-          <button type="button" class="text-primary hover:underline" @click="stop">Stop</button>
-        </template>
-        <template v-else>
-          Some links are not read yet.
-          <Button size="sm" variant="ghost" class="h-7 px-2" @click="showAll">Show all</Button>
-        </template>
+      <div v-if="walking" class="flex flex-wrap items-center gap-2 px-4 pt-3 text-xs text-muted-foreground">
+        Reading: {{ graph.steps }} steps read
+        <button type="button" class="text-primary hover:underline" @click="stop">Stop</button>
       </div>
       <div ref="pane" :class="start.kind === 'dataset' ? 'p-4' : 'py-2'">
         <div v-if="narrow" class="flex flex-col gap-4">

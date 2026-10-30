@@ -364,6 +364,14 @@ describe('chain columns', () => {
     const direct = chainColumns(graph, [record!], true)
     expect(direct.cards.map((card) => card.node.ids[0])).toEqual(['genome', 'db', 'run:r1', 'dataset:d1'])
     expect(direct.cards.find((card) => card.node.ids[0] === 'db')).toMatchObject({ column: 0, open: false })
+
+    // Opening the database card in place draws one step more; closing the run hides its inputs.
+    const db = direct.cards.find((card) => card.node.ids[0] === 'db')!
+    const run = direct.cards.find((card) => card.node.ids[0] === 'run:r1')!
+    const opened = chainColumns(graph, [record!], true, new Map([[db.id, true]]))
+    expect(opened.cards.map((card) => [card.node.ids[0], card.open])).toEqual([['genome', false], ['release:6', false], ['db', true], ['run:r1', true], ['dataset:d1', true]])
+    const closed = chainColumns(graph, [record!], true, new Map([[run.id, false]]))
+    expect(closed.cards.map((card) => card.node.ids[0])).toEqual(['run:r1', 'dataset:d1'])
   })
 
   it('folds many files without sources into one card, a few stay apart', () => {

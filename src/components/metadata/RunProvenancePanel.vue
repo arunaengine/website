@@ -270,7 +270,7 @@ function groupSize(group: FileGroup): string {
         <SectionHeading id="run-inputs-heading" title="Inputs" :icon="LogIn">
           <template #actions>
             <span v-if="inputSummary" class="text-xs tabular-nums text-muted-foreground">{{ inputSummary }}</span>
-            <Button variant="outline" size="sm" @click="emit('chain')"><GitBranch class="h-4 w-4" /> Full chain</Button>
+            <Button variant="outline" size="sm" @click="emit('chain')"><GitBranch class="h-4 w-4" /> Where it came from</Button>
           </template>
         </SectionHeading>
         <div class="surface flex-1 overflow-hidden">

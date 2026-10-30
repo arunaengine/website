@@ -27,13 +27,6 @@ const component = compileClientComponent(new URL('./ProvenanceView.vue', import.
   '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
   '@/components/ui/Tooltip.vue': moduleDefault(Slotted('span')),
   '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent({ props: { title: String }, setup: (props, { slots }) => () => h('header', [props.title, slots.actions?.()]) })),
-  '@/components/ui/OptionToggle.vue': moduleDefault(
-    defineComponent({
-      props: { modelValue: String, options: Array },
-      emits: ['update:modelValue'],
-      setup: (props, { emit }) => () => h('div', (props.options as { value: string; label: string }[]).map((option) => h('button', { onClick: () => emit('update:modelValue', option.value) }, option.label))),
-    }),
-  ),
   '@/lib/crate/dataIdentity': { folderRoute: (bucket: string) => ({ name: 'bucket', params: { bucketId: bucket } }), objectRoute: (bucket: string, key: string) => ({ name: 'bucket', params: { bucketId: bucket }, query: { object: key } }) },
   '@/lib/objectListing': { splitName: (name: string) => [name, ''] },
   '@/composables/useAruna': { useAruna: () => aruna },
@@ -51,6 +44,16 @@ const crate = {
     { '@id': 's3://lab/in.faa', '@type': 'File', name: 'in.faa', contentUrl: ['s3://lab/in.faa', INPUT] },
     { '@id': 's3://lab/c.yaml', '@type': 'File', name: 'c.yaml', contentUrl: 's3://lab/c.yaml' },
   ],
+}
+
+// Opens every closed card in place, one step at a time, until nothing earlier is left.
+async function openAll(root: Awaited<ReturnType<typeof render>>) {
+  for (;;) {
+    await vi.waitFor(() => expect(content(root)).not.toContain('Reading:'))
+    const closed = nodes(root).find((node) => node.tag === 'button' && node.props['aria-expanded'] === false && String(node.props['aria-label'] ?? '').startsWith('Show '))
+    if (!closed) return
+    await click(closed)
+  }
 }
 
 async function render(extra: Partial<OriginResponse> = {}) {
@@ -80,16 +83,24 @@ describe('provenance view', () => {
     expect(run?.props.to).toEqual({ name: 'dataset', params: { id: 'doc1' } })
   })
 
-  it('follows the full chain on request', async () => {
+  it('opens and closes an earlier step in place, with no switch', async () => {
     aruna.getVersionOrigin.mockReset().mockResolvedValue(origin({ origin: { kind: 'source' } as never, source: { url: 'https://example.org/in.faa' } as never }))
     const root = await render()
     await vi.waitFor(() => expect(content(root)).toContain('in.faa'))
     expect(content(root)).not.toContain('example.org')
+    expect(content(root)).not.toContain('Full chain')
 
-    await click(button(root, 'Full chain'))
+    const toggle = () => nodes(root).find((node) => node.tag === 'button' && node.props['aria-expanded'] !== undefined && content(node) !== 'Show the files')!
+    expect(toggle().props['aria-label']).toBe('Show 1 step before this')
+    await click(toggle())
     await vi.waitFor(() => expect(content(root)).toContain('example.org'))
     const source = nodes(root).find((node) => node.tag === 'a' && node.props.href === 'https://example.org/in.faa')
     expect(content(source!)).toContain('example.org')
+
+    expect(toggle().props['aria-label']).toBe('Hide earlier steps')
+    await click(toggle())
+    expect(content(root)).not.toContain('example.org')
+    expect(toggle().props['aria-label']).toBe('Show 1 step before this')
   })
 
   it('exports the crate of the start version', async () => {
@@ -158,7 +169,7 @@ describe('provenance view', () => {
     // Directly, the database's files read as the database with its release and file count.
     await vi.waitFor(() => expect(content(root)).toContain('Bakta database (light)Show the filesRelease 6.0 light, 66 files'))
     expect(content(root)).not.toContain('Source')
-    await click(button(root, 'Full chain'))
+    await openAll(root)
     await vi.waitFor(() => expect(content(root)).toContain('zenodo.org'))
     const text = content(root)
 
@@ -196,7 +207,7 @@ describe('provenance view', () => {
     }))
     const start = { kind: 'dataset', documentId: '01M63099Q2000108CB51QQDB2P', title: 'Bakta run', crate: { '@graph': [...dbFiles, result] } }
     const { root } = await mountApp(component, { props: { start } })
-    await click(button(root, 'Full chain'))
+    await openAll(root)
     await vi.waitFor(() => expect(content(root)).toContain('Where these came from is shown elsewhere.'))
     const text = content(root)
 

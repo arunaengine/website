@@ -405,14 +405,17 @@ export interface ChainCard {
   open: boolean
 }
 
-/** Places the drawn chain in columns; `direct` keeps the start, its runs and their inputs only. */
-export function chainColumns(graph: Graph, chain: DrawnNode[], direct: boolean) {
+/**
+ * Places the drawn chain in columns; `direct` keeps the start, its runs and their inputs only.
+ * `opened` opens or closes single cards by their id over that default.
+ */
+export function chainColumns(graph: Graph, chain: DrawnNode[], direct: boolean, opened?: ReadonlyMap<string, boolean>) {
   const isRun = (node: DrawnNode) => graph.boxes[node.ids[0]!]?.kind === 'run'
   const placed: (Omit<ChainCard, 'column'> & { depth: number })[] = []
   let next = 0
   const place = (node: DrawnNode, depth: number, into: string | null, underRun: boolean): number => {
     const id = `${into ?? ''}>${node.key}`
-    const open = !direct || (!underRun && (depth === 0 || isRun(node)))
+    const open = opened?.get(id) ?? (!direct || (!underRun && (depth === 0 || isRun(node))))
     const rows = (open ? node.sources : []).map((source) => place(source, depth + 1, id, underRun || isRun(node)))
     const row = rows.length ? Math.round(rows[0]! + rows[rows.length - 1]!) / 2 : next++
     placed.push({ id, node, depth, row, into, open })
