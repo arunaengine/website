@@ -25,6 +25,9 @@ describe('group storage line', () => {
     expect(limited.text).toContain('2 KB of 9.8 KB, 20%')
     expect(limited.text).toContain('500 B referenced')
     expect(limited.html).toContain('role="meter"')
+    // The bar names its share in a tooltip that the keyboard reaches too.
+    expect(limited.html).toContain('tabindex="0"')
+    expect(limited.html.replace(/\u00a0/g, ' ')).toContain('aria-label="2 KB of 9.8 KB used, 20%"')
 
     const free = await render(entry(null))
     expect(free.text).toContain('2 KB stored, no quota')

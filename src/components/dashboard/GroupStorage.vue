@@ -3,6 +3,7 @@
 // The bar shows only for a group that has a quota; `compact` is the slim one of tables and lists.
 import { HardDrive, Link } from '@lucide/vue'
 import QuotaBar from '@/components/ui/QuotaBar.vue'
+import Tooltip from '@/components/ui/Tooltip.vue'
 import type { GroupUsageEntry } from '@/composables/useMyGroupsUsage'
 import { formatBytes } from '@/lib/utils'
 
@@ -12,6 +13,10 @@ function quotaPercent(): number {
   const quota = props.entry.quota?.quota_bytes
   if (quota == null || quota <= 0) return 0
   return Math.round(((props.entry.usedBytes ?? 0) / quota) * 100)
+}
+
+function quotaTip(quota: number): string {
+  return `${formatBytes(props.entry.usedBytes ?? 0)} of ${formatBytes(quota)} used, ${quotaPercent()}%`
 }
 </script>
 
@@ -28,16 +33,23 @@ function quotaPercent(): number {
         <Link class="size-3.5 shrink-0" /><b class="font-medium text-foreground">{{ formatBytes(entry.referencedBytes) }}</b> referenced
       </span>
     </p>
-    <div v-if="entry.quota?.quota_bytes != null" :class="compact ? 'mt-1.5 w-48 max-w-full' : 'mt-2.5'">
-      <QuotaBar
-        :used="entry.usedBytes ?? 0"
-        :quota="entry.quota.quota_bytes"
-        :ceiling="entry.quota.ceiling_bytes"
-        :referenced="entry.referencedBytes ?? 0"
-        :warn="entry.quota.warning"
-        :compact="compact"
-        :show-labels="false"
-      />
-    </div>
+    <Tooltip v-if="entry.quota?.quota_bytes != null" :label="quotaTip(entry.quota.quota_bytes)">
+      <div
+        tabindex="0"
+        :aria-label="quotaTip(entry.quota.quota_bytes)"
+        class="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        :class="compact ? 'mt-1.5 w-48 max-w-full' : 'mt-2.5'"
+      >
+        <QuotaBar
+          :used="entry.usedBytes ?? 0"
+          :quota="entry.quota.quota_bytes"
+          :ceiling="entry.quota.ceiling_bytes"
+          :referenced="entry.referencedBytes ?? 0"
+          :warn="entry.quota.warning"
+          :compact="compact"
+          :show-labels="false"
+        />
+      </div>
+    </Tooltip>
   </div>
 </template>
