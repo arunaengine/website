@@ -393,7 +393,7 @@ export interface ChainCard {
   id: string
   node: DrawnNode
   column: number
-  /** A card with sources sits halfway between its first and last source, so a row may be a half. */
+  /** A card with sources sits about halfway between its first and last source, on a half row. */
   row: number
   /** The card this one leads into. */
   into: string | null
@@ -410,7 +410,7 @@ export function chainColumns(graph: Graph, chain: DrawnNode[], direct: boolean) 
     const id = `${into ?? ''}>${node.key}`
     const open = !direct || (!underRun && (depth === 0 || isRun(node)))
     const rows = (open ? node.sources : []).map((source) => place(source, depth + 1, id, underRun || isRun(node)))
-    const row = rows.length ? (rows[0]! + rows[rows.length - 1]!) / 2 : next++
+    const row = rows.length ? Math.round(rows[0]! + rows[rows.length - 1]!) / 2 : next++
     placed.push({ id, node, depth, row, into, open })
     return row
   }

@@ -355,6 +355,12 @@ describe('chain columns', () => {
     expect(place('genome')).toMatchObject({ column: 2, row: 0 })
     expect(place('source:zenodo')).toMatchObject({ column: 0, row: 1, into: place('release:6')!.id })
 
+    put(graph, 'db', 'file', ['release:6', 'run:prep'])
+    put(graph, 'run:prep', 'run', ['tarball'])
+    put(graph, 'tarball', 'file')
+    const halves = chainColumns(graph, intoRecord(graph, drawnChain(graph)), false)
+    expect(halves.cards.every((card) => Number.isInteger(card.row * 2))).toBe(true)
+
     const direct = chainColumns(graph, [record!], true)
     expect(direct.cards.map((card) => card.node.ids[0])).toEqual(['genome', 'db', 'run:r1', 'dataset:d1'])
     expect(direct.cards.find((card) => card.node.ids[0] === 'db')).toMatchObject({ column: 0, open: false })
