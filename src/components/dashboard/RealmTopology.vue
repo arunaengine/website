@@ -2,7 +2,8 @@
 // The dashboard's realm topology: the node serving this portal in the middle, the other nodes beside
 // it and, in the desktop, this computer below. A ring takes the node kind's colour, the dot its
 // state, an arc an import. Edges are the hub's own connections only, never a guessed mesh.
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { useElementSize } from '@vueuse/core'
 import { Laptop, MapPin } from '@lucide/vue'
 import type { RealmNodeInfo } from '@/lib/api'
 import { nodeName, nodeOnline, roleLabel } from '@/components/nodes/node-display'
@@ -19,20 +20,30 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ select: [nodeId: string]; hover: [nodeId: string | null] }>()
 
-const VW = 520
-const VH = 330
-const CX = VW / 2
-const HUB_Y = 120
 const RING = 20
 const HUB_RING = 22
 const DEVICE_RING = 18
 const ARC = RING + 6
-const SPREAD_X = 180
-const SPREAD_Y = 70
-const DEVICE_Y = HUB_Y + 140
 const LABEL_MAX = 22
 
 const KIND_STROKE: Record<RealmNodeInfo['kind'], string> = { management: '#335DC6', server: '#24A9E6', user: 'hsl(var(--muted-foreground))' }
+
+// Drawn in the pane's own pixels, so rings and labels keep their size at every width. A narrow
+// pane lifts the other nodes above the hub so their labels do not collide.
+const root = ref<HTMLElement | null>(null)
+const size = useElementSize(root)
+const box = computed(() => {
+  const w = size.width.value || 520
+  const h = size.height.value || 330
+  const narrow = w < 470
+  const lift = narrow ? 56 : 0
+  const spreadX = narrow ? Math.max(80, (w - 32) / 2 - 64) : Math.min(210, Math.max(144, (w - 32) / 2 - 66))
+  const below = props.computer ? 58 + 72 : 0
+  const top = 44
+  const room = h - 56 - top
+  const hubY = top + Math.max(0, (room - lift - 35 - 58 - below) / 2) + lift + 35
+  return { w, h, cx: w / 2, hubY, lift, spreadX, spreadY: 70, deviceY: hubY + 58 + Math.min(110, Math.max(28, room - lift - 35 - 58 - 72)) + DEVICE_RING }
+})
 
 const hub = computed(() => (props.localPeerId ? props.nodes.find((node) => node.node_id === props.localPeerId) : undefined))
 // The other nodes on a flat ellipse starting at the left, so two of them stand beside the hub.
@@ -40,13 +51,14 @@ const placed = computed(() => {
   const others = props.nodes.filter((node) => node !== hub.value).sort((a, b) => a.node_id.localeCompare(b.node_id))
   return others.map((node, index) => {
     const angle = Math.PI + (2 * Math.PI * index) / others.length
-    return { node, x: CX + Math.cos(angle) * SPREAD_X, y: HUB_Y + Math.sin(angle) * SPREAD_Y }
+    const { cx, hubY, lift, spreadX, spreadY } = box.value
+    return { node, x: cx + Math.cos(angle) * spreadX, y: hubY - lift + Math.sin(angle) * spreadY }
   })
 })
 // The spokes first, the hub last so it sits on top.
 const spots = computed(() => [
   ...placed.value.map((spot) => ({ ...spot, r: RING, isHub: false })),
-  ...(hub.value ? [{ node: hub.value, x: CX, y: HUB_Y, r: HUB_RING, isHub: true }] : []),
+  ...(hub.value ? [{ node: hub.value, x: box.value.cx, y: box.value.hubY, r: HUB_RING, isHub: true }] : []),
 ])
 const trim = (x1: number, y1: number, r1: number, x2: number, y2: number, r2: number) => {
   const length = Math.hypot(x2 - x1, y2 - y1) || 1
@@ -58,7 +70,7 @@ const edges = computed(() =>
     ? placed.value.map((spot) => ({
         id: spot.node.node_id,
         connected: spot.node.connection_status === 'connected',
-        ...trim(CX, HUB_Y, HUB_RING, spot.x, spot.y, RING),
+        ...trim(box.value.cx, box.value.hubY, HUB_RING, spot.x, spot.y, RING),
       }))
     : [],
 )
@@ -67,10 +79,11 @@ const computerSpot = computed(() => {
   const own = props.computer
   if (!own) return null
   const peers = new Set(own.peers)
-  const targets = [...(hub.value ? [{ node: hub.value, x: CX, y: HUB_Y, r: HUB_RING }] : []), ...placed.value.map((spot) => ({ ...spot, r: RING }))]
+  const { cx, hubY, deviceY } = box.value
+  const targets = [...(hub.value ? [{ node: hub.value, x: cx, y: hubY, r: HUB_RING }] : []), ...placed.value.map((spot) => ({ ...spot, r: RING }))]
   const lines = targets
     .filter((target) => peers.has(target.node.node_id))
-    .map((target) => ({ id: target.node.node_id, ...trim(CX, DEVICE_Y, DEVICE_RING, target.x, target.y, target.r) }))
+    .map((target) => ({ id: target.node.node_id, ...trim(cx, deviceY, DEVICE_RING, target.x, target.y, target.r) }))
   const named = own.name !== THIS_COMPUTER
   const type = ['Device', named ? 'this computer' : '', lines.length ? '' : 'not connected'].filter(Boolean).join(', ')
   return { ...own, label: short(own.name), type, lines, connected: lines.length > 0 }
@@ -107,12 +120,12 @@ const label = computed(() =>
 </script>
 
 <template>
-  <div class="grid-faint absolute inset-0">
+  <div ref="root" class="grid-faint absolute inset-0">
     <p v-if="placeLabel" class="absolute left-4 top-4 z-10 flex items-center gap-1.5 type-secondary">
       <MapPin class="size-3.5" aria-hidden="true" />{{ placeLabel }}
     </p>
     <p v-if="!nodes.length" class="absolute inset-0 grid place-items-center text-sm text-muted-foreground">This realm has no nodes yet.</p>
-    <svg v-else :viewBox="`0 0 ${VW} ${VH}`" preserveAspectRatio="xMidYMid meet" class="absolute inset-0 h-full w-full" role="img" :aria-label="label">
+    <svg v-else :viewBox="`0 0 ${box.w} ${box.h}`" class="absolute inset-0 h-full w-full" role="img" :aria-label="label">
       <defs>
         <radialGradient id="topology-glow" cx="0.5" cy="0.5" r="0.5">
           <stop offset="0%" stop-color="#4E86D7" stop-opacity="0.12" />
@@ -123,7 +136,7 @@ const label = computed(() =>
           <stop offset="100%" stop-color="#55C4DE" stop-opacity="0" />
         </radialGradient>
       </defs>
-      <ellipse :cx="CX" :cy="HUB_Y + 40" :rx="SPREAD_X + 90" :ry="SPREAD_Y + 110" fill="url(#topology-glow)" />
+      <ellipse :cx="box.cx" :cy="box.hubY + 40" :rx="box.spreadX + 90" :ry="box.spreadY + 110" fill="url(#topology-glow)" />
 
       <template v-for="edge in edges" :key="edge.id">
         <line v-if="edge.connected" :x1="edge.x1" :y1="edge.y1" :x2="edge.x2" :y2="edge.y2" stroke="#10b981" stroke-opacity="0.7" stroke-width="2" stroke-linecap="round" />
@@ -184,11 +197,11 @@ const label = computed(() =>
         @blur="hover(null)"
       >
         <title>{{ computerSpot.name }}</title>
-        <circle :cx="CX" :cy="DEVICE_Y" :r="DEVICE_RING + 10" fill="none" stroke="hsl(var(--primary))" stroke-width="2" :opacity="highlight === computerSpot.id ? 0.6 : 0" />
-        <circle :cx="CX" :cy="DEVICE_Y" :r="DEVICE_RING" fill="hsl(var(--card))" stroke="hsl(var(--muted-foreground))" stroke-width="1.5" />
-        <Laptop :x="CX - 9" :y="DEVICE_Y - 9" :size="18" color="hsl(var(--muted-foreground))" />
-        <text :x="CX" :y="DEVICE_Y + DEVICE_RING + 18" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="hsl(var(--foreground))" stroke="hsl(var(--background))" stroke-width="4" stroke-linejoin="round" paint-order="stroke">{{ computerSpot.label }}</text>
-        <text :x="CX" :y="DEVICE_Y + DEVICE_RING + 33" text-anchor="middle" font-family="Inter, sans-serif" font-size="11.5" fill="hsl(var(--muted-foreground))" stroke="hsl(var(--background))" stroke-width="4" stroke-linejoin="round" paint-order="stroke">{{ computerSpot.type }}</text>
+        <circle :cx="box.cx" :cy="box.deviceY" :r="DEVICE_RING + 10" fill="none" stroke="hsl(var(--primary))" stroke-width="2" :opacity="highlight === computerSpot.id ? 0.6 : 0" />
+        <circle :cx="box.cx" :cy="box.deviceY" :r="DEVICE_RING" fill="hsl(var(--card))" stroke="hsl(var(--muted-foreground))" stroke-width="1.5" />
+        <Laptop :x="box.cx - 9" :y="box.deviceY - 9" :size="18" color="hsl(var(--muted-foreground))" />
+        <text :x="box.cx" :y="box.deviceY + DEVICE_RING + 18" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="hsl(var(--foreground))" stroke="hsl(var(--background))" stroke-width="4" stroke-linejoin="round" paint-order="stroke">{{ computerSpot.label }}</text>
+        <text :x="box.cx" :y="box.deviceY + DEVICE_RING + 33" text-anchor="middle" font-family="Inter, sans-serif" font-size="11.5" fill="hsl(var(--muted-foreground))" stroke="hsl(var(--background))" stroke-width="4" stroke-linejoin="round" paint-order="stroke">{{ computerSpot.type }}</text>
       </g>
     </svg>
 

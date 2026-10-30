@@ -53,6 +53,7 @@ describe('realm topology', () => {
       '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => null) }),
       '@/components/nodes/node-display': NodeDisplay,
       '@/composables/useRealmNodes': { THIS_COMPUTER: 'This computer' },
+      '@vueuse/core': { useElementSize: () => ({ width: { value: 0 }, height: { value: 0 } }) },
     })
     const onSelect = vi.fn()
     const onHover = vi.fn()
