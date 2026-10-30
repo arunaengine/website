@@ -22,6 +22,8 @@ describe('database header', () => {
 
     expect(text).toContain('RefSeq genomes, version 229')
     expect(text).toContain('RefSeq assemblies')
+    // More shows only once the line is measured as cut off.
+    expect(text).not.toContain('More')
     expect(html).toContain('aria-label="Open the license')
     expect(html).toContain('href="https://doi.org/10.1093/nar/gkv1189"')
     expect(text).toContain(' License ')

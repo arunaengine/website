@@ -1,12 +1,12 @@
 <script setup lang="ts">
 // The card above the files of every bucket: a database names its dataset's title, version,
 // description, license and identifiers; a synced bucket its partners, any other bucket its name.
-import { computed, onMounted } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useResizeObserver } from '@vueuse/core'
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import ExternalLinkText from '@/components/ui/ExternalLink.vue'
 import IconTile from '@/components/ui/IconTile.vue'
-import InfoHint from '@/components/ui/InfoHint.vue'
 import { useDatabases } from '@/composables/useDatabases'
 import { identifierUrl } from '@/lib/databases'
 import { licenseText, licenseUrl } from '@/lib/licenses'
@@ -38,6 +38,16 @@ const title = computed(() => {
   return version ? `${name}, version ${version}` : name
 })
 const description = computed(() => described.value?.description ?? '')
+// "More" shows only while the one line cuts the description off.
+const descriptionEl = ref<HTMLElement | null>(null)
+const descriptionOpen = ref(false)
+const descriptionCut = ref(false)
+const measure = () => (descriptionCut.value = Boolean(descriptionEl.value && descriptionEl.value.scrollWidth > descriptionEl.value.clientWidth))
+useResizeObserver(descriptionEl, measure)
+watch(description, () => {
+  descriptionOpen.value = false
+  void nextTick(measure)
+})
 // An SPDX id reads as its license page, so every license is a link.
 const license = computed(() => licenseUrl(described.value?.license ?? ''))
 // A license without a short name reads "License" rather than its whole address.
@@ -57,15 +67,21 @@ const identifiers = computed(() => (described.value?.identifiers ?? []).map((ite
         </template>
         <template v-else>{{ bucket }}</template>
       </p>
-      <!-- One line; the whole description is behind the hint. -->
-      <p v-if="description" class="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
-        <span class="truncate">{{ description }}</span>
-        <InfoHint :label="description" name="About this database" />
+      <!-- One line; More opens the whole description in place. -->
+      <p v-if="description" class="flex min-w-0 items-baseline gap-1.5 text-sm text-muted-foreground">
+        <span ref="descriptionEl" :class="descriptionOpen ? '' : 'truncate'">{{ description }}</span>
+        <button
+          v-if="descriptionCut || descriptionOpen"
+          type="button"
+          class="shrink-0 text-primary hover:underline"
+          :aria-expanded="descriptionOpen"
+          @click="descriptionOpen = !descriptionOpen"
+        >{{ descriptionOpen ? 'Less' : 'More' }}</button>
       </p>
       <p v-if="$slots.default || entry?.public || identifiers.length" class="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <slot />
         <span v-if="entry?.public">Public</span>
-        <span v-for="item in identifiers" :key="`${item.name}:${item.value}`">{{ item.name }} <ExternalLinkText :href="item.url" :label="item.value" class="font-mono" /></span>
+        <span v-for="item in identifiers" :key="`${item.name}:${item.value}`">{{ item.name }} <ExternalLinkText :href="item.url" :label="item.value" :show-icon="false" class="font-mono" /></span>
       </p>
     </div>
     <div v-if="license || entry?.datasetId" class="flex flex-wrap items-center gap-2">
