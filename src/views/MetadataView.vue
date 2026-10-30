@@ -56,6 +56,7 @@ import { useFirstPaint } from '@/composables/useFirstPaint'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { datasetPurposeOf } from '@/lib/datasetPurpose'
 import { resultsFolder, runDuration, runState } from '@/lib/runCrate'
+import { folderRoute, parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { useS3 } from '@/composables/useS3'
 import { type MetadataDocumentSummary, type RepositoryLink, type StorageLocation } from '@/lib/api'
 import { publishedLinks } from '@/lib/repository'
@@ -98,7 +99,7 @@ const {
   licenseLabel,
   projectCrate,
 } = state
-const { displayName } = useRealmNodes()
+const { displayName, isLocalNode } = useRealmNodes()
 
 // One header for the dataset: its kind, a run's state and where it ran, and a line of facts.
 const KIND = { 'process-run': 'Run record', profile: 'Profile', dataset: 'Dataset', unknown: 'Dataset' } as const
@@ -122,13 +123,16 @@ const crumbs = computed(() => {
     : purpose.value === 'profile' ? [{ label: KINDS.profile, to: { name: 'profiles' } }] : []
   return [...kind, { label: pageTitle.value }]
 })
-// Show results opens the results folder with only this run's files.
+// Show results opens the results folder in the record's group, on the node that holds it, with only
+// this run's files. An output without a node in its id was written where the run ran.
 const { endpoint: s3Endpoint } = useS3()
 const runResults = computed(() => {
   const run = runProvenance.value
   const folder = run ? resultsFolder(run, s3Endpoint.value) : null
   if (!run || !folder) return null
-  return { name: 'bucket', params: { bucketId: folder.bucket }, query: { ...(folder.prefix ? { prefix: folder.prefix } : {}), ...(run.runId ? { run: run.runId } : {}) } }
+  const route = folderRoute(folder.bucket, folder.prefix, groupId.value)
+  const node = parseDataIdentity(run.outputs[0], s3Endpoint.value).arn?.nodeId ?? run.site?.nodeId
+  return { ...route, query: { ...route.query, ...(isLocalNode(node) ? {} : { node }), ...(run.runId ? { run: run.runId } : {}) } }
 })
 // The record's own card in its provenance: its results, their folder and where the run ran.
 const runRecord = computed(() => {

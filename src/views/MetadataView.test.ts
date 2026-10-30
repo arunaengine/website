@@ -32,6 +32,13 @@ describe('MetadataView', () => {
     expect(overview).toContain('<DetailsSection\n            v-if="!runProvenance"')
   })
 
+  it('opens the run results in the record group and on the node holding them', () => {
+    const results = source.slice(source.indexOf('const runResults = computed'), source.indexOf('// The record\'s own card'))
+    expect(results).toContain('folderRoute(folder.bucket, folder.prefix, groupId.value)')
+    expect(results).toContain('.arn?.nodeId ?? run.site?.nodeId')
+    expect(results).toContain('...(isLocalNode(node) ? {} : { node })')
+  })
+
   it('shows the dataset id once, in the developer section with a copy button', () => {
     expect(source.match(/\{\{ detailId \}\}/g)).toHaveLength(1)
     expect(source).toContain('<CopyButton :value="detailId" label="Copy the dataset id" />')
