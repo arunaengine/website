@@ -82,6 +82,28 @@ describe('databases', () => {
     scope.stop()
   })
 
+  it('keeps a dataset change pending until a read after it succeeds', async () => {
+    let first: (value: unknown) => void = () => {}
+    aruna.searchBuckets.mockReturnValueOnce(new Promise((resolve) => (first = resolve)))
+    const { databases, scope } = start()
+    databases.ensure()
+    aruna.datasetChanges.value = [...aruna.datasetChanges.value, 'd-lab']
+    databases.ensure()
+    aruna.searchBuckets.mockResolvedValueOnce(page([view('lab', 'Lab renamed')]))
+    first(page([view('lab')]))
+    await vi.waitFor(() => expect(databases.find('lab', null, null)?.title).toBe('Lab renamed'))
+    expect(aruna.searchBuckets).toHaveBeenCalledTimes(2)
+
+    aruna.searchBuckets.mockRejectedValueOnce(new Error('node down'))
+    aruna.datasetChanges.value = [...aruna.datasetChanges.value, 'd-lab']
+    databases.ensure()
+    await vi.waitFor(() => expect(databases.state.value).toBe('failed'))
+    aruna.searchBuckets.mockResolvedValueOnce(page([view('lab', 'Lab again')]))
+    databases.ensure()
+    await vi.waitFor(() => expect(databases.find('lab', null, null)?.title).toBe('Lab again'))
+    scope.stop()
+  })
+
   it('reads every page up to the end and finds the database of a bucket', async () => {
     aruna.searchBuckets.mockResolvedValueOnce(page([view('lab')], 'c1'))
     aruna.searchBuckets.mockResolvedValueOnce(page([view('spire')]))

@@ -18,7 +18,7 @@ const complete = ref(true)
 // The session the state belongs to; a load of an earlier session never blocks a new one.
 let stateEpoch = -1
 let runs = 0
-// How many dataset changes the last read started after.
+// How many dataset changes the last successful read started after.
 let changesRead = 0
 
 export function useDatabases() {
@@ -31,7 +31,7 @@ export function useDatabases() {
     const run = ++runs
     const epoch = sessionEpoch.value
     stateEpoch = epoch
-    changesRead = datasetChanges.value.length
+    const seen = datasetChanges.value.length
     if (!authToken.value) {
       listed.value = []
       state.value = 'idle'
@@ -56,6 +56,9 @@ export function useDatabases() {
       listedEpoch.value = epoch
       complete.value = failedNodes === 0
       state.value = 'ready'
+      // Changes are read only once a read that started after them succeeds.
+      changesRead = seen
+      if (changed()) void load()
     } catch (cause) {
       if (run !== runs || epoch !== sessionEpoch.value) return
       state.value = 'failed'
