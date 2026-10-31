@@ -44,6 +44,7 @@ const children = [
   'data/DeleteDialog',
   'data/FileDetailsDialog',
   'data/PublicAccessDialog',
+  'data/ShareLinkDialog',
   'ui/EmptyState',
   'data/manager/MockSidebar',
   'data/DatabaseHeader',
