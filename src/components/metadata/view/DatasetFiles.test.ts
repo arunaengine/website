@@ -12,6 +12,9 @@ import * as PagedList from '@/composables/usePagedList'
 import * as BucketLayout from '@/lib/bucketLayout'
 
 const load = vi.fn()
+// What the realm answered for the linked parts, and the part ids the files section asked about.
+const partFacts = ref(new Map<string, unknown>())
+let askedParts: { value: string[] } = { value: [] }
 const Slot = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
 const LinkStub = defineComponent({
   props: { to: { type: Object, required: true } },
@@ -22,7 +25,6 @@ const DatasetFiles = compileClientComponent(new URL('./DatasetFiles.vue', import
   vue: VueRuntime,
   'vue-router': { RouterLink: LinkStub },
   '@/components/data/ReferencedBy.vue': moduleDefault(Slot),
-  '@/components/metadata/view/LinkedPartActions.vue': moduleDefault(defineComponent({ props: { id: String }, setup: (props) => () => h('em', `linked part ${props.id}`) })),
   '@/components/metadata/view/VersionActions.vue': moduleDefault(defineComponent({ props: { realmId: String, versionId: String }, setup: (props) => () => h('em', `version actions ${props.realmId}/${props.versionId}`) })),
   '@/lib/linkedPart': LinkedPart,
   '@/components/ui/Badge.vue': moduleDefault(Slot),
@@ -44,6 +46,12 @@ const DatasetFiles = compileClientComponent(new URL('./DatasetFiles.vue', import
   },
   '@/composables/useBacklinks': {
     useBacklinks: () => ({ result: ref(null), error: ref(null), busy: ref(false), load, reset: vi.fn() }),
+  },
+  '@/composables/useLinkedParts': {
+    useLinkedParts: (ids: { value: string[] }) => {
+      askedParts = ids
+      return partFacts
+    },
   },
   '@/composables/useCrateReferences': { useCrateReferences: () => ({ referencesFor: () => [] }) },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ localNodeId: ref('n1'), displayName: () => 'Node one' }) },
@@ -167,20 +175,41 @@ describe('DatasetFiles', () => {
     mounted.app.unmount()
   })
 
-  it('offers the live files and the other datasets for a Dataset-typed part that names a bucket', async () => {
+  it('shows a linked bucket as a row with its node, links its name to Data and names the other datasets', async () => {
     const part = 'https://w3id.org/aruna/data/k3V9xQ2m/01K8Y2B6D8/cmF3LzIwMjYv'
+    const route = { name: 'bucket', params: { bucketId: 'raw' }, query: { node: 'n2' } }
+    partFacts.value = new Map([[part, {
+      target: { id: part, bucket: 'raw', prefix: '', node_id: 'n2', held_here: false },
+      problem: null,
+      route,
+      usage: { bucket: 'raw', objects: 68231, versions: 0, delete_markers: 0, open_multipart_uploads: 0, logical_bytes: 2 * 1024 ** 3, complete: true },
+      entries: { list: [{ name: 'genomes', folder: true, size: null, route: { name: 'bucket', params: { bucketId: 'raw' }, query: { prefix: 'genomes' } } }], more: true },
+      others: [{ document_id: 'd2', group_id: 'g1', document_path: 'other', graph_iri: '', title: 'Other set', links: [] }],
+    }]])
     const mounted = await render({ '@id': part, '@type': 'Dataset', name: 'Raw 2026' })
+    const text = content(mounted.root)
+    partFacts.value = new Map()
 
-    expect(content(mounted.root)).toContain(`linked part ${part}`)
+    expect(askedParts.value).toEqual([part])
+    expect(element(mounted.root, (node) => node.tag === 'a' && content(node) === 'Raw 2026').props.to).toEqual(route)
+    expect(text).toContain('68,231')
+    expect(text).toContain('2.0\u00a0GiB')
+    expect(text).toContain('Node one')
+    expect(text).toContain('genomes')
+    expect(text).toContain('More in Data')
+    expect(text).toContain('Also linked by')
+    expect(text).toContain('Other set')
+    expect(text).not.toContain('Browse the files')
     mounted.app.unmount()
   })
 
-  it('offers nothing of the kind for a file, or a Dataset that is not a bucket', async () => {
+  it('asks the realm about nothing for a file, or a Dataset that is not a bucket', async () => {
     const file = await render({ '@id': 's3://reads/raw/one.csv' })
-    expect(content(file.root)).not.toContain('linked part')
+    expect(askedParts.value).toEqual([])
+    expect(content(file.root)).not.toContain('Also linked by')
     file.app.unmount()
     const dataset = await render({ '@id': '#sub', '@type': 'Dataset', name: 'Sub' })
-    expect(content(dataset.root)).not.toContain('linked part')
+    expect(askedParts.value).toEqual([])
     dataset.app.unmount()
   })
 
@@ -206,7 +235,7 @@ describe('DatasetFiles', () => {
     const text = content(mounted.root)
 
     expect(text).toContain('db')
-    expect(text).toContain('2 files')
+    expect(nodes(mounted.root).some((node) => node.tag === 'td' && content(node).trim() === '2')).toBe(true)
     expect(text).toContain('2.0\u00a0KiB')
     expect(text).toContain('a.txt')
     expect(text).toContain('sub')

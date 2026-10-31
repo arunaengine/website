@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // The data entities a dataset references as a folder tree, plus the datasets that reference one
 // file, looked up across the Realm on its content identity. A row opens its entity for the rest.
+// A linked bucket or folder also shows what the realm knows: its node, counts and top entries.
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import ReferencedBy from '@/components/data/ReferencedBy.vue'
-import LinkedPartActions from '@/components/metadata/view/LinkedPartActions.vue'
 import VersionActions from '@/components/metadata/view/VersionActions.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -19,7 +19,9 @@ import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useBacklinks } from '@/composables/useBacklinks'
+import { useLinkedParts } from '@/composables/useLinkedParts'
 import { usePagedList } from '@/composables/usePagedList'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import type { DatasetViewState } from '@/composables/useDatasetView'
 import { bucketLayout, declaredFiles } from '@/lib/bucketLayout'
@@ -85,10 +87,11 @@ const visibleRows = computed(() =>
 )
 const { page, pageSize, shown, total, paged } = usePagedList(visibleRows)
 
-// A folder's files and bytes, summed over everything listed below it.
-function folderTotals(row: DataEntityNode): { files: number; bytes: number } {
+// A folder's files, bytes and formats, summed over everything listed below it.
+function folderTotals(row: DataEntityNode): { files: number; bytes: number; formats: Set<string> } {
   let files = 0
   let bytes = 0
+  const formats = new Set<string>()
   const walk = (ids: string[]) => {
     for (const id of ids) {
       const child = byId.value.get(id)
@@ -98,11 +101,12 @@ function folderTotals(row: DataEntityNode): { files: number; bytes: number } {
         files++
         const size = Number(child.contentSize)
         if (Number.isFinite(size)) bytes += size
+        if (child.encodingFormat) formats.add(child.encodingFormat)
       }
     }
   }
   walk(row.childIds)
-  return { files, bytes }
+  return { files, bytes, formats }
 }
 // A folder may declare more files than the dataset lists, such as a whole bucket.
 const rawById = computed(() => new Map(crateGraph(currentCrate.value).map((entity) => [String(entity['@id']), entity])))
@@ -110,10 +114,55 @@ function notListed(row: DataEntityNode): number {
   const declared = row.directory ? declaredFiles(rawById.value.get(row.id)) : null
   return declared === null ? 0 : Math.max(0, declared - folderTotals(row).files)
 }
+// A top folder adds what it declares beyond its listed files, or what its bucket's node counts.
 const fileCount = computed(() =>
-  dataEntities.value.reduce((sum, row) => sum + (row.directory ? (row.depth === 0 ? notListed(row) : 0) : 1), 0),
+  dataEntities.value.reduce((sum, row) => {
+    if (!row.directory) return sum + 1
+    if (row.depth) return sum
+    const counted = (partOf(row)?.usage?.objects ?? 0) - folderTotals(row).files
+    return sum + Math.max(notListed(row), counted)
+  }, 0),
 )
 const layout = computed(() => bucketLayout(currentCrate.value))
+
+// The linked parts on this page; their top entries are asked for only when nothing else lists them.
+const { displayName } = useRealmNodes()
+const partIds = computed(() => shown.value.filter(linkedPart).map((row) => row.id))
+const parts = useLinkedParts(partIds, detailId, (id) => !byId.value.get(id)?.childIds.length && !layout.value.rows.length)
+const partOf = (row: DataEntityNode) => parts.value.get(row.id)
+const entriesOf = (row: DataEntityNode) => partOf(row)?.entries?.list ?? []
+
+// A folder's file count: what the dataset lists and declares, or the bucket's own larger count.
+function filesOf(row: DataEntityNode): string {
+  if (!row.directory) return ''
+  const listed = folderTotals(row).files + notListed(row)
+  const usage = partOf(row)?.usage
+  if (usage && usage.objects > listed) return `${usage.complete ? '' : 'at least '}${formatCount(usage.objects)}`
+  return listed ? formatCount(listed) : ''
+}
+function sizeOf(row: DataEntityNode): string {
+  if (!row.directory) return row.contentSize ? formatContentSize(row.contentSize) : ''
+  const bytes = folderTotals(row).bytes
+  if (bytes) return formatBinary(bytes)
+  if (row.contentSize) return formatContentSize(row.contentSize)
+  const usage = partOf(row)?.usage
+  const counted = usage ? usage.logical_bytes + (usage.referenced_bytes ?? 0) : 0
+  return counted ? `${usage!.complete ? '' : 'at least '}${formatBinary(counted)}` : ''
+}
+// The row's own format, else those of the files below it, else those the bucket layout names.
+function formatsOf(row: DataEntityNode): string {
+  if (row.encodingFormat || !row.directory) return row.encodingFormat ?? ''
+  const formats = folderTotals(row).formats
+  if (!formats.size && linkedPart(row)) layout.value.rows.forEach((entry) => entry.format && formats.add(entry.format))
+  return [...formats].join(', ')
+}
+function storedOn(row: DataEntityNode): string {
+  const target = partOf(row)?.target
+  if (target?.node_id) return displayName(target.node_id)
+  return target?.set_id ? 'Several nodes' : ''
+}
+const storedShown = computed(() => shown.value.some((row) => storedOn(row)))
+const columns = computed(() => (storedShown.value ? 6 : 5))
 
 function identityOf(row: DataEntity) {
   return parseDataIdentity(row, s3Endpoint.value)
@@ -180,6 +229,8 @@ function browserRoute(row: DataEntity) {
 
 // Where a row opens in Data: a folder (also a whole bucket) as a folder, a file as its object.
 function dataRoute(row: DataEntityNode) {
+  const part = partOf(row)?.route
+  if (part) return part
   if (!row.directory) return browserRoute(row)
   const s3 = identityOf(row).s3
   if (s3) return folderRoute(s3.bucket, s3.key)
@@ -206,7 +257,7 @@ function openPreview(row: DataEntity) {
 </script>
 
 <template>
-  <section aria-labelledby="files-heading">
+  <section v-if="loadingCrate || crateNotReady || dataEntities.length || layout.rows.length" aria-labelledby="files-heading">
     <SectionHeading id="files-heading" title="Files" :icon="Files" :count="fileCount ? formatCount(fileCount) : undefined" />
     <div class="surface overflow-hidden">
       <table v-if="loadingCrate || dataEntities.length" class="w-full text-sm">
@@ -214,7 +265,9 @@ function openPreview(row: DataEntity) {
           <tr>
             <th class="py-2 pl-[3.25rem] pr-3 text-left font-medium">Name</th>
             <th class="px-3 py-2 text-right font-medium max-sm:hidden">Format</th>
+            <th class="px-3 py-2 text-right font-medium max-sm:hidden">Files</th>
             <th class="px-3 py-2 text-right font-medium">Size</th>
+            <th v-if="storedShown" class="px-3 py-2 text-left font-medium max-md:hidden">Stored on</th>
             <th class="w-px px-3 py-2"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
@@ -223,6 +276,7 @@ function openPreview(row: DataEntity) {
             <tr v-for="n in 3" :key="n" class="border-t border-border-subtle">
               <td class="py-2 pl-[3.25rem] pr-3"><Skeleton class="h-4 w-40" /></td>
               <td class="px-3 py-2 max-sm:hidden"><Skeleton class="ml-auto h-4 w-16" /></td>
+              <td class="px-3 py-2 max-sm:hidden"><Skeleton class="ml-auto h-4 w-10" /></td>
               <td class="px-3 py-2"><Skeleton class="ml-auto h-4 w-12" /></td>
               <td class="px-3 py-2"></td>
             </tr>
@@ -234,7 +288,7 @@ function openPreview(row: DataEntity) {
                   <span class="flex min-w-0 items-center gap-2" :style="{ paddingLeft: `${0.5 + row.depth * 1.5}rem` }">
                     <span class="flex w-6 shrink-0 justify-center">
                       <IconButton
-                        v-if="row.directory && row.childIds.length"
+                        v-if="row.directory && (row.childIds.length || entriesOf(row).length)"
                         :label="isOpen(row) ? `Close ${row.name}` : `Open ${row.name}`"
                         class="h-6 w-6"
                         :aria-expanded="isOpen(row)"
@@ -244,24 +298,26 @@ function openPreview(row: DataEntity) {
                       </IconButton>
                     </span>
                     <component :is="row.directory ? (isOpen(row) ? FolderOpen : Folder) : FileIcon" class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <RouterLink
+                      v-if="partOf(row)?.route"
+                      :to="partOf(row)!.route!"
+                      class="min-w-0 truncate underline decoration-border underline-offset-4 hover:decoration-foreground"
+                      :title="`Open ${row.name} in Data`"
+                    >{{ row.name }}</RouterLink>
                     <button
+                      v-else
                       type="button"
                       class="min-w-0 truncate text-left underline decoration-border underline-offset-4 hover:decoration-foreground"
                       @click="emit('info', row.id)"
                     >{{ row.name }}</button>
-                    <span v-if="row.directory && folderTotals(row).files + notListed(row)" class="shrink-0 text-xs tabular-nums text-muted-foreground">
-                      {{ formatCount(folderTotals(row).files + notListed(row)) }} {{ folderTotals(row).files + notListed(row) === 1 ? 'file' : 'files' }}
-                    </span>
                     <Badge v-if="externalHost(row)" variant="outline" size="sm" :title="`Kept at ${externalHost(row)}`">External</Badge>
                   </span>
-                  <span v-if="linkedPart(row)" class="block" :style="{ paddingLeft: `${3.75 + row.depth * 1.5}rem` }">
-                    <LinkedPartActions :id="row.id" :dataset-id="detailId" />
-                  </span>
+                  <span v-if="partOf(row)?.problem" class="block text-[11px] text-muted-foreground" :style="{ paddingLeft: `${3.75 + row.depth * 1.5}rem` }">{{ partOf(row)!.problem }}</span>
                 </td>
-                <td class="truncate px-3 py-1.5 text-right text-xs text-muted-foreground max-sm:hidden" :title="row.encodingFormat">{{ row.encodingFormat || '' }}</td>
-                <td class="whitespace-nowrap px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground">
-                  {{ row.directory ? (folderTotals(row).bytes ? formatBinary(folderTotals(row).bytes) : '') : row.contentSize ? formatContentSize(row.contentSize) : '' }}
-                </td>
+                <td class="truncate px-3 py-1.5 text-right text-xs text-muted-foreground max-sm:hidden" :title="formatsOf(row)">{{ formatsOf(row) }}</td>
+                <td class="whitespace-nowrap px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground max-sm:hidden">{{ filesOf(row) }}</td>
+                <td class="whitespace-nowrap px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground">{{ sizeOf(row) }}</td>
+                <td v-if="storedShown" class="truncate px-3 py-1.5 text-xs text-muted-foreground max-md:hidden">{{ storedOn(row) }}</td>
                 <td class="px-3 py-1.5">
                   <div class="flex items-center justify-end gap-1">
                     <VersionActions
@@ -298,8 +354,27 @@ function openPreview(row: DataEntity) {
                   </div>
                 </td>
               </tr>
-              <tr v-if="notListed(row) && (isOpen(row) || !row.childIds.length)" class="border-t border-border-subtle">
-                <td colspan="4" class="py-1.5 pr-3">
+              <template v-if="isOpen(row)">
+                <tr v-for="entry in entriesOf(row)" :key="`${row.id}:${entry.name}`" class="border-t border-border-subtle">
+                  <td class="max-w-0 py-1.5 pr-3">
+                    <span class="flex min-w-0 items-center gap-2" :style="{ paddingLeft: `${2.5 + (row.depth + 1) * 1.5}rem` }">
+                      <component :is="entry.folder ? Folder : FileIcon" class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <RouterLink :to="entry.route" class="min-w-0 truncate underline decoration-border underline-offset-4 hover:decoration-foreground" :title="entry.name">{{ entry.name }}</RouterLink>
+                    </span>
+                  </td>
+                  <td class="max-sm:hidden"></td>
+                  <td class="max-sm:hidden"></td>
+                  <td class="whitespace-nowrap px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground">{{ entry.size !== null ? formatBinary(entry.size) : '' }}</td>
+                  <td :colspan="columns - 4"></td>
+                </tr>
+                <tr v-if="partOf(row)?.entries?.more && dataRoute(row)" class="border-t border-border-subtle">
+                  <td :colspan="columns" class="py-1.5 pr-3" :style="{ paddingLeft: `${2.5 + (row.depth + 1) * 1.5}rem` }">
+                    <RouterLink :to="dataRoute(row)!" class="text-xs text-primary hover:underline">More in Data</RouterLink>
+                  </td>
+                </tr>
+              </template>
+              <tr v-if="notListed(row) && !entriesOf(row).length && (isOpen(row) || !row.childIds.length)" class="border-t border-border-subtle">
+                <td :colspan="columns" class="py-1.5 pr-3">
                   <span class="flex min-w-0 items-center gap-2" :style="{ paddingLeft: `${2 + row.depth * 1.5}rem` }">
                     <Files class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                     <span class="text-muted-foreground">{{ formatCount(notListed(row)) }} {{ notListed(row) === 1 ? 'file' : 'files' }} not listed in this dataset</span>
@@ -307,8 +382,16 @@ function openPreview(row: DataEntity) {
                   </span>
                 </td>
               </tr>
+              <tr v-if="partOf(row)?.others.length" class="border-t border-border-subtle">
+                <td :colspan="columns" class="py-1.5 pr-3 text-xs" :style="{ paddingLeft: `${3.75 + row.depth * 1.5}rem` }">
+                  <span class="text-muted-foreground">Also linked by</span>
+                  <template v-for="(other, index) in partOf(row)!.others" :key="other.document_id">
+                    <RouterLink :to="{ name: 'dataset', params: { id: other.document_id } }" class="ml-1.5 underline decoration-border underline-offset-4 hover:decoration-foreground">{{ other.title || other.document_path }}</RouterLink><template v-if="index < partOf(row)!.others.length - 1">,</template>
+                  </template>
+                </td>
+              </tr>
               <tr v-if="selectedBacklinkId === row.id" class="border-t border-border-subtle bg-muted/15">
-                <td colspan="4" class="px-5 py-3">
+                <td :colspan="columns" class="px-5 py-3">
                   <ReferencedBy
                     :preflight="backlinkResult"
                     :busy="backlinkLoading"
@@ -363,12 +446,6 @@ function openPreview(row: DataEntity) {
       <EmptyState v-if="crateNotReady" compact title="This dataset is still being prepared.">
         <Button variant="outline" size="sm" @click="fetchCrate(detailId)">Retry</Button>
       </EmptyState>
-      <EmptyState
-        v-else-if="!loadingCrate && !dataEntities.length"
-        compact
-        title="This dataset does not reference any data files."
-        description="Files can be attached by editing this dataset."
-      />
     </div>
   </section>
 </template>
