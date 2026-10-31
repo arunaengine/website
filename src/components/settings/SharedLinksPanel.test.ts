@@ -126,6 +126,21 @@ describe('SharedLinksPanel', () => {
     expect(content(rowOf(root, 'reef'))).toContain('Revoked')
   })
 
+  it('asks the other nodes once the realm names them', async () => {
+    const nodesBefore = aruna.realmInfo.value.nodes
+    aruna.realmInfo.value = { nodes: [] }
+    try {
+      const { root } = await mountApp(SharedLinksPanel)
+      await vi.waitFor(() => expect(content(root)).toContain('data/results/'))
+      expect(content(root)).not.toContain('reef')
+
+      aruna.realmInfo.value = { nodes: nodesBefore }
+      await vi.waitFor(() => expect(content(root)).toContain('reef'))
+    } finally {
+      aruna.realmInfo.value = { nodes: nodesBefore }
+    }
+  })
+
   it('shows a count it could not read as not known, never as zero', async () => {
     routes['GET https://local.test/api/v1/shares/L1/log?limit=1000'] = json({ error: 'gone' }, 500)
     const { root } = await mountApp(SharedLinksPanel)

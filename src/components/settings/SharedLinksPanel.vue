@@ -72,7 +72,8 @@ async function load() {
   loading.value = false
 }
 
-watch(currentUser, (user) => user && void load(), { immediate: true })
+// The realm's node list may arrive after the tab opens; its nodes are asked then.
+watch([currentUser, () => nodesToAsk().join()], ([user]) => user && void load(), { immediate: true })
 watch(() => props.refreshRevision, () => currentUser.value && void load())
 
 const shown = computed(() => rows.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value))
