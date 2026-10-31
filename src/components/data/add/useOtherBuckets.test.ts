@@ -38,8 +38,8 @@ function objects(...keys: string[]) {
 
 let scope = effectScope()
 
-function imports() {
-  return scope.run(() => useOtherBuckets({ open: ref(true), bucket: ref('inbox'), prefix: ref('in/') }))!
+function imports(nodeId: string | null = null) {
+  return scope.run(() => useOtherBuckets({ open: ref(true), bucket: ref('inbox'), prefix: ref('in/'), nodeId: ref(nodeId) }))!
 }
 
 beforeEach(() => {
@@ -65,6 +65,18 @@ describe('imports from other buckets', () => {
     expect(apiBase.value).toBe('https://b.test/api/v1')
     state.pickSearchHit(hit('local', 'node-a'))
     expect(apiBase.value).toBe('https://a.test/api/v1')
+  })
+
+  it('targets the node that holds the open bucket, else this node', async () => {
+    for (const [holder, target] of [['node-c', 'node-c'], [null, 'node-a']] as const) {
+      createSyncRelationship.mockClear()
+      const state = imports(holder)
+      state.pickSearchHit(hit('sealed', 'node-b'))
+      state.addOtherSelection(objects('a.txt'))
+      await state.createOtherRelationships()
+
+      expect(createSyncRelationship.mock.calls[0][0]).toMatchObject({ target: { node_id: target, bucket: 'inbox' } })
+    }
   })
 
   it('stores a copy of an encrypted source unencrypted only when the row asks for it', async () => {

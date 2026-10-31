@@ -40,6 +40,8 @@ export function useOtherBuckets(options: {
   open: Ref<boolean>
   bucket: Ref<string>
   prefix: Ref<string>
+  /** The node holding the target bucket; empty for this node. */
+  nodeId?: Ref<string | null | undefined>
 }) {
   const { apiBaseUrl, sessionEpoch, createSyncRelationship } = useAruna()
   const realmNodes = useRealmNodes()
@@ -135,7 +137,7 @@ export function useOtherBuckets(options: {
     if (err instanceof ApiError) {
       if (err.status === 409) return 'This sync relationship already exists.'
       if (err.status === 501) return 'Reference mode is not supported by the source node yet.'
-      if (err.status === 502) return 'The source node could not reach this node right now.'
+      if (err.status === 502) return 'The source node could not reach the node of this bucket right now.'
       if (err.status === 401 || err.status === 403) {
         return copyRefusal(err) ?? 'You need read access on the source bucket to import from it.'
       }
@@ -150,7 +152,7 @@ export function useOtherBuckets(options: {
 
   /** Resolves to true when at least one relationship was created. */
   async function createOtherRelationships(): Promise<boolean> {
-    const targetNode = realmNodes.localNodeId.value
+    const targetNode = options.nodeId?.value || realmNodes.localNodeId.value
     if (!targetNode || !options.bucket.value || otherBusy.value) return false
     const epoch = sessionEpoch.value
     const apiBase = apiBaseUrl.value

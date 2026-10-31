@@ -69,6 +69,7 @@ const otherBuckets = useOtherBuckets({
   open: toRef(props, 'open'),
   bucket: toRef(props, 'bucket'),
   prefix: toRef(props, 'prefix'),
+  nodeId: toRef(props, 'nodeId'),
 })
 
 const { groupSel, registerOpen, onConnectorSaved } = connectorSource
