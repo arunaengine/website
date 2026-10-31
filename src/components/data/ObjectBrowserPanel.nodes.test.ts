@@ -30,7 +30,7 @@ const Panel = compileClientComponent(new URL('./ObjectBrowserPanel.vue', import.
   '@/components/ui/DropdownMenuItem.vue': moduleDefault(EmptyStub),
   '@/components/ui/DropdownMenuLabel.vue': moduleDefault(EmptyStub),
   '@/components/ui/EmptyState.vue': moduleDefault(EmptyStub),
-  '@/components/nodes/NodeLabel.vue': moduleDefault(NodeStub),
+  '@/components/ui/NodeLabel.vue': moduleDefault(NodeStub),
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
   '@/components/ui/Spinner.vue': moduleDefault(EmptyStub),
   '@/components/data/ObjectBrowserSkeleton.vue': moduleDefault(EmptyStub),
