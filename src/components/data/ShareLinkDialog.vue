@@ -151,7 +151,7 @@ const expiresText = (at: string | null) => (at ? formatDateTime(at) : 'No expiry
 
 <template>
   <Dialog :open="open" @update:open="(value: boolean) => emit('update:open', value)">
-    <DialogContent class="max-w-lg grid-cols-[minmax(0,1fr)]">
+    <DialogContent class="grid-cols-[minmax(0,1fr)]">
       <DialogHeader>
         <DialogTitle class="flex min-w-0 items-center gap-2">
           <Share2 class="h-4 w-4 shrink-0 text-primary" /> <span class="truncate">Share {{ name }}</span>
