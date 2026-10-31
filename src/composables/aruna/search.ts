@@ -12,7 +12,7 @@ import {
 } from '@/lib/api'
 import { withMembers } from '@/lib/distribution'
 import { getBucketDistribution } from './storage'
-import { request } from './state'
+import { request, sessionEpoch } from './state'
 
 export const DEFAULT_SPARQL_MODE: SparqlExecutionMode = 'distributed-strict'
 
@@ -212,8 +212,36 @@ export async function searchBuckets(
   for (const hit of page.hits) if (hit.set_id && !sets.has(hit.set_id)) sets.set(hit.set_id, hit)
   const members = new Map<string, string[]>()
   await Promise.all([...sets].map(async ([setId, hit]) => {
-    const status = await getBucketDistribution(hit.bucket, options.signal, hit.node_id).catch(() => null)
-    if (status?.set_id === setId) members.set(setId, status.members.map((member) => member.node_id))
+    const nodes = await membersOf(hit, setId)
+    if (nodes) members.set(setId, nodes)
   }))
   return { ...page, hits: withMembers(page.hits, members) }
+}
+
+// The member nodes of each listed set, kept for a minute of the session, so the lists that
+// search buckets together or again soon ask each set's node once. A failed read is asked again.
+const MEMBERS_FRESH_MS = 60_000
+const memberReads = new Map<string, { at: number; nodes: Promise<string[] | null> }>()
+let membersEpoch = -1
+
+function membersOf(hit: BucketSearchHit, setId: string): Promise<string[] | null> {
+  if (membersEpoch !== sessionEpoch.value) {
+    membersEpoch = sessionEpoch.value
+    memberReads.clear()
+  }
+  const key = `${setId}|${hit.node_id}|${hit.bucket}`
+  const known = memberReads.get(key)
+  if (known && Date.now() - known.at < MEMBERS_FRESH_MS) return known.nodes
+  const entry = {
+    at: Date.now(),
+    nodes: getBucketDistribution(hit.bucket, undefined, hit.node_id).then(
+      (status) => (status.set_id === setId ? status.members.map((member) => member.node_id) : null),
+      () => {
+        if (memberReads.get(key) === entry) memberReads.delete(key)
+        return null
+      },
+    ),
+  }
+  memberReads.set(key, entry)
+  return entry.nodes
 }
