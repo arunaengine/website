@@ -9,6 +9,7 @@ import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EntityFieldList from '@/components/metadata/EntityFieldList.vue'
 import ProfileSummary from '@/components/metadata/view/ProfileSummary.vue'
+import PersistentIdRow from '@/components/metadata/view/PersistentIdRow.vue'
 import type { DatasetViewState } from '@/composables/useDatasetView'
 import { ABOUT_KEYS, aboutFacts } from '@/lib/datasetAbout'
 import { formatCount } from '@/lib/formatCount'
@@ -102,6 +103,7 @@ watch(() => current.value?.description, () => {
             </template>
           </dd>
         </template>
+        <PersistentIdRow v-if="detailId" :document-id="detailId" />
         <dt class="text-muted-foreground">Cite as</dt>
         <dd class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <a v-if="facts.doi" :href="facts.doi" target="_blank" rel="noopener noreferrer" class="truncate text-primary hover:underline">{{ facts.doi }}</a>
