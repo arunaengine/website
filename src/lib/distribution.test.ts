@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { BucketSearchHit, DistributedResponse } from '@/lib/api'
 import { defaultSettings, type Placement, type PresetId } from '@/lib/distributedMock'
-import { createRequest, defaultDraft, degradedRanges, distinctCount, draftProblem, fromStatus, isDeleting, leaveBlock, mergeSets, openTransfers, placementProblem, settingsBody, transferBlock, transferChoice } from './distribution'
+import { createRequest, defaultDraft, degradedRanges, distinctCount, draftProblem, fromStatus, isDeleting, leaveBlock, mergeSets, openTransfers, placementProblem, settingsBody, transferBlock, transferChoice, withMembers } from './distribution'
 
 const NODE_A = 'a'.repeat(64)
 const NODE_B = 'b'.repeat(64)
@@ -258,6 +258,27 @@ describe('mergeSets', () => {
     const rows = mergeSets([...first, hit('bakrep', NODE_B, 's1')], () => false)
     expect(rows).toHaveLength(1)
     expect(rows[0].nodes).toEqual([NODE_A, NODE_B])
+  })
+})
+
+describe('withMembers', () => {
+  const hit = (bucket: string, node: string, set?: string): BucketSearchHit => ({
+    arn: `arn:aruna:realm:${node}:s3/${bucket}`, bucket, node_id: node, group_id: 'g1', created_at: '', set_id: set ?? null,
+  })
+
+  it('adds the other member nodes of a bucket the search listed once', () => {
+    const hits = withMembers([hit('bakrep', NODE_A, 's1'), hit('notes', NODE_A)], new Map([['s1', [NODE_A, NODE_B]]]))
+    expect(hits.map((entry) => [entry.bucket, entry.node_id, entry.arn])).toEqual([
+      ['bakrep', NODE_A, `arn:aruna:realm:${NODE_A}:s3/bakrep`],
+      ['bakrep', NODE_B, `arn:aruna:realm:${NODE_B}:s3/bakrep`],
+      ['notes', NODE_A, `arn:aruna:realm:${NODE_A}:s3/notes`],
+    ])
+    // Two buckets on three nodes, one spread over two: the node totals say 3, and so do the hits.
+    expect(distinctCount(3, hits.length, mergeSets(hits, () => false).length, true)).toEqual({ count: 2, exact: true })
+  })
+
+  it('keeps a set whose members are unknown as listed', () => {
+    expect(withMembers([hit('bakrep', NODE_A, 's1')], new Map())).toHaveLength(1)
   })
 })
 

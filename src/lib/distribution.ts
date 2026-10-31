@@ -122,6 +122,20 @@ export function mergeSets(hits: readonly BucketSearchHit[], isLocal: (nodeId: st
   return rows
 }
 
+/** The search lists a distributed bucket once; this adds a hit for each of its other member nodes. */
+export function withMembers(hits: readonly BucketSearchHit[], members: ReadonlyMap<string, readonly string[]>): BucketSearchHit[] {
+  const seen = new Set(hits.flatMap((hit) => (hit.set_id ? [`${hit.set_id}|${hit.node_id}`] : [])))
+  return hits.flatMap((hit) => {
+    const added = (hit.set_id ? members.get(hit.set_id) ?? [] : []).flatMap((node) => {
+      const key = `${hit.set_id}|${node}`
+      if (seen.has(key)) return []
+      seen.add(key)
+      return [{ ...hit, node_id: node, arn: hit.arn.replace(`:${hit.node_id}:`, `:${node}:`) }]
+    })
+    return [hit, ...added]
+  })
+}
+
 /**
  * A bucket count with each distributed bucket once. `total` counts a member bucket on every node
  * that holds one; `copies` and `buckets` are the listed hits and rows. Exact only when all were listed.

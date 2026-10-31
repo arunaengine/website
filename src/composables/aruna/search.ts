@@ -1,5 +1,6 @@
 import type { SparqlExecutionMode, SparqlResult } from '@/data/types'
 import {
+  type BucketSearchHit,
   type BucketSearchResponse,
   type MetadataSearchOptions,
   type MetadataSearchResponse,
@@ -9,6 +10,8 @@ import {
   type UnifiedSearchOptions,
   type UnifiedSearchResponse,
 } from '@/lib/api'
+import { withMembers } from '@/lib/distribution'
+import { getBucketDistribution } from './storage'
 import { request } from './state'
 
 export const DEFAULT_SPARQL_MODE: SparqlExecutionMode = 'distributed-strict'
@@ -193,7 +196,7 @@ export async function searchBuckets(
   q: string,
   options: { limit?: number; groupId?: string; cursor?: string; database?: boolean; signal?: AbortSignal } = {},
 ): Promise<BucketSearchResponse> {
-  return request<BucketSearchResponse>('/search/buckets', {
+  const page = await request<BucketSearchResponse>('/search/buckets', {
     // Backend default is 10, clamped 1..=50; mirror the clamp here.
     query: {
       q,
@@ -204,4 +207,13 @@ export async function searchBuckets(
     },
     signal: options.signal,
   })
+  // A distributed bucket is listed once; its member nodes come from its distribution.
+  const sets = new Map<string, BucketSearchHit>()
+  for (const hit of page.hits) if (hit.set_id && !sets.has(hit.set_id)) sets.set(hit.set_id, hit)
+  const members = new Map<string, string[]>()
+  await Promise.all([...sets].map(async ([setId, hit]) => {
+    const status = await getBucketDistribution(hit.bucket, options.signal, hit.node_id).catch(() => null)
+    if (status?.set_id === setId) members.set(setId, status.members.map((member) => member.node_id))
+  }))
+  return { ...page, hits: withMembers(page.hits, members) }
 }

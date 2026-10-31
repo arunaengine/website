@@ -28,7 +28,9 @@ export async function listBuckets(search: Search, groupId: string | undefined, c
     if (page === MAX_PAGES) return { hits, complete: false }
     const answer = await search('', { limit: PAGE, groupId, cursor })
     if (!current()) return { hits, complete: false }
-    hits.push(...answer.hits.filter((hit) => !groupId || hit.group_id === groupId))
+    // A distributed bucket may show again on the next page; each node's copy counts once.
+    const known = new Set(hits.map((hit) => `${hit.set_id}|${hit.node_id}|${hit.bucket}`))
+    hits.push(...answer.hits.filter((hit) => (!groupId || hit.group_id === groupId) && !(hit.set_id && known.has(`${hit.set_id}|${hit.node_id}|${hit.bucket}`))))
     complete &&= answer.nodes_failed === 0
     cursor = answer.next_cursor ?? undefined
     if (!cursor) return { hits, complete }
