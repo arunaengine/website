@@ -99,14 +99,15 @@ describe('node interfaces', () => {
     expect(text).not.toContain('Interfaces')
   })
 
-  it('says nothing about a working interface and one plain word about one that is not', async () => {
+  it('gives every interface one plain state word', async () => {
     const working = info('https://api.example.org/api/v1')
     working.services.interfaces.rest.status = 'available'
     working.services.interfaces.s3.status = 'not_configured'
     const { root } = await mountApp(details, { props: { info: working } })
     const row = (label: string) => content(element(root, (node) => node.tag === 'li' && content(node).startsWith(label)))
 
-    expect(row('REST')).not.toMatch(/available/i)
+    expect(row('REST')).toContain('available')
+    expect(row('OAI-PMH')).toContain('available')
     expect(row('S3')).toContain('not configured')
     expect(content(root)).not.toContain('AVAILABLE')
   })

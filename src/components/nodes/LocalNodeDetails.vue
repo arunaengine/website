@@ -117,8 +117,8 @@ const META = 'flex flex-wrap items-center gap-x-5 gap-y-1 type-secondary [&>span
           class="flex items-center gap-2 rounded-md border border-border/70 bg-background/60 px-2.5 py-1.5"
         >
           <span class="min-w-16 shrink-0 whitespace-nowrap text-xs font-medium text-foreground">{{ iface.label }}</span>
-          <!-- A working interface needs no word; only one that is not says so. -->
-          <span v-if="statusProblem(iface.status)" class="shrink-0 text-[11px] text-destructive">{{ statusProblem(iface.status)!.word }}</span>
+          <!-- One state word per interface, as for the services; a problem reads in red. -->
+          <span :class="['shrink-0 text-[11px]', statusProblem(iface.status) ? 'text-destructive' : 'text-foreground']">{{ (iface.status || 'unknown').replace(/_/g, ' ') }}</span>
           <span class="min-w-0 flex-1 truncate text-right font-mono text-[11px] text-muted-foreground" :title="iface.url">
             {{ iface.url || '-' }}
           </span>
