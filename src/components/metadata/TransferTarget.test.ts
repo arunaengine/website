@@ -1,7 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { compileClientComponent, content, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
+import { click, compileClientComponent, content, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
 import { nodesByBucket } from '@/composables/useBucketCount'
 
 const Empty = defineComponent(() => () => null)
@@ -70,10 +70,10 @@ describe('TransferTarget', () => {
     // Two buckets, so none is picked for the user.
     expect(bucket.value).toBe('')
 
-    await element(mounted.root, (node) => node.props['data-bucket'] === 'demo').props.onClick()
+    await click(element(mounted.root, (node) => node.props['data-bucket'] === 'demo'))
     await flush()
     expect(nodes.at(-1)).toBe('node-2')
-    await element(mounted.root, (node) => node.props['data-bucket'] === 'shared').props.onClick()
+    await click(element(mounted.root, (node) => node.props['data-bucket'] === 'shared'))
     await flush()
     expect(nodes.at(-1)).toBeNull()
     mounted.app.unmount()
