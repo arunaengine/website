@@ -455,13 +455,15 @@ const isEmpty = computed(
           <li v-for="entry in visibleBuckets" :key="`${entry.nodeId ?? ''}/${entry.name}`">
             <button
               type="button"
-              class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-muted"
+              class="flex w-full items-start gap-2 px-3 py-1.5 text-left text-xs hover:bg-muted"
               :class="entry.name === activeBucket && (!everyNode || entry.nodeId === pickedNode) ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
               @click="openBucket(entry.name, entry.nodeId)"
             >
-              <Boxes class="h-3.5 w-3.5 shrink-0 text-primary" />
-              <span class="min-w-0 flex-1 truncate">{{ entry.name }}</span>
-              <NodeLabel v-if="entry.nodeId" :node-id="entry.nodeId" size="sm" class="shrink-0 text-muted-foreground" />
+              <Boxes class="mt-px h-3.5 w-3.5 shrink-0 text-primary" />
+              <span class="min-w-0 flex-1">
+                <span class="block truncate" :title="entry.name">{{ entry.name }}</span>
+                <span v-if="entry.nodeId" class="block font-normal text-muted-foreground"><NodeLabel :node-id="entry.nodeId" size="sm" /></span>
+              </span>
             </button>
           </li>
           <li v-if="realmList && realm.more.value" class="px-3 py-1">
