@@ -56,7 +56,7 @@ describe('Data view session affordances', () => {
     // The dialog browser opens the required node's own session instead of
     // offering a switch button; a wrong-node session never lists anything.
     expect(objectBrowser).toContain('context.nodeId === requiredNodeId.value')
-    expect(objectBrowser).toContain('s3.activateContext(props.nodeId ?? null, selectedGroupId.value)')
+    expect(objectBrowser).toContain('s3.activateContext(browsedNode.value, selectedGroupId.value)')
     expect(objectBrowser).toContain('const canBrowse = computed(() => contextReady.value && Boolean(effectiveEndpoint.value))')
     expect(objectBrowser).not.toContain('Open on this node')
     expect(objectBrowser).not.toContain('Open group')
