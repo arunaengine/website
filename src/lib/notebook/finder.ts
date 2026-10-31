@@ -6,6 +6,8 @@ export interface FoundNotebook {
   key: string
   size?: number
   lastModified?: Date
+  /** The node holding the bucket; null or absent is the connected node. */
+  nodeId?: string | null
 }
 
 /** The notebooks among the keys of one bucket, newest first. */

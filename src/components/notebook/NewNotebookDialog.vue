@@ -15,7 +15,8 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import { useS3 } from '@/composables/useS3'
 import { notebookKey, notebookSlug } from '@/lib/notebook/document'
 
-const props = defineProps<{ open: boolean; bucket: string; prefix: string; groupId: string }>()
+/** `nodeId`: the node holding the bucket; null or absent is the connected node. */
+const props = defineProps<{ open: boolean; bucket: string; prefix: string; groupId: string; nodeId?: string | null }>()
 const emit = defineEmits<{ (e: 'update:open', value: boolean): void }>()
 
 const router = useRouter()
@@ -40,7 +41,7 @@ function create() {
   void router.push({
     name: 'notebook',
     params: { bucketId: props.bucket, key: target.value },
-    query: { group: props.groupId },
+    query: { group: props.groupId, ...(props.nodeId ? { node: props.nodeId } : {}) },
   })
 }
 </script>

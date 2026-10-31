@@ -27,7 +27,8 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
-  (e: 'chosen', value: { bucket: string; prefix: string }): void
+  /** `nodeId`: the node holding the bucket; null is the connected node. */
+  (e: 'chosen', value: { bucket: string; prefix: string; nodeId: string | null }): void
 }>()
 
 const router = useRouter()
@@ -63,11 +64,14 @@ watch([bucket, prefix, () => props.open], async ([name, at, open]) => {
   listing.value = 'loading'
   listError.value = null
   try {
+    // A bucket on another node is read through that node's own session.
+    const node = finder.nodes.value.get(name) ?? null
+    const reference = node ? await s3.referenceForNode(node, activeGroupId.value) : undefined
     let token: string | undefined
     const seenFolders: FolderEntry[] = []
     const seenFiles: ObjectEntry[] = []
     do {
-      const page = await s3.listObjects(name, at, token)
+      const page = node ? await s3.listObjects(name, at, token, node, { reference }) : await s3.listObjects(name, at, token)
       seenFolders.push(...page.folders)
       seenFiles.push(...page.objects)
       token = page.nextToken
@@ -107,7 +111,7 @@ const view = computed(() => {
       rows.push({
         id: `${entry.bucket}/${entry.key}`, kind: 'notebook', name: entry.key.slice(folderOf(entry.key).length),
         where: `${entry.bucket}/${folderOf(entry.key)}`, saved: entry.lastModified ? formatDateTime(entry.lastModified) : '-',
-        go: props.mode === 'new' ? undefined : () => openNotebook(entry.bucket, entry.key),
+        go: props.mode === 'new' ? undefined : () => openNotebook(entry.bucket, entry.key, entry.nodeId ?? null),
       })
     }
     return { rows, hiddenFolders, hiddenFiles }
@@ -142,7 +146,7 @@ const view = computed(() => {
     rows.push({
       id: file.key, kind: notebook ? 'notebook' : 'file', name: file.name,
       saved: file.lastModified ? formatDateTime(file.lastModified) : '-',
-      go: notebook && props.mode !== 'new' ? () => openNotebook(bucket.value!, file.key) : undefined,
+      go: notebook && props.mode !== 'new' ? () => openNotebook(bucket.value!, file.key, finder.nodes.value.get(bucket.value!) ?? null) : undefined,
     })
   }
   return { rows, hiddenFolders, hiddenFiles }
@@ -174,14 +178,14 @@ function enter(name: string | null, at: string) {
   query.value = ''
 }
 
-function openNotebook(name: string, key: string) {
+function openNotebook(name: string, key: string, node: string | null) {
   emit('update:open', false)
-  void router.push({ name: 'notebook', params: { bucketId: name, key }, query: { group: activeGroupId.value } })
+  void router.push({ name: 'notebook', params: { bucketId: name, key }, query: { group: activeGroupId.value, ...(node ? { node } : {}) } })
 }
 
 function useFolder() {
   if (!bucket.value) return
-  emit('chosen', { bucket: bucket.value, prefix: prefix.value })
+  emit('chosen', { bucket: bucket.value, prefix: prefix.value, nodeId: finder.nodes.value.get(bucket.value) ?? null })
   emit('update:open', false)
 }
 
@@ -263,7 +267,7 @@ const ROW_ICON = { bucket: Package, folder: Folder, notebook: NotebookPen, file:
 
       <p v-if="!busy && !query.trim() && !showAll && hiddenText" class="text-xs text-muted-foreground">Hidden because they hold no notebooks: {{ hiddenText }}</p>
       <p v-if="finder.partial.value.length" class="text-xs text-muted-foreground">
-        Too many files to search in full, so nothing is hidden there: {{ finder.partial.value.join(', ') }}
+        Searched only in part, so nothing is hidden there: {{ finder.partial.value.join(', ') }}
       </p>
       <p v-if="finder.failed.value.length" class="text-xs text-muted-foreground">Could not be searched: {{ finder.failed.value.join(', ') }}</p>
     </div>

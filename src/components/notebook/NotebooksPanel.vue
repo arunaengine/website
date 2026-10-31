@@ -42,8 +42,8 @@ const shellState = computed(() => {
 const picking = ref(false)
 const choosing = ref(false)
 const naming = ref(false)
-const target = ref({ bucket: '', prefix: '' })
-function chosen(value: { bucket: string; prefix: string }) {
+const target = ref<{ bucket: string; prefix: string; nodeId: string | null }>({ bucket: '', prefix: '', nodeId: null })
+function chosen(value: { bucket: string; prefix: string; nodeId: string | null }) {
   target.value = value
   naming.value = true
 }
@@ -91,7 +91,7 @@ const nameOf = (key: string) => key.slice(folderOf(key).length)
               <td class="hidden w-12 pl-5 pr-0 sm:table-cell"><KindTile :icon="NotebookPen" tone="aqua" label="Notebook" /></td>
               <td class="w-full max-w-0 pl-5">
                 <RouterLink
-                  :to="{ name: 'notebook', params: { bucketId: entry.bucket, key: entry.key }, query: { group: activeGroupId } }"
+                  :to="{ name: 'notebook', params: { bucketId: entry.bucket, key: entry.key }, query: { group: activeGroupId, node: entry.nodeId ?? undefined } }"
                   class="block truncate font-medium text-foreground hover:underline"
                 >{{ nameOf(entry.key) }}</RouterLink>
                 <p class="mt-1 truncate font-mono text-xs text-muted-foreground" :title="`${entry.bucket}/${entry.key}`">
@@ -115,12 +115,12 @@ const nameOf = (key: string) => key.slice(folderOf(key).length)
       </template>
     </ListShell>
     <p v-if="finder.partial.value.length" class="mt-2 text-xs text-muted-foreground">
-      Searched only in part, too many files: {{ finder.partial.value.join(', ') }}
+      Searched only in part: {{ finder.partial.value.join(', ') }}
     </p>
     <p v-if="finder.failed.value.length" class="mt-2 text-xs text-muted-foreground">Could not be searched: {{ finder.failed.value.join(', ') }}</p>
 
     <NotebookPicker v-model:open="picking" :finder="finder" />
     <NotebookPicker v-model:open="choosing" mode="new" :finder="finder" @chosen="chosen" />
-    <NewNotebookDialog v-model:open="naming" :bucket="target.bucket" :prefix="target.prefix" :group-id="activeGroupId" />
+    <NewNotebookDialog v-model:open="naming" :bucket="target.bucket" :prefix="target.prefix" :node-id="target.nodeId" :group-id="activeGroupId" />
   </section>
 </template>

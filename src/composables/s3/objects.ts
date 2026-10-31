@@ -112,7 +112,7 @@ export async function listObjects(
   prefix: string,
   token?: string,
   nodeId?: string | null,
-  options: { nameStart?: string; maxKeys?: number } = {},
+  options: { nameStart?: string; maxKeys?: number; reference?: S3SessionReference } = {},
 ): Promise<ObjectPage> {
   const command = new ListObjectsV2Command({
     Bucket: bucket,
@@ -131,7 +131,7 @@ export async function listObjects(
     },
     { step: 'deserialize' },
   )
-  const response = await client(nodeId).send(command)
+  const response = await client(nodeId, options.reference).send(command)
   const folders = (response.CommonPrefixes ?? [])
     .filter((entry) => entry.Prefix)
     .map((entry) => {

@@ -19,17 +19,20 @@ const SwitchStub = defineComponent({
 })
 
 const lab = Finder.notebooksOf('lab', [{ key: 'notebooks/a.ipynb' }, { key: 'notebooks/deep/b.ipynb' }])
+const far = [{ bucket: 'far', key: 'remote.ipynb', nodeId: 'node-2' }]
 const finder = {
-  buckets: ref(['lab', 'empty']),
-  scans: shallowRef(new Map([['lab', { notebooks: lab, truncated: false }], ['empty', { notebooks: [], truncated: false }]])),
-  notebooks: ref(lab),
+  buckets: ref(['lab', 'empty', 'far']),
+  nodes: shallowRef(new Map<string, string | null>([['lab', null], ['empty', null], ['far', 'node-2']])),
+  scans: shallowRef(new Map([['lab', { notebooks: lab, truncated: false }], ['empty', { notebooks: [], truncated: false }], ['far', { notebooks: far, truncated: false }]])),
+  notebooks: ref([...lab, ...far]),
   failed: ref<string[]>([]),
   partial: ref<string[]>([]),
   state: ref('ready'),
   error: ref(null),
   load: vi.fn(),
 }
-const listObjects = vi.fn(async (_bucket: string, prefix: string) => (prefix === ''
+const referenceForNode = vi.fn(async (nodeId: string, groupId: string) => ({ nodeId, groupId, accessKeyId: 'k2' }))
+const listObjects = vi.fn(async (_bucket: string, prefix: string, _token?: string, _node?: string, _options?: unknown) => (prefix === ''
   ? { folders: [{ prefix: 'notebooks/', name: 'notebooks' }, { prefix: 'results/', name: 'results' }], objects: [{ key: 'readme.md', name: 'readme.md' }] }
   : { folders: [{ prefix: 'notebooks/deep/', name: 'deep' }], objects: [{ key: 'notebooks/a.ipynb', name: 'a.ipynb' }] }))
 const push = vi.fn()
@@ -48,7 +51,7 @@ const component = compileClientComponent(new URL('./NotebookPicker.vue', import.
   '@/components/ui/Switch.vue': moduleDefault(SwitchStub),
   '@/composables/useNotebookFinder': { useNotebookFinder: () => finder },
   '@/composables/useGroupSelection': { activeGroupId: ref('group') },
-  '@/composables/useS3': { useS3: () => ({ listObjects }) },
+  '@/composables/useS3': { useS3: () => ({ listObjects, referenceForNode }) },
   '@/lib/notebook/finder': Finder,
   '@/lib/notebook/document': Document,
   '@/lib/utils': { errorMessage: String, formatDateTime: () => '29 Oct 2026, 13:38' },
@@ -60,7 +63,7 @@ describe('the notebook picker', () => {
   it('shows only places that hold notebooks, with counts, until all files are asked for', async () => {
     const { root } = await mountApp(component, { props: { open: true, finder } })
 
-    expect(rows(root)).toEqual([expect.stringContaining('lab')])
+    expect(rows(root)).toEqual([expect.stringContaining('lab'), expect.stringContaining('far')])
     expect(rows(root)[0]).toContain('2 notebooks')
     expect(content(root)).toContain('Hidden because they hold no notebooks: 1 bucket')
 
@@ -84,5 +87,20 @@ describe('the notebook picker', () => {
     expect(content(root)).toContain('1 notebook found in all buckets')
     await bubbleClick(button(root, 'b.ipynb'))
     expect(push).toHaveBeenCalledWith({ name: 'notebook', params: { bucketId: 'lab', key: 'notebooks/deep/b.ipynb' }, query: { group: 'group' } })
+  })
+
+  it('opens and browses a bucket on another node through that node', async () => {
+    const { root } = await mountApp(component, { props: { open: true, finder } })
+    const search = nodes(root).find((node) => node.tag === 'input')!
+    ;(search.props.onInput as (event: { target: { value: string } }) => void)({ target: { value: 'remote' } })
+    await flush()
+    await bubbleClick(button(root, 'remote.ipynb'))
+    expect(push).toHaveBeenLastCalledWith({ name: 'notebook', params: { bucketId: 'far', key: 'remote.ipynb' }, query: { group: 'group', node: 'node-2' } })
+
+    ;(search.props.onInput as (event: { target: { value: string } }) => void)({ target: { value: '' } })
+    await flush()
+    await bubbleClick(button(root, 'far'))
+    await flush()
+    expect(listObjects).toHaveBeenLastCalledWith('far', '', undefined, 'node-2', { reference: { nodeId: 'node-2', groupId: 'group', accessKeyId: 'k2' } })
   })
 })
