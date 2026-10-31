@@ -31,6 +31,12 @@ describe('MetadataView', () => {
     expect(runs).toContain(':skip="runProvenance?.actionId"')
   })
 
+  it('puts the type pill on the title line, not between title and byline', () => {
+    const title = source.slice(source.indexOf('<template #title>'), source.indexOf('#description>'))
+    expect(title).toContain('<CrateTypeBadge v-if="current" :type="crateType" :crate="currentCrate" />')
+    expect(source).toContain('<template v-if="bylineNames.length" #description>')
+  })
+
   it('opens the run results in the record group and on the node holding them', () => {
     const results = source.slice(source.indexOf('const runResults = computed'), source.indexOf('// The record\'s own card'))
     expect(results).toContain('folderRoute(folder.bucket, folder.prefix, groupId.value)')

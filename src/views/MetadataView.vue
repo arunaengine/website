@@ -315,19 +315,21 @@ function jumpTo(entityId: string) {
       <template #title>
         <span class="flex items-start gap-3">
           <DatasetTile v-if="current" :doc="current" size="lg" class="mt-0.5" />
-          <span class="min-w-0 break-words">{{ pageTitle }}</span>
+          <span class="min-w-0 break-words">
+            {{ pageTitle }}
+            <span v-if="current || fetchedSummary" class="ml-1 inline-flex flex-wrap items-center gap-2 align-middle font-sans tracking-normal">
+              <CrateTypeBadge v-if="current" :type="crateType" :crate="currentCrate" />
+              <StatusPill v-if="runStateLabel" :state="runStateLabel" />
+              <Badge v-if="projectCrate" variant="outline">Project dataset</Badge>
+              <button v-if="published.length" type="button" class="rounded-full" aria-label="Published. Show where this dataset is published" @click="showPublished = true">
+                <Badge variant="success" class="cursor-pointer hover:opacity-80">Published</Badge>
+              </button>
+            </span>
+          </span>
         </span>
       </template>
-      <template v-if="current || fetchedSummary" #description>
-        <span class="flex flex-wrap items-center gap-2">
-          <CrateTypeBadge v-if="current" :type="crateType" :crate="currentCrate" />
-          <StatusPill v-if="runStateLabel" :state="runStateLabel" />
-          <Badge v-if="projectCrate" variant="outline">Project dataset</Badge>
-          <button v-if="published.length" type="button" class="rounded-full" aria-label="Published. Show where this dataset is published" @click="showPublished = true">
-            <Badge variant="success" class="cursor-pointer hover:opacity-80">Published</Badge>
-          </button>
-        </span>
-        <span v-if="bylineNames.length" class="mt-2 block text-sm text-foreground">
+      <template v-if="bylineNames.length" #description>
+        <span class="block text-sm text-foreground">
           <template v-if="isRun">Run by </template>
           <template v-for="(person, index) in bylineNames" :key="person.id">
             <button type="button" class="inline-block max-w-[20rem] truncate align-bottom underline decoration-border underline-offset-4 hover:decoration-foreground" :title="person.name" @click="openInfo(person.id)">{{ person.name }}</button><template v-if="index < bylineNames.length - 1">, </template>
