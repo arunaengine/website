@@ -1,8 +1,8 @@
 import type { MetadataDoc } from '@/data/types'
 import { crateActions, crateTypeOf } from '@/lib/crateType'
+import { bylineOf } from '@/lib/datasetAbout'
 import { licenseLabelOf } from '@/lib/licenses'
-import { parseRunCrate } from '@/lib/runCrate'
-import { formatBinary, formatDate, formatDateTime, formatDuration } from '@/lib/utils'
+import { formatBinary, formatDate, formatDuration } from '@/lib/utils'
 
 export interface ListFact {
   label: string
@@ -34,29 +34,24 @@ export function actionDuration(action: Entity | undefined): string {
   return Number.isFinite(start) && Number.isFinite(end) && end >= start ? formatDuration(end - start) : ''
 }
 
-type Names = { group: (id: string) => string; node: (id: string) => string }
+type Names = { group: (id: string) => string; person: (userId: string) => string }
 
-/** A dataset's license, group, size and last change; a fact the summary does not hold is empty. */
+/** Who a dataset names as its makers, as its page header does: a run's starter, else its authors. */
+export function makersOf(doc: MetadataDoc) {
+  return bylineOf(doc.roCrate, crateTypeOf(doc).endsWith('-run') ? mainAction(doc.roCrate) : undefined)
+}
+
+/** The same facts for every dataset type: license, makers, size and last change; unknown is empty. */
 export function datasetFacts(doc: MetadataDoc, names: Names): ListFact[] {
   const sizeText = text(rootOf(doc.roCrate)?.contentSize).trim()
   const size = Number(sizeText)
+  // A run names the person who started it, never its group; an unresolved user stays empty.
+  const people = makersOf(doc).map((person) => (person.userId ? names.person(person.userId) : person.name)).filter(Boolean)
+  const group = crateTypeOf(doc).endsWith('-run') || !doc.realmId ? '' : names.group(doc.realmId)
   return [
     { label: 'License', value: doc.license ? licenseLabelOf(doc.license) : '', title: doc.license },
-    { label: 'Group', value: doc.realmId ? names.group(doc.realmId) : '' },
+    { label: 'By', value: people.join(', ') || group },
     { label: 'Size', value: sizeText && Number.isFinite(size) ? formatBinary(size) : '' },
     { label: 'Updated', value: doc.updatedAt ? formatDate(doc.updatedAt) : '', title: doc.updatedAt },
-  ]
-}
-
-/** The labeled facts a dataset row or card shows; a run shows its run facts instead. */
-export function listFacts(doc: MetadataDoc, names: Names): ListFact[] {
-  if (!crateTypeOf(doc).endsWith('-run')) return datasetFacts(doc, names)
-  const action = mainAction(doc.roCrate)
-  const node = parseRunCrate(doc.roCrate, '')?.site?.nodeId
-  return [
-    { label: 'Started', value: action?.startTime ? formatDateTime(text(action.startTime)) : '' },
-    { label: 'Duration', value: actionDuration(action) },
-    { label: 'Node', value: node ? names.node(node) : '' },
-    { label: 'Group', value: doc.realmId ? names.group(doc.realmId) : '' },
   ]
 }

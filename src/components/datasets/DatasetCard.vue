@@ -36,7 +36,7 @@ const type = computed(() => crateTypeOf(props.doc))
         <FavouriteStar v-if="currentUser" :favourite="Boolean(favourite)" :busy="busy" @toggle="emit('toggle-favourite', doc.ulid)" />
       </div>
     </div>
-    <p v-if="!type.endsWith('-run') && doc.description" class="line-clamp-2 text-sm text-muted-foreground">{{ doc.description }}</p>
+    <p v-if="doc.description" class="line-clamp-2 text-sm text-muted-foreground">{{ doc.description }}</p>
     <Badge v-if="score !== undefined" variant="outline" size="sm" class="w-fit">Score {{ score.toFixed(2) }}</Badge>
     <div class="mt-auto"><DatasetFactGrid :doc="doc" /></div>
   </div>

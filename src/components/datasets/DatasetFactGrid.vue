@@ -1,19 +1,22 @@
 <script setup lang="ts">
-// The labeled facts of one dataset in a row or card; a fact the summary lacks shows a dash.
-import { computed } from 'vue'
+// The labeled facts of one dataset in a row or card, the same for every type; a missing fact shows a dash.
+import { computed, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
-import { useRealmNodes } from '@/composables/useRealmNodes'
-import { listFacts } from '@/lib/datasetFacts'
+import { useUserDirectory } from '@/composables/useUserDirectory'
+import { datasetFacts, makersOf } from '@/lib/datasetFacts'
 import { truncateMiddle } from '@/lib/utils'
 import type { MetadataDoc } from '@/data/types'
 
 const props = defineProps<{ doc: MetadataDoc }>()
 const { myGroups } = useAruna()
-const { displayName } = useRealmNodes()
+const userDir = useUserDirectory()
+watch(() => makersOf(props.doc).flatMap((person) => person.userId ?? []), (ids) => {
+  if (ids.length) void userDir.resolveUsers(ids)
+}, { immediate: true })
 const facts = computed(() =>
-  listFacts(props.doc, {
+  datasetFacts(props.doc, {
     group: (id) => myGroups.value.find((group) => group.id === id)?.name ?? truncateMiddle(id),
-    node: (id) => displayName(id),
+    person: (id) => userDir.cachedUser(id)?.name ?? '',
   }),
 )
 </script>

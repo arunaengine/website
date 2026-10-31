@@ -25,7 +25,7 @@ const type = computed(() => crateTypeOf(props.doc))
         :to="{ name: 'dataset', params: { id: doc.ulid } }"
         class="block text-sm font-semibold text-foreground after:absolute after:inset-0 after:content-[''] hover:underline"
       >{{ doc.title }}</RouterLink>
-      <p v-if="!type.endsWith('-run') && doc.description" class="line-clamp-2 text-sm text-muted-foreground">{{ doc.description }}</p>
+      <p v-if="doc.description" class="line-clamp-2 text-sm text-muted-foreground">{{ doc.description }}</p>
       <div class="max-w-2xl"><DatasetFactGrid :doc="doc" /></div>
     </div>
     <div class="relative z-10 flex items-center gap-2 max-sm:col-start-2 max-sm:row-start-2 sm:items-start sm:pt-0.5">
