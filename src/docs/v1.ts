@@ -294,6 +294,22 @@ export const docsTopics: DocsTopic[] = [
           'A failed transfer stays in the Transfers panel with its error and a Retry link. [Retrying](concept:states-and-retry#retry-without-inventing-an-outcome) is always safe.',
         ],
       },
+      {
+        title: 'Share with a link',
+        icon: 'Share2',
+        paragraphs: [
+          'A share link opens a file, folder, bucket or dataset for people without an account. A link never replaces or deletes a stored file.',
+        ],
+        steps: [
+          'Choose Share on the bucket toolbar, in the menu of a file or folder row, or under More on a dataset page.',
+          'Pick the access. Read only: visitors browse and download. Read and write: visitors download and upload new files. Upload only: a file drop, visitors upload new files and see nothing stored. Files and datasets are always read only.',
+          'Pick when the link expires, and optionally a password and a label only you see. Choose Create link and copy it.',
+          'The dialog lists the links for this item. [Settings](page:settings), Shared links lists all your links with their downloads, uploads and last use, and revokes them.',
+        ],
+        bullets: [
+          'A bucket stored on several nodes cannot be shared yet. Share then shows disabled with the reason.',
+        ],
+      },
     ],
   },
   {
@@ -808,7 +824,7 @@ export const docsTopics: DocsTopic[] = [
         route: '/app/settings',
         anchor: 'settings-access',
         title: 'Access',
-        body: 'This tab shows your browser session, the API endpoint, and every session issued for your account.',
+        body: 'This tab shows where you are signed in, your S3 access keys, and the API connection.',
       },
     ],
     sections: [
@@ -825,6 +841,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'KeyRound',
         steps: [
           'Open [Settings](page:settings), then Access.',
+          'Under S3 access keys choose Create key.',
           'Confirm the issuing [node](concept:glossary#node), restrictions, and the intended client.',
           'Copy the access key and one-time secret into the client; the portal never shows the secret again.',
           'Point the client at the issuing node; the key is invalid elsewhere.',
@@ -832,8 +849,8 @@ export const docsTopics: DocsTopic[] = [
         ],
         image: {
           src: '/docs/v1/settings-access.jpg',
-          alt: 'Settings access and connection tab with the session, API connection, and sessions list',
-          caption: 'Access: the browser session, the API endpoint, and issued sessions.',
+          alt: 'Settings Access tab with sign-ins, S3 access keys and the API connection',
+          caption: 'Access: sign-ins, S3 access keys, and the API connection.',
         },
       },
     ],
@@ -913,7 +930,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Add the repository to a group',
         icon: 'Plug',
         steps: [
-          'Open the group in [Groups](page:groups), then Sources.',
+          'Open the group in [Groups](page:groups), then Data sources.',
           'Under Repositories, add a repository. This needs write access to the group metadata. Zenodo and Zenodo sandbox fill in their API URL for you. Other Invenio repositories need their API URL with https.',
           'The import and publish dialogs also offer Add Zenodo when the group has no repository yet.',
           'Add a community to submit published records to it for review. Add a read token only to import restricted records.',
@@ -934,7 +951,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Publish a dataset and get a DOI',
         icon: 'Send',
         paragraphs: [
-          'On a dataset page, open Import / export and choose Publish to repository, then Publish to Zenodo. This needs write access to the dataset. Aruna creates a draft and, where the repository reserves DOIs, shows the DOI right away. The DOI becomes active when you publish.',
+          'On a dataset page, open More beside the title and choose Publish to repository. This needs write access to the dataset. Aruna creates a draft and, where the repository reserves DOIs, shows the DOI right away. The DOI becomes active when you publish.',
           'The draft follows every later change of the dataset. Publish when it is ready. With a community, publishing submits the record for review and the Repositories section shows the review state. After a declined review Aruna stops publishing automatically; Publish submits it again.',
           'Files are public on the repository by default, so anyone can download them once the record is published. Under Advanced options, Export once sends the dataset as it is now and shows the DOI when the job ends. Advanced options also take extra repository fields as JSON. Required fields always come from the dataset.',
           'The dialog first checks the dataset against the repository requirements. A missing required field blocks publishing: an author or creator, a title, a publication date and, on Invenio repositories other than Zenodo, a publisher. A missing license is only a warning. A record takes at most 100 files. The dialog shows inputs for the missing fields, saves them into the dataset and checks again. Show what goes where lists which dataset entries become which repository fields. A published record cannot be deleted.',
@@ -972,7 +989,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Find the clone URL',
         icon: 'Link2',
         steps: [
-          'Open the dataset and go to Advanced at the bottom of the page.',
+          'Open the dataset and go to the Details section on its Overview tab.',
           'Under Git repository, copy the clone URL. It ends with the dataset id and `.git`.',
           'The row shows only when you are signed in and the node offers Git for this dataset. It also says where the files you push are stored.',
         ],
@@ -1006,7 +1023,7 @@ export const docsTopics: DocsTopic[] = [
         bullets: [
           'Files you push are stored in the dataset\'s storage location. By default that is the group\'s dataset location, in a folder named after the dataset id.',
           'Every group starts with the generated bucket `datasets-<group id>` as its default. Group admins can change it under Dataset location in the Storage tab of the group page. This does not move existing datasets or their files.',
-          'The location dialog prefills the group default when you create a dataset. Choose another bucket and folder there, or later with Change next to Storage location under Advanced on the dataset page.',
+          'The location dialog prefills the group default when you create a dataset. Choose another bucket and folder there, or later with Change next to Storage location under Details on the dataset page.',
           'Inside Aruna, a data file entry has the file\'s content address `https://w3id.org/aruna/data/<blake3 hex>` as `@id` and its S3 path `s3://<bucket>/<key>` as `contentUrl`.',
           'In Git, the same entry uses the file\'s relative path as `@id`, and the file is a Git LFS file. Clone and push convert between the two forms automatically.',
           'Files are content addressed: the same content always has the same address.',
@@ -1111,7 +1128,7 @@ export const docsTopics: DocsTopic[] = [
         route: '/app/settings?tab=assistant',
         anchor: 'assistant-mcp',
         title: 'Connect an MCP client',
-        body: 'Outside clients reach this node over MCP with a session of their own, listed and revocable under Sessions.',
+        body: 'Outside clients reach this node over MCP with a session of their own, listed and revocable under Access.',
       },
       {
         route: '/app',
@@ -1344,7 +1361,7 @@ export const docsTopics: DocsTopic[] = [
           'Copy the [MCP](concept:glossary#mcp) endpoint of this node.',
           'Pick the client, for example Claude Code.',
           'Create a labeled client session and copy the token; it is shown once.',
-          'Find and revoke the session later under Sessions.',
+          'Find and revoke the session later in [Settings](page:settings), on the Access tab.',
         ],
         image: {
           src: '/docs/v1/assistant-providers.jpg',
@@ -1396,6 +1413,19 @@ export const docsTopics: DocsTopic[] = [
           'Process run: a dataset conforming to the Process Run Crate profile. It records a single computation, such as a compute run.',
           'Profile: a dataset whose root declares the Profile type. It defines requirements for other datasets.',
           'The type changes presentation only; none of the four is a separate storage system.',
+        ],
+      },
+      {
+        title: 'The dataset page',
+        icon: 'LayoutDashboard',
+        paragraphs: [
+          'The title line shows the type pill and the authors, or the run that made the dataset. Beside it sit Watch, Cite, Export and Edit. More holds Share, the other exports, Publish to repository and Import.',
+        ],
+        bullets: [
+          'Overview: About with the facts, keywords and identifiers, then People and organizations, Runs, Files, Entities as a List or a Graph, Links and Details.',
+          'Provenance: where the files came from, step by step. Earlier steps are marked Upstream, and Show full graph reads every step you are allowed to see.',
+          'History: the versions of the dataset, when the node keeps them.',
+          'JSON-LD: the RO-Crate metadata as stored.',
         ],
       },
       {
@@ -1480,7 +1510,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Buckets hold the bytes',
         icon: 'Database',
         paragraphs: [
-          'Files live as [objects](concept:glossary#object) in buckets, served over S3 by a [node](concept:realm-nodes-groups) and browsed in the [Data manager](page:buckets).',
+          'Files live as [objects](concept:glossary#object) in buckets, served over S3 by a [node](concept:realm-nodes-groups) and browsed in the [Data](page:buckets) view.',
           'A [dataset](concept:datasets) references file identities or locations; it never owns the stored bytes, and one content identity can have several replicas.',
           'Deletion checks warn about visible references and about removing the last resolvable location. Warnings inform; storage permissions decide.',
         ],
@@ -1522,7 +1552,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Globe',
         bullets: [
           'Public access is a group [role](concept:glossary#role) named public with the public flag: read rules on files, folders or a whole bucket that apply to everyone, signed in or not. The node rejects any other level on a public role.',
-          'Group admins grant or remove it in the Data view (Public access next to Delete selected, or the details of a file or folder) and on the bucket settings Overview, which lists every public rule of the bucket.',
+          'Group admins grant or remove it in the Data view (Make public in the selection bar or in the menu of a row, or the details of a file or folder) and on the Access tab of the bucket settings, which lists every public rule of the bucket.',
           'A folder rule covers everything below it, so a file under a public folder stays public until that folder rule is removed.',
         ],
       },
@@ -1531,7 +1561,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Eraser',
         paragraphs: [
           'Delete permanently removes every version and delete marker of a file, folder or bucket on the node you are connected to, aborts its open uploads, and reports what it committed. Nothing brings them back, and a node that holds its own copy keeps it.',
-          'Delete bucket lives in the danger zone of the bucket\'s Storage page. It also settles the sync relationships that point at the bucket, proves the bucket is empty, and only then removes it.',
+          'Delete bucket sits at the bottom of the Overview tab of the bucket settings, and beside each bucket in the bucket list. It also settles the sync relationships that point at the bucket, proves the bucket is empty, and only then removes it.',
           'Everything destructive starts in the same dialog: it names the target and the node, shows what the target contains, and asks you to type the name for a folder or a bucket.',
         ],
       },
@@ -1617,7 +1647,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Portal S3 session',
         icon: 'Clock',
         paragraphs: [
-          'Browsing the [Data manager](page:buckets) uses a short-lived SigV4 session for one selected [group](concept:realm-nodes-groups): held in memory only, valid for at most one hour or the remaining sign-in lifetime, and refreshed shortly before expiry.',
+          'Browsing the [Data](page:buckets) view uses a short-lived SigV4 session for one selected [group](concept:realm-nodes-groups): held in memory only, valid for at most one hour or the remaining sign-in lifetime, and refreshed shortly before expiry.',
           'A session is issued by one node and works only there. Sign-out, account change, or API change clears it.',
         ],
       },

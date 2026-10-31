@@ -160,7 +160,7 @@ export const glossaryTopic: DocsTopic = {
       title: 'Bucket',
       icon: 'Database',
       paragraphs: [
-        'An S3 container for stored objects, served by a node and browsed in the [Data manager](page:buckets); see [Data, buckets, and deletion](concept:data-and-deletion#buckets-hold-the-bytes).',
+        'An S3 container for stored objects, served by a node and browsed in the [Data](page:buckets) view; see [Data, buckets, and deletion](concept:data-and-deletion#buckets-hold-the-bytes).',
       ],
     },
     {
@@ -316,7 +316,7 @@ export const glossaryTopic: DocsTopic = {
       title: 'Compute job',
       icon: 'Wrench',
       paragraphs: [
-        'Background work a node runs for your account, such as staging, provenance, and maintenance. Jobs appear beside your runs in the [Compute](page:compute) view; you can follow or cancel one, never start one.',
+        'Background work a node runs for your account, such as staging, provenance, and maintenance. Jobs appear under System jobs in the [Compute](page:compute) view; you can follow or cancel one, never start one.',
       ],
     },
     {
