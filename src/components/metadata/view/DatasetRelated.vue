@@ -7,6 +7,7 @@ import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import ListPager from '@/components/ui/ListPager.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import { useAruna } from '@/composables/useAruna'
 import type { DatasetViewState } from '@/composables/useDatasetView'
 import { usePagedList } from '@/composables/usePagedList'
@@ -86,32 +87,31 @@ watch(relatedDocs, (rows) => {
 </script>
 
 <template>
-  <section v-if="relatedDocs.length" class="surface overflow-hidden">
-    <div class="flex items-center gap-2 border-b border-border px-5 py-3.5 text-sm font-medium text-foreground">
-      <Link2 class="h-4 w-4 text-primary" /> Links
-      <span class="text-xs font-normal text-muted-foreground">{{ relatedDocs.length }}</span>
+  <section v-if="relatedDocs.length">
+    <SectionHeading title="Links" :icon="Link2" :count="String(relatedDocs.length)" />
+    <div class="surface overflow-hidden">
+      <ul class="divide-y divide-border">
+        <li v-for="row in shown" :key="row.iri" class="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
+          <RouterLink
+            v-if="row.documentId"
+            :to="{ name: 'dataset', params: { id: row.documentId } }"
+            class="min-w-0 truncate font-medium text-primary hover:underline"
+            :title="row.iri"
+          >
+            {{ row.label }}
+          </RouterLink>
+          <ExternalLink
+            v-else-if="isHttpUrl(row.iri)"
+            :href="row.iri"
+            :label="row.label"
+            class="min-w-0 truncate"
+            :title="row.iri"
+          />
+          <span v-else class="min-w-0 truncate text-muted-foreground" :title="row.iri">{{ row.label }}</span>
+          <Badge variant="outline" size="sm" class="shrink-0 uppercase">{{ row.documentId ? 'in portal' : 'external' }}</Badge>
+        </li>
+      </ul>
+      <ListPager v-if="paged" v-model:page="page" v-model:page-size="pageSize" :total="total" class="border-t border-border" />
     </div>
-    <ul class="divide-y divide-border">
-      <li v-for="row in shown" :key="row.iri" class="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
-        <RouterLink
-          v-if="row.documentId"
-          :to="{ name: 'dataset', params: { id: row.documentId } }"
-          class="min-w-0 truncate font-medium text-primary hover:underline"
-          :title="row.iri"
-        >
-          {{ row.label }}
-        </RouterLink>
-        <ExternalLink
-          v-else-if="isHttpUrl(row.iri)"
-          :href="row.iri"
-          :label="row.label"
-          class="min-w-0 truncate"
-          :title="row.iri"
-        />
-        <span v-else class="min-w-0 truncate text-muted-foreground" :title="row.iri">{{ row.label }}</span>
-        <Badge variant="outline" size="sm" class="shrink-0 uppercase">{{ row.documentId ? 'in portal' : 'external' }}</Badge>
-      </li>
-    </ul>
-    <ListPager v-if="paged" v-model:page="page" v-model:page-size="pageSize" :total="total" class="border-t border-border" />
   </section>
 </template>

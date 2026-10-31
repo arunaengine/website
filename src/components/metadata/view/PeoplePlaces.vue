@@ -1,12 +1,13 @@
 <script setup lang="ts">
 // People and organizations grouped by their role in the dataset, then the places it names.
+// `part` shows only one of the two, so the page can set them side by side.
 import { computed } from 'vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 import NameGrid from '@/components/metadata/view/NameGrid.vue'
 import type { DatasetViewState } from '@/composables/useDatasetView'
 import { Building2, MapPin, User, Users } from '@lucide/vue'
 
-const props = defineProps<{ state: DatasetViewState }>()
+const props = defineProps<{ state: DatasetViewState; part?: 'people' | 'places' }>()
 const emit = defineEmits<{ (e: 'open', id: string): void }>()
 const { presentation } = props.state
 
@@ -29,7 +30,7 @@ const places = computed(() =>
 </script>
 
 <template>
-  <section v-if="peopleCount" aria-labelledby="people-heading">
+  <section v-if="peopleCount && part !== 'places'" aria-labelledby="people-heading">
     <SectionHeading id="people-heading" title="People and organizations" :icon="Users" :count="String(peopleCount)" />
     <div class="surface space-y-5 p-5">
       <div v-for="[role, items] in roles" :key="role" class="grid gap-x-6 gap-y-2 sm:grid-cols-[10rem_minmax(0,1fr)]">
@@ -38,7 +39,7 @@ const places = computed(() =>
       </div>
     </div>
   </section>
-  <section v-if="places.length" aria-labelledby="places-heading">
+  <section v-if="places.length && part !== 'people'" aria-labelledby="places-heading">
     <SectionHeading id="places-heading" title="Places" :icon="MapPin" :count="String(places.length)" />
     <div class="surface p-5"><NameGrid :items="places" noun="places" @open="(id: string) => emit('open', id)" /></div>
   </section>

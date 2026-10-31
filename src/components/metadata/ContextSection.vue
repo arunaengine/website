@@ -3,6 +3,7 @@ import { computed, watch, type Component } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import ListPager from '@/components/ui/ListPager.vue'
 import EntityFieldList from '@/components/metadata/EntityFieldList.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import type { CommentEntry, PresentedEntity } from '@/lib/cratePresenter'
 import type { EntityKind } from '@/lib/contextualEntities'
 import { usePagedList } from '@/composables/usePagedList'
@@ -11,11 +12,13 @@ import { AppWindow, BookOpen, MapPin, MessageSquare, Shapes, Tag } from '@lucide
 
 // Every remaining contextual entity with all of its fields and values,
 // profile-labeled and profile-ordered, plus the crate's comments.
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   entities: PresentedEntity[]
   comments: CommentEntry[]
   highlightId?: string
-}>()
+  title?: string
+  icon?: Component
+}>(), { highlightId: undefined, title: 'Other entities', icon: Shapes })
 const emit = defineEmits<{ (e: 'jump', id: string): void }>()
 
 const total = computed(() => props.entities.length + props.comments.length)
@@ -48,13 +51,9 @@ function timeLabel(iso: string): string {
 </script>
 
 <template>
-  <section v-if="total" class="surface overflow-hidden">
-    <div class="flex items-center gap-2 border-b border-border px-5 py-3.5 text-sm font-medium text-foreground">
-      <Shapes class="h-4 w-4 text-primary" /> Other entities
-      <span class="text-xs font-normal text-muted-foreground">{{ total }}</span>
-    </div>
-
-    <div class="divide-y divide-border">
+  <section v-if="total">
+    <SectionHeading :title="title" :icon="icon" :count="String(total)" />
+    <div class="surface divide-y divide-border overflow-hidden">
       <div
         v-for="entity in visible"
         :id="`ctx-${entity.id}`"

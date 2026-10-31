@@ -10,7 +10,8 @@ import { Share2 } from '@lucide/vue'
 
 const CrateGraph = defineAsyncComponent(() => import('@/components/metadata/CrateGraph.vue'))
 
-const props = defineProps<{ state: DatasetViewState }>()
+// `hideHeading`: the page's Entities heading names the graph and switches to it.
+const props = defineProps<{ state: DatasetViewState; hideHeading?: boolean }>()
 const emit = defineEmits<{ (e: 'open', entityId: string): void }>()
 const { currentCrate, crateHasEntities, loadingCrate, detailId } = props.state
 
@@ -27,8 +28,8 @@ function toggle(kind: GraphKind) {
 </script>
 
 <template>
-  <section aria-labelledby="graph-heading">
-    <SectionHeading id="graph-heading" title="Graph" :icon="Share2" info="Click a node to see its links, double-click to open it." />
+  <section :aria-labelledby="hideHeading ? undefined : 'graph-heading'">
+    <SectionHeading v-if="!hideHeading" id="graph-heading" title="Graph" :icon="Share2" info="Click a node to see its links, double-click to open it." />
     <div class="space-y-3">
       <div v-if="kinds.length > 1" class="flex flex-wrap items-center gap-1" role="group" aria-label="Kinds shown">
         <button
