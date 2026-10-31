@@ -34,6 +34,7 @@ function select(value: string) {
     <Button
       v-for="option in options"
       :key="option.value"
+      type="button"
       size="sm"
       variant="ghost"
       :class="cn('h-[26px]', modelValue === option.value
