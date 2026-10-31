@@ -46,7 +46,7 @@ const {
           <Button variant="outline" size="sm" :disabled="loadScriptBusy" @click="pendingScriptPick = null">Cancel</Button>
         </div>
       </Notice>
-      <ObjectBrowserPanel v-else @select="onScriptPick" />
+      <ObjectBrowserPanel v-else all-nodes @select="onScriptPick" />
       <p v-if="loadScriptBusy && !(pendingScriptPick && editorHasCustomContent)" class="text-[11px] text-muted-foreground">
         Loading script…
       </p>

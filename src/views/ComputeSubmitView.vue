@@ -53,7 +53,10 @@ const store = useCustomRun({
   s3,
   myGroups,
   currentUser,
+  searchBuckets,
   nodes,
+  isTarget,
+  isLocalNode,
   getTask,
   dataView,
   realmName: computed(() => realm.value.shortName),
@@ -66,6 +69,7 @@ const {
   reuseSelectedScript,
   stagedScript,
   stagingBucket,
+  stagingNode,
   normalizedScriptKey,
   dependencyConfig,
   dependencyConfigKey,
@@ -290,18 +294,23 @@ async function run() {
   try {
     let draft = task.value
     // The draft names these keys; an edit while the upload runs must not change what is pinned.
+    // A staging bucket on another node gets the files through that node's own session.
+    const remote = stagingNode.value
+    const reference = remote ? await s3.referenceForNode(remote, groupId.value) : undefined
     const target: UploadTarget = {
       bucket: stagingBucket.value.trim(),
       scriptKey: normalizedScriptKey.value,
       dependencyKey: dependencyConfigKey.value,
-      nodeId: s3.nodeIdFor(),
+      nodeId: remote ?? s3.nodeIdFor(),
     }
+    const put = (key: string, text: string, type: string) =>
+      remote ? s3.putTextObject(target.bucket, key, text, type, remote, reference) : s3.putTextObject(target.bucket, key, text, type)
     const [scriptUpload, dependencyUpload] = await Promise.all([
       hasScript.value && !reuseSelectedScript.value
-        ? s3.putTextObject(target.bucket, target.scriptKey, stagedScript.value, language.value.contentType)
+        ? put(target.scriptKey, stagedScript.value, language.value.contentType)
         : Promise.resolve(null),
       dependencyConfig.value
-        ? s3.putTextObject(target.bucket, target.dependencyKey, dependencyConfig.value, 'application/json')
+        ? put(target.dependencyKey, dependencyConfig.value, 'application/json')
         : Promise.resolve(null),
     ])
     if (runTarget.local.value) {
@@ -321,7 +330,7 @@ async function run() {
     }
     fence()
     if (await submitLocally(draft, submission)) return
-    // The uploads sit on the connected node; another node must read exactly those versions.
+    // The uploads sit on the staging bucket's node; another node must read exactly those versions.
     draft = pinUploads(draft, target, [
       scriptUpload && { key: target.scriptKey, versionId: scriptUpload.versionId },
       dependencyUpload && { key: target.dependencyKey, versionId: dependencyUpload.versionId },

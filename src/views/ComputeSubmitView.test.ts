@@ -144,9 +144,10 @@ const DialogStub = defineComponent({
   setup: (props, { slots }) => () => (props.open ? h('div', slots.default?.()) : null),
 })
 
-// Bucket holders the federated search answers; this node unless a test says otherwise.
+// Bucket holders the federated search answers; this node unless a test says otherwise. The
+// empty query lists the run group's buckets.
 const searchBuckets = vi.fn(async (q: string, _options?: { cursor?: string; groupId?: string }) => ({
-  hits: [{ bucket: q, node_id: 'node-id', group_id: 'group-id' }] as Array<{ bucket: string; node_id: string; group_id: string; set_id?: string }>,
+  hits: [{ bucket: q || 'results', node_id: 'node-id', group_id: 'group-id' }] as Array<{ bucket: string; node_id: string; group_id: string; set_id?: string }>,
   nodes_failed: 0,
   next_cursor: null as string | null,
 }))
@@ -519,9 +520,9 @@ describe('run page', () => {
   })
 
   it('sends the run to the node holding its buckets', async () => {
-    searchBuckets.mockImplementationOnce(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-b', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
     const mounted = await mount(ComputeSubmitView, '/app/compute/new')
     await fillValidRun(mounted.root)
+    searchBuckets.mockImplementationOnce(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-b', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
 
     await click(runButton(mounted.root))
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -533,10 +534,10 @@ describe('run page', () => {
   })
 
   it('follows the bucket search to its last page before routing', async () => {
-    searchBuckets.mockImplementationOnce(async () => ({ hits: [], nodes_failed: 0, next_cursor: 'page-2' }))
-    searchBuckets.mockImplementationOnce(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-b', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
     const mounted = await mount(ComputeSubmitView, '/app/compute/new')
     await fillValidRun(mounted.root)
+    searchBuckets.mockImplementationOnce(async () => ({ hits: [], nodes_failed: 0, next_cursor: 'page-2' }))
+    searchBuckets.mockImplementationOnce(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-b', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
 
     await click(runButton(mounted.root))
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -549,14 +550,14 @@ describe('run page', () => {
 
   it('counts every ready member of a distributed bucket the search shows once', async () => {
     // The search answers one hit per set, from the member that sorts first.
+    getBucketDistribution.mockResolvedValueOnce({ members: [{ node_id: 'node-b', state: 'ready' }, { node_id: 'node-id', state: 'ready' }] })
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
+    await fillValidRun(mounted.root)
     searchBuckets.mockImplementationOnce(async (q: string) => ({
       hits: [{ bucket: q, node_id: 'node-b', group_id: 'group-id', set_id: 'set-1' }],
       nodes_failed: 0,
       next_cursor: null,
     }))
-    getBucketDistribution.mockResolvedValueOnce({ members: [{ node_id: 'node-b', state: 'ready' }, { node_id: 'node-id', state: 'ready' }] })
-    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
-    await fillValidRun(mounted.root)
 
     await click(runButton(mounted.root))
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -568,13 +569,13 @@ describe('run page', () => {
   })
 
   it('writes results only to a bucket of the run\'s own group', async () => {
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
+    await fillValidRun(mounted.root)
     searchBuckets.mockImplementationOnce(async (q: string) => ({
       hits: [{ bucket: q, node_id: 'node-id', group_id: 'other-group' }, { bucket: q, node_id: 'node-b', group_id: 'group-id' }],
       nodes_failed: 0,
       next_cursor: null,
     }))
-    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
-    await fillValidRun(mounted.root)
 
     await click(runButton(mounted.root))
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -778,7 +779,7 @@ describe('run page', () => {
     expect(base).toBe('https://node-b.example.org/api/v1')
     expect(submitted.inputs?.[0]?.url).toBe(ContentIdentity.versionObjectId('realm', 'node-c', 'refs', 'k12.fna', version))
     searchBuckets.mockReset()
-    searchBuckets.mockImplementation(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-id', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
+    searchBuckets.mockImplementation(async (q: string) => ({ hits: [{ bucket: q || 'results', node_id: 'node-id', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
     useSavedRuns().remove('r4')
     mounted.app.unmount()
   })
@@ -815,7 +816,7 @@ describe('run page', () => {
     const [submitted] = createTask.mock.calls.at(-1) as unknown as [Tes.TesTask]
     expect(submitted.inputs?.map((entry) => [entry.name, entry.path, entry.type])).toEqual([['sub/a.tsv', '/work/in/db/sub/a.tsv', 'FILE']])
     searchBuckets.mockReset()
-    searchBuckets.mockImplementation(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-id', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
+    searchBuckets.mockImplementation(async (q: string) => ({ hits: [{ bucket: q || 'results', node_id: 'node-id', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
     useSavedRuns().remove('r6')
     mounted.app.unmount()
   })
@@ -848,7 +849,7 @@ describe('run page', () => {
     expect(createTask).not.toHaveBeenCalled()
     expect(content(mounted.root)).toContain('listed from a copy that may miss recent files')
     searchBuckets.mockReset()
-    searchBuckets.mockImplementation(async (q: string) => ({ hits: [{ bucket: q, node_id: 'node-id', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
+    searchBuckets.mockImplementation(async (q: string) => ({ hits: [{ bucket: q || 'results', node_id: 'node-id', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
     useSavedRuns().remove('r5')
     mounted.app.unmount()
   })
@@ -879,6 +880,31 @@ describe('run page', () => {
     const [submitted] = createTask.mock.calls.at(-1) as unknown as [Tes.TesTask]
     const script = submitted.inputs?.find((entry) => entry.path.endsWith('script.py'))
     expect(script?.url).toMatch(/^arn:aruna:realm:node-id:s3\/results\/.+script\.py@v1$/)
+    mounted.app.unmount()
+  })
+
+  it('stages the script in a bucket of another node through that node', async () => {
+    searchBuckets.mockImplementation(async (q: string) => ({ hits: [{ bucket: q || 'demo', node_id: 'node-b', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
+    s3.referenceForNode.mockClear()
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?template=python')
+    await click(button(mounted.root, 'Add output'))
+    await typeValue(input(mounted.root, 'aria-label', 'Container path to capture'), '/work/out/result.txt')
+    await typeValue(input(mounted.root, 'aria-label', 'Destination key'), 'runs/result.txt')
+    await flush()
+    expect(content(mounted.root)).not.toContain('The script needs a bucket')
+
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    const reference = { nodeId: 'node-b', groupId: 'group-id', accessKeyId: 'k-b' }
+    expect(s3.referenceForNode).toHaveBeenCalledWith('node-b', 'group-id')
+    expect(s3.putTextObject).toHaveBeenCalledWith('demo', expect.stringMatching(/script\.py$/), expect.any(String), expect.any(String), 'node-b', reference)
+    const [submitted, base] = createTask.mock.calls.at(-1) as unknown as [Tes.TesTask, string]
+    expect(submitted.inputs?.find((entry) => entry.path.endsWith('script.py'))?.url).toMatch(/^arn:aruna:realm:node-b:s3\/demo\/.+script\.py@v1$/)
+    expect(base).toBe('https://node-b.example.org/api/v1')
+    searchBuckets.mockReset()
+    searchBuckets.mockImplementation(async (q: string) => ({ hits: [{ bucket: q || 'results', node_id: 'node-id', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
     mounted.app.unmount()
   })
 

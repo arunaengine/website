@@ -63,6 +63,7 @@ import {
 } from '@/lib/quickDependencies'
 import { bucketNameProblem, objectKeyProblem } from '@/lib/bucketName'
 import { isHiddenBucket } from '@/lib/workspaces'
+import { listBuckets } from '@/composables/useBucketCount'
 import { quoteCommand, tokenizeCommand } from '@/lib/shellwords'
 import { errorMessage } from '@/lib/utils'
 import { isSecretName, type SavedRun } from '@/lib/savedRuns'
@@ -80,7 +81,10 @@ export interface CustomRunDeps {
   s3: ReturnType<typeof useS3>
   myGroups: ReturnType<typeof useAruna>['myGroups']
   currentUser: ReturnType<typeof useAruna>['currentUser']
+  searchBuckets: ReturnType<typeof useAruna>['searchBuckets']
   nodes: ReturnType<typeof useRealmNodes>['nodes']
+  isTarget: ReturnType<typeof useRealmNodes>['isTarget']
+  isLocalNode: ReturnType<typeof useRealmNodes>['isLocalNode']
   getTask: ReturnType<typeof useTes>['getTask']
   dataView: ReturnType<typeof useComputeDataView>
   realmName: ComputedRef<string>
@@ -664,25 +668,44 @@ function createStore(deps: CustomRunDeps) {
   })
 
   // ── Buckets ────────────────────────────────────────────────────────────────
-  const buckets = ref<string[]>([])
+  // The run group's buckets on every node, as the Data view lists them; null is the connected node.
+  const bucketNodes = ref(new Map<string, string | null>())
+  const buckets = computed(() => [...bucketNodes.value.keys()])
   const bucketsLoading = ref(false)
   const bucketsLoaded = ref(false)
   const bucketOptions = computed(() => buckets.value.map((b) => ({ value: b, label: b })))
+  /** The node holding the staging bucket; null is the connected node. */
+  const stagingNode = computed(() => bucketNodes.value.get(stagingBucket.value.trim()) ?? null)
+  let bucketRun = 0
   async function loadBuckets() {
-    if (!s3.hasActiveKey.value || !s3.endpoint.value) return
+    const group = groupId.value
+    if (!currentUser.value || !group) return
+    const run = ++bucketRun
+    const current = () => run === bucketRun && group === groupId.value
     bucketsLoading.value = true
     try {
-      // System-managed ws-… buckets are never run targets.
-      buckets.value = (await s3.listBuckets()).map((b) => b.name).filter((n) => !isHiddenBucket(n))
-      bucketsLoaded.value = true
-      if (!stagingBucket.value && buckets.value.length) stagingBucket.value = buckets.value[0]
+      const listing = await listBuckets(deps.searchBuckets, group, current)
+      if (!current()) return
+      const found = new Map<string, string | null>()
+      // System-managed ws-… buckets are never run targets; a name held here stays on this node.
+      for (const hit of listing.hits) {
+        if (isHiddenBucket(hit.bucket) || !deps.isTarget(hit.node_id)) continue
+        const local = deps.isLocalNode(hit.node_id)
+        if (local || !found.has(hit.bucket)) found.set(hit.bucket, local ? null : hit.node_id)
+      }
+      bucketNodes.value = found
+      // A partial list never rejects a typed name.
+      bucketsLoaded.value = listing.complete
+      if (!stagingBucket.value && found.size) stagingBucket.value = buckets.value[0]
     } catch {
-      buckets.value = []
+      if (!current()) return
+      bucketNodes.value = new Map()
       bucketsLoaded.value = false
     } finally {
-      bucketsLoading.value = false
+      if (run === bucketRun) bucketsLoading.value = false
     }
   }
+  watch(groupId, () => void loadBuckets())
   // Creating the first bucket from the run page; the script always stages on
   // the connected node, so the session check needs no node id.
   const creatingBucket = ref(false)
@@ -754,7 +777,7 @@ function createStore(deps: CustomRunDeps) {
   const loadScriptOpen = ref(false)
   const loadScriptBusy = ref(false)
   const loadScriptError = ref<string | null>(null)
-  const pendingScriptPick = ref<{ bucket: string; key: string; name: string } | null>(null)
+  const pendingScriptPick = ref<{ bucket: string; key: string; name: string; nodeId?: string | null } | null>(null)
   const editorHasCustomContent = computed(
     () => script.value.trim().length > 0 && !RUNTIMES.some((rt) => script.value === rt.template),
   )
@@ -764,7 +787,7 @@ function createStore(deps: CustomRunDeps) {
     if (fileName.endsWith('.sh')) return 'bash'
     return null
   }
-  function onScriptPick(entry: { bucket: string; key: string; name: string }) {
+  function onScriptPick(entry: { bucket: string; key: string; name: string; nodeId?: string | null }) {
     pendingScriptPick.value = entry
     loadScriptError.value = null
     if (!editorHasCustomContent.value) void applyScriptPick()
@@ -775,7 +798,7 @@ function createStore(deps: CustomRunDeps) {
     loadScriptBusy.value = true
     loadScriptError.value = null
     try {
-      const content = await s3.getObjectText(pick.bucket, pick.key)
+      const content = await (pick.nodeId ? s3.getObjectText(pick.bucket, pick.key, pick.nodeId) : s3.getObjectText(pick.bucket, pick.key))
       const inferred = inferRuntimeId(pick.name)
       if (inferred && executorMode.value === 'runtime') runtimeId.value = inferred
       script.value = content
@@ -1350,6 +1373,7 @@ function createStore(deps: CustomRunDeps) {
     openInputDialog,
     useInputAsScript,
     buckets,
+    stagingNode,
     bucketsLoading,
     bucketsLoaded,
     bucketOptions,
