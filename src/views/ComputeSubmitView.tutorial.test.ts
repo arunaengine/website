@@ -72,7 +72,7 @@ describe('compute tutorial walkthrough', () => {
       states.push(statusLine())
     }
 
-    expect(states.map(stageWord)).toEqual(['Pending', 'Preparing', 'Running', 'Completed'])
+    expect(states.map(stageWord)).toEqual(['Queued', 'Initializing', 'Running', 'Finished'])
     expect(mounted.fetchSpy).not.toHaveBeenCalled()
   })
 
@@ -90,7 +90,7 @@ describe('compute tutorial walkthrough', () => {
       states.push(statusLine())
     }
 
-    expect(states.map(stageWord)).toEqual(['Pending', 'Preparing', 'Running', 'Completed'])
+    expect(states.map(stageWord)).toEqual(['Queued', 'Initializing', 'Running', 'Finished'])
     expect(mounted.fetchSpy).not.toHaveBeenCalled()
   })
 
@@ -167,7 +167,7 @@ describe('compute tutorial walkthrough', () => {
 })
 
 function stageWord(line: string): string {
-  return ['Pending', 'Preparing', 'Running', 'Completed'].find((word) => line.includes(word)) ?? line
+  return ['Queued', 'Initializing', 'Running', 'Finished'].find((word) => line.includes(word)) ?? line
 }
 
 function previewButtons(root: HostNode): HostNode[] {

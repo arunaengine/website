@@ -19,17 +19,16 @@ export const TUTORIAL_JOB_ID = '01TUTORIALJOB000000000000'
 export const RUN_STAGES: TesState[] = ['QUEUED', 'INITIALIZING', 'RUNNING', 'COMPLETE']
 export const RUN_STAGE_MS = 6000
 
-// Plain words for the stage, so the tutorial never makes the reader translate
-// the wire vocabulary of either surface.
+// The stage words of the run page stepper, so the notice and the page agree.
 const STAGE_LABEL: Partial<Record<TesState, string>> = {
-  QUEUED: 'Pending',
-  INITIALIZING: 'Preparing',
+  QUEUED: 'Queued',
+  INITIALIZING: 'Initializing',
   RUNNING: 'Running',
-  COMPLETE: 'Completed',
+  COMPLETE: 'Finished',
 }
 
 export function runStageLabel(state: TesState | undefined): string {
-  return STAGE_LABEL[state ?? 'QUEUED'] ?? 'Pending'
+  return STAGE_LABEL[state ?? 'QUEUED'] ?? 'Queued'
 }
 
 const NATIVE_STATE: Partial<Record<TesState, JobStatusResponse['state']>> = {

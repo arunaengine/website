@@ -78,7 +78,7 @@ export const computeTutorialSteps: TutorialStep[] = [
     id: 'placement',
     route: TUTORIAL_COMPUTE_ROUTE,
     target: 'run-placement',
-    title: 'Execution options',
+    title: 'Placement',
     advanceOn: 'next',
     body: 'Placement decides which nodes the run may land on: a pinned node, an executor kind, and label constraints the nodes advertise. The tile says how many nodes still match.',
   },
@@ -104,7 +104,7 @@ export const computeTutorialSteps: TutorialStep[] = [
     target: 'run-progress',
     title: 'Follow the states',
     advanceOn: 'next',
-    body: 'A run goes Pending, Preparing, Running, Completed. The page polls for you; the simulated run walks the same four states over the next few seconds.',
+    body: 'A run goes Queued, Initializing, Running, Finished. The page polls for you; the simulated run walks the same four states over the next few seconds.',
   },
   {
     id: 'logs',
