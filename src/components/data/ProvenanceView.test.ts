@@ -26,6 +26,7 @@ const component = compileClientComponent(new URL('./ProvenanceView.vue', import.
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
   '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
   '@/components/ui/Tooltip.vue': moduleDefault(Slotted('span')),
+  '@/components/ui/Spinner.vue': moduleDefault(Slotted('span')),
   '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent({ props: { title: String }, setup: (props, { slots }) => () => h('header', [props.title, slots.actions?.()]) })),
   '@/lib/crate/dataIdentity': { folderRoute: (bucket: string) => ({ name: 'bucket', params: { bucketId: bucket } }), objectRoute: (bucket: string, key: string) => ({ name: 'bucket', params: { bucketId: bucket }, query: { object: key } }) },
   '@/lib/objectListing': { splitName: (name: string) => [name, ''] },
@@ -83,24 +84,55 @@ describe('provenance view', () => {
     expect(run?.props.to).toEqual({ name: 'dataset', params: { id: 'doc1' } })
   })
 
-  it('opens and closes an earlier step in place, with no switch', async () => {
+  it('shows where an input came from at once, and closes and opens it in place', async () => {
     aruna.getVersionOrigin.mockReset().mockResolvedValue(origin({ origin: { kind: 'source' } as never, source: { url: 'https://example.org/in.faa' } as never }))
     const root = await render()
-    await vi.waitFor(() => expect(content(root)).toContain('in.faa'))
-    expect(content(root)).not.toContain('example.org')
-    expect(content(root)).not.toContain('Full chain')
-
-    const toggle = () => nodes(root).find((node) => node.tag === 'button' && node.props['aria-expanded'] !== undefined && content(node) !== 'Show the files')!
-    expect(toggle().props['aria-label']).toBe('Show 1 step before this')
-    await click(toggle())
     await vi.waitFor(() => expect(content(root)).toContain('example.org'))
+    expect(content(root)).toContain('in.faa')
+    expect(content(root)).not.toContain('Full chain')
     const source = nodes(root).find((node) => node.tag === 'a' && node.props.href === 'https://example.org/in.faa')
     expect(content(source!)).toContain('example.org')
 
+    const toggle = () => nodes(root).find((node) => node.tag === 'button' && node.props['aria-expanded'] !== undefined && content(node) !== 'Show the files')!
     expect(toggle().props['aria-label']).toBe('Hide earlier steps')
     await click(toggle())
     expect(content(root)).not.toContain('example.org')
     expect(toggle().props['aria-label']).toBe('Show 1 step before this')
+    await click(toggle())
+    await vi.waitFor(() => expect(content(root)).toContain('example.org'))
+  })
+
+  it('draws the run that made an input one level up, and reads every level on request', async () => {
+    const version = (name: string, last: string) => `https://w3id.org/aruna/data/arn:aruna:r:n:s3/lab/${name}@01K8W1B3D5F7H9KMQ1S3V5X7Z${last}`
+    const [x, y, z] = [version('x.fa', '3'), version('y.fa', '4'), version('z.fa', '5')]
+    const input = (id: string, name: string, exact: string) => ({ '@id': id, '@type': 'File', name, contentUrl: [`s3://lab/${name}`, exact] })
+    const runCrate = (name: string, id: string, file: string, exact: string) => ({ '@graph': [{ '@id': '#run', '@type': 'CreateAction', name, object: [{ '@id': id }] }, input(id, file, exact)] })
+    aruna.getRun.mockImplementation(async (runId: string) => ({ run_id: runId, run_crate: runId }))
+    aruna.fetchRoCrateRaw.mockImplementation(async (doc: string) => (doc === 'b' ? runCrate('Trimming', 'y', 'y.fa', y) : runCrate('Download', 'z', 'z.fa', z)))
+    aruna.getVersionOrigin.mockImplementation(async (id: string) => origin({ origin: id === x ? { kind: 'job', run_id: 'b' } : id === y ? { kind: 'job', run_id: 'c' } : ({ kind: 'upload' } as never) }))
+    const crate = {
+      '@graph': [
+        { '@id': '#run-a', '@type': 'CreateAction', name: 'Assembly', object: [{ '@id': 'x' }], result: [{ '@id': 'out' }] },
+        input('x', 'x.fa', x),
+        { '@id': 'out', '@type': 'File', name: 'out.fa', contentUrl: 's3://lab/out.fa' },
+      ],
+    }
+    const { root } = await mountApp(component, { props: { start: { kind: 'dataset', documentId: 'd1', title: 'Assembly result', crate } } })
+
+    await vi.waitFor(() => expect(content(root)).toContain('Upstream input file'))
+    expect(content(root)).toContain('Upstream runHideTrimming')
+    expect(content(root)).not.toContain('Reading')
+    expect(content(root)).not.toContain('Download')
+    expect(aruna.getRun).not.toHaveBeenCalledWith('c')
+
+    await click(button(root, 'Show full graph'))
+    await vi.waitFor(() => expect(content(root)).toContain('Show direct steps'))
+    expect(aruna.getVersionOrigin).toHaveBeenCalledWith(z)
+    expect(content(root)).toContain('Upstream runHideDownload')
+    expect(content(root)).toContain('z.fa')
+
+    await click(button(root, 'Show direct steps'))
+    expect(content(root)).not.toContain('Download')
   })
 
   it('exports the crate of the start version', async () => {
@@ -167,9 +199,11 @@ describe('provenance view', () => {
       })
     })
     const root = await render()
-    // Directly, the database's files read as the database with its release and file count.
-    await vi.waitFor(() => expect(content(root)).toContain('Bakta database (light)Show the filesRelease 6.0 light, 66 files'))
-    expect(content(root)).not.toContain('Source')
+    // Directly, the database files show their release and the run that made them, marked upstream.
+    await vi.waitFor(() => expect(content(root)).toContain('Prepare Bakta DB 6.0 light'))
+    expect(content(root)).toContain('66 filesShow the filesRelease 6.0 light')
+    expect(content(root)).toContain('Upstream run')
+    expect(content(root)).not.toContain('zenodo.org')
     await openAll(root)
     await vi.waitFor(() => expect(content(root)).toContain('zenodo.org'))
     const text = content(root)

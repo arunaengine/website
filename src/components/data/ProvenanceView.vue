@@ -8,8 +8,9 @@ import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
-import { ArrowDown, CloudOff, Database, Download, EyeOff, File, FileText, Files, GitBranch, Globe, Info, Minus, MoveRight, Plus, RotateCw, Workflow } from '@lucide/vue'
+import { ArrowDown, CloudOff, Database, Download, EyeOff, File, FileText, Files, GitBranch, Globe, Info, Minus, MoveRight, Network, Plus, RotateCw, Workflow } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { apiErrorMessage } from '@/lib/api'
 import { folderRoute, objectRoute } from '@/lib/crate/dataIdentity'
@@ -48,6 +49,8 @@ const graph = reactive<Graph>(emptyGraph())
 const walking = ref(false)
 // Cards opened or closed by hand, by card id; the rest follow the direct default.
 const opened = ref(new Map<string, boolean>())
+// The full graph opens every card, so reading goes on until nothing waits or it is stopped.
+const full = ref(false)
 // Each read has its number; a newer read or a stop ends the older one.
 let reading = 0
 let generation = 0
@@ -70,6 +73,7 @@ watch(
     went.value = null
     wentState.value = 'idle'
     opened.value = new Map()
+    full.value = false
     Object.assign(graph, emptyGraph())
     if (props.start.kind === 'file') startFile(graph, props.start.id, props.start.name, props.start.origin)
     else startDataset(graph, props.start.title, props.start.documentId, props.start.crate)
@@ -78,11 +82,12 @@ watch(
 )
 
 // The open cards; a run record's results are not read, its card counts them.
+const waiting = (item: Box | undefined) => Boolean(item?.pending.length) && item!.kind !== 'silent' && !(item!.id.startsWith('dataset:') && props.record)
+const unread = computed(() => layout.value.cards.some((card) => card.open && card.node.ids.some((id) => waiting(graph.boxes[id]))))
 async function readDirect() {
   const current = fenced()
   const run = ++reading
   walking.value = true
-  const waiting = (item: Box | undefined) => Boolean(item?.pending.length) && item!.kind !== 'silent' && !(item!.id.startsWith('dataset:') && props.record)
   for (;;) {
     const next = layout.value.cards.filter((card) => card.open).flatMap((card) => card.node.ids).find((id) => waiting(graph.boxes[id]))
     if (!next || run !== reading || !current()) break
@@ -94,6 +99,11 @@ async function readDirect() {
 function stop() {
   reading += 1
   walking.value = false
+}
+
+function showFull(value: boolean) {
+  full.value = value
+  opened.value = new Map()
 }
 
 // The export is assembled by the node and saved as one file.
@@ -147,7 +157,7 @@ const PITCH = 120
 const GAP = 48
 
 const chain = computed(() => intoRecord(graph, drawnChain(graph)))
-const layout = computed(() => chainColumns(graph, chain.value, true, opened.value))
+const layout = computed(() => chainColumns(graph, chain.value, !full.value, opened.value))
 const gridStyle = computed(() => ({
   gridTemplateColumns: Array.from({ length: layout.value.columns }, () => 'minmax(9rem, 16rem)').join(` ${GAP}px `),
   gridTemplateRows: `repeat(${layout.value.rows * 2}, ${PITCH / 2}px)`,
@@ -303,7 +313,7 @@ const CardView = defineComponent({
       }
       const head = [
         h(view.icon, { class: ['h-3.5 w-3.5 shrink-0', view.me ? 'text-aruna-navy dark:text-aruna-aqua' : 'text-muted-foreground'], 'aria-hidden': 'true' }),
-        h('span', { class: 'truncate' }, view.role),
+        h('span', { class: 'truncate' }, cardProps.card.upstream ? `Upstream ${view.role.charAt(0).toLowerCase()}${view.role.slice(1)}` : view.role),
       ]
       if (view.me && props.start.kind === 'dataset') head.push(h('span', { class: 'ml-auto shrink-0 font-medium text-aruna-navy dark:text-aruna-aqua' }, 'This record'))
       if (view.action) {
@@ -384,6 +394,9 @@ const legend = computed(() => {
   <div class="space-y-4">
     <SectionHeading v-if="start.kind === 'dataset'" id="provenance-heading" title="Provenance" :icon="GitBranch" :info="INFO">
       <template #actions>
+        <Button v-if="!full" size="sm" variant="outline" @click="showFull(true)"><Network class="h-4 w-4" /> Show full graph</Button>
+        <Button v-else-if="!walking && unread" size="sm" variant="outline" @click="readDirect"><Network class="h-4 w-4" /> Read the rest</Button>
+        <Button v-else-if="!walking" size="sm" variant="outline" @click="showFull(false)"><Network class="h-4 w-4" /> Show direct steps</Button>
         <Button size="sm" variant="outline" :disabled="exporting" @click="exportCrate"><Download class="h-4 w-4" /> Export as crate</Button>
       </template>
     </SectionHeading>
@@ -397,8 +410,9 @@ const legend = computed(() => {
     <p v-else-if="exported" role="status" class="text-xs text-muted-foreground">Saved as provenance.zip.</p>
 
     <div :class="start.kind === 'dataset' ? 'surface overflow-hidden' : ''">
-      <div v-if="walking" class="flex flex-wrap items-center gap-2 px-4 pt-3 text-xs text-muted-foreground">
-        Reading: {{ graph.steps }} steps read
+      <div v-if="walking" role="status" class="flex flex-wrap items-center gap-2 px-4 pt-3 text-xs text-muted-foreground">
+        <Spinner v-if="full" />
+        {{ full ? 'Reading the full graph' : 'Reading' }}: {{ graph.steps }} steps read
         <button type="button" class="text-primary hover:underline" @click="stop">Stop</button>
       </div>
       <div ref="pane" :class="start.kind === 'dataset' ? 'p-4' : 'py-2'">
