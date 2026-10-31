@@ -37,6 +37,8 @@ describe('v2 login', () => {
     expect(location.searchParams.get('code_challenge_method')).toBe('S256')
     const meta = JSON.parse(decodeURIComponent(loginMeta))
     expect(meta.provider).toBe('lifescience')
+    expect(location.searchParams.get('state')).toBe(meta.state)
+    expect(meta.state).toMatch(/^[0-9a-f-]{36}$/)
     const challenge = crypto.createHash('sha256').update(meta.code_verifier).digest('base64url')
     expect(location.searchParams.get('code_challenge')).toBe(challenge)
   })
@@ -44,7 +46,7 @@ describe('v2 login', () => {
   test('callback exchanges code and sets session cookies', async () => {
     const {location, loginMeta} = await startLogin('lifescience')
     const state = location.searchParams.get('state')
-    const response = await finishLogin(`code=abc${state ? `&state=${state}` : ''}`, `login_meta=${loginMeta}`)
+    const response = await finishLogin(`code=abc&state=${state}`, `login_meta=${loginMeta}`)
     expect(response.status).toBe(302)
     expect(response.headers.get('location')).toBe('/')
     expect(cookieValue(response, 'access_token')).toBe('new-access')
@@ -64,7 +66,7 @@ describe('v2 login', () => {
     const {location, loginMeta} = await startLogin('iam4nfdi')
     expect(location.searchParams.has('code_challenge')).toBe(false)
     const state = location.searchParams.get('state')
-    const response = await finishLogin(`code=abc${state ? `&state=${state}` : ''}`, `login_meta=${loginMeta}`)
+    const response = await finishLogin(`code=abc&state=${state}`, `login_meta=${loginMeta}`)
     expect(response.status).toBe(302)
     expect(cookieValue(response, 'access_token')).toBe('new-access')
 
@@ -80,7 +82,7 @@ describe('v2 login', () => {
     const {location, loginMeta} = await startLogin('local')
     expect(location.origin + location.pathname).toBe('https://local.test/authorize')
     const state = location.searchParams.get('state')
-    const response = await finishLogin(`code=abc${state ? `&state=${state}` : ''}`, `login_meta=${loginMeta}`)
+    const response = await finishLogin(`code=abc&state=${state}`, `login_meta=${loginMeta}`)
     expect(response.headers.get('location')).toBe('/')
     expect(cookieValue(response, 'access_token')).toBe('new-access')
   })
@@ -89,11 +91,22 @@ describe('v2 login', () => {
     const {location, loginMeta} = await startLogin('lifescience', '&add_idp=true')
     const state = location.searchParams.get('state')
     const cookie = `login_meta=${loginMeta}; access_token=old-access`
-    const response = await finishLogin(`code=abc${state ? `&state=${state}` : ''}`, cookie)
+    const response = await finishLogin(`code=abc&state=${state}`, cookie)
     expect(response.headers.get('location')).toBe('/user/account?add=success')
     expect(cookieValue(response, 'access_token')).toBeUndefined()
     const patch = fetchCalls.find(c => c.url === '/api/user/oidc')!
     expect(patch.options.body).toEqual({accessToken: 'old-access', newAccessToken: 'new-access'})
+  })
+
+  test('callback with wrong or missing state is rejected', async () => {
+    const {loginMeta} = await startLogin('lifescience')
+    for (const query of ['code=abc&state=forged', 'code=abc']) {
+      fetchCalls.length = 0
+      const response = await finishLogin(query, `login_meta=${loginMeta}`)
+      expect(response.status).toBe(400)
+      expect(cookieValue(response, 'access_token')).toBeUndefined()
+      expect(fetchCalls).toHaveLength(0)
+    }
   })
 
   test('callback without code is rejected', async () => {

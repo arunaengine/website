@@ -32,11 +32,13 @@ export default defineEventHandler(async event => {
   console.log(`[Login Server] Idp meta fetch ${response}`)
 
   // Start authentication flow
+  const state = crypto.randomUUID()
   let auth_query: AuthQuery = {
     client_id: config.clientId,
     redirect_uri: config.redirectUrl,
     scope: config.scope.join(' '),
     response_type: 'code',
+    state: state,
   }
 
   let code_verifier
@@ -57,6 +59,7 @@ export default defineEventHandler(async event => {
   setCookie(event, 'login_meta', JSON.stringify({
     provider: provider,
     code_verifier: code_verifier,
+    state: state,
     add_idp: add_idp ? add_idp : false
   }))
 

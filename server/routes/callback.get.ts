@@ -49,7 +49,13 @@ export default defineEventHandler(async event => {
 
   if (!login_meta)
     throw new Error('Missing login meta information')
-  const {provider, code_verifier, add_idp} = JSON.parse(login_meta)
+  const {provider, code_verifier, add_idp, state: expected_state} = JSON.parse(login_meta)
+  if (!state || state !== expected_state) {
+    return createError({
+      statusCode: 400,
+      message: 'Login failed: invalid state. Please try again.',
+    });
+  }
 
   // Fetch provider specific config
   const providers = useRuntimeConfig().provider
