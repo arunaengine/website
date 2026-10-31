@@ -27,9 +27,9 @@ const example = computed(() => (mockEnabled() ? mockBucket(props.bucket) : undef
 const previewOpen = ref(false)
 const previewResult = ref('')
 
+// A bucket on another node is deleted through that node's API, which checks the rights itself.
 const refusal = computed(() => {
-  if (example.value) return null
-  if (props.nodeId) return 'Only the node that serves this bucket can delete it.'
+  if (example.value || props.nodeId) return null
   if (!s3.canDeletePrefix(props.bucket, '', null)) {
     return 'This session cannot delete this bucket: it needs write on the whole bucket.'
   }
@@ -39,7 +39,7 @@ const refusal = computed(() => {
 async function onCompleted(result: DeletionResult) {
   if (!result.committed.length) return
   shortcuts.remove(props.bucket, props.nodeId)
-  await bucketList.refresh()
+  if (!props.nodeId) await bucketList.refresh()
   await router.push({ name: 'buckets', query: props.groupId ? { group: props.groupId } : {} })
 }
 </script>
