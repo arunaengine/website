@@ -88,6 +88,11 @@ export default defineNuxtConfig({
         post_auth: false
       }
     },
+    v3Bridge: {
+      // e.g. https://keycloak.v3.aruna-engine.org/realms/aruna, empty disables the v3 login bridge
+      realmUrl: '',
+      providers: 'lifescience,iam4nfdi,gfbio'
+    },
     markdownCss: {
       h1: ['font-display', 'text-3xl', 'font-semibold', 'tracking-tight', 'text-aruna-text-accent'],
       h2: ['mt-8', 'mb-2', 'font-display', 'text-2xl', 'font-semibold', 'tracking-tight', 'text-aruna-text-accent'],

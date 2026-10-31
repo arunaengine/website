@@ -1,5 +1,6 @@
 import type {v2AddOidcProviderResponse} from "~/composables/aruna_api_json";
-import {errorToPOJO, fetchCachedOidcMetadata} from "~/server/utils/oidc";
+import {withQuery} from 'ufo'
+import {bridgeTarget, errorToPOJO, fetchCachedOidcMetadata} from "~/server/utils/oidc";
 
 type AuthCodeRequest = {
   grant_type: 'authorization_code',
@@ -20,6 +21,20 @@ type AuthCodeResponse = {
 export default defineEventHandler(async event => {
   const query = getQuery(event)
   const {code, state} = query
+
+  // v3 login bridge: forward the response to the fixed v3 Keycloak broker URL, no v2 login
+  if (typeof state === 'string' && state.startsWith('v3.')) {
+    const [, alias = '', bridgedState = ''] = /^v3\.([^.]+)\.(.+)$/s.exec(state) ?? []
+    const brokerUrl = bridgeTarget(alias)?.brokerUrl
+    if (!bridgedState || !brokerUrl) {
+      throw createError({statusCode: 400, statusMessage: 'Invalid login bridge request'})
+    }
+    const forward: Record<string, string> = {state: bridgedState}
+    for (const key of ['code', 'error', 'error_description', 'iss']) {
+      if (typeof query[key] === 'string') forward[key] = query[key] as string
+    }
+    return sendRedirect(event, withQuery(brokerUrl, forward))
+  }
 
   if (!code) {
     return createError({

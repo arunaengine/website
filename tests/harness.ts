@@ -32,6 +32,7 @@ export const config: any = {
       post_auth: true,
     },
   },
+  v3Bridge: {realmUrl: 'https://kc.test/realms/aruna', providers: 'lifescience,iam4nfdi,gfbio'},
 }
 
 export const fetchCalls: { url: string, options: any }[] = []
@@ -60,6 +61,11 @@ Object.assign(globalThis, h3, {
     fetchCalls.push({url, options})
     return fetchReply(url, options)
   },
+  fetch: async (url: string, options: any) => {
+    fetchCalls.push({url, options})
+    const reply = fetchReply(url, options)
+    return reply instanceof Response ? reply : Response.json(reply)
+  },
 })
 
 export async function createHandler() {
@@ -67,6 +73,8 @@ export async function createHandler() {
   const router = h3.createRouter()
     .get('/auth/login', await route('auth/login.get.ts'))
     .get('/callback', await route('callback.get.ts'))
+    .get('/v3-bridge/:provider/authorize', await route('v3-bridge/[provider]/authorize.get.ts'))
+    .post('/v3-bridge/:provider/token', await route('v3-bridge/[provider]/token.post.ts'))
   return h3.toWebHandler(h3.createApp().use(router))
 }
 

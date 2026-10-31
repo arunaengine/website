@@ -38,3 +38,17 @@ export const fetchCachedOidcMetadata = defineCachedFunction(async (wellKnowUrl: 
   swr: false,
   getKey: (identityProvider: string) => identityProvider,
 })
+
+// Provider config and fixed v3 Keycloak broker URL of a bridged provider, else undefined
+export function bridgeTarget(provider: string) {
+  const {realmUrl, providers: bridged} = useRuntimeConfig().v3Bridge
+  const providers = useRuntimeConfig().provider
+  if (!realmUrl || !bridged.split(',').includes(provider) || !Object.hasOwn(providers, provider)) {
+    return undefined
+  }
+  const config = providers[provider as keyof typeof providers]
+  if (!config.clientId) {
+    return undefined
+  }
+  return {config, brokerUrl: `${realmUrl.replace(/\/+$/, '')}/broker/${provider}/endpoint`}
+}
