@@ -3,8 +3,15 @@ import type { ShareMode, ShareStatus, ShareTarget } from '@/lib/api'
 
 export const MODE_LABELS: Record<ShareMode, string> = {
   read: 'Read only',
-  read_upload: 'Read and upload',
+  read_upload: 'Read and write',
   upload: 'Upload only',
+}
+
+/** What a visitor may do in each mode; a link never replaces or deletes a stored file. */
+export const MODE_HINTS: Record<ShareMode, string> = {
+  read: 'Visitors can browse and download.',
+  read_upload: 'Visitors can download and upload new files.',
+  upload: 'A file drop: visitors upload new files and see nothing stored.',
 }
 
 export const STATUS_LABELS: Record<ShareStatus, string> = {

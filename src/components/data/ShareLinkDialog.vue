@@ -17,7 +17,7 @@ import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { linkFor, linkNode, linkSite, shareClient, shareErrorMessage } from '@/composables/useShareLinks'
 import { createShare, listShares, revokeShare, shareUrl, type ShareInfo, type ShareMode, type ShareTarget } from '@/lib/api'
-import { EXPIRY_OPTIONS, MODE_LABELS, STATUS_LABELS, expiryFor, modesFor, sameTarget, type ExpiryChoice } from '@/lib/shareLinks'
+import { EXPIRY_OPTIONS, MODE_HINTS, MODE_LABELS, STATUS_LABELS, expiryFor, modesFor, sameTarget, type ExpiryChoice } from '@/lib/shareLinks'
 import { copyToClipboard, formatDateTime } from '@/lib/utils'
 
 const props = defineProps<{
@@ -184,6 +184,7 @@ const expiresText = (at: string | null) => (at ? formatDateTime(at) : 'No expiry
             <OptionToggle v-if="modeOptions.length > 1" v-model="mode" :options="modeOptions" aria-label="Access" />
             <p v-else class="text-sm text-foreground">{{ MODE_LABELS.read }}</p>
           </div>
+          <p class="mt-1 text-xs text-muted-foreground">{{ MODE_HINTS[mode] }}</p>
         </div>
         <div>
           <label class="text-xs font-medium text-foreground">Expires after</label>

@@ -98,7 +98,9 @@ describe('ShareLinkDialog', () => {
     answers.push({ body: { shares: [] } }, { body: { share: share({ mode: 'read_upload', password: true }), token: 'S1.secret' } })
     const { root } = await open({ kind: 'folder', bucket: 'data', prefix: 'results/' }, 'node-2')
 
-    await click(button(root, 'Read and upload'))
+    expect(content(root)).toContain('Visitors can browse and download.')
+    await click(button(root, 'Read and write'))
+    expect(content(root)).toContain('Visitors can download and upload new files.')
     const password = nodes(root).find((node) => node.tag === 'input' && node.props.type === 'password')!
     const enter = password.props['onUpdate:modelValue'] as (value: string) => void
     enter('pass phrase')
