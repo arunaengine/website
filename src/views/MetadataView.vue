@@ -51,6 +51,7 @@ import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { providePageContext } from '@/composables/usePageContext'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import { useUserDirectory } from '@/composables/useUserDirectory'
 import { crateActions, crateTypeOf } from '@/lib/crateType'
 import { aboutFacts, bylineOf, citationText } from '@/lib/datasetAbout'
 import { mainAction } from '@/lib/datasetFacts'
@@ -107,6 +108,15 @@ const runStateLabel = computed(() => {
   return value === 'succeeded' || value === 'failed' ? null : value
 })
 const byline = computed(() => bylineOf(currentCrate.value, isRun.value ? mainAction(currentCrate.value) : undefined))
+const userDir = useUserDirectory()
+watch(() => byline.value.flatMap((person) => person.userId ?? []), (ids) => {
+  if (ids.length) void userDir.resolveUsers(ids)
+}, { immediate: true })
+// An unnamed Aruna user shows by the user's name once known, never by the raw id.
+const bylineNames = computed(() => byline.value.flatMap((person) => {
+  const name = person.userId ? userDir.cachedUser(person.userId)?.name : person.name
+  return name ? [{ id: person.id, name }] : []
+}))
 const pageTitle = computed(() => current.value?.title || fetchedSummary.value?.document_path || 'Dataset')
 // Datasets, then the kind's own list where it has one, then this page.
 const crumbs = computed(() => {
@@ -318,10 +328,10 @@ function jumpTo(entityId: string) {
             <Badge variant="success" class="cursor-pointer hover:opacity-80">Published</Badge>
           </button>
         </span>
-        <span v-if="byline.length" class="mt-2 block text-sm text-foreground">
+        <span v-if="bylineNames.length" class="mt-2 block text-sm text-foreground">
           <template v-if="isRun">Run by </template>
-          <template v-for="(person, index) in byline" :key="person.id">
-            <button type="button" class="underline decoration-border underline-offset-4 hover:decoration-foreground" @click="openInfo(person.id)">{{ person.name }}</button><template v-if="index < byline.length - 1">, </template>
+          <template v-for="(person, index) in bylineNames" :key="person.id">
+            <button type="button" class="inline-block max-w-[20rem] truncate align-bottom underline decoration-border underline-offset-4 hover:decoration-foreground" :title="person.name" @click="openInfo(person.id)">{{ person.name }}</button><template v-if="index < bylineNames.length - 1">, </template>
           </template>
         </span>
       </template>

@@ -63,6 +63,13 @@ describe('bylineOf', () => {
     expect(bylineOf(crate).map((entry) => entry.name)).toEqual(['Ada Lovelace', 'Grace Hopper'])
     expect(bylineOf(crate, { agent: { '@id': 'https://orcid.org/0000-0001' } })).toHaveLength(1)
   })
+
+  it('marks an unnamed Aruna user agent by its user id', () => {
+    const user = `01M63KXP71RJ4MJAEDT9ZJ1VXP@${'Q'.repeat(43)}`
+    const run = { '@graph': [{ '@id': `#agent-${user}`, '@type': 'Person', identifier: user }] }
+    expect(bylineOf(run, { agent: { '@id': `#agent-${user}` } })[0]?.userId).toBe(user)
+    expect(bylineOf(crate)[0]?.userId).toBeUndefined()
+  })
 })
 
 describe('referencesTo', () => {

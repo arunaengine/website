@@ -2,7 +2,7 @@ import { crateGraph, crateRootId, stringProp, typesOf } from '@/lib/dataEntities
 import { unlistedFiles } from '@/lib/bucketLayout'
 import { toArray } from '@/lib/contextualEntities'
 import { prettifyKey } from '@/lib/cratePresenter'
-import { readableIri } from '@/lib/identifiers'
+import { isArunaUserId, readableIri } from '@/lib/identifiers'
 import { formatBinary, formatDate, isHttpUrl } from '@/lib/utils'
 
 export interface IdentifierLink {
@@ -73,8 +73,11 @@ export function citationText(parts: CitationParts): string {
   return [head, parts.title, parts.publisher, parts.link].filter(Boolean).map((part) => part.replace(/\.$/, '')).join('. ')
 }
 
-/** Who the header names: a run's agents, else the root's authors or creators, by entity name. */
-export function bylineOf(crate: unknown, action?: Record<string, unknown>): Array<{ id: string; name: string }> {
+/**
+ * Who the header names: a run's agents, else the root's authors or creators, by entity name.
+ * An unnamed Aruna user carries `userId`, so the page can show the user's name instead of the id.
+ */
+export function bylineOf(crate: unknown, action?: Record<string, unknown>): Array<{ id: string; name: string; userId?: string }> {
   const graph = crateGraph(crate)
   const root = graph.find((entity) => entity['@id'] === crateRootId(crate))
   const source = action ? toArray(action.agent) : toArray(root?.author).length ? toArray(root?.author) : toArray(root?.creator)
@@ -85,7 +88,8 @@ export function bylineOf(crate: unknown, action?: Record<string, unknown>): Arra
     seen.add(id)
     const entity = graph.find((candidate) => candidate['@id'] === id)
     const name = stringProp(entity?.name) || (value && typeof value === 'object' ? '' : id)
-    return [{ id, name: name || readableIri(id) }]
+    const userId = stringProp(entity?.name) ? undefined : [stringProp(entity?.identifier), id.replace(/^#agent-/, '')].find(isArunaUserId)
+    return [{ id, name: name || readableIri(id), ...(userId ? { userId } : {}) }]
   })
 }
 
