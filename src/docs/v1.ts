@@ -117,7 +117,7 @@ export const docsTopics: DocsTopic[] = [
         ],
         image: {
           src: '/docs/v1/dashboard.jpg',
-          alt: 'Portal dashboard with personal statistics, per-group storage, and realm statistics',
+          alt: 'Portal dashboard with the Overview cards, your groups, recent runs and recent datasets',
           caption: 'The dashboard: the Overview cards, then your groups or the realm.',
         },
       },
@@ -132,7 +132,7 @@ export const docsTopics: DocsTopic[] = [
         ],
         image: {
           src: '/docs/v1/quick-search.jpg',
-          alt: 'Quick search open in the top bar with dataset and object results for the query reef',
+          alt: 'Quick search open in the top bar with dataset and object results for the query genome',
           caption: 'Quick search groups results by kind and links to the full search page.',
         },
       },
@@ -211,7 +211,7 @@ export const docsTopics: DocsTopic[] = [
         image: {
           src: '/docs/v1/group-detail.jpg',
           alt: 'Group detail page with the Overview, Members, Roles, Data sources, Policies and Storage tabs',
-          caption: 'The group page: role badge next to the name, management tabs below.',
+          caption: 'The group page: your role under the name, management tabs below.',
         },
       },
     ],
@@ -260,8 +260,8 @@ export const docsTopics: DocsTopic[] = [
         ],
         image: {
           src: '/docs/v1/data-browser.jpg',
-          alt: 'Data view with the reef-survey-2026 bucket and two uploaded objects',
-          caption: 'A bucket with uploaded objects; the toolbar reaches Watch, Share and Settings.',
+          alt: 'Data view with the laptop bucket open on its my-genome folder',
+          caption: 'A bucket with its files; the toolbar reaches Notify me, Share and Settings.',
         },
       },
       {
@@ -487,8 +487,8 @@ export const docsTopics: DocsTopic[] = [
         ],
         image: {
           src: '/docs/v1/dataset-addfiles.jpg',
-          alt: 'Add files dialog showing bucket objects with checkboxes',
-          caption: 'Attaching bucket objects references them in the graph; the bytes stay in the bucket.',
+          alt: 'Add files dialog with the From a database source and two files ticked',
+          caption: 'Attaching files references them in the graph; the bytes stay where they are.',
         },
       },
       {
@@ -521,7 +521,7 @@ export const docsTopics: DocsTopic[] = [
         ],
         image: {
           src: '/docs/v1/datasets-catalog.jpg',
-          alt: 'Datasets catalog with search, filters, and the saved dataset card',
+          alt: 'Datasets catalog with search, filters, and the list of datasets',
           caption: 'The catalog: type, profile and group filters; More actions opens the SPARQL workbench.',
         },
       },
@@ -598,8 +598,6 @@ export const docsTopics: DocsTopic[] = [
       },
     ],
   },
-  // The three screenshots below still show the old two-step wizards; they need
-  // to be retaken against the one run page.
   {
     slug: 'compute-run',
     kind: 'Guide',
@@ -616,7 +614,7 @@ export const docsTopics: DocsTopic[] = [
         ],
         image: {
           src: '/docs/v1/compute-new-run.jpg',
-          alt: 'Compute view with the New menu listing New run and the run templates',
+          alt: 'Compute view with the New menu listing New run, the run templates and New notebook',
           caption: 'New: a blank run, or a run template.',
         },
       },
@@ -636,8 +634,8 @@ export const docsTopics: DocsTopic[] = [
         ],
         image: {
           src: '/docs/v1/quick-run-script.jpg',
-          alt: 'The run page with the script editor and the container filesystem',
-          caption: 'The script and the filesystem it works on, side by side.',
+          alt: 'The script editor on the run page with the paths it names listed below',
+          caption: 'The script, with each path it names shown as a chip below the editor.',
         },
       },
       {
@@ -654,7 +652,7 @@ export const docsTopics: DocsTopic[] = [
         ],
         image: {
           src: '/docs/v1/quick-run-review.jpg',
-          alt: 'The end of the run page with the readiness line, Show request and Run',
+          alt: 'The run page with the readiness panel, Show request and Run',
           caption: 'The request is shown verbatim before anything is sent.',
         },
       },
@@ -668,8 +666,8 @@ export const docsTopics: DocsTopic[] = [
         ],
         image: {
           src: '/docs/v1/run-detail.jpg',
-          alt: 'Run detail page with lifecycle states and the distributed execution record',
-          caption: 'A run in flight: lifecycle on top, the distributed execution record below.',
+          alt: 'Run details with timing, the progress steps, inputs and results',
+          caption: 'A finished run: timing and progress on top, inputs and results below.',
         },
       },
     ],
@@ -763,7 +761,7 @@ export const docsTopics: DocsTopic[] = [
         ],
         image: {
           src: '/docs/v1/group-storage.jpg',
-          alt: 'Group storage tab with Aruna storage and your own storage with its rules',
+          alt: 'Group Storage tab with the built-in Aruna storage, the new buckets rule and the dataset location',
           caption: 'Storage lives on the group: rules decide which buckets go to your storage.',
         },
       },
@@ -843,8 +841,8 @@ export const docsTopics: DocsTopic[] = [
         ],
         image: {
           src: '/docs/v1/settings-access.jpg',
-          alt: 'Settings Access tab with sign-ins, S3 access keys and the API connection',
-          caption: 'Access: sign-ins, S3 access keys, and the API connection.',
+          alt: 'Settings Access tab with S3 access keys and the advanced API connection',
+          caption: 'Access: S3 access keys, with the API connection under Advanced.',
         },
       },
     ],
@@ -1359,8 +1357,8 @@ export const docsTopics: DocsTopic[] = [
         ],
         image: {
           src: '/docs/v1/assistant-providers.jpg',
-          alt: 'Assistant settings with a Ready provider and the connect-an-MCP-client card',
-          caption: 'A ready provider powers the panel; the MCP endpoint below wires external clients.',
+          alt: 'Assistant settings with the Connect an MCP client card and the MCP endpoint',
+          caption: 'The MCP endpoint of this node, to copy into an external client.',
         },
       },
     ],
@@ -1473,8 +1471,8 @@ export const docsTopics: DocsTopic[] = [
         ],
         image: {
           src: '/docs/v1/status.jpg',
-          alt: 'Status view with realm topology, locations, and the list of realm nodes',
-          caption: 'The Status view: the realm, its locations, and every node with role, latency, and connectivity.',
+          alt: 'Status view with the realm figures and the node map',
+          caption: 'The Status view: realm figures on top, then a map of every node and its connections.',
         },
       },
       {
