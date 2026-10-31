@@ -7,7 +7,7 @@ import { RouterLink } from 'vue-router'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 import StatusMark from '@/components/ui/StatusMark.vue'
 import Button from '@/components/ui/Button.vue'
-import InfoHint from '@/components/ui/InfoHint.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import DeviceLane from '@/components/onboarding/DeviceLane.vue'
 import WizardSteps from '@/components/onboarding/WizardSteps.vue'
@@ -15,7 +15,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useDeviceEnrollment } from '@/composables/useDeviceEnrollment'
 import { Laptop, Plus, Trash2, X } from '@lucide/vue'
 import type { UserDevice } from '@/lib/api'
-import { relativeTime } from '@/lib/utils'
+import { relativeTime, truncateMiddle } from '@/lib/utils'
 import { isDesktop } from '@/lib/desktop'
 import { nodeName, nodeOnline } from '@/components/nodes/node-display'
 import NodeNameEdit from '@/components/nodes/NodeNameEdit.vue'
@@ -84,9 +84,10 @@ interface DeviceRow {
   name: string | null
   value: string | null
   shortId: string
-  fullId: string
   status: string
   lastSeen: string
+  /** The enrollment id, or the device id once enrolled. */
+  enrollmentId: string
 }
 const { renameDevice } = useNodeNames()
 const rows = computed<DeviceRow[]>(() =>
@@ -99,7 +100,7 @@ const rows = computed<DeviceRow[]>(() =>
     const nodeId = device.status === 'enrolled' ? device.node_id : null
     // An enrolled device always has a name for people; an enrollment in flight goes by its code id.
     const name = device.status === 'enrolled' ? (node ? nodeName(node) : 'Device') : null
-    return { id: device.id, nodeId, name, value: node?.display_name ?? null, shortId: (device.node_id ?? device.id).slice(0, 8), fullId: device.node_id ?? device.id, status, lastSeen: seen }
+    return { id: device.id, nodeId, name, value: node?.display_name ?? null, shortId: (device.node_id ?? device.id).slice(0, 8), status, lastSeen: seen, enrollmentId: device.enrollment_id ?? device.id }
   }),
 )
 const confirming = ref('')
@@ -144,6 +145,7 @@ function remove(id: string) {
           <thead>
             <tr>
               <th class="py-2 pr-4 text-left font-semibold">Name</th>
+              <th class="py-2 pr-4 text-left font-semibold">Enrollment id</th>
               <th class="py-2 pr-4 text-left font-semibold">Status</th>
               <th class="py-2 pr-4 text-left font-semibold">Last seen</th>
               <th class="py-2"></th>
@@ -156,12 +158,16 @@ function remove(id: string) {
                 <NodeNameEdit v-if="row.nodeId" :name="row.name ?? row.shortId" :value="row.value" :save="(name) => renameDevice(row.nodeId!, name)">
                   <RouterLink v-if="row.name" :to="deviceLink(row.nodeId)" class="text-foreground hover:underline">{{ row.name }}</RouterLink>
                   <span v-else class="font-mono text-[11px] text-muted-foreground">{{ row.shortId }}</span>
-                  <InfoHint v-if="row.name" :label="row.fullId" name="Device id" class="ml-1" />
                 </NodeNameEdit>
                 <span v-else class="inline-flex items-center gap-1">
                   <span v-if="row.name" class="text-foreground">{{ row.name }}</span>
                   <span v-else class="font-mono text-[11px] text-muted-foreground">{{ row.shortId }}</span>
-                  <InfoHint v-if="row.name" :label="row.fullId" name="Device id" />
+                </span>
+              </td>
+              <td class="py-2.5 pr-4">
+                <span class="inline-flex items-center gap-1">
+                  <code class="font-mono text-[11px] text-muted-foreground" :title="row.enrollmentId">{{ truncateMiddle(row.enrollmentId) }}</code>
+                  <CopyButton :value="row.enrollmentId" label="Copy enrollment id" />
                 </span>
               </td>
               <td class="py-2.5 pr-4">

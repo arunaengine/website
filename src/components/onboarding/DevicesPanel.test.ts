@@ -105,10 +105,23 @@ describe('devices panel', () => {
     devices.value = [device({ id: '73ea340a1234', node_id: '73ea340a1234' }), device({ id: 'enr-9abcdef12', node_id: null, status: 'pending' })]
     const rendered = await text()
 
-    expect(rendered).toContain('Name Status Last seen')
-    expect(rendered).toContain('Microbiology laptop Online 2m ago')
-    expect(rendered).not.toContain('73ea340a')
-    expect(rendered).toContain('enr-9abc Pending -')
+    expect(rendered).toContain('Name Enrollment id Status Last seen')
+    // The id stays in its own column; the name column never falls back to it.
+    expect(rendered).toContain('Microbiology laptop 73ea340a1234 Online 2m ago')
+    expect(rendered).toContain('enr-9abc enr-9abcdef12 Pending -')
+  })
+
+  it('lists the enrollment id of each device with a copy button', async () => {
+    devices.value = [
+      device({ id: 'node-1234567890abcdef', node_id: 'node-1234567890abcdef' }),
+      device({ id: 'enr-1', node_id: null, enrollment_id: 'enr-1', status: 'pending', expires_at: 4102444800 }),
+    ]
+    const html = await renderToString(createSSRApp({ render: () => h(DevicesPanel) }))
+
+    expect(html).toContain('Enrollment id')
+    expect(html).toContain('title="node-1234567890abcdef"')
+    expect(html).toContain('enr-1')
+    expect(html.match(/aria-label="Copy enrollment id"/g)?.length).toBe(2)
   })
 
   it('reads a device the realm has seen as online, and one without contact as offline', async () => {
@@ -131,7 +144,7 @@ describe('devices panel', () => {
     devices.value = [device({ id: '73ea340a1234', node_id: '73ea340a1234' })]
     const rendered = await text()
 
-    expect(rendered).toContain('Lab laptop Online')
+    expect(rendered).toContain('Lab laptop 73ea340a1234 Online')
     expect(rendered).not.toContain('Microbiology laptop')
   })
 
@@ -149,9 +162,9 @@ describe('devices panel', () => {
     devices.value = [device({ id: '73ea340a1234', node_id: '73ea340a1234' }), device({ id: '5b1c9d2e7777', node_id: '5b1c9d2e7777' })]
     const rendered = await text()
 
-    expect(rendered).toContain('Device Online')
+    expect(rendered).toContain('Device 73ea340a1234 Online')
     // Not listed by the realm yet: still a device, never a bare id.
-    expect(rendered).toContain('Device Unknown')
+    expect(rendered).toContain('Device 5b1c9d2e7777 Unknown')
   })
 
   it('says the realm caps nothing when it does not', async () => {
