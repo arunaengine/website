@@ -33,6 +33,9 @@ const props = withDefaults(
   },
 )
 
+// The header tooltip renders only its slot, so listeners such as @click must be bound by hand.
+defineOptions({ inheritAttrs: false })
+
 const inHeader = inject(IN_PAGE_HEADER, false)
 const iconLabel = computed(() => props.srLabel ?? props.label)
 const compact = computed(() => props.size === 'xs')
@@ -48,6 +51,7 @@ const buttonClasses = computed(() =>
 <template>
   <Tooltip v-if="inHeader && !srLabel" :label="label">
     <Button
+      v-bind="$attrs"
       :variant="variant"
       size="icon-sm"
       :class="props.class"
@@ -60,6 +64,7 @@ const buttonClasses = computed(() =>
   </Tooltip>
   <Button
     v-else
+    v-bind="$attrs"
     :variant="variant"
     :size="buttonSize"
     :class="buttonClasses"

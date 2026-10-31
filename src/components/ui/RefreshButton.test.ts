@@ -39,4 +39,15 @@ describe('refresh button', () => {
     expect(button.props['aria-label']).toBe('Refresh')
     expect(content(button).trim()).toBe('')
   })
+
+  it('passes the click listener to the button inside a page header', async () => {
+    const { defineComponent, h, provide } = await import('vue')
+    const onClick = () => undefined
+    const Header = defineComponent(() => {
+      provide(Symbol.for('in page header'), true)
+      return () => h(refreshButton(), { busy: false, onClick })
+    })
+    const { root } = await mountApp(Header)
+    expect(element(root, (node) => node.tag === 'button').props.onClick).toBe(onClick)
+  })
 })
