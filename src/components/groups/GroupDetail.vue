@@ -129,7 +129,8 @@ const objectCounts = computed(() => {
   const value = usage.value
   if (!value || typeof value.objects !== 'number') return null
   const stored = typeof value.stored_blobs === 'number' ? value.stored_blobs : null
-  return { total: value.objects, physicalBlobs: stored }
+  // The realm-wide count, as for the bytes above; the node's own count misses other nodes.
+  return { total: value.realm?.objects ?? value.objects, physicalBlobs: stored }
 })
 // The group's own counters from its usage, never the approximate document estimate.
 const purposeCounts = computed(() => ({

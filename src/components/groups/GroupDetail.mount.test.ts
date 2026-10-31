@@ -12,6 +12,7 @@ import * as Utils from '@/lib/utils'
 
 const TAB_NAMES = ['stats', 'members', 'roles', 'sources', 'storage', 'policies']
 const leaveGroup = vi.fn(async (_group: string) => undefined)
+const getGroupUsage = vi.fn(async (): Promise<Record<string, unknown>> => ({ quota: null }))
 const listBuckets = vi.fn(async (..._args: unknown[]) => ({ hits: [] as object[], complete: true }))
 const REALM = 'realm-1'
 interface Role {
@@ -42,6 +43,10 @@ const joinRequestsEnabled = ref(false)
 const inboxCount = ref<number | null>(null)
 const inboxError = ref<string | null>(null)
 const Empty = defineComponent(() => () => null)
+const OverviewCellStub = defineComponent({
+  props: { label: String },
+  setup: (props, { slots }) => () => h('div', { 'data-cell': props.label }, slots.value?.()),
+})
 const icons = new Proxy({}, { get: () => Empty })
 const Passthrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const SELECT = Symbol('select tab')
@@ -97,7 +102,7 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   '@/composables/useAruna': {
     useAruna: () => ({
       getGroup: vi.fn(async () => group.value),
-      getGroupUsage: vi.fn(async () => ({ quota: null })),
+      getGroupUsage,
       getGroupUsageHistory: vi.fn(async () => ({ points: [] })),
       listGroupMembers: vi.fn(async () => ({ members: [] })),
       listGroupMetadata: vi.fn(async () => ({ documents: [] })),
@@ -113,7 +118,7 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   '@/components/dashboard/PageHeader.vue': moduleDefault(
     defineComponent((_, { slots }) => () => h('header', [h('h1', slots.title?.()), slots.description?.(), h('div', slots.actions?.())])),
   ),
-  '@/components/dashboard/OverviewCell.vue': moduleDefault(Empty),
+  '@/components/dashboard/OverviewCell.vue': moduleDefault(OverviewCellStub),
   '@/components/dashboard/RecentRunsCard.vue': moduleDefault(Empty),
   '@/components/ui/CopyButton.vue': moduleDefault(Empty),
   '@/components/ui/IconTile.vue': moduleDefault(Empty),
@@ -254,6 +259,13 @@ describe('Group tab counts', () => {
     const opens = nodes(root).filter((node) => typeof node.props['aria-label'] === 'string' && node.props['aria-label'].startsWith('Open '))
 
     expect(opens.map((node) => node.props['aria-label'])).toEqual(['Open reef', 'Open reef', 'Open shared'])
+  })
+
+  it('counts the objects of the whole realm, not of the asked node', async () => {
+    getGroupUsage.mockResolvedValueOnce({ quota: null, buckets: 0, objects: 0, referenced_bytes: 0, realm: { buckets: 7, objects: 44438129, logical_bytes: 0, referenced_bytes: 0 } })
+    const { root } = await mount('/app/groups/g1')
+
+    expect(content(element(root, (node) => node.props['data-cell'] === 'Objects'))).toContain('44438129')
   })
 
   it('tells the storage tab which bucket the dataset location uses', async () => {
