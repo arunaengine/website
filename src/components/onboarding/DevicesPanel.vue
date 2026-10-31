@@ -17,7 +17,7 @@ import { Laptop, Plus, Trash2, X } from '@lucide/vue'
 import type { UserDevice } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
 import { isDesktop } from '@/lib/desktop'
-import { nodeName } from '@/components/nodes/node-display'
+import { nodeName, nodeOnline } from '@/components/nodes/node-display'
 import NodeNameEdit from '@/components/nodes/NodeNameEdit.vue'
 import { useNodeNames } from '@/composables/useNodeNames'
 
@@ -92,9 +92,9 @@ const { renameDevice } = useNodeNames()
 const rows = computed<DeviceRow[]>(() =>
   devices.value.map((device) => {
     const node = (realmInfo.value?.nodes ?? []).find((entry) => entry.node_id === device.node_id)
-    // User nodes report recent contact as `seen`, and no status says offline, so the rest is unknown.
-    const online = node?.connection_status === 'connected' || node?.connection_status === 'seen'
-    const status = device.status === 'enrolled' ? (online ? 'online' : 'unknown') : device.status
+    // The same reading as the Status page; without a reported contact state it stays unknown.
+    const online = node ? nodeOnline({ ...node, kind: 'user' }) : false
+    const status = device.status === 'enrolled' ? (node?.connection_status ? (online ? 'online' : 'offline') : 'unknown') : device.status
     const seen = node?.last_seen_ms ? relativeTime(new Date(node.last_seen_ms).toISOString()) : online ? 'just now' : ''
     const nodeId = device.status === 'enrolled' ? device.node_id : null
     // An enrolled device always has a name for people; an enrollment in flight goes by its code id.

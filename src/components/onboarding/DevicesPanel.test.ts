@@ -111,7 +111,7 @@ describe('devices panel', () => {
     expect(rendered).toContain('enr-9abc Pending -')
   })
 
-  it('reads a device the realm has seen as online, and one without contact as unknown', async () => {
+  it('reads a device the realm has seen as online, and one without contact as offline', async () => {
     realmInfo.value = {
       nodes: [
         { node_id: 'seen1234abcd', connection_status: 'seen', present: false, last_seen_ms: Date.now() - 300_000 },
@@ -122,8 +122,8 @@ describe('devices panel', () => {
     const rendered = await text()
 
     expect(rendered).toContain('Online 5m ago')
-    expect(rendered).toContain('Unknown -')
-    expect(rendered).not.toContain('offline')
+    expect(rendered).toContain('Offline -')
+    expect(rendered).not.toContain('Unknown')
   })
 
   it('names a device by its realm display name first', async () => {
