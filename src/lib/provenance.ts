@@ -403,25 +403,31 @@ export interface ChainCard {
   into: string | null
   /** Whether its sources are drawn. */
   open: boolean
+  /** Made by a run of an input, or one of that run's own inputs. */
+  upstream: boolean
 }
 
 /**
- * Places the drawn chain in columns; `direct` keeps the start, its runs and their inputs only.
- * `opened` opens or closes single cards by their id over that default.
+ * Places the drawn chain in columns; `direct` keeps the start, its runs, their inputs, and the run
+ * that made each input with that run's inputs. `opened` opens or closes single cards over that.
  */
 export function chainColumns(graph: Graph, chain: DrawnNode[], direct: boolean, opened?: ReadonlyMap<string, boolean>) {
   const isRun = (node: DrawnNode) => graph.boxes[node.ids[0]!]?.kind === 'run'
   const placed: (Omit<ChainCard, 'column'> & { depth: number })[] = []
   let next = 0
-  const place = (node: DrawnNode, depth: number, into: string | null, underRun: boolean): number => {
+  // `runs` counts the runs between the start and this card; `byRun` says a run used this card.
+  const place = (node: DrawnNode, depth: number, into: string | null, runs: number, byRun: boolean): number => {
     const id = `${into ?? ''}>${node.key}`
-    const open = opened?.get(id) ?? (!direct || (!underRun && (depth === 0 || isRun(node))))
-    const rows = (open ? node.sources : []).map((source) => place(source, depth + 1, id, underRun || isRun(node)))
+    const run = isRun(node)
+    const crossed = runs + Number(run)
+    const shown = depth === 0 || (run && crossed <= 2) || (byRun && crossed === 1)
+    const open = opened?.get(id) ?? (!direct || shown)
+    const rows = (open ? node.sources : []).map((source) => place(source, depth + 1, id, crossed, run))
     const row = rows.length ? Math.round(rows[0]! + rows[rows.length - 1]!) / 2 : next++
-    placed.push({ id, node, depth, row, into, open })
+    placed.push({ id, node, depth, row, into, open, upstream: crossed >= 2 })
     return row
   }
-  for (const root of chain) place(root, 0, null, false)
+  for (const root of chain) place(root, 0, null, 0, false)
   const deepest = Math.max(0, ...placed.map((card) => card.depth))
   const cards: ChainCard[] = placed.map(({ depth, ...card }) => ({ ...card, column: deepest - depth }))
   return { cards, columns: deepest + 1, rows: Math.max(1, next) }

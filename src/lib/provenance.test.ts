@@ -364,17 +364,51 @@ describe('chain columns', () => {
     const halves = chainColumns(graph, intoRecord(graph, drawnChain(graph)), false)
     expect(halves.cards.every((card) => Number.isInteger(card.row * 2))).toBe(true)
 
-    const direct = chainColumns(graph, [record!], true)
-    expect(direct.cards.map((card) => card.node.ids[0])).toEqual(['genome', 'db', 'run:r1', 'dataset:d1'])
-    expect(direct.cards.find((card) => card.node.ids[0] === 'db')).toMatchObject({ column: 0, open: false })
+    // The direct view opens each input and draws the run that made it, with that run's inputs closed.
+    const [later] = intoRecord(graph, drawnChain(graph))
+    const direct = chainColumns(graph, [later!], true)
+    expect(direct.cards.map((card) => [card.node.ids[0], card.open, card.upstream])).toEqual([
+      ['genome', true, false],
+      ['release:6', false, false],
+      ['tarball', false, true],
+      ['run:prep', true, true],
+      ['db', true, false],
+      ['run:r1', true, false],
+      ['dataset:d1', true, false],
+    ])
 
-    // Opening the database card in place draws one step more; closing the run hides its inputs.
+    // Closing an input card hides what made it; closing the run hides its inputs.
     const db = direct.cards.find((card) => card.node.ids[0] === 'db')!
     const run = direct.cards.find((card) => card.node.ids[0] === 'run:r1')!
-    const opened = chainColumns(graph, [record!], true, new Map([[db.id, true]]))
-    expect(opened.cards.map((card) => [card.node.ids[0], card.open])).toEqual([['genome', false], ['release:6', false], ['db', true], ['run:r1', true], ['dataset:d1', true]])
-    const closed = chainColumns(graph, [record!], true, new Map([[run.id, false]]))
+    const shut = chainColumns(graph, [later!], true, new Map([[db.id, false]]))
+    expect(shut.cards.map((card) => [card.node.ids[0], card.open])).toEqual([['genome', true], ['db', false], ['run:r1', true], ['dataset:d1', true]])
+    const closed = chainColumns(graph, [later!], true, new Map([[run.id, false]]))
     expect(closed.cards.map((card) => card.node.ids[0])).toEqual(['run:r1', 'dataset:d1'])
+  })
+
+  it('stops the direct view one run above the inputs, and the full view draws every step', () => {
+    const graph = emptyGraph()
+    put(graph, 'dataset:d3', 'file', ['run:a'])
+    put(graph, 'run:a', 'run', ['x'])
+    put(graph, 'x', 'file', ['run:b'])
+    put(graph, 'run:b', 'run', ['y'])
+    put(graph, 'y', 'file', ['run:c'])
+    put(graph, 'run:c', 'run', ['z'])
+    put(graph, 'z', 'file')
+    graph.roots = ['dataset:d3']
+
+    const chain = drawnChain(graph)
+    const direct = chainColumns(graph, chain, true)
+    expect(direct.cards.map((card) => [card.node.ids[0], card.open, card.upstream])).toEqual([
+      ['y', false, true],
+      ['run:b', true, true],
+      ['x', true, false],
+      ['run:a', true, false],
+      ['dataset:d3', true, false],
+    ])
+    const full = chainColumns(graph, chain, false)
+    expect(full.cards.map((card) => card.node.ids[0])).toEqual(['z', 'run:c', 'y', 'run:b', 'x', 'run:a', 'dataset:d3'])
+    expect(full.cards.filter((card) => card.upstream).map((card) => card.node.ids[0])).toEqual(['z', 'run:c', 'y', 'run:b'])
   })
 
   it('folds many files without sources into one card, a few stay apart', () => {
