@@ -71,7 +71,8 @@ async function refreshForContext(context: ReturnType<typeof refreshContext>): Pr
     } else {
       // A login made before the realm was known is stored once it is.
       const key = currentTokenKey()
-      if (key) storeValue(key, context.client.token)
+      // A renewal during the load already stored its newer token.
+      if (key && context.client.token === authToken.value) storeValue(key, context.client.token)
     }
   } catch (err) {
     if (context.epoch === sessionEpoch.value) error.value = errorMessage(err)
@@ -173,6 +174,15 @@ export function setAuthToken(token: string) {
   clearIdentityState()
   loading.value = false
   bootstrapped.value = false
+}
+
+/** Swaps in a renewal of the live token; the identity and everything loaded with it stay. */
+export function replaceToken(token: string) {
+  const next = token.trim()
+  if (!authToken.value || !next || next === authToken.value) return
+  authToken.value = next
+  const key = currentTokenKey()
+  if (key) storeValue(key, next)
 }
 
 // `keepToken` is the desktop shell moving this window between its own bases. The token returns
