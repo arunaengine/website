@@ -55,6 +55,22 @@ describe('the notebook finder', () => {
     expect(finder.partial.value).toEqual(['shared'])
   })
 
+  it('finds the upper-case spellings of the ending once each', async () => {
+    searchBuckets.mockResolvedValue({ hits: [bucketHit('lab', 'node-1')], nodes_failed: 0, next_cursor: null })
+    searchObjects.mockImplementation(async (query: string) => ({
+      hits: query === 'ipynb'
+        ? [objectHit('lab', 'low.ipynb', 'node-1')]
+        : [objectHit('lab', query === 'IPYNB' ? 'UP.IPYNB' : 'Mixed.Ipynb', 'node-1'), objectHit('lab', 'low.ipynb', 'node-1')],
+      next_cursor: null,
+      coverage: coverage(true),
+    }))
+    const finder = useNotebookFinder()
+    await finder.load()
+
+    expect(searchObjects.mock.calls.map((call) => call[0]).sort()).toEqual(['IPYNB', 'Ipynb', 'ipynb'])
+    expect(finder.notebooks.value.map((entry) => entry.key).sort()).toEqual(['Mixed.Ipynb', 'UP.IPYNB', 'low.ipynb'])
+  })
+
   it('drops the answer of a load that a newer one replaced', async () => {
     let release: (value: unknown) => void = () => {}
     searchBuckets

@@ -9,8 +9,9 @@ import { isNotebookKey } from '@/lib/notebook/document'
 import type { FoundNotebook } from '@/lib/notebook/finder'
 import { errorMessage } from '@/lib/utils'
 
-// A substring query matches whole name parts of a key, so this finds every name ending in .ipynb.
-const QUERY = 'ipynb'
+// A substring query matches whole name parts of a key, case-sensitive, so each usual spelling of
+// the .ipynb ending is asked for; the search offers no case-insensitive match.
+const QUERIES = ['ipynb', 'IPYNB', 'Ipynb']
 const PAGE = 100
 
 export interface BucketScan {
@@ -45,15 +46,18 @@ export function useNotebookFinder() {
       const held = nodesByBucket(listing.hits, isTarget, isLocalNode)
       const found = new Map([...held.keys()].map((name) => [name, { notebooks: [] as FoundNotebook[], truncated: false }]))
       const bad = new Set<string>()
+      const seen = new Set<string>()
       // Without a bucket the search skips distributed buckets; each of those is searched by name.
-      const search = async (bucket?: string) => {
+      const search = async (query: string, bucket?: string) => {
         let cursor: string | undefined
         do {
-          const page = await searchObjects(QUERY, { bucket, limit: PAGE, cursor })
+          const page = await searchObjects(query, { bucket, limit: PAGE, cursor })
           if (!current()) return
           for (const hit of page.hits) {
             const scan = found.get(hit.bucket)
-            if (!scan || hit.group_id !== groupId || !isNotebookKey(hit.key)) continue
+            const id = `${hit.issuer_node_id}\n${hit.bucket}\n${hit.key}`
+            if (!scan || hit.group_id !== groupId || !isNotebookKey(hit.key) || seen.has(id)) continue
+            seen.add(id)
             scan.notebooks.push({
               bucket: hit.bucket,
               key: hit.key,
@@ -69,7 +73,10 @@ export function useNotebookFinder() {
         } while (cursor)
       }
       const sets = [...new Set(listing.hits.filter((hit) => hit.set_id && found.has(hit.bucket)).map((hit) => hit.bucket))]
-      await Promise.all([search(), ...sets.map((name) => search(name).catch(() => void bad.add(name)))])
+      await Promise.all(QUERIES.flatMap((query) => [
+        search(query),
+        ...sets.map((name) => search(query, name).catch(() => void bad.add(name))),
+      ]))
       if (!current()) return
       for (const scan of found.values()) {
         scan.notebooks.sort((a, b) => (b.lastModified?.getTime() ?? 0) - (a.lastModified?.getTime() ?? 0))
