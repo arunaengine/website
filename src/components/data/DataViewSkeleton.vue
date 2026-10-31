@@ -3,13 +3,16 @@
 // browser in their final positions, so opening a session and loading the group
 // data swap into the real view instead of stacking loading states.
 import Skeleton from '@/components/ui/Skeleton.vue'
+
+// Only the object browser column, for a bucket that opens beside the shown bucket list.
+defineProps<{ files?: boolean }>()
 </script>
 
 <template>
-  <div class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]" aria-busy="true">
-    <span class="sr-only">Loading buckets and objects</span>
+  <div :class="files ? 'min-w-0' : 'grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]'" aria-busy="true">
+    <span class="sr-only">{{ files ? 'Loading objects' : 'Loading buckets and objects' }}</span>
 
-    <aside class="space-y-3">
+    <aside v-if="!files" class="space-y-3">
       <div class="surface p-3"><Skeleton class="h-9 w-full" /></div>
       <div class="surface overflow-hidden">
         <header class="flex items-center justify-between border-b border-border px-4 py-3">

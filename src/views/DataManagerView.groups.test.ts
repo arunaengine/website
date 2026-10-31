@@ -71,7 +71,7 @@ describe('Data view group selection', () => {
   })
 
   it('gates the browser on one readiness condition', () => {
-    const gate = template.indexOf('<DataViewSkeleton v-else-if="contextBusy || !viewReady" />')
+    const gate = template.indexOf('<DataViewSkeleton v-else-if="(contextBusy || !viewReady) && !viewKept" />')
     const browser = template.indexOf('<section v-else class="grid')
     expect(gate).toBeGreaterThan(-1)
     expect(browser).toBeGreaterThan(gate)
@@ -93,7 +93,8 @@ describe('Data view group selection', () => {
   })
 
   it('shows one placeholder instead of stacked loading states', () => {
-    expect(template.split('<DataViewSkeleton')).toHaveLength(3)
+    // The third one stands only for the files beside a shown bucket list.
+    expect(template.split('<DataViewSkeleton')).toHaveLength(4)
     expect(template).not.toContain('<Spinner')
   })
 })

@@ -236,3 +236,52 @@ describe('Data view width', () => {
     view.done()
   })
 })
+
+describe('Data view on another node', () => {
+  it('keeps the shown bucket list while a bucket opens there', async () => {
+    manager = fakeManager(null)
+    const known = manager as Record<string, unknown>
+    const busy = ref(false)
+    const ready = ref(false)
+    const group = ref('g1')
+    Object.assign(known, { hasGroups: ref(true), groupsLoading: ref(false), viewReady: ready, contextBusy: busy, selectedGroupId: group })
+    user.value = { id: 'u1' }
+    booted.value = true
+    endpoint.value = 'https://s3.test'
+    viewWidth.value = 1130
+    const { root, app } = await mountApp(DataManagerView)
+    const stubs = (name: string) => nodes(root).filter((node) => node.props['data-stub'] === name)
+    // Before the view was ever shown, one placeholder stands for all of it.
+    expect(stubs('BucketSidebar')).toHaveLength(0)
+    expect(stubs('DataViewSkeleton')[0].props.files).toBeUndefined()
+
+    ready.value = true
+    await flush()
+    const list = stubs('BucketSidebar')[0]
+    // A bucket on another node opens a new session, so the view waits for it again.
+    ;(known.bucket as { value: string }).value = 'bakrep'
+    busy.value = true
+    ready.value = false
+    await flush()
+    expect(stubs('BucketSidebar')[0]).toBe(list)
+    expect(stubs('DataViewSkeleton').map((node) => node.props.files)).toEqual([''])
+    expect(stubs('ObjectBrowser')).toHaveLength(0)
+
+    busy.value = false
+    ready.value = true
+    await flush()
+    expect(stubs('BucketSidebar')[0]).toBe(list)
+    expect(stubs('ObjectBrowser')).toHaveLength(1)
+
+    // Another group starts over with the whole placeholder.
+    group.value = 'g2'
+    ready.value = false
+    await flush()
+    expect(stubs('BucketSidebar')).toHaveLength(0)
+    app.unmount()
+    user.value = null
+    booted.value = false
+    endpoint.value = null
+    viewWidth.value = 0
+  })
+})

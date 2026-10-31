@@ -113,6 +113,10 @@ const {
 const root = ref<HTMLElement | null>(null)
 const { width: viewWidth } = useElementSize(root)
 const narrow = computed(() => viewWidth.value > 0 && viewWidth.value < 960)
+// Once shown, the view stays while a bucket on another node opens; a new group or user starts over.
+const viewKept = ref(false)
+watch(viewReady, (ready) => ready && (viewKept.value = true), { immediate: true })
+watch([selectedGroupId, () => currentUser.value?.id], () => (viewKept.value = false))
 const phone = computed(() => viewWidth.value > 0 && viewWidth.value < 600)
 const pickerOpen = ref(false)
 watch(narrow, (value) => {
@@ -493,7 +497,7 @@ async function createFolder() {
       </section>
 
       <!-- Opening the session and loading its data share one placeholder. -->
-      <DataViewSkeleton v-else-if="contextBusy || !viewReady" />
+      <DataViewSkeleton v-else-if="(contextBusy || !viewReady) && !viewKept" />
 
       <section v-else class="grid gap-x-6 gap-y-8" :class="narrow ? '' : 'grid-cols-[300px_minmax(0,1fr)] 2xl:grid-cols-[340px_minmax(0,1fr)]'">
         <Notice v-if="sessionWarning" tone="warning" :class="narrow ? '' : 'col-span-2'">
@@ -512,6 +516,7 @@ async function createFolder() {
         />
 
         <BucketChooser v-if="!bucket && !narrow" />
+        <DataViewSkeleton v-else-if="bucket && (contextBusy || !viewReady)" files />
         <ObjectBrowser
           v-else-if="bucket"
           :manager="manager"
