@@ -8,7 +8,8 @@ const api = vi.hoisted(() => ({
 }))
 vi.mock('./useAruna', () => ({ useAruna: () => api }))
 vi.mock('./useStaging', () => ({ useStaging: () => ({}), stagingErrorMessage: (err: unknown) => String(err) }))
-vi.mock('./useUploadQueue', () => ({ useUploadQueue: () => ({ items: ref([]) }) }))
+const enqueue = vi.hoisted(() => vi.fn())
+vi.mock('./useUploadQueue', () => ({ useUploadQueue: () => ({ items: ref([]), enqueue }) }))
 vi.mock('@/lib/config', () => ({ portalConfig: () => ({ features: {} }) }))
 
 import { useBuilderBasket } from './useBuilderBasket'
@@ -30,6 +31,22 @@ describe('connector staging', () => {
 
     expect(api.createStagingJob).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'reads' }), 'node-b')
     expect(api.getStagingJob).toHaveBeenCalledWith('job-1', 'node-b')
+    scope.stop()
+  })
+})
+
+describe('file uploads', () => {
+  it('uploads to the node that holds the bucket', async () => {
+    const scope = effectScope()
+    const basket = scope.run(() =>
+      useBuilderBasket({ bucket: ref('reads'), prefix: ref('raw/'), groupId: ref('group-1'), nodeId: ref('node-b') }),
+    )!
+    const file = new File(['x'], 'a.fastq')
+    basket.addUploads([file])
+
+    await basket.submit()
+
+    expect(enqueue).toHaveBeenCalledWith([file], expect.objectContaining({ bucket: 'reads', nodeId: 'node-b' }))
     scope.stop()
   })
 })

@@ -215,6 +215,7 @@ export function useBuilderBasket(ctx: {
       groupId: row.groupId,
       key: targetKey,
       overwrite: ctx.existingKeys?.value.has(targetKey) ?? false,
+      nodeId: ctx.nodeId?.value ?? null,
     })
     // enqueue appends synchronously, so the row's item is the last one.
     row.uploadId = uploads.items.value[uploads.items.value.length - 1]?.id ?? null
