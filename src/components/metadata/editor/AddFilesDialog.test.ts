@@ -21,6 +21,7 @@ import * as ContentIdentity from '@/lib/contentIdentity'
 import * as LinkedPart from '@/lib/linkedPart'
 import * as Uri from '@/lib/profiles/uri'
 import * as Utils from '@/lib/utils'
+import { nodesByBucket } from '@/composables/useBucketCount'
 
 // The identity of a picked object is decided once, in dataIdentity; here it is
 // pinned to the two forms it answers with.
@@ -131,10 +132,10 @@ const AddFilesDialog = compileClientComponent(new URL('./AddFilesDialog.vue', im
     useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'node-1', isTarget: (id: string) => id !== 'device-1' }),
   },
   '@/composables/useBucketCount': {
+    nodesByBucket,
     listBuckets: async (search: (q: string, options: { groupId?: string }) => Promise<{ hits: unknown[] }>, groupId?: string) =>
       ({ hits: (await search('', { groupId })).hits, complete: true }),
   },
-  '@/lib/workspaces': { isHiddenBucket: () => false },
   '@/components/metadata/SubcratePickerDialog.vue': moduleDefault(EmptyStub),
   '@/composables/useAruna': {
     useAruna: () => ({

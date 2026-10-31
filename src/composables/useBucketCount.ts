@@ -5,6 +5,7 @@ import { computed, ref, watch, type Ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import type { BucketSearchHit, BucketSearchResponse, UsageTotals } from '@/lib/api'
 import { distinctCount, mergeSets } from '@/lib/distribution'
+import { isHiddenBucket } from '@/lib/workspaces'
 
 const PAGE = 50
 // At most 1000 buckets are listed; a longer list is not whole.
@@ -35,6 +36,24 @@ export async function listBuckets(search: Search, groupId: string | undefined, c
     cursor = answer.next_cursor ?? undefined
     if (!cursor) return { hits, complete }
   }
+}
+
+/**
+ * Each listed bucket by name, on the node that holds it (null: the connected node, preferred when
+ * it holds a copy). Devices and system buckets are left out, as in the Data view.
+ */
+export function nodesByBucket(
+  hits: BucketSearchHit[],
+  isTarget: (nodeId: string) => boolean,
+  isLocalNode: (nodeId: string) => boolean,
+): Map<string, string | null> {
+  const found = new Map<string, string | null>()
+  for (const hit of hits) {
+    if (isHiddenBucket(hit.bucket) || !isTarget(hit.node_id)) continue
+    const local = isLocalNode(hit.node_id)
+    if (local || !found.has(hit.bucket)) found.set(hit.bucket, local ? null : hit.node_id)
+  }
+  return found
 }
 
 /** A corrected count as text: the number, or "up to" the number when it is not exact. */

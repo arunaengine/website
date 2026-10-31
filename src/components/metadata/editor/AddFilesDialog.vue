@@ -17,7 +17,7 @@ import UploadTab from '@/components/data/add/UploadTab.vue'
 import DatabasesTab from '@/components/data/add/DatabasesTab.vue'
 import SubcratePickerDialog from '@/components/metadata/SubcratePickerDialog.vue'
 import { useAruna } from '@/composables/useAruna'
-import { listBuckets } from '@/composables/useBucketCount'
+import { listBuckets, nodesByBucket } from '@/composables/useBucketCount'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3, s3ErrorMessage, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { UPLOAD_FINISHING_MESSAGE, useUploadQueue } from '@/composables/useUploadQueue'
@@ -48,7 +48,6 @@ import {
 } from '@/lib/crate/editor'
 import { isAbsoluteUri } from '@/lib/profiles/uri'
 import { isDataEntity } from '@/lib/dataEntities'
-import { isHiddenBucket } from '@/lib/workspaces'
 import { ApiError, getStorageLocation, type MetadataDocumentListItem, type StorageLocation } from '@/lib/api'
 import { isNodeArn, partId } from '@/lib/linkedPart'
 import { formatBytes } from '@/lib/utils'
@@ -169,12 +168,7 @@ async function loadBuckets() {
   bucket.value = ''
   try {
     const [listing, stored] = await Promise.all([listBuckets(searchBuckets, uploadGroup() ?? undefined, () => true), storageLocation()])
-    const found = new Map<string, string | null>()
-    // The buckets of every node but devices, as the Data view lists them; a name held here stays here.
-    for (const hit of listing.hits) {
-      if (isHiddenBucket(hit.bucket) || !isTarget(hit.node_id)) continue
-      if (isLocalNode(hit.node_id) || !found.has(hit.bucket)) found.set(hit.bucket, isLocalNode(hit.node_id) ? null : hit.node_id)
-    }
+    const found = nodesByBucket(listing.hits, isTarget, isLocalNode)
     bucketNodes.value = found
     buckets.value = [...found.keys()].map((name) => ({ value: name, label: name }))
     const location = stored && found.has(stored.bucket) ? stored : null

@@ -62,8 +62,7 @@ import {
   type DependencyVerificationResult,
 } from '@/lib/quickDependencies'
 import { bucketNameProblem, objectKeyProblem } from '@/lib/bucketName'
-import { isHiddenBucket } from '@/lib/workspaces'
-import { listBuckets } from '@/composables/useBucketCount'
+import { listBuckets, nodesByBucket } from '@/composables/useBucketCount'
 import { quoteCommand, tokenizeCommand } from '@/lib/shellwords'
 import { errorMessage } from '@/lib/utils'
 import { isSecretName, type SavedRun } from '@/lib/savedRuns'
@@ -686,13 +685,7 @@ function createStore(deps: CustomRunDeps) {
     try {
       const listing = await listBuckets(deps.searchBuckets, group, current)
       if (!current()) return
-      const found = new Map<string, string | null>()
-      // System-managed ws-… buckets are never run targets; a name held here stays on this node.
-      for (const hit of listing.hits) {
-        if (isHiddenBucket(hit.bucket) || !deps.isTarget(hit.node_id)) continue
-        const local = deps.isLocalNode(hit.node_id)
-        if (local || !found.has(hit.bucket)) found.set(hit.bucket, local ? null : hit.node_id)
-      }
+      const found = nodesByBucket(listing.hits, deps.isTarget, deps.isLocalNode)
       bucketNodes.value = found
       // A partial list never rejects a typed name.
       bucketsLoaded.value = listing.complete
