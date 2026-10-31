@@ -4,11 +4,8 @@ import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Avatar from '@/components/ui/Avatar.vue'
-import AccessBadge from '@/components/ui/AccessBadge.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import IconTile from '@/components/ui/IconTile.vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
-import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import DevicesPanel from '@/components/onboarding/DevicesPanel.vue'
 import SessionsPanel from '@/components/settings/SessionsPanel.vue'
 import S3SessionsPanel from '@/components/settings/S3SessionsPanel.vue'
@@ -33,13 +30,12 @@ import { useRouteTab } from '@/composables/useRouteTab'
 import { useAuth } from '@/composables/useAuth'
 import { useWatches } from '@/composables/useWatches'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { apiOrigin } from '@/lib/api'
 import { isDesktop } from '@/lib/desktop'
 import { errorMessage } from '@/lib/utils'
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
-import { ChevronRight, CircleCheck, Code2, ExternalLink, Eye, KeyRound, Laptop, Lock, Palette, Moon, Sun, Monitor, ListChecks, LogIn, Plus, Save, Sparkles, UserRound, Users } from '@lucide/vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
+import { ChevronRight, CircleCheck, Code2, ExternalLink, Eye, KeyRound, Laptop, Lock, Palette, Moon, Sun, Monitor, ListChecks, LogIn, Save, Sparkles, UserRound } from '@lucide/vue'
 import { SETTINGS_TAB_ANCHORS } from '@/components/layout/nav'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 
@@ -57,7 +53,6 @@ const {
   nodeInfo,
   userInfo,
   myGroups,
-  discoverableGroups,
   profiles,
   authError,
   bootstrapped,
@@ -82,7 +77,6 @@ const { shown } = usePortalFeatures()
 
 const settingsTabs = [
   { id: 'profile', label: 'Profile', icon: UserRound },
-  { id: 'groups', label: 'Groups', icon: Users },
   { id: 'access', label: 'Access', icon: KeyRound },
   { id: 'devices', label: 'Devices', icon: Laptop },
   { id: 'assistant', label: 'Assistant', icon: Sparkles },
@@ -236,9 +230,6 @@ const themeOptions: Array<{ id: ThemeMode; title: string; icon: unknown; preview
   { id: 'system', title: 'System', icon: Monitor, preview: 'linear-gradient(90deg, #ffffff 0 50%, #0B0B0E 50% 100%)' },
 ]
 const { mode: appearance, setTheme } = useTheme()
-const router = useRouter()
-
-const createGroupOpen = ref(false)
 </script>
 
 <template>
@@ -436,51 +427,6 @@ const createGroupOpen = ref(false)
           </div>
         </section>
         <LinkedLogins />
-      </TabsContent>
-
-      <TabsContent value="groups" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-8 py-6">
-        <section aria-labelledby="settings-groups-heading">
-          <SectionHeading id="settings-groups-heading" title="Your groups" :icon="Users">
-            <template #actions>
-              <Button variant="outline" size="sm" :disabled="!currentUser" @click="createGroupOpen = true"><Plus class="h-3.5 w-3.5" /> Create group</Button>
-            </template>
-          </SectionHeading>
-          <EmptyState v-if="!myGroups.length" title="You are not in a group yet.">
-            <template #icon><Users class="size-6" /></template>
-            <Button v-if="currentUser" variant="outline" size="sm" @click="createGroupOpen = true">
-              <Plus class="h-3.5 w-3.5" /> Create group
-            </Button>
-          </EmptyState>
-          <ul v-else class="surface divide-y divide-border-subtle overflow-hidden">
-            <li v-for="group in myGroups" :key="group.id">
-              <RouterLink :to="{ name: 'group', params: { id: group.id } }" class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40">
-                <IconTile :icon="Users" size="sm" />
-                <div class="min-w-0 flex-1">
-                  <div class="truncate text-sm font-medium text-foreground">{{ group.name }}</div>
-                  <div class="flex flex-wrap items-center gap-x-4 text-xs text-muted-foreground">
-                    <span class="truncate font-mono">{{ group.id }}</span>
-                    <span v-if="group.memberCount !== undefined" class="inline-flex items-center gap-1.5"><Users class="size-3.5" /><b class="font-medium text-foreground">{{ group.memberCount }}</b> {{ group.memberCount === 1 ? 'member' : 'members' }}</span>
-                  </div>
-                </div>
-                <div class="flex flex-wrap justify-end gap-1"><AccessBadge v-for="role in group.tags" :key="role" :access="role" /></div>
-                <ChevronRight class="h-4 w-4 shrink-0 text-muted-foreground" />
-              </RouterLink>
-            </li>
-          </ul>
-        </section>
-        <section v-if="discoverableGroups.length" aria-labelledby="settings-other-groups-heading">
-          <SectionHeading id="settings-other-groups-heading" title="Other groups" :icon="Users" info="Their admins manage membership. Request access on the group's page." />
-          <ul class="surface divide-y divide-border-subtle overflow-hidden">
-            <li v-for="group in discoverableGroups" :key="group.id">
-              <RouterLink :to="{ name: 'group', params: { id: group.id } }" class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40">
-                <IconTile :icon="Users" tone="muted" size="sm" />
-                <div class="min-w-0 flex-1"><div class="truncate text-sm font-medium text-foreground">{{ group.name }}</div><div class="truncate font-mono text-xs text-muted-foreground">{{ group.id }}</div></div>
-                <ChevronRight class="h-4 w-4 shrink-0 text-muted-foreground" />
-              </RouterLink>
-            </li>
-          </ul>
-        </section>
-        <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => router.push({ name: 'group', params: { id: group.group_id } })" />
       </TabsContent>
 
       <TabsContent value="assistant" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-8 py-6">

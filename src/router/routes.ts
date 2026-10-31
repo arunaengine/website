@@ -153,7 +153,13 @@ export function portalRoutes(): RouteRecordRaw[] {
         { path: 'nodes/:nodeId', name: 'node', redirect: (to) => ({ name: 'status', query: { node: String(to.params.nodeId) } }) },
         ...desktopRoutes(),
         // Settings (consolidates account preferences, members, tokens)
-        { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
+        {
+          path: 'settings',
+          name: 'settings',
+          component: () => import('@/views/SettingsView.vue'),
+          // The groups tab became the Groups page.
+          beforeEnter: (to) => (to.query.tab === 'groups' ? { name: 'groups' } : true),
+        },
         // Watched resources: served by the merged notifications backend, so no
         // feature flag; the view degrades inline when the endpoints are absent.
         { path: 'settings/watches', name: 'settings-watches', component: () => import('@/views/WatchesView.vue'), meta: { feature: 'watches' } },

@@ -192,6 +192,14 @@ describe('desktop routes', () => {
     }
   })
 
+  it('sends the old settings groups tab to the Groups page', async () => {
+    const routes = await build()
+    const settings = child(routes, 'settings') as AnyRoute & { beforeEnter: (to: { query: Record<string, string> }) => unknown }
+
+    expect(settings.beforeEnter({ query: { tab: 'groups' } })).toEqual({ name: 'groups' })
+    expect(settings.beforeEnter({ query: { tab: 'access' } })).toBe(true)
+  })
+
   it('sends the old notebook and run template pages to their Compute tabs', async () => {
     const routes = await build()
     for (const path of ['notebooks', 'compute/notebooks']) {

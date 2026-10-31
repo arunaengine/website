@@ -102,7 +102,8 @@ describe('SettingsView responsive geometry', () => {
   })
 
   it('offers every settings section as a shareable tab', () => {
-    const tabIds = ['profile', 'groups', 'access', 'devices', 'assistant', 'keys', 'appearance']
+    // Groups live on the Groups page only; old ?tab=groups links redirect there.
+    const tabIds = ['profile', 'access', 'devices', 'assistant', 'keys', 'appearance']
     const tabList = source.match(/const settingsTabs = \[([\s\S]*?)\] as const/)?.[1] ?? ''
     const declaredIds = Array.from(tabList.matchAll(/\{ id: '([^']+)'/g), (match) => match[1])
     const panelIds = collectElements(root, (node) => node.tag === 'TabsContent')
@@ -435,29 +436,6 @@ describe('SettingsView access tab', () => {
     expect(text).toContain('Sign in')
     expect(text).toContain('Onboarding secret')
     expect(text).toContain('Existing API token')
-  })
-})
-
-describe('SettingsView groups tab', () => {
-  beforeEach(() => {
-    myGroups.value = [{ id: 'g1', name: 'Genomics lab', tags: ['admin'], memberCount: 3 }]
-    discoverableGroups.value = [{ id: 'g2', name: 'Climate lab', tags: [] }]
-  })
-
-  it('links every row to the group page instead of embedding it', async () => {
-    // The embedded detail bound its own tabs to ?tab=, which the settings tabs
-    // already own; one surface for group management removes the collision.
-    const { root, errors } = await mount('?tab=groups')
-
-    const links = nodes(root)
-      .filter((node) => node.tag === 'a')
-      .map((node) => String(node.props.href ?? ''))
-
-    expect(errors).toEqual([])
-    expect(links).toContain('/app/groups/g1')
-    expect(links).toContain('/app/groups/g2')
-    expect(source).not.toContain('GroupDetail')
-    expect(panelText(root, 'groups')).toContain('Create group')
   })
 })
 
