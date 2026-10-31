@@ -388,6 +388,11 @@ function jumpTo(entityId: string) {
         <template v-if="tab === 'overview'">
           <DatasetAbout :state="state" @open="openInfo" @cite="showCite = true" />
 
+          <div class="hidden gap-6 has-[>:not(:empty)]:grid lg:grid-cols-2">
+            <div :class="[cell, first]"><PeoplePlaces :state="state" part="people" @open="openInfo" /></div>
+            <div :class="[cell, second]"><PeoplePlaces :state="state" part="places" @open="openInfo" /></div>
+          </div>
+
           <div v-if="runProvenance || actionCount" class="space-y-6">
             <RunProvenancePanel v-if="runProvenance" :run="runProvenance" :document-id="detailId" :published="current?.createdAt" />
             <CrateRuns
@@ -419,8 +424,6 @@ function jumpTo(entityId: string) {
             </SectionHeading>
             <div class="grid gap-6 lg:grid-cols-2">
               <template v-if="entityView === 'list'">
-                <div :class="[cell, first]"><PeoplePlaces :state="state" part="people" @open="openInfo" /></div>
-                <div :class="[cell, second]"><PeoplePlaces :state="state" part="places" @open="openInfo" /></div>
                 <div :class="[cell, first]">
                   <SubcratesSection v-if="subcrateIris.size" :crate="currentCrate" :document-id="detailId" :can-write="Boolean(current) && canWrite" />
                 </div>

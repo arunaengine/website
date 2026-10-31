@@ -20,10 +20,11 @@ describe('MetadataView', () => {
     const overview = source.slice(source.indexOf('<template v-if="tab === \'overview\'">'))
     const order = [
       '<DatasetAbout',
-      '<RunProvenancePanel',
-      '<DatasetFiles',
       'part="people"',
       'part="places"',
+      '<RunProvenancePanel',
+      '<CrateRuns',
+      '<DatasetFiles',
       '<SubcratesSection',
       'title="Software"',
       '<DatasetDetails',
@@ -41,6 +42,14 @@ describe('MetadataView', () => {
     expect(source).not.toContain('grid-flow-dense')
     const cells = [...source.matchAll(/:class="\[cell, ([^\]]+)\]"/g)].map((match) => match[1])
     expect(cells).toEqual(['first', 'second', 'first', 'second', 'first', "entityView === 'list' ? second : 'lg:col-span-2'", "'lg:col-span-2'"])
+  })
+
+  it('shows people and places right after About, and hides their row when both are empty', () => {
+    const about = source.indexOf('<DatasetAbout')
+    const row = source.indexOf('<div class="hidden gap-6 has-[>:not(:empty)]:grid lg:grid-cols-2">')
+    expect(row).toBeGreaterThan(about)
+    expect(source.slice(about, row)).not.toMatch(/<(RunProvenancePanel|CrateRuns|DatasetFiles)/)
+    expect(source.slice(row, source.indexOf('</div>\n', source.indexOf('part="places"')))).toContain('part="people"')
   })
 
   it('switches only the entities between list and graph, and opens the graph for old links', () => {
