@@ -30,6 +30,8 @@ export interface RealmImportForm {
   bucket: string
   prefix: string
   metadataPath: string
+  /** The API of the node holding the target bucket; the connected node when absent. */
+  apiBase?: string
 }
 
 export type ImportPhase = 'idle' | 'preparing' | 'choosing' | 'copying' | 'started' | 'failed'
@@ -162,7 +164,9 @@ export function useRealmImport() {
     files.value = null
     phase.value = 'preparing'
     await guarded(run, form, async () => {
-      const context = refreshContext()
+      const fresh = refreshContext()
+      // Every step runs on the node holding the target bucket, as the import writes there.
+      const context = form.apiBase ? { ...fresh, client: { ...fresh.client, baseUrl: form.apiBase } } : fresh
       const popup = openPopup(window, IMPORT_TIMEOUT_MS)
       channel = popup
       const { secret, nonce } = await newSecret()

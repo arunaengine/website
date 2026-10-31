@@ -20,11 +20,12 @@ import {
 
 type TransferRow = ArchiveReportRow<Partial<ImportReportDetail & ExportReportDetail>>
 
-const props = defineProps<{ jobId: string; settled: boolean }>()
+/** `baseUrl`: the API of the node that runs the job; the connected node when absent. */
+const props = defineProps<{ jobId: string; settled: boolean; baseUrl?: string }>()
 
 const { apiBaseUrl, authToken } = useAruna()
 function client() {
-  return { baseUrl: apiBaseUrl.value, token: authToken.value }
+  return { baseUrl: props.baseUrl ?? apiBaseUrl.value, token: authToken.value }
 }
 
 const rows = ref<TransferRow[]>([])

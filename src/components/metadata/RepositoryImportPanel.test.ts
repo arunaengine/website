@@ -38,12 +38,14 @@ const SearchStub = defineComponent({
     h('button', { onClick: () => emit('pick', { id: '77', doi: '10.5281/zenodo.77' }) }, 'Pick record 77'),
 })
 // Fills the target the way a user would; the panel only needs the models.
+let targetNode: string | null = null
 const TargetStub = defineComponent({
-  props: { groupId: String, bucket: String, prefix: String },
-  emits: ['update:groupId', 'update:bucket', 'update:prefix'],
+  props: { groupId: String, bucket: String, prefix: String, nodeId: String },
+  emits: ['update:groupId', 'update:bucket', 'update:prefix', 'update:nodeId'],
   setup: (_, { emit, slots }) => {
     emit('update:groupId', 'g1')
     emit('update:bucket', 'b1')
+    emit('update:nodeId', targetNode)
     return () => h('div', slots.default?.())
   },
 })
@@ -72,6 +74,12 @@ const ImportPanel = compileClientComponent(new URL('./RepositoryImportPanel.vue'
   '@/components/metadata/TransferTarget.vue': moduleDefault(TargetStub),
   '@/composables/useAruna': {
     useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch: ref(0) }),
+  },
+  '@/composables/useRealmNodes': {
+    useRealmNodes: () => ({
+      nodeById: (id: string) => (id === 'node-2' ? { apiBase: 'https://node-2.test/api/v1' } : null),
+      displayName: (id: string) => `Node ${id}`,
+    }),
   },
   '@/composables/useRepository': {
     useRepositoryConnectors: () => ({ connectors, loading: ref(false), error: ref(null), load: loadConnectors }),
@@ -123,12 +131,34 @@ beforeEach(() => {
   canWriteMeta.value = true
   capabilities.value = { pull: true, search: true, import: true }
   job.value = null
+  targetNode = null
   for (const mock of [submitRepositoryImport, lookupPid, listPersistentIds, createRepositoryConnector, loadConnectors]) mock.mockReset()
   lookupPid.mockResolvedValue([])
   submitRepositoryImport.mockResolvedValue({ job_id: 'j1', status_url: '/jobs/j1' })
 })
 
 describe('RepositoryImportPanel', () => {
+  it('submits the import to the node holding the target bucket', async () => {
+    targetNode = 'node-2'
+    const mounted = await mount()
+    await typeValue(recordField(mounted.root), '10.5281/zenodo.42')
+    await click(button(mounted.root, 'Import record'))
+
+    expect(submitRepositoryImport.mock.calls[0][1]).toEqual({ baseUrl: 'https://node-2.test/api/v1', token: 'bearer' })
+    mounted.app.unmount()
+  })
+
+  it('refuses a target node without an API address', async () => {
+    targetNode = 'node-3'
+    const mounted = await mount()
+    await typeValue(recordField(mounted.root), '10.5281/zenodo.42')
+    await click(button(mounted.root, 'Import record'))
+
+    expect(submitRepositoryImport).not.toHaveBeenCalled()
+    expect(content(mounted.root)).toContain('Node node-3 holds the target bucket but names no API address.')
+    mounted.app.unmount()
+  })
+
   it('sends a typed DOI as doi and keeps the dataset updated by default', async () => {
     const mounted = await mount()
     await typeValue(recordField(mounted.root), 'https://doi.org/10.5281/zenodo.42')

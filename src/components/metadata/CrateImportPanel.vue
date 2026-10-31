@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Uploads a .zip or .eln RO-Crate and imports it as a new dataset. The import is
 // a durable job, so progress and the report come from the shared job machinery.
-import { computed, ref, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import DetailList, { type Detail } from '@/components/ui/DetailList.vue'
@@ -12,9 +12,11 @@ import Switch from '@/components/ui/Switch.vue'
 import TransferJobStatus from '@/components/metadata/TransferJobStatus.vue'
 import TransferReport from '@/components/metadata/TransferReport.vue'
 import TransferTarget from '@/components/metadata/TransferTarget.vue'
+import type { ApiClientOptions } from '@/lib/api'
 import { useAruna } from '@/composables/useAruna'
 import { useJobDetail } from '@/composables/useJobs'
 import { useNotifications } from '@/composables/useNotifications'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { isTerminalJobState } from '@/lib/jobs'
 import { errorMessage, formatBytes } from '@/lib/utils'
 import { ARCHIVE_FILE_ACCEPT, archiveMediaType, importJobResult, submitImport, uploadArchive } from '@/lib/rocrateArchive'
@@ -29,6 +31,14 @@ const { bumpDashboard } = useNotifications()
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
+const { nodeById, displayName } = useRealmNodes()
+// The import runs on the node holding the target bucket: the archive is uploaded there too.
+function targetClient() {
+  if (!nodeId.value) return client()
+  const baseUrl = nodeById(nodeId.value)?.apiBase
+  if (!baseUrl) throw new Error(`${displayName(nodeId.value)} holds the target bucket but names no API address.`)
+  return { baseUrl, token: authToken.value }
+}
 
 const file = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -37,6 +47,7 @@ const groupId = ref('')
 const documentPath = ref('')
 const bucket = ref('')
 const prefix = ref('')
+const nodeId = ref<string | null>(null)
 const isPublic = ref(false)
 
 // One attempt = one uploaded archive: keeping the key across a retried submit
@@ -47,8 +58,11 @@ const uploadedBytes = ref(0)
 const busy = ref<'' | 'uploading' | 'submitting'>('')
 const submitError = ref<string | null>(null)
 const activeJobId = ref<string | null>(null)
+const jobClient = shallowRef<ApiClientOptions | null>(null)
 
-const { job, loadState, loadError, lastPollError, load } = useJobDetail(() => activeJobId.value)
+const { job, loadState, loadError, lastPollError, load } = useJobDetail(() => activeJobId.value, {
+  client: () => jobClient.value ?? client(),
+})
 
 const terminal = computed(() => Boolean(job.value && isTerminalJobState(job.value.state)))
 const importResult = computed(() => importJobResult(job.value?.result))
@@ -85,6 +99,13 @@ function pickFile(next: File | null) {
   if (!documentPath.value) documentPath.value = `datasets/${next.name.replace(/\.(zip|eln)$/i, '')}`
 }
 
+// An upload sits on the node it went to; another target node needs the archive again.
+watch(nodeId, () => {
+  if (activeJobId.value) return
+  uploadId.value = null
+  attemptKey.value = ''
+})
+
 function onDrop(event: DragEvent) {
   dragActive.value = false
   pickFile(event.dataTransfer?.files?.[0] ?? null)
@@ -105,11 +126,12 @@ async function startImport() {
   if (!selected || !importReady.value || busy.value) return
   submitError.value = null
   try {
+    const target = targetClient()
     let uploaded = uploadId.value
     if (!uploaded) {
       attemptKey.value = crypto.randomUUID()
       busy.value = 'uploading'
-      const upload = await uploadArchive(selected, client())
+      const upload = await uploadArchive(selected, target)
       uploaded = upload.upload_id
       uploadId.value = upload.upload_id
       uploadedBytes.value = upload.size
@@ -122,8 +144,9 @@ async function startImport() {
         metadata: { group_id: groupId.value, path: documentPath.value.trim(), public: isPublic.value },
         idempotency_key: attemptKey.value,
       },
-      client(),
+      target,
     )
+    jobClient.value = target
     activeJobId.value = submitted.job_id
   } catch (err) {
     submitError.value = errorMessage(err)
@@ -134,6 +157,7 @@ async function startImport() {
 
 function reset() {
   activeJobId.value = null
+  jobClient.value = null
   submitError.value = null
   uploadId.value = null
   attemptKey.value = ''
@@ -171,6 +195,7 @@ function reset() {
             v-model:group-id="groupId"
             v-model:bucket="bucket"
             v-model:prefix="prefix"
+            v-model:node-id="nodeId"
             :active="props.active"
             @navigate="emit('close')"
           >
@@ -195,7 +220,7 @@ function reset() {
         <Button v-if="createdDocumentId" variant="outline" size="sm" as-child @click="emit('close')">
           <RouterLink :to="{ name: 'dataset', params: { id: createdDocumentId } }">Open the created dataset</RouterLink>
         </Button>
-        <TransferReport :key="activeJobId" :job-id="activeJobId" :settled="terminal" />
+        <TransferReport :key="activeJobId" :job-id="activeJobId" :settled="terminal" :base-url="jobClient?.baseUrl" />
       </section>
 
       <p v-if="submitError" class="text-xs text-destructive">{{ submitError }}</p>

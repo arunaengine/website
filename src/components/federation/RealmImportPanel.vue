@@ -15,6 +15,7 @@ import TransferReport from '@/components/metadata/TransferReport.vue'
 import TransferTarget from '@/components/metadata/TransferTarget.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJobDetail } from '@/composables/useJobs'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useRealmImport } from '@/composables/useRealmImport'
 import type { VerifiedRealm } from '@/lib/federation/descriptor'
 import { isTerminalJobState } from '@/lib/jobs'
@@ -33,15 +34,15 @@ const choosingRealm = ref(true)
 const groupId = ref('')
 const bucket = ref('')
 const prefix = ref('')
+const nodeId = ref<string | null>(null)
 const documentPath = ref('')
+const { nodeById, displayName } = useRealmNodes()
 
 const jobId = computed(() => submitted.value?.job_id ?? null)
 const detail = useJobDetail(() => jobId.value, { client: () => jobClient.value ?? { baseUrl: apiBaseUrl.value } })
 const { job, loadState, loadError, lastPollError, load, cancel, cancelling } = detail
 const terminal = computed(() => Boolean(job.value && isTerminalJobState(job.value.state)))
 const createdDocumentId = computed(() => importJobResult(job.value?.result)?.document_id ?? null)
-// The report is read from this node; a pushed import may run on another node of this realm.
-const reportHere = computed(() => !jobClient.value || jobClient.value.baseUrl === apiBaseUrl.value)
 
 const ready = computed(() =>
   Boolean(home.value && groupId.value && bucket.value.trim() && documentPath.value.trim()),
@@ -60,7 +61,13 @@ function chooseRealm(picked: VerifiedRealm) {
 
 function start() {
   if (!home.value || !ready.value) return
+  const apiBase = nodeId.value ? nodeById(nodeId.value)?.apiBase : undefined
+  if (nodeId.value && !apiBase) {
+    failure.value = `${displayName(nodeId.value)} holds the target bucket but names no API address.`
+    return
+  }
   void flow.start({
+    ...(apiBase ? { apiBase } : {}),
     home: home.value,
     groupId: groupId.value,
     groupName: groups.value.find((group) => group.id === groupId.value)?.name ?? 'this group',
@@ -93,6 +100,7 @@ onBeforeUnmount(() => flow.reset())
             v-model:group-id="groupId"
             v-model:bucket="bucket"
             v-model:prefix="prefix"
+            v-model:node-id="nodeId"
             :active="props.active"
             @navigate="emit('close')"
           >
@@ -112,7 +120,7 @@ onBeforeUnmount(() => flow.reset())
         <Button v-if="createdDocumentId" variant="outline" size="sm" as-child @click="emit('close')">
           <RouterLink :to="{ name: 'dataset', params: { id: createdDocumentId } }">Open dataset</RouterLink>
         </Button>
-        <TransferReport v-if="jobId && reportHere" :key="jobId" :job-id="jobId" :settled="terminal" />
+        <TransferReport v-if="jobId" :key="jobId" :job-id="jobId" :settled="terminal" :base-url="jobClient?.baseUrl" />
       </section>
     </div>
 

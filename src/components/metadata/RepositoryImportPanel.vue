@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Imports one published repository record, for example from Zenodo, as a new
 // dataset through a durable import job. A pull link can keep the dataset updated.
-import { computed, ref, useId, watch } from 'vue'
+import { computed, ref, shallowRef, useId, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import Button from '@/components/ui/Button.vue'
@@ -22,6 +22,8 @@ import { useAruna } from '@/composables/useAruna'
 import { useGroupRights, useRepositoryConnectors, useRepositoryKinds } from '@/composables/useRepository'
 import { useJobDetail } from '@/composables/useJobs'
 import { useNotifications } from '@/composables/useNotifications'
+import { useRealmNodes } from '@/composables/useRealmNodes'
+import type { ApiClientOptions } from '@/lib/api'
 import {
   ApiError,
   createRepositoryConnector,
@@ -49,11 +51,20 @@ const uid = useId()
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
+const { nodeById, displayName } = useRealmNodes()
+// The import runs on the node holding the target bucket.
+function targetClient() {
+  if (!nodeId.value) return client()
+  const baseUrl = nodeById(nodeId.value)?.apiBase
+  if (!baseUrl) throw new Error(`${displayName(nodeId.value)} holds the target bucket but names no API address.`)
+  return { baseUrl, token: authToken.value }
+}
 
 const groupId = ref('')
 const connectorId = ref('')
 const bucket = ref('')
 const prefix = ref('')
+const nodeId = ref<string | null>(null)
 // A record id, a version or concept DOI, or a record URL.
 const recordInput = ref('')
 const documentPath = ref('')
@@ -193,14 +204,17 @@ watch(recordInput, () => {
 
 // One attempt keeps one idempotency key; any change to the request is a new attempt.
 const attemptKey = ref('')
-watch([groupId, connectorId, recordInput, documentPath, bucket, prefix, mode, allVersions, keepUpdated, autoUpdate, isPublic], () => {
+watch([groupId, connectorId, recordInput, documentPath, bucket, prefix, nodeId, mode, allVersions, keepUpdated, autoUpdate, isPublic], () => {
   attemptKey.value = ''
 })
 
 const busy = ref(false)
 const submitError = ref<string | null>(null)
 const activeJobId = ref<string | null>(null)
-const { job, loadState, loadError, lastPollError, load } = useJobDetail(() => activeJobId.value)
+const jobClient = shallowRef<ApiClientOptions | null>(null)
+const { job, loadState, loadError, lastPollError, load } = useJobDetail(() => activeJobId.value, {
+  client: () => jobClient.value ?? client(),
+})
 const terminal = computed(() => Boolean(job.value && isTerminalJobState(job.value.state)))
 const importResult = computed(() => importJobResult(job.value?.result))
 const createdDocumentId = computed(() => importResult.value?.document_id ?? null)
@@ -248,6 +262,7 @@ async function startImport() {
   const epoch = sessionEpoch.value
   if (!attemptKey.value) attemptKey.value = crypto.randomUUID()
   try {
+    const target = targetClient()
     const submitted = await submitRepositoryImport(
       {
         ...found,
@@ -261,9 +276,11 @@ async function startImport() {
         metadata: { group_id: groupId.value, path: documentPath.value.trim(), public: isPublic.value },
         idempotency_key: attemptKey.value,
       },
-      client(),
+      target,
     )
-    if (epoch === sessionEpoch.value) activeJobId.value = submitted.job_id
+    if (epoch !== sessionEpoch.value) return
+    jobClient.value = target
+    activeJobId.value = submitted.job_id
   } catch (err) {
     if (epoch === sessionEpoch.value) submitError.value = repositoryError(err, true)
   } finally {
@@ -273,6 +290,7 @@ async function startImport() {
 
 function reset() {
   activeJobId.value = null
+  jobClient.value = null
   submitError.value = null
   attemptKey.value = ''
   recordInput.value = ''
@@ -302,6 +320,7 @@ watch(sessionEpoch, () => {
             v-model:group-id="groupId"
             v-model:bucket="bucket"
             v-model:prefix="prefix"
+            v-model:node-id="nodeId"
             :active="props.active"
             @navigate="emit('close')"
           >
@@ -430,7 +449,7 @@ watch(sessionEpoch, () => {
             <RouterLink :to="{ name: 'job', params: { jobId: activeJobId } }">Open the job</RouterLink>
           </Button>
         </div>
-        <TransferReport :key="activeJobId" :job-id="activeJobId" :settled="terminal" />
+        <TransferReport :key="activeJobId" :job-id="activeJobId" :settled="terminal" :base-url="jobClient?.baseUrl" />
       </section>
 
       <p v-if="submitError" role="alert" class="text-xs text-destructive">{{ submitError }}</p>
