@@ -153,7 +153,7 @@ function onClick() {
 <template>
   <div
     ref="rowEl"
-    class="group relative flex items-start gap-2.5 border-l-2 py-2 pl-3 pr-2 hover:bg-muted/60 has-[:focus-visible]:bg-muted/60"
+    class="group relative grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-start gap-x-2.5 border-l-2 py-2 pl-3 pr-2 hover:bg-muted/60 has-[:focus-visible]:bg-muted/60"
     :class="[active ? 'border-primary bg-muted' : 'border-transparent', highlighted && !active ? 'bg-muted/60' : '']"
     @pointerdown="onPointerdown"
     @pointerup="endPress"
@@ -194,12 +194,7 @@ function onClick() {
         />
       </div>
       <p v-if="subtitle" class="truncate text-xs text-muted-foreground">{{ subtitle }}</p>
-      <p v-if="parts" class="flex min-w-0 items-center gap-3 overflow-hidden whitespace-nowrap text-xs tabular-nums text-muted-foreground">
-        <span class="inline-flex shrink-0 items-center gap-1" :title="`${parts.files} files`"><Files class="h-3 w-3" aria-hidden="true" /><span class="sr-only">Files: </span>{{ parts.files }}</span>
-        <span v-if="parts.stored" class="inline-flex shrink-0 items-center gap-1" :title="`${parts.stored} stored`"><HardDrive class="h-3 w-3" aria-hidden="true" /><span class="sr-only">Stored: </span>{{ parts.stored }}</span>
-        <span v-if="parts.referenced" class="inline-flex shrink-0 items-center gap-1" :title="`${parts.referenced} referenced`"><Link2 class="h-3 w-3" aria-hidden="true" /><span class="sr-only">Referenced: </span>{{ parts.referenced }}</span>
-      </p>
-      <p v-else-if="facts" class="text-xs tabular-nums text-muted-foreground">{{ facts }}</p>
+      <p v-if="!parts && facts" class="text-xs tabular-nums text-muted-foreground">{{ facts }}</p>
     </div>
     <div class="relative flex shrink-0 items-center gap-0.5">
       <Popover v-for="mark in marks" :key="mark.id" :tooltip="mark.tooltip" align="end">
@@ -239,5 +234,10 @@ function onClick() {
         <Pin class="h-3.5 w-3.5" :fill="pinned ? 'currentColor' : 'none'" />
       </button>
     </div>
+    <p v-if="parts" class="flex min-w-0 items-center gap-2.5 [grid-column:2/-1] overflow-hidden whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+      <span class="inline-flex shrink-0 items-center gap-1" :title="`${parts.files} files`"><Files class="h-3 w-3" aria-hidden="true" /><span class="sr-only">Files: </span>{{ parts.files }}</span>
+      <span v-if="parts.stored" class="inline-flex shrink-0 items-center gap-1" :title="`${parts.stored} stored`"><HardDrive class="h-3 w-3" aria-hidden="true" /><span class="sr-only">Stored: </span>{{ parts.stored }}</span>
+      <span v-if="parts.referenced" class="inline-flex shrink-0 items-center gap-1" :title="`${parts.referenced} referenced`"><Link2 class="h-3 w-3" aria-hidden="true" /><span class="sr-only">Referenced: </span>{{ parts.referenced }}</span>
+    </p>
   </div>
 </template>
