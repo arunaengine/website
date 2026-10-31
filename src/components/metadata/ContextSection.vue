@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<{
   highlightId?: string
   title?: string
   icon?: Component
-}>(), { highlightId: undefined, title: 'Other entities', icon: Shapes })
+}>(), { highlightId: undefined, title: 'Other entities', icon: () => Shapes })
 const emit = defineEmits<{ (e: 'jump', id: string): void }>()
 
 const total = computed(() => props.entities.length + props.comments.length)
