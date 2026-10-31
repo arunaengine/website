@@ -50,7 +50,8 @@ function missingObject(error: unknown): boolean {
   return code === 'NoSuchKey' || code === 'NotFound' || shape.$metadata?.httpStatusCode === 404
 }
 
-export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () => NotebookSeed) {
+/** `nodeId`: the node holding the bucket; null is the connected node. */
+export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () => NotebookSeed, nodeId: Ref<string | null> = ref(null)) {
   const s3 = useS3()
   const { apiBaseUrl, currentUser, nodeInfo, createMetadata } = useAruna()
   const scope = computed(() => JSON.stringify([
@@ -115,7 +116,7 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     loading.value = false
     saveError.value = null
   }
-  watch([scope, bucket, key], invalidate, { flush: 'sync' })
+  watch([scope, bucket, key, nodeId], invalidate, { flush: 'sync' })
   onScopeDispose(invalidate)
 
   // Counted, not timed: two edits in the same millisecond must still differ.
@@ -137,7 +138,7 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     const defaults = { version: 1 as const, workspace_bucket: bucket.value, ...seed() }
     const target = {
       scope: scope.value, bucket: bucket.value, key: key.value,
-      nodeId: nodeInfo.value?.node.peer_id ?? null, groupId: defaults.group_id,
+      nodeId: nodeId.value ?? nodeInfo.value?.node.peer_id ?? null, groupId: defaults.group_id,
     }
     loading.value = true
     loadError.value = null

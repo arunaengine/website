@@ -43,6 +43,18 @@ afterEach(() => {
 })
 
 describe('createNotebook', () => {
+  it('reads and saves a notebook on the node that holds its bucket', async () => {
+    s3.getObjectText.mockRejectedValue({ name: 'NoSuchKey' })
+    s3.activateContext.mockClear()
+    const notebook = createNotebook(ref('lab-data'), ref('notebooks/counts.ipynb'), seed, ref('node-b'))
+    await notebook.load()
+    expect(s3.activateContext).toHaveBeenCalledWith('node-b', 'group-1')
+    expect(s3.getObjectText.mock.calls[0].slice(2)).toEqual(['node-b', undefined, { nodeId: 'node-b', groupId: 'group-1', accessKeyId: 'temporary' }])
+    notebook.setSource(notebook.cells.value[0].id, 'remote edit')
+    await notebook.save()
+    expect(s3.putTextObject.mock.calls[0].slice(4)).toEqual(['node-b', { nodeId: 'node-b', groupId: 'group-1', accessKeyId: 'temporary' }])
+  })
+
   it('does not restore another account or node working copy', async () => {
     s3.getObjectText.mockRejectedValue({ name: 'NoSuchKey' })
     const notebook = store()

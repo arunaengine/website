@@ -44,12 +44,14 @@ const { tesEnabled } = useTes()
 
 const bucket = computed(() => String(route.params.bucketId ?? ''))
 const key = computed(() => String(route.params.key ?? ''))
+// The node holding the bucket, when it is not the connected node.
+const node = computed(() => (typeof route.query.node === 'string' && route.query.node) || null)
 const routeGroup = computed(() => (typeof route.query.group === 'string' ? route.query.group : activeGroupId.value) || undefined)
 
 const notebook = createNotebook(bucket, key, () => ({
   runtime: typeof route.query.runtime === 'string' ? route.query.runtime : SESSION_RUNTIMES[0].id,
   group_id: typeof route.query.group === 'string' ? route.query.group : activeGroupId.value,
-}))
+}), node)
 const session = createNotebookSession(notebook)
 provideNotebook({ notebook, session })
 // The assistant may read and change this notebook while the page is open.
@@ -208,12 +210,12 @@ const savedLabel = computed(() => {
   <div>
     <PageHeader
       :title="notebook.name.value || 'Notebook'"
-      :crumbs="[{ label: bucket, to: { name: 'bucket', params: { bucketId: bucket }, query: { group: routeGroup } } }, { label: notebook.name.value || 'Notebook' }]"
+      :crumbs="[{ label: bucket, to: { name: 'bucket', params: { bucketId: bucket }, query: { group: routeGroup, node: node ?? undefined } } }, { label: notebook.name.value || 'Notebook' }]"
       :docs="{ topic: 'notebooks', section: 'The session bar' }"
     >
       <template #description>
         <span class="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <RouterLink :to="{ name: 'bucket', params: { bucketId: bucket }, query: { group: routeGroup } }" class="inline-flex items-center gap-1.5 hover:text-foreground hover:underline"><Package class="size-4" />{{ bucket }}</RouterLink>
+          <RouterLink :to="{ name: 'bucket', params: { bucketId: bucket }, query: { group: routeGroup, node: node ?? undefined } }" class="inline-flex items-center gap-1.5 hover:text-foreground hover:underline"><Package class="size-4" />{{ bucket }}</RouterLink>
           <span class="inline-flex min-w-0 items-center gap-1.5 font-mono text-xs" :title="key"><FileText class="size-4 shrink-0" /><span class="truncate">{{ key }}</span></span>
         </span>
       </template>
