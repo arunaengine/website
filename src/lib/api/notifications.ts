@@ -20,6 +20,8 @@ export interface ApiNotification {
   bucket?: string
   key?: string
   size_bytes?: number
+  // share_upload: the link a visitor uploaded through
+  share_id?: string
   // sync_completed / sync_failed (bucket sync watch events)
   relationship_id?: string
   versions_synced?: number

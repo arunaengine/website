@@ -58,3 +58,16 @@ describe('join request notifications', () => {
     expect(display.link).toEqual({ name: 'group', params: { id: 'group-1' }, query: { tab: 'members' } })
   })
 })
+
+describe('share upload notifications', () => {
+  it('names the file a visitor uploaded and opens it on its node', () => {
+    const notification: ApiNotification = {
+      id: 'notification-9', category: 'shares', kind: 'share_upload', class: 'direct', created_at_ms: 1, read: false,
+      share_id: 'S1', node_id: 'node-b', group_id: 'group-1', bucket: 'reef', key: 'inbox/report (1).pdf', size_bytes: 2048,
+    }
+    const display = describeNotification(notification, { groupName: () => undefined })
+    expect(display.title).toBe('A visitor uploaded a file through your link')
+    expect(display.detail).toBe('reef/inbox/report (1).pdf, 2\u00a0KiB')
+    expect(display.link).toEqual({ name: 'bucket', params: { bucketId: 'reef' }, query: { prefix: 'inbox', node: 'node-b', object: 'inbox/report (1).pdf' } })
+  })
+})

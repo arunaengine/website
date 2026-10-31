@@ -98,6 +98,22 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
       return { name: 'bucket', params: { bucketId: n.bucket }, query: prefix ? { prefix } : {} }
     },
   },
+  // A visitor uploaded through one of the owner's share links; opens the file on its node.
+  share_upload: {
+    icon: Upload,
+    title: () => 'A visitor uploaded a file through your link',
+    detail: (n) => {
+      if (!n.bucket || !n.key) return n.path
+      const size = typeof n.size_bytes === 'number' ? `, ${formatBytes(n.size_bytes)}` : ''
+      return `${n.bucket}/${n.key}${size}`
+    },
+    link: (n) => {
+      if (!n.bucket || !n.key) return null
+      const prefix = keyPrefix(n.key)
+      const query = { ...(prefix ? { prefix } : {}), ...(n.node_id ? { node: n.node_id } : {}), object: n.key }
+      return { name: 'bucket', params: { bucketId: n.bucket }, query }
+    },
+  },
   // ── Bucket sync (aruna feat/portal_extensions) ─────────────────────────────
   // Emitted for s3-namespace watches when a sync relationship finishes a run
   // (sync_completed with versions_synced) or records a failure (sync_failed
