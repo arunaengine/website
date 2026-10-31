@@ -119,8 +119,8 @@ describe('provenance view', () => {
     }
     const { root } = await mountApp(component, { props: { start: { kind: 'dataset', documentId: 'd1', title: 'Assembly result', crate } } })
 
-    await vi.waitFor(() => expect(content(root)).toContain('Upstream input file'))
-    expect(content(root)).toContain('Upstream runHideTrimming')
+    await vi.waitFor(() => expect(content(root)).toContain('UpstreamMorey.fa'))
+    expect(content(root)).toContain('UpstreamHideTrimming')
     expect(content(root)).not.toContain('Reading')
     expect(content(root)).not.toContain('Download')
     expect(aruna.getRun).not.toHaveBeenCalledWith('c')
@@ -128,7 +128,7 @@ describe('provenance view', () => {
     await click(button(root, 'Show full graph'))
     await vi.waitFor(() => expect(content(root)).toContain('Show direct steps'))
     expect(aruna.getVersionOrigin).toHaveBeenCalledWith(z)
-    expect(content(root)).toContain('Upstream runHideDownload')
+    expect(content(root)).toContain('UpstreamHideDownload')
     expect(content(root)).toContain('z.fa')
 
     await click(button(root, 'Show direct steps'))
@@ -202,7 +202,7 @@ describe('provenance view', () => {
     // Directly, the database files show their release and the run that made them, marked upstream.
     await vi.waitFor(() => expect(content(root)).toContain('Prepare Bakta DB 6.0 light'))
     expect(content(root)).toContain('66 filesShow the filesRelease 6.0 light')
-    expect(content(root)).toContain('Upstream run')
+    expect(content(root)).toContain('UpstreamHidePrepare Bakta DB 6.0 light')
     expect(content(root)).not.toContain('zenodo.org')
     await openAll(root)
     await vi.waitFor(() => expect(content(root)).toContain('zenodo.org'))

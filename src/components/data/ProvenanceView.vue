@@ -311,9 +311,10 @@ const CardView = defineComponent({
       if (view.fold) {
         detail.unshift(h('button', { type: 'button', class: 'relative z-10 text-primary hover:underline', 'aria-expanded': view.fold.open, onClick: () => toggleFold(view.fold!.key) }, view.fold.open ? 'Hide the files' : 'Show the files'))
       }
+      // Steps made by a run of an input read as upstream; the icon still tells a run from a file.
       const head = [
         h(view.icon, { class: ['h-3.5 w-3.5 shrink-0', view.me ? 'text-aruna-navy dark:text-aruna-aqua' : 'text-muted-foreground'], 'aria-hidden': 'true' }),
-        h('span', { class: 'truncate' }, cardProps.card.upstream ? `Upstream ${view.role.charAt(0).toLowerCase()}${view.role.slice(1)}` : view.role),
+        h('span', { class: 'truncate' }, cardProps.card.upstream ? 'Upstream' : view.role),
       ]
       if (view.me && props.start.kind === 'dataset') head.push(h('span', { class: 'ml-auto shrink-0 font-medium text-aruna-navy dark:text-aruna-aqua' }, 'This record'))
       if (view.action) {
