@@ -581,10 +581,6 @@ function deleteRestorable(entry: DeletedObjectEntry) {
 }
 
 const filePicker = ref<HTMLInputElement | null>(null)
-function upload() {
-  if (remoteNodeId.value) filePicker.value?.click()
-  else emit('add-data')
-}
 function onPicked(event: Event) {
   const input = event.target as HTMLInputElement
   const files = [...(input.files ?? [])]
@@ -759,9 +755,17 @@ async function onDrop(event: DragEvent) {
             />
             <Button v-if="desktop && currentBindSource && !currentLinkedFolder && !remoteBlocked" variant="outline" size="sm" aria-label="Link a local folder" title="Keep a folder on this computer and this bucket in step" @click="emit('sync-to-computer', currentBindSource)"><FolderSync class="h-4 w-4" /><span :class="toolbarLabel">Link a local folder</span></Button>
             <Button v-if="notebooks && !remoteNodeId" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" aria-label="New notebook" :title="writeRestrictionMessage ?? 'Create a notebook here'" @click="emit('new-notebook')"><NotebookPen class="h-4 w-4" /><span :class="toolbarLabel">New notebook</span></Button>
-            <!-- Add data targets the connected node; another node's bucket takes files from a
-                 picker, the same upload a drop on the list starts. -->
-            <Button data-tour="bucket-add-data" size="sm" :disabled="Boolean(addReason)" aria-label="Upload" :title="addReason ?? (remoteNodeId ? 'Upload files from this device' : 'Upload files or add data from other sources')" @click="upload"><Upload class="h-4 w-4" /><span :class="desktop ? '' : '@max-[360px]:sr-only'">Upload</span></Button>
+            <!-- Upload files is the same upload a drop on the list starts; Add from opens every other
+                 source for the open bucket and folder. -->
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <Button data-tour="bucket-add-data" size="sm" :disabled="Boolean(addReason)" aria-label="Upload" :title="addReason ?? 'Upload files or add data from other sources'"><Upload class="h-4 w-4" /><span :class="desktop ? '' : '@max-[360px]:sr-only'">Upload</span><ChevronDown class="h-3.5 w-3.5" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem @click="filePicker?.click()"><Upload class="h-3.5 w-3.5" /> Upload files</DropdownMenuItem>
+                <DropdownMenuItem @click="emit('add-data')"><Plus class="h-3.5 w-3.5" /> Add from…</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <input ref="filePicker" type="file" multiple class="hidden" aria-hidden="true" tabindex="-1" @change="onPicked" />
             <Button variant="outline" size="sm" :disabled="Boolean(addReason)" aria-label="New folder" :title="addReason ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /><span :class="toolbarLabel">New folder</span></Button>
             <Tooltip v-if="addReason" :label="addReason">

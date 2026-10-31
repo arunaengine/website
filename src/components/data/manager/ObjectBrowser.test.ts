@@ -278,11 +278,16 @@ describe('object browser toolbar', () => {
 })
 
 describe('object browser upload', () => {
-  it('opens Add data for a bucket on the connected node', async () => {
-    const onAddData = vi.fn()
-    const root = await render({}, { onAddData })
-    await click(action(root, 'Upload'))
-    expect(onAddData).toHaveBeenCalledOnce()
+  const uploadItem = (root: HostNode, label: string) =>
+    element(root, (node) => node.props.role === 'menuitem' && content(node).trim() === label)
+
+  it('opens Add data for the open bucket from Add from, on any node', async () => {
+    for (const remoteNodeId of [ref(null), ref('store-1')]) {
+      const onAddData = vi.fn()
+      const root = await render({ remoteNodeId }, { onAddData })
+      await click(uploadItem(root, 'Add from…'))
+      expect(onAddData).toHaveBeenCalledOnce()
+    }
   })
 
   it('takes files from a picker for a bucket on another node and uploads them there', async () => {
@@ -293,7 +298,7 @@ describe('object browser upload', () => {
     const open = vi.fn()
     Object.assign(picker, { click: open })
 
-    await click(action(root, 'Upload'))
+    await click(uploadItem(root, 'Upload files'))
     expect(open).toHaveBeenCalledOnce()
     expect(onAddData).not.toHaveBeenCalled()
 
@@ -414,7 +419,7 @@ describe('object browser link a local folder', () => {
     const web = await render()
     expect(String(label(web, 'New folder').props.class)).toContain('@max-[600px]:sr-only')
     // Upload keeps its word down to 360 px, where the search box needs the room.
-    expect(label(web, 'Upload').props.class).toBe('@max-[360px]:sr-only')
+    expect(label(action(web, 'Upload'), 'Upload').props.class).toBe('@max-[360px]:sr-only')
   })
 })
 

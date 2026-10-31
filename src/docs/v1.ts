@@ -237,7 +237,7 @@ export const docsTopics: DocsTopic[] = [
         route: '/app/buckets',
         anchor: 'bucket-add-data',
         title: 'Add your files',
-        body: 'Select the bucket, then drag files onto the drop zone or use Add data.',
+        body: 'Select the bucket, then drag files onto the list or use Upload: Upload files, or Add from… for other sources.',
       },
       {
         route: '/app/buckets',
