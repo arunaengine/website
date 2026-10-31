@@ -72,15 +72,20 @@ const InputStub = defineComponent({
     onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
   }),
 })
+// The node the browser says holds the picked bucket, and whether it listed every node.
+let browserNode: string | null = null
+const browserEveryNode: boolean[] = []
 const BrowserStub = defineComponent({
+  props: { allNodes: Boolean, nodeId: { type: String, default: null } },
   emits: ['add'],
-  setup: (_, { emit }) => () => h('button', {
+  setup: (props, { emit }) => () => (browserEveryNode.push(props.allNodes), h('button', {
     onClick: () => emit('add', {
       bucket: 'reads',
+      nodeId: props.nodeId ?? browserNode,
       objects: [{ key: 'raw/one.csv', name: 'one.csv', size: 2048 }],
       folders: [{ prefix: 'raw/nested/', name: 'nested' }],
     }),
-  }, 'Pick objects'),
+  }, 'Pick objects')),
 })
 const UploadStub = defineComponent({
   emits: ['add'],
@@ -183,6 +188,8 @@ beforeEach(() => {
   counter = 0
   resolvable = true
   bucketNames = ['reads']
+  browserNode = null
+  browserEveryNode.length = 0
   enqueue.mockClear()
   getGroup.mockReset().mockResolvedValue({ dataset_location: { bucket: 'reads', prefix: '' } })
   getStorageLocation.mockReset()
@@ -342,6 +349,20 @@ describe('AddFilesDialog', () => {
     expect(getFileOrigin).not.toHaveBeenCalled()
     expect(Editor.findEntity(updates[0], 'arn:aruna:realm-1:node-2:s3/reads/raw/nested/')?.types).toEqual(['Dataset'])
     expect(content(mounted.root)).toContain('Files of a bucket on another node were added without their origin and datasets.')
+    mounted.app.unmount()
+  })
+
+  it('lists the buckets of every node and keeps the node of a picked one', async () => {
+    browserNode = 'node-2'
+    const updates: Editor.CrateDraft[] = []
+    const mounted = await mount(updates)
+
+    expect(browserEveryNode.at(-1)).toBe(true)
+    await click(button(mounted.root, 'Pick objects'))
+    await flush()
+
+    expect(getFileOrigin).not.toHaveBeenCalled()
+    expect(Editor.findEntity(updates[0], 'arn:aruna:realm-1:node-2:s3/reads/raw/nested/')?.types).toEqual(['Dataset'])
     mounted.app.unmount()
   })
 

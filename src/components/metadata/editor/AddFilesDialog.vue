@@ -323,7 +323,7 @@ async function folderPart(bucketName: string, folder: FolderEntry, remote: strin
   return { id, name: folder.name, type: 'Dataset', contentUrl: location }
 }
 
-async function addObjects(selection: { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[] }, nodeId: string | null = null) {
+async function addObjects(selection: { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[]; nodeId?: string | null }, nodeId = selection.nodeId ?? null) {
   const parts: FilePart[] = []
   notes.value = []
   for (const [index, object] of selection.objects.entries()) {
@@ -427,7 +427,7 @@ function addUrl() {
       </label>
 
       <div v-if="tab === 'bucket'" class="space-y-2">
-        <ObjectBrowserPanel selectable @add="addObjects" />
+        <ObjectBrowserPanel selectable all-nodes @add="addObjects" />
         <p class="text-xs text-muted-foreground">A folder is added as one part with everything in it.</p>
       </div>
 

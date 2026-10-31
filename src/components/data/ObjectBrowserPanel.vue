@@ -8,10 +8,12 @@ import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
 import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import DropdownMenuLabel from '@/components/ui/DropdownMenuLabel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import NodeLabel from '@/components/nodes/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import ObjectBrowserSkeleton from '@/components/data/ObjectBrowserSkeleton.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
+import { useAllBuckets } from '@/composables/useAllBuckets'
 import { useAruna } from '@/composables/useAruna'
 import { useGroupSelection } from '@/composables/useGroupSelection'
 import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, type BucketEntry, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
@@ -45,15 +47,20 @@ const props = withDefaults(
     selectable?: boolean
     /** Embedded in a host surface: the list drops its own frame. */
     flush?: boolean
+    /** Default mode: list the buckets of every node; a picked bucket opens on its own node. */
+    allNodes?: boolean
   }>(),
-  { bucket: undefined, prefix: '', nodeId: null, selectable: false, flush: false },
+  { bucket: undefined, prefix: '', nodeId: null, selectable: false, flush: false, allNodes: false },
 )
 
+/** `nodeId` is the node holding the bucket; null is the connected node. */
+type Selection = { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[]; nodeId: string | null }
+
 const emit = defineEmits<{
-  (e: 'select', entry: { bucket: string; key: string; name: string; size?: number }): void
-  (e: 'add', selection: { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[] }): void
+  (e: 'select', entry: { bucket: string; key: string; name: string; size?: number; nodeId: string | null }): void
+  (e: 'add', selection: Selection): void
   /** Selectable mode only: fires on every checkbox change (live previews). */
-  (e: 'selection-change', selection: { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[] }): void
+  (e: 'selection-change', selection: Selection): void
   (e: 'auth-error'): void
   /** Fires on every location change; empty bucket = the bucket overview. */
   (e: 'navigate', location: { bucket: string; prefix: string }): void
@@ -64,13 +71,17 @@ const realmNodes = useRealmNodes()
 const { currentUser, myGroups } = useAruna()
 
 const controlled = computed(() => props.bucket !== undefined)
+const everyNode = computed(() => props.allNodes && !controlled.value)
+// The node of the bucket picked from the list of every node.
+const pickedNode = ref<string | null>(null)
+const browsedNode = computed(() => (everyNode.value ? pickedNode.value : props.nodeId ?? null))
 const activeBucket = ref(props.bucket ?? props.initialBucket ?? '')
 const prefix = ref(props.prefix.replace(/^\/+|\/+$/g, ''))
 const s3Prefix = computed(() => (prefix.value ? `${prefix.value}/` : ''))
 
 // The endpoint actually serving the browsed bucket (local or remote).
-const effectiveEndpoint = computed(() => s3.endpointForNode(props.nodeId ?? null))
-const requiredNodeId = computed(() => s3.nodeIdFor(props.nodeId ?? null))
+const effectiveEndpoint = computed(() => s3.endpointForNode(browsedNode.value))
+const requiredNodeId = computed(() => s3.nodeIdFor(browsedNode.value))
 const requiredNodeName = computed(() =>
   requiredNodeId.value ? realmNodes.displayName(requiredNodeId.value) : 'the selected node',
 )
@@ -125,7 +136,7 @@ async function openSelectedContext() {
   contextError.value = null
   try {
     // The required node mints its own session; no key crosses nodes.
-    await s3.activateContext(props.nodeId ?? null, selectedGroupId.value)
+    await s3.activateContext(browsedNode.value, selectedGroupId.value)
   } catch (err) {
     contextError.value = s3ErrorMessage(err)
   } finally {
@@ -155,15 +166,24 @@ watch(
 // remote browsing skips it.
 const references = useStagingReferences(
   activeBucket,
-  computed(() => !props.nodeId),
+  computed(() => !browsedNode.value),
 )
 
 const buckets = ref<BucketEntry[]>([])
 const bucketsLoading = ref(false)
 const bucketsError = ref<string | null>(null)
 
+// The same list of every node as the Data view; nodes refusing it get this node's list.
+const realm = useAllBuckets(ref(''), selectedGroupId, everyNode)
+const realmList = computed(() => everyNode.value && !realm.needsName.value)
 // Pickers never offer per-run ws-<jobId> scratch buckets.
-const visibleBuckets = computed(() => buckets.value.filter((entry) => !isHiddenBucket(entry.name)))
+const visibleBuckets = computed(() =>
+  realmList.value
+    ? realm.hits.value.map((hit) => ({ name: hit.bucket, nodeId: realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id }))
+    : buckets.value.filter((entry) => !isHiddenBucket(entry.name)).map((entry) => ({ name: entry.name, nodeId: null })),
+)
+const sidebarLoading = computed(() => (realmList.value ? realm.loading.value && !realm.hits.value.length : bucketsLoading.value))
+const sidebarError = computed(() => (realmList.value ? realm.error.value : bucketsError.value))
 
 const folders = ref<FolderEntry[]>([])
 const objects = ref<ObjectEntry[]>([])
@@ -200,7 +220,7 @@ function clearObjects() {
 }
 
 async function refreshBuckets() {
-  if (controlled.value) return
+  if (controlled.value || realmList.value) return
   if (!canBrowse.value) return
   const requestId = ++bucketRequestId
   bucketsLoading.value = true
@@ -225,7 +245,7 @@ async function loadObjects(more = false) {
   const requestId = ++listRequestId
   const targetBucket = activeBucket.value
   const targetPrefix = s3Prefix.value
-  const targetNode = props.nodeId ?? null
+  const targetNode = browsedNode.value
   const continuation = more ? nextToken.value : undefined
   listLoading.value = true
   listError.value = null
@@ -279,8 +299,19 @@ watch(
   },
 )
 
-function openBucket(name: string) {
+watch(realmList, (on) => {
+  if (!on) void refreshBuckets()
+})
+// Another group lists other buckets, so the picked one is dropped.
+watch(selectedGroupId, () => {
+  if (!everyNode.value) return
+  pickedNode.value = null
+  activeBucket.value = ''
+})
+
+function openBucket(name: string, nodeId: string | null = null) {
   clearObjects()
+  pickedNode.value = nodeId
   activeBucket.value = name
   prefix.value = ''
   selected.value = new Map()
@@ -302,7 +333,7 @@ function pick(object: ObjectEntry) {
     toggleObject(object, !selected.value.has(object.key))
     return
   }
-  emit('select', { bucket: activeBucket.value, key: object.key, name: object.name, size: object.size })
+  emit('select', { bucket: activeBucket.value, key: object.key, name: object.name, size: object.size, nodeId: browsedNode.value })
 }
 
 function toggleObject(object: ObjectEntry, checked: boolean) {
@@ -324,9 +355,10 @@ const selectedFolderCount = computed(
   () => selectedList.value.filter((entry) => entry.kind === 'folder').length,
 )
 
-function selectionSnapshot(): { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[] } {
+function selectionSnapshot(): Selection {
   return {
     bucket: activeBucket.value,
+    nodeId: browsedNode.value,
     objects: selectedList.value
       .filter((entry): entry is Extract<SelectionEntry, { kind: 'object' }> => entry.kind === 'object')
       .map((entry) => entry.object),
@@ -380,7 +412,7 @@ const isEmpty = computed(
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <span v-if="props.groupId === undefined" :title="requiredNodeId ?? undefined">on {{ requiredNodeName }}</span>
+      <span v-if="props.groupId === undefined && !everyNode" :title="requiredNodeId ?? undefined">on {{ requiredNodeName }}</span>
       <div class="ml-auto">
         <slot name="actions" :bucket="activeBucket" :group-id="selectedGroupId" :prefix="s3Prefix" :ready="canBrowse" />
       </div>
@@ -396,6 +428,9 @@ const isEmpty = computed(
         <p class="mt-1">{{ contextError }}</p>
         <Button variant="outline" size="sm" class="mt-3" :disabled="contextBusy" @click="openSelectedContext">
           <KeyRound class="h-3.5 w-3.5" /> Retry
+        </Button>
+        <Button v-if="everyNode && pickedNode" variant="ghost" size="sm" class="mt-3" @click="openBucket('')">
+          Choose another bucket
         </Button>
       </div>
     </Notice>
@@ -414,19 +449,23 @@ const isEmpty = computed(
           <span class="text-xs font-semibold text-foreground">Buckets</span>
           <Badge variant="outline" size="count">{{ visibleBuckets.length }}</Badge>
         </header>
-        <Spinner v-if="bucketsLoading" show-label label="Loading…" class="px-3 py-3" />
-        <p v-else-if="bucketsError" class="px-3 py-2 text-xs text-destructive">{{ bucketsError }}</p>
+        <Spinner v-if="sidebarLoading" show-label label="Loading…" class="px-3 py-3" />
+        <p v-else-if="sidebarError" class="px-3 py-2 text-xs text-destructive">{{ sidebarError }}</p>
         <ul v-else-if="visibleBuckets.length" class="max-h-[260px] overflow-y-auto py-1">
-          <li v-for="entry in visibleBuckets" :key="entry.name">
+          <li v-for="entry in visibleBuckets" :key="`${entry.nodeId ?? ''}/${entry.name}`">
             <button
               type="button"
               class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-muted"
-              :class="entry.name === activeBucket ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
-              @click="openBucket(entry.name)"
+              :class="entry.name === activeBucket && (!everyNode || entry.nodeId === pickedNode) ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
+              @click="openBucket(entry.name, entry.nodeId)"
             >
               <Boxes class="h-3.5 w-3.5 shrink-0 text-primary" />
-              <span class="truncate">{{ entry.name }}</span>
+              <span class="min-w-0 flex-1 truncate">{{ entry.name }}</span>
+              <NodeLabel v-if="entry.nodeId" :node-id="entry.nodeId" size="sm" class="shrink-0 text-muted-foreground" />
             </button>
+          </li>
+          <li v-if="realmList && realm.more.value" class="px-3 py-1">
+            <Button variant="ghost" size="sm" :disabled="realm.loading.value" @click="realm.loadMore()">Load more</Button>
           </li>
         </ul>
         <EmptyState v-else compact title="No buckets in this group yet." />

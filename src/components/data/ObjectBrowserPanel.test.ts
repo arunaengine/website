@@ -33,7 +33,7 @@ describe('Dialog browser session', () => {
   })
 
   it('opens the session on the required node', () => {
-    expect(script).toContain('s3.activateContext(props.nodeId ?? null, selectedGroupId.value)')
+    expect(script).toContain('s3.activateContext(browsedNode.value, selectedGroupId.value)')
     expect(script).toContain('context.nodeId === requiredNodeId.value')
   })
 
