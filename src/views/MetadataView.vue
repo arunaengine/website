@@ -12,6 +12,7 @@ import ContextSection from '@/components/metadata/ContextSection.vue'
 import CrateTypeBadge from '@/components/datasets/CrateTypeBadge.vue'
 import DatasetTile from '@/components/datasets/DatasetTile.vue'
 import CiteDialog from '@/components/metadata/view/CiteDialog.vue'
+import ShareLinkDialog from '@/components/data/ShareLinkDialog.vue'
 import CrateRuns from '@/components/metadata/view/CrateRuns.vue'
 import DatasetAbout from '@/components/metadata/view/DatasetAbout.vue'
 import DatasetDetails from '@/components/metadata/view/DatasetDetails.vue'
@@ -60,7 +61,7 @@ import { crateGraph, crateRootId, stringProp } from '@/lib/dataEntities'
 import { resultsFolder, runState } from '@/lib/runCrate'
 import { folderRoute, parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { useS3 } from '@/composables/useS3'
-import { type MetadataDocumentSummary, type RepositoryLink, type StorageLocation } from '@/lib/api'
+import { type MetadataDocumentSummary, type RepositoryLink, type ShareTarget, type StorageLocation } from '@/lib/api'
 import { publishedLinks } from '@/lib/repository'
 import { errorMessage } from '@/lib/utils'
 import { AppWindow, ArrowLeft, Braces, GitBranch, History as HistoryIcon, LayoutDashboard, List, Shapes, Share2 } from '@lucide/vue'
@@ -266,6 +267,8 @@ watch(tab, async (value) => {
 
 // Cite: authors, year, title, publisher and the DOI, or else this page's address.
 const showCite = ref(false)
+const showShare = ref(false)
+const shareTarget = computed<ShareTarget>(() => ({ kind: 'dataset', dataset_id: detailId.value }))
 const citation = computed(() => {
   const root = crateGraph(currentCrate.value).find((entity) => entity['@id'] === crateRootId(currentCrate.value))
   const publisher = presentation.value.organizations.find((entity) => entity.roles.includes('Publisher'))?.name
@@ -337,6 +340,7 @@ function jumpTo(entityId: string) {
           :run="isRun"
           :results="runResults"
           @cite="showCite = true"
+          @share="showShare = true"
           @export="showCrateExport = true"
           @import="openCrate('openImport')"
           @publish="showPublish = true"
@@ -510,6 +514,7 @@ function jumpTo(entityId: string) {
     />
 
     <CiteDialog v-model:open="showCite" :citation="citation" />
+    <ShareLinkDialog v-model:open="showShare" :target="shareTarget" :node-id="null" :name="current?.title ?? 'dataset'" />
     <CrateTransferDialog v-model:open="showCrateExport" :document-id="detailId" :document-path="currentPath" />
     <RepositoryPublishDialog
       v-if="fetchedSummary"

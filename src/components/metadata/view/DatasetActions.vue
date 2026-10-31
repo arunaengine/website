@@ -22,7 +22,7 @@ import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { downloadCrateJson } from '@/lib/crateImport'
 import { assistantAvailable } from '@/composables/assistantState'
 import { copyToClipboard, errorMessage } from '@/lib/utils'
-import { Code2, Download, Ellipsis, FileArchive, FileJson2, FolderOpen, Link, Pencil, Quote, Send, Sparkles, Star, Trash2, Upload } from '@lucide/vue'
+import { Code2, Download, Ellipsis, FileArchive, FileJson2, FolderOpen, Link, Pencil, Quote, Send, Share2, Sparkles, Star, Trash2, Upload } from '@lucide/vue'
 
 // `results`: where a run record's results open; set only for a run record.
 const props = defineProps<{ state: DatasetViewState; run?: boolean; results?: RouteLocationRaw | null }>()
@@ -33,6 +33,7 @@ const emit = defineEmits<{
   (e: 'publish'): void
   (e: 'raw'): void
   (e: 'delete'): void
+  (e: 'share'): void
 }>()
 const {
   detailId,
@@ -157,6 +158,12 @@ async function toggleFav() {
         </DropdownMenuItem>
         <DropdownMenuItem v-if="current && assistantAvailable" class="cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2" @click="askAi">
           <Sparkles class="h-4 w-4 shrink-0 text-primary" /> Ask AI
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+      </template>
+      <template v-if="currentUser">
+        <DropdownMenuItem class="cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2" @click="emit('share')">
+          <Share2 class="h-4 w-4 shrink-0 text-primary" /> Share
         </DropdownMenuItem>
         <DropdownMenuSeparator />
       </template>

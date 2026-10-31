@@ -60,6 +60,19 @@ describe('run record actions', () => {
   })
 })
 
+describe('dataset share link', () => {
+  it('offers Share in the menu and asks the page to open the dialog', async () => {
+    const onShare = vi.fn()
+    const { root } = await mountApp(component, { props: { state: viewState(), onShare } })
+    const item = element(root, (node) => node.tag === 'div' && content(node).trim() === 'Share')
+
+    await (item.props.onClick as () => void)()
+    await flush()
+
+    expect(onShare).toHaveBeenCalledOnce()
+  })
+})
+
 describe('dataset crate export', () => {
   it('names the file after the dataset it was asked for', async () => {
     let answer!: (blob: Blob) => void
