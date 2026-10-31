@@ -9,10 +9,11 @@ import Select from '@/components/ui/Select.vue'
 import GroupSelect from '@/components/groups/GroupSelect.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useBuckets } from '@/composables/useBuckets'
+import { listBuckets, nodesByBucket } from '@/composables/useBucketCount'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
-import { isHiddenBucket } from '@/lib/workspaces'
+import { errorMessage } from '@/lib/utils'
 import { FolderPlus, FolderTree } from '@lucide/vue'
 
 const props = defineProps<{ active: boolean }>()
@@ -20,17 +21,43 @@ const emit = defineEmits<{ (e: 'navigate'): void }>()
 const groupId = defineModel<string>('groupId', { required: true })
 const bucket = defineModel<string>('bucket', { required: true })
 const prefix = defineModel<string>('prefix', { required: true })
+/** The node holding the target bucket; null is the connected node. The import runs there. */
+const nodeId = defineModel<string | null>('nodeId', { default: null })
 
-const { groups } = useAruna()
+const { groups, searchBuckets, sessionEpoch } = useAruna()
+const { isTarget, isLocalNode } = useRealmNodes()
 const uid = useId()
 const groupOptions = computed(() => groups.value.map((group) => ({ value: group.id, label: group.name })))
 
 const s3 = useS3()
-const bucketList = useBuckets()
-const bucketsLoading = bucketList.loading
-const bucketsLoaded = bucketList.loaded
-const bucketsError = bucketList.error
 const shortcuts = useBucketShortcuts()
+// The chosen group's buckets on every node, from the realm bucket search.
+const bucketPlaces = ref(new Map<string, string | null>())
+const bucketsLoading = ref(false)
+const bucketsLoaded = ref(false)
+const bucketsError = ref<string | null>(null)
+let bucketRun = 0
+async function loadBuckets() {
+  const group = groupId.value
+  const run = ++bucketRun
+  const epoch = sessionEpoch.value
+  const current = () => run === bucketRun && epoch === sessionEpoch.value && group === groupId.value
+  bucketPlaces.value = new Map()
+  bucketsLoaded.value = false
+  bucketsError.value = null
+  if (!group) return
+  bucketsLoading.value = true
+  try {
+    const listing = await listBuckets(searchBuckets, group, current)
+    if (!current()) return
+    bucketPlaces.value = nodesByBucket(listing.hits, isTarget, isLocalNode)
+    bucketsLoaded.value = true
+  } catch (err) {
+    if (current()) bucketsError.value = errorMessage(err)
+  } finally {
+    if (run === bucketRun) bucketsLoading.value = false
+  }
+}
 
 // Browsing the target needs an S3 session, the import API only needs realm
 // auth, so without a key bucket and prefix stay free text.
@@ -40,25 +67,21 @@ const browserOpen = ref(false)
 const newSegment = ref('')
 
 const bucketOptions = computed(() => {
-  const names = bucketList.buckets.value
-    .map((entry) => entry.name)
-    .filter((name) => !isHiddenBucket(name))
+  const names = [...bucketPlaces.value.keys()]
   const typed = bucket.value.trim()
   // A hand-typed target stays selected when the list arrives later.
   if (typed && !names.includes(typed)) names.push(typed)
   return names.map((name) => ({ value: name, label: name }))
 })
 
-const authRejected = computed(() => bucketList.authError.value || browseAuthError.value)
-const pickBucket = computed(
-  () => canBrowse.value && !authRejected.value && bucketOptions.value.length > 0,
-)
+const authRejected = computed(() => browseAuthError.value)
+const pickBucket = computed(() => bucketOptions.value.length > 0)
 
 const browseHint = computed(() => {
-  if (!s3.endpoint.value) return 'This node advertises no S3 endpoint, so the target is typed by hand.'
-  if (!s3.hasActiveKey.value) return 'S3 credentials from Data unlock the bucket picker; the import itself does not need them.'
+  if (bucketsLoaded.value && !bucketOptions.value.length) return 'This group has no buckets yet, type the target name.'
+  if (!s3.endpoint.value) return 'This node advertises no S3 endpoint, so folders cannot be browsed.'
+  if (!s3.hasActiveKey.value) return 'S3 credentials from Data unlock folder browsing; the import itself does not need them.'
   if (authRejected.value) return 'Your S3 credentials were rejected, so the target cannot be browsed.'
-  if (bucketList.loaded.value && !bucketOptions.value.length) return 'No buckets are visible with this key, type the target name.'
   return null
 })
 
@@ -105,7 +128,7 @@ function preselectBucket() {
   if (bucket.value || !bucketOptions.value.length) return
   const names = new Set(bucketOptions.value.map((option) => option.value))
   const known = [...shortcuts.recent.value, ...shortcuts.pinned.value].find(
-    (entry) => !entry.nodeId && names.has(entry.bucket),
+    (entry) => names.has(entry.bucket) && (entry.nodeId ?? null) === (bucketPlaces.value.get(entry.bucket) ?? null),
   )
   const only = bucketOptions.value.length === 1 ? bucketOptions.value[0] : undefined
   if (known) bucket.value = known.bucket
@@ -113,15 +136,18 @@ function preselectBucket() {
 }
 
 watch(
-  [() => props.active, () => s3.activeKey.value, () => s3.endpoint.value],
-  ([active, key, endpoint]) => {
+  [() => props.active, groupId, sessionEpoch],
+  ([active]) => {
     if (!active) return
     browseAuthError.value = false
-    if (!key || !endpoint) return
-    void bucketList.ensure().then(preselectBucket)
+    void loadBuckets().then(preselectBucket)
   },
   { immediate: true },
 )
+// A picked or typed name follows its listed node; an unlisted name stays on this node.
+watch([bucket, bucketPlaces], ([name]) => {
+  nodeId.value = bucketPlaces.value.get(name.trim()) ?? null
+}, { immediate: true })
 </script>
 
 <template>
@@ -173,7 +199,7 @@ watch(
   </div>
 
   <div v-if="browserOpen && canBrowse && bucket" class="space-y-2 rounded-md border border-border p-2 sm:col-span-2">
-    <ObjectBrowserPanel :bucket="bucket" :prefix="prefix" @navigate="onNavigate" @auth-error="onBrowseFailure" />
+    <ObjectBrowserPanel :bucket="bucket" :node-id="nodeId" :prefix="prefix" @navigate="onNavigate" @auth-error="onBrowseFailure" />
     <div class="flex flex-wrap items-center gap-2">
       <Input
         v-model="newSegment"
