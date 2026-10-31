@@ -10,6 +10,7 @@ import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import { ApiError, type MetadataSearchHit, type MetadataSearchResponse } from '@/lib/api'
 import { featureEnabled } from '@/lib/config'
 import { useAruna } from '@/composables/useAruna'
+import { signedInEpoch } from '@/composables/aruna/state'
 import { createSwrCache, type SwrFailure } from '@/lib/swr'
 import type { MetadataDoc } from '@/data/types'
 import { errorMessage } from '@/lib/utils'
@@ -94,7 +95,7 @@ export function useMetadataSearch(
   // slot and behaves exactly as it did before, never evicting the shared page.
   { cached = false }: { cached?: boolean } = {},
 ) {
-  const { metadata, searchMetadata, authToken, apiBaseUrl } = useAruna()
+  const { metadata, searchMetadata, apiBaseUrl } = useAruna()
   const cache = cached ? sharedCache : createSwrCache<SearchPage>(EMPTY_PAGE, SEARCH_FRESH_MS)
   const cursorEnabled = featureEnabled('searchCursor')
   const pageSize = cursorEnabled ? CURSOR_PAGE_SIZE : SEARCH_PAGE_CAP
@@ -424,7 +425,7 @@ export function useMetadataSearch(
 
   // A filter change re-binds the cursor, so the watched deps include the server
   // push-down filters: any change restarts paging from the first page.
-  const watchDeps: Array<Ref<unknown>> = [query, authToken, apiBaseUrl]
+  const watchDeps: Array<Ref<unknown>> = [query, signedInEpoch, apiBaseUrl]
   if (filters.groupId) watchDeps.push(filters.groupId)
   if (filters.conformsTo) watchDeps.push(filters.conformsTo)
   watch(watchDeps, () => {

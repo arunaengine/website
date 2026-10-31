@@ -1,6 +1,6 @@
 import { ref, watch, type Ref } from 'vue'
 import { getBucketCheck, type BrokenReason } from '@/lib/api'
-import { apiBaseUrl, authToken } from './aruna/state'
+import { apiBaseUrl, authToken, signedInEpoch } from './aruna/state'
 import { nodeApiBaseReady } from './s3/endpoints'
 
 const PAGE = 500
@@ -42,7 +42,7 @@ export function useBrokenFiles(bucket: Ref<string>, nodeId: Ref<string | null>, 
 
   // Another bucket or node never keeps the marks of the previous one.
   watch([bucket, nodeId], () => (reasons.value = {}), { flush: 'sync' })
-  watch([bucket, nodeId, authToken, () => listed?.value], load, { immediate: true })
+  watch([bucket, nodeId, signedInEpoch, () => listed?.value], load, { immediate: true })
 
   return { reasonOf: (key: string): string | null => (reasons.value[key] ? WORDS[reasons.value[key]] : null) }
 }

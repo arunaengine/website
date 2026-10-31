@@ -3,6 +3,7 @@
 // feeds the row indicators, the preview origin line and the header stats.
 import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
 import { useAruna } from './useAruna'
+import { signedInEpoch } from './aruna/state'
 import { aggregateReferences } from '@/lib/references'
 import type { StagingReferenceEntry } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
@@ -47,7 +48,7 @@ export function useStagingReferences(bucket: Ref<string>, active?: Ref<boolean>)
     }
   }
 
-  watch([bucket, () => active?.value, authToken], () => void load(), { immediate: true })
+  watch([bucket, () => active?.value, signedInEpoch], () => void load(), { immediate: true })
   onScopeDispose(() => controller?.abort())
 
   const referencedByKey = computed(() => {

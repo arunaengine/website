@@ -87,6 +87,20 @@ describe('useBrokenFiles', () => {
     scope.stop()
   })
 
+  it('keeps the marks when a renewal replaces the token, and drops them on sign out', async () => {
+    getBucketCheck.mockResolvedValue({ bucket: 'reef', broken: [file('a.txt', 'missing_blob')] })
+    const scope = effectScope()
+    const broken = scope.run(() => useBrokenFiles(ref('reef'), ref(null)))!
+    await settle()
+    authToken.value = 'renewed'
+    await settle()
+    expect(getBucketCheck).toHaveBeenCalledTimes(1)
+    authToken.value = ''
+    await settle()
+    expect(broken.reasonOf('a.txt')).toBeNull()
+    scope.stop()
+  })
+
   it('marks nothing when the node has no check', async () => {
     getBucketCheck.mockRejectedValue(new ApiError(404, 'not found'))
     const scope = effectScope()

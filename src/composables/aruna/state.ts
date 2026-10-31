@@ -1,4 +1,4 @@
-import { effectScope, getCurrentScope, onScopeDispose, ref, watch } from 'vue'
+import { computed, effectScope, getCurrentScope, onScopeDispose, ref, watch } from 'vue'
 import { nodeApiBase } from '@/components/nodes/node-probe'
 import {
   ApiError,
@@ -72,6 +72,8 @@ export const bootstrapped = ref(false)
 // Monotonic identity counter: bumped whenever the token or API base changes,
 // so in-flight work and module-singleton caches can tell sessions apart.
 export const sessionEpoch = ref(0)
+/** The signed-in session, or -1 signed out; a renewal that replaces the token keeps it. */
+export const signedInEpoch = computed(() => (authToken.value ? sessionEpoch.value : -1))
 // The session whose realm document was read with its token; only that one names the nodes.
 export const realmReadEpoch = ref(-1)
 

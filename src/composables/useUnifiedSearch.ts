@@ -17,6 +17,7 @@ import {
   type UnifiedSearchResponse,
 } from '@/lib/api'
 import { useAruna } from '@/composables/useAruna'
+import { signedInEpoch } from '@/composables/aruna/state'
 import { errorMessage } from '@/lib/utils'
 import { isHiddenBucket } from '@/lib/workspaces'
 
@@ -330,7 +331,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     if (term.length >= UNIFIED_MIN_CHARS) void runSearch(term)
   }
 
-  const deps: Array<Ref<unknown>> = [query, authToken, apiBaseUrl]
+  const deps: Array<Ref<unknown>> = [query, signedInEpoch, apiBaseUrl]
   if (config.groupId) deps.push(config.groupId)
   if (config.conformsTo) deps.push(config.conformsTo)
   if (includeObjects) deps.push(objectMode)
