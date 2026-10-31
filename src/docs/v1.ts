@@ -441,7 +441,7 @@ export const docsTopics: DocsTopic[] = [
         route: '/app/datasets/new',
         anchor: 'editor-validation',
         title: 'Validation',
-        body: 'Validate asks the node to check the draft exactly as a save would, without saving anything.',
+        body: 'The node checks the draft as you edit, exactly as a save would, without saving anything. Validate runs the check again.',
       },
       {
         route: '/app/datasets/new',
