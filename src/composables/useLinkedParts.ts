@@ -31,6 +31,10 @@ export interface LinkedPartFacts {
 }
 
 const SHOWN = 10
+// The last facts of each part per dataset, kept for the session, so a new visit shows them at once
+// while they are read again.
+const remembered = new Map<string, LinkedPartFacts>()
+let rememberedEpoch = -1
 
 export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wantsEntries: (id: string) => boolean) {
   const { getPartTarget, getBucketUsage, getBucketDistribution, listBucketObjects, getDataLinks, sessionEpoch } = useAruna()
@@ -39,7 +43,11 @@ export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wants
   let generation = 0
   const asked = new Set<string>()
 
-  const put = (id: string, value: LinkedPartFacts) => (facts.value = new Map(facts.value).set(id, value))
+  const memoryKey = (id: string) => `${datasetId.value}\n${id}`
+  const put = (id: string, value: LinkedPartFacts) => {
+    remembered.set(memoryKey(id), value)
+    facts.value = new Map(facts.value).set(id, value)
+  }
 
   async function load(id: string, round: number) {
     const current = () => round === generation
@@ -54,7 +62,7 @@ export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wants
     const problem = browseProblem(target, isLocalNode)
     const nodes = target.node_id ? [target.node_id] : []
     const base = { target, problem, route: problem ? null : browseRoute(target, isLocalNode), nodes, usage: null, entries: null, others: [] }
-    put(id, base)
+    if (!facts.value.has(id)) put(id, base)
     const node = target.node_id && !isLocalNode(target.node_id) ? target.node_id : null
     const bucket = target.bucket ?? ''
     const [usage, page, links, distribution] = await Promise.all([
@@ -96,6 +104,8 @@ export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wants
       generation++
       asked.clear()
       facts.value = new Map()
+      if (rememberedEpoch !== sessionEpoch.value) remembered.clear()
+      rememberedEpoch = sessionEpoch.value
     },
     { immediate: true },
   )
@@ -105,6 +115,8 @@ export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wants
       for (const id of ids.value) {
         if (asked.has(id)) continue
         asked.add(id)
+        const known = remembered.get(memoryKey(id))
+        if (known) facts.value = new Map(facts.value).set(id, known)
         void load(id, generation)
       }
     },

@@ -19,6 +19,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 beforeEach(() => {
   vi.clearAllMocks()
+  aruna.sessionEpoch.value++
   aruna.getBucketUsage.mockResolvedValue({ bucket: 'refseq', objects: 120, logical_bytes: 1024, complete: true })
   aruna.listBucketObjects.mockResolvedValue({ bucket: 'refseq', prefixes: ['genomes/'], objects: [{ key: 'README.md', version_id: 'v', size: 12 }] })
   aruna.getDataLinks.mockResolvedValue({ documents: [{ document_id: 'd1' }, { document_id: 'd2', title: 'Other' }], complete: true })
@@ -65,6 +66,20 @@ describe('useLinkedParts', () => {
     expect(aruna.getBucketUsage).not.toHaveBeenCalled()
     expect(aruna.listBucketObjects).not.toHaveBeenCalled()
     expect(facts.value.get(PART)?.entries).toBeNull()
+    scope.stop()
+  })
+
+  it('shows the facts of an earlier visit at once and reads them again', async () => {
+    aruna.getPartTarget.mockResolvedValue({ id: PART, bucket: 'refseq', prefix: '', node_id: 'n2', held_here: false })
+    const first = effectScope()
+    first.run(() => useLinkedParts(ref([PART]), ref('d1'), () => false))
+    await settle()
+    first.stop()
+    aruna.getPartTarget.mockReturnValue(new Promise(() => {}))
+    const scope = effectScope()
+    const facts = scope.run(() => useLinkedParts(ref([PART]), ref('d1'), () => false))!
+    expect(facts.value.get(PART)?.usage?.objects).toBe(120)
+    expect(aruna.getPartTarget).toHaveBeenCalledTimes(2)
     scope.stop()
   })
 
