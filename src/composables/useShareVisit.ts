@@ -2,7 +2,6 @@
 // leaves the address bar at once; it stays in this tab's session storage so a reload still works.
 // The visit token lives in memory only and is opened again when it ends.
 import { ref, shallowRef } from 'vue'
-import { nodeApiBase } from '@/components/nodes/node-probe'
 import { ApiError, apiRequest, defaultApiBaseUrl, openShare, type RealmInfoResponse, type VisitShare } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
 
@@ -40,16 +39,12 @@ export function takeLinkToken(nodeId: string): string | null {
   return token
 }
 
-/** The node's API base from the realm's node list; the portal's own node when it is not listed. */
-export async function resolveNodeBase(nodeId: string): Promise<string> {
-  const base = defaultApiBaseUrl()
-  try {
-    const realm = await apiRequest<RealmInfoResponse>('/system/realm', {}, { baseUrl: base })
-    const node = (realm.nodes ?? []).find((entry) => entry.node_id === nodeId)
-    return (node && nodeApiBase(node)) || base
-  } catch {
-    return base
-  }
+/** The node's API base from the realm's public node list; null when the realm names no such node. */
+export async function resolveNodeBase(nodeId: string): Promise<string | null> {
+  const realm = await apiRequest<RealmInfoResponse>('/system/realm', {}, { baseUrl: defaultApiBaseUrl() })
+  const url = realm.public_nodes?.find((entry) => entry.node_id === nodeId)?.api_url.replace(/\/+$/, '')
+  if (!url) return null
+  return url.endsWith('/api/v1') ? url : `${url}/api/v1`
 }
 
 export function isUnavailable(cause: unknown): boolean {
@@ -63,6 +58,7 @@ export function useShareVisit() {
   const busy = ref(false)
   const baseUrl = ref('')
   let linkToken: string | null = null
+  let node = ''
   // Kept in memory so the visit can be opened again without asking twice.
   let password: string | undefined
   let visitToken = ''
@@ -75,7 +71,7 @@ export function useShareVisit() {
       phase.value = 'broken'
       return
     }
-    baseUrl.value = await resolveNodeBase(nodeId)
+    node = nodeId
     await open()
   }
 
@@ -85,6 +81,15 @@ export function useShareVisit() {
     busy.value = true
     error.value = null
     try {
+      if (!baseUrl.value) {
+        // An unknown node gets the same answer as an unknown link.
+        const found = await resolveNodeBase(node)
+        if (!found) {
+          phase.value = 'broken'
+          return
+        }
+        baseUrl.value = found
+      }
       const answer = await openShare(linkToken, password, baseUrl.value)
       visitToken = answer.visit_token
       visitEnds = Date.parse(answer.expires_at)

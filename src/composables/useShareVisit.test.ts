@@ -11,7 +11,7 @@ const replaceState = vi.fn((_state: unknown, _title: string, url: string) => {
   location.pathname = url
 })
 
-const realm = { nodes: [{ node_id: 'node-2', kind: 'server', info: { urls: { api: 'https://node2.test' } } }] }
+const realm = { nodes: [], public_nodes: [{ node_id: 'node-2', api_url: 'https://node2.test/' }, { node_id: 'node-3', api_url: 'https://node3.test/api/v1' }] }
 const opened = (expires = Date.now() + 3_600_000) => ({
   body: { visit_token: 'v1', expires_at: new Date(expires).toISOString(), share: { kind: 'folder', name: 'results', mode: 'read' } },
 })
@@ -114,10 +114,30 @@ describe('useShareVisit', () => {
     expect(visit.phase.value).toBe('broken')
   })
 
-  it('falls back to the portal node when the realm does not list the node', async () => {
-    answers.push({ status: 500 }, opened())
+  it('reads the node from the public list on the portal node and calls an unknown node a broken link', async () => {
+    answers.push({ body: realm }, opened(), { body: realm })
+    const known = useShareVisit()
+    await known.start('node-3')
+    expect(sent[0].url).toBe('https://portal.test/api/v1/system/realm')
+    expect(sent[0].auth).toBeNull()
+    expect(sent[1].url).toBe('https://node3.test/api/v1/shares/open')
+
+    location.hash = '#L2.secret'
+    const unknown = useShareVisit()
+    await unknown.start('node-9')
+    expect(unknown.phase.value).toBe('broken')
+    expect(sent).toHaveLength(3)
+  })
+
+  it('offers to try again when the realm cannot be read, and then opens the link', async () => {
+    answers.push({ status: 400 }, { body: realm }, opened())
     const visit = useShareVisit()
-    await visit.start('node-9')
-    expect(sent[1].url).toBe('https://portal.test/api/v1/shares/open')
+    await visit.start('node-2')
+    expect(visit.phase.value).toBe('opening')
+    expect(visit.error.value).toBeTruthy()
+
+    await visit.open()
+    expect(visit.phase.value).toBe('ready')
+    expect(sent.at(-1)?.url).toBe('https://node2.test/api/v1/shares/open')
   })
 })
