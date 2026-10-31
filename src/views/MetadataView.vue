@@ -311,7 +311,6 @@ function jumpTo(entityId: string) {
       :title="pageTitle"
       :crumbs="crumbs"
       :docs="{ topic: 'datasets', section: 'The bundle is an RO-Crate' }"
-      content-class="mx-auto max-w-5xl"
     >
       <template #title>
         <span class="flex items-start gap-3">
