@@ -248,7 +248,7 @@ watch(
         Compute administration controls execution admission and capacity signals, while record placement separately decides which nodes hold records and system jobs.
       </p>
 
-      <div class="grid gap-6 lg:grid-cols-[260px_1fr]">
+      <div class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
         <nav class="flex flex-col gap-1 text-sm lg:sticky lg:top-20 lg:self-start">
           <a href="#compute-links" class="rounded-md bg-primary/5 px-3 py-2 font-medium text-primary">Bandwidth links</a>
           <a href="#compute-quotas" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Group quotas</a>
@@ -256,7 +256,7 @@ watch(
           <a href="#compute-drain" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Drain</a>
         </nav>
 
-        <div class="space-y-6">
+        <div class="min-w-0 space-y-6">
           <div class="flex justify-end">
             <RefreshButton :busy="reloadSpinning" label="Reload" @click="onReloadAll" />
           </div>
