@@ -67,6 +67,34 @@ describe('all-nodes bucket list', () => {
     scopes.splice(0).forEach((scope) => scope.stop())
   })
 
+  it('shows the last first page on a new visit while it is read again', async () => {
+    searchBuckets.mockResolvedValue(answer([hit('results')]))
+    const first = start()
+    await settle()
+    first.scope.stop()
+    let answerNow: (value: BucketSearchResponse) => void = () => {}
+    searchBuckets.mockReturnValue(new Promise((resolve) => (answerNow = resolve)))
+    const { list } = start()
+    await settle()
+    expect(list.hits.value.map((entry) => entry.bucket)).toEqual(['results'])
+    expect(list.loading.value).toBe(true)
+    answerNow(answer([hit('results'), hit('new')]))
+    await settle()
+    expect(list.hits.value.map((entry) => entry.bucket)).toEqual(['results', 'new'])
+  })
+
+  it('shows no page of another account', async () => {
+    searchBuckets.mockResolvedValue(answer([hit('mine')]))
+    start().scope.stop()
+    await settle()
+    setAuthToken('t2')
+    signIn('u2')
+    searchBuckets.mockReturnValue(new Promise(() => {}))
+    const { list } = start()
+    await settle()
+    expect(list.hits.value).toEqual([])
+  })
+
   it('leaves out a device bucket once the realm names the device, after the answer came', async () => {
     deviceKnown.value = false
     searchBuckets.mockResolvedValue(answer([hit('results', 'g1', 'n2'), hit('laptop-notes', 'g1', 'device-1')]))

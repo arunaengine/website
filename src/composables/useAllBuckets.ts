@@ -13,6 +13,9 @@ export const BUCKET_PAGE = 25
 const MIN_CHARS = 2
 const TYPING_MS = 250
 
+// The first page of the last listed group, so a new visit shows it at once while it is read again.
+let firstPage: { key: string; hits: BucketSearchHit[]; cursor: string | null; failedNodes: number } | null = null
+
 export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled: Ref<boolean>) {
   const { apiBaseUrl, currentUser, searchBuckets, sessionEpoch } = useAruna()
   const { isTarget } = useRealmNodes()
@@ -53,6 +56,13 @@ export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled:
     if (next && !cursor) return
     if (!next) reset()
     if (!enabled.value || !groupId.value || !account.value || (term && term.length < MIN_CHARS)) return
+    const key = `${account.value}|${sessionEpoch.value}|${groupId.value}`
+    if (!next && !term && firstPage?.key === key) {
+      found.value = firstPage.hits
+      cursor = firstPage.cursor
+      more.value = Boolean(cursor)
+      failedNodes.value = firstPage.failedNodes
+    }
     const id = ++seq
     inFlight = next
     const after = next ? cursor : null
@@ -71,6 +81,7 @@ export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled:
       )
       found.value = after ? [...found.value, ...page] : page
       cursor = response.next_cursor ?? null
+      if (!after && !term) firstPage = { key, hits: page, cursor, failedNodes: response.nodes_failed }
       more.value = Boolean(cursor)
       failedNodes.value = response.nodes_failed
       needsName.value = false
