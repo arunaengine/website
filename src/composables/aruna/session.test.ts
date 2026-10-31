@@ -28,6 +28,7 @@ function serveRealm(realmId: string) {
 
 const state = await import('./state')
 const { refresh, setApiBaseUrl, setAuthToken } = await import('./session')
+const { bootRestoring, bootstrapGate } = await import('./restoreGate')
 
 let storage: Record<string, string>
 
@@ -56,6 +57,19 @@ describe('token restore', () => {
     expect(state.authToken.value).toBe('TOKEN-A')
     const tokens = calls.map(([, , client]) => client?.token).filter(Boolean)
     expect(new Set(tokens)).toEqual(new Set(['TOKEN-A']))
+  })
+
+  it('shares its load with a page that the restore lets start', async () => {
+    serveRealm('REALM-A')
+    let second: Promise<void> | undefined
+    // Like a page that mounts once the gate opened.
+    const stop = watch(bootRestoring, (open) => void (open || (second = refresh())))
+    bootstrapGate()
+    const first = refresh()
+    await first
+    stop()
+    expect(second).toBe(first)
+    expect(vi.mocked(apiRequest).mock.calls.filter(([path]) => path === '/access/users/me')).toHaveLength(1)
   })
 
   it('restores nothing when the API base serves another realm now', async () => {

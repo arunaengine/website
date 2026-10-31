@@ -113,7 +113,7 @@ async function trustedBase(baseUrl: string, realm: RealmInfoResponse): Promise<b
  * named its realm at this API base, so no request carries a token stored for another realm
  * or API origin.
  */
-async function restoreToken(context: ReturnType<typeof refreshContext>): Promise<void> {
+async function restoreToken(context: ReturnType<typeof refreshContext>, restored: () => void): Promise<void> {
   try {
     const realm = await apiRequest<RealmInfoResponse>('/system/realm', {}, { baseUrl: context.client.baseUrl })
     if (context.epoch !== sessionEpoch.value) return
@@ -123,7 +123,9 @@ async function restoreToken(context: ReturnType<typeof refreshContext>): Promise
     if (context.epoch !== sessionEpoch.value) return
     carried = null
     const stored = held || readStored(tokenKey(realm.realm_id, context.client.baseUrl))
-    if (stored) setAuthToken(stored)
+    if (!stored) return
+    setAuthToken(stored)
+    restored()
   } catch {
     // The realm is unknown, so the session stays signed out until a later refresh.
   }
@@ -144,8 +146,12 @@ export function refresh(): Promise<void> {
     && (carried?.baseUrl === context.client.baseUrl || hasStoredToken(context.client.baseUrl))
   const gate = restoring.value ? openGate() : null
   if (!gate) closeGate()
-  const promise = gate
-    ? restoreToken(context)
+  // The restored session loads in this chain, so a page the open gate mounts does not repeat it.
+  const adopt = () => {
+    if (refreshInFlight?.promise === promise) refreshInFlight = { epoch: sessionEpoch.value, promise }
+  }
+  const promise: Promise<void> = gate
+    ? restoreToken(context, adopt)
         .finally(() => closeGate(gate))
         .then(() => refreshForContext(refreshContext()))
         .finally(() => {
