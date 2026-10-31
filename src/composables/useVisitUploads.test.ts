@@ -79,6 +79,22 @@ describe('useVisitUploads', () => {
     expect(landed).toHaveBeenCalledTimes(2)
   })
 
+  it('sends a file once more when another writer took its name meanwhile, and only once', async () => {
+    replies.push(
+      { status: 409, body: { error: 'taken', code: 'name_taken' } },
+      { status: 201, body: { name: 'a (1).txt', size: 10 } },
+      { status: 409, body: { error: 'taken', code: 'name_taken' } },
+      { status: 409, body: { error: 'taken', code: 'name_taken' } },
+    )
+    const { uploads, add } = useVisitUploads(visit)
+
+    await add('', [file('a.txt'), file('b.txt')])
+
+    expect(requests).toHaveLength(4)
+    expect(uploads.value[0]).toMatchObject({ state: 'done', landed: 'a (1).txt' })
+    expect(uploads.value[1]).toMatchObject({ state: 'failed', error: 'Another upload took this name. Send the file again.' })
+  })
+
   it('names a full group storage and goes on with the next file', async () => {
     replies.push({ status: 409, body: { error: 'quota exhausted' } }, { status: 201, body: { name: 'b.txt', size: 10 } })
     const { uploads, add } = useVisitUploads(visit)

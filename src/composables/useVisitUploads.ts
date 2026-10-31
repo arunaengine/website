@@ -24,6 +24,7 @@ export function uploadName(prefix: string, file: File): string {
 }
 
 function failure(cause: unknown): string {
+  if (cause instanceof ApiError && cause.code === 'name_taken') return 'Another upload took this name. Send the file again.'
   if (cause instanceof ApiError && cause.status === 409) return 'The storage of this group is full.'
   if (cause instanceof ApiError && cause.status === 403) return 'This link does not accept uploads here.'
   return errorMessage(cause)
@@ -42,8 +43,14 @@ export function useVisitUploads(visit: Visit, onLanded: () => void = () => {}) {
     const entry = uploads.value.find((candidate) => candidate.id === id)
     if (!entry) return
     update(id, { state: 'sending' })
+    const upload = () => visit((token, base) => uploadVisitFile(entry.name, file, token, base, (sent) => update(id, { sent })))
     try {
-      const landed = await visit((token, base) => uploadVisitFile(entry.name, file, token, base, (sent) => update(id, { sent })))
+      // Another writer took the name during the upload; the node picks a free one on a resend.
+      const landed = await upload().catch((cause) => {
+        if (!(cause instanceof ApiError && cause.status === 409 && cause.code === 'name_taken')) throw cause
+        update(id, { sent: 0 })
+        return upload()
+      })
       update(id, { state: 'done', sent: entry.size, landed: landed.name })
       onLanded()
     } catch (cause) {
