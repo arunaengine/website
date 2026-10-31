@@ -111,6 +111,14 @@ describe('node interfaces', () => {
     expect(content(root)).not.toContain('AVAILABLE')
   })
 
+  it('gives every service one state word', async () => {
+    const served = info('https://api.example.org/api/v1')
+    Object.assign(served.services, { network: { status: 'available' }, blob: { status: 'available' }, database: { status: 'degraded' } })
+    const { root } = await mountApp(details, { props: { info: served } })
+
+    expect(content(root)).toMatch(/Network\s*available\s*Blob storage\s*available\s*Database\s*degraded/)
+  })
+
   it('names a storage backend only when it has a problem, and never next to a pill', async () => {
     const backends = info('https://api.example.org/api/v1')
     backends.services.blob = {

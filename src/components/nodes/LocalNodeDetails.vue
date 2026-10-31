@@ -137,7 +137,8 @@ const META = 'flex flex-wrap items-center gap-x-5 gap-y-1 type-secondary [&>span
       <p :class="['mt-1.5', META]">
         <span v-for="service in services" :key="service.name">
           <component :is="service.icon" aria-hidden="true" />{{ service.label }}
-          <span v-if="statusProblem(service.status)" class="text-destructive">{{ statusProblem(service.status)!.word }}</span>
+          <!-- One state word per service; a problem reads in red. -->
+          <span :class="statusProblem(service.status) ? 'text-destructive' : 'text-foreground'">{{ service.status!.replace(/_/g, ' ') }}</span>
         </span>
       </p>
     </div>
