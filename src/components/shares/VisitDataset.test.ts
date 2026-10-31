@@ -14,6 +14,7 @@ const assign = vi.fn()
 const listings: Record<string, unknown> = {
   '': { files: [{ name: 'readme.txt', size: 2048 }], folders: ['run-1/'], next_cursor: null },
   'run-1/': { files: [{ name: 'run-1/table.csv', size: 5 }], folders: [], next_cursor: null },
+  'many/': { files: Array.from({ length: 12 }, (_, index) => ({ name: `many/f${String(index).padStart(2, '0')}.txt`, size: 1 })), folders: [], next_cursor: null },
 }
 
 const Pass = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
@@ -23,7 +24,11 @@ const VisitDataset = compileClientComponent(new URL('./VisitDataset.vue', import
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => null) }),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
-  '@/components/ui/ListPager.vue': moduleDefault(Pass),
+  '@/components/ui/ListPager.vue': moduleDefault(defineComponent({
+    props: { page: Number, pageSize: Number, total: Number },
+    emits: ['update:page'],
+    setup: (props, { emit }) => () => h('nav', { onNext: () => emit('update:page', (props.page ?? 1) + 1) }, `page ${props.page} of ${props.total}`),
+  })),
   '@/components/ui/RefusalNote.vue': moduleDefault(defineComponent({ props: { message: String }, setup: (props) => () => h('p', props.message) })),
   '@/components/ui/Spinner.vue': moduleDefault(Pass),
   '@/composables/useShareVisit': { isUnavailable },
@@ -76,6 +81,32 @@ describe('VisitDataset', () => {
     await (folderButton(root, 'results').props.onClick as () => Promise<void>)()
     await flush()
     expect(content(root)).not.toContain('readme.txt')
+  })
+
+  it('pages an opened folder of more than 10 entries on its own', async () => {
+    listings[''] = { files: [{ name: 'readme.txt', size: 2048 }], folders: ['run-1/', 'many/'], next_cursor: null }
+    try {
+      const { root } = await mountApp(VisitDataset, { props: { visit } })
+      await vi.waitFor(() => expect(content(root)).toContain('summary.pdf'))
+      await (folderButton(root, 'results').props.onClick as () => Promise<void>)()
+      await flush()
+      expect(nodes(root).filter((node) => node.tag === 'nav')).toHaveLength(0)
+
+      await (folderButton(root, 'many').props.onClick as () => Promise<void>)()
+      await flush()
+      const pager = element(root, (node) => node.tag === 'nav')
+      expect(content(pager)).toBe('page 1 of 12')
+      expect(content(root)).toContain('f09.txt')
+      expect(content(root)).not.toContain('f10.txt')
+
+      await (pager.props.onNext as () => void)()
+      await flush()
+      expect(content(root)).toContain('f11.txt')
+      expect(content(root)).not.toContain('f00.txt')
+      expect(content(root)).toContain('readme.txt')
+    } finally {
+      listings[''] = { files: [{ name: 'readme.txt', size: 2048 }], folders: ['run-1/'], next_cursor: null }
+    }
   })
 
   it('downloads a dataset file by its id and a file inside a part by the part and its name', async () => {
