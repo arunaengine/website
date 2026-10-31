@@ -83,8 +83,8 @@ export const docsTopics: DocsTopic[] = [
       {
         route: '/app',
         anchor: 'top-create-dataset',
-        title: 'Create',
-        body: 'Create uploads files and creates buckets, runs, datasets and groups.',
+        title: 'Add',
+        body: 'Add uploads files and creates buckets, runs, datasets and groups.',
         desktop: false,
       },
       {
@@ -111,13 +111,14 @@ export const docsTopics: DocsTopic[] = [
         title: 'Start at the dashboard',
         icon: 'LayoutDashboard',
         paragraphs: [
-          'Sign-in lands on the [dashboard](page:dashboard): your own statistics first, aggregated over the [groups](concept:realm-nodes-groups#groups-own-your-work) you belong to, with the per-group breakdown right below them, then [realm](concept:realm-nodes-groups#nodes-and-the-realm) statistics, live from the [node](concept:glossary#node) your browser talks to.',
-          'The "Lead with" switch in the section header decides which of the two comes first, and it follows your account to every browser. Figures for the node you are connected to live on the [Status](page:status) page.',
+          'Sign-in lands on the [dashboard](page:dashboard). The Overview shows four cards: storage, objects, runs and the [realm](concept:realm-nodes-groups#nodes-and-the-realm) nodes.',
+          'The switch beside Overview picks the figures. My groups adds up the [groups](concept:realm-nodes-groups#groups-own-your-work) you belong to and lists each group below. Whole realm counts every [node](concept:glossary#node) and shows the realm map and node table below. The choice follows your account to every browser.',
+          'Figures for the node you are connected to live on the [Status](page:status) page.',
         ],
         image: {
           src: '/docs/v1/dashboard.jpg',
           alt: 'Portal dashboard with personal statistics, per-group storage, and realm statistics',
-          caption: 'The dashboard: your statistics and your groups on top, realm statistics below.',
+          caption: 'The dashboard: the Overview cards, then your groups or the realm.',
         },
       },
       {
@@ -126,8 +127,8 @@ export const docsTopics: DocsTopic[] = [
         bullets: [
           'Context switcher: the active [realm](concept:realm-nodes-groups#nodes-and-the-realm) and [group](concept:realm-nodes-groups#groups-own-your-work) everything you create belongs to.',
           'Search: [datasets](concept:datasets), data [objects](concept:glossary#object), groups, and users in one field; Ctrl+K or Cmd+K focuses it anywhere.',
-          'Create: upload files, or start a new bucket, run, [dataset](page:dataset-new) or group.',
-          'Bell, theme toggle, and the account menu with profile, tokens, and sign-out.',
+          'Add: upload files, or create a bucket, run, [dataset](page:dataset-new) or group.',
+          'Assistant, notifications, theme toggle, and the account menu with profile, access tokens and sign-out.',
         ],
         image: {
           src: '/docs/v1/quick-search.jpg',
@@ -139,9 +140,9 @@ export const docsTopics: DocsTopic[] = [
         title: 'The sidebar',
         icon: 'PanelLeft',
         bullets: [
-          'Dashboard, [Data](page:buckets), [Datasets](page:datasets), [Profiles](page:profiles), and [Compute](page:compute): the everyday views.',
+          'Dashboard, [Data](page:buckets), [Datasets](page:datasets), [Profiles](page:profiles), and [Compute](page:compute): the everyday views. Compute holds runs, notebooks and run templates in one place.',
           '[Groups](page:groups), [Status](page:status), [Settings](page:settings), and Docs: membership, health, and your account.',
-          'Admin and Users appear only for realm administrators.',
+          'Admin and Users appear only for realm administrators. Background jobs such as imports are listed under Admin > Jobs.',
           'Narrow windows collapse the sidebar to an icon rail automatically; the bottom button sets your wide-screen preference.',
         ],
       },
@@ -176,7 +177,7 @@ export const docsTopics: DocsTopic[] = [
         route: '/app/groups',
         anchor: 'group-tabs',
         title: 'Inside a group',
-        body: 'A group page carries tabs for live statistics, members, roles, data sources, policies, and storage.',
+        body: 'A group page has the tabs Overview, Members, Roles, Data sources, Policies and Storage.',
       },
     ],
     sections: [
@@ -205,11 +206,11 @@ export const docsTopics: DocsTopic[] = [
         title: 'Inside a group',
         icon: 'Settings',
         paragraphs: [
-          'Tabs cover statistics, members, [roles](concept:glossary#role), data sources, policies, and [storage](concept:storage-access#external-storage-backend). The context switcher now carries the group, and new [buckets](concept:data-and-deletion#buckets-hold-the-bytes), [datasets](concept:datasets), and runs are created in its name.',
+          'The tabs are Overview, Members, [Roles](concept:glossary#role), Data sources, Policies and [Storage](concept:storage-access#external-storage-backend). The context switcher now carries the group, and new [buckets](concept:data-and-deletion#buckets-hold-the-bytes), [datasets](concept:datasets), and runs are created in its name.',
         ],
         image: {
           src: '/docs/v1/group-detail.jpg',
-          alt: 'Group detail page with stats, members, roles, data sources, policies, and storage tabs',
+          alt: 'Group detail page with the Overview, Members, Roles, Data sources, Policies and Storage tabs',
           caption: 'The group page: role badge next to the name, management tabs below.',
         },
       },
@@ -231,7 +232,7 @@ export const docsTopics: DocsTopic[] = [
         route: '/app/buckets',
         anchor: 'bucket-create',
         title: 'Create a bucket',
-        body: 'Type a bucket name under the bucket list and confirm. A name needs 3 to 63 characters: lowercase letters, digits, dots and dashes, starting and ending with a letter or digit.',
+        body: 'New bucket opens a dialog for the name, the kind and the node. A name needs 3 to 63 characters: lowercase letters, digits, dots and dashes, starting and ending with a letter or digit.',
       },
       {
         route: '/app/buckets',
@@ -243,7 +244,7 @@ export const docsTopics: DocsTopic[] = [
         route: '/app/buckets',
         anchor: 'bucket-settings',
         title: 'Bucket storage',
-        body: 'Storage opens one page per bucket: which backend takes new uploads, which placement policies apply, and which syncs exist.',
+        body: 'Settings opens one page per bucket: which backend takes new uploads, which placement policies apply, and which syncs exist.',
       },
     ],
     sections: [
@@ -258,15 +259,15 @@ export const docsTopics: DocsTopic[] = [
         title: 'Create a bucket and upload',
         icon: 'Upload',
         steps: [
-          'Open [Data](page:buckets) and confirm the group next to "Showing buckets of".',
-          'Type a [bucket](concept:data-and-deletion#buckets-hold-the-bytes) name under the bucket list and confirm. A name needs 3 to 63 characters: lowercase letters, digits, dots and dashes, starting and ending with a letter or digit.',
-          'Select the bucket, then drag files in or use Add data.',
+          'Pick the group in the context switcher, then open [Data](page:buckets). The bucket list shows the buckets of that group.',
+          'Choose New bucket, enter a [bucket](concept:data-and-deletion#buckets-hold-the-bytes) name, and pick whether the files are stored in the realm or referenced from a source. A name needs 3 to 63 characters: lowercase letters, digits, dots and dashes, starting and ending with a letter or digit.',
+          'Open the bucket, then drag files onto the list or use Upload. Upload files picks files from your computer; Add from… adds data from other sources.',
           'Watch the Transfers panel until every file reports done.',
         ],
         image: {
           src: '/docs/v1/data-browser.jpg',
           alt: 'Data view with the reef-survey-2026 bucket and two uploaded objects',
-          caption: 'A bucket with uploaded objects; the toolbar reaches Watch and Storage.',
+          caption: 'A bucket with uploaded objects; the toolbar reaches Watch, Share and Settings.',
         },
       },
       {
@@ -365,7 +366,7 @@ export const docsTopics: DocsTopic[] = [
           'Not stored: the version holds no data anywhere. It marks a deletion, or it points at data held elsewhere.',
         ],
         steps: [
-          'Open a file in [Data](page:buckets) and choose Storage in its row; the Storage tab lists the copies of the selected version.',
+          'Open a file in [Data](page:buckets): a click on its row opens its details. The Storage tab lists the copies of the selected version.',
           'Read the state per node, and the note that says why a list may be incomplete.',
           'Use "Add a copy" to ask a named node to fetch that exact version. It needs write permission and is answered as queued, not as stored.',
         ],
@@ -417,7 +418,7 @@ export const docsTopics: DocsTopic[] = [
         route: '/app',
         anchor: 'top-create-dataset',
         title: 'Create dataset',
-        body: 'Create, then Create dataset in the top bar opens a fresh, unsaved dataset in the editor.',
+        body: 'Add, then Create dataset in the top bar opens a fresh, unsaved dataset in the editor.',
         desktop: false,
       },
       {
@@ -430,13 +431,13 @@ export const docsTopics: DocsTopic[] = [
         route: '/app/datasets/new',
         anchor: 'editor-validation',
         title: 'Validation',
-        body: 'The node previews validation findings while you edit; findings advise and never block.',
+        body: 'Validate asks the node to check the draft exactly as a save would, without saving anything.',
       },
       {
         route: '/app/datasets/new',
         anchor: 'editor-save',
         title: 'Save it',
-        body: 'Create dataset makes the write durable and mints the w3id identifier.',
+        body: 'The bar at the bottom counts the open issues. Create dataset saves the dataset and mints the w3id identifier.',
       },
     ],
     sections: [
@@ -444,24 +445,24 @@ export const docsTopics: DocsTopic[] = [
         title: 'Before you start',
         icon: 'ListChecks',
         bullets: [
-          'Have a [group](concept:realm-nodes-groups#groups-own-your-work); the editor shows the owning group under the title.',
+          'Have a [group](concept:realm-nodes-groups#groups-own-your-work); the line under the title shows the group, path and visibility, and Change edits them.',
           'Upload the files you want to attach first; the [upload guide](concept:upload-data) shows how.',
-          'New description: Create dataset. Existing [RO-Crate](concept:datasets#the-bundle-is-an-ro-crate) archive: Import, then RO-Crate archive.',
+          'New description: Create dataset. Existing [RO-Crate](concept:datasets#the-bundle-is-an-ro-crate) archive: Import on the [Datasets](page:datasets) page, then RO-Crate archive.',
         ],
       },
       {
         title: 'Describe the dataset',
         icon: 'PencilLine',
         steps: [
-          'Choose Create, then [Create dataset](page:dataset-new) in the top bar.',
+          'Choose Add, then [Create dataset](page:dataset-new) in the top bar, or New dataset on the [Datasets](page:datasets) page.',
           'Add a name and a description of what it contains and how it was made.',
           'Pick a license and keywords; both drive discovery.',
-          'Optionally pick a [Profile](concept:profiles-conformance), public or from the dataset\'s group; preview findings advise, never block.',
+          'Optionally pick a [Profile](concept:profiles-conformance), public or from the dataset\'s group. Issues show inline under each field.',
         ],
         image: {
           src: '/docs/v1/dataset-editor.jpg',
           alt: 'Dataset editor with name, description, license, and keyword fields filled in',
-          caption: 'The editor: entities on the left, fields in the middle, validation at the bottom.',
+          caption: 'The editor: entities on the left, fields in the middle, issues and Create dataset in the bar at the bottom.',
         },
       },
       {
@@ -469,9 +470,9 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Files',
         steps: [
           'Choose Add files in the left panel, or Add files on the Has part row of any dataset or folder.',
-          'Pick From a bucket, select the [bucket](concept:data-and-deletion#buckets-hold-the-bytes), tick the [objects](concept:glossary#object).',
+          'Set Source to From a bucket, select the [bucket](concept:data-and-deletion#buckets-hold-the-bytes), tick the [objects](concept:glossary#object).',
           'Add the selection; the files become entities of the dataset [graph](concept:glossary#graph) and appear on the Has part row.',
-          'The same dialog uploads new objects, links another dataset, reuses something already here, or records an external URL.',
+          'The other sources upload new objects, read from a database, link another dataset, reuse something already here, or record an external URL.',
           'Has part is an ordinary row: its menu unlinks an entry, and unlinking the last link to a file offers to remove the file as well. A file the dataset cannot reach is flagged, because the node refuses it.',
         ],
         image: {
@@ -484,34 +485,34 @@ export const docsTopics: DocsTopic[] = [
         title: 'Save and verify',
         icon: 'BadgeCheck',
         steps: [
-          'Check the validation footer, then choose Create dataset. On [Preparing](concept:states-and-retry), wait or Retry; never create a duplicate.',
-          'On the detail page check the [purpose](concept:datasets#one-catalog-three-purposes) badge, group, license, and the [w3id](concept:identifiers) turning Active.',
+          'Check the issues in the bar at the bottom, then choose Create dataset. On [Preparing](concept:states-and-retry), wait or Retry; never create a duplicate.',
+          'On the dataset page check the type pill beside the title, then the About section: group, license, and the [w3id](concept:identifiers) turning Active.',
         ],
         image: {
           src: '/docs/v1/dataset-detail.jpg',
-          alt: 'Saved dataset detail page with metadata cards and the persistent identifier',
-          caption: 'A saved dataset: metadata up top, the resolvable w3id identifier below.',
+          alt: 'Saved dataset page with the About section and the persistent identifier',
+          caption: 'A saved dataset: About first, with the resolvable w3id identifier.',
         },
       },
       {
         title: 'Import an existing RO-Crate',
         icon: 'Import',
         steps: [
-          'Choose Import, then RO-Crate archive, and pick the archive.',
-          'Review detected version, files, [purpose](concept:datasets#one-catalog-three-purposes), [Profile](concept:profiles-conformance) references, and destination.',
-          'Confirm and follow the preparation to a [Complete or a recoverable Partial](concept:states-and-retry) state.',
+          'On the [Datasets](page:datasets) page choose Import, then RO-Crate archive, and pick the archive.',
+          'Pick the group, the bucket and folder for the files, and the dataset path. Switch on Make the imported dataset public if everyone should see it.',
+          'Start the import and follow it to a [Complete or a recoverable Partial](concept:states-and-retry) state, then choose Open the created dataset.',
         ],
       },
       {
         title: 'Find it again',
         icon: 'Search',
         paragraphs: [
-          'The [Datasets](page:datasets) view filters by [purpose](concept:datasets#one-catalog-three-purposes), profile, and group; quick search reaches the same catalog from anywhere.',
+          'The [Datasets](page:datasets) view filters by [type](concept:datasets#one-catalog-four-types), profile, group and favourites; quick search reaches the same catalog from anywhere.',
         ],
         image: {
           src: '/docs/v1/datasets-catalog.jpg',
           alt: 'Datasets catalog with search, filters, and the saved dataset card',
-          caption: 'The catalog: purpose, profile, and group filters, plus a SPARQL workbench.',
+          caption: 'The catalog: type, profile and group filters; More actions opens the SPARQL workbench.',
         },
       },
     ],
@@ -1383,14 +1384,15 @@ export const docsTopics: DocsTopic[] = [
         ],
       },
       {
-        title: 'One catalog, three purposes',
+        title: 'One catalog, four types',
         icon: 'Tags',
-        paragraphs: ['Every entry in the catalog is a dataset; its purpose decides how it is shown.'],
+        paragraphs: ['Every entry in the catalog is a dataset; its type decides how it is shown. The type shows as a pill beside the title, and the [Datasets](page:datasets) view filters by it.'],
         bullets: [
-          'Dataset is the default purpose: data described and bundled as above.',
+          'Dataset is the default type: data described and bundled as above.',
+          'Workflow run: a dataset conforming to the Workflow Run Crate profile. It records a workflow and what it ran.',
+          'Process run: a dataset conforming to the Process Run Crate profile. It records a single computation, such as a compute run.',
           'Profile: a dataset whose root declares the Profile type. It defines requirements for other datasets.',
-          'Process Run: a dataset conforming to the Process Run Crate profile. It records a computation.',
-          'Purpose changes presentation only; none of the three is a separate storage system.',
+          'The type changes presentation only; none of the four is a separate storage system.',
         ],
       },
       {
@@ -1398,7 +1400,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Split',
         paragraphs: [
           'The dataset record is the graph. The file bytes live in [buckets](concept:data-and-deletion) or external locations, and editing or deleting the record never silently touches them.',
-          'Files pushed with Git go to the dataset\'s storage location, shown under Advanced on the dataset page. See [Work with a dataset in Git](concept:dataset-git).',
+          'Files pushed with Git go to the dataset\'s storage location, shown under Details on the dataset page. See [Work with a dataset in Git](concept:dataset-git).',
         ],
       },
       {

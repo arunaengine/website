@@ -94,10 +94,10 @@ export const glossaryTopic: DocsTopic = {
       ],
     },
     {
-      title: 'Purpose type',
+      title: 'Dataset type',
       icon: 'Tag',
       paragraphs: [
-        'What a catalog entry is for: Dataset, Profile, or Process Run. Purpose changes [how an entry is shown](concept:datasets#one-catalog-three-purposes), never where it is stored.',
+        'What a catalog entry is: Dataset, Workflow run, Process run, or Profile. The type changes [how an entry is shown](concept:datasets#one-catalog-four-types), never where it is stored.',
       ],
     },
     {

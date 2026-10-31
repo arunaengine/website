@@ -108,7 +108,7 @@ const { realm } = useAruna()
     v-else-if="!cursorEnabled || (searched && !searchPending && !searchPaging)"
     :title="searchResults.length ? 'No matches after filters' : 'No matches'"
     :description="searchResults.length
-      ? 'Results were hidden by the active purpose, group, profile, or favourites filters.'
+      ? 'Results were hidden by the active type, group, profile, or favourites filters.'
       : textQuery
         ? `No dataset in ${realm.shortName} matched “${textQuery}”.`
         : `No dataset in ${realm.shortName} conforms to this profile.`"
