@@ -7,6 +7,7 @@ import * as Utils from '@/lib/utils'
 import { button, click, compileClientComponent, content, element, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 
 const push = vi.fn()
+let currentRoute: Record<string, unknown> = { fullPath: '/app' }
 const signOut = vi.fn(async () => undefined)
 const currentUser = ref<Record<string, unknown> | null>({ id: 'u1', name: 'Test User', email: 'me@example.org' })
 const nodeLabel = ref('online')
@@ -36,7 +37,7 @@ const TopBar = compileClientComponent(new URL('./TopBar.vue', import.meta.url), 
   'vue-router': {
     ...RouterRuntime,
     RouterLink: defineComponent((_, { slots }) => () => h('a', slots.default?.())),
-    useRoute: () => ({ fullPath: '/app' }),
+    useRoute: () => currentRoute,
     useRouter: () => ({ push }),
   },
   '@lucide/vue': icons,
@@ -121,6 +122,16 @@ describe('portal chrome', () => {
       expect(push).toHaveBeenLastCalledWith(target)
     }
     mounted.app.unmount()
+  })
+
+  it('keeps the open bucket and folder as the upload target', async () => {
+    currentRoute = { name: 'bucket', fullPath: '/app/buckets/b1', query: { prefix: 'raw/', node: 'n2' } }
+    const mounted = await mountApp(TopBar)
+
+    await click(button(mounted.root, 'Upload files'))
+    expect(push).toHaveBeenLastCalledWith({ query: { prefix: 'raw/', node: 'n2', addData: '1' } })
+    mounted.app.unmount()
+    currentRoute = { fullPath: '/app' }
   })
 
   it('leaves New run out without the run service', async () => {

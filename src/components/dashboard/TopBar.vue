@@ -36,6 +36,11 @@ const { isDark, toggleTheme } = useTheme()
 const { label: nodeLabel, state: nodeState, start: watchNode, stop: unwatchNode } = useDeviceStatus()
 const route = useRoute()
 const router = useRouter()
+// An open bucket stays the upload target, with its folder and node.
+function uploadFiles() {
+  if (route.name === 'bucket') void router.push({ query: { ...route.query, addData: '1' } })
+  else void router.push({ name: 'buckets', query: { addData: '1' } })
+}
 
 const desktop = computed(() => props.variant === 'desktop')
 const { shown } = usePortalFeatures()
@@ -149,7 +154,7 @@ async function handleSignOut() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" class="w-56">
-          <DropdownMenuItem @click="router.push({ name: 'buckets', query: { addData: '1' } })"><Upload class="h-3.5 w-3.5" /> Upload files</DropdownMenuItem>
+          <DropdownMenuItem @click="uploadFiles"><Upload class="h-3.5 w-3.5" /> Upload files</DropdownMenuItem>
           <DropdownMenuItem @click="router.push({ name: 'buckets', query: { create: 'bucket' } })"><FolderPlus class="h-3.5 w-3.5" /> New bucket</DropdownMenuItem>
           <DropdownMenuItem v-if="canRun" @click="router.push({ name: 'compute-new' })"><Play class="h-3.5 w-3.5" /> New run</DropdownMenuItem>
           <DropdownMenuSeparator />
