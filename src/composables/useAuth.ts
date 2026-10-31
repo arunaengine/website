@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { restoring } from '@/composables/aruna/state'
+import { tokenClaims } from '@/composables/aruna/renewal'
 import { apiRequest } from '@/lib/api'
 import type { RealmInfoResponse } from '@/lib/api'
 import { featureEnabled, portalConfig } from '@/lib/config'
@@ -232,8 +233,18 @@ async function completeSignIn(params: URLSearchParams): Promise<string> {
  * Clears the Aruna session; when the sign-in came through Keycloak the browser
  * is also sent through the end-session endpoint so the SSO session ends.
  */
+// Best effort: a refused or lost revoke still signs out here, and the session then expires.
+// `keepalive` lets the request finish while the tab moves on to the provider.
+function revokeCurrent(token: string, baseUrl: string) {
+  const sid = token ? tokenClaims(token)?.sid : undefined
+  if (!sid) return
+  const path = `/access/sessions/${encodeURIComponent(sid)}`
+  void apiRequest<void>(path, { method: 'DELETE', keepalive: true }, { baseUrl, token }).catch(() => undefined)
+}
+
 async function signOut() {
   const aruna = useAruna()
+  revokeCurrent(aruna.authToken.value, aruna.apiBaseUrl.value)
   aruna.setAuthToken('')
   const idToken = window.sessionStorage.getItem(ID_TOKEN_KEY)
   window.sessionStorage.removeItem(ID_TOKEN_KEY)

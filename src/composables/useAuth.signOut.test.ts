@@ -8,6 +8,7 @@ const DISCOVERY = {
   end_session_endpoint: 'https://idp.test/logout',
 }
 
+const authToken = ref('')
 const setAuthToken = vi.fn()
 const refresh = vi.fn(async () => undefined)
 
@@ -16,7 +17,7 @@ vi.mock('@/composables/useAruna', () => ({
     setAuthToken,
     refresh,
     apiBaseUrl: ref('/api/v1'),
-    authToken: ref(''),
+    authToken,
     bootstrapped: ref(true),
     currentUser: ref(null),
     realmInfo: ref({
@@ -40,15 +41,24 @@ async function load(desktop: boolean) {
       removeItem: (key: string) => void session.delete(key),
     },
   })
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(DISCOVERY))))
+  vi.stubGlobal('fetch', vi.fn(async (url: string) =>
+    String(url).includes('/access/sessions/')
+      ? new Response('{"message":"node unavailable"}', { status: 500 })
+      : new Response(JSON.stringify(DISCOVERY))))
   const config = await import('@/lib/config')
   config.applyPortalConfig({ features: { desktop, systemBrowserAuth: desktop } })
   return { auth: await import('./useAuth'), assign }
 }
 
 afterEach(() => {
+  authToken.value = ''
   vi.unstubAllGlobals()
 })
+
+function jwt(claims: Record<string, unknown>) {
+  const part = (value: unknown) => btoa(JSON.stringify(value)).replace(/=+$/, '')
+  return `${part({ alg: 'EdDSA' })}.${part(claims)}.signature`
+}
 
 describe('signing out', () => {
   it('ends the sso session in the system browser', async () => {
@@ -74,5 +84,22 @@ describe('signing out', () => {
 
     expect(assign).toHaveBeenCalledWith(expect.stringContaining('post_logout_redirect_uri'))
     expect(refresh).not.toHaveBeenCalled()
+  })
+
+  it('revokes the current session and still signs out when the revoke fails', async () => {
+    const { auth, assign } = await load(false)
+    const token = jwt({ sub: 'USER@REALM', iat: 1, exp: 2, sid: 'SID-1' })
+    authToken.value = token
+
+    await auth.useAuth().signOut()
+
+    const revoke = vi.mocked(fetch).mock.calls.find(([url]) => String(url).includes('/access/sessions/'))
+    expect(String(revoke?.[0])).toContain('/api/v1/access/sessions/SID-1')
+    const init = revoke?.[1] as RequestInit
+    expect(init.method).toBe('DELETE')
+    expect(init.keepalive).toBe(true)
+    expect(new Headers(init.headers).get('Authorization')).toBe(`Bearer ${token}`)
+    expect(setAuthToken).toHaveBeenCalledWith('')
+    expect(assign).toHaveBeenCalledWith(expect.stringContaining('https://idp.test/logout'))
   })
 })
