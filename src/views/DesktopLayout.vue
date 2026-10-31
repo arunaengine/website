@@ -14,6 +14,8 @@ import Notice from '@/components/ui/Notice.vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { bootRestoring } from '@/composables/aruna/restoreGate'
+import Spinner from '@/components/ui/Spinner.vue'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { uploadQueueItems } from '@/composables/uploadQueueState'
 import { assistantAvailable, assistantOpen } from '@/composables/assistantState'
@@ -160,7 +162,9 @@ watch(
         <NodeDown v-else-if="nodeDown" />
         <template v-else>
           <FeatureHidden />
-          <RouterView />
+          <!-- Pages start once the stored sign-in is back, so their first load is not discarded. -->
+          <Spinner v-if="bootRestoring" label="Signing in" class="m-6" />
+          <RouterView v-else />
         </template>
       </main>
     </div>

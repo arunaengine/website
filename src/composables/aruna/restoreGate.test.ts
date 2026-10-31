@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { bootstrapGate, closeGate, openGate, pendingGate } from './restoreGate'
+import { bootRestoring, bootstrapGate, closeGate, openGate, pendingGate } from './restoreGate'
 
 afterEach(() => closeGate())
 
@@ -50,6 +50,17 @@ describe('restore gate', () => {
     closeGate(first)
     await Promise.resolve()
     expect(released).toBe(true)
+  })
+
+  it('marks only the page load restore as open', () => {
+    bootstrapGate()
+    expect(bootRestoring.value).toBe(true)
+    const first = openGate()
+    expect(bootRestoring.value).toBe(true)
+    closeGate(first)
+    expect(bootRestoring.value).toBe(false)
+    openGate()
+    expect(bootRestoring.value).toBe(false)
   })
 
   it('frees the waiters of a gate that is replaced', async () => {

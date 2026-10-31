@@ -10,6 +10,8 @@ import FeatureHidden from '@/components/layout/FeatureHidden.vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { bootRestoring } from '@/composables/aruna/restoreGate'
+import Spinner from '@/components/ui/Spinner.vue'
 import { assistantOpen } from '@/composables/assistantState'
 import { bindTourRouter, tourActive } from '@/composables/useTour'
 import { bindTutorialRouter, tutorialActive } from '@/lib/tutorial/session'
@@ -116,7 +118,9 @@ watch(
         <template v-else>
           <LinkOffer />
           <FeatureHidden />
-          <RouterView />
+          <!-- Pages start once the stored sign-in is back, so their first load is not discarded. -->
+          <Spinner v-if="bootRestoring" label="Signing in" class="m-6" />
+          <RouterView v-else />
         </template>
       </main>
     </div>

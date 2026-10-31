@@ -5,6 +5,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import * as Nav from '@/components/layout/nav'
 import * as Utils from '@/lib/utils'
 import { button, click, compileClientComponent, content, moduleDefault, mountApp } from '@/test/clientRender'
+import { bootRestoring } from '@/composables/aruna/restoreGate'
 
 const route = { name: 'dashboard', path: '/app', hash: '' }
 const permissions = {
@@ -83,6 +84,8 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
   '@/composables/uploadQueueState': { uploadQueueItems: ref([]) },
   '@/lib/chunk-recovery': { asyncChunkError: vi.fn() },
   '@/components/ui/Notice.vue': moduleDefault(Notice),
+  '@/components/ui/Spinner.vue': moduleDefault(EmptyStub),
+  '@/composables/aruna/restoreGate': { bootRestoring },
   '@/composables/useAruna': { useAruna: () => ({ ...permissions, bootstrapped: ref(true) }) },
   '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
   '@/components/layout/FeatureHidden.vue': moduleDefault(EmptyStub),
@@ -173,6 +176,7 @@ beforeEach(() => {
   nodeLoaded.value = false
   appQuit.mockReset().mockResolvedValue(undefined)
   desktopMode = false
+  bootRestoring.value = false
   pageLoader.mockClear()
   resolveRoute.mockClear()
 })
@@ -379,6 +383,16 @@ describe('desktop shell', () => {
 
     expect(html).toContain('routed-view')
     expect(html).not.toContain('node-down')
+  })
+
+  it('starts routed views only after the stored sign-in is back', async () => {
+    bootRestoring.value = true
+    expect(await renderToString(createSSRApp(AppLayout))).not.toContain('routed-view')
+    expect(await renderToString(createSSRApp(DesktopLayout))).not.toContain('routed-view')
+
+    bootRestoring.value = false
+    expect(await renderToString(createSSRApp(AppLayout))).toContain('routed-view')
+    expect(await renderToString(createSSRApp(DesktopLayout))).toContain('routed-view')
   })
 
   it('keeps the realm failure page ahead of the node failure page', async () => {

@@ -1,3 +1,5 @@
+import { ref } from 'vue'
+
 // Requests with an empty token wait here while a stored token is being restored. Each restore has
 // its own gate, so the late end of an abandoned restore never releases the requests of a newer one.
 // A replaced gate releases its waiters, and so does a bootstrap gate no restore ever takes. A restore
@@ -13,6 +15,8 @@ export interface RestoreGate {
 
 const LIMIT_MS = 15_000
 let current: RestoreGate | null = null
+// The restore of the page load is open; pages wait for it so their first load keeps its session.
+export const bootRestoring = ref(false)
 
 function create(owned: boolean): RestoreGate {
   let finish = () => {}
@@ -33,7 +37,10 @@ function create(owned: boolean): RestoreGate {
 
 /** The gate of the page load, open before any refresh starts; the first restore takes it over. */
 export function bootstrapGate(): RestoreGate {
-  current ??= create(false)
+  if (!current) {
+    current = create(false)
+    bootRestoring.value = true
+  }
   return current
 }
 
@@ -55,6 +62,7 @@ export function closeGate(gate: RestoreGate | null = current) {
   if (!gate) return
   gate.resolve()
   if (current === gate) current = null
+  if (!current) bootRestoring.value = false
 }
 
 export function pendingGate(): Promise<void> | null {
