@@ -23,7 +23,7 @@ function base64(hex: string): string {
 
 /** A vault whose only keypair is the vector user key, retired as after a rotation elsewhere. */
 async function retiredVault(): Promise<string> {
-  const created = await createVault(PASSPHRASE, false, { iterations: 500 })
+  const created = await createVault(PASSPHRASE, false, { kdf: { name: 'argon2id', iterations: 1, memory_kib: 64, parallelism: 1 } })
   const entry = await sealKeypair(created.masterKey, KEY_ID, bytes(copy.recipient_private), '2026-10-01T00:00:00Z')
   return JSON.stringify({ ...created.payload, keys: [{ ...entry, retired_at: '2026-10-02T00:00:00Z' }] })
 }

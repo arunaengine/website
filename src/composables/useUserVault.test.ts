@@ -100,12 +100,13 @@ vi.mock('@/lib/vault/keyStore', () => ({
     },
   }),
 }))
+const FAST = vi.hoisted(() => ({ kdf: { name: 'argon2id' as const, iterations: 1, memory_kib: 64, parallelism: 1 } }))
 vi.mock('@/lib/vault/crypto', async (importOriginal) => {
   const original = await importOriginal<typeof Crypto>()
   return {
     ...original,
     createVault: (passphrase: string, withRecovery: boolean) =>
-      original.createVault(passphrase, withRecovery, { iterations: 500 }),
+      original.createVault(passphrase, withRecovery, FAST),
   }
 })
 
@@ -347,7 +348,7 @@ describe('useUserVault', () => {
   })
 
   it('adds a keypair on unlock to a vault without one', async () => {
-    const created = await Crypto.createVault('correct horse', false, { iterations: 500 })
+    const created = await Crypto.createVault('correct horse', false, FAST)
     node.heads = [{ revision: 'R0000', predecessors: [], payload: JSON.stringify(created.payload), updated_at: '' }]
     const { vault } = await boot()
 
@@ -358,6 +359,29 @@ describe('useUserVault', () => {
     expect(Crypto.activeKeypair(saved.keys)).not.toBeNull()
     await vi.waitFor(() => expect(vault.ownKey.value).toBe('matches'))
     expect(directory[0].public_key).toBe(saved.keys[0].public)
+  })
+
+  it('moves a pbkdf2 vault to argon2id after a passphrase unlock, not after a recovery unlock', async () => {
+    const legacy = { kdf: { name: 'pbkdf2-sha256' as const, iterations: 500 } }
+    const actual = await vi.importActual<typeof Crypto>('@/lib/vault/crypto')
+    const created = await actual.createVault('correct horse', true, legacy)
+    created.payload.keys = await Crypto.rotateKeypair(created.masterKey, [])
+    node.heads = [{ revision: 'R0000', predecessors: [], payload: JSON.stringify(created.payload), updated_at: '' }]
+    const first = await boot()
+
+    await first.vault.unlockWithRecovery(created.recoveryCode ?? '')
+    expect(saveVault).not.toHaveBeenCalled()
+    first.vault.lock()
+    const { vault } = await boot()
+    await vault.unlock('correct horse')
+
+    expect(saveVault.mock.calls[0][0].predecessors).toEqual(['R0000'])
+    const saved = Crypto.parseVaultPayload(node.heads[0].payload)
+    expect(saved.kdf).toMatchObject({ name: 'argon2id', iterations: 3, memory_kib: 65536, parallelism: 1 })
+    expect(saved.recovery?.kdf).toEqual(legacy.kdf)
+    expect(await nodeProviders('correct horse')).toEqual([])
+    const recovered = await Crypto.unlockWithRecovery(saved, created.recoveryCode ?? '')
+    expect((await Crypto.openData(recovered, saved)).providers).toEqual([])
   })
 
   it('reports a directory key that is not its own', async () => {
@@ -389,7 +413,7 @@ describe('useUserVault', () => {
   })
 
   it('does not publish a keypair the holders did not keep', async () => {
-    const created = await Crypto.createVault('correct horse', false, { iterations: 500 })
+    const created = await Crypto.createVault('correct horse', false, FAST)
     node.heads = [{ revision: 'R0000', predecessors: [], payload: JSON.stringify(created.payload), updated_at: '' }]
     const { vault } = await boot()
     saveVault.mockRejectedValueOnce(refused(503, 'vault_unavailable'))
@@ -889,8 +913,8 @@ describe('useUserVault', () => {
     const { vault } = await boot()
     let release!: () => void
     const gate = new Promise<void>((resolve) => (release = resolve))
-    const derive = crypto.subtle.deriveKey.bind(crypto.subtle)
-    const held = vi.spyOn(crypto.subtle, 'deriveKey').mockImplementationOnce(async (...args) => {
+    const derive = crypto.subtle.importKey.bind(crypto.subtle)
+    const held = vi.spyOn(crypto.subtle, 'importKey').mockImplementationOnce(async (...args) => {
       await gate
       return derive(...args)
     })
@@ -909,8 +933,8 @@ describe('useUserVault', () => {
     const { vault, state } = await boot()
     let release!: () => void
     const gate = new Promise<void>((resolve) => (release = resolve))
-    const derive = crypto.subtle.deriveKey.bind(crypto.subtle)
-    const held = vi.spyOn(crypto.subtle, 'deriveKey').mockImplementationOnce(async (...args) => {
+    const derive = crypto.subtle.importKey.bind(crypto.subtle)
+    const held = vi.spyOn(crypto.subtle, 'importKey').mockImplementationOnce(async (...args) => {
       await gate
       return derive(...args)
     })

@@ -8,6 +8,7 @@ import {
   createVault,
   keyFingerprint,
   minPassphraseLength,
+  needsUpgrade,
   openData,
   openKeypair,
   parseVaultPayload,
@@ -17,6 +18,8 @@ import {
   sealKeypair,
   unlockVault,
   unlockWithRecovery,
+  upgradePassphrase,
+  type VaultKdfParams,
 } from './crypto'
 import { openSealed } from './hpke'
 
@@ -28,8 +31,8 @@ function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-// The contract's 600 000 iterations are for browsers; the tests only need the flow.
-const FAST = { iterations: 500 }
+// The node's 64 MiB are for browsers; the tests only need the flow.
+const FAST = { kdf: { name: 'argon2id', iterations: 1, memory_kib: 64, parallelism: 1 } satisfies VaultKdfParams }
 
 const providers = [
   { id: 'browser-1', kind: 'anthropic', label: 'Work', model: 'claude', apiKey: 'sk-1' },
@@ -43,7 +46,8 @@ describe('vault crypto', () => {
     expect(recoveryCode).toBeNull()
     expect(payload.recovery).toBeUndefined()
     expect(payload.keys).toEqual([])
-    expect(payload.kdf).toMatchObject({ name: 'pbkdf2-sha256', iterations: 500 })
+    expect(payload.kdf).toMatchObject({ name: 'argon2id', iterations: 1, memory_kib: 64, parallelism: 1 })
+    expect(needsUpgrade(payload)).toBe(false)
     expect(masterKey.extractable).toBe(false)
     expect(await openData(masterKey, payload)).toEqual({ providers: [] })
 
@@ -155,6 +159,48 @@ describe('vault test vectors', () => {
     const sealed = await sealKeypair(master, entry.id, hex(vectors.keypair.private), entry.created_at, Uint8Array.from(atob(entry.nonce), (char) => char.charCodeAt(0)))
 
     expect(sealed).toEqual(entry)
+  })
+
+  it('upgrades the pbkdf2 vector to the argon2id vector and keeps the recovery wrap', async () => {
+    const kdf: VaultKdfParams = { name: 'argon2id', iterations: 2, memory_kib: 1024, parallelism: 1 }
+    const salt = Uint8Array.from({ length: 16 }, (_, index) => 16 + index)
+    const nonce = Uint8Array.from({ length: 12 }, (_, index) => 40 + index)
+    expect(needsUpgrade(payload)).toBe(true)
+
+    const upgraded = await upgradePassphrase(payload, vault.passphrase, kdf, salt, nonce)
+
+    expect(JSON.stringify(upgraded)).toBe(vectors.argon2_vault.payload)
+    expect(needsUpgrade(upgraded)).toBe(false)
+    const reread = parseVaultPayload(vectors.argon2_vault.payload)
+    expect(reread).toEqual(upgraded)
+    expect(JSON.stringify(await openData(await unlockVault(reread, vault.passphrase), reread))).toBe(vault.data)
+    expect(JSON.stringify(await openData(await unlockWithRecovery(reread, vault.recovery_code), reread))).toBe(vault.data)
+    await expect(upgradePassphrase(payload, 'wrong horse', kdf)).rejects.toThrow('Wrong passphrase.')
+  })
+
+  it('moves a pbkdf2 vault to argon2id on a passphrase change', async () => {
+    const after = await changePassphrase(payload, { recoveryCode: vault.recovery_code }, 'new horse battery')
+
+    expect(after.kdf).toMatchObject({ name: 'argon2id', iterations: 3, memory_kib: 65536, parallelism: 1 })
+    expect(after.recovery?.kdf).toEqual({ name: 'pbkdf2-sha256', iterations: 1000 })
+    const reread = parseVaultPayload(JSON.stringify(after))
+    expect(JSON.stringify(await openData(await unlockVault(reread, 'new horse battery'), reread))).toBe(vault.data)
+    expect(JSON.stringify(await openData(await unlockWithRecovery(reread, vault.recovery_code), reread))).toBe(vault.data)
+  })
+
+  it('refuses unknown or unbounded key derivation settings', () => {
+    const argon = JSON.parse(vectors.argon2_vault.payload)
+    const parse = (change: (value: typeof argon) => void) => {
+      const value = structuredClone(argon)
+      change(value)
+      return () => parseVaultPayload(JSON.stringify(value))
+    }
+    expect(parse((value) => (value.kdf.name = 'scrypt'))).toThrow(VaultFormatError)
+    expect(parse((value) => delete value.kdf.memory_kib)).toThrow(VaultFormatError)
+    expect(parse((value) => (value.kdf.memory_kib = 2 * 1024 * 1024))).toThrow(VaultFormatError)
+    expect(parse((value) => (value.kdf.iterations = 65))).toThrow(VaultFormatError)
+    expect(parse((value) => (value.recovery.kdf.iterations = 10_000_001))).toThrow(VaultFormatError)
+    expect(parse((value) => (value.recovery.kdf.memory_kib = 1024))).toThrow(VaultFormatError)
   })
 
   it('refuses a keypair whose public key does not match', async () => {

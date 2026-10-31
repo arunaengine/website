@@ -1,15 +1,23 @@
 // The user vault: provider keys sealed in the browser so the node only ever
-// holds ciphertext. A passphrase derives a wrapping key (PBKDF2-SHA256) that
+// holds ciphertext. A passphrase derives a wrapping key (argon2id, PBKDF2-SHA256 before) that
 // wraps the random master key; the master key seals the data. An optional
 // recovery code wraps a second copy of the master key. The master key stays a
 // WebCrypto handle: it is generated, wrapped and unwrapped, never exported.
 // The `keys` slot holds the user's X25519 keypairs, the private key sealed with
 // the master key; the newest pair that is not retired is the active one.
+import { argon2id } from 'hash-wasm'
 import { fromBase64Url, importPrivateKey, type X25519Pair } from './hpke'
 
 export const VAULT_VERSION = 1 as const
-export const VAULT_KDF_NAME = 'pbkdf2-sha256' as const
-export const VAULT_KDF_ITERATIONS = 600_000
+export const VAULT_KDF_NAME = 'argon2id' as const
+export const LEGACY_KDF_NAME = 'pbkdf2-sha256' as const
+/** The node's vault parameters: 64 MiB, 3 passes, 1 lane (RFC 9106, second choice). */
+export const VAULT_KDF: VaultKdfParams = { name: VAULT_KDF_NAME, iterations: 3, memory_kib: 64 * 1024, parallelism: 1 }
+/** Bounds for stored parameters, as on the node, so a payload cannot stall the reader. */
+const MAX_MEMORY_KIB = 1024 * 1024
+const MAX_PASSES = 64
+const MAX_LANES = 16
+const MAX_PBKDF2_ROUNDS = 10_000_000
 export const MIN_PASSPHRASE_LENGTH = 8
 /** A key holder's vault opens bucket keys, so its passphrase must be longer. */
 export const MIN_KEY_HOLDER_PASSPHRASE_LENGTH = 12
@@ -21,11 +29,12 @@ const NONCE_BYTES = 12
 const RECOVERY_BYTES = 32
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 
-export interface VaultKdf {
-  name: typeof VAULT_KDF_NAME
-  iterations: number
-  salt: string
-}
+/** `iterations` counts argon2id passes or pbkdf2 rounds. */
+export type VaultKdfParams =
+  | { name: typeof VAULT_KDF_NAME; iterations: number; memory_kib: number; parallelism: number }
+  | { name: typeof LEGACY_KDF_NAME; iterations: number }
+
+export type VaultKdf = VaultKdfParams & { salt: string }
 
 export interface VaultWrapped {
   nonce: string
@@ -34,6 +43,8 @@ export interface VaultWrapped {
 
 export interface VaultRecovery extends VaultWrapped {
   salt: string
+  /** The recovery wrap's own function when it differs from the passphrase one. */
+  kdf?: VaultKdfParams
 }
 
 export interface VaultSealed {
@@ -127,16 +138,45 @@ const MASTER_USAGES: KeyUsage[] = ['encrypt', 'decrypt']
 async function wrappingKey(
   secret: Uint8Array<ArrayBuffer>,
   salt: Uint8Array<ArrayBuffer>,
-  iterations: number,
+  kdf: VaultKdfParams,
 ): Promise<CryptoKey> {
-  const base = await crypto.subtle.importKey('raw', secret, 'PBKDF2', false, ['deriveKey'])
-  return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations },
-    base,
-    MASTER_ALGORITHM,
-    false,
-    ['wrapKey', 'unwrapKey'],
-  )
+  if (kdf.name === LEGACY_KDF_NAME) {
+    const base = await crypto.subtle.importKey('raw', secret, 'PBKDF2', false, ['deriveKey'])
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: kdf.iterations },
+      base,
+      MASTER_ALGORITHM,
+      false,
+      ['wrapKey', 'unwrapKey'],
+    )
+  }
+  const raw = new Uint8Array(32)
+  const derived = await argon2id({
+    password: secret,
+    salt,
+    iterations: kdf.iterations,
+    memorySize: kdf.memory_kib,
+    parallelism: kdf.parallelism,
+    hashLength: 32,
+    outputType: 'binary',
+  })
+  raw.set(derived)
+  derived.fill(0)
+  try {
+    return await crypto.subtle.importKey('raw', raw, MASTER_ALGORITHM, false, ['wrapKey', 'unwrapKey'])
+  } finally {
+    raw.fill(0)
+  }
+}
+
+function sameKdf(a: VaultKdfParams, b: VaultKdfParams): boolean {
+  if (a.name === LEGACY_KDF_NAME || b.name === LEGACY_KDF_NAME) return a.name === b.name && a.iterations === b.iterations
+  return a.iterations === b.iterations && a.memory_kib === b.memory_kib && a.parallelism === b.parallelism
+}
+
+function kdfParams(kdf: VaultKdf): VaultKdfParams {
+  const { salt: _salt, ...params } = kdf
+  return params
 }
 
 function passphraseBytes(passphrase: string): Uint8Array<ArrayBuffer> {
@@ -183,8 +223,11 @@ function recoveryBytes(code: string): Uint8Array<ArrayBuffer> {
   return bytes
 }
 
-async function wrapMaster(masterKey: CryptoKey, kek: CryptoKey): Promise<VaultWrapped> {
-  const nonce = randomBytes(NONCE_BYTES)
+async function wrapMaster(
+  masterKey: CryptoKey,
+  kek: CryptoKey,
+  nonce: Uint8Array<ArrayBuffer> = randomBytes(NONCE_BYTES),
+): Promise<VaultWrapped> {
   const wrapped = await crypto.subtle.wrapKey('raw', masterKey, kek, gcm(nonce))
   return { nonce: toBase64(nonce), wrapped: toBase64(new Uint8Array(wrapped)) }
 }
@@ -207,17 +250,18 @@ async function unwrapMaster(
 /** The KEK for a secret and the block it opens; the recovery block needs its own salt. */
 async function keyFor(payload: VaultPayload, secret: VaultSecret): Promise<{ kek: CryptoKey; block: VaultWrapped; failure: string }> {
   if ('passphrase' in secret) {
-    const kek = await wrappingKey(passphraseBytes(secret.passphrase), fromBase64(payload.kdf.salt), payload.kdf.iterations)
+    const kek = await wrappingKey(passphraseBytes(secret.passphrase), fromBase64(payload.kdf.salt), kdfParams(payload.kdf))
     return { kek, block: payload.master, failure: WRONG_PASSPHRASE }
   }
   if (!payload.recovery) throw new VaultUnlockError('This vault has no recovery code.')
-  const kek = await wrappingKey(recoveryBytes(secret.recoveryCode), fromBase64(payload.recovery.salt), payload.kdf.iterations)
+  const params = payload.recovery.kdf ?? kdfParams(payload.kdf)
+  const kek = await wrappingKey(recoveryBytes(secret.recoveryCode), fromBase64(payload.recovery.salt), params)
   return { kek, block: payload.recovery, failure: WRONG_RECOVERY_CODE }
 }
 
 export interface CreateVaultOptions {
-  /** Lower only in tests; the default is the contract's 600 000. */
-  iterations?: number
+  /** Cheaper only in tests; the default is the node's `VAULT_KDF`. */
+  kdf?: VaultKdfParams
 }
 
 export async function createVault(
@@ -225,18 +269,18 @@ export async function createVault(
   withRecovery: boolean,
   options: CreateVaultOptions = {},
 ): Promise<CreatedVault> {
-  const iterations = options.iterations ?? VAULT_KDF_ITERATIONS
+  const kdf = options.kdf ?? VAULT_KDF
   // Extractable only so it can be wrapped here; the handle handed out below is not.
   const generated = await crypto.subtle.generateKey(MASTER_ALGORITHM, true, MASTER_USAGES)
   const salt = randomBytes(SALT_BYTES)
-  const kek = await wrappingKey(passphraseBytes(passphrase), salt, iterations)
+  const kek = await wrappingKey(passphraseBytes(passphrase), salt, kdf)
   const master = await wrapMaster(generated, kek)
   let recovery: VaultRecovery | undefined
   let recoveryCode: string | null = null
   if (withRecovery) {
     const code = randomBytes(RECOVERY_BYTES)
     const recoverySalt = randomBytes(SALT_BYTES)
-    const recoveryKek = await wrappingKey(code, recoverySalt, iterations)
+    const recoveryKek = await wrappingKey(code, recoverySalt, kdf)
     recovery = { salt: toBase64(recoverySalt), ...(await wrapMaster(generated, recoveryKek)) }
     recoveryCode = formatRecoveryCode(code)
   }
@@ -244,7 +288,7 @@ export async function createVault(
   const data = await sealData(masterKey, { providers: [] })
   const payload: VaultPayload = {
     version: VAULT_VERSION,
-    kdf: { name: VAULT_KDF_NAME, iterations, salt: toBase64(salt) },
+    kdf: { ...kdf, salt: toBase64(salt) },
     master,
     ...(recovery ? { recovery } : {}),
     keys: [],
@@ -272,7 +316,35 @@ export function passphraseLongEnough(passphrase: string, keyHolder: boolean): bo
   return passphrase.length >= minPassphraseLength(keyHolder)
 }
 
-/** Re-wraps the master key under the new passphrase; the recovery code and the data stay as they are. */
+/** True while the passphrase wrap still uses pbkdf2; a passphrase unlock should upgrade it. */
+export function needsUpgrade(payload: VaultPayload): boolean {
+  return payload.kdf.name !== VAULT_KDF_NAME
+}
+
+/** Wraps the master key under `passphrase` with `kdf`; the recovery wrap keeps its own function. */
+async function rewrap(
+  payload: VaultPayload,
+  masterKey: CryptoKey,
+  passphrase: string,
+  kdf: VaultKdfParams,
+  salt: Uint8Array<ArrayBuffer>,
+  nonce: Uint8Array<ArrayBuffer>,
+): Promise<VaultPayload> {
+  const nextKek = await wrappingKey(passphraseBytes(passphrase), salt, kdf)
+  const next: VaultPayload = {
+    ...payload,
+    kdf: { ...kdf, salt: toBase64(salt) },
+    master: await wrapMaster(masterKey, nextKek, nonce),
+  }
+  if (payload.recovery) {
+    const { kdf: own, ...block } = payload.recovery
+    const current = own ?? kdfParams(payload.kdf)
+    next.recovery = sameKdf(current, kdf) ? block : { ...block, kdf: current }
+  }
+  return next
+}
+
+/** Re-wraps the master key under the new passphrase, moving pbkdf2 vaults to argon2id. */
 export async function changePassphrase(
   payload: VaultPayload,
   secret: VaultSecret,
@@ -280,13 +352,21 @@ export async function changePassphrase(
 ): Promise<VaultPayload> {
   const { kek, block, failure } = await keyFor(payload, secret)
   const masterKey = await unwrapMaster(block, kek, true, failure)
-  const salt = randomBytes(SALT_BYTES)
-  const nextKek = await wrappingKey(passphraseBytes(newPassphrase), salt, payload.kdf.iterations)
-  return {
-    ...payload,
-    kdf: { ...payload.kdf, salt: toBase64(salt) },
-    master: await wrapMaster(masterKey, nextKek),
-  }
+  const kdf = needsUpgrade(payload) ? VAULT_KDF : kdfParams(payload.kdf)
+  return rewrap(payload, masterKey, newPassphrase, kdf, randomBytes(SALT_BYTES), randomBytes(NONCE_BYTES))
+}
+
+/** Re-wraps the master key under the same passphrase with `kdf`; tests give salt and nonce. */
+export async function upgradePassphrase(
+  payload: VaultPayload,
+  passphrase: string,
+  kdf: VaultKdfParams = VAULT_KDF,
+  salt: Uint8Array<ArrayBuffer> = randomBytes(SALT_BYTES),
+  nonce: Uint8Array<ArrayBuffer> = randomBytes(NONCE_BYTES),
+): Promise<VaultPayload> {
+  const { kek, block, failure } = await keyFor(payload, { passphrase })
+  const masterKey = await unwrapMaster(block, kek, true, failure)
+  return rewrap(payload, masterKey, passphrase, kdf, salt, nonce)
 }
 
 export async function sealData(masterKey: CryptoKey, data: VaultData): Promise<VaultSealed> {
@@ -384,6 +464,28 @@ function text(value: unknown, message: string): string {
   return value
 }
 
+function integer(value: unknown, low: number, high: number, message: string): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < low || value > high) {
+    throw new VaultFormatError(message)
+  }
+  return value
+}
+
+/** The function a payload names, checked against the node's readable range. */
+function kdfOf(input: Record<string, unknown>, message: string): VaultKdfParams {
+  if (input.name === LEGACY_KDF_NAME && input.memory_kib === undefined && input.parallelism === undefined) {
+    return { name: LEGACY_KDF_NAME, iterations: integer(input.iterations, 1, MAX_PBKDF2_ROUNDS, message) }
+  }
+  if (input.name !== VAULT_KDF_NAME) throw new VaultFormatError(message)
+  const parallelism = integer(input.parallelism, 1, MAX_LANES, message)
+  return {
+    name: VAULT_KDF_NAME,
+    iterations: integer(input.iterations, 1, MAX_PASSES, message),
+    memory_kib: integer(input.memory_kib, 8 * parallelism, MAX_MEMORY_KIB, message),
+    parallelism,
+  }
+}
+
 function wrappedBlock(value: unknown, message: string): VaultWrapped {
   const input = record(value, message)
   return { nonce: text(input.nonce, message), wrapped: text(input.wrapped, message) }
@@ -404,6 +506,12 @@ function keyEntry(value: unknown, message: string): VaultKeyEntry {
   }
 }
 
+function recoveryOf(input: Record<string, unknown>, message: string): VaultRecovery {
+  const block: VaultRecovery = { salt: text(input.salt, message), ...wrappedBlock(input, message) }
+  if (input.kdf !== undefined) block.kdf = kdfOf(record(input.kdf, message), message)
+  return block
+}
+
 /** Reads the payload text the node returned; a version this portal does not know is refused. */
 export function parseVaultPayload(serialized: string): VaultPayload {
   const unreadable = 'The vault payload is not readable.'
@@ -418,21 +526,15 @@ export function parseVaultPayload(serialized: string): VaultPayload {
     throw new VaultFormatError('This vault was written by a newer portal. Update the portal to open it.')
   }
   const kdf = record(input.kdf, unreadable)
-  if (kdf.name !== VAULT_KDF_NAME) throw new VaultFormatError(unreadable)
-  const iterations = kdf.iterations
-  if (typeof iterations !== 'number' || !Number.isInteger(iterations) || iterations < 1) {
-    throw new VaultFormatError(unreadable)
-  }
+  const params = kdfOf(kdf, unreadable)
   const data = record(input.data, unreadable)
   const recovery = input.recovery === undefined ? undefined : record(input.recovery, unreadable)
   if (!Array.isArray(input.keys)) throw new VaultFormatError(unreadable)
   return {
     version: VAULT_VERSION,
-    kdf: { name: VAULT_KDF_NAME, iterations, salt: text(kdf.salt, unreadable) },
+    kdf: { ...params, salt: text(kdf.salt, unreadable) },
     master: wrappedBlock(input.master, unreadable),
-    ...(recovery
-      ? { recovery: { salt: text(recovery.salt, unreadable), ...wrappedBlock(recovery, unreadable) } }
-      : {}),
+    ...(recovery ? { recovery: recoveryOf(recovery, unreadable) } : {}),
     keys: input.keys.map((entry) => keyEntry(entry, unreadable)),
     data: { nonce: text(data.nonce, unreadable), sealed: text(data.sealed, unreadable) },
   }

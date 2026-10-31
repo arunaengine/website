@@ -25,6 +25,7 @@ import {
   activeKeypair,
   changePassphrase as rewrapMaster,
   createVault,
+  needsUpgrade,
   openData,
   openKeypair,
   parseVaultPayload,
@@ -33,6 +34,7 @@ import {
   sealData,
   unlockVault,
   unlockWithRecovery as unwrapWithRecovery,
+  upgradePassphrase,
   type VaultPayload,
   type VaultSecret,
 } from '@/lib/vault/crypto'
@@ -599,7 +601,10 @@ async function create(passphrase: string, withRecovery: boolean): Promise<string
 }
 
 /** Tries the heads newest first, so a head saved with another passphrase does not block. */
-async function unlockWith(open: (current: VaultPayload) => Promise<CryptoKey>) {
+async function unlockWith(
+  open: (current: VaultPayload) => Promise<CryptoKey>,
+  upgrade?: (current: VaultPayload) => Promise<VaultPayload>,
+) {
   const scope = requireScope()
   requirePayload()
   vaultWork += 1
@@ -617,14 +622,19 @@ async function unlockWith(open: (current: VaultPayload) => Promise<CryptoKey>) {
   }
   if (!key) throw failure
   const merged = await mergeHeads(heads, key)
+  // A pbkdf2 wrap moves to argon2id with the next save; when it fails the next unlock tries again.
+  const upgraded = upgrade && needsUpgrade(merged.payload) ? await upgrade(merged.payload).catch(() => null) : null
   if (run !== generation) throw new Error(REPLACED)
-  unlocked(merged, key)
+  unlocked(upgraded ? { ...merged, payload: upgraded } : merged, key)
   await rememberKey(scope, key)
-  await finishUnlock(run, merged.revisions.length > 1)
+  await finishUnlock(run, merged.revisions.length > 1 || upgraded !== null)
 }
 
 function unlock(passphrase: string): Promise<void> {
-  return unlockWith((current) => unlockVault(current, passphrase))
+  return unlockWith(
+    (current) => unlockVault(current, passphrase),
+    (current) => upgradePassphrase(current, passphrase),
+  )
 }
 
 function unlockWithRecovery(recoveryCode: string): Promise<void> {
