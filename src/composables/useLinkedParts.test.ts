@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const aruna = vi.hoisted(() => ({
   getPartTarget: vi.fn(),
   getBucketUsage: vi.fn(),
+  getBucketDistribution: vi.fn(),
   listBucketObjects: vi.fn(),
   getDataLinks: vi.fn(),
   sessionEpoch: { value: 1 },
@@ -35,9 +36,23 @@ describe('useLinkedParts', () => {
     expect(aruna.listBucketObjects).toHaveBeenCalledWith('refseq', { prefix: undefined, delimiter: '/', limit: 11 }, 'n2')
     expect(part.route).toEqual({ name: 'bucket', params: { bucketId: 'refseq' }, query: { node: 'n2' } })
     expect(part.usage?.objects).toBe(120)
+    expect(part.nodes).toEqual(['n2'])
+    expect(aruna.getBucketDistribution).not.toHaveBeenCalled()
     expect(part.entries?.list.map((entry) => [entry.name, entry.folder])).toEqual([['genomes', true], ['README.md', false]])
     expect(part.entries?.list[0].route).toEqual({ name: 'bucket', params: { bucketId: 'refseq' }, query: { prefix: 'genomes', node: 'n2' } })
     expect(part.others.map((other) => other.document_id)).toEqual(['d2'])
+    scope.stop()
+  })
+
+  it('names every member node of a bucket stored on more nodes', async () => {
+    aruna.getPartTarget.mockResolvedValue({ id: PART, bucket: 'refseq', prefix: '', set_id: 's1', held_here: true })
+    aruna.getBucketDistribution.mockResolvedValue({ members: [{ node_id: 'n1' }, { node_id: 'n2' }, { node_id: 'n3' }] })
+    const scope = effectScope()
+    const facts = scope.run(() => useLinkedParts(ref([PART]), ref('d1'), () => false))!
+    await settle()
+
+    expect(aruna.getBucketDistribution).toHaveBeenCalledWith('refseq', undefined, null)
+    expect(facts.value.get(PART)?.nodes).toEqual(['n1', 'n2', 'n3'])
     scope.stop()
   })
 

@@ -15,6 +15,8 @@ export interface BucketUsageResponse {
   open_multipart_uploads: number
   /** Bytes over all stored versions. */
   logical_bytes: number
+  /** Bytes of the current files; absent where the node does not report it. */
+  current_bytes?: number
   /** Bytes reachable only through external references; absent on older nodes. */
   referenced_bytes?: number
   /** False while a count is not whole: every number is a lower bound. */

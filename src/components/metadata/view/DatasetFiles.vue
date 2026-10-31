@@ -6,6 +6,7 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import ReferencedBy from '@/components/data/ReferencedBy.vue'
 import VersionActions from '@/components/metadata/view/VersionActions.vue'
+import NodeChips from '@/components/nodes/NodeChips.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
@@ -21,7 +22,6 @@ import { useAruna } from '@/composables/useAruna'
 import { useBacklinks } from '@/composables/useBacklinks'
 import { useLinkedParts } from '@/composables/useLinkedParts'
 import { usePagedList } from '@/composables/usePagedList'
-import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import type { DatasetViewState } from '@/composables/useDatasetView'
 import { bucketLayout, declaredFiles } from '@/lib/bucketLayout'
@@ -126,7 +126,6 @@ const fileCount = computed(() =>
 const layout = computed(() => bucketLayout(currentCrate.value))
 
 // The linked parts on this page; their top entries are asked for only when nothing else lists them.
-const { displayName } = useRealmNodes()
 const partIds = computed(() => shown.value.filter(linkedPart).map((row) => row.id))
 const parts = useLinkedParts(partIds, detailId, (id) => !byId.value.get(id)?.childIds.length && !layout.value.rows.length)
 const partOf = (row: DataEntityNode) => parts.value.get(row.id)
@@ -145,8 +144,9 @@ function sizeOf(row: DataEntityNode): string {
   const bytes = folderTotals(row).bytes
   if (bytes) return formatBinary(bytes)
   if (row.contentSize) return formatContentSize(row.contentSize)
+  // The current files' size where the node reports it, else every stored version and reference.
   const usage = partOf(row)?.usage
-  const counted = usage ? usage.logical_bytes + (usage.referenced_bytes ?? 0) : 0
+  const counted = usage ? usage.current_bytes ?? usage.logical_bytes + (usage.referenced_bytes ?? 0) : 0
   return counted ? `${usage!.complete ? '' : 'at least '}${formatBinary(counted)}` : ''
 }
 // The row's own format, else those of the files below it, else those the bucket layout names.
@@ -156,12 +156,8 @@ function formatsOf(row: DataEntityNode): string {
   if (!formats.size && linkedPart(row)) layout.value.rows.forEach((entry) => entry.format && formats.add(entry.format))
   return [...formats].join(', ')
 }
-function storedOn(row: DataEntityNode): string {
-  const target = partOf(row)?.target
-  if (target?.node_id) return displayName(target.node_id)
-  return target?.set_id ? 'Several nodes' : ''
-}
-const storedShown = computed(() => shown.value.some((row) => storedOn(row)))
+const storedOn = (row: DataEntityNode) => partOf(row)?.nodes ?? []
+const storedShown = computed(() => shown.value.some((row) => storedOn(row).length))
 const columns = computed(() => (storedShown.value ? 6 : 5))
 
 function identityOf(row: DataEntity) {
@@ -317,7 +313,7 @@ function openPreview(row: DataEntity) {
                 <td class="truncate px-3 py-1.5 text-right text-xs text-muted-foreground max-sm:hidden" :title="formatsOf(row)">{{ formatsOf(row) }}</td>
                 <td class="whitespace-nowrap px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground max-sm:hidden">{{ filesOf(row) }}</td>
                 <td class="whitespace-nowrap px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground">{{ sizeOf(row) }}</td>
-                <td v-if="storedShown" class="truncate px-3 py-1.5 text-xs text-muted-foreground max-md:hidden">{{ storedOn(row) }}</td>
+                <td v-if="storedShown" class="px-3 py-1.5 max-md:hidden"><NodeChips :nodes="storedOn(row)" /></td>
                 <td class="px-3 py-1.5">
                   <div class="flex items-center justify-end gap-1">
                     <VersionActions

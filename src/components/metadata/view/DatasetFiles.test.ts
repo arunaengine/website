@@ -27,6 +27,7 @@ const DatasetFiles = compileClientComponent(new URL('./DatasetFiles.vue', import
   '@/components/data/ReferencedBy.vue': moduleDefault(Slot),
   '@/components/metadata/view/VersionActions.vue': moduleDefault(defineComponent({ props: { realmId: String, versionId: String }, setup: (props) => () => h('em', `version actions ${props.realmId}/${props.versionId}`) })),
   '@/lib/linkedPart': LinkedPart,
+  '@/components/nodes/NodeChips.vue': moduleDefault(defineComponent({ props: { nodes: Array }, setup: (props) => () => h('em', `nodes ${(props.nodes as string[]).join(' ')}`) })),
   '@/components/ui/Badge.vue': moduleDefault(Slot),
   '@/components/ui/Button.vue': moduleDefault(Slot),
   '@/components/ui/IconButton.vue': moduleDefault(Slot),
@@ -182,7 +183,8 @@ describe('DatasetFiles', () => {
       target: { id: part, bucket: 'raw', prefix: '', node_id: 'n2', held_here: false },
       problem: null,
       route,
-      usage: { bucket: 'raw', objects: 68231, versions: 0, delete_markers: 0, open_multipart_uploads: 0, logical_bytes: 2 * 1024 ** 3, complete: true },
+      nodes: ['n2', 'n3'],
+      usage: { bucket: 'raw', objects: 68231, versions: 0, delete_markers: 0, open_multipart_uploads: 0, logical_bytes: 5 * 1024 ** 3, current_bytes: 2 * 1024 ** 3, complete: true },
       entries: { list: [{ name: 'genomes', folder: true, size: null, route: { name: 'bucket', params: { bucketId: 'raw' }, query: { prefix: 'genomes' } } }], more: true },
       others: [{ document_id: 'd2', group_id: 'g1', document_path: 'other', graph_iri: '', title: 'Other set', links: [] }],
     }]])
@@ -194,7 +196,7 @@ describe('DatasetFiles', () => {
     expect(element(mounted.root, (node) => node.tag === 'a' && content(node) === 'Raw 2026').props.to).toEqual(route)
     expect(text).toContain('68,231')
     expect(text).toContain('2.0\u00a0GiB')
-    expect(text).toContain('Node one')
+    expect(text).toContain('nodes n2 n3')
     expect(text).toContain('genomes')
     expect(text).toContain('More in Data')
     expect(text).toContain('Also linked by')

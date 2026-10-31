@@ -21,6 +21,8 @@ export interface LinkedPartFacts {
   /** Why the files cannot be opened from here, or null. */
   problem: string | null
   route: RouteLocationRaw | null
+  /** The nodes that store the bucket: its one node, or every member of a bucket on more nodes. */
+  nodes: string[]
   /** The bucket's own count; only for a part that is a whole bucket. */
   usage: BucketUsageResponse | null
   /** The first entries below the part, when asked for; `more` when the bucket holds further ones. */
@@ -31,7 +33,7 @@ export interface LinkedPartFacts {
 const SHOWN = 10
 
 export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wantsEntries: (id: string) => boolean) {
-  const { getPartTarget, getBucketUsage, listBucketObjects, getDataLinks, sessionEpoch } = useAruna()
+  const { getPartTarget, getBucketUsage, getBucketDistribution, listBucketObjects, getDataLinks, sessionEpoch } = useAruna()
   const { isLocalNode } = useRealmNodes()
   const facts = ref(new Map<string, LinkedPartFacts>())
   let generation = 0
@@ -45,21 +47,23 @@ export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wants
     try {
       target = await getPartTarget(id)
     } catch (cause) {
-      if (current()) put(id, { target: null, problem: apiErrorMessage(cause), route: null, usage: null, entries: null, others: [] })
+      if (current()) put(id, { target: null, problem: apiErrorMessage(cause), route: null, nodes: [], usage: null, entries: null, others: [] })
       return
     }
     if (!current()) return
     const problem = browseProblem(target, isLocalNode)
-    const base = { target, problem, route: problem ? null : browseRoute(target, isLocalNode), usage: null, entries: null, others: [] }
+    const nodes = target.node_id ? [target.node_id] : []
+    const base = { target, problem, route: problem ? null : browseRoute(target, isLocalNode), nodes, usage: null, entries: null, others: [] }
     put(id, base)
     const node = target.node_id && !isLocalNode(target.node_id) ? target.node_id : null
     const bucket = target.bucket ?? ''
-    const [usage, page, links] = await Promise.all([
+    const [usage, page, links, distribution] = await Promise.all([
       bucket && !target.prefix ? getBucketUsage(bucket, node).catch(() => null) : null,
       bucket && !problem && wantsEntries(id)
         ? listBucketObjects(bucket, { prefix: target.prefix || undefined, delimiter: '/', limit: SHOWN + 1 }, node).catch(() => null)
         : null,
       getDataLinks(id, { parts_only: true }).catch(() => null),
+      bucket && target.set_id ? getBucketDistribution(bucket, undefined, node).catch(() => null) : null,
     ])
     if (!current()) return
     const nodeQuery = node ? { node } : {}
@@ -79,6 +83,7 @@ export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wants
       : []
     put(id, {
       ...base,
+      nodes: distribution ? [...new Set(distribution.members.map((member) => member.node_id))] : nodes,
       usage,
       entries: page ? { list: list.slice(0, SHOWN), more: list.length > SHOWN || Boolean(page.next_cursor) } : null,
       others: (links?.documents ?? []).filter((document) => document.document_id !== datasetId.value),
