@@ -199,7 +199,7 @@ const emptyGroupsMessage = computed(() =>
               <ViewToggle v-model="groupView" />
             </template>
           </SectionHeading>
-          <GroupQuotaCards v-if="myGroups.length" :refresh-revision="cardsRevision" :view="groupView" />
+          <GroupQuotaCards v-if="myGroups.length" :refresh-revision="cardsRevision" :view="groupView" members />
           <EmptyState v-else :title="emptyGroupsMessage">
             <template #icon><Users class="size-6" /></template>
             <Button v-if="currentUser" variant="outline" size="sm" @click="createGroupOpen = true">

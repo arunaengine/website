@@ -13,7 +13,7 @@ import * as Utils from '@/lib/utils'
 // The cards read the shared composable, so the fetch mock sits one level down
 // at the API call the composable makes.
 const aruna = vi.hoisted(() => ({
-  myGroups: { value: [] as Array<{ id: string; name: string }> },
+  myGroups: { value: [] as Array<{ id: string; name: string; memberCount?: number; tags?: string[] }> },
   getGroupUsage: vi.fn<(groupId: string) => Promise<UsageResponse>>(),
 }))
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
@@ -69,7 +69,9 @@ const GroupQuotaCards = compileClientComponent(new URL('./GroupQuotaCards.vue', 
   vue: VueRuntime,
   'vue-router': { RouterLink: RouterLinkStub, useRouter: () => ({ push }) },
   '@lucide/vue': icons,
+  '@/components/ui/AccessBadge.vue': moduleDefault(defineComponent({ props: { access: String }, setup: (props) => () => h('span', props.access) })),
   '@/components/ui/Badge.vue': moduleDefault(SlotStub),
+  '@/composables/useAruna': { useAruna: () => aruna },
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/IconTile.vue': moduleDefault(SlotStub),
   '@/components/dashboard/GroupStorage.vue': moduleDefault(SlotStub),
@@ -167,9 +169,9 @@ async function flush() {
   }
 }
 
-function mountCards(view: 'cards' | 'table' = 'cards'): { app: App<HostNode>; root: HostNode } {
+function mountCards(view: 'cards' | 'table' = 'cards', members = false): { app: App<HostNode>; root: HostNode } {
   const root = hostNode('root')
-  const app = renderer.createApp(GroupQuotaCards, { refreshRevision: 0, view })
+  const app = renderer.createApp(GroupQuotaCards, { refreshRevision: 0, view, members })
   app.mount(root)
   mountedApps.push(app)
   return { app, root }
@@ -210,6 +212,21 @@ describe('group purpose counts', () => {
     const links = allNodes(mounted.root).filter((node) => node.tag === 'a')
     expect(links.at(-1)?.props.to).toEqual({ name: 'groups', query: { create: 'group' } })
     expect(content(links.at(-1)!)).toBe('Create group')
+  })
+
+  it('shows the member count and your role on each Groups page card', async () => {
+    myGroups.value = [{ id: 'g-1', name: 'Research group', memberCount: 3, tags: ['admin'] }, { id: 'g-2', name: 'Solo', memberCount: 1, tags: [] }]
+    getGroupUsage.mockResolvedValue(usage({}))
+    const mounted = mountCards('cards', true)
+
+    await flush()
+    const text = content(mounted.root)
+    expect(text).toContain('3 members admin')
+    expect(text).toContain('1 member')
+    // The dashboard keeps its cards as they are.
+    const dashboard = mountCards()
+    await flush()
+    expect(content(dashboard.root)).not.toContain('3 members')
   })
 
   it('shows the same figures as table rows when the table was chosen', async () => {

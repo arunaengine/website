@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { ChevronRight, FileJson2, Files, Package, Plus, Users, Workflow } from '@lucide/vue'
+import AccessBadge from '@/components/ui/AccessBadge.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import IconTile from '@/components/ui/IconTile.vue'
@@ -10,6 +11,7 @@ import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import GroupStorage from '@/components/dashboard/GroupStorage.vue'
 import { useMyGroupsUsage, entryState, QUOTA_SEVERITY, type GroupUsageEntry } from '@/composables/useMyGroupsUsage'
 import { countText } from '@/composables/useBucketCount'
+import { useAruna } from '@/composables/useAruna'
 import { useReachableUsage } from '@/composables/useReachableUsage'
 import type { ViewMode } from '@/composables/useViewMode'
 import { distinctCount } from '@/lib/distribution'
@@ -18,8 +20,11 @@ import { QUOTA_STATE_BADGES } from '@/lib/quota'
 
 const { entries, membershipKey, refresh, retry } = useMyGroupsUsage()
 const reach = useReachableUsage()
-/** `view`: cards or table, as the heading's toggle holds it. */
-const props = withDefaults(defineProps<{ refreshRevision: number; view?: ViewMode }>(), { view: 'cards' })
+// Members and your roles, as the group list reports them.
+const { myGroups } = useAruna()
+const memberships = computed(() => new Map(myGroups.value.map((group) => [group.id, group])))
+/** `view`: cards or table, as the heading's toggle holds it; `members` adds members and your roles. */
+const props = withDefaults(defineProps<{ refreshRevision: number; view?: ViewMode; members?: boolean }>(), { view: 'cards', members: false })
 const router = useRouter()
 const groupPage = (entry: GroupUsageEntry) => ({ name: 'group', params: { id: entry.groupId } })
 const createGroup = { name: 'groups', query: { create: 'group' } }
@@ -94,6 +99,12 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
             {{ badgeFor(entry)!.label }}
           </Badge>
         </div>
+        <p v-if="members && memberships.get(entry.groupId)" class="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span v-if="memberships.get(entry.groupId)!.memberCount !== undefined" class="tabular-nums">
+            {{ memberships.get(entry.groupId)!.memberCount }} {{ memberships.get(entry.groupId)!.memberCount === 1 ? 'member' : 'members' }}
+          </span>
+          <AccessBadge v-for="role in memberships.get(entry.groupId)!.tags ?? []" :key="role" :access="role" />
+        </p>
         <Skeleton v-if="entry.status === 'loading'" class="mt-3 h-16" />
         <div v-else-if="entry.status === 'error'" class="mt-3">
           <p class="text-xs text-destructive">{{ entry.error }}</p>
