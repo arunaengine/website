@@ -98,6 +98,15 @@ const store = createCustomRun({
   s3,
   myGroups: groups,
   currentUser,
+  // The practice buckets live in the tutorial's own store, never in the realm search.
+  searchBuckets: async () => ({
+    hits: (await s3.listBuckets()).map((entry) => ({ arn: '', bucket: entry.name, node_id: '', group_id: TUTORIAL_GROUP.id, created_at: '' })),
+    nodes_queried: 1,
+    nodes_failed: 0,
+    failed_nodes: [],
+  }),
+  isTarget: () => true,
+  isLocalNode: () => true,
   nodes: computed(() => TUTORIAL_NODES),
   getTask,
   dataView: ref('tree'),
