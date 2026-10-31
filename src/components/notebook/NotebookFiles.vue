@@ -865,7 +865,34 @@ async function startCopy(list: TreeRow[]) {
   copyOpen.value = true
 }
 
-async function copyOne(source: CopySource, destination: { bucket: string; prefix: string }, active: () => boolean) {
+type CopyDestination = { bucket: string; prefix: string; nodeId?: string | null }
+
+// A bucket on another node cannot take a server-side copy: each file is read here and uploaded there.
+async function copyAcross(source: CopySource, destination: CopyDestination, node: string, active: () => boolean) {
+  const group = notebook.meta.value?.group_id ?? ''
+  const [from, to] = await Promise.all([s3.referenceForNode(null, group), s3.referenceForNode(node, group)])
+  const put = (blob: Blob, key: string, name: string) =>
+    s3.uploadObject(destination.bucket, key, new File([blob], name, { type: blob.type }), undefined, node, to).promise
+  if (source.kind === 'dir') {
+    for (const key of source.keys) {
+      const relative = key.slice(prefixOf(source.path).length)
+      const blob = await s3.getObjectBlob(bucket.value, key, null, undefined, from)
+      if (!active()) return
+      await put(blob, `${destination.prefix}${source.name}/${relative}`, relative.split('/').pop() ?? relative)
+      if (!active()) return
+    }
+  } else if (source.keys.length) {
+    const blob = await s3.getObjectBlob(bucket.value, keyOf(source.path), null, undefined, from)
+    if (active()) await put(blob, `${destination.prefix}${source.name}`, source.name)
+  } else {
+    if (!session.jobId.value) return
+    const blob = await readScratch(session.jobId.value, source.path, session.client.value)
+    if (active()) await put(blob, `${destination.prefix}${source.name}`, source.name)
+  }
+}
+
+async function copyOne(source: CopySource, destination: CopyDestination, active: () => boolean) {
+  if (destination.nodeId) return copyAcross(source, destination, destination.nodeId, active)
   if (source.kind === 'dir') {
     for (const key of source.keys) {
       const relative = key.slice(prefixOf(source.path).length)
@@ -883,7 +910,7 @@ async function copyOne(source: CopySource, destination: { bucket: string; prefix
   }
 }
 
-async function copyTo(destination: { bucket: string; prefix: string }) {
+async function copyTo(destination: CopyDestination) {
   const sources = copySources.value
   const [source] = sources
   if (!source || copyBusy.value) return

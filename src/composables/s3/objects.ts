@@ -961,8 +961,9 @@ export async function getObjectBlob(
   key: string,
   nodeId?: string | null,
   versionId?: string,
+  reference?: S3SessionReference,
 ): Promise<Blob> {
-  return (await fetchObject(bucket, key, nodeId, versionId)).blob()
+  return (await fetchObject(bucket, key, nodeId, versionId, reference)).blob()
 }
 
 // One profile artifact (or a pasted document itself) fetched as text. A URL that

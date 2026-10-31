@@ -13,8 +13,10 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
-import { useBuckets } from '@/composables/useBuckets'
-import { isHiddenBucket } from '@/lib/workspaces'
+import { useAruna } from '@/composables/useAruna'
+import { listBuckets, nodesByBucket } from '@/composables/useBucketCount'
+import { useRealmNodes } from '@/composables/useRealmNodes'
+import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{
   open: boolean
@@ -27,19 +29,43 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
-  (e: 'copy', target: { bucket: string; prefix: string }): void
+  /** `nodeId`: the node holding the bucket; null is the connected node. */
+  (e: 'copy', target: { bucket: string; prefix: string; nodeId: string | null }): void
 }>()
 
-const bucketList = useBuckets()
+const { searchBuckets, sessionEpoch } = useAruna()
+const { isTarget, isLocalNode } = useRealmNodes()
 const bucket = ref('')
 const prefix = ref('')
+// The group's buckets on every node, from the realm bucket search.
+const places = ref(new Map<string, string | null>())
+const loading = ref(false)
+const loaded = ref(false)
+const loadError = ref<string | null>(null)
+const nodeId = computed(() => places.value.get(bucket.value) ?? null)
+let run = 0
 
-const bucketOptions = computed(() =>
-  bucketList.buckets.value
-    .map((entry) => entry.name)
-    .filter((name) => !isHiddenBucket(name))
-    .map((name) => ({ value: name, label: name })),
-)
+async function loadBuckets() {
+  const mine = ++run
+  const epoch = sessionEpoch.value
+  const current = () => mine === run && epoch === sessionEpoch.value
+  places.value = new Map()
+  loaded.value = false
+  loadError.value = null
+  loading.value = true
+  try {
+    const listing = await listBuckets(searchBuckets, props.groupId ?? undefined, current)
+    if (!current()) return
+    places.value = nodesByBucket(listing.hits, isTarget, isLocalNode)
+    loaded.value = true
+  } catch (err) {
+    if (current()) loadError.value = errorMessage(err)
+  } finally {
+    if (mine === run) loading.value = false
+  }
+}
+
+const bucketOptions = computed(() => [...places.value.keys()].map((name) => ({ value: name, label: name })))
 
 const target = computed(() => `s3://${bucket.value || 'bucket'}/${prefix.value ? `${prefix.value}/` : ''}`)
 const label = computed(() => (props.count === 1 ? props.source : `${props.count} files`))
@@ -59,12 +85,12 @@ watch(() => props.open, (open) => {
   if (!open) return
   bucket.value = ''
   prefix.value = ''
-  void bucketList.ensure()
+  void loadBuckets()
 }, { immediate: true })
 
 function confirm() {
   if (!bucket.value || props.busy) return
-  emit('copy', { bucket: bucket.value, prefix: prefix.value ? `${prefix.value}/` : '' })
+  emit('copy', { bucket: bucket.value, prefix: prefix.value ? `${prefix.value}/` : '', nodeId: nodeId.value })
 }
 </script>
 
@@ -87,11 +113,11 @@ function confirm() {
             class="mt-1"
             @update:model-value="pickBucket"
           />
-          <Spinner v-if="bucketList.loading.value && !bucketList.loaded.value" show-label label="Loading buckets…" class="mt-1 flex text-[11px]" />
-          <p v-else-if="bucketList.error.value" class="mt-1 text-[11px] text-destructive">{{ bucketList.error.value }}</p>
+          <Spinner v-if="loading && !loaded" show-label label="Loading buckets…" class="mt-1 flex text-[11px]" />
+          <p v-else-if="loadError" class="mt-1 text-[11px] text-destructive">{{ loadError }}</p>
         </div>
         <div v-if="bucket" class="rounded-md border border-border p-2">
-          <ObjectBrowserPanel :key="bucket" flush :bucket="bucket" :group-id="groupId ?? undefined" @navigate="onNavigate" />
+          <ObjectBrowserPanel :key="bucket" flush :bucket="bucket" :node-id="nodeId" :group-id="groupId ?? undefined" @navigate="onNavigate" />
         </div>
         <p class="truncate font-mono text-[11px] text-muted-foreground" :title="target">{{ target }}</p>
       </div>

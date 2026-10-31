@@ -50,7 +50,7 @@ const InputStub = defineComponent({
   setup: (props, { attrs, emit }) => () => h('input', { ...attrs, value: props.modelValue, onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value) }),
 })
 
-async function render(options: { live?: boolean; running?: boolean; starting?: boolean; mount?: { prefix: string; path: string } } = {}) {
+async function render(options: { live?: boolean; running?: boolean; starting?: boolean; mount?: { prefix: string; path: string }; copyNode?: string } = {}) {
   const generation = ref(1)
   const activeCellId = ref('first')
   const noteCellInputs = vi.fn()
@@ -67,7 +67,9 @@ async function render(options: { live?: boolean; running?: boolean; starting?: b
     copyObject: vi.fn().mockResolvedValue(undefined),
     deleteObject: vi.fn().mockResolvedValue(undefined),
     deletePrefix: vi.fn().mockResolvedValue({ deleted: 1, errors: [] }),
-    uploadObject: vi.fn((_bucket: string, _key: string, _file: File) => ({ promise: Promise.resolve(), abort: vi.fn() })),
+    uploadObject: vi.fn((_bucket: string, _key: string, _file: File, _progress?: unknown, _node?: string | null, _reference?: unknown) => ({ promise: Promise.resolve(), abort: vi.fn() })),
+    getObjectBlob: vi.fn(async () => new Blob(['a,b'], { type: 'text/csv' })),
+    referenceForNode: vi.fn(async (nodeId: string | null, groupId: string) => ({ nodeId: nodeId ?? 'node-1', groupId, accessKeyId: `k-${nodeId}` })),
   }
   listScratch.mockReset()
   listScratch.mockImplementation(async (_job: string, path: string) => {
@@ -81,7 +83,7 @@ async function render(options: { live?: boolean; running?: boolean; starting?: b
   ]) })
   const importer = defineComponent({ props: ['open', 'prefix'], setup: (props) => () => props.open ? h('p', `Import into ${props.prefix}`) : null })
   const copyDialog = defineComponent({ props: ['open', 'source', 'count'], emits: ['copy'], setup: (props, { emit }) => () => props.open
-    ? h('button', { onClick: () => emit('copy', { bucket: 'dest', prefix: 'out/' }) }, `Copy ${props.count} of ${props.source} to dest`)
+    ? h('button', { onClick: () => emit('copy', { bucket: 'dest', prefix: 'out/', nodeId: options.copyNode ?? null }) }, `Copy ${props.count} of ${props.source} to dest`)
     : null })
   // The store derives running from the job id, so a stopped fake has none.
   const session = {
@@ -482,6 +484,23 @@ describe('kernel file tree', () => {
     await click(await rowItem(root, 'a.csv', 'Copy to bucket'))
     await click(button(root, 'Copy 1 of a.csv to dest'))
     expect(s3.copyObject).toHaveBeenCalledWith({ bucket: 'workspace', key: 'data/sub/a.csv' }, 'dest', 'out/a.csv')
+    expect(content(root)).toContain('Copied a.csv to dest/out/.')
+    app.unmount()
+  })
+
+  it('copies a data/ file to a bucket on another node by reading it here and uploading it there', async () => {
+    const { root, app, s3 } = await render({ copyNode: 'node-2' })
+    await expand(root, 'data')
+    await expand(root, 'sub')
+    await click(await rowItem(root, 'a.csv', 'Copy to bucket'))
+    await click(button(root, 'Copy 1 of a.csv to dest'))
+    await flush()
+
+    expect(s3.copyObject).not.toHaveBeenCalled()
+    const from = { nodeId: 'node-1', groupId: 'group', accessKeyId: 'k-null' }
+    expect(s3.getObjectBlob).toHaveBeenCalledWith('workspace', 'data/sub/a.csv', null, undefined, from)
+    const [bucket, key, file, , node, reference] = s3.uploadObject.mock.calls[0]
+    expect([bucket, key, file.name, node, reference]).toEqual(['dest', 'out/a.csv', 'a.csv', 'node-2', { nodeId: 'node-2', groupId: 'group', accessKeyId: 'k-node-2' }])
     expect(content(root)).toContain('Copied a.csv to dest/out/.')
     app.unmount()
   })
