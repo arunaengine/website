@@ -89,7 +89,7 @@ const stagingOpen = ref(false)
               </span>
             </DropdownMenuItem>
             <DropdownMenuItem
-              v-if="!nodeId && stagingEnabled && shown('connectors')"
+              v-if="stagingEnabled && shown('connectors')"
               class="items-start"
               @click="stagingOpen = true"
             >
@@ -138,9 +138,10 @@ const stagingOpen = ref(false)
       @created="reload"
     />
     <AddDataDialog
-      v-if="!nodeId && stagingEnabled"
+      v-if="stagingEnabled"
       v-model:open="stagingOpen"
       :bucket="bucket"
+      :node-id="nodeId"
       prefix=""
       :group-id="groupId"
       tab="connector"

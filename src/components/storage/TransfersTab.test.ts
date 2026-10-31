@@ -19,7 +19,7 @@ const TitleStub = defineComponent({ props: { title: String }, setup: (props) => 
 const tab = compileClientComponent(new URL('./TransfersTab.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => IconStub }),
-  '@/components/data/AddDataDialog.vue': moduleDefault(Slotted('div')),
+  '@/components/data/AddDataDialog.vue': moduleDefault(defineComponent({ props: { nodeId: String }, setup: (props) => () => h('div', { 'data-add-node': props.nodeId }) })),
   '@/components/data/SyncBucketDialog.vue': moduleDefault(Slotted('div')),
   '@/components/storage/StagingJobRows.vue': moduleDefault(EmptyList),
   '@/components/storage/SyncsTab.vue': moduleDefault(EmptyList),
@@ -60,5 +60,11 @@ describe('transfers tab', () => {
   it('keeps the filter for a bucket on another node, whose node lists its staging jobs', async () => {
     const { root } = await mountApp(defineComponent({ setup: () => () => h(tab, { bucket: 'reef', nodeId: 'n-2', ownerNodes: ['n-2'], groupId: 'g-1' }) }))
     expect(element(root, (node) => node.props['aria-label'] === 'Which transfers to show')).toBeTruthy()
+  })
+
+  it('offers connector staging for a bucket on another node and stages it there', async () => {
+    const { root } = await mountApp(defineComponent({ setup: () => () => h(tab, { bucket: 'reef', nodeId: 'n-2', ownerNodes: ['n-2'], groupId: 'g-1' }) }))
+    expect(content(root)).toContain('Stage from a connector')
+    expect(element(root, (node) => node.props['data-add-node'] !== undefined).props['data-add-node']).toBe('n-2')
   })
 })
