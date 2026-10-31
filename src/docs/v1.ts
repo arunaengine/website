@@ -175,9 +175,9 @@ export const docsTopics: DocsTopic[] = [
       },
       {
         route: '/app/groups',
-        anchor: 'group-tabs',
+        anchor: 'groups-yours',
         title: 'Inside a group',
-        body: 'A group page has the tabs Overview, Members, Roles, Data sources, Policies and Storage.',
+        body: 'Choose a group to open it. A group page has the tabs Overview, Members, Roles, Data sources, Policies and Storage.',
       },
     ],
     sections: [
@@ -236,15 +236,9 @@ export const docsTopics: DocsTopic[] = [
       },
       {
         route: '/app/buckets',
-        anchor: 'bucket-add-data',
-        title: 'Add your files',
-        body: 'Select the bucket, then drag files onto the list or use Upload: Upload files, or Add from… for other sources.',
-      },
-      {
-        route: '/app/buckets',
-        anchor: 'bucket-settings',
-        title: 'Bucket storage',
-        body: 'Settings opens one page per bucket: which backend takes new uploads, which placement policies apply, and which syncs exist.',
+        anchor: 'bucket-list',
+        title: 'Open a bucket',
+        body: 'Choose a bucket to open it, then drag files onto its list or use Upload: Upload files, or Add from… for other sources. Settings on its toolbar shows the storage, placement policies and syncs of the bucket.',
       },
     ],
     sections: [
@@ -742,9 +736,9 @@ export const docsTopics: DocsTopic[] = [
       },
       {
         route: '/app/groups',
-        anchor: 'group-tabs',
+        anchor: 'groups-yours',
         title: 'The Storage tab',
-        body: 'The Storage tab lists each storage of the group with its buckets, and Aruna storage.',
+        body: 'Choose the group, then its Storage tab. It lists each storage of the group with its buckets, and Aruna storage.',
       },
     ],
     sections: [

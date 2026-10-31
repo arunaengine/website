@@ -193,7 +193,7 @@ const emptyGroupsMessage = computed(() =>
       </div>
 
       <div v-else class="w-full space-y-8 px-4 py-6 sm:px-6">
-        <section aria-labelledby="your-groups-heading">
+        <section data-tour="groups-yours" aria-labelledby="your-groups-heading">
           <SectionHeading id="your-groups-heading" title="Your groups" :icon="Users" info="A bucket stored on several nodes counts once.">
             <template v-if="myGroups.length" #actions>
               <ViewToggle v-model="groupView" />

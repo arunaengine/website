@@ -387,7 +387,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
       <DialogTitle class="type-section-title">Buckets <span class="text-sm font-normal tabular-nums text-muted-foreground">{{ bucketCount }}</span></DialogTitle>
       <Button size="sm" data-tour="bucket-create" @click="emit('new-bucket')"><FolderPlus class="h-4 w-4" /> New bucket</Button>
     </div>
-    <div :class="sheet ? '' : 'surface'" :aria-busy="bucketsRefreshing">
+    <div data-tour="bucket-list" :class="sheet ? '' : 'surface'" :aria-busy="bucketsRefreshing">
       <div class="sticky top-0 z-10 flex items-center gap-2 bg-card px-3.5 pb-1 pt-3" :class="sheet ? 'bg-background' : ''">
         <Input
           v-model="bucketNameFilter"
