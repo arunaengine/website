@@ -227,6 +227,12 @@ describe('bucket encryption tab', () => {
     expect(await render('ready', encrypted({ mode: 'off', caller: admin }))).toContain('mode settings')
   })
 
+  it('tells a key holder about their copy only on an encrypted bucket', async () => {
+    const holder = { holder: true, ready_copy: false, admin: true }
+    expect(await render('ready', encrypted({ caller: holder }))).toContain('your copy is not ready')
+    expect(await render('ready', encrypted({ mode: 'off', caller: holder }))).not.toContain('your copy is not ready')
+  })
+
   it('offers key replacement only on ABE buckets to holders and admins', async () => {
     const abe = { epoch: 2, raise_due: false, rekey: null }
     const reader = { holder: false, ready_copy: false, admin: false }

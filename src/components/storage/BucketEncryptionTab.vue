@@ -70,8 +70,9 @@ const permitted = computed(() => {
   const caller = status.value?.caller
   if (!caller) return []
   const lines: string[] = []
-  if (caller.holder && caller.ready_copy) lines.push('You hold a ready copy of the bucket key: you may unlock, extend and lock.')
-  else if (caller.holder) lines.push('You are a key holder, but your copy is not ready. It is made at the next unlock.')
+  // Key holding says nothing on a bucket without encryption.
+  if (encrypted.value && caller.holder && caller.ready_copy) lines.push('You hold a ready copy of the bucket key: you may unlock, extend and lock.')
+  else if (encrypted.value && caller.holder) lines.push('You are a key holder, but your copy is not ready. It is made at the next unlock.')
   if (caller.admin) lines.push('As a group admin you may lock, change the mode, manage key holders and rotate the key.')
   if (!lines.length) lines.push('You may read this state. Unlocking and settings need a key holder or a group admin.')
   return lines
