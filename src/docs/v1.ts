@@ -647,7 +647,7 @@ export const docsTopics: DocsTopic[] = [
         steps: [
           'Leave the node unpinned unless the run must sit on a specific [node](concept:glossary#node).',
           'Show request opens the exact body that is sent, verbatim.',
-          'The line at the end of the form either lists what is still needed or says the run is ready.',
+          'The panel at the top right says Ready to run, or lists what is still needed. Each item jumps to its field.',
           'Run once. [Accepted](concept:states-and-retry) means durable; Preparing means scheduling is still converging.',
         ],
         image: {
@@ -660,7 +660,8 @@ export const docsTopics: DocsTopic[] = [
         title: 'Follow the run',
         icon: 'Activity',
         paragraphs: [
-          'The run page tracks Queued, Initializing, Running, and Finished, with the distributed record underneath: several nodes may plan the same [family](concept:glossary#run-family), and duplicate successes reconcile to one [result execution](concept:glossary#result-execution).',
+          'The run page shows the steps Queued, Initializing, Running and Finished. Below them are the inputs, the results and each attempt of the run.',
+          'For developers holds the run id and the request. When several nodes may plan the same [family](concept:glossary#run-family), it also shows the placement plan and the executions. Duplicate successes count as one [result execution](concept:glossary#result-execution).',
           'On completion Aruna writes a Process run [dataset](concept:datasets) with action, tool, inputs, outputs, status, and group. Open the run record from the run details, or filter the [Datasets](page:datasets) view by the type Process run.',
           'Compute lists runs under the Runs tab. Save as run template on a finished run keeps its tool, inputs and settings; the Run templates tab lists them and imports or exports them as a file. Run templates are saved only on this computer.',
         ],
@@ -754,15 +755,15 @@ export const docsTopics: DocsTopic[] = [
           'Open the group from [Groups](page:groups) and switch to its Storage tab.',
           'Choose Add storage and enter the endpoint and [keys](concept:storage-access#external-storage-backend). Aruna checks the keys before it saves them. Edit on a storage changes its name, region and path-style setting, replaces the keys or removes the storage.',
           'Each storage shows a table of the buckets that keep their files there: the S3 bucket, how new uploads are named and the last sync.',
-          'The row new buckets says where buckets created from now on go: Aruna storage, one shared S3 bucket where Aruna names the files, or an own S3 bucket per bucket from a template such as aruna-spire-{bucket}. Existing buckets never move.',
+          'The storage that gets new buckets shows a new buckets row. Its Edit picks where buckets created from now on go: Aruna storage, or one of your storages. On your storage, choose one shared S3 bucket where Aruna names the files, or an own S3 bucket for each bucket from a template such as aruna-spire-{bucket}. Existing buckets never move.',
           'Link an S3 bucket shows the files already in an S3 bucket in an Aruna bucket. Nothing is copied. A link ends only when its Aruna bucket is empty or deleted.',
           'Edit on a bucket row sets how new uploads are named: {name}, or {name}~{id} if taken (the default), {name}~{id}, the old {id}_{name}, or a custom name with {name}. An existing file is never overwritten. Changing the style can also rename the files that use the old one.',
           'Writers use the storage but can never see or change the keys.',
         ],
         image: {
           src: '/docs/v1/group-storage.jpg',
-          alt: 'Group Storage tab with the built-in Aruna storage, the new buckets rule and the dataset location',
-          caption: 'Storage lives on the group: rules decide which buckets go to your storage.',
+          alt: 'Group Storage tab with the built-in Aruna storage, the new buckets row and the dataset location',
+          caption: 'Storage lives on the group. The new buckets row says where new buckets go.',
         },
       },
       {
