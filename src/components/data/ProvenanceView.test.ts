@@ -209,7 +209,7 @@ describe('provenance view', () => {
     const start = { kind: 'dataset', documentId: '01M63099Q2000108CB51QQDB2P', title: 'Bakta run', crate: { '@graph': [...dbFiles, result] } }
     const { root } = await mountApp(component, { props: { start } })
     await openAll(root)
-    await vi.waitFor(() => expect(content(root)).toContain('Where these came from is shown elsewhere.'))
+    await vi.waitFor(() => expect(content(root)).toContain('Their provenance is shown elsewhere.'))
     const text = content(root)
 
     expect(text.split('Release 6.0 light')).toHaveLength(3)

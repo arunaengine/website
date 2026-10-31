@@ -31,7 +31,7 @@ const start = computed<ProvenanceStart>(() => ({
   <section aria-labelledby="provenance-heading">
     <ProvenanceView v-if="crateHasEntities" :start="start" :record="record" />
     <template v-else>
-      <SectionHeading id="provenance-heading" title="Where it came from" :icon="GitBranch" />
+      <SectionHeading id="provenance-heading" title="Provenance" :icon="GitBranch" />
       <div class="surface px-5 py-4">
         <Skeleton v-if="loadingCrate" class="h-40" />
         <p v-else class="py-6 text-center text-sm text-muted-foreground">There is nothing to follow until the dataset's metadata has loaded.</p>

@@ -138,7 +138,7 @@ describe('RunProvenancePanel record facts', () => {
     expect(content(mounted.root)).toContain('Record iddoc-1')
     expect(copies).toEqual(['doc-1', 'https://api.test/metadata/doc-1', 'run.sh'])
     expect(content(mounted.root)).toContain('Published')
-    ;(nodes(mounted.root).find((node) => node.tag === 'button' && content(node).includes('Where it came from'))!.props.onClick as () => void)()
+    ;(nodes(mounted.root).find((node) => node.tag === 'button' && content(node).includes('Show provenance'))!.props.onClick as () => void)()
     expect(chain).toHaveBeenCalledOnce()
     mounted.app.unmount()
   })

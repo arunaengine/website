@@ -726,7 +726,7 @@ watch([crateJob, () => isTerminalTesState(task.value?.state)], ([job, done], [pr
 })
 
 const recordState = computed(() => {
-  if (runCrate.value) return 'Inputs, results and where they came from'
+  if (runCrate.value) return 'Inputs, results and provenance'
   if (localRecordJob.value) return 'Kept on this computer until you publish the run'
   if (sessionRuntime(task.value?.tags) !== null) return 'None, a notebook session keeps its report instead'
   if (runCrateLoading.value) return 'Looking for it'

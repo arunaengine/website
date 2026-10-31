@@ -131,11 +131,11 @@ const recorded = computed(() => Boolean(origin.value || hop.value))
         <p v-if="!recorded" class="text-muted-foreground">Not recorded for this version.</p>
       </div>
       <div v-if="startId">
-        <Button size="sm" variant="outline" @click="showing = true">Where it came from</Button>
+        <Button size="sm" variant="outline" @click="showing = true">Show provenance</Button>
       </div>
       <DetailDialog v-if="start" :open="showing" @update:open="(open) => (showing = open)">
         <template #header>
-          <h2 class="font-display text-lg font-semibold text-aruna-navy">Where it came from</h2>
+          <h2 class="font-display text-lg font-semibold text-aruna-navy">Provenance</h2>
           <p class="text-xs text-muted-foreground">{{ fileName }}</p>
         </template>
         <ProvenanceView v-if="showing" :start="start" />

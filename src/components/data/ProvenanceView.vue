@@ -224,7 +224,7 @@ function shown(card: ChainCard): Shown {
   const item = items[0]!
   const me = !card.into
   const action = item.kind === 'silent' ? { label: 'Try again', icon: RotateCw, run: () => expand(graph, item.id, readers, fenced()) } : undefined
-  const repeat = card.node.repeat && item.from.length ? (items.length > 1 ? 'Where these came from is shown elsewhere.' : 'Where it came from is shown elsewhere.') : ''
+  const repeat = card.node.repeat && item.from.length ? (items.length > 1 ? 'Their provenance is shown elsewhere.' : 'Its provenance is shown elsewhere.') : ''
   const base = { identifiers: [], me, muted: false, action, earlier: earlierOf(card) }
   if (me && props.record && props.start.kind === 'dataset') {
     const files = props.record.files
@@ -382,14 +382,14 @@ const legend = computed(() => {
 
 <template>
   <div class="space-y-4">
-    <SectionHeading v-if="start.kind === 'dataset'" id="provenance-heading" title="Where it came from" :icon="GitBranch" :info="INFO">
+    <SectionHeading v-if="start.kind === 'dataset'" id="provenance-heading" title="Provenance" :icon="GitBranch" :info="INFO">
       <template #actions>
         <Button size="sm" variant="outline" :disabled="exporting" @click="exportCrate"><Download class="h-4 w-4" /> Export as crate</Button>
       </template>
     </SectionHeading>
     <div v-else class="flex flex-wrap items-center gap-2">
       <Tooltip :label="INFO">
-        <button type="button" class="inline-flex rounded-full text-muted-foreground hover:text-foreground" aria-label="About where it came from"><Info class="size-4" /></button>
+        <button type="button" class="inline-flex rounded-full text-muted-foreground hover:text-foreground" aria-label="About provenance"><Info class="size-4" /></button>
       </Tooltip>
       <Button size="sm" variant="outline" class="ml-auto" :disabled="exporting" @click="exportCrate"><Download class="h-4 w-4" /> Export as crate</Button>
     </div>

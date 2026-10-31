@@ -113,9 +113,9 @@ describe('file origin provenance', () => {
     state.value = 'ready'
     origin.value = response({ origin: { kind: 'job', run_id: 'r1' } })
     const root = await render()
-    expect(content(root)).not.toContain('provenance')
+    expect(content(root)).not.toContain('provenance https://')
 
-    await click(button(root, 'Where it came from'))
+    await click(button(root, 'Show provenance'))
     expect(content(root)).toContain('provenance https://w3id.org/aruna/data/arn:aruna:realm1:node1:s3/spire/a.tsv@v1')
   })
 
@@ -123,7 +123,7 @@ describe('file origin provenance', () => {
     state.value = 'ready'
     origin.value = response({ global_id: 'https://w3id.org/aruna/data/realm1/01K8Y2' })
     const root = await render()
-    await click(button(root, 'Where it came from'))
+    await click(button(root, 'Show provenance'))
 
     expect(content(root)).toContain('provenance https://w3id.org/aruna/data/realm1/01K8Y2')
   })
