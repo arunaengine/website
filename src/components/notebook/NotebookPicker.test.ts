@@ -89,6 +89,22 @@ describe('the notebook picker', () => {
     expect(push).toHaveBeenCalledWith({ name: 'notebook', params: { bucketId: 'lab', key: 'notebooks/deep/b.ipynb' }, query: { group: 'group' } })
   })
 
+  it('loads a long folder page by page through the listing cursor', async () => {
+    listObjects
+      .mockResolvedValueOnce({ folders: [], objects: [{ key: 'readme.md', name: 'readme.md' }], nextToken: 't2' } as never)
+      .mockResolvedValueOnce({ folders: [{ prefix: 'later/', name: 'later' }], objects: [{ key: 'z.ipynb', name: 'z.ipynb' }] } as never)
+    const { root } = await mountApp(component, { props: { open: true, finder } })
+    await bubbleClick(button(root, 'lab'))
+    await flush()
+    expect(content(root)).toContain('No notebooks loaded yet')
+
+    await click(button(root, 'Load more'))
+    await flush()
+    expect(listObjects).toHaveBeenLastCalledWith('lab', '', 't2')
+    expect(rows(root).join(' ')).toContain('z.ipynb')
+    expect(() => button(root, 'Load more')).toThrow()
+  })
+
   it('opens and browses a bucket on another node through that node', async () => {
     const { root } = await mountApp(component, { props: { open: true, finder } })
     const search = nodes(root).find((node) => node.tag === 'input')!

@@ -47,16 +47,33 @@ watch(() => props.open, (open) => {
   if (finder.state.value === 'idle' || finder.state.value === 'error') void finder.load()
 }, { immediate: true })
 
-// The plain listing of the folder on screen; a newer folder drops the older answer.
+// The plain listing of the folder on screen, page by page through the listing cursor; a newer
+// folder drops the older answer.
 const folders = ref<FolderEntry[]>([])
 const files = ref<ObjectEntry[]>([])
 const listing = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
 const listError = ref<string | null>(null)
+const nextToken = ref<string | undefined>()
+const loadingMore = ref(false)
 let listRun = 0
+
+async function listPage(name: string, at: string, run: number, token?: string) {
+  // A bucket on another node is read through that node's own session.
+  const node = finder.nodes.value.get(name) ?? null
+  const reference = node ? await s3.referenceForNode(node, activeGroupId.value) : undefined
+  const page = node ? await s3.listObjects(name, at, token, node, { reference }) : await s3.listObjects(name, at, token)
+  if (run !== listRun) return
+  folders.value = [...folders.value, ...page.folders]
+  files.value = [...files.value, ...page.objects]
+  nextToken.value = page.nextToken
+}
+
 watch([bucket, prefix, () => props.open], async ([name, at, open]) => {
   const run = ++listRun
   folders.value = []
   files.value = []
+  nextToken.value = undefined
+  loadingMore.value = false
   if (!name || !open) {
     listing.value = 'idle'
     return
@@ -64,28 +81,29 @@ watch([bucket, prefix, () => props.open], async ([name, at, open]) => {
   listing.value = 'loading'
   listError.value = null
   try {
-    // A bucket on another node is read through that node's own session.
-    const node = finder.nodes.value.get(name) ?? null
-    const reference = node ? await s3.referenceForNode(node, activeGroupId.value) : undefined
-    let token: string | undefined
-    const seenFolders: FolderEntry[] = []
-    const seenFiles: ObjectEntry[] = []
-    do {
-      const page = node ? await s3.listObjects(name, at, token, node, { reference }) : await s3.listObjects(name, at, token)
-      seenFolders.push(...page.folders)
-      seenFiles.push(...page.objects)
-      token = page.nextToken
-    } while (token && seenFolders.length + seenFiles.length < 2000)
-    if (run !== listRun) return
-    folders.value = seenFolders
-    files.value = seenFiles
-    listing.value = 'ready'
+    await listPage(name, at, run)
+    if (run === listRun) listing.value = 'ready'
   } catch (cause) {
     if (run !== listRun) return
     listing.value = 'error'
     listError.value = errorMessage(cause)
   }
 })
+
+async function loadMore() {
+  const name = bucket.value
+  if (!name || !nextToken.value || loadingMore.value) return
+  const run = listRun
+  loadingMore.value = true
+  listError.value = null
+  try {
+    await listPage(name, prefix.value, run, nextToken.value)
+  } catch (cause) {
+    if (run === listRun) listError.value = errorMessage(cause)
+  } finally {
+    if (run === listRun) loadingMore.value = false
+  }
+}
 
 const scan = computed(() => (bucket.value ? finder.scans.value.get(bucket.value) : undefined))
 // Counts are known only for a bucket searched in full; elsewhere nothing is hidden.
@@ -261,10 +279,15 @@ const ROW_ICON = { bucket: Package, folder: Folder, notebook: NotebookPen, file:
 
       <div v-else class="flex flex-col items-center rounded-lg border border-border-subtle px-5 py-8 text-center">
         <IconTile :icon="NotebookPen" tone="aqua" class="mb-3" />
-        <p class="text-sm font-medium text-foreground">{{ query.trim() ? 'No notebook matches' : 'No notebooks here' }}</p>
+        <p class="text-sm font-medium text-foreground">{{ query.trim() ? 'No notebook matches' : bucket && nextToken ? 'No notebooks loaded yet' : 'No notebooks here' }}</p>
         <Button v-if="!showAll && !query.trim()" variant="outline" size="sm" class="mt-3" @click="showAll = true">Show all files</Button>
       </div>
 
+      <div v-if="!busy && !query.trim() && bucket && nextToken" class="flex flex-wrap items-center gap-2">
+        <Button variant="outline" size="sm" :disabled="loadingMore" @click="loadMore">{{ loadingMore ? 'Loading…' : 'Load more' }}</Button>
+        <span class="text-xs text-muted-foreground">This folder holds more entries.</span>
+      </div>
+      <p v-if="listing === 'ready' && listError" class="text-xs text-destructive">{{ listError }}</p>
       <p v-if="!busy && !query.trim() && !showAll && hiddenText" class="text-xs text-muted-foreground">Hidden because they hold no notebooks: {{ hiddenText }}</p>
       <p v-if="finder.partial.value.length" class="text-xs text-muted-foreground">
         Searched only in part, so nothing is hidden there: {{ finder.partial.value.join(', ') }}
