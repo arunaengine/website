@@ -44,7 +44,7 @@ watch(() => current.value?.description, () => {
     <div class="surface p-5">
       <div v-if="current?.description" class="mb-5">
         <p class="text-xs text-muted-foreground">Description</p>
-        <p ref="description" class="mt-0.5 whitespace-pre-line text-sm" :class="expanded ? '' : 'line-clamp-3'">{{ current.description }}</p>
+        <p ref="description" class="mt-0.5 max-w-[90ch] whitespace-pre-line text-sm" :class="expanded ? '' : 'line-clamp-3'">{{ current.description }}</p>
         <Button v-if="clamped || expanded" variant="ghost" size="sm" class="mt-1 h-7 px-2" :aria-expanded="expanded" @click="expanded = !expanded">
           <component :is="expanded ? ChevronUp : ChevronDown" class="h-3.5 w-3.5" /> {{ expanded ? 'Show less' : 'Show more' }}
         </Button>
