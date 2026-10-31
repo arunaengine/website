@@ -87,10 +87,10 @@ watch(
               <RouterLink
                 :to="{ name: 'bucket-storage', params: { bucketId: inspected.trim() }, query: { tab: 'placement' } }"
               >
-                Open its Storage page
+                Open its settings
               </RouterLink>
             </Button>
-            <span v-else class="text-xs text-muted-foreground">Name a bucket to open its Storage page.</span>
+            <span v-else class="text-xs text-muted-foreground">Name a bucket to open its settings.</span>
           </div>
         </div>
         </div>

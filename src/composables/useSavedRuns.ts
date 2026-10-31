@@ -11,7 +11,7 @@ function store(next: SavedRun[]): boolean {
   try {
     writeSavedRuns(next)
   } catch (cause) {
-    failure.value = `This computer could not keep the saved runs: ${cause instanceof Error ? cause.message : String(cause)}`
+    failure.value = `This computer could not keep the run templates: ${cause instanceof Error ? cause.message : String(cause)}`
     return false
   }
   failure.value = null

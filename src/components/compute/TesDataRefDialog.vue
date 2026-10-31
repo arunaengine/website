@@ -328,8 +328,8 @@ watch(
 
       <p class="text-[11px] text-muted-foreground">
         External sources (S3, HTTP, WebDAV, FTP) are referenced into a bucket first: in the
-        <RouterLink :to="{ name: 'buckets' }" class="font-medium text-primary hover:underline">Data section</RouterLink>,
-        use Add data &gt; From connector with the Reference strategy, then pick the referenced objects here.
+        <RouterLink :to="{ name: 'buckets' }" class="font-medium text-primary hover:underline">Data view</RouterLink>,
+        open a bucket, choose Upload, then Add from…, and use From connector with the Reference strategy. Then pick the referenced objects here.
       </p>
 
       <DialogFooter>
