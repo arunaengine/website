@@ -30,6 +30,7 @@ import NodePicker from '@/components/data/NodePicker.vue'
 import DeleteDialog from '@/components/data/DeleteDialog.vue'
 import FileDetailsDialog from '@/components/data/FileDetailsDialog.vue'
 import PublicAccessDialog from '@/components/data/PublicAccessDialog.vue'
+import ShareLinkDialog from '@/components/data/ShareLinkDialog.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import MockSidebar from '@/components/data/manager/MockSidebar.vue'
 import DistributionBanner from '@/components/data/manager/DistributionBanner.vue'
@@ -51,7 +52,7 @@ import type { PublicTarget } from '@/lib/publicAccess'
 import { computed, ref, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import { RouterLink } from 'vue-router'
-import type { ObjectSearchHit } from '@/lib/api'
+import type { ObjectSearchHit, ShareTarget } from '@/lib/api'
 import { ChevronDown, KeyRound, LogIn, Server, ShieldAlert } from '@lucide/vue'
 
 const { bootstrapped, currentUser, myGroups } = useAruna()
@@ -149,6 +150,21 @@ const publicTargets = ref<PublicTarget[]>([])
 function openPublicAccess(targets: PublicTarget[]) {
   publicTargets.value = targets
   publicOpen.value = true
+}
+
+// ── Share links ─────────────────────────────────────────────────────────────
+const shareOpen = ref(false)
+const shareTarget = ref<ShareTarget | null>(null)
+const shareName = computed(() => {
+  const target = shareTarget.value
+  if (!target || target.kind === 'dataset') return ''
+  const path = target.kind === 'bucket' ? target.bucket : target.kind === 'folder' ? target.prefix : target.key
+  return path.replace(/\/$/, '').split('/').at(-1) ?? path
+})
+
+function openShareLink(target: ShareTarget) {
+  shareTarget.value = target
+  shareOpen.value = true
 }
 
 // ── Bucket sync ─────────────────────────────────────────────────────────────
@@ -506,6 +522,7 @@ async function createFolder() {
           @new-notebook="newNotebookOpen = true"
           @sync-to-computer="openBindDialog"
           @public-access="openPublicAccess"
+          @share-link="openShareLink"
           @new-bucket="newBucketOpen = true"
           @open-hit="openFound"
         >
@@ -576,6 +593,8 @@ async function createFolder() {
       :node-id="remoteNodeId"
       :targets="publicTargets"
     />
+
+    <ShareLinkDialog v-model:open="shareOpen" :target="shareTarget" :node-id="remoteNodeId" :name="shareName" />
 
     <FileDetailsDialog
       :open="Boolean(detailsKey)"

@@ -95,7 +95,7 @@ describe('object browser row actions', () => {
         .filter((node) => node.tag === 'button' && node.props['aria-label'])
         .map((node) => String(node.props['aria-label'])),
     ).toEqual(['Preview', 'Download', 'Actions for reads.fastq'])
-    expect(menuLabels(row)).toEqual(['Preview', 'Download', 'Rename', 'Copy to', 'Move to', 'Share', 'Make public', 'Delete', 'Delete permanently…'])
+    expect(menuLabels(row)).toEqual(['Preview', 'Download', 'Rename', 'Copy to', 'Move to', 'Copy link for members', 'Make public', 'Delete', 'Delete permanently…'])
     // Icon only: the label is the accessible name, not visible text.
     expect(content(action(root, 'Preview')).trim()).toBe('')
   })
@@ -204,6 +204,29 @@ describe('object browser row actions', () => {
     expect(String(end.props.class)).toContain('shrink-0')
   })
 
+  it('opens the share dialog for a file, a folder and the bucket of an ordinary bucket', async () => {
+    const onShareLink = vi.fn()
+    const root = await render({ folders: ref([listedFolder]) }, { setId: null, onShareLink })
+    const row = element(root, (node) => node.tag === 'tr' && content(node).includes('reads.fastq'))
+    expect(menuLabels(row)).toEqual(['Preview', 'Download', 'Rename', 'Share', 'Copy to', 'Move to', 'Copy link for members', 'Make public', 'Delete', 'Delete permanently…'])
+
+    await click(menuItem(root, 'Share'))
+    await click(menuItem(root, 'Share', 'genomes'))
+    await click(action(root, 'Share bucket'))
+
+    expect(onShareLink.mock.calls.map(([target]) => target)).toEqual([
+      { kind: 'object', bucket: 'reef', key: listedObject.key },
+      { kind: 'folder', bucket: 'reef', prefix: listedFolder.prefix },
+      { kind: 'bucket', bucket: 'reef' },
+    ])
+  })
+
+  it('leaves Share out while the bucket may be distributed', async () => {
+    const root = await render({}, { setId: undefined })
+    expect(menuLabels(element(root, (node) => node.tag === 'tr' && content(node).includes('reads.fastq')))).not.toContain('Share')
+    expect(() => action(root, 'Share bucket')).toThrow()
+  })
+
   it('links the realm website from the desktop and names the node that serves the bucket', async () => {
     const writeText = vi.fn(async () => undefined)
     vi.stubGlobal('navigator', { clipboard: { writeText } })
@@ -214,13 +237,13 @@ describe('object browser row actions', () => {
     try {
       desktopMode.website = 'https://realm.example'
       const root = await render({ router: { push, resolve }, activeGroupId: ref('g1'), realmNodes })
-      await click(menuItem(root, 'Share'))
+      await click(menuItem(root, 'Copy link for members'))
       expect(writeText).toHaveBeenCalledWith('https://realm.example/app/buckets/reef?prefix=raw&node=laptop-1&group=g1&object=raw%2Freads.fastq')
 
       writeText.mockClear()
       desktopMode.website = null
       const unknown = await render({ router: { push, resolve }, activeGroupId: ref('g1'), realmNodes })
-      await click(menuItem(unknown, 'Share'))
+      await click(menuItem(unknown, 'Copy link for members'))
       expect(writeText).not.toHaveBeenCalled()
       expect(content(unknown)).toContain('No link: the realm website is not known')
     } finally {
@@ -237,7 +260,7 @@ describe('object browser row actions', () => {
     const resolve = vi.fn((to: { query: Record<string, string> }) => ({ href: `/data/reef?${new URLSearchParams(to.query)}` }))
     try {
       const root = await render({ router: { push, resolve }, activeGroupId: ref('g1') })
-      await click(menuItem(root, 'Share'))
+      await click(menuItem(root, 'Copy link for members'))
 
       expect(resolve).toHaveBeenCalledWith({ name: 'bucket', params: { bucketId: 'reef' }, query: { prefix: 'raw', group: 'g1', object: listedObject.key } })
       expect(writeText).toHaveBeenCalledWith('https://portal.example/data/reef?prefix=raw&group=g1&object=raw%2Freads.fastq')

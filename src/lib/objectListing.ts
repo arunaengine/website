@@ -61,7 +61,7 @@ export function fileRows<O extends { key: string }>(objects: O[], deleted: Delet
   return rows.sort((a, b) => (a.entry.key < b.entry.key ? -1 : a.entry.key > b.entry.key ? 1 : 0))
 }
 
-export type RowAction = 'open' | 'details' | 'preview' | 'download' | 'rename' | 'move' | 'copy' | 'share' | 'access' | 'delete' | 'purge'
+export type RowAction = 'open' | 'details' | 'preview' | 'download' | 'rename' | 'move' | 'copy' | 'share' | 'share-link' | 'access' | 'delete' | 'purge'
 
 export type SelectionAction = 'download' | 'move' | 'copy' | 'rename' | 'share' | 'access' | 'delete'
 

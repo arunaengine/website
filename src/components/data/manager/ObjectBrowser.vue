@@ -49,7 +49,7 @@ import {
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
 import { PAGE_SIZES } from '@/composables/useListPages'
 import type { PublicTarget } from '@/lib/publicAccess'
-import type { ObjectSearchHit } from '@/lib/api'
+import type { ObjectSearchHit, ShareTarget } from '@/lib/api'
 import { featureEnabled } from '@/lib/config'
 import { isNotebookKey } from '@/lib/notebook/document'
 import { collectDropFiles } from '@/lib/upload/dropEntries'
@@ -88,6 +88,7 @@ import {
   Plus,
   Search,
   Settings,
+  Share2,
   Upload,
   Users,
   Trash2,
@@ -102,6 +103,7 @@ const emit = defineEmits<{
   (e: 'new-notebook'): void
   (e: 'sync-to-computer', source: BindSource): void
   (e: 'public-access', targets: PublicTarget[]): void
+  (e: 'share-link', target: ShareTarget): void
   (e: 'new-bucket'): void
   (e: 'open-hit', hit: ObjectSearchHit): void
 }>()
@@ -248,6 +250,9 @@ const linkedPart = computed(() => {
   const prefix = currentLinkedFolder.value?.remote.prefix.replace(/\/+$/, '')
   return prefix ? ` (only ${prefix}/)` : ''
 })
+
+// Share links need an ordinary bucket on a node visitors can reach, not one on this computer.
+const linksShown = computed(() => props.setId === null && Boolean(bucket.value) && !onThisComputer.value)
 
 // A bucket on this computer: its files are already here, so no folder can be linked.
 const onThisComputer = computed(
@@ -468,6 +473,7 @@ function onObjectAction(object: ObjectEntry, action: RowAction) {
   if (action === 'details') openDetails(object)
   else if (action === 'preview') openDetails(object, 'preview')
   else if (action === 'share') void share([object.key])
+  else if (action === 'share-link') emit('share-link', { kind: 'object', bucket: bucket.value, key })
   else if (action === 'download') void locked.download(object)
   else if (action === 'access') emit('public-access', [{ kind: 'file', bucket: bucket.value, key }])
   else if (action === 'delete' || action === 'purge') deleteObject(object, action === 'purge')
@@ -479,6 +485,7 @@ function onFolderAction(folder: FolderEntry, action: RowAction) {
   if (action === 'open') openFolder(folder)
   else if (action === 'details') openDetails({ key, name: `${folder.name}/` })
   else if (action === 'share') void share([key])
+  else if (action === 'share-link') emit('share-link', { kind: 'folder', bucket: bucket.value, prefix: key })
   else if (action === 'access') emit('public-access', [{ kind: 'folder', bucket: bucket.value, key }])
   else if (action === 'delete' || action === 'purge') deleteFolder(folder, action === 'purge')
   else if (action !== 'download' && action !== 'preview') openTransfer(action, [{ key, folder: true }])
@@ -611,6 +618,9 @@ async function onDrop(event: DragEvent) {
             bell
             :label-class="toolbarLabel"
           />
+          <Button v-if="linksShown" variant="outline" size="sm" aria-label="Share bucket" title="Share this bucket with a link" @click="emit('share-link', { kind: 'bucket', bucket })">
+            <Share2 class="h-4 w-4" /><span :class="toolbarLabel">Share</span>
+          </Button>
           <!-- The count of syncs and placement policies; the settings page names them. -->
           <span v-if="showStorageButton" data-tour="bucket-settings" class="inline-flex">
             <Button variant="outline" size="sm" aria-label="Bucket settings" title="Bucket settings" @click="openBucketSettings">
@@ -936,6 +946,7 @@ async function onDrop(event: DragEvent) {
                     folder
                     :change-reason="folderReason(folder.prefix)"
                     :access="Boolean(activeGroupId)"
+                    :links="linksShown"
                     @pick="(action: RowAction) => onFolderAction(folder, action)"
                   />
                 </div>
@@ -1020,6 +1031,7 @@ async function onDrop(event: DragEvent) {
                     :name="object.name"
                     :change-reason="objectReason(object.key)"
                     :access="Boolean(activeGroupId)"
+                    :links="linksShown"
                     @pick="(action: RowAction) => onObjectAction(object, action)"
                   />
                 </div>
