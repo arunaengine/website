@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-// The page pulls in the whole portal, so the layout wiring is checked at the source: four tabs, one
-// area at a time on the overview, and an opened entity lands in the same dialog the file rows use.
+// The page pulls in the whole portal, so the layout wiring is checked at the source: four tabs, every
+// section at once on the overview, and an opened entity lands in the same dialog the file rows use.
 const source = readFileSync(new URL('./MetadataView.vue', import.meta.url), 'utf8')
 const details = readFileSync(new URL('../components/metadata/view/DatasetDetails.vue', import.meta.url), 'utf8')
 
@@ -16,17 +16,34 @@ describe('MetadataView', () => {
     expect(source).toContain('<template v-if="tab === \'overview\'">')
   })
 
-  it('puts About first, then one area chosen in the seg query', () => {
+  it('shows every section at once in the agreed order, without area segments', () => {
     const overview = source.slice(source.indexOf('<template v-if="tab === \'overview\'">'))
-    expect(overview.indexOf('<DatasetAbout')).toBeLessThan(overview.indexOf('<OptionToggle'))
-    expect(source).toContain("useRouteTab(['files', 'people', 'runs', 'graph', 'details'], '', 'seg')")
-    expect(source).toContain("return isRun.value && actionCount.value ? 'runs' : 'files'")
-    // An old graph tab link opens the graph area.
-    expect(source).toContain("const wanted = routeTab.value === 'graph' ? 'graph' : routeSeg.value")
+    const order = [
+      '<DatasetAbout',
+      '<RunProvenancePanel',
+      '<DatasetFiles',
+      'part="people"',
+      'part="places"',
+      '<SubcratesSection',
+      'title="Software"',
+      ':entities="otherEntities"',
+      '<DatasetDetails',
+    ].map((marker) => overview.indexOf(marker))
+    expect(order.every((index) => index >= 0)).toBe(true)
+    expect(order).toEqual([...order].sort((a, b) => a - b))
+    expect(source).not.toContain("'seg')")
+    expect(source).not.toMatch(/routeSeg|segments|seg\.value/)
+  })
+
+  it('switches only the entities between list and graph, and opens the graph for old links', () => {
+    expect(source).toContain("useRouteTab(['list', 'graph'], 'list', 'entities')")
+    expect(source).toContain("routeTab.value === 'graph' || route.query.seg === 'graph' ? 'graph' : routeEntities.value")
+    const toggle = source.slice(source.indexOf('<template v-if="entityView === \'list\'">'), source.indexOf('<DatasetDetails'))
+    expect(toggle).toContain('<DatasetGraph v-else :state="state" hide-heading')
   })
 
   it('shows a run record in full under Runs with the other runs as a table', () => {
-    const runs = source.slice(source.indexOf('<template v-else-if="seg === \'runs\'">'), source.indexOf('<DatasetGraph'))
+    const runs = source.slice(source.indexOf('<div v-if="runProvenance || actionCount"'), source.indexOf('<DatasetFiles'))
     expect(runs).toContain('<RunProvenancePanel v-if="runProvenance"')
     expect(runs).toContain(':skip="runProvenance?.actionId"')
   })
@@ -51,11 +68,11 @@ describe('MetadataView', () => {
 
   it('returns to the overview for a jump out of the entity dialog', () => {
     expect(source).toContain('@jump="jumpTo"')
-    expect(source).toContain("tab.value = 'overview'")
+    expect(source).toContain("entityView.value = 'list'")
   })
 
   it('keeps the repository links loaded on every tab for the published badge', () => {
-    expect(source).toContain(":class=\"{ hidden: tab !== 'overview' || seg !== 'details' || !shown('repositories') }\"")
+    expect(source).toContain(":class=\"{ hidden: tab !== 'overview' || !shown('repositories') }\"")
     expect(source).toContain('v-if="published.length"')
     expect(source).toContain(':hide-manage="!shown(\'repositories\')"')
     expect(source).toContain('@manage="manageRepositories"')

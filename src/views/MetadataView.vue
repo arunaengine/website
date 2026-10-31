@@ -6,6 +6,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import OptionToggle from '@/components/ui/OptionToggle.vue'
+import SectionHeading from '@/components/ui/SectionHeading.vue'
 import StatusPill from '@/components/ui/StatusPill.vue'
 import ContextSection from '@/components/metadata/ContextSection.vue'
 import CrateTypeBadge from '@/components/datasets/CrateTypeBadge.vue'
@@ -62,7 +63,7 @@ import { useS3 } from '@/composables/useS3'
 import { type MetadataDocumentSummary, type RepositoryLink, type StorageLocation } from '@/lib/api'
 import { publishedLinks } from '@/lib/repository'
 import { errorMessage } from '@/lib/utils'
-import { ArrowLeft, Braces, FolderTree, GitBranch, History as HistoryIcon, LayoutDashboard, List, Play, Share2, Users } from '@lucide/vue'
+import { AppWindow, ArrowLeft, Braces, GitBranch, History as HistoryIcon, LayoutDashboard, List, Shapes, Share2 } from '@lucide/vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -90,6 +91,7 @@ const {
   currentPath,
   canWrite,
   subcrateIris,
+  crateHasEntities,
   runProvenance,
   presentation,
   highlightId,
@@ -188,34 +190,28 @@ const tab = computed({
   set: (next: string) => (routeTab.value = next),
 })
 
-// The overview shows one area at a time, kept in `?seg=`; a run opens on its runs.
+// The overview shows every section at once. The entities show as lists or as one graph, kept in
+// `?entities=`; an old graph tab or area link opens the graph.
 const facts = computed(() => aboutFacts(currentCrate.value))
 const actionCount = computed(() => crateActions(currentCrate.value).length)
-const peopleCount = computed(() => {
-  const view = presentation.value
-  return view.people.length + view.organizations.length + view.entities.filter((entity) => entity.kind === 'places').length
+const routeEntities = useRouteTab(['list', 'graph'], 'list', 'entities')
+const entityView = computed({
+  get: () => (routeTab.value === 'graph' || route.query.seg === 'graph' ? 'graph' : routeEntities.value),
+  // Only the overview offers the switch, so it also drops an old `tab` or `seg` link.
+  set: (next: string) => void router.replace({ query: { ...route.query, tab: undefined, seg: undefined, entities: next === 'graph' ? next : undefined } }),
 })
-const segments = computed(() => [
-  { value: 'files', label: 'Files', icon: FolderTree, count: facts.value.files },
-  ...(peopleCount.value ? [{ value: 'people', label: 'People and places', icon: Users, count: peopleCount.value }] : []),
-  ...(actionCount.value ? [{ value: 'runs', label: 'Runs', icon: Play, count: actionCount.value }] : []),
+const entityOptions = [
+  { value: 'list', label: 'List', icon: List },
   { value: 'graph', label: 'Graph', icon: Share2 },
-  { value: 'details', label: 'Details', icon: List },
-])
-const routeSeg = useRouteTab(['files', 'people', 'runs', 'graph', 'details'], '', 'seg')
-const seg = computed({
-  get: () => {
-    const wanted = routeTab.value === 'graph' ? 'graph' : routeSeg.value
-    if (segments.value.some((entry) => entry.value === wanted)) return wanted
-    return isRun.value && actionCount.value ? 'runs' : 'files'
-  },
-  set: (next: string) => {
-    // An old graph tab link carries the area in `tab`; picking another area drops it.
-    if (routeTab.value === 'graph') void router.replace({ query: { ...route.query, tab: undefined, seg: next === 'files' ? undefined : next } })
-    else routeSeg.value = next
-  },
+]
+const hasEntities = computed(() => {
+  const view = presentation.value
+  return Boolean(view.people.length + view.organizations.length + view.entities.length + view.comments.length + subcrateIris.value.size)
 })
-const otherEntities = computed(() => presentation.value.entities.filter((entity) => entity.kind !== 'places'))
+const software = computed(() => presentation.value.entities.filter((entity) => entity.kind === 'software'))
+const otherEntities = computed(() => presentation.value.entities.filter((entity) => entity.kind !== 'places' && entity.kind !== 'software'))
+// Short sections pair up on wide screens as equal-height cards; an empty cell takes no room.
+const cell = 'flex min-w-0 flex-col empty:hidden [&>section]:flex [&>section]:flex-1 [&>section]:flex-col [&>section>.surface]:flex-1'
 const showCrateExport = ref(false)
 const showPublish = ref(false)
 const repositoryLinks = ref<InstanceType<typeof RepositoryLinksSection> | null>(null)
@@ -228,7 +224,6 @@ const showPublished = ref(false)
 async function manageRepositories() {
   showPublished.value = false
   tab.value = 'overview'
-  seg.value = 'details'
   await nextTick()
   repositoryLinks.value?.$el?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
 }
@@ -298,9 +293,9 @@ function openInfo(entityId: string) {
   infoOpen.value = true
 }
 
-// A jump lands on an overview section, so the overview has to be showing.
+// A jump lands on an overview section, so the overview has to show the entity lists.
 function jumpTo(entityId: string) {
-  tab.value = 'overview'
+  entityView.value = 'list'
   jumpEntity(entityId)
 }
 </script>
@@ -386,55 +381,61 @@ function jumpTo(entityId: string) {
         <template v-if="tab === 'overview'">
           <DatasetAbout :state="state" @open="openInfo" @cite="showCite = true" />
 
-          <div class="space-y-5">
-            <OptionToggle
-              :model-value="seg"
-              :options="segments"
-              aria-label="Content"
-              class="flex w-full flex-wrap sm:inline-flex sm:w-auto"
-              @update:model-value="(value: string) => (seg = value)"
+          <div v-if="runProvenance || actionCount" class="space-y-6">
+            <RunProvenancePanel v-if="runProvenance" :run="runProvenance" :document-id="detailId" :published="current?.createdAt" @chain="tab = 'provenance'" />
+            <CrateRuns
+              :crate="currentCrate"
+              :skip="runProvenance?.actionId"
+              :title="runProvenance ? 'Other runs' : 'Runs'"
+              @open="openInfo"
             />
+          </div>
 
-            <template v-if="seg === 'files'">
-              <SubcratesSection
-                v-if="subcrateIris.size"
-                :crate="currentCrate"
-                :document-id="detailId"
-                :can-write="Boolean(current) && canWrite"
-              />
-              <DatasetFiles :state="state" @preview="openPreview" @info="openInfo" />
-            </template>
+          <DatasetFiles :state="state" @preview="openPreview" @info="openInfo" />
 
-            <PeoplePlaces v-else-if="seg === 'people'" :state="state" @open="openInfo" />
-
-            <template v-else-if="seg === 'runs'">
-              <RunProvenancePanel v-if="runProvenance" :run="runProvenance" :document-id="detailId" :published="current?.createdAt" @chain="tab = 'provenance'" />
-              <CrateRuns
-                :crate="currentCrate"
-                :skip="runProvenance?.actionId"
-                :title="runProvenance ? 'Other runs' : 'Runs'"
-                @open="openInfo"
-              />
-            </template>
-
-            <DatasetGraph v-else-if="seg === 'graph'" :state="state" @open="openInfo" />
-
-            <template v-else-if="seg === 'details'">
-              <DatasetDetails
-                ref="details"
-                :state="state"
-                :links="repositoryList"
-                :changed="changedStorage"
-                @changed="(value: StorageLocation) => (changedStorage = value)"
-              />
-              <DatasetRelated :state="state" />
-              <ContextSection
-                :entities="otherEntities"
-                :comments="presentation.comments"
-                :highlight-id="highlightId"
-                @jump="jumpEntity"
-              />
-            </template>
+          <div>
+            <SectionHeading
+              v-if="hasEntities || entityView === 'graph'"
+              id="entities-heading"
+              title="Entities"
+              :icon="Shapes"
+              :info="entityView === 'graph' ? 'Click a node to see its links, double-click to open it.' : undefined"
+            >
+              <template #actions>
+                <OptionToggle
+                  :model-value="entityView"
+                  :options="entityOptions"
+                  aria-label="Show the entities as"
+                  @update:model-value="(value: string) => (entityView = value)"
+                />
+              </template>
+            </SectionHeading>
+            <div class="grid gap-6 lg:grid-flow-dense lg:grid-cols-2">
+              <template v-if="entityView === 'list'">
+                <div :class="cell"><PeoplePlaces :state="state" part="people" @open="openInfo" /></div>
+                <div :class="cell"><PeoplePlaces :state="state" part="places" @open="openInfo" /></div>
+                <div v-if="subcrateIris.size" :class="cell">
+                  <SubcratesSection :crate="currentCrate" :document-id="detailId" :can-write="Boolean(current) && canWrite" />
+                </div>
+                <div :class="cell"><DatasetRelated :state="state" /></div>
+                <div :class="cell">
+                  <ContextSection title="Software" :icon="AppWindow" :entities="software" :comments="[]" :highlight-id="highlightId" @jump="jumpEntity" />
+                </div>
+                <div :class="[cell, 'lg:col-span-2']">
+                  <ContextSection :entities="otherEntities" :comments="presentation.comments" :highlight-id="highlightId" @jump="jumpEntity" />
+                </div>
+              </template>
+              <DatasetGraph v-else :state="state" hide-heading class="lg:col-span-2" @open="openInfo" />
+              <div :class="cell">
+                <DatasetDetails
+                  ref="details"
+                  :state="state"
+                  :links="repositoryList"
+                  :changed="changedStorage"
+                  @changed="(value: StorageLocation) => (changedStorage = value)"
+                />
+              </div>
+            </div>
           </div>
         </template>
 
@@ -442,7 +443,7 @@ function jumpTo(entityId: string) {
         <RepositoryLinksSection
           v-if="fetchedSummary && currentUser"
           ref="repositoryLinks"
-          :class="{ hidden: tab !== 'overview' || seg !== 'details' || !shown('repositories') }"
+          :class="{ hidden: tab !== 'overview' || !shown('repositories') }"
           :document-id="detailId"
           :group-id="fetchedSummary.group_id"
           :can-write="canWrite"
