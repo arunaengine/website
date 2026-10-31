@@ -140,7 +140,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'The sidebar',
         icon: 'PanelLeft',
         bullets: [
-          'Dashboard, [Data](page:buckets), [Datasets](page:datasets), [Profiles](page:profiles), and [Compute](page:compute): the everyday views. Compute holds runs, notebooks and run templates in one place.',
+          'Dashboard, [Data](page:buckets), [Datasets](page:datasets), [Profiles](page:profiles), and [Compute](page:compute): the everyday views. Compute has the tabs Runs, Notebooks and Run templates.',
           '[Groups](page:groups), [Status](page:status), [Settings](page:settings), and Docs: membership, health, and your account.',
           'Admin and Users appear only for realm administrators. Background jobs such as imports are listed under Admin > Jobs.',
           'Narrow windows collapse the sidebar to an icon rail automatically; the bottom button sets your wide-screen preference.',
@@ -601,12 +601,13 @@ export const docsTopics: DocsTopic[] = [
         title: 'Start from a template',
         icon: 'Play',
         paragraphs: [
-          'New run offers a Python, JavaScript or Bash script, or a blank run for your own container image. A template only prefills the image, the command and the working directory; every field stays editable, and a blank run can still add a script.',
+          'Open [Compute](page:compute) and choose New. New run starts a blank run for your own container image. Under Run templates the menu lists your own run templates, then a Python, JavaScript or Bash script.',
+          'A script template only prefills the image, the command and the working directory; every field stays editable, and a blank run can still add a script.',
         ],
         image: {
           src: '/docs/v1/compute-new-run.jpg',
-          alt: 'Compute view with the New run menu listing the script templates and a blank run',
-          caption: 'New run: a script template, or your own container.',
+          alt: 'Compute view with the New menu listing New run and the run templates',
+          caption: 'New: a blank run, or a run template.',
         },
       },
       {
@@ -652,7 +653,8 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Activity',
         paragraphs: [
           'The run page tracks Queued, Initializing, Running, and Finished, with the distributed record underneath: several nodes may plan the same [family](concept:glossary#run-family), and duplicate successes reconcile to one [result execution](concept:glossary#result-execution).',
-          'On completion Aruna writes a Process Run [dataset](concept:datasets) with action, tool, inputs, outputs, status, and group. Open it from the run detail, or filter the [Datasets](page:datasets) view by Process Run.',
+          'On completion Aruna writes a Process run [dataset](concept:datasets) with action, tool, inputs, outputs, status, and group. Open the run record from the run details, or filter the [Datasets](page:datasets) view by the type Process run.',
+          'Compute lists runs under the Runs tab. Save as run template on a finished run keeps its tool, inputs and settings; the Run templates tab lists them and imports or exports them as a file. Run templates are saved only on this computer.',
         ],
         image: {
           src: '/docs/v1/run-detail.jpg',
@@ -676,7 +678,8 @@ export const docsTopics: DocsTopic[] = [
           'While you work, one session job runs on a node of the realm. Cells go to that session over a live connection, and the outputs come back the same way. The cells themselves never become run records.',
         ],
         bullets: [
-          'New notebook in a bucket starts one; the file is written on the first save.',
+          'New, then New notebook in [Compute](page:compute) starts one, and so does New notebook in a bucket; the file is written on the first save.',
+          'The Notebooks tab in Compute lists your notebooks.',
           'A stored .ipynb file opens in the notebook page.',
         ],
       },
