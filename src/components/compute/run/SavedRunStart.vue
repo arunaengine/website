@@ -98,8 +98,8 @@ function chooseHome(bucket: string, folder: string) {
           <span class="inline-flex items-center gap-1"><Laptop class="h-3 w-3" />Saved on this computer</span>
         </p>
       </div>
-      <Button variant="outline" size="sm" class="max-sm:w-8 max-sm:px-0" aria-label="Edit saved run" title="Edit saved run" @click="editSaved">
-        <Pencil class="h-3.5 w-3.5" /><span class="max-sm:sr-only">Edit saved run</span>
+      <Button variant="outline" size="sm" class="max-sm:w-8 max-sm:px-0" aria-label="Edit run template" title="Edit run template" @click="editSaved">
+        <Pencil class="h-3.5 w-3.5" /><span class="max-sm:sr-only">Edit run template</span>
       </Button>
     </div>
 
@@ -129,7 +129,7 @@ function chooseHome(bucket: string, folder: string) {
             <p class="truncate font-mono text-xs text-muted-foreground">{{ entryPath(entry) }}</p>
             <p class="truncate font-mono text-xs text-muted-foreground">{{ pickText(entry) }}<span v-if="pickNode(entry)" class="font-sans"> on {{ pickNode(entry) }}</span></p>
           </div>
-          <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground max-sm:basis-full max-sm:pl-11"><Lock class="h-3.5 w-3.5" />Set by the saved run</span>
+          <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground max-sm:basis-full max-sm:pl-11"><Lock class="h-3.5 w-3.5" />Set by the run template</span>
         </div>
         <div v-for="(row, i) in secrets" :id="i === 0 ? 'saved-secrets' : undefined" :key="row.key" class="flex flex-wrap items-center gap-3 px-5 py-4">
           <IconTile :icon="KeyRound" tone="warn" size="sm" />
@@ -163,7 +163,7 @@ function chooseHome(bucket: string, folder: string) {
         </template>
         <div v-else class="flex flex-wrap items-center gap-3">
           <p class="min-w-0 flex-1 truncate font-mono text-xs text-foreground">{{ outputDestination(outputRows[0]) }}</p>
-          <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Lock class="h-3.5 w-3.5" />Set by the saved run</span>
+          <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Lock class="h-3.5 w-3.5" />Set by the run template</span>
         </div>
       </div>
     </section>

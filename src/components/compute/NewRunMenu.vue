@@ -39,7 +39,7 @@ function open(template: string) {
     </Button>
     <DropdownMenu>
       <DropdownMenuTrigger as-child>
-        <Button :size="size" :variant="variant" class="rounded-l-none border-l border-white/20 px-2" aria-label="Start from a saved run or a template">
+        <Button :size="size" :variant="variant" class="rounded-l-none border-l border-white/20 px-2" aria-label="Start from a run template">
           <ChevronDown class="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>

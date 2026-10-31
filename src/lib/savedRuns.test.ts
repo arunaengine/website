@@ -49,8 +49,8 @@ describe('saved runs', () => {
     const merged = importRuns(file, [run('a', 'Old'), run('c')])
 
     expect(merged.map((item) => [item.id, item.name])).toEqual([['a', 'Shared'], ['c', 'Run c'], ['b', 'Run b']])
-    expect(() => importRuns('{"runs": []}', [])).toThrow('not a saved runs file')
-    expect(() => importRuns('nope', [])).toThrow('not a saved runs file')
+    expect(() => importRuns('{"runs": []}', [])).toThrow('not a run templates file')
+    expect(() => importRuns('nope', [])).toThrow('not a run templates file')
     expect(() => importRuns(JSON.stringify({ format: 'aruna-my-runs', runs: [{ id: 1 }] }), [])).toThrow('not readable')
   })
 

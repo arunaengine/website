@@ -109,9 +109,9 @@ export function importRuns(text: string, runs: readonly SavedRun[]): SavedRun[] 
   try {
     parsed = JSON.parse(text) as typeof parsed
   } catch {
-    throw new Error('This file is not a saved runs file.')
+    throw new Error('This file is not a run templates file.')
   }
-  if (parsed?.format !== FORMAT || !Array.isArray(parsed.runs)) throw new Error('This file is not a saved runs file.')
+  if (parsed?.format !== FORMAT || !Array.isArray(parsed.runs)) throw new Error('This file is not a run templates file.')
   const found = parsed.runs.filter(isSavedRun)
   if (found.length !== parsed.runs.length) throw new Error('Some runs in this file are not readable.')
   return found.map(withoutSecrets).reduce<SavedRun[]>((all, run) => withRun(all, run), [...runs])

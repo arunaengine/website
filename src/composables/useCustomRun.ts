@@ -1089,7 +1089,7 @@ function createStore(deps: CustomRunDeps) {
     savedError.value = null
     const run = savedRuns.find(id)
     if (!run) {
-      savedError.value = 'This saved run is not on this computer.'
+      savedError.value = 'This run template is not on this computer.'
       return
     }
     rerunLoading.value = true
