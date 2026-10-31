@@ -21,11 +21,10 @@ import { isArunaUserId } from '@/lib/identifiers'
 import { groupFiles, type FileGroup } from '@/lib/fileGroups'
 import type { RunCrateFileRef, RunCrateModel } from '@/lib/runCrate'
 import { formatBytes, formatDateTime, formatResourceGb, isHttpUrl, shortUserId, truncateMiddle } from '@/lib/utils'
-import { ChevronDown, ChevronRight, Database, Download, ExternalLink as ExternalLinkIcon, File as FileIcon, Files, Folder, GitBranch, LogIn, Terminal } from '@lucide/vue'
+import { ChevronDown, ChevronRight, Database, Download, ExternalLink as ExternalLinkIcon, File as FileIcon, Files, Folder, LogIn, Terminal } from '@lucide/vue'
 
 // `documentId`: the record's id, named with its API address; `published`: when the record was made.
 const props = defineProps<{ run: RunCrateModel; documentId?: string; published?: string }>()
-const emit = defineEmits<{ (e: 'chain'): void }>()
 
 const { apiBaseUrl } = useAruna()
 const userDir = useUserDirectory()
@@ -270,7 +269,6 @@ function groupSize(group: FileGroup): string {
         <SectionHeading id="run-inputs-heading" title="Inputs" :icon="LogIn">
           <template #actions>
             <span v-if="inputSummary" class="text-xs tabular-nums text-muted-foreground">{{ inputSummary }}</span>
-            <Button variant="outline" size="sm" @click="emit('chain')"><GitBranch class="h-4 w-4" /> Show provenance</Button>
           </template>
         </SectionHeading>
         <div class="surface flex-1 overflow-hidden">

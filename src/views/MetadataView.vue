@@ -386,7 +386,7 @@ function jumpTo(entityId: string) {
           <DatasetAbout :state="state" @open="openInfo" @cite="showCite = true" />
 
           <div v-if="runProvenance || actionCount" class="space-y-6">
-            <RunProvenancePanel v-if="runProvenance" :run="runProvenance" :document-id="detailId" :published="current?.createdAt" @chain="tab = 'provenance'" />
+            <RunProvenancePanel v-if="runProvenance" :run="runProvenance" :document-id="detailId" :published="current?.createdAt" />
             <CrateRuns
               :crate="currentCrate"
               :skip="runProvenance?.actionId"

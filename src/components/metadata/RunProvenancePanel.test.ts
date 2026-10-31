@@ -129,17 +129,15 @@ describe('RunProvenancePanel', () => {
 })
 
 describe('RunProvenancePanel record facts', () => {
-  it('names the record id and its API address with copy buttons, and opens where it came from', async () => {
-    const chain = vi.fn()
+  it('names the record id and its API address with copy buttons, without a provenance button', async () => {
     const run = { inputs: [], outputs: [], command: 'run.sh' }
-    const mounted = await mountApp(RunProvenancePanel, { props: { run, documentId: 'doc-1', published: '2026-10-29T10:00:00Z', onChain: chain } })
+    const mounted = await mountApp(RunProvenancePanel, { props: { run, documentId: 'doc-1', published: '2026-10-29T10:00:00Z' } })
     const copies = nodes(mounted.root).filter((node) => node.props['data-copy']).map((node) => node.props['data-copy'])
 
     expect(content(mounted.root)).toContain('Record iddoc-1')
     expect(copies).toEqual(['doc-1', 'https://api.test/metadata/doc-1', 'run.sh'])
     expect(content(mounted.root)).toContain('Published')
-    ;(nodes(mounted.root).find((node) => node.tag === 'button' && content(node).includes('Show provenance'))!.props.onClick as () => void)()
-    expect(chain).toHaveBeenCalledOnce()
+    expect(content(mounted.root)).not.toContain('Show provenance')
     mounted.app.unmount()
   })
 })
