@@ -52,3 +52,19 @@ export const KIND_LABELS: Record<ShareTarget['kind'], string> = {
 export function sameTarget(a: ShareTarget, b: ShareTarget): boolean {
   return a.kind === b.kind && targetPath(a) === targetPath(b)
 }
+
+function plainText(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) return value.map(plainText).filter(Boolean).join(', ')
+  if (value && typeof value === 'object' && '@value' in value) return plainText((value as { '@value': unknown })['@value'])
+  return ''
+}
+
+/** Title and description of a crate's root dataset, as a visitor reads them. */
+export function crateSummary(rocrate: Record<string, unknown>): { title: string; description: string } {
+  const graph = Array.isArray(rocrate['@graph']) ? (rocrate['@graph'] as Record<string, unknown>[]) : []
+  const metadata = graph.find((entity) => entity['@id'] === 'ro-crate-metadata.json')
+  const about = (metadata?.about as { '@id'?: string } | undefined)?.['@id'] ?? './'
+  const root = graph.find((entity) => entity['@id'] === about) ?? {}
+  return { title: plainText(root.name), description: plainText(root.description) }
+}

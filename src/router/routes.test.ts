@@ -128,6 +128,7 @@ describe('web routes', () => {
       ['/terms', 'terms'],
       ['/news', 'news'],
       ['/news/:slug', 'news-post'],
+      ['/s/:node', 'share-visit'],
     ]
 
     for (const [path, name] of expected) {
@@ -157,7 +158,7 @@ describe('desktop routes', () => {
   it('has no public pages', async () => {
     const routes = await build({ apiBaseUrl: '/api/v1' })
 
-    for (const path of ['/imprint', '/terms', '/news', '/news/:slug']) expect(find(routes, path)).toBeUndefined()
+    for (const path of ['/imprint', '/terms', '/news', '/news/:slug', '/s/:node']) expect(find(routes, path)).toBeUndefined()
   })
 
   it('mounts the device views', async () => {

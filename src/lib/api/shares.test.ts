@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { listVisitFiles, openShare, shareUrl, shareUses, ticketUrl } from './shares'
-import { expiryFor, modesFor, sameTarget } from '@/lib/shareLinks'
+import { crateSummary, expiryFor, modesFor, sameTarget } from '@/lib/shareLinks'
 
 interface Sent {
   url: string
@@ -85,5 +85,17 @@ describe('share link choices', () => {
   it('matches links by what they open', () => {
     expect(sameTarget({ kind: 'folder', bucket: 'b', prefix: 'x/' }, { kind: 'folder', bucket: 'b', prefix: 'x/' })).toBe(true)
     expect(sameTarget({ kind: 'bucket', bucket: 'b' }, { kind: 'folder', bucket: 'b', prefix: '' })).toBe(false)
+  })
+
+  it('reads the title and description of the root dataset a crate names', () => {
+    const rocrate = {
+      '@graph': [
+        { '@id': 'ro-crate-metadata.json', about: { '@id': 'https://w3id.org/x' } },
+        { '@id': './', name: 'Wrong root' },
+        { '@id': 'https://w3id.org/x', name: 'Reef survey', description: [{ '@value': 'Counts' }, 'per site'] },
+      ],
+    }
+    expect(crateSummary(rocrate)).toEqual({ title: 'Reef survey', description: 'Counts, per site' })
+    expect(crateSummary({})).toEqual({ title: '', description: '' })
   })
 })

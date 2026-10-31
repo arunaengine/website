@@ -17,6 +17,8 @@ function publicRoutes(): RouteRecordRaw[] {
     { path: '/terms', name: 'terms', component: () => import('@/views/TermsView.vue') },
     { path: '/news', name: 'news', component: () => import('@/views/NewsView.vue') },
     { path: '/news/:slug', name: 'news-post', component: () => import('@/views/NewsPostView.vue') },
+    // A share link opens without an account, outside the app shell; its token is in the fragment.
+    { path: '/s/:node', name: 'share-visit', component: () => import('@/views/ShareVisitView.vue') },
   ]
 }
 
