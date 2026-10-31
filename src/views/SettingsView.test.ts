@@ -103,7 +103,7 @@ describe('SettingsView responsive geometry', () => {
 
   it('offers every settings section as a shareable tab', () => {
     // Groups live on the Groups page only; old ?tab=groups links redirect there.
-    const tabIds = ['profile', 'access', 'devices', 'assistant', 'keys', 'appearance']
+    const tabIds = ['profile', 'access', 'devices', 'links', 'assistant', 'keys', 'appearance']
     const tabList = source.match(/const settingsTabs = \[([\s\S]*?)\] as const/)?.[1] ?? ''
     const declaredIds = Array.from(tabList.matchAll(/\{ id: '([^']+)'/g), (match) => match[1])
     const panelIds = collectElements(root, (node) => node.tag === 'TabsContent')
@@ -277,6 +277,7 @@ const SettingsView = compileClientComponent(new URL('./SettingsView.vue', import
   '@/components/settings/FeatureSettings.vue': moduleDefault(Empty),
   '@/components/settings/AssistantProviders.vue': moduleDefault(Empty),
   '@/components/settings/VaultSettings.vue': moduleDefault(Empty),
+  '@/components/settings/SharedLinksPanel.vue': moduleDefault(Empty),
   '@/components/settings/McpConnect.vue': moduleDefault(Empty),
   '@/components/federation/LinkAccount.vue': moduleDefault(Empty),
   '@/components/federation/LinkedLogins.vue': moduleDefault(Empty),

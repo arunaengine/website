@@ -12,6 +12,7 @@ import S3SessionsPanel from '@/components/settings/S3SessionsPanel.vue'
 import FeatureSettings from '@/components/settings/FeatureSettings.vue'
 import AssistantProviders from '@/components/settings/AssistantProviders.vue'
 import VaultSettings from '@/components/settings/VaultSettings.vue'
+import SharedLinksPanel from '@/components/settings/SharedLinksPanel.vue'
 import McpConnect from '@/components/settings/McpConnect.vue'
 import LinkAccount from '@/components/federation/LinkAccount.vue'
 import LinkedLogins from '@/components/federation/LinkedLogins.vue'
@@ -35,7 +36,7 @@ import { apiOrigin } from '@/lib/api'
 import { isDesktop } from '@/lib/desktop'
 import { errorMessage } from '@/lib/utils'
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
-import { ChevronRight, CircleCheck, Code2, ExternalLink, Eye, KeyRound, Laptop, Lock, Palette, Moon, Sun, Monitor, ListChecks, LogIn, Save, Sparkles, UserRound } from '@lucide/vue'
+import { ChevronRight, CircleCheck, Code2, ExternalLink, Eye, KeyRound, Laptop, Link2, Lock, Palette, Moon, Sun, Monitor, ListChecks, LogIn, Save, Sparkles, UserRound } from '@lucide/vue'
 import { SETTINGS_TAB_ANCHORS } from '@/components/layout/nav'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 
@@ -79,6 +80,7 @@ const settingsTabs = [
   { id: 'profile', label: 'Profile', icon: UserRound },
   { id: 'access', label: 'Access', icon: KeyRound },
   { id: 'devices', label: 'Devices', icon: Laptop },
+  { id: 'links', label: 'Shared links', icon: Link2 },
   { id: 'assistant', label: 'Assistant', icon: Sparkles },
   { id: 'keys', label: 'Vault', icon: Lock },
   { id: 'appearance', label: 'Appearance', icon: Palette },
@@ -358,6 +360,10 @@ const { mode: appearance, setTheme } = useTheme()
 
       <TabsContent value="devices" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-8 py-6">
         <DevicesPanel :refresh-revision="panelRevision" />
+      </TabsContent>
+
+      <TabsContent value="links" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-8 py-6">
+        <SharedLinksPanel :refresh-revision="panelRevision" />
       </TabsContent>
 
       <TabsContent value="profile" class="w-full px-4 sm:px-6 mt-0 min-w-0 space-y-8 py-6">
