@@ -97,7 +97,8 @@ describe('ShareLinkDialog', () => {
 
     await click(button(root, 'Read and upload'))
     const password = nodes(root).find((node) => node.tag === 'input' && node.props.type === 'password')!
-    password.props['onUpdate:modelValue']('pass phrase')
+    const enter = password.props['onUpdate:modelValue'] as (value: string) => void
+    enter('pass phrase')
     await flush()
     await click(button(root, 'Create link'))
 
