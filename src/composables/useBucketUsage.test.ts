@@ -9,7 +9,7 @@ vi.mock('@/composables/useAruna', () => ({
     getBucketUsage: (bucket: string, node: string | null) => new Promise<BucketUsageResponse>((resolve) => asked.push({ bucket, node, resolve })),
   }),
 }))
-const { usageText, useBucketUsage } = await import('./useBucketUsage')
+const { usageParts, usageText, useBucketUsage } = await import('./useBucketUsage')
 
 const usage = (extra: Partial<BucketUsageResponse> = {}): BucketUsageResponse => ({
   bucket: 'laptop', objects: 16, versions: 16, delete_markers: 0, open_multipart_uploads: 0, logical_bytes: 52_638_515, complete: true, ...extra,
@@ -25,6 +25,15 @@ describe('bucket usage', () => {
       .toBe('70\u00a0files, 3.8\u00a0GiB stored, 1.3\u00a0GiB referenced')
     expect(usageText(usage({ objects: 0, logical_bytes: 0, referenced_bytes: 0 }))).toBe('0\u00a0files, 0\u00a0B stored')
     expect(usageText(usage({ complete: false }))).toBe('at least 16\u00a0files, 50.2\u00a0MiB stored')
+  })
+
+  it('splits the line into the file count and each size that is not 0', () => {
+    expect(usageParts(usage())).toEqual({ files: '16', stored: '50.2\u00a0MiB', referenced: null })
+    expect(usageParts(usage({ objects: 43_882_006, logical_bytes: 0, referenced_bytes: 42_450_742_909_920 })))
+      .toEqual({ files: '43,882,006', stored: null, referenced: '38.6\u00a0TiB' })
+    expect(usageParts(usage({ objects: 70, logical_bytes: 4_112_885_380, referenced_bytes: 1_344_199_496 })))
+      .toEqual({ files: '70', stored: '3.8\u00a0GiB', referenced: '1.3\u00a0GiB' })
+    expect(usageParts(usage({ complete: false })).files).toBe('≥\u00a016')
   })
 
   it('keeps only the answer for the bucket still open', async () => {

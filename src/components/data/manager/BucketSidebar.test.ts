@@ -69,7 +69,7 @@ const choose = vi.fn((nodeId: string | null) => {
 })
 
 // The listed usage the sidebar reads, by bucket name, and what it asked for.
-const listedFacts = new Map<string, string>()
+const listedParts = new Map<string, { files: string; stored: string | null; referenced: string | null }>()
 const usageAsked: unknown[] = []
 const Empty = defineComponent(() => () => null)
 // The row renders its name and action slot so the sidebar's own controls are visible.
@@ -86,6 +86,7 @@ const RowStub = defineComponent({
     database: Boolean,
     subtitle: { type: String, default: null },
     facts: { type: String, default: null },
+    parts: { type: Object, default: null },
     nodes: { type: Array, default: () => [] },
     placeNode: { type: String, default: null },
     syncedWith: { type: Array, default: () => [] },
@@ -101,7 +102,7 @@ const RowStub = defineComponent({
       h('span', { role: 'tooltip' }, slots.tooltip?.()),
       props.database ? h('i', { 'data-testid': 'database-icon' }, `${props.bucket} is a database`) : null,
       props.subtitle ? h('small', { 'data-testid': 'row-subtitle' }, `${props.bucket}: ${props.subtitle}`) : null,
-      props.facts ? h('small', { 'data-testid': 'row-facts' }, `${props.bucket}: ${props.facts}`) : null,
+      props.parts ? h('small', { 'data-testid': 'row-facts' }, `${props.bucket}: ${[props.parts.files, props.parts.stored, props.parts.referenced].filter(Boolean).join(' | ')}`) : null,
       props.nodes.length ? h('small', { 'data-testid': 'row-nodes' }, `${props.bucket}: ${props.nodes.join(', ')}`) : null,
       props.syncedWith.length ? h('small', { 'data-testid': 'row-sync' }, `${props.bucket}: ${props.syncedWith.join(', ')}`) : null,
       props.pinnable ? h('button', { 'aria-label': `${props.pinned ? 'Unpin' : 'Pin'} ${props.bucket}`, onClick: () => emit('toggle-pin') }) : null,
@@ -176,7 +177,7 @@ const sidebarModules = {
   '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Passthrough),
   '@/lib/distributedMockData': { exampleBuckets: () => [] },
   '@/lib/distributedMock': { mockEnabled: () => false, defaultPlacement: () => ({}), placementLabel: () => '' },
-  '@/composables/useBucketUsage': { useListedUsage: () => ({ ensure: (entries: unknown[]) => usageAsked.push(entries), textOf: (name: string) => listedFacts.get(name) ?? null, referencedOf: (name: string) => referencedBuckets.get(name) ?? null, answered: (name: string) => referencedBuckets.has(name) }) },
+  '@/composables/useBucketUsage': { useListedUsage: () => ({ ensure: (entries: unknown[]) => usageAsked.push(entries), partsOf: (name: string) => listedParts.get(name) ?? null, referencedOf: (name: string) => referencedBuckets.get(name) ?? null, answered: (name: string) => referencedBuckets.has(name) }) },
   '@/composables/useBucketSearch': {
     useBucketSearch: () => ({ hits: otherSearch, error: otherError, searched: ref(true), nodesFailed: otherFailed }),
   },
@@ -923,7 +924,7 @@ describe('Bucket sidebar sections', () => {
       { bucket: 'bakta-database', node_id: 'node-2', group_id: 'g1' },
       { bucket: 'images', node_id: 'home', group_id: 'g1' },
     ]
-    listedFacts.set('laptop', '16 files, 50.2 MB')
+    listedParts.set('laptop', { files: '16', stored: '50.2 MB', referenced: null })
     usageAsked.length = 0
     const state = manager()
     state.shortcuts.pinned.value = [{ bucket: 'images', nodeId: null }]
@@ -936,7 +937,7 @@ describe('Bucket sidebar sections', () => {
       // The database icon tells databases apart, so the rest has no heading, only a thin line.
       expect(labels(root)).toEqual(['Pinned', ''])
       expect(order(root)).toEqual(['images', 'bakta-database', 'laptop'])
-      expect(nodes(root).filter((node) => node.props['data-testid'] === 'row-facts').map((node) => content(node))).toEqual(['laptop: 16 files, 50.2 MB'])
+      expect(nodes(root).filter((node) => node.props['data-testid'] === 'row-facts').map((node) => content(node))).toEqual(['laptop: 16 | 50.2 MB'])
       expect(nodes(root).filter((node) => node.props['data-testid'] === 'row-sync').map((node) => content(node))).toEqual(['laptop: laptop-device'])
       // Earlier tests leave their lists mounted, so only this list's request is looked for.
       expect(usageAsked).toContainEqual([
@@ -953,7 +954,7 @@ describe('Bucket sidebar sections', () => {
     } finally {
       databaseRows.value = []
       allBuckets.hits.value = []
-      listedFacts.clear()
+      listedParts.clear()
     }
   })
 
@@ -1074,14 +1075,14 @@ describe('database buckets in the list', () => {
       nodes(root).filter((node) => node.props['data-testid'] === id).map((node) => content(node))
 
     expect(marks(all.root, 'database-icon')).toEqual(['bakta-database is a database'])
-    expect(marks(all.root, 'row-subtitle')).toEqual(['bakta-database: Bakta database (light)'])
+    expect(marks(all.root, 'row-subtitle')).toEqual([])
     databaseRows.value = [{ ...(databaseRows.value[0] as object), description: { version: '6.0', identifiers: [] } }, databaseRows.value[1]]
     await flush()
-    expect(marks(all.root, 'row-subtitle')).toEqual(['bakta-database: Bakta database (light) 6.0'])
+    expect(marks(all.root, 'row-subtitle')).toEqual([])
 
     const one = await mountApp(BucketSidebar, { props: { manager: withBucket() } })
     await pickNode()
-    expect(marks(one.root, 'row-subtitle')).toEqual(['reef-survey: Reef survey'])
+    expect(marks(one.root, 'row-subtitle')).toEqual([])
     databaseRows.value = []
     allBuckets.hits.value = []
   })

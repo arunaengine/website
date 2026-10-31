@@ -4,7 +4,8 @@ import Popover from '@/components/ui/Popover.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import type { BucketJob } from '@/lib/api'
-import { Database, FolderSync, Network, Package, Pin, Server, TriangleAlert } from '@lucide/vue'
+import type { UsageParts } from '@/composables/useBucketUsage'
+import { Database, Files, FolderSync, HardDrive, Link2, Network, Package, Pin, Server, TriangleAlert } from '@lucide/vue'
 import { computed, onMounted, ref, watch, type Component } from 'vue'
 import { RouterLink } from 'vue-router'
 
@@ -38,6 +39,8 @@ const props = withDefaults(
     subtitle?: string | null
     /** Files and size, for example "16 files, 50.2 MB". */
     facts?: string | null
+    /** Files and sizes shown with icons on one line; replaces `facts` when set. */
+    parts?: UsageParts | null
     /** The bucket is a database; it shows the database icon. */
     database?: boolean
     /** Render as a combobox option (role/aria-selected). */
@@ -66,6 +69,7 @@ const props = withDefaults(
     highlighted: false,
     subtitle: null,
     facts: null,
+    parts: null,
     database: false,
     option: false,
     openOnMousedown: false,
@@ -190,7 +194,12 @@ function onClick() {
         />
       </div>
       <p v-if="subtitle" class="truncate text-xs text-muted-foreground">{{ subtitle }}</p>
-      <p v-if="facts" class="text-xs tabular-nums text-muted-foreground">{{ facts }}</p>
+      <p v-if="parts" class="flex min-w-0 items-center gap-3 overflow-hidden whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+        <span class="inline-flex shrink-0 items-center gap-1" :title="`${parts.files} files`"><Files class="h-3 w-3" aria-hidden="true" /><span class="sr-only">Files: </span>{{ parts.files }}</span>
+        <span v-if="parts.stored" class="inline-flex shrink-0 items-center gap-1" :title="`${parts.stored} stored`"><HardDrive class="h-3 w-3" aria-hidden="true" /><span class="sr-only">Stored: </span>{{ parts.stored }}</span>
+        <span v-if="parts.referenced" class="inline-flex shrink-0 items-center gap-1" :title="`${parts.referenced} referenced`"><Link2 class="h-3 w-3" aria-hidden="true" /><span class="sr-only">Referenced: </span>{{ parts.referenced }}</span>
+      </p>
+      <p v-else-if="facts" class="text-xs tabular-nums text-muted-foreground">{{ facts }}</p>
     </div>
     <div class="relative flex shrink-0 items-center gap-0.5">
       <Popover v-for="mark in marks" :key="mark.id" :tooltip="mark.tooltip" align="end">

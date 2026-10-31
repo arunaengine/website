@@ -296,7 +296,6 @@ const entryIndex = (entry: NodeEntry) => shownEntries.value.indexOf(entry)
 // Each shown row names its files and size once its node answered.
 const usage = useListedUsage()
 const usageNode = (nodeId: string | null) => (nodeId && !realmNodes.isLocalNode(nodeId) ? nodeId : null)
-const factsOf = (name: string, nodeId: string | null) => usage.textOf(name, usageNode(nodeId))
 watch(
   () => (searchList.value ? shownRows.value.map((row) => ({ bucket: row.bucket, nodeId: usageNode(rowNodeId(row)) })) : shownEntries.value.map((entry) => ({ bucket: entry.bucket, nodeId: usageNode(entry.nodeId ?? null) }))),
   (entries) => usage.ensure(entries),
@@ -501,8 +500,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                 v-if="row.hit"
                 :bucket="row.bucket"
                 :database="Boolean(databaseOf(row.bucket, row.hit.node_id))"
-                :subtitle="databaseOf(row.bucket, row.hit.node_id)?.title ?? null"
-                :facts="factsOf(row.bucket, row.hit.node_id)"
+                :parts="usage.partsOf(row.bucket, usageNode(row.hit.node_id))"
                 :pinned="row.pinned"
                 option
                 :highlighted="rowIndex(row) === activeIndex"
@@ -527,8 +525,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                 :bucket="row.bucket"
                 :node-id="row.nodeId"
                 :database="Boolean(databaseOf(row.bucket, row.nodeId))"
-                :subtitle="databaseOf(row.bucket, row.nodeId)?.title ?? null"
-                :facts="factsOf(row.bucket, row.nodeId)"
+                :parts="usage.partsOf(row.bucket, usageNode(row.nodeId))"
                 pinned
                 option
                 :highlighted="rowIndex(row) === activeIndex"
@@ -585,8 +582,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                   :bucket="entry.bucket"
                   option
                   :database="Boolean(databaseOf(entry.bucket, entry.nodeId ?? null))"
-                  :subtitle="databaseOf(entry.bucket, entry.nodeId ?? null)?.title ?? null"
-                  :facts="factsOf(entry.bucket, entry.nodeId ?? null)"
+                  :parts="usage.partsOf(entry.bucket, usageNode(entry.nodeId ?? null))"
                   :highlighted="entryIndex(entry) === activeIndex"
                   :node-id="entry.nodeId"
                   :pinned="entry.pinned"

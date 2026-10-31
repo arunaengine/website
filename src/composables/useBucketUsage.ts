@@ -18,6 +18,22 @@ export function usageText(usage: BucketUsageResponse): string {
   return [files, ...sizes].join(', ')
 }
 
+/** File count, stored and referenced size of one bucket; a size that is 0 is left out. */
+export interface UsageParts {
+  files: string
+  stored: string | null
+  referenced: string | null
+}
+
+export function usageParts(usage: BucketUsageResponse): UsageParts {
+  const referenced = usage.referenced_bytes ?? 0
+  return {
+    files: `${usage.complete ? '' : '≥\u00a0'}${formatCount(usage.objects)}`,
+    stored: usage.logical_bytes || !referenced ? formatBytes(usage.logical_bytes) : null,
+    referenced: referenced ? formatBytes(referenced) : null,
+  }
+}
+
 export function useBucketUsage(bucket: Ref<string>, nodeId: Ref<string | null>) {
   const { getBucketUsage, sessionEpoch } = useAruna()
   const usage = ref<BucketUsageResponse | null>(null)
@@ -85,6 +101,11 @@ export function useListedUsage() {
     return usage ? usageText(usage) : null
   }
 
+  function partsOf(bucket: string, nodeId: string | null): UsageParts | null {
+    const usage = listed.value.get(listedKey(bucket, nodeId))
+    return usage ? usageParts(usage) : null
+  }
+
   // Whether the bucket reads files in place at their source; null while unknown.
   function referencedOf(bucket: string, nodeId: string | null): boolean | null {
     const usage = listed.value.get(listedKey(bucket, nodeId))
@@ -94,5 +115,5 @@ export function useListedUsage() {
   // The row's node answered, or failed to; false while its read is still waiting.
   const answered = (bucket: string, nodeId: string | null) => listed.value.has(listedKey(bucket, nodeId))
 
-  return { ensure, textOf, referencedOf, answered }
+  return { ensure, textOf, partsOf, referencedOf, answered }
 }
