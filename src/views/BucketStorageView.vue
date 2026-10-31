@@ -3,10 +3,11 @@
 // goes (Storage), who may read it, its encryption and how files got in. Policy parts are gated
 // by what the node will let this viewer write.
 import { computed, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -45,7 +46,8 @@ import { formatBytes, formatNumber } from '@/lib/utils'
 import { ChevronLeft } from '@lucide/vue'
 
 const route = useRoute()
-const { currentUser, getGroup, getBucketUsage, isRealmAdmin, sessionEpoch } = useAruna()
+const router = useRouter()
+const { currentUser, getGroup, getBucketUsage, isRealmAdmin, searchBuckets, sessionEpoch } = useAruna()
 const { shown } = usePortalFeatures()
 const { activeContext } = useS3()
 const realmNodes = useRealmNodes()
@@ -60,6 +62,23 @@ const groupId = computed(() => {
   if (typeof value === 'string' && value) return value
   return activeContext.value?.groupId ?? null
 })
+
+// A link without a node names a bucket of any node: the realm's bucket search names its holder.
+const resolving = ref(false)
+let resolveRun = 0
+watch([bucket, () => route.query.node, sessionEpoch], async ([name, node]) => {
+  const run = ++resolveRun
+  resolving.value = false
+  if (node || !name || mockEnabled()) return
+  resolving.value = true
+  const scope = groupId.value
+  const found = await searchBuckets(name, { limit: 50, groupId: scope || undefined }).catch(() => null)
+  if (run !== resolveRun) return
+  const hits = (found?.hits ?? []).filter((hit) => hit.bucket === name && (!scope || hit.group_id === scope))
+  const holder = hits.some((hit) => realmNodes.isLocalNode(hit.node_id)) ? null : hits[0]
+  if (holder) await router.replace({ query: { ...route.query, node: holder.node_id, group: scope || holder.group_id } })
+  if (run === resolveRun) resolving.value = false
+}, { immediate: true })
 
 const group = ref<GroupDetailResponse | null>(null)
 watch(
@@ -161,7 +180,7 @@ const browserLink = computed(() => ({
   <div>
     <PageHeader
       :title="bucket"
-      :description="summary"
+      :description="resolving ? undefined : summary"
       :crumbs="[{ label: bucket, to: browserLink }, { label: 'Settings' }]"
       :docs="{ topic: 'where-data-lives', section: 'Buckets' }"
     >
@@ -172,7 +191,8 @@ const browserLink = computed(() => ({
       </template>
     </PageHeader>
 
-    <Tabs v-model="tab" class="w-full px-4 sm:px-6 space-y-5 py-6">
+    <Spinner v-if="resolving" label="Finding the node of this bucket" class="m-6" />
+    <Tabs v-else v-model="tab" class="w-full px-4 sm:px-6 space-y-5 py-6">
       <div class="overflow-x-auto">
         <TabsList aria-label="Bucket settings sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>

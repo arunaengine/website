@@ -37,6 +37,10 @@ const setState = ref('ordinary')
 const setError = ref<string | null>(null)
 const group = ref<GroupDetailResponse>(groupDetail(false))
 const sessionEpoch = ref(0)
+const searchBuckets = vi.fn(async (..._args: unknown[]) => ({ hits: [] as object[] }))
+const replace = vi.fn(async (to: { query: Record<string, string> }) => {
+  route.query = to.query
+})
 const bucketUsage = vi.fn((..._args: unknown[]) => Promise.resolve(usage.value))
 const usage = ref({ logical_bytes: 2048, objects: 52, versions: 60, delete_markers: 0, open_multipart_uploads: 0, complete: true })
 
@@ -70,13 +74,14 @@ const Marker = (text: string) => defineComponent({ setup: () => () => h('section
 
 const view = compileClientComponent(new URL('./BucketStorageView.vue', import.meta.url), {
   vue: VueRuntime,
-  'vue-router': { RouterLink: Slotted('a'), useRoute: () => route },
+  'vue-router': { RouterLink: Slotted('a'), useRoute: () => route, useRouter: () => ({ replace }) },
   '@lucide/vue': new Proxy({}, { get: () => IconStub }),
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
   '@/components/ui/DocsLink.vue': moduleDefault(Slotted('a')),
   '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
+  '@/components/ui/Spinner.vue': moduleDefault(Marker('finding the node')),
   '@/components/ui/Tabs.vue': moduleDefault(TabsStub),
   '@/components/ui/TabsContent.vue': moduleDefault(TabsContentStub),
   '@/components/ui/TabsList.vue': moduleDefault(Slotted('div')),
@@ -113,6 +118,7 @@ const view = compileClientComponent(new URL('./BucketStorageView.vue', import.me
       getGroup: () => Promise.resolve(group.value),
       getBucketUsage: bucketUsage,
       isRealmAdmin,
+      searchBuckets,
       sessionEpoch,
     }),
   },
@@ -163,6 +169,17 @@ function tabLabels(root: Awaited<ReturnType<typeof render>>): string[] {
 }
 
 describe('bucket storage page', () => {
+  it('finds the node of a bucket the link names without one before it shows settings', async () => {
+    searchBuckets.mockResolvedValueOnce({ hits: [{ bucket: 'reef-survey', node_id: 'node-b', group_id: 'g-1' }] })
+    const root = await render({ query: { tab: 'encryption' } })
+    await flush()
+
+    expect(searchBuckets).toHaveBeenLastCalledWith('reef-survey', { limit: 50, groupId: 'g-1' })
+    expect(replace).toHaveBeenLastCalledWith({ query: { tab: 'encryption', node: 'node-b', group: 'g-1' } })
+    expect(content(root)).toContain('encryption state')
+    expect(content(root)).not.toContain('finding the node')
+  })
+
   it('keeps the policy tabs from a reader', async () => {
     const root = await render()
 
