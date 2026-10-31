@@ -87,6 +87,8 @@ export interface RealmInfoResponse {
   // api base urls of the realm's management nodes, this node's own first.
   is_management_node?: boolean
   management_urls?: string[]
+  // Public: each server and management node's id and api base url, so a share link reaches it.
+  public_nodes?: Array<{ node_id: string; api_url: string }>
   oidc_providers: Array<{
     id: string
     issuer: string

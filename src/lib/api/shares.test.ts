@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { listVisitFiles, openShare, shareUrl, shareUses, ticketUrl } from './shares'
+import { datasetTicket, listDatasetPart, listVisitFiles, openShare, shareUrl, ticketUrl } from './shares'
 import { crateSummary, expiryFor, modesFor, sameTarget } from '@/lib/shareLinks'
 
 interface Sent {
@@ -47,19 +47,18 @@ describe('share link requests', () => {
     expect(sent[0].auth).toBe('Share v1')
   })
 
-  it('counts downloads and uploads over every log page', async () => {
-    const sent = stubFetch([
-      { body: { entries: [{ action: 'open' }, { action: 'download' }, { action: 'upload' }], next: 'L2' } },
-      { body: { entries: [{ action: 'download' }, { action: 'wrong_password' }], next: null } },
-    ])
+  it('lists a folder part of a dataset and names a file inside it for its ticket', async () => {
+    const sent = stubFetch([{ body: { files: [], folders: [] } }, { body: { path: '/p', expires_at: '' } }, { body: { path: '/p', expires_at: '' } }])
+    const base = 'https://node.test/api/v1'
 
-    const uses = await shareUses('S1', { baseUrl: 'https://node.test/api/v1', token: 't' })
+    await listDatasetPart('https://w3id.org/aruna/data/x', { prefix: 'run-1/' }, 'v1', base)
+    await datasetTicket('https://w3id.org/aruna/data/x', 'run-1/table.csv', 'v1', base)
+    await datasetTicket('https://w3id.org/aruna/data/y', undefined, 'v1', base)
 
-    expect(uses).toEqual({ downloads: 2, uploads: 1 })
-    expect(sent.map((entry) => entry.url)).toEqual([
-      'https://node.test/api/v1/shares/S1/log?limit=1000',
-      'https://node.test/api/v1/shares/S1/log?after=L2&limit=1000',
-    ])
+    expect(sent[0].url).toBe('https://node.test/api/v1/shares/visit/dataset/files?part=https%3A%2F%2Fw3id.org%2Faruna%2Fdata%2Fx&prefix=run-1%2F')
+    expect(sent[0].auth).toBe('Share v1')
+    expect(sent[1].body).toEqual({ entity_id: 'https://w3id.org/aruna/data/x', name: 'run-1/table.csv' })
+    expect(sent[2].body).toEqual({ entity_id: 'https://w3id.org/aruna/data/y' })
   })
 
   it('builds the ticket address on the node origin', () => {

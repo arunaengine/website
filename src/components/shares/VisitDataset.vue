@@ -42,7 +42,7 @@ async function download(entityId: string) {
   downloading.value = entityId
   error.value = null
   try {
-    const url = await props.visit(async (token, base) => ticketUrl(base, (await datasetTicket(entityId, token, base)).path))
+    const url = await props.visit(async (token, base) => ticketUrl(base, (await datasetTicket(entityId, undefined, token, base)).path))
     window.location.assign(url)
   } catch (cause) {
     if (!isUnavailable(cause)) error.value = errorMessage(cause)

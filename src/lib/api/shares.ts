@@ -24,6 +24,11 @@ export interface ShareInfo {
   password: boolean
   revoked_at: string | null
   status: ShareStatus
+  /** Counted on the node as the link is used. */
+  downloads: number
+  uploads: number
+  /** The last open, download or upload; null while the link was never used. */
+  last_access_at?: string | null
 }
 
 export interface ShareDetails {
@@ -83,21 +88,6 @@ export function shareLog(
   return apiRequest(`/shares/${encodeURIComponent(id)}/log`, { query, signal }, client)
 }
 
-/** Downloads and uploads over the whole log, read page by page. */
-export async function shareUses(id: string, client: ApiClientOptions, signal?: AbortSignal) {
-  const uses = { downloads: 0, uploads: 0 }
-  let after: string | undefined
-  do {
-    const page = await shareLog(id, { after, limit: 1000 }, client, signal)
-    for (const entry of page.entries) {
-      if (entry.action === 'download') uses.downloads += 1
-      else if (entry.action === 'upload') uses.uploads += 1
-    }
-    after = page.next ?? undefined
-  } while (after)
-  return uses
-}
-
 /** The link a visitor opens; the token stays in the fragment so it never reaches a server log. */
 export function shareUrl(site: string, nodeId: string, token: string): string {
   return `${site.replace(/\/+$/, '')}/s/${encodeURIComponent(nodeId)}#${token}`
@@ -132,10 +122,17 @@ export interface VisitListing {
   next_cursor?: string | null
 }
 
+export interface VisitDatasetFile {
+  entity_id: string
+  name?: string | null
+  /** `folder` for a folder or bucket part, listed with `listDatasetPart`. */
+  kind: 'file' | 'folder'
+}
+
 export interface VisitDataset {
   dataset_id: string
   rocrate: Record<string, unknown>
-  files: { entity_id: string; name?: string | null }[]
+  files: VisitDatasetFile[]
 }
 
 export interface VisitTicket {
@@ -175,9 +172,20 @@ export function visitDataset(visitToken: string, baseUrl: string): Promise<Visit
   return apiRequest('/shares/visit/dataset', { headers: shareAuth(visitToken) }, { baseUrl })
 }
 
-export function datasetTicket(entityId: string, visitToken: string, baseUrl: string): Promise<VisitTicket> {
-  const init = { method: 'POST', body: JSON.stringify({ entity_id: entityId }), headers: shareAuth(visitToken) }
-  return apiRequest('/shares/visit/dataset/tickets', init, { baseUrl })
+/** One level of a folder part; names are relative to the part. */
+export function listDatasetPart(
+  part: string,
+  query: { prefix?: string; cursor?: string; limit?: number },
+  visitToken: string,
+  baseUrl: string,
+): Promise<VisitListing> {
+  return apiRequest('/shares/visit/dataset/files', { query: { part, ...query }, headers: shareAuth(visitToken) }, { baseUrl })
+}
+
+/** A file part by its id, or a file inside a folder part by the part's id and its `name`. */
+export function datasetTicket(entityId: string, name: string | undefined, visitToken: string, baseUrl: string): Promise<VisitTicket> {
+  const body = JSON.stringify(name === undefined ? { entity_id: entityId } : { entity_id: entityId, name })
+  return apiRequest('/shares/visit/dataset/tickets', { method: 'POST', body, headers: shareAuth(visitToken) }, { baseUrl })
 }
 
 /** The ticket path on the node's origin; the path already starts with `/api/v1`. */
@@ -185,7 +193,7 @@ export function ticketUrl(baseUrl: string, path: string): string {
   return `${baseUrl.replace(/\/+$/, '').replace(/\/api\/v1$/, '')}${path}`
 }
 
-/** Sends one file with upload progress, which fetch cannot report. */
+/** Streams one file with upload progress, which fetch cannot report. */
 export function uploadVisitFile(
   name: string,
   file: Blob,
@@ -196,7 +204,7 @@ export function uploadVisitFile(
 ): Promise<UploadedFile> {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest()
-    request.open('PUT', apiUrl('/shares/visit/files', { name }, { baseUrl }).href)
+    request.open('PUT', apiUrl('/shares/visit/uploads', { name }, { baseUrl }).href)
     request.setRequestHeader('Authorization', `Share ${visitToken}`)
     request.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
     request.upload.onprogress = (event) => onProgress(event.loaded)

@@ -67,8 +67,8 @@ describe('useVisitUploads', () => {
     await add('', [file('report.pdf'), file('b.txt', '', '')])
 
     expect(requests.map((request) => request.url)).toEqual([
-      'https://node.test/api/v1/shares/visit/files?name=report.pdf',
-      'https://node.test/api/v1/shares/visit/files?name=b.txt',
+      'https://node.test/api/v1/shares/visit/uploads?name=report.pdf',
+      'https://node.test/api/v1/shares/visit/uploads?name=b.txt',
     ])
     expect(requests[0].headers).toEqual({ Authorization: 'Share v1', 'Content-Type': 'application/pdf' })
     expect(requests[1].headers['Content-Type']).toBe('application/octet-stream')

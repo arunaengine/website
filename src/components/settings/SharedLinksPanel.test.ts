@@ -23,6 +23,9 @@ function share(id: string, overrides: Record<string, unknown> = {}) {
     password: false,
     revoked_at: null,
     status: 'active',
+    downloads: 0,
+    uploads: 0,
+    last_access_at: null,
     ...overrides,
   }
 }
@@ -56,7 +59,6 @@ const SharedLinksPanel = compileClientComponent(new URL('./SharedLinksPanel.vue'
   '@/components/ui/Notice.vue': moduleDefault(Pass),
   '@/components/ui/RefusalNote.vue': moduleDefault(defineComponent({ props: { message: String }, setup: (props) => () => h('p', props.message) })),
   '@/components/ui/SectionHeading.vue': moduleDefault(Pass),
-  '@/components/ui/Skeleton.vue': moduleDefault(defineComponent(() => () => h('i', 'loading'))),
   '@/components/settings/ShareLogDialog.vue': moduleDefault(defineComponent({ props: { open: Boolean, share: Object }, setup: (props) => () => h('aside', props.open ? `log of ${(props.share as { id: string }).id}` : '') })),
   '@/components/nodes/node-probe': { nodeApiBase: (node: { info?: { urls?: { api?: string } } }) => node.info?.urls?.api ?? null },
   '@/composables/useAruna': { useAruna: () => aruna },
@@ -75,11 +77,9 @@ beforeEach(() => {
   sent = []
   copied.length = 0
   routes = {
-    'GET https://local.test/api/v1/shares': json({ shares: [share('L1')] }),
-    'GET https://remote.test/api/v1/shares': json({ shares: [share('R1', { created_at: '2026-10-31T09:00:00Z', target: { kind: 'bucket', bucket: 'reef' }, password: true })] }),
+    'GET https://local.test/api/v1/shares': json({ shares: [share('L1', { downloads: 2 })] }),
+    'GET https://remote.test/api/v1/shares': json({ shares: [share('R1', { created_at: '2026-10-31T09:00:00Z', target: { kind: 'bucket', bucket: 'reef' }, password: true, uploads: 1, last_access_at: '2026-10-31T10:00:00Z' })] }),
     'GET https://down.test/api/v1/shares': json({ error: 'down' }, 503),
-    'GET https://local.test/api/v1/shares/L1/log?limit=1000': json({ entries: [{ action: 'download' }, { action: 'download' }], next: null }),
-    'GET https://remote.test/api/v1/shares/R1/log?limit=1000': json({ entries: [{ action: 'upload' }], next: null }),
     'DELETE https://remote.test/api/v1/shares/R1': () => new Response(null, { status: 204 }),
   }
   vi.stubGlobal('window', { location: { origin: 'https://portal.test' } })
@@ -104,8 +104,9 @@ describe('SharedLinksPanel', () => {
     expect(rows.map((row) => content(row))).toEqual([expect.stringContaining('reef'), expect.stringContaining('data/results/')])
     expect(content(root)).toContain('1 node did not answer')
     expect(sent.some((entry) => entry.url.startsWith('https://phone.test'))).toBe(false)
-    await vi.waitFor(() => expect(content(rowOf(root, 'reef'))).toMatch(/Yes\s*0\s*1\s*Active/))
-    expect(content(rowOf(root, 'data/results/'))).toMatch(/No\s*2\s*0\s*Active/)
+    expect(content(rowOf(root, 'reef'))).toMatch(new RegExp(`Yes\\s*0\\s*1\\s*${formatDateTime('2026-10-31T10:00:00Z')}\\s*Active`))
+    expect(content(rowOf(root, 'data/results/'))).toMatch(/No\s*2\s*0\s*Never\s*Active/)
+    expect(sent.some((entry) => entry.url.includes('/log'))).toBe(false)
   })
 
   it('copies and revokes a link on the node that holds it, and opens its log', async () => {
@@ -139,12 +140,5 @@ describe('SharedLinksPanel', () => {
     } finally {
       aruna.realmInfo.value = { nodes: nodesBefore }
     }
-  })
-
-  it('shows a count it could not read as not known, never as zero', async () => {
-    routes['GET https://local.test/api/v1/shares/L1/log?limit=1000'] = json({ error: 'gone' }, 500)
-    const { root } = await mountApp(SharedLinksPanel)
-
-    await vi.waitFor(() => expect(content(rowOf(root, 'data/results/'))).toContain('Not known'))
   })
 })

@@ -27,6 +27,9 @@ function share(overrides: Record<string, unknown> = {}) {
     password: false,
     revoked_at: null,
     status: 'active',
+    downloads: 0,
+    uploads: 0,
+    last_access_at: null,
     ...overrides,
   }
 }

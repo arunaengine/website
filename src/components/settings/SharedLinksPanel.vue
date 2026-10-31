@@ -12,13 +12,12 @@ import ListPager from '@/components/ui/ListPager.vue'
 import Notice from '@/components/ui/Notice.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
-import Skeleton from '@/components/ui/Skeleton.vue'
 import ShareLogDialog from '@/components/settings/ShareLogDialog.vue'
 import { nodeApiBase } from '@/components/nodes/node-probe'
 import { useAruna } from '@/composables/useAruna'
 import { linkFor, shareClient, shareErrorMessage } from '@/composables/useShareLinks'
 import { isUnsupportedEndpoint } from '@/composables/aruna/connectors'
-import { listShares, revokeShare, shareUses, type ShareInfo } from '@/lib/api'
+import { listShares, revokeShare, type ShareInfo } from '@/lib/api'
 import { KIND_LABELS, MODE_LABELS, STATUS_LABELS, targetPath } from '@/lib/shareLinks'
 import { copyToClipboard, formatDateTime } from '@/lib/utils'
 
@@ -31,13 +30,11 @@ interface Row {
   /** null is the connected node. */
   nodeId: string | null
 }
-type Uses = { downloads: number; uploads: number } | 'loading' | 'unknown'
 
 const rows = ref<Row[]>([])
 const loading = ref(false)
 const silentNodes = ref(0)
 const error = ref<string | null>(null)
-const uses = ref<Record<string, Uses>>({})
 const page = ref(1)
 const pageSize = ref(10)
 const busy = ref<string | null>(null)
@@ -67,7 +64,6 @@ async function load() {
   silentNodes.value = failed.length
   if (failed.length === answers.length && !found.length) error.value = shareErrorMessage((failed[0] as PromiseRejectedResult).reason)
   rows.value = found.sort((a, b) => b.share.created_at.localeCompare(a.share.created_at))
-  uses.value = {}
   page.value = 1
   loading.value = false
 }
@@ -77,27 +73,6 @@ watch([currentUser, () => nodesToAsk().join()], ([user]) => user && void load(),
 watch(() => props.refreshRevision, () => currentUser.value && void load())
 
 const shown = computed(() => rows.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value))
-
-// Counts come from each link's log, read for the rows on screen only.
-watch(shown, (list) => {
-  const run = generation
-  for (const row of list) {
-    if (uses.value[row.share.id]) continue
-    uses.value = { ...uses.value, [row.share.id]: 'loading' }
-    void shareClient(row.nodeId)
-      .then((client) => shareUses(row.share.id, client))
-      .then(
-        (counted) => run === generation && (uses.value = { ...uses.value, [row.share.id]: counted }),
-        () => run === generation && (uses.value = { ...uses.value, [row.share.id]: 'unknown' }),
-      )
-  }
-})
-
-function count(row: Row, kind: 'downloads' | 'uploads'): string | null {
-  const known = uses.value[row.share.id]
-  if (!known || known === 'loading') return null
-  return known === 'unknown' ? 'Not known' : known[kind].toLocaleString('en-US')
-}
 
 async function copy(row: Row) {
   busy.value = row.share.id
@@ -152,6 +127,7 @@ function openLog(row: Row) {
                 <th class="px-5 py-2 text-left font-semibold">Password</th>
                 <th class="px-5 py-2 text-right font-semibold">Downloads</th>
                 <th class="px-5 py-2 text-right font-semibold">Uploads</th>
+                <th class="px-5 py-2 text-left font-semibold">Last used</th>
                 <th class="px-5 py-2 text-left font-semibold">Status</th>
                 <th class="px-5 py-2"><span class="sr-only">Actions</span></th>
               </tr>
@@ -168,14 +144,9 @@ function openLog(row: Row) {
                 <td class="whitespace-nowrap px-5 py-2.5 text-muted-foreground">{{ row.share.expires_at ? formatDateTime(row.share.expires_at) : 'No expiry' }}</td>
                 <td class="whitespace-nowrap px-5 py-2.5 text-muted-foreground">{{ formatDateTime(row.share.created_at) }}</td>
                 <td class="px-5 py-2.5 text-muted-foreground">{{ row.share.password ? 'Yes' : 'No' }}</td>
-                <td class="px-5 py-2.5 text-right tabular-nums text-muted-foreground">
-                  <Skeleton v-if="count(row, 'downloads') === null" class="ml-auto h-3 w-6" />
-                  <template v-else>{{ count(row, 'downloads') }}</template>
-                </td>
-                <td class="px-5 py-2.5 text-right tabular-nums text-muted-foreground">
-                  <Skeleton v-if="count(row, 'uploads') === null" class="ml-auto h-3 w-6" />
-                  <template v-else>{{ count(row, 'uploads') }}</template>
-                </td>
+                <td class="px-5 py-2.5 text-right tabular-nums text-muted-foreground">{{ row.share.downloads.toLocaleString('en-US') }}</td>
+                <td class="px-5 py-2.5 text-right tabular-nums text-muted-foreground">{{ row.share.uploads.toLocaleString('en-US') }}</td>
+                <td class="whitespace-nowrap px-5 py-2.5 text-muted-foreground">{{ row.share.last_access_at ? formatDateTime(row.share.last_access_at) : 'Never' }}</td>
                 <td class="px-5 py-2.5 text-muted-foreground">{{ STATUS_LABELS[row.share.status] }}</td>
                 <td class="whitespace-nowrap px-5 py-2.5 text-right">
                   <Button v-if="row.share.status === 'active'" variant="outline" size="icon-sm" :disabled="busy === row.share.id" aria-label="Copy link" title="Copy link" @click="copy(row)">
@@ -195,7 +166,7 @@ function openLog(row: Row) {
                 </td>
               </tr>
               <tr v-if="!rows.length">
-                <td colspan="9" class="px-5 py-6 text-center text-xs text-muted-foreground">
+                <td colspan="10" class="px-5 py-6 text-center text-xs text-muted-foreground">
                   {{ loading ? 'Loading shared links…' : 'No shared links yet' }}
                 </td>
               </tr>
