@@ -524,7 +524,8 @@ watch(
             <div class="surface">
             <div class="space-y-3 p-5">
               <label class="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-                <Switch :checked="snapshots?.operator_draining ?? false" :disabled="drainBusy || !snapshots" aria-label="Drain this node's compute plane" @update:checked="setDrain" />
+                <!-- On while the node accepts work, as the node table above says. -->
+                <Switch :checked="Boolean(snapshots) && !snapshots?.operator_draining" :disabled="drainBusy || !snapshots" aria-label="Accept new compute work on this node" @update:checked="(accepting: boolean) => setDrain(!accepting)" />
                 {{ snapshots?.operator_draining ? 'Draining' : 'Accepting new compute work' }}
               </label>
               <p class="text-[11px] text-muted-foreground">
