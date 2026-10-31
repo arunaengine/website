@@ -20,6 +20,8 @@ const props = defineProps<{
   access?: boolean
   /** Share links work on ordinary buckets of a realm node. */
   links?: boolean
+  /** Why this bucket cannot have share links; Share then shows disabled with it. */
+  linkReason?: string | null
 }>()
 const emit = defineEmits<{ (e: 'pick', action: RowAction): void }>()
 
@@ -48,6 +50,7 @@ const groups = computed<RowAction[][]>(() => {
 })
 
 function blocked(action: RowAction): boolean {
+  if (action === 'share-link') return Boolean(props.linkReason)
   return Boolean(props.changeReason) && ['rename', 'move', 'delete', 'purge'].includes(action)
 }
 </script>
@@ -64,17 +67,18 @@ function blocked(action: RowAction): boolean {
       <DropdownMenuLabel class="max-w-[12rem] truncate">{{ name }}</DropdownMenuLabel>
       <template v-for="(group, index) in groups" :key="index">
         <DropdownMenuSeparator v-if="index" />
-        <DropdownMenuItem
-          v-for="action in group"
-          :key="action"
-          :disabled="blocked(action)"
-          :title="blocked(action) ? changeReason ?? undefined : undefined"
+        <template v-for="action in group" :key="action">
+          <DropdownMenuItem
+            :disabled="blocked(action)"
+            :title="blocked(action) && action !== 'share-link' ? changeReason ?? undefined : undefined"
             :class="action === 'delete' || action === 'purge' ? 'text-destructive focus:text-destructive' : undefined"
-          @click="emit('pick', action)"
-        >
-          <component :is="ICONS[action]" class="h-3.5 w-3.5" />
-          {{ action === 'delete' && folder ? 'Delete folder' : LABELS[action] }}
-        </DropdownMenuItem>
+            @click="emit('pick', action)"
+          >
+            <component :is="ICONS[action]" class="h-3.5 w-3.5" />
+            {{ action === 'delete' && folder ? 'Delete folder' : LABELS[action] }}
+          </DropdownMenuItem>
+          <p v-if="action === 'share-link' && linkReason" class="max-w-[14rem] px-2 pb-1.5 pl-[1.875rem] text-xs text-muted-foreground">{{ linkReason }}</p>
+        </template>
       </template>
     </DropdownMenuContent>
   </DropdownMenu>

@@ -251,8 +251,12 @@ const linkedPart = computed(() => {
   return prefix ? ` (only ${prefix}/)` : ''
 })
 
-// Share links need an ordinary bucket on a node visitors can reach, not one on this computer.
-const linksShown = computed(() => props.setId === null && Boolean(bucket.value) && !onThisComputer.value)
+// Share links need an ordinary bucket on a node visitors can reach; the node refuses distributed ones.
+const linksShown = computed(() => Boolean(bucket.value))
+const linkReason = computed(() => {
+  if (onThisComputer.value) return 'Share links need a bucket on a realm node, not on this computer.'
+  return props.setId ? 'Share links are not available for distributed buckets yet.' : null
+})
 
 // A bucket on this computer: its files are already here, so no folder can be linked.
 const onThisComputer = computed(
@@ -618,9 +622,13 @@ async function onDrop(event: DragEvent) {
             bell
             :label-class="toolbarLabel"
           />
-          <Button v-if="linksShown" variant="outline" size="sm" aria-label="Share bucket" title="Share this bucket with a link" @click="emit('share-link', { kind: 'bucket', bucket })">
-            <Share2 class="h-4 w-4" /><span :class="toolbarLabel">Share</span>
-          </Button>
+          <Tooltip v-if="linksShown" :label="linkReason ?? 'Share this bucket with a link'">
+            <span class="inline-flex" :tabindex="linkReason ? 0 : undefined">
+              <Button variant="outline" size="sm" aria-label="Share bucket" :disabled="Boolean(linkReason)" :title="linkReason ?? 'Share this bucket with a link'" @click="emit('share-link', { kind: 'bucket', bucket })">
+                <Share2 class="h-4 w-4" /><span :class="toolbarLabel">Share</span>
+              </Button>
+            </span>
+          </Tooltip>
           <!-- The count of syncs and placement policies; the settings page names them. -->
           <span v-if="showStorageButton" data-tour="bucket-settings" class="inline-flex">
             <Button variant="outline" size="sm" aria-label="Bucket settings" title="Bucket settings" @click="openBucketSettings">
@@ -947,6 +955,7 @@ async function onDrop(event: DragEvent) {
                     :change-reason="folderReason(folder.prefix)"
                     :access="Boolean(activeGroupId)"
                     :links="linksShown"
+                    :link-reason="linkReason"
                     @pick="(action: RowAction) => onFolderAction(folder, action)"
                   />
                 </div>
@@ -1032,6 +1041,7 @@ async function onDrop(event: DragEvent) {
                     :change-reason="objectReason(object.key)"
                     :access="Boolean(activeGroupId)"
                     :links="linksShown"
+                    :link-reason="linkReason"
                     @pick="(action: RowAction) => onObjectAction(object, action)"
                   />
                 </div>

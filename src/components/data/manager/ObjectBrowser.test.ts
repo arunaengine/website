@@ -95,7 +95,7 @@ describe('object browser row actions', () => {
         .filter((node) => node.tag === 'button' && node.props['aria-label'])
         .map((node) => String(node.props['aria-label'])),
     ).toEqual(['Preview', 'Download', 'Actions for reads.fastq'])
-    expect(menuLabels(row)).toEqual(['Preview', 'Download', 'Rename', 'Copy to', 'Move to', 'Copy link for members', 'Make public', 'Delete', 'Delete permanently…'])
+    expect(menuLabels(row)).toEqual(['Preview', 'Download', 'Rename', 'Share', 'Copy to', 'Move to', 'Copy link for members', 'Make public', 'Delete', 'Delete permanently…'])
     // Icon only: the label is the accessible name, not visible text.
     expect(content(action(root, 'Preview')).trim()).toBe('')
   })
@@ -221,10 +221,16 @@ describe('object browser row actions', () => {
     ])
   })
 
-  it('leaves Share out while the bucket may be distributed', async () => {
-    const root = await render({}, { setId: undefined })
-    expect(menuLabels(element(root, (node) => node.tag === 'tr' && content(node).includes('reads.fastq')))).not.toContain('Share')
-    expect(() => action(root, 'Share bucket')).toThrow()
+  it('shows Share disabled with the reason in a distributed bucket', async () => {
+    const root = await render({ folders: ref([listedFolder]) }, { setId: 's1' })
+    const reason = 'Share links are not available for distributed buckets yet.'
+
+    for (const name of ['reads.fastq', 'genomes']) {
+      expect(menuItem(root, 'Share', name).props.disabled).toBe(true)
+      expect(content(element(root, (node) => node.tag === 'tr' && content(node).includes(name)))).toContain(reason)
+    }
+    expect(action(root, 'Share bucket').props.disabled).toBe(true)
+    expect(action(root, 'Share bucket').props.title).toBe(reason)
   })
 
   it('links the realm website from the desktop and names the node that serves the bucket', async () => {
@@ -1061,7 +1067,7 @@ describe('object browser public access', () => {
 
     // The folder icon marks it; the name carries no trailing slash, the title keeps it.
     expect(content(element(row, (node) => node.tag === 'button' && node.props.title === `${listedFolder.name}/`))).toBe(listedFolder.name)
-    expect(menuLabels(row)).toEqual(['Open', 'Details', 'Rename', 'Copy to', 'Move to', 'Make public', 'Delete folder', 'Delete permanently…'])
+    expect(menuLabels(row)).toEqual(['Open', 'Details', 'Rename', 'Share', 'Copy to', 'Move to', 'Make public', 'Delete folder', 'Delete permanently…'])
 
     await click(menuItem(root, 'Details', `${listedFolder.name}/`))
 
