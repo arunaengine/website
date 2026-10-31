@@ -5,7 +5,6 @@ import { bootRuntimeConfig } from './lib/desktop'
 import { isChunkError, recoverFromChunkError } from './lib/chunk-recovery'
 import { reportGlobalError } from './composables/useGlobalErrors'
 import { useTheme } from './composables/useTheme'
-import { startRenewal } from './composables/aruna/renewal'
 import './assets/main.css'
 
 router.onError((error, to) => {
@@ -40,5 +39,6 @@ useTheme()
 
 void bootRuntimeConfig().finally(() => {
   createApp(App).use(router).mount('#app')
-  startRenewal()
+  // Loaded after the config, since the session state reads the API base when it loads.
+  void import('./composables/aruna/renewal').then(({ startRenewal }) => startRenewal())
 })
