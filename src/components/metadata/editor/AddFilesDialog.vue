@@ -17,6 +17,7 @@ import UploadTab from '@/components/data/add/UploadTab.vue'
 import DatabasesTab from '@/components/data/add/DatabasesTab.vue'
 import SubcratePickerDialog from '@/components/metadata/SubcratePickerDialog.vue'
 import { useAruna } from '@/composables/useAruna'
+import { listBuckets } from '@/composables/useBucketCount'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3, s3ErrorMessage, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { UPLOAD_FINISHING_MESSAGE, useUploadQueue } from '@/composables/useUploadQueue'
@@ -47,6 +48,7 @@ import {
 } from '@/lib/crate/editor'
 import { isAbsoluteUri } from '@/lib/profiles/uri'
 import { isDataEntity } from '@/lib/dataEntities'
+import { isHiddenBucket } from '@/lib/workspaces'
 import { ApiError, getStorageLocation, type MetadataDocumentListItem, type StorageLocation } from '@/lib/api'
 import { isNodeArn, partId } from '@/lib/linkedPart'
 import { formatBytes } from '@/lib/utils'
@@ -65,10 +67,10 @@ const emit = defineEmits<{
   (e: 'update', draft: CrateDraft): void
 }>()
 
-const { apiBaseUrl, authToken, nodeInfo, getGroup, getFileOrigin, getFilePartOf, getBucketDistribution, getPartTarget } = useAruna()
+const { apiBaseUrl, authToken, nodeInfo, getGroup, getFileOrigin, getFilePartOf, getBucketDistribution, getPartTarget, searchBuckets } = useAruna()
 const s3 = useS3()
 const queue = useUploadQueue()
-const { isLocalNode } = useRealmNodes()
+const { isLocalNode, isTarget } = useRealmNodes()
 
 const FORMATS: Readonly<Record<string, string>> = {
   csv: 'text/csv',
@@ -98,6 +100,8 @@ const SOURCES = [
 const bucket = ref('')
 const prefix = ref('')
 const buckets = ref<Array<{ value: string; label: string }>>([])
+// The node of each upload bucket; null is the connected node.
+const bucketNodes = ref(new Map<string, string | null>())
 const bucketError = ref('')
 // The storage location's bucket when this S3 session does not list it.
 const missingBucket = ref('')
@@ -164,13 +168,20 @@ async function loadBuckets() {
   missingBucket.value = ''
   bucket.value = ''
   try {
-    const [entries, stored] = await Promise.all([s3.listBuckets(), storageLocation()])
-    buckets.value = entries.map((entry) => ({ value: entry.name, label: entry.name }))
-    const found = stored && buckets.value.some((entry) => entry.value === stored.bucket) ? stored : null
+    const [listing, stored] = await Promise.all([listBuckets(searchBuckets, uploadGroup() ?? undefined, () => true), storageLocation()])
+    const found = new Map<string, string | null>()
+    // The buckets of every node but devices, as the Data view lists them; a name held here stays here.
+    for (const hit of listing.hits) {
+      if (isHiddenBucket(hit.bucket) || !isTarget(hit.node_id)) continue
+      if (isLocalNode(hit.node_id) || !found.has(hit.bucket)) found.set(hit.bucket, isLocalNode(hit.node_id) ? null : hit.node_id)
+    }
+    bucketNodes.value = found
+    buckets.value = [...found.keys()].map((name) => ({ value: name, label: name }))
+    const location = stored && found.has(stored.bucket) ? stored : null
     // Never another bucket: without the storage location the user picks one.
-    bucket.value = found?.bucket ?? ''
-    if (found && !prefix.value) prefix.value = found.prefix
-    if (stored && !found) missingBucket.value = stored.bucket
+    bucket.value = location?.bucket ?? ''
+    if (location && !prefix.value) prefix.value = location.prefix
+    if (stored && !location) missingBucket.value = stored.bucket
   } catch (error) {
     bucketError.value = s3ErrorMessage(error)
   }
@@ -340,14 +351,31 @@ function chooseDatabase(bucket: string, nodeId: string, groupId: string) {
   database.value = { bucket, nodeId: isLocalNode(nodeId) ? null : nodeId, groupId }
 }
 
-function upload(files: File[]) {
+function uploadGroup(): string | null {
+  return s3.activeContext.value?.groupId ?? props.groupId ?? null
+}
+
+async function upload(files: File[]) {
   if (!bucket.value) return
+  const name = bucket.value
+  const groupId = uploadGroup()
+  const nodeId = bucketNodes.value.get(name) ?? null
+  // The queue uploads through the bucket node's own session, opened here when there is none.
+  if (nodeId && groupId) {
+    try {
+      await s3.referenceForNode(nodeId, groupId)
+    } catch (error) {
+      bucketError.value = s3ErrorMessage(error)
+      return
+    }
+  }
   const known = new Set(queue.items.value.map((item) => item.id))
   const target = prefix.value.trim() ? `${prefix.value.trim().replace(/\/+$/, '')}/` : ''
   queue.enqueue(files, {
-    bucket: bucket.value,
+    bucket: name,
     prefix: target,
-    groupId: s3.activeContext.value?.groupId ?? props.groupId ?? null,
+    groupId,
+    ...(nodeId ? { nodeId } : {}),
   })
   uploading.value = [
     ...uploading.value,
@@ -358,13 +386,13 @@ function upload(files: File[]) {
 // An upload becomes a part only once the object exists on the node.
 watch(uploads, (items) => void linkUploads(items), { deep: true })
 
-async function linkUploads(items: Array<{ id: number; bucket: string; key: string; name: string; size: number; state: string }>) {
+async function linkUploads(items: Array<{ id: number; bucket: string; key: string; name: string; size: number; state: string; nodeId?: string | null }>) {
   const ready = items.filter((item) => item.state === 'done' && !linked.value.has(item.id))
   if (!ready.length) return
   const parts: FilePart[] = []
   for (const item of ready) {
     linked.value.add(item.id)
-    parts.push(await filePart(item.bucket, item.key, item.name, item.size))
+    parts.push(await filePart(item.bucket, item.key, item.name, item.size, true, item.nodeId ?? null))
   }
   apply(parts)
 }

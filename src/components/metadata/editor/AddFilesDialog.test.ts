@@ -27,6 +27,9 @@ import * as Utils from '@/lib/utils'
 const BLAKE3 = 'a'.repeat(64)
 let resolvable = true
 let bucketNames = ['reads']
+// Buckets the search lists on other nodes and devices, beside this node's `bucketNames`.
+let otherHits: Array<{ bucket: string; node_id: string }> = []
+const referenceForNode = vi.fn(async (nodeId: string, groupId: string) => ({ nodeId, groupId, accessKeyId: 'k-2' }))
 const getGroup = vi.fn()
 const getStorageLocation = vi.fn()
 const getFileOrigin = vi.fn()
@@ -124,7 +127,14 @@ const AddFilesDialog = compileClientComponent(new URL('./AddFilesDialog.vue', im
     emits: ['choose'],
     setup: (_, { emit }) => () => h('button', { onClick: () => emit('choose', 'reads', 'node-2', 'group-9') }, 'Choose a database'),
   })),
-  '@/composables/useRealmNodes': { useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'node-1' }) },
+  '@/composables/useRealmNodes': {
+    useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'node-1', isTarget: (id: string) => id !== 'device-1' }),
+  },
+  '@/composables/useBucketCount': {
+    listBuckets: async (search: (q: string, options: { groupId?: string }) => Promise<{ hits: unknown[] }>, groupId?: string) =>
+      ({ hits: (await search('', { groupId })).hits, complete: true }),
+  },
+  '@/lib/workspaces': { isHiddenBucket: () => false },
   '@/components/metadata/SubcratePickerDialog.vue': moduleDefault(EmptyStub),
   '@/composables/useAruna': {
     useAruna: () => ({
@@ -136,13 +146,16 @@ const AddFilesDialog = compileClientComponent(new URL('./AddFilesDialog.vue', im
       getFilePartOf,
       getBucketDistribution,
       getPartTarget,
+      searchBuckets: async () => ({
+        hits: [...bucketNames.map((bucket) => ({ bucket, node_id: 'node-1' })), ...otherHits].map((hit) => ({ ...hit, group_id: 'group-1' })),
+      }),
     }),
   },
   '@/composables/useS3': {
     useS3: () => ({
-      listBuckets: async () => bucketNames.map((name) => ({ name })),
       activeContext: ref({ groupId: 'group-1' }),
       headObject: async () => ({ versionId: '01VERSION', metadata: {} }),
+      referenceForNode,
     }),
     s3ErrorMessage: (error: unknown) => String(error),
   },
@@ -189,6 +202,8 @@ beforeEach(() => {
   resolvable = true
   bucketNames = ['reads']
   browserNode = null
+  otherHits = []
+  referenceForNode.mockClear()
   browserEveryNode.length = 0
   enqueue.mockClear()
   getGroup.mockReset().mockResolvedValue({ dataset_location: { bucket: 'reads', prefix: '' } })
@@ -569,6 +584,35 @@ describe('AddFilesDialog', () => {
       [{ name: 'two.json', size: 64 }],
       { bucket: 'lab', prefix: 'projects/', groupId: 'group-1' },
     )
+    mounted.app.unmount()
+  })
+
+  it('uploads to a storage location bucket on another node through that node', async () => {
+    otherHits = [{ bucket: 'lab', node_id: 'node-2' }]
+    getGroup.mockResolvedValue({ dataset_location: { bucket: 'lab', prefix: 'projects/' } })
+    const mounted = await mount([])
+    await source(mounted.root, 'Upload to a bucket')
+    await flush()
+
+    await click(button(mounted.root, 'Pick files'))
+    await flush()
+    expect(referenceForNode).toHaveBeenCalledWith('node-2', 'group-1')
+    expect(enqueue).toHaveBeenCalledWith(
+      [{ name: 'two.json', size: 64 }],
+      { bucket: 'lab', prefix: 'projects/', groupId: 'group-1', nodeId: 'node-2' },
+    )
+    mounted.app.unmount()
+  })
+
+  it('offers no bucket of a device for uploads', async () => {
+    otherHits = [{ bucket: 'lab', node_id: 'device-1' }]
+    getGroup.mockResolvedValue({ dataset_location: { bucket: 'lab', prefix: 'projects/' } })
+    const mounted = await mount([])
+    await source(mounted.root, 'Upload to a bucket')
+    await flush()
+
+    expect(content(mounted.root)).toContain('The storage location bucket lab is not available to this session.')
+    expect(() => button(mounted.root, 'Pick files')).toThrow()
     mounted.app.unmount()
   })
 
