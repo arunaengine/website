@@ -5,7 +5,6 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import BucketRoutingSection from '@/components/data/BucketRoutingSection.vue'
 import DocsLink from '@/components/ui/DocsLink.vue'
-import StorageFeatureLink from '@/components/distributed/StorageFeatureLink.vue'
 import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -97,7 +96,6 @@ const groupDefault = computed(() => targetLabel(groupTarget.value, backends.valu
             Change it on the group Storage tab
           </RouterLink>
           <DocsLink icon topic="where-data-lives" section="Storage backend" class="ml-0.5" />
-          <StorageFeatureLink icon question="rules" class="ml-0.5" />
         </p>
       </div>
     </section>
