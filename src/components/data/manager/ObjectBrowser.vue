@@ -467,7 +467,6 @@ async function downloadSelected() {
 function onBarAction(action: SelectionAction) {
   if (action === 'download') void downloadSelected()
   else if (action === 'access') emit('public-access', publicTargets())
-  else if (action === 'share') void share([...selectedPrefixes.value, ...selectedObjectKeys.value])
   else if (action === 'delete') deleteSelection()
   else openTransfer(action, selectedSources())
 }
