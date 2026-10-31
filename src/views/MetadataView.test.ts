@@ -26,13 +26,21 @@ describe('MetadataView', () => {
       'part="places"',
       '<SubcratesSection',
       'title="Software"',
-      ':entities="otherEntities"',
       '<DatasetDetails',
+      ':entities="otherEntities"',
     ].map((marker) => overview.indexOf(marker))
     expect(order.every((index) => index >= 0)).toBe(true)
     expect(order).toEqual([...order].sort((a, b) => a - b))
     expect(source).not.toContain("'seg')")
     expect(source).not.toMatch(/routeSeg|segments|seg\.value/)
+  })
+
+  it('pairs short sections and lets a card without its partner span both columns', () => {
+    expect(source).toContain("const first = 'lg:[&:has(+:empty)]:col-span-2'")
+    expect(source).toContain("const second = 'lg:[:empty+&]:col-span-2'")
+    expect(source).not.toContain('grid-flow-dense')
+    const cells = [...source.matchAll(/:class="\[cell, ([^\]]+)\]"/g)].map((match) => match[1])
+    expect(cells).toEqual(['first', 'second', 'first', 'second', 'first', "entityView === 'list' ? second : 'lg:col-span-2'", "'lg:col-span-2'"])
   })
 
   it('switches only the entities between list and graph, and opens the graph for old links', () => {

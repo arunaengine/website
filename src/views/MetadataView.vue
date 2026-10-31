@@ -213,6 +213,9 @@ const software = computed(() => presentation.value.entities.filter((entity) => e
 const otherEntities = computed(() => presentation.value.entities.filter((entity) => entity.kind !== 'places' && entity.kind !== 'software'))
 // Short sections pair up on wide screens as equal-height cards; an empty cell takes no room.
 const cell = 'flex min-w-0 flex-col empty:hidden [&>section]:flex [&>section]:flex-1 [&>section]:flex-col [&>section>.surface]:flex-1'
+// A card whose partner cell is empty spans both columns, so no card stands alone at half width.
+const first = 'lg:[&:has(+:empty)]:col-span-2'
+const second = 'lg:[:empty+&]:col-span-2'
 const showCrateExport = ref(false)
 const showPublish = ref(false)
 const repositoryLinks = ref<InstanceType<typeof RepositoryLinksSection> | null>(null)
@@ -414,23 +417,20 @@ function jumpTo(entityId: string) {
                 />
               </template>
             </SectionHeading>
-            <div class="grid gap-6 lg:grid-flow-dense lg:grid-cols-2">
+            <div class="grid gap-6 lg:grid-cols-2">
               <template v-if="entityView === 'list'">
-                <div :class="cell"><PeoplePlaces :state="state" part="people" @open="openInfo" /></div>
-                <div :class="cell"><PeoplePlaces :state="state" part="places" @open="openInfo" /></div>
-                <div v-if="subcrateIris.size" :class="cell">
-                  <SubcratesSection :crate="currentCrate" :document-id="detailId" :can-write="Boolean(current) && canWrite" />
+                <div :class="[cell, first]"><PeoplePlaces :state="state" part="people" @open="openInfo" /></div>
+                <div :class="[cell, second]"><PeoplePlaces :state="state" part="places" @open="openInfo" /></div>
+                <div :class="[cell, first]">
+                  <SubcratesSection v-if="subcrateIris.size" :crate="currentCrate" :document-id="detailId" :can-write="Boolean(current) && canWrite" />
                 </div>
-                <div :class="cell"><DatasetRelated :state="state" /></div>
-                <div :class="cell">
+                <div :class="[cell, second]"><DatasetRelated :state="state" /></div>
+                <div :class="[cell, first]">
                   <ContextSection title="Software" :icon="AppWindow" :entities="software" :comments="[]" :highlight-id="highlightId" @jump="jumpEntity" />
-                </div>
-                <div :class="[cell, 'lg:col-span-2']">
-                  <ContextSection :entities="otherEntities" :comments="presentation.comments" :highlight-id="highlightId" @jump="jumpEntity" />
                 </div>
               </template>
               <DatasetGraph v-else :state="state" hide-heading class="lg:col-span-2" @open="openInfo" />
-              <div :class="cell">
+              <div :class="[cell, entityView === 'list' ? second : 'lg:col-span-2']">
                 <DatasetDetails
                   ref="details"
                   :state="state"
@@ -438,6 +438,9 @@ function jumpTo(entityId: string) {
                   :changed="changedStorage"
                   @changed="(value: StorageLocation) => (changedStorage = value)"
                 />
+              </div>
+              <div v-if="entityView === 'list'" :class="[cell, 'lg:col-span-2']">
+                <ContextSection :entities="otherEntities" :comments="presentation.comments" :highlight-id="highlightId" @jump="jumpEntity" />
               </div>
             </div>
           </div>
