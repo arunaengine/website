@@ -20,6 +20,8 @@ import {
 const listObjectVersions = vi.fn()
 const deleteObjectVersion = vi.fn(async () => undefined)
 const canWrite = vi.fn(() => true)
+const activeContext = ref<{ nodeId: string } | null>({ nodeId: 'node-a' })
+class S3ContextMismatchError extends Error {}
 
 const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
 const slotted = (tag: string) =>
@@ -52,8 +54,9 @@ const panel = compileClientComponent(new URL('./ObjectVersionsPanel.vue', import
   '@/lib/deletion/options': DeletionOptions,
   '@/lib/objectVersions': ObjectVersions,
   '@/composables/useS3': {
+    S3ContextMismatchError,
     s3ErrorMessage: (error: unknown) => String(error),
-    useS3: () => ({ listObjectVersions, deleteObjectVersion, canWrite, downloadUrl: async () => 'url' }),
+    useS3: () => ({ listObjectVersions, deleteObjectVersion, canWrite, activeContext, downloadUrl: async () => 'url' }),
   },
   '@/components/ui/Badge.vue': moduleDefault(slotted('span')),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
@@ -191,6 +194,19 @@ describe('object versions panel', () => {
 
     expect(listObjectVersions).toHaveBeenCalledWith('reef', 'a.txt', 'node-b')
     expect(content(root)).not.toContain('served by another node')
+    expect(content(root)).toContain('Current')
+  })
+
+  it('waits for the session of the bucket node instead of showing the mismatch', async () => {
+    listObjectVersions.mockClear()
+    listObjectVersions.mockRejectedValueOnce(new S3ContextMismatchError('Session issuer node-a cannot access node node-b'))
+    const { root } = await render([current], 'node-b')
+    expect(content(root)).not.toContain('cannot access')
+    expect(content(root)).not.toContain('Current')
+
+    activeContext.value = { nodeId: 'node-b' }
+    await flush()
+    expect(listObjectVersions).toHaveBeenCalledTimes(2)
     expect(content(root)).toContain('Current')
   })
 })

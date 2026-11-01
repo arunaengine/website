@@ -10,7 +10,7 @@ import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import IconButton from '@/components/ui/IconButton.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import { useS3, s3ErrorMessage } from '@/composables/useS3'
+import { S3ContextMismatchError, useS3, s3ErrorMessage } from '@/composables/useS3'
 import { deletionOptions, type DeletionOptionId } from '@/lib/deletion/options'
 import type { DeleteRequest } from '@/lib/deletion/request'
 import { versionStateLabel, type ObjectVersionEntry } from '@/lib/objectVersions'
@@ -41,6 +41,8 @@ const loadError = ref<string | null>(null)
 const actionError = ref<string | null>(null)
 const restoringId = ref<string | null>(null)
 let loadSeq = 0
+// A deep link asks before the session of the bucket's node is open; that session asks again.
+let waitingSession = false
 
 // Versions list through the bucket's node; only purging needs the owner node itself.
 const remote = computed(() => Boolean(props.nodeId))
@@ -52,6 +54,7 @@ async function load() {
   const seq = ++loadSeq
   loading.value = true
   loadError.value = null
+  waitingSession = false
   try {
     const page = await s3.listObjectVersions(props.bucket, props.objectKey, props.nodeId ?? null)
     if (seq !== loadSeq) return
@@ -60,11 +63,15 @@ async function load() {
   } catch (err) {
     if (seq !== loadSeq) return
     versions.value = []
-    loadError.value = s3ErrorMessage(err)
+    waitingSession = err instanceof S3ContextMismatchError
+    if (!waitingSession) loadError.value = s3ErrorMessage(err)
   } finally {
-    if (seq === loadSeq) loading.value = false
+    if (seq === loadSeq && !waitingSession) loading.value = false
   }
 }
+watch(() => s3.activeContext.value, () => {
+  if (waitingSession && props.active) void load()
+})
 
 watch(
   () => [props.active, props.bucket, props.objectKey, props.nodeId, props.revision],
