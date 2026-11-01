@@ -57,7 +57,7 @@ describe('linked logins in settings', () => {
     const { root, app } = await render()
     const text = content(root)
     expect(text).toContain('Linked logins')
-    for (const name of ['LS Login', 'IAM4NFDI', 'GFBio', 'ORCID', 'GitHub']) expect(text).toContain(name)
+    for (const name of ['LifeScience RI', 'GFBio SSO', 'NFDI AAI']) expect(text).toContain(name)
     expect(text).toContain('Logins you already linked are not shown here.')
     const account = element(root, (node) => node.tag === 'a')
     expect(account.props.href).toBe(`${ISSUER}/account/account-security/linked-accounts`)
@@ -66,8 +66,8 @@ describe('linked logins in settings', () => {
 
   it('starts the Keycloak link for the chosen login', async () => {
     const { root, app } = await render()
-    await click(element(root, (node) => node.tag === 'button' && node.props['aria-label'] === 'Link ORCID'))
-    expect(linkProvider).toHaveBeenCalledWith('orcid')
+    await click(element(root, (node) => node.tag === 'button' && node.props['aria-label'] === 'Link NFDI AAI'))
+    expect(linkProvider).toHaveBeenCalledWith('iam4nfdi')
     app.unmount()
   })
 

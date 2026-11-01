@@ -132,7 +132,7 @@ describe('completeSignIn after linking', () => {
   it('reports the linked login without a new Aruna session', async () => {
     const { target, link } = await finish({ kc_action_status: 'success' })
     expect(target).toBe('/app/settings')
-    expect(link).toEqual({ name: 'LS Login', linked: true })
+    expect(link).toEqual({ name: 'LifeScience RI', linked: true })
     expect(fetchMock).not.toHaveBeenCalled()
     expect(storage.get('aruna.oidc.idToken')).toBe('id-1')
     expect(storage.has('aruna.oidc.link')).toBe(false)
@@ -146,7 +146,7 @@ describe('completeSignIn after linking', () => {
 
   it('reports a refused link with the reason', async () => {
     const { link } = await finish({ kc_action_status: 'error', error_description: 'Already linked to another user' })
-    expect(link).toEqual({ name: 'LS Login', linked: false, message: 'Already linked to another user' })
+    expect(link).toEqual({ name: 'LifeScience RI', linked: false, message: 'Already linked to another user' })
     expect(storage.get('aruna.oidc.idToken')).toBe('id-1')
   })
 

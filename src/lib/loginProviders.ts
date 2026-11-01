@@ -1,18 +1,22 @@
 // Logins the v3 Keycloak offers next to its own accounts. The alias is the
 // Keycloak identity provider alias; change this list to add or drop one.
 
+import lifescienceLogo from '@/assets/brand/providers/ls-ri.webp'
+import gfbioLogo from '@/assets/brand/providers/gfbio.webp'
+import nfdiLogo from '@/assets/brand/providers/iam4nfdi.webp'
+
 export interface LoginProvider {
   alias: string
   name: string
   description: string
+  logo: string
 }
 
+// ORCID and GitHub come in through LS Login and NFDI AAI, so they are not offered on their own.
 export const LOGIN_PROVIDERS: LoginProvider[] = [
-  { alias: 'lifescience', name: 'LS Login', description: 'Life science research login (LS-AAI)' },
-  { alias: 'iam4nfdi', name: 'IAM4NFDI', description: 'NFDI and German research institutions' },
-  { alias: 'gfbio', name: 'GFBio', description: 'German Federation for Biological Data' },
-  { alias: 'orcid', name: 'ORCID', description: 'Your ORCID iD' },
-  { alias: 'github', name: 'GitHub', description: 'Your GitHub account' },
+  { alias: 'lifescience', name: 'LifeScience RI', description: 'Life Science Login (LS AAI)', logo: lifescienceLogo },
+  { alias: 'gfbio', name: 'GFBio SSO', description: 'German Federation for Biological Data', logo: gfbioLogo },
+  { alias: 'iam4nfdi', name: 'NFDI AAI', description: 'NFDI and German research institutions', logo: nfdiLogo },
 ]
 
 /** Only realms whose issuer lives under this domain have the providers above. */

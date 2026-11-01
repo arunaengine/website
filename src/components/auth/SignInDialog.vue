@@ -9,13 +9,13 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import { signInChoice } from '@/composables/signInChoice'
 import { useAuth } from '@/composables/useAuth'
 import { LOGIN_PROVIDERS } from '@/lib/loginProviders'
-import { ChevronRight } from '@lucide/vue'
+import iconMark from '@/assets/brand/icon-mark.avif'
 
 const { signIn } = useAuth()
 
 const choices = [
   ...LOGIN_PROVIDERS,
-  { alias: '', name: 'Aruna account', description: 'Username and password' },
+  { alias: '', name: 'Aruna (legacy)', description: 'Aruna username and password', logo: iconMark },
 ]
 
 const open = computed({
@@ -35,23 +35,24 @@ function choose(alias: string) {
 
 <template>
   <Dialog v-model:open="open">
-    <DialogContent class="max-w-md">
+    <DialogContent class="max-w-sm">
       <DialogHeader>
-        <DialogTitle>Sign in</DialogTitle>
-        <DialogDescription>Choose how you want to sign in.</DialogDescription>
+        <DialogTitle class="text-center">Continue login with</DialogTitle>
+        <DialogDescription class="sr-only">Choose how you want to sign in.</DialogDescription>
       </DialogHeader>
-      <ul class="divide-y divide-border overflow-hidden rounded-md border border-border">
+      <ul class="flex flex-col gap-2.5">
         <li v-for="choice in choices" :key="choice.alias || 'aruna'">
           <button
             type="button"
-            class="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/50"
+            :title="choice.description"
+            class="flex w-full items-center justify-center gap-3 rounded-md border border-border px-4 py-2.5 text-base font-medium text-foreground transition-colors hover:bg-muted/50"
             @click="choose(choice.alias)"
           >
-            <span class="min-w-0 flex-1">
-              <span class="block text-sm font-medium text-foreground">{{ choice.name }}</span>
-              <span class="block text-xs text-muted-foreground">{{ choice.description }}</span>
+            <span class="flex h-8 w-14 shrink-0 items-center justify-center overflow-hidden rounded bg-zinc-950 px-1 dark:bg-transparent">
+              <!-- The Aruna mark carries wide padding, so it is drawn larger and cropped by the tile. -->
+              <img :src="choice.logo" alt="" :class="choice.alias ? 'max-h-6 max-w-full object-contain' : 'h-12 max-w-none'" />
             </span>
-            <ChevronRight class="size-4 shrink-0 text-muted-foreground" />
+            <span class="w-36 text-left">{{ choice.name }}</span>
           </button>
         </li>
       </ul>

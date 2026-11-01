@@ -24,6 +24,7 @@ const dialog = compileClientComponent(new URL('./SignInDialog.vue', import.meta.
   '@/composables/signInChoice': { signInChoice },
   '@/composables/useAuth': { useAuth: () => ({ signIn }) },
   '@/lib/loginProviders': loginProviders,
+  '@/assets/brand/icon-mark.avif': { __esModule: true, default: 'icon.avif' },
 })
 
 async function render() {
@@ -41,14 +42,14 @@ describe('sign-in dialog', () => {
   it('lists every login and explains linking by email', async () => {
     const { root, app } = await render()
     const text = content(root)
-    for (const name of ['LS Login', 'IAM4NFDI', 'GFBio', 'ORCID', 'GitHub', 'Aruna account']) expect(text).toContain(name)
+    for (const name of ['LifeScience RI', 'GFBio SSO', 'NFDI AAI', 'Aruna (legacy)']) expect(text).toContain(name)
     expect(text).toContain('You sign in once with that account to link both.')
     app.unmount()
   })
 
   it('signs in at the chosen login and keeps the pending options', async () => {
     const { root, app } = await render()
-    await click(button(root, 'IAM4NFDI'))
+    await click(button(root, 'NFDI AAI'))
     expect(signIn).toHaveBeenCalledWith({ redirectTo: '/app/data', onboardingSecret: 's1', idpHint: 'iam4nfdi' })
     expect(signInChoice.value).toBeNull()
     app.unmount()
@@ -56,7 +57,7 @@ describe('sign-in dialog', () => {
 
   it('signs in without a hint for the Aruna account', async () => {
     const { root, app } = await render()
-    await click(button(root, 'Aruna account'))
+    await click(button(root, 'Aruna (legacy)'))
     expect(signIn).toHaveBeenCalledWith({ redirectTo: '/app/data', onboardingSecret: 's1' })
     app.unmount()
   })
