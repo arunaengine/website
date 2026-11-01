@@ -327,9 +327,14 @@ describe('object browser upload', () => {
     const open = vi.fn()
     Object.assign(picker, { click: open })
 
+    const menu = () => element(root, (node) => 'open' in node.props && content(node).includes('Upload files'))
+    ;(menu().props['onUpdate:open'] as (value: boolean) => void)(true)
+    await flush()
+    expect(menu().props.open).toBe(true)
     await click(uploadItem(root, 'Upload files'))
     expect(open).toHaveBeenCalledOnce()
     expect(onAddData).not.toHaveBeenCalled()
+    expect(menu().props.open).toBe(false)
 
     const file = { name: 'genome.fna', size: 4 }
     const target = { files: [file], value: 'C:\\fakepath\\genome.fna' }

@@ -591,7 +591,14 @@ function deleteRestorable(entry: DeletedObjectEntry) {
 }
 
 const filePicker = ref<HTMLInputElement | null>(null)
+// The file chooser takes focus from the menu, so the menu is closed by hand.
+const uploadMenuOpen = ref(false)
+function pickFiles() {
+  uploadMenuOpen.value = false
+  filePicker.value?.click()
+}
 function onPicked(event: Event) {
+  uploadMenuOpen.value = false
   const input = event.target as HTMLInputElement
   const files = [...(input.files ?? [])]
   input.value = ''
@@ -774,12 +781,12 @@ async function onDrop(event: DragEvent) {
             <Button v-if="notebooks && !remoteNodeId" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" aria-label="New notebook" :title="writeRestrictionMessage ?? 'Create a notebook here'" @click="emit('new-notebook')"><NotebookPen class="h-4 w-4" /><span :class="toolbarLabel">New notebook</span></Button>
             <!-- Upload files is the same upload a drop on the list starts; Add from opens every other
                  source for the open bucket and folder. -->
-            <DropdownMenu>
+            <DropdownMenu v-model:open="uploadMenuOpen">
               <DropdownMenuTrigger as-child>
                 <Button data-tour="bucket-add-data" size="sm" :disabled="Boolean(addReason)" aria-label="Upload" :title="addReason ?? 'Upload files or add data from other sources'"><Upload class="h-4 w-4" /><span :class="desktop ? '' : '@max-[360px]:sr-only'">Upload</span><ChevronDown class="h-3.5 w-3.5" /></Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem @click="filePicker?.click()"><Upload class="h-3.5 w-3.5" /> Upload files</DropdownMenuItem>
+                <DropdownMenuItem @click="pickFiles"><Upload class="h-3.5 w-3.5" /> Upload files</DropdownMenuItem>
                 <DropdownMenuItem @click="emit('add-data')"><Plus class="h-3.5 w-3.5" /> Add from…</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
