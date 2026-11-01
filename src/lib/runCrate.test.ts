@@ -30,7 +30,7 @@ describe('run crate', () => {
   })
 
   it('reads the source that served an input', () => {
-    const graph = crate['@graph'].map((entity) => (entity['@id'] === 'input-db' ? { ...entity, additionalProperty: [{ '@id': 'input-db#source-served-by' }] } : entity))
+    const graph: Record<string, unknown>[] = crate['@graph'].map((entity) => (entity['@id'] === 'input-db' ? { ...entity, additionalProperty: [{ '@id': 'input-db#source-served-by' }] } : entity))
     graph.push({ '@id': 'input-db#source-served-by', '@type': 'PropertyValue', name: 'Served by', value: 'https://mirror.example/db.tar.xz' })
     const run = parseRunCrate({ '@graph': graph }, 'runs/01EXEC')!
 
