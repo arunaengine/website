@@ -10,6 +10,11 @@ const listTasks = vi.fn()
 const push = vi.fn()
 const metadataAtPath = vi.fn()
 const getRun = vi.fn()
+const route: { name: string; params: Record<string, string> } = { name: 'compute', params: {} }
+const DetailStub = defineComponent({
+  props: { taskId: String, apiBase: String },
+  setup: (props) => () => h('aside', `detail ${props.taskId} at ${props.apiBase ?? 'serving node'}`),
+})
 const realmNodes = ref<Array<{ name: string; nodeId?: string; isLocal: boolean; apiBase: string | null; kind?: string }>>([])
 
 const Plain = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
@@ -53,7 +58,7 @@ const TasksPanel = compileClientComponent(new URL('./TasksPanel.vue', import.met
   vue: VueRuntime,
   'vue-router': {
     RouterLink: Plain,
-    useRoute: () => ({ name: 'compute', params: {} }),
+    useRoute: () => route,
     useRouter: () => ({ push }),
   },
   '@lucide/vue': new Proxy({}, { get: () => Empty }),
@@ -74,7 +79,7 @@ const TasksPanel = compileClientComponent(new URL('./TasksPanel.vue', import.met
   '@/components/compute/KindTile.vue': moduleDefault(Empty),
   '@/components/ui/SectionHeading.vue': moduleDefault(Empty),
   '@/components/ui/StatusPill.vue': moduleDefault(Empty),
-  '@/components/compute/TaskDetailPanel.vue': moduleDefault(Empty),
+  '@/components/compute/TaskDetailPanel.vue': moduleDefault(DetailStub),
   '@/components/compute/NewRunMenu.vue': moduleDefault(Empty),
   '@/composables/useTes': {
     useTes: () => ({ getTesServiceInfo: async () => ({ type: { version: '1.1' } }), listTasks }),
@@ -199,6 +204,34 @@ describe('runs on other nodes', () => {
     expect(text).toContain('Only the newest 50 runs of node-2 are shown.')
     realmNodes.value = []
     mounted.app.unmount()
+  })
+})
+
+describe('the open run of another node', () => {
+  it('names the node that owns it to the run details', async () => {
+    desktopMode.value = false
+    realmNodes.value = [
+      { name: 'node-1', nodeId: 'node-1', isLocal: true, apiBase: 'https://n1.test/api/v1' },
+      { name: 'node-2', nodeId: 'node-2', isLocal: false, apiBase: 'https://n2.test/api/v1' },
+    ]
+    const farRun = { id: 'J3', name: 'far-run', state: 'COMPLETE', creation_time: created, tags: { [Tes.TES_JOB_ID_TAG]: 'J3' } }
+    listTasks.mockReset().mockImplementation(async (_params: unknown, baseUrl?: string) =>
+      ({ tasks: baseUrl ? [farRun] : [localRun] }))
+    route.name = 'task'
+    route.params = { taskId: 'J3' }
+    const far = await mountApp(TasksPanel)
+    await flush()
+    expect(content(far.root)).toContain('detail J3 at https://n2.test/api/v1')
+    far.app.unmount()
+
+    route.params = { taskId: 'J1' }
+    const local = await mountApp(TasksPanel)
+    await flush()
+    expect(content(local.root)).toContain('detail J1 at serving node')
+    local.app.unmount()
+    route.name = 'compute'
+    route.params = {}
+    realmNodes.value = []
   })
 })
 

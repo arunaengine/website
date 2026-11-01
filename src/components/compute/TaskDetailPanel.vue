@@ -91,7 +91,8 @@ import {
 const NODE_LABEL_KEY = 'aruna-engine.org/node'
 const NODE_LABEL_TAG = `${TES_LABEL_TAG_PREFIX}${NODE_LABEL_KEY}`
 
-const props = defineProps<{ taskId: string; open: boolean }>()
+// `apiBase` is the API of the node that owns the run, when the serving node does not.
+const props = defineProps<{ taskId: string; open: boolean; apiBase?: string }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
   (e: 'canceled'): void
@@ -869,7 +870,7 @@ async function confirmDelete() {
   deleteBusy.value = true
   deleteError.value = null
   try {
-    await deleteJob(props.taskId)
+    await deleteJob(props.taskId, props.apiBase)
   } catch (err) {
     deleteError.value = deleteErrorMessage(err)
   } finally {

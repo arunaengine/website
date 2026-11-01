@@ -192,6 +192,12 @@ function kindLine(task: TesTask): string {
   return detail ? `${KIND_META[kindOf(task)].label}, ${detail}` : KIND_META[kindOf(task)].label
 }
 
+// The API of the other node that owns the open run; the serving node's own runs need none.
+const openTaskApi = computed(() => {
+  const owner = remoteNode.value.get(openTaskId.value)
+  return (owner && realmNodes.value.find((node) => node.nodeId === owner)?.apiBase) || undefined
+})
+
 function onDeleted() {
   const id = openTaskId.value
   tasks.value = tasks.value.filter((task) => task.id !== id)
@@ -679,6 +685,7 @@ onUnmounted(() => {
     <TaskDetailPanel
       v-if="openTaskId"
       :task-id="openTaskId"
+      :api-base="openTaskApi"
       :open="!!openTaskId"
       @update:open="(v) => !v && closeTask()"
       @resolved="(id) => router.replace({ name: 'task', params: { taskId: id } })"

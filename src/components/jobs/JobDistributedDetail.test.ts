@@ -1223,9 +1223,18 @@ describe('distributed job detail components', () => {
     expect(content(done.root)).toContain('in every browser')
     await press(done.root, 'Confirm delete')
     await flushPanel()
-    expect(deleteJob).toHaveBeenCalledWith('run')
+    expect(deleteJob).toHaveBeenCalledWith('run', undefined)
     expect(onDeleted).toHaveBeenCalledOnce()
     done.app.unmount()
+
+    // A run another node owns is deleted on that node.
+    const farDelete = vi.fn(async () => undefined)
+    const far = await mount(taskPanel(vi.fn(async () => ({ ...base, state: 'COMPLETE' })), getJob, farDelete), { taskId: 'run', open: true, apiBase: 'https://n2.test/api/v1' })
+    await press(far.root, 'Delete')
+    await press(far.root, 'Confirm delete')
+    await flushPanel()
+    expect(farDelete).toHaveBeenCalledWith('run', 'https://n2.test/api/v1')
+    far.app.unmount()
 
     const refused = vi.fn(async () => { throw new ApiError(409, 'the run has not finished') })
     const onRefused = vi.fn()

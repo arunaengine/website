@@ -374,9 +374,11 @@ export function useJobs() {
     return requestDownloadArtifact(jobId, resolveClient())
   }
 
-  function deleteJob(jobId: string): Promise<void> {
+  /** `baseUrl` names the node that owns the run, when that is not the serving node. */
+  function deleteJob(jobId: string, baseUrl?: string): Promise<void> {
     assertEnabled()
-    return requestDeleteJob(jobId, resolveClient())
+    const options = resolveClient()
+    return requestDeleteJob(jobId, baseUrl ? { ...options, baseUrl } : options)
   }
 
   return { jobsEnabled, getJob, getJobAudit, getJobReport, headJobArtifact, downloadJobArtifact, deleteJob }
