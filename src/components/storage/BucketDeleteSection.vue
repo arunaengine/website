@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import DeleteDialog from '@/components/data/DeleteDialog.vue'
 import SetDeleteDialog from '@/components/distributed/SetDeleteDialog.vue'
 import Button from '@/components/ui/Button.vue'
+import { forgetBucket } from '@/composables/useAllBuckets'
 import { useBuckets } from '@/composables/useBuckets'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { useS3 } from '@/composables/useS3'
@@ -39,6 +40,7 @@ const refusal = computed(() => {
 async function onCompleted(result: DeletionResult) {
   if (!result.committed.length) return
   shortcuts.remove(props.bucket, props.nodeId)
+  forgetBucket(props.bucket)
   if (!props.nodeId) await bucketList.refresh()
   await router.push({ name: 'buckets', query: props.groupId ? { group: props.groupId } : {} })
 }

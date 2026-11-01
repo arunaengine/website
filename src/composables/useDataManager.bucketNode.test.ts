@@ -160,3 +160,46 @@ describe('bucket address without a node', () => {
     searchBuckets.mockImplementation(answer)
   })
 })
+
+describe('deleted bucket', () => {
+  async function open(query: Record<string, string>) {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/buckets', name: 'buckets', component: View },
+        { path: '/buckets/:bucketId', name: 'bucket', component: View },
+      ],
+    })
+    await router.push({ name: 'bucket', params: { bucketId: 'gone' }, query })
+    let manager: ReturnType<typeof useDataManager> | null = null
+    const host = defineComponent({
+      setup: () => {
+        manager = useDataManager()
+        return () => null
+      },
+    })
+    await mountApp(host, { router })
+    for (let round = 0; round < 8; round++) await new Promise((resolve) => setTimeout(resolve, 0))
+    return { router, manager: manager! }
+  }
+
+  it('is gone when the node of the address no longer has it', async () => {
+    const original = s3.listObjects.getMockImplementation()!
+    s3.listObjects.mockImplementation(async () => {
+      throw new Error('That bucket does not exist.')
+    })
+    const { router, manager } = await open({ group: 'g-a', node: 'n-2' })
+    expect(manager.bucketMissing.value).toBe(true)
+    expect(router.currentRoute.value.query).toEqual({ group: 'g-a', node: 'n-2' })
+    s3.listObjects.mockImplementation(original)
+    await flush()
+  })
+
+  it('is gone when no node of the group holds it', async () => {
+    const { router, manager } = await open({ group: 'g-a' })
+    expect(searchBuckets).toHaveBeenCalledWith('gone', { limit: 50, groupId: 'g-a' })
+    expect(manager.bucketMissing.value).toBe(true)
+    expect(router.currentRoute.value.query).toEqual({ group: 'g-a' })
+    await flush()
+  })
+})

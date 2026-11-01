@@ -54,7 +54,7 @@ import { computed, ref, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import { RouterLink } from 'vue-router'
 import type { ObjectSearchHit, ShareTarget } from '@/lib/api'
-import { ChevronDown, KeyRound, Server, ShieldAlert } from '@lucide/vue'
+import { ArrowLeft, ChevronDown, KeyRound, Server, ShieldAlert } from '@lucide/vue'
 
 const { bootstrapped, currentUser, myGroups } = useAruna()
 const s3 = useS3()
@@ -65,6 +65,7 @@ const {
   route,
   router,
   bucket,
+  bucketMissing,
   s3Prefix,
   remoteNodeId,
   realmNodes,
@@ -512,6 +513,17 @@ async function createFolder() {
 
         <BucketChooser v-if="!bucket && !narrow" />
         <DataViewSkeleton v-else-if="bucket && (contextBusy || !viewReady)" files />
+        <EmptyState
+          v-else-if="bucket && bucketMissing"
+          title="This bucket was deleted"
+          description="It no longer exists, or the link is wrong."
+        >
+          <Button variant="outline" as-child>
+            <RouterLink :to="{ name: 'buckets', query: selectedGroupId ? { group: selectedGroupId } : {} }">
+              <ArrowLeft class="h-4 w-4" /> All buckets
+            </RouterLink>
+          </Button>
+        </EmptyState>
         <ObjectBrowser
           v-else-if="bucket"
           :manager="manager"

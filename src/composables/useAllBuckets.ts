@@ -16,6 +16,11 @@ const TYPING_MS = 250
 // The first page of the last listed group, so a new visit shows it at once while it is read again.
 let firstPage: { key: string; hits: BucketSearchHit[]; cursor: string | null; failedNodes: number } | null = null
 
+// A deleted bucket leaves the remembered first page at once, so no later visit shows it.
+export function forgetBucket(bucket: string) {
+  if (firstPage) firstPage = { ...firstPage, hits: firstPage.hits.filter((hit) => hit.bucket !== bucket) }
+}
+
 export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled: Ref<boolean>) {
   const { apiBaseUrl, currentUser, searchBuckets, sessionEpoch } = useAruna()
   const { isTarget } = useRealmNodes()

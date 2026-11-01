@@ -36,7 +36,7 @@ import type { DeletedObjectEntry } from '@/lib/objectVersions'
 import { deletedOnPage, lastListedKey, shownDeleted, shownEntries, type ListingShow } from '@/lib/objectListing'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { isFolderBucket, isHiddenBucket, isWorkspaceBucket } from '@/lib/workspaces'
-import { useAllBuckets } from './useAllBuckets'
+import { forgetBucket, useAllBuckets } from './useAllBuckets'
 import type { BucketSearchHit, SourceConnectorSummary, SyncRelationship, UsageResponse } from '@/lib/api'
 import { referenceSourceLabel, referenceSourceName, type ReferenceSourceGroup } from '@/lib/references'
 import { bindSource, type BindSource } from '@/lib/bindSource'
@@ -603,6 +603,8 @@ export function useDataManager() {
   const nextToken = pages.nextToken
   const listLoading = ref(false)
   const listError = ref<string | null>(null)
+  // The open bucket is gone on its node and no other node of the group holds it.
+  const bucketMissing = ref(false)
   const listAuthError = ref(false)
   // A copy listed part of the page while its coordinator could not answer.
   const listStale = ref(false)
@@ -773,6 +775,7 @@ export function useDataManager() {
     pages.reset()
     listLoading.value = false
     listError.value = null
+    bucketMissing.value = false
     listAuthError.value = false
     listStale.value = false
     remoteBrowseBlocked.value = false
@@ -812,6 +815,7 @@ export function useDataManager() {
     const maxKeys = pages.pageSize.value
     listLoading.value = true
     listError.value = null
+    bucketMissing.value = false
     listAuthError.value = false
     listStale.value = false
     remoteBrowseBlocked.value = false
@@ -840,8 +844,12 @@ export function useDataManager() {
         } else {
           listError.value = s3ErrorMessage(err)
           listAuthError.value = isS3AuthError(err)
-          if (isS3BucketMissingError(err)) shortcuts.remove(targetBucket, targetNode)
-          if (isS3BucketMissingError(err) && !targetNode && !routeString(route.query.node)) void findBucketNode(targetBucket, requestId)
+          if (isS3BucketMissingError(err)) {
+            shortcuts.remove(targetBucket, targetNode)
+            forgetBucket(targetBucket)
+            if (!targetNode && !routeString(route.query.node)) void findBucketNode(targetBucket, requestId)
+            else bucketMissing.value = true
+          }
         }
       }
     } finally {
@@ -864,7 +872,11 @@ export function useDataManager() {
     if (!current()) return
     const hits = (found?.hits ?? []).filter((hit) => hit.bucket === name && (!groupId || hit.group_id === groupId))
     const holder = hits.some((hit) => realmNodes.isLocalNode(hit.node_id)) ? null : hits[0]
-    if (!holder) return
+    // A failed search proves nothing; an answer without another holder means the bucket is gone.
+    if (!holder) {
+      if (found) bucketMissing.value = true
+      return
+    }
     void navigate(() => {
       if (!current()) return
       const query = { ...route.query, node: holder.node_id, ...(groupId ? {} : { group: holder.group_id }) }
@@ -905,7 +917,9 @@ export function useDataManager() {
       if (isS3BucketMissingError(err) && target === bucket.value && node === remoteNodeId.value) {
         clearObjectListing()
         listError.value = s3ErrorMessage(err)
+        bucketMissing.value = true
         shortcuts.remove(target, node)
+        forgetBucket(target)
         return
       }
     }
@@ -1588,6 +1602,7 @@ export function useDataManager() {
     setPageSize,
     listLoading,
     listError,
+    bucketMissing,
     listAuthError,
     listStale,
     listedKeys,

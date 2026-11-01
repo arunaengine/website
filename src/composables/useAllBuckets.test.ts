@@ -23,7 +23,7 @@ vi.mock('@/composables/useAruna', async () => {
 const deviceKnown = ref(true)
 vi.mock('@/composables/useRealmNodes', () => ({ useRealmNodes: () => ({ isTarget: (id: string) => !deviceKnown.value || id !== 'device-1' }) }))
 
-const { BUCKET_PAGE, useAllBuckets } = await import('./useAllBuckets')
+const { BUCKET_PAGE, forgetBucket, useAllBuckets } = await import('./useAllBuckets')
 const { userInfo } = await import('@/composables/aruna/state')
 const { setAuthToken } = await import('@/composables/aruna/session')
 
@@ -81,6 +81,18 @@ describe('all-nodes bucket list', () => {
     answerNow(answer([hit('results'), hit('new')]))
     await settle()
     expect(list.hits.value.map((entry) => entry.bucket)).toEqual(['results', 'new'])
+  })
+
+  it('never shows a deleted bucket from the last first page', async () => {
+    searchBuckets.mockResolvedValue(answer([hit('results'), hit('gone')]))
+    const first = start()
+    await settle()
+    first.scope.stop()
+    forgetBucket('gone')
+    searchBuckets.mockReturnValue(new Promise(() => {}))
+    const { list } = start()
+    await settle()
+    expect(list.hits.value.map((entry) => entry.bucket)).toEqual(['results'])
   })
 
   it('shows no page of another account', async () => {
