@@ -7,6 +7,7 @@ const aruna = vi.hoisted(() => ({
   getBucketDistribution: vi.fn(),
   listBucketObjects: vi.fn(),
   getDataLinks: vi.fn(),
+  searchBuckets: vi.fn(),
   sessionEpoch: { value: 1 },
 }))
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
@@ -54,6 +55,23 @@ describe('useLinkedParts', () => {
 
     expect(aruna.getBucketDistribution).toHaveBeenCalledWith('refseq', undefined, null)
     expect(facts.value.get(PART)?.nodes).toEqual(['n1', 'n2', 'n3'])
+    scope.stop()
+  })
+
+  it('lists a distributed bucket through a member when this node holds none of it', async () => {
+    aruna.getPartTarget.mockResolvedValue({ id: PART, bucket: 'refseq', prefix: '', set_id: 's1', held_here: false })
+    aruna.searchBuckets.mockResolvedValue({ hits: [{ bucket: 'refseq', set_id: 'other', node_id: 'n4' }, { bucket: 'refseq', set_id: 's1', node_id: 'n3' }] })
+    aruna.getBucketDistribution.mockResolvedValue({ members: [{ node_id: 'n2' }, { node_id: 'n3' }] })
+    const scope = effectScope()
+    const facts = scope.run(() => useLinkedParts(ref([PART]), ref('d1'), () => true))!
+    await settle()
+
+    const part = facts.value.get(PART)!
+    expect(part.problem).toBeNull()
+    expect(part.route).toEqual({ name: 'bucket', params: { bucketId: 'refseq' }, query: { node: 'n3' } })
+    expect(aruna.getBucketUsage).toHaveBeenCalledWith('refseq', 'n3')
+    expect(aruna.listBucketObjects).toHaveBeenCalledWith('refseq', { prefix: undefined, delimiter: '/', limit: 11 }, 'n3')
+    expect(part.nodes).toEqual(['n2', 'n3'])
     scope.stop()
   })
 

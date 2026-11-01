@@ -37,7 +37,7 @@ const remembered = new Map<string, LinkedPartFacts>()
 let rememberedEpoch = -1
 
 export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wantsEntries: (id: string) => boolean) {
-  const { getPartTarget, getBucketUsage, getBucketDistribution, listBucketObjects, getDataLinks, sessionEpoch } = useAruna()
+  const { getPartTarget, getBucketUsage, getBucketDistribution, listBucketObjects, getDataLinks, searchBuckets, sessionEpoch } = useAruna()
   const { isLocalNode } = useRealmNodes()
   const facts = ref(new Map<string, LinkedPartFacts>())
   let generation = 0
@@ -49,11 +49,19 @@ export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wants
     facts.value = new Map(facts.value).set(id, value)
   }
 
+  // A node outside a distributed bucket knows only its set; the bucket search names its members.
+  async function memberOf(target: PartTargetResponse): Promise<PartTargetResponse> {
+    if (target.held_here || target.node_id || !target.set_id || !target.bucket) return target
+    const found = await searchBuckets(target.bucket, { limit: 50 }).catch(() => null)
+    const member = found?.hits.find((hit) => hit.set_id === target.set_id && !isLocalNode(hit.node_id))
+    return member ? { ...target, node_id: member.node_id } : target
+  }
+
   async function load(id: string, round: number) {
     const current = () => round === generation
     let target: PartTargetResponse
     try {
-      target = await getPartTarget(id)
+      target = await memberOf(await getPartTarget(id))
     } catch (cause) {
       if (current()) put(id, { target: null, problem: apiErrorMessage(cause), route: null, nodes: [], usage: null, entries: null, others: [] })
       return
