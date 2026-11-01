@@ -1,32 +1,26 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Badge from '@/components/ui/Badge.vue'
-import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
 import InputLocalityHint from '@/components/compute/InputLocalityHint.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { inputPlace, type TesDataRefEntry } from '@/lib/tes'
 import { Folder, ListPlus, X } from '@lucide/vue'
 
 // Input row editor (aruna#290): never mutates the prop; every change emits a
-// fresh array. New rows come from the TesDataRefDialog picker. Files keep an
+// fresh array. New rows come from the run form's picker (add). Files keep an
 // inline-editable container path; a folder is ONE summary row whose base path
 // is editable. It becomes one DIRECTORY input, or one FILE input per listed
 // file, at run assembly (lib/tes expandDataRefEntry).
 const props = defineProps<{ modelValue: TesDataRefEntry[]; disabled?: boolean }>()
-const emit = defineEmits<{ (e: 'update:modelValue', v: TesDataRefEntry[]): void }>()
+const emit = defineEmits<{ (e: 'update:modelValue', v: TesDataRefEntry[]): void; (e: 'add'): void }>()
 
-const dialogOpen = ref(false)
 const { displayName, isLocalNode } = useRealmNodes()
 const nodeOf = (url: string) => {
   const node = inputPlace(url).nodeId
   return node && !isLocalNode(node) ? displayName(node) : ''
 }
 
-function addEntry(entry: TesDataRefEntry) {
-  emit('update:modelValue', [...props.modelValue, entry])
-}
 function patchPath(i: number, path: string) {
   emit(
     'update:modelValue',
@@ -103,8 +97,6 @@ function remove(i: number) {
       still place it elsewhere.
     </p>
 
-    <Button data-tutorial="run-add-input" variant="outline" size="sm" :disabled="disabled" @click="dialogOpen = true"><ListPlus class="size-3.5" /> Add input</Button>
-
-    <TesDataRefDialog v-model:open="dialogOpen" mode="input" mount-default="/inputs/" @add="addEntry" />
+    <Button data-tutorial="run-add-input" variant="outline" size="sm" :disabled="disabled" @click="emit('add')"><ListPlus class="size-3.5" /> Add input</Button>
   </div>
 </template>

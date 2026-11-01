@@ -954,6 +954,19 @@ describe('run page', () => {
     mounted.app.unmount()
   })
 
+  it('mounts a pick from the Table view where the Tree view mounts it', async () => {
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?template=bakta')
+    const editor = element(mounted.root, (node) => typeof node.props.onAdd === 'function' && 'modelValue' in node.props)
+
+    ;(editor.props.onAdd as () => void)()
+    await flush()
+
+    const dialog = element(mounted.root, (node) => 'mount-default' in node.props || 'mountDefault' in node.props)
+    expect(dialog.props['mount-default'] ?? dialog.props.mountDefault).toBe('/work/in/')
+    expect(dialog.props.open).toBe(true)
+    mounted.app.unmount()
+  })
+
   it('captures the Bakta output folder as a folder', async () => {
     const mounted = await mount(ComputeSubmitView, '/app/compute/new?template=bakta')
     await click(button(mounted.root, 'Capture'))

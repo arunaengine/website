@@ -135,7 +135,7 @@ const checkLabel = computed(() => {
 
     <template v-else>
       <div class="space-y-3">
-        <TesInputsEditor v-model="inputs" />
+        <TesInputsEditor v-model="inputs" @add="openInputDialog()" />
         <div class="space-y-2">
           <h3 class="font-display text-sm font-semibold text-aruna-navy">Outputs</h3>
           <div
