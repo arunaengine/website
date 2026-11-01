@@ -143,6 +143,16 @@ describe('ShareLinkDialog', () => {
     expect(nodes(root).filter((node) => node.tag === 'button' && content(node) === 'Revoke')).toHaveLength(0)
   })
 
+  it('names each link by its label so two links of one item read apart', async () => {
+    answers.push({ body: { shares: [share({ label: 'For reviewers' }), share({ id: 'S4' })] } })
+    const { root } = await open({ kind: 'folder', bucket: 'data', prefix: 'results/' })
+
+    const cells = nodes(root).filter((node) => node.tag === 'td').map((node) => content(node).trim())
+    expect(content(root)).toContain('Label')
+    expect(cells).toContain('For reviewers')
+    expect(cells).toContain('-')
+  })
+
   it('names the refusal of a distributed bucket', async () => {
     answers.push({ body: { shares: [] } }, { status: 409, body: { error: 'conflict', code: 'distributed_bucket' } })
     const { root } = await open({ kind: 'bucket', bucket: 'spread' })

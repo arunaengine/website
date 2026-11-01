@@ -209,6 +209,7 @@ const expiresText = (at: string | null) => (at ? formatDateTime(at) : 'No expiry
           <table class="data-table min-w-max text-xs">
             <thead>
               <tr>
+                <th v-if="existing.some((share) => share.label)" class="py-1.5 pr-4 text-left font-semibold">Label</th>
                 <th class="py-1.5 pr-4 text-left font-semibold">Access</th>
                 <th class="py-1.5 pr-4 text-left font-semibold">Expires</th>
                 <th class="py-1.5 pr-4 text-left font-semibold">Password</th>
@@ -218,6 +219,7 @@ const expiresText = (at: string | null) => (at ? formatDateTime(at) : 'No expiry
             </thead>
             <tbody>
               <tr v-for="share in existing" :key="share.id" class="border-t border-border">
+                <td v-if="existing.some((entry) => entry.label)" class="max-w-40 truncate py-1.5 pr-4 text-foreground" :title="share.label">{{ share.label || '-' }}</td>
                 <td class="py-1.5 pr-4 text-foreground">{{ MODE_LABELS[share.mode] }}</td>
                 <td class="whitespace-nowrap py-1.5 pr-4 text-muted-foreground">{{ expiresText(share.expires_at) }}</td>
                 <td class="py-1.5 pr-4 text-muted-foreground">{{ share.password ? 'Yes' : 'No' }}</td>
