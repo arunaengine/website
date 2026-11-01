@@ -95,7 +95,8 @@ export function classifyPath(path: string, targets: RunPathTargets): RunPathChec
   if (targets.outputs.some((output) => output.trim() === path)) {
     return { path, kind: 'captured', label: 'captured', fix: null }
   }
-  const staged = targets.inputs.filter((input) => folderOf(input.trim()) === asDir).length
+  // A folder picked as its files may hold them only in subfolders, such as a database.
+  const staged = targets.inputs.filter((input) => folderOf(input.trim()).startsWith(asDir)).length
   if (staged) {
     return { path, kind: 'input-folder', label: `${staged} input${staged === 1 ? '' : 's'}`, fix: null }
   }

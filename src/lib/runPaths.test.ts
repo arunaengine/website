@@ -93,6 +93,12 @@ describe('classifyPath', () => {
     expect(classifyPath('/work/in/', targets).label).toBe('2 inputs')
     expect(classifyPath('/work/in', targets).label).toBe('2 inputs')
   })
+
+  it('counts the files of a folder that sit only in its subfolders', () => {
+    const db = { workdir: '/work', inputs: ['/work/in/db/amrfinderplus-db/latest/AMR.LIB', '/work/in/db/pfam/hmm.h3m'], outputs: [] }
+    expect(classifyPath('/work/in/db', db)).toMatchObject({ kind: 'input-folder', label: '2 inputs', fix: null })
+    expect(classifyPath('/work/in/dbx', db)).toMatchObject({ kind: 'missing-input', fix: 'input' })
+  })
 })
 
 describe('checkPaths', () => {
