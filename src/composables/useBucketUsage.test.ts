@@ -10,6 +10,10 @@ vi.mock('@/composables/useAruna', () => ({
   }),
 }))
 const { usageParts, usageText, useBucketUsage } = await import('./useBucketUsage')
+const { lastUpload } = await import('./uploadQueueState')
+const settle = async () => {
+  for (let i = 0; i < 4; i++) await Promise.resolve()
+}
 
 const usage = (extra: Partial<BucketUsageResponse> = {}): BucketUsageResponse => ({
   bucket: 'laptop', objects: 16, versions: 16, delete_markers: 0, open_multipart_uploads: 0, logical_bytes: 52_638_515, complete: true, ...extra,
@@ -53,6 +57,25 @@ describe('bucket usage', () => {
     await Promise.resolve()
     expect(read.value?.objects).toBe(3)
   })
+
+  it('reads the count again after an upload into the open bucket and keeps the old one meanwhile', async () => {
+    asked.length = 0
+    const read = useBucketUsage(ref('fresh'), ref<string | null>('n2'))
+    asked[0].resolve(usage({ bucket: 'fresh', objects: 0, logical_bytes: 0 }))
+    await settle()
+
+    lastUpload.value = { bucket: 'fresh', key: 'a.txt', nodeId: null, at: 1 }
+    await nextTick()
+    expect(asked).toHaveLength(1)
+    lastUpload.value = { bucket: 'fresh', key: 'a.txt', nodeId: 'n2', at: 2 }
+    await nextTick()
+    expect(asked).toHaveLength(2)
+    expect(read.value?.objects).toBe(0)
+
+    asked[1].resolve(usage({ bucket: 'fresh', objects: 4 }))
+    await settle()
+    expect(read.value?.objects).toBe(4)
+  })
 })
 
 describe('listed bucket usage', () => {
@@ -73,5 +96,23 @@ describe('listed bucket usage', () => {
     expect(listed.textOf('b', null)).toBeNull()
     listed.ensure(entries)
     expect(asked).toHaveLength(5)
+  })
+
+  it('reads a listed bucket again after an upload into it', async () => {
+    const { useListedUsage } = await import('./useBucketUsage')
+    for (const entry of asked.splice(0)) entry.resolve(usage({ bucket: entry.bucket }))
+    await settle()
+    const listed = useListedUsage()
+    listed.ensure([{ bucket: 'up', nodeId: 'n2' }])
+    asked.splice(0)[0].resolve(usage({ bucket: 'up', objects: 0, logical_bytes: 0 }))
+    await settle()
+    expect(listed.textOf('up', 'n2')).toBe('0\u00a0files, 0\u00a0B stored')
+
+    lastUpload.value = { bucket: 'up', key: 'a.txt', nodeId: 'n2', at: 3 }
+    await nextTick()
+    expect(listed.textOf('up', 'n2')).toBe('0\u00a0files, 0\u00a0B stored')
+    asked.splice(0)[0].resolve(usage({ bucket: 'up', objects: 4 }))
+    await settle()
+    expect(listed.textOf('up', 'n2')).toBe('4\u00a0files, 50.2\u00a0MiB stored')
   })
 })

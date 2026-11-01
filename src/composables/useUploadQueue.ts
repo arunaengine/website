@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue'
+import { computed, watch } from 'vue'
 import {
   useS3,
   s3ErrorMessage,
@@ -7,7 +7,7 @@ import {
   type S3SessionReference,
   type UploadHandle,
 } from './useS3'
-import { uploadQueueItems as items, type UploadItemState, type UploadQueueItem } from './uploadQueueState'
+import { lastUpload as lastCompleted, uploadQueueItems as items, type UploadItemState, type UploadQueueItem } from './uploadQueueState'
 
 export { UPLOAD_FINISHING_MESSAGE, type UploadItemState, type UploadQueueItem } from './uploadQueueState'
 
@@ -45,7 +45,6 @@ const UPLOAD_OUTCOME_UNKNOWN =
   'The node no longer has this upload, but its completion was already sent, so the file may ' +
   'already be stored. Check the bucket; Retry uploads the whole file again.'
 
-const lastCompleted = ref<{ bucket: string; key: string; nodeId: string | null; at: number } | null>(null)
 
 function sessionOf(nodeId: string | null, groupId: string | null): S3SessionReference | null {
   return groupId ? s3.referenceForContext(nodeId, groupId) : null

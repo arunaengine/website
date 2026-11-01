@@ -37,3 +37,5 @@ export interface UploadQueueItem {
 }
 
 export const uploadQueueItems = ref<UploadQueueItem[]>([])
+/** The last upload that finished; its node is null for the connected node. */
+export const lastUpload = ref<{ bucket: string; key: string; nodeId: string | null; at: number } | null>(null)

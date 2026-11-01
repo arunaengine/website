@@ -2,6 +2,7 @@
 // usage stays null, so the view shows nothing instead of a zero.
 import { ref, watch, type Ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { lastUpload } from '@/composables/uploadQueueState'
 import type { BucketUsageResponse } from '@/lib/api'
 import { formatCount } from '@/lib/formatCount'
 import { formatBytes } from '@/lib/utils'
@@ -38,17 +39,24 @@ export function useBucketUsage(bucket: Ref<string>, nodeId: Ref<string | null>) 
   const { getBucketUsage, sessionEpoch } = useAruna()
   const usage = ref<BucketUsageResponse | null>(null)
   let round = 0
+  async function read() {
+    const mine = ++round
+    if (!bucket.value) return
+    const answer = await getBucketUsage(bucket.value, nodeId.value).catch(() => null)
+    if (mine === round) usage.value = answer ?? usage.value
+  }
   watch(
     [bucket, nodeId, sessionEpoch],
-    async () => {
-      const mine = ++round
+    () => {
       usage.value = null
-      if (!bucket.value) return
-      const answer = await getBucketUsage(bucket.value, nodeId.value).catch(() => null)
-      if (mine === round) usage.value = answer
+      void read()
     },
     { immediate: true },
   )
+  // An upload into this bucket changes its count; the shown count stays until the new one arrives.
+  watch(lastUpload, (done) => {
+    if (done?.bucket === bucket.value && done.nodeId === nodeId.value) void read()
+  })
   return usage
 }
 
@@ -79,6 +87,16 @@ export function useListedUsage() {
         })
     }
   }
+
+  // A finished upload drops its bucket's count, so the next ensure reads it again.
+  watch(lastUpload, (done) => {
+    if (!done) return
+    const key = listedKey(done.bucket, done.nodeId)
+    if (!listed.value.has(key) || pending.has(key)) return
+    pending.add(key)
+    queue.push({ key, bucket: done.bucket, nodeId: done.nodeId })
+    pump()
+  })
 
   function ensure(entries: { bucket: string; nodeId: string | null }[]) {
     if (listedEpoch !== sessionEpoch.value) {
