@@ -59,7 +59,7 @@ function bucketHitRoute(hit: BucketSearchHit): RouteLocationRaw {
 
   <!-- Entity-kind chips: metadata stays the primary result set; groups and
        people render as extra sections like the top-bar quick search. -->
-  <div v-if="textQuery" class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Result types">
+  <div v-if="textQuery && currentUser" class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Result types">
     <button
       v-for="kind in KIND_OPTIONS"
       :key="kind.id"
