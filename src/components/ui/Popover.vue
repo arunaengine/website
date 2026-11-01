@@ -24,6 +24,8 @@ const props = withDefaults(
     open?: boolean
     /** Shown on hover and focus; a tap on a touch screen opens the popover instead. */
     tooltip?: string
+    /** Set for a table: wider, yet never wider than the screen. */
+    wide?: boolean
   }>(),
   { open: undefined },
 )
@@ -68,8 +70,8 @@ function keepOpen(event: Event) {
         :side="side || 'bottom'"
         :align="align || 'start'"
         :side-offset="6"
-        class="w-72 rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0"
-        :class="props.raised ? 'z-[var(--z-assistant-modal)]' : 'z-50'"
+        class="rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0"
+        :class="[props.raised ? 'z-[var(--z-assistant-modal)]' : 'z-50', props.wide ? 'w-[34rem] max-w-[calc(100vw-2rem)]' : 'w-72']"
         @pointer-down-outside="keepOpen"
         @focus-outside="keepOpen"
       >

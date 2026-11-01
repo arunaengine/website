@@ -7,13 +7,14 @@ import Button from '@/components/ui/Button.vue'
 import IconTile from '@/components/ui/IconTile.vue'
 import StatusMark from '@/components/ui/StatusMark.vue'
 import StatusPill from '@/components/ui/StatusPill.vue'
+import NodeJobsPopover from '@/components/nodes/NodeJobsPopover.vue'
 import NodeNameEdit from '@/components/nodes/NodeNameEdit.vue'
 import { nodeActivity, nodeName } from '@/components/nodes/node-display'
 import type { RealmNodeInfo } from '@/lib/api'
 import { formatCount } from '@/lib/formatCount'
 import { LOCATION_AFFINITY_KEY } from '@/lib/placement'
 import { formatBytes } from '@/lib/utils'
-import { Download, Info, MapPin, Server, WifiOff } from '@lucide/vue'
+import { Info, MapPin, Server, WifiOff } from '@lucide/vue'
 
 const props = defineProps<{
   nodes: RealmNodeInfo[]
@@ -75,9 +76,7 @@ const devicesLine = computed(() => {
           <StatusPill v-else state="Offline" tone="failed" :icon="WifiOff" />
         </div>
         <p class="text-xs text-muted-foreground">{{ facts(node) }}</p>
-        <p v-if="activity(node)" class="inline-flex items-center gap-1 text-xs text-sky-700 dark:text-aruna-aqua">
-          <Download class="h-3 w-3" /> {{ activity(node) }}
-        </p>
+        <NodeJobsPopover v-if="activity(node)" :node-id="node.node_id" :label="activity(node)!" />
         <Button
           v-if="details"
           variant="outline"
