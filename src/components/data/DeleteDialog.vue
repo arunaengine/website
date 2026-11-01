@@ -169,7 +169,8 @@ const options = computed<DeletionOption[]>(() => {
     // A remote bucket always confirms a full purge; its node does not refuse new data.
     counts: remoteBucket.value ? null : counts.value,
     permissions: { canWrite: canWrite.value, canPurge: canPurge.value },
-    remote: current.nodeId !== null && !remoteBucket.value,
+    // The open session of the bucket's node names its API, which runs the purge there.
+    remote: current.nodeId !== null && !remoteBucket.value && !apiClient(),
     nodeName: remoteBucket.value ? nodeName.value : undefined,
     selectionCount: ids.value.length,
   })

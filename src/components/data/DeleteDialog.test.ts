@@ -180,7 +180,7 @@ function dialogModules(overrides: Record<string, unknown> = {}) {
       backlinkPreflight,
       backlinkPreflightBusy: ref(false),
       backlinkPreflightError: ref(null),
-      permanentDeleteApiBase: () => 'https://api.test',
+      permanentDeleteApiBase: () => deleteApiBase.value,
       resetBacklinkPreflightState: () => {},
       loadBacklinkPreflight: async () => {},
       loadBulkBacklinkPreflight: async () => {},
@@ -310,6 +310,9 @@ const olderVersion = {
   size: 1024,
   lastModified: new Date('2026-01-01T00:00:00Z'),
 }
+
+// The API of the node whose S3 session is open; null when the bucket's node has none open.
+const deleteApiBase = ref<string | null>('https://api.test')
 
 async function open(
   request: DeletionRequest.DeleteRequest,
@@ -517,6 +520,23 @@ describe('delete dialog', () => {
     await click(confirmButton(root))
 
     expect(purgeRun).toHaveBeenCalledTimes(1)
+  })
+
+  it('purges a file of a bucket on another node through that node, once its session is open', async () => {
+    purgeRun.mockClear()
+    deleteApiBase.value = null
+    const closed = await open({ kind: 'object', bucket: 'reef', nodeId: 'node-far', key: 'a.txt' })
+    await choose(closed.root, 'delete-permanently')
+    expect(content(closed.root)).toContain('runs on the node that holds this bucket')
+
+    deleteApiBase.value = 'https://api.node-far'
+    const { root } = await open({ kind: 'object', bucket: 'reef', nodeId: 'node-far', key: 'a.txt' })
+    await choose(root, 'delete-permanently')
+    expect(content(root)).not.toContain('runs on the node that holds this bucket')
+    await typeValue(element(root, (node) => node.tag === 'input' && node.props.type !== 'radio'), 'a.txt')
+    await click(confirmButton(root))
+    expect(purgeRun).toHaveBeenCalledTimes(1)
+    deleteApiBase.value = 'https://api.test'
   })
 
   it('holds a folder purge until the exact name is typed', async () => {
