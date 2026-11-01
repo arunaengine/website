@@ -13,6 +13,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useFileOrigin, type OriginTarget } from '@/composables/useFileOrigin'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useTes } from '@/composables/useTes'
+import { useUserDirectory } from '@/composables/useUserDirectory'
 import { TES_STATE_META, type TesState } from '@/lib/tes'
 import { CircleCheck, CircleX, LoaderCircle } from '@lucide/vue'
 import { s3ErrorMessage, useS3 } from '@/composables/useS3'
@@ -30,11 +31,16 @@ const { displayName, localNodeId } = useRealmNodes()
 const s3 = useS3()
 const found = useFileOrigin(computed(() => props.target))
 watch(() => found.origin.value, (value) => emit('origin', value), { immediate: true })
+// An upload names its user by id; the shared directory gives the name, the short id stays the fallback.
+const userDir = useUserDirectory()
+watch(() => found.origin.value?.created_by, (id) => {
+  if (id) void userDir.resolveUsers([id])
+}, { immediate: true })
 
 const origin = computed(() =>
   found.origin.value
     ? originFrom(found.origin.value, {
-        user: shortUserId,
+        user: (id) => userDir.cachedUser(id)?.name || shortUserId(id),
         node: displayName,
         backend: (id) => truncateMiddle(id, 8, 4),
       })

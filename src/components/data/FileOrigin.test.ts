@@ -12,6 +12,10 @@ const state = ref('ready')
 const downloadUrl = vi.fn(async () => 'https://s3.test/signed')
 const getRun = vi.fn(async (_id: string): Promise<{ logical_job_id?: string }> => ({}))
 const getTask = vi.fn(async (_id: string, _view: string) => ({ name: 'Annotate with Bakta', state: 'COMPLETE' }))
+const users = ref<Record<string, { name: string }>>({})
+const resolveUsers = vi.fn(async (ids: string[]) => {
+  users.value = { ...users.value, ...Object.fromEntries(ids.map((id) => [id, { name: 'Ada Lovelace' }])) }
+})
 const Icon = (name: string) => defineComponent({ inheritAttrs: false, setup: (_, { attrs }) => () => h('i', { ...attrs, 'data-icon': name }) })
 
 const Marker = (text: string) => defineComponent({ props: { globalUrl: String }, setup: (props) => () => h('section', `${text} ${props.globalUrl ?? ''}`) })
@@ -23,7 +27,9 @@ const component = compileClientComponent(new URL('./FileOrigin.vue', import.meta
   '@lucide/vue': { CircleCheck: Icon('check'), CircleX: Icon('cross'), LoaderCircle: Icon('loader') },
   '@/composables/useTes': { useTes: () => ({ getTask }) },
   '@/lib/tes': { TES_STATE_META: { COMPLETE: { label: 'Complete' }, RUNNING: { label: 'Running' }, SYSTEM_ERROR: { label: 'System error' } } },
-  '@/components/data/OriginLine.vue': moduleDefault(Marker('origin line')),
+  '@/components/data/OriginLine.vue': moduleDefault(
+    defineComponent({ props: { origin: Object, short: Boolean }, setup: (props) => () => h('section', `origin line ${(props.origin as { user?: string } | undefined)?.user ?? ''}`) }),
+  ),
   '@/components/distributed/GlobalId.vue': moduleDefault(Marker('global id')),
   '@/components/data/ProvenanceView.vue': moduleDefault(
     defineComponent({ props: { start: Object }, setup: (props) => () => h('section', `provenance ${(props.start as { id: string }).id}`) }),
@@ -37,6 +43,7 @@ const component = compileClientComponent(new URL('./FileOrigin.vue', import.meta
   '@/components/ui/Spinner.vue': moduleDefault(defineComponent(() => () => h('i'))),
   '@/composables/useS3': { useS3: () => ({ downloadUrl }), s3ErrorMessage: (cause: unknown) => String(cause) },
   '@/composables/useDatabases': { useDatabases: () => ({ rows: ref([]) }) },
+  '@/composables/useUserDirectory': { useUserDirectory: () => ({ resolveUsers, cachedUser: (id: string) => users.value[id] ?? null }) },
   '@/composables/useFileOrigin': { useFileOrigin: () => ({ origin, state, error: ref(null) }) },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id, localNodeId: ref('node1') }) },
   '@/lib/fileOrigin': FileOriginLib,
@@ -68,6 +75,16 @@ describe('file origin', () => {
 
     expect(downloadUrl).toHaveBeenCalledWith('spire', 'a.tsv', null, 'v1', 'a.tsv')
     expect(appended).toEqual([expect.objectContaining({ href: 'https://s3.test/signed', download: 'a.tsv' })])
+  })
+
+  it('names the user who uploaded the version', async () => {
+    state.value = 'ready'
+    origin.value = response({ created_by: '01M69K804AA1JFYFDKPZJ69ZVN', origin: { kind: 'upload', node_id: 'n1' } })
+    const root = await render()
+    await flush()
+
+    expect(resolveUsers).toHaveBeenCalledWith(['01M69K804AA1JFYFDKPZJ69ZVN'])
+    expect(content(root)).toContain('origin line Ada Lovelace')
   })
 
   it('shows no id for a bucket on one node, and says when nothing was recorded', async () => {
