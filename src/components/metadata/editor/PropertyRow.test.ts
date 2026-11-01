@@ -381,6 +381,7 @@ describe('PropertyRow', () => {
     const mounted = await mount('author', [], draft)
 
     expect(labels(mounted.root)).toEqual(expect.arrayContaining(['Create', 'Link']))
+    expect(nodes(mounted.root).map((node) => node.props['aria-label'])).toEqual(expect.arrayContaining(['Create author', 'Link author']))
     mounted.app.unmount()
   })
 

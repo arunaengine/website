@@ -467,8 +467,11 @@ export function presentCrate(crate: unknown, options: PresentOptions = {}): Crat
   cardIds.sort((a, b) => rank(a) - rank(b))
   const people: ContextualEntity[] = []
   const organizations: ContextualEntity[] = []
+  // An organization named only as someone's affiliation is shown as one, not under "Other".
+  const affiliations = new Set(graph.flatMap((entity) => toArray(entity.affiliation).map(refId)))
   for (const id of cardIds) {
-    const roles = [...(roleIndex.get(id) ?? []), ...(relationIndex.get(id) ?? [])]
+    const given = [...(roleIndex.get(id) ?? []), ...(relationIndex.get(id) ?? [])]
+    const roles = given.length || !affiliations.has(id) ? given : ['Affiliation']
     const row = cardEntity(id, byId.get(id), roles, byId)
     if ((cardKinds.get(id) ?? 'people') === 'people') people.push(row)
     else organizations.push(row)

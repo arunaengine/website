@@ -40,10 +40,10 @@ const tint = computed(() => {
       <Plus class="h-3.5 w-3.5" /> {{ addLabel }}
     </Button>
     <template v-else>
-      <Button variant="outline" size="sm" :aria-label="`Create a ${label}`" @click="emit('create')">
+      <Button variant="outline" size="sm" :aria-label="`Create ${label.toLowerCase()}`" @click="emit('create')">
         <Plus class="h-3.5 w-3.5" /> Create
       </Button>
-      <Button variant="outline" size="sm" :aria-label="`Link a ${label}`" @click="emit('link')">
+      <Button variant="outline" size="sm" :aria-label="`Link ${label.toLowerCase()}`" @click="emit('link')">
         <Link2 class="h-3.5 w-3.5" /> Link
       </Button>
     </template>

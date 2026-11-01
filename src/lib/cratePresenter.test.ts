@@ -137,6 +137,16 @@ describe('presentCrate', () => {
     expect(result.people.map((row) => row.name)).toEqual(['Oliver Schwengers', 'Linda Fenske', 'Alexander Goesmann'])
   })
 
+  it('names an organization that is only an affiliation by that role', () => {
+    const result = presentCrate(
+      crate({ author: { '@id': '#p1' } }, [
+        { '@id': '#p1', '@type': 'Person', name: 'Josiah Carberry', affiliation: { '@id': 'https://ror.org/05gq02987' } },
+        { '@id': 'https://ror.org/05gq02987', '@type': 'Organization', name: 'Brown University' },
+      ]),
+    )
+    expect(result.organizations.map((row) => [row.name, row.roles])).toEqual([['Brown University', ['Affiliation']]])
+  })
+
   it('files organization authors', () => {
     const result = presentCrate(
       crate({ author: { '@id': '#lab' } }, [{ '@id': '#lab', '@type': 'Organization', name: 'Example Lab' }]),
