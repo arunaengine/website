@@ -202,13 +202,9 @@ async function linkProvider(option: LoginOption, redirectTo = '/app/settings') {
   return authorize({ redirectTo, link: option.name, params: option.linkParams })
 }
 
-/** Opens the login chooser when the portal config lists logins, else signs in. */
+/** Opens the login chooser, which always offers logins with another Aruna realm. */
 async function requestSignIn(options: SignInOptions = {}) {
-  if (portalConfig().login.options.length) {
-    signInChoice.value = options
-    return
-  }
-  await signIn(options)
+  signInChoice.value = options
 }
 
 // Keycloak returns from an action with `kc_action_status`; the session is untouched.

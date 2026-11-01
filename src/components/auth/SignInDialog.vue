@@ -1,17 +1,28 @@
 <script setup lang="ts">
-// The login chooser: the configured logins, or the realm's plain sign-in.
-import { computed } from 'vue'
+// The login chooser: the configured logins, or the realm's plain sign-in, then another Aruna realm.
+import { computed, ref, shallowRef } from 'vue'
+import { useRouter } from 'vue-router'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
+import Button from '@/components/ui/Button.vue'
+import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
+import RealmPicker from '@/components/federation/RealmPicker.vue'
 import ProviderLogo from '@/components/auth/ProviderLogo.vue'
 import { signInChoice } from '@/composables/signInChoice'
+import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { loginWithRealm } from '@/composables/useFederation'
 import { portalConfig, type LoginOption } from '@/lib/config'
+import type { VerifiedRealm } from '@/lib/federation/descriptor'
+import { Globe2, RefreshCw } from '@lucide/vue'
 
 const { signIn } = useAuth()
+const { realm } = useAruna()
+const router = useRouter()
 
 const PLAIN_SIGN_IN: LoginOption = {
   name: 'Realm account',
@@ -39,6 +50,26 @@ function choose(choice: LoginOption) {
   const params = Object.keys(choice.params).length ? choice.params : undefined
   void signIn(params ? { ...options, params } : options)
 }
+
+// Login with an account of another realm: a popup at that realm, then a session here.
+const pickerOpen = ref(false)
+const homeRealm = shallowRef<VerifiedRealm | null>(null)
+const federating = ref(false)
+const federationError = ref<string | null>(null)
+
+async function loginElsewhere(home: VerifiedRealm) {
+  const redirectTo = signInChoice.value?.redirectTo ?? '/app'
+  homeRealm.value = home
+  federating.value = true
+  federationError.value = null
+  const failure = await loginWithRealm(home, realm.value.name)
+  federating.value = false
+  if (homeRealm.value !== home) return
+  federationError.value = failure
+  if (failure) return
+  signInChoice.value = null
+  void router.push(redirectTo)
+}
 </script>
 
 <template>
@@ -55,7 +86,32 @@ function choose(choice: LoginOption) {
             <span class="w-36 text-left">{{ choice.name }}</span>
           </button>
         </li>
+        <li>
+          <button
+            type="button"
+            title="Use your account of another Aruna realm"
+            :class="rowClass"
+            :aria-expanded="pickerOpen"
+            :disabled="federating"
+            @click="pickerOpen = !pickerOpen"
+          >
+            <span class="flex h-8 w-14 shrink-0 items-center justify-center">
+              <Globe2 class="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+            </span>
+            <span class="w-36 text-left">Another Aruna realm</span>
+          </button>
+        </li>
       </ul>
+      <div v-if="pickerOpen && !federating" class="rounded-lg border border-border bg-muted/30 p-1">
+        <RealmPicker action-label="Choose" :exclude-realm-id="realm.id" :check-pick="false" @pick="loginElsewhere" />
+      </div>
+      <Spinner v-if="federating && homeRealm" show-label :label="`Waiting for ${homeRealm.name}…`" class="text-xs" />
+      <Notice v-if="federationError" tone="error" class="flex items-center justify-between gap-3">
+        <span>{{ federationError }}</span>
+        <Button v-if="homeRealm" size="sm" variant="outline" @click="loginElsewhere(homeRealm)">
+          <RefreshCw class="h-3.5 w-3.5" /> Try again
+        </Button>
+      </Notice>
       <p class="text-xs leading-relaxed text-muted-foreground">
         New login with the email of an existing account? You sign in once with that account to link both.
       </p>

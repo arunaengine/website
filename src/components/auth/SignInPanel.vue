@@ -2,11 +2,6 @@
 // The guest gate into a realm. Sign-in is one OIDC redirect, so the panel is
 // a branded frame around that action plus the first-admin secret path.
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import RealmPicker from '@/components/federation/RealmPicker.vue'
-import Spinner from '@/components/ui/Spinner.vue'
-import { loginWithRealm } from '@/composables/useFederation'
-import type { VerifiedRealm } from '@/lib/federation/descriptor'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -14,7 +9,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { featureEnabled } from '@/lib/config'
 import iconMark from '@/assets/brand/icon-mark.avif'
-import { ChevronRight, LogIn, RefreshCw } from '@lucide/vue'
+import { ChevronRight, LogIn } from '@lucide/vue'
 
 // `compact` is the slim banner the dashboard shows guests; the sign-in page keeps the full frame.
 const props = defineProps<{ compact?: boolean }>()
@@ -34,24 +29,6 @@ const signInHint = featureEnabled('embeddedAuth')
   : featureEnabled('systemBrowserAuth')
     ? 'Sign-in opens in your browser at the realm’s identity provider, then returns to the app.'
     : 'Sign-in continues at the realm’s identity provider, then returns here.'
-
-// Login with an account of another realm: a popup at that realm, then a session here.
-const router = useRouter()
-const pickerOpen = ref(false)
-const homeRealm = ref<VerifiedRealm | null>(null)
-const federating = ref(false)
-const federationError = ref<string | null>(null)
-
-async function loginElsewhere(home: VerifiedRealm) {
-  homeRealm.value = home
-  federating.value = true
-  federationError.value = null
-  const failure = await loginWithRealm(home, realm.value.name)
-  federating.value = false
-  if (homeRealm.value !== home) return
-  federationError.value = failure
-  if (!failure) void router.push('/app')
-}
 
 function startSignIn() {
   void requestSignIn({ onboardingSecret: onboardingSecret.value, redirectTo: '/app' })
@@ -103,14 +80,9 @@ function startSignIn() {
       <div :class="['flex flex-col justify-center', props.compact ? 'gap-3 px-5 py-4' : 'gap-4 p-6 md:p-7']">
         <div v-if="props.compact" class="flex flex-wrap items-center justify-between gap-3">
           <p class="text-sm text-muted-foreground">Sign in to upload data, run analyses and work with your groups.</p>
-          <div class="flex shrink-0 flex-wrap items-center gap-2">
-            <Button size="sm" :disabled="signingIn" @click="startSignIn">
-              <LogIn class="h-4 w-4" /> {{ signingIn ? 'Opening sign-in…' : 'Sign in' }}
-            </Button>
-            <Button size="sm" variant="outline" :aria-expanded="pickerOpen" :disabled="federating" @click="pickerOpen = !pickerOpen">
-              Log in with another realm
-            </Button>
-          </div>
+          <Button size="sm" class="shrink-0" :disabled="signingIn" @click="startSignIn">
+            <LogIn class="h-4 w-4" /> {{ signingIn ? 'Opening sign-in…' : 'Sign in' }}
+          </Button>
         </div>
         <template v-else>
           <div>
@@ -122,28 +94,6 @@ function startSignIn() {
           </Button>
         </template>
         <Notice v-if="stageError" tone="error">{{ stageError }}</Notice>
-        <template v-if="!props.compact">
-          <div class="flex items-center gap-2.5 text-[11px] text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">or</div>
-          <Button
-            variant="outline"
-            class="w-full sm:w-auto sm:self-start"
-            :aria-expanded="pickerOpen"
-            :disabled="federating"
-            @click="pickerOpen = !pickerOpen"
-          >
-            Log in with another realm
-          </Button>
-        </template>
-        <div v-if="pickerOpen && !federating" class="rounded-lg border border-border bg-muted/30 p-1">
-          <RealmPicker action-label="Choose" :exclude-realm-id="realm.id" :check-pick="false" @pick="loginElsewhere" />
-        </div>
-        <Spinner v-if="federating && homeRealm" show-label :label="`Waiting for ${homeRealm.name}…`" class="text-xs" />
-        <Notice v-if="federationError" tone="error" class="flex items-center justify-between gap-3">
-          <span>{{ federationError }}</span>
-          <Button v-if="homeRealm" size="sm" variant="outline" @click="loginElsewhere(homeRealm)">
-            <RefreshCw class="h-3.5 w-3.5" /> Try again
-          </Button>
-        </Notice>
         <div v-if="!props.compact" class="border-t border-border/70 pt-3">
           <button
             type="button"

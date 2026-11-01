@@ -87,18 +87,11 @@ describe('sign-in with login option params', () => {
 })
 
 describe('requestSignIn', () => {
-  it('opens the chooser when the portal config lists logins', async () => {
-    await setup('https://login.example.org/realms/aruna', {}, { login: { options: [{ name: 'SSO' }] } })
+  it('opens the chooser at any realm, which offers another Aruna realm', async () => {
+    await setup('https://login.example.org/realms/aruna')
     await useAuth().requestSignIn({ redirectTo: '/app/data' })
     expect(signInChoice.value).toEqual({ redirectTo: '/app/data' })
     expect(assign).not.toHaveBeenCalled()
-  })
-
-  it('signs in directly without configured logins', async () => {
-    await setup(ARUNA_ISSUER)
-    await useAuth().requestSignIn({ redirectTo: '/app/data' })
-    expect(signInChoice.value).toBeNull()
-    expect(redirected().searchParams.has('kc_idp_hint')).toBe(false)
   })
 })
 
