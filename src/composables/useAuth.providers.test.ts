@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useAuth } from './useAuth'
+import { setAuthOpener, useAuth } from './useAuth'
 import { signInChoice } from './signInChoice'
 import { loadPortalConfig } from '@/lib/config'
 
@@ -15,8 +15,8 @@ function json(body: unknown, status = 200): Response {
 }
 
 // A fresh discovery url per case, so no cached discovery leaks between cases.
-async function setup(issuer: string, stored: Record<string, string> = {}) {
-  vi.stubGlobal('fetch', vi.fn(async () => json({})))
+async function setup(issuer: string, stored: Record<string, string> = {}, served: Record<string, unknown> = {}) {
+  vi.stubGlobal('fetch', vi.fn(async () => json(served)))
   await loadPortalConfig()
   storage = new Map(Object.entries(stored))
   assign = vi.fn()
@@ -49,6 +49,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  setAuthOpener(null)
   vi.unstubAllGlobals()
 })
 
@@ -59,6 +60,15 @@ describe('sign-in with a provider hint', () => {
     const url = redirected()
     expect(url.searchParams.get('kc_idp_hint')).toBe('lifescience')
     expect(url.searchParams.has('kc_action')).toBe(false)
+  })
+
+  it('hands the hint to the desktop sign-in window', async () => {
+    await setup(ARUNA_ISSUER, {}, { features: { embeddedAuth: true } })
+    const opener = vi.fn()
+    setAuthOpener(opener)
+    await useAuth().signIn({ idpHint: 'orcid' })
+    expect(assign).not.toHaveBeenCalled()
+    expect(new URL(opener.mock.calls[0][0] as string).searchParams.get('kc_idp_hint')).toBe('orcid')
   })
 
   it('sends no hint for the plain account', async () => {
