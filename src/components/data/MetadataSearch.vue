@@ -33,7 +33,7 @@ const { displayName, isLocalNode } = useRealmNodes()
 // The search spans nodes by bucket name; a hit of another node names that node.
 const elsewhere = (hit: ObjectSearchHit) => (props.nodeId ? hit.issuer_node_id !== props.nodeId : !isLocalNode(hit.issuer_node_id))
 
-const { searchObjects, sessionEpoch } = useAruna()
+const { searchObjects, listBucketObjects, sessionEpoch } = useAruna()
 const chips = ref<{ column: string; value: string }[]>([])
 const hits = ref<ObjectSearchHit[] | null>(null)
 const cursor = ref<string | null>(null)
@@ -45,6 +45,9 @@ const failure = ref<string | null>(null)
 const busy = ref(false)
 // The groups opened to their files; they stay open while more pages load.
 const opened = ref(new Set<string>())
+// The file counts of folders the search found only by their own entry, listed once on their node.
+const counted = ref(new Map<string, string>())
+let countRound = 0
 let runs = 0
 let unmounted = false
 // The words of the last search; after a search of chips alone, new text in the box is a new query.
@@ -65,6 +68,8 @@ watch(() => [props.bucket, props.nodeId, sessionEpoch.value], () => {
   failure.value = null
   busy.value = false
   opened.value = new Set()
+  counted.value = new Map()
+  countRound++
 })
 
 const query = computed(() => searchQuery(searchTerms(typed.value).words, chips.value))
@@ -174,8 +179,25 @@ function fileName(group: Group, file: ObjectSearchHit): string {
 }
 function fileCount(group: Group): string {
   const count = groupFiles(group).length
-  return count ? `${count}${morePages.value ? '+' : ''} ${count === 1 && !morePages.value ? 'file' : 'files'}` : ''
+  return count ? `${count}${morePages.value ? '+' : ''} ${count === 1 && !morePages.value ? 'file' : 'files'}` : (counted.value.get(group.key) ?? '')
 }
+const COUNT_LIMIT = 100
+watch(rows, (list) => {
+  for (const group of list) {
+    if (group.kind !== 'group' || groupFiles(group).length || counted.value.has(group.key)) continue
+    counted.value = new Map(counted.value).set(group.key, '')
+    const round = countRound
+    void listBucketObjects(props.bucket, { prefix: `${group.folder}/`, limit: COUNT_LIMIT }, group.nodeId)
+      .then((page) => {
+        if (round !== countRound) return
+        const files = page.objects.filter((object) => !object.key.endsWith('/')).length
+        const more = Boolean(page.next_cursor)
+        const label = files ? `${files}${more ? '+' : ''} ${files === 1 && !more ? 'file' : 'files'}` : ''
+        counted.value = new Map(counted.value).set(group.key, label)
+      })
+      .catch(() => undefined)
+  }
+})
 // "4 genomes" when every group names an assembly, else folders; files found outside a group follow.
 const found = computed(() => {
   const groups = rows.value.filter((row): row is Group => row.kind === 'group')

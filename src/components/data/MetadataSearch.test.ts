@@ -14,6 +14,7 @@ async function expand(root: HostNode) {
 }
 
 const hit = { key: 'GCF_000005845.2_ASM584v2/', bucket: 'ncbi', issuer_node_id: 'n2', group_id: 'g1' }
+const listBucketObjects = vi.fn(async (..._args: unknown[]) => ({ objects: [] as Array<{ key: string }>, prefixes: [], next_cursor: null as string | null }))
 const searchObjects = vi.fn(async (_q: string, _options: { match: string }) => ({ hits: [hit] as unknown[], next_cursor: null as string | null, coverage: { complete: true } }))
 
 // Searching while typing waits for a pause; it is over at once unless a test holds it.
@@ -29,7 +30,7 @@ const view = compileClientComponent(new URL('./MetadataSearch.vue', import.meta.
   '@vueuse/core': { useDebounceFn },
   '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => h('i')) }),
   '@/components/ui/Button.vue': moduleDefault(defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()) })),
-  '@/composables/useAruna': { useAruna: () => ({ searchObjects, sessionEpoch: ref(1) }) },
+  '@/composables/useAruna': { useAruna: () => ({ searchObjects, listBucketObjects, sessionEpoch: ref(1) }) },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => `node ${id}`, isLocalNode: (id: string) => id === 'n1' }) },
   '@/lib/searchGroups': SearchGroups,
   '@/lib/tableImport': TableImport,
@@ -392,14 +393,18 @@ describe('bucket search results by record folder', () => {
     searchObjects.mockReset().mockImplementation(async () => ({ hits: [hit] as unknown[], next_cursor: null, coverage: { complete: true } }))
   })
 
-  it('names no file count for an assembly found only by its folder entry', async () => {
+  it('counts the files of an assembly found only by its folder entry on its node', async () => {
     const SAKAI = { organism_name: 'Escherichia coli O157:H7 str. Sakai', infraspecific_name: 'strain=Sakai substr. RIMD 0509952', assembly_accession: 'GCF_000008865.2', assembly_level: 'Complete Genome' }
     searchObjects.mockImplementation(async (_q, options) => (options.match === 'metadata'
       ? { hits: [found('GCF_000008865.2_ASM886v2/', SAKAI)], next_cursor: null, coverage: { complete: true } }
       : { hits: [], next_cursor: null, coverage: { complete: true } }))
+    listBucketObjects.mockResolvedValueOnce({ objects: [{ key: 'GCF_000008865.2_ASM886v2/' }, { key: 'GCF_000008865.2_ASM886v2/a.fna' }, { key: 'GCF_000008865.2_ASM886v2/b.gff' }], prefixes: [], next_cursor: null })
     const { root, app } = await open()
+    await flush()
     const text = content(root)
 
+    expect(listBucketObjects).toHaveBeenCalledWith('ncbi', { prefix: 'GCF_000008865.2_ASM886v2/', limit: 100 }, 'n1')
+    expect(text).toContain('2 files')
     expect(text).toContain('Escherichia coli O157:H7 str. Sakai substr. RIMD 0509952')
     expect(text).not.toContain('Sakai Sakai')
     expect(text).toContain('GCF_000008865.2')
