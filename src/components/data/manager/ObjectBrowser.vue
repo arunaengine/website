@@ -310,7 +310,7 @@ function openObject(object: ObjectEntry) {
   void router.push({
     name: 'notebook',
     params: { bucketId: bucket.value, key: object.key },
-    query: { group: selectedGroupId.value },
+    query: { group: selectedGroupId.value, ...(remoteNodeId.value ? { node: remoteNodeId.value } : {}) },
   })
 }
 

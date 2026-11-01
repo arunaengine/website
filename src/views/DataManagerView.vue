@@ -565,6 +565,7 @@ async function createFolder() {
       :bucket="bucket"
       :prefix="s3Prefix"
       :group-id="activeGroupId ?? ''"
+      :node-id="remoteNodeId"
     />
 
     <BindFolderDialog

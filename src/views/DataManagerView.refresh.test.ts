@@ -142,6 +142,19 @@ describe('Data view after a folder link', () => {
   })
 })
 
+describe('Data view new notebook', () => {
+  it('opens a new notebook on the node that holds the bucket', async () => {
+    manager = fakeManager(null)
+    const known = manager as Record<string, unknown>
+    known.bucket = ref('reads')
+    known.remoteNodeId = ref('store-1')
+    const { root, app } = await mountApp(DataManagerView)
+    const dialog = element(root, (node: HostNode) => node.props['data-stub'] === 'NewNotebookDialog')
+    expect(dialog.props['node-id'] ?? dialog.props.nodeId).toBe('store-1')
+    app.unmount()
+  })
+})
+
 describe('Data view search hits', () => {
   it('opens a found file with its details and a found folder as the folder', async () => {
     manager = fakeManager(null)

@@ -1031,6 +1031,16 @@ describe('notebooks in the bucket', () => {
     expect(openDetails).toHaveBeenCalledWith(listedObject)
   })
 
+  it('opens a notebook of a bucket on another node on that node', async () => {
+    push.mockClear()
+    const manager = fakeManager({ openDetails, router: { push }, objects: ref([notebookObject]), remoteNodeId: ref('store-1') })
+    const host = defineComponent({ setup: () => () => h(browser, { manager, notebooks: true }) })
+    const { root } = await mountApp(host)
+
+    await bubbleClick(element(root, (node) => node.tag === 'tr' && content(node).includes('counts.ipynb')))
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({ query: { group: 'g-1', node: 'store-1' } }))
+  })
+
   it('marks notebook rows only while the flag is set', async () => {
     const marked = async (notebooks: boolean) => {
       const manager = fakeManager({ openDetails, router: { push }, objects: ref([notebookObject]) })
