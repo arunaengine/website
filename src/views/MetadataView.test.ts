@@ -95,4 +95,10 @@ describe('MetadataView', () => {
     expect(source).toContain('@manage="manageRepositories"')
     expect(source).toContain('@publish="showPublish = true"')
   })
+
+  it('tells a visitor that a hidden dataset may be private and offers sign-in', () => {
+    const missing = source.slice(source.indexOf("docState === 'not-found'"), source.indexOf("docState === 'forbidden'"))
+    expect(missing).toContain("'This dataset is not public, or it does not exist.'")
+    expect(missing).toContain('<Button v-if="!currentUser" size="sm" @click="signIn({ redirectTo: route.fullPath })">')
+  })
 })

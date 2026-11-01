@@ -46,6 +46,7 @@ import DataEntityDialog from '@/components/metadata/DataEntityDialog.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
+import { useAuth } from '@/composables/useAuth'
 import { useDatasetView } from '@/composables/useDatasetView'
 import { useDatasetHistory } from '@/composables/useDatasetHistory'
 import { useRouteTab } from '@/composables/useRouteTab'
@@ -65,10 +66,11 @@ import { useS3 } from '@/composables/useS3'
 import { type MetadataDocumentSummary, type RepositoryLink, type ShareTarget, type StorageLocation } from '@/lib/api'
 import { publishedLinks } from '@/lib/repository'
 import { errorMessage } from '@/lib/utils'
-import { AppWindow, ArrowLeft, Braces, GitBranch, History as HistoryIcon, LayoutDashboard, List, Shapes, Share2 } from '@lucide/vue'
+import { AppWindow, ArrowLeft, Braces, GitBranch, History as HistoryIcon, LayoutDashboard, List, LogIn, Shapes, Share2 } from '@lucide/vue'
 
 const router = useRouter()
 const route = useRoute()
+const { signIn } = useAuth()
 const { currentUser, saving, deleteMetadataDocument, fullCrates, sessionEpoch, realm } = useAruna()
 const { shown } = usePortalFeatures()
 
@@ -481,9 +483,10 @@ function jumpTo(entityId: string) {
 
       <EmptyState
         v-else-if="docState === 'not-found'"
-        title="This dataset does not exist or has been deleted."
-        :description="detailId"
+        :title="currentUser ? 'This dataset does not exist or has been deleted.' : 'This dataset is not public, or it does not exist.'"
+        :description="currentUser ? detailId : 'Sign in to see it if you have access.'"
       >
+        <Button v-if="!currentUser" size="sm" @click="signIn({ redirectTo: route.fullPath })"><LogIn class="h-4 w-4" /> Sign in</Button>
         <Button variant="outline" as-child>
           <RouterLink :to="{ name: 'datasets' }"><ArrowLeft class="h-4 w-4" /> Datasets</RouterLink>
         </Button>
