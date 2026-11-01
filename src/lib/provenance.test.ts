@@ -68,6 +68,16 @@ describe('provenance graph', () => {
     expect(hasPending(graph)).toBe(false)
   })
 
+  it('names the device a run input was uploaded from', async () => {
+    const read = readers({ [arn('b.faa', V2)]: origin({ origin: { kind: 'upload', node_id: 'n1', device: 'd1' } }) }, runCrate)
+    const graph = emptyGraph()
+    startFile(graph, arn('out.tsv', V1), 'out.tsv', origin({ origin: { kind: 'job', run_id: 'r1' } }))
+    await expandAll(graph, read, () => false)
+
+    expect(graph.boxes[arn('b.faa', V2)].from).toEqual(['device:d1'])
+    expect(graph.boxes['device:d1']).toMatchObject({ kind: 'device', role: 'Uploaded from device', title: 'd1' })
+  })
+
   it('reads each version once, also in a cycle', async () => {
     const [a, b] = [arn('a', V1), arn('b', V2)]
     const read = readers({ [b]: origin({ origin: { kind: 'copy', from: a } }) })

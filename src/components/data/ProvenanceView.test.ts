@@ -32,6 +32,7 @@ const component = compileClientComponent(new URL('./ProvenanceView.vue', import.
   '@/lib/crate/dataIdentity': { folderRoute: (bucket: string) => ({ name: 'bucket', params: { bucketId: bucket } }), objectRoute: (bucket: string, key: string) => ({ name: 'bucket', params: { bucketId: bucket }, query: { object: key } }) },
   '@/lib/objectListing': { splitName: (name: string) => [name, ''] },
   '@/composables/useAruna': { useAruna: () => aruna },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => `node ${id}` }) },
   '@/composables/useDatabases': { useDatabases: () => ({ rows: ref([]) }) },
   '@/lib/api': { apiErrorMessage: (cause: unknown) => (cause as Error).message },
   '@/lib/provenance': Provenance,
@@ -114,6 +115,13 @@ describe('provenance view', () => {
     await vi.waitFor(() => expect(content(root)).toContain('Bakta K-12'))
     expect(aruna.getBucketRuns).toHaveBeenCalledWith('bakta-results', '', 'n2')
     expect(aruna.getRun).toHaveBeenCalledWith('k12')
+  })
+
+  it('names the device an input was uploaded from', async () => {
+    aruna.getVersionOrigin.mockReset().mockResolvedValue(origin({ origin: { kind: 'upload', node_id: 'n2', device: 'd1' } }))
+    const root = await render()
+    await vi.waitFor(() => expect(content(root)).toContain('node d1'))
+    expect(content(root)).toContain('Uploaded from device')
   })
 
   it('draws the run that made an input one level up, and reads every level on request', async () => {

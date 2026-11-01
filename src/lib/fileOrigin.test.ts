@@ -16,7 +16,7 @@ describe('file origin', () => {
   it('says who uploaded a version, where and from which device', () => {
     const origin = originFrom(response({ origin: { kind: 'upload', node_id: 'n1', device: 'laptop' } }), labels)
 
-    expect(origin).toEqual({ kind: 'upload', user: 'user u1', node: 'node n1', time: '2026-10-20T10:12:00Z', device: 'laptop' })
+    expect(origin).toEqual({ kind: 'upload', user: 'user u1', node: 'node n1', time: '2026-10-20T10:12:00Z', device: 'node laptop' })
   })
 
   it('names the source with its public url, its etag and the first digest, and the database', () => {

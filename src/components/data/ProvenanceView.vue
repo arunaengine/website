@@ -10,8 +10,9 @@ import ExternalLink from '@/components/ui/ExternalLink.vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
-import { ArrowDown, CloudOff, Database, Download, EyeOff, File, FileText, Files, GitBranch, Globe, Info, Minus, MoveRight, Network, Plus, RotateCw, Workflow } from '@lucide/vue'
+import { ArrowDown, CloudOff, Database, Download, EyeOff, File, FileText, Files, GitBranch, Globe, Info, Laptop, Minus, MoveRight, Network, Plus, RotateCw, Workflow } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { apiErrorMessage } from '@/lib/api'
 import { folderRoute, objectRoute } from '@/lib/crate/dataIdentity'
 import { splitName } from '@/lib/objectListing'
@@ -40,6 +41,7 @@ const props = defineProps<{
 }>()
 
 const { getVersionOrigin, getRun, getBucketRuns, fetchRoCrateRaw, downloadProvenanceCrate, runSparql, sessionEpoch } = useAruna()
+const { displayName } = useRealmNodes()
 
 const readers: Readers = {
   origin: (version) => getVersionOrigin(version),
@@ -205,7 +207,7 @@ function placeOf(item: Box): RouteLocationRaw | undefined {
   return bucket ? folderRoute(bucket, '') : undefined
 }
 
-const ICONS: Record<Box['kind'], Component> = { file: File, unversioned: File, run: Workflow, database: Database, source: Globe, hidden: EyeOff, silent: CloudOff }
+const ICONS: Record<Box['kind'], Component> = { file: File, unversioned: File, run: Workflow, database: Database, source: Globe, device: Laptop, hidden: EyeOff, silent: CloudOff }
 
 interface Shown {
   icon: Component
@@ -276,7 +278,7 @@ function shown(card: ChainCard): Shown {
     ...base,
     icon: me && props.start.kind === 'dataset' ? FileText : ICONS[item.kind],
     role: item.role,
-    title: item.title,
+    title: item.kind === 'device' ? displayName(item.title) : item.title,
     detail: repeat || item.detail || (run && run === props.record?.runId ? props.record.where ?? '' : ''),
     mono: item.kind === 'hidden',
     path: item.path,
@@ -394,6 +396,7 @@ const INFO = 'You only see what you are allowed to read.'
 const LEGEND = [
   { icon: MoveRight, label: 'Flows from source to result' },
   { icon: Globe, label: 'Source' },
+  { icon: Laptop, label: 'Device' },
   { icon: File, label: 'File' },
   { icon: Database, label: 'Database' },
   { icon: Workflow, label: 'Run' },

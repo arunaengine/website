@@ -35,7 +35,7 @@ export function originFrom(response: OriginResponse, labels: OriginLabels): Orig
         user: labels.user(response.created_by),
         node: labels.node(origin.node_id),
         time: response.created_at,
-        ...(origin.device ? { device: origin.device } : {}),
+        ...(origin.device ? { device: labels.node(origin.device) } : {}),
       }
     case 'source': {
       const source = response.source

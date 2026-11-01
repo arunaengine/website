@@ -9,7 +9,7 @@ import { formatDate } from '@/lib/utils'
 const DATA_PREFIX = 'https://w3id.org/aruna/data/'
 const GLOBAL_VERSION = /^https:\/\/w3id\.org\/aruna\/data\/[A-Za-z0-9_-]+\/[0-9A-HJKMNP-TV-Z]{26}$/
 
-export type BoxKind = 'file' | 'run' | 'database' | 'source' | 'hidden' | 'unversioned' | 'silent'
+export type BoxKind = 'file' | 'run' | 'database' | 'source' | 'device' | 'hidden' | 'unversioned' | 'silent'
 
 /** A link still to read: an exact version, or a run. */
 export type Hop =
@@ -106,6 +106,9 @@ function fileBox(graph: Graph, parent: string | null, id: string, asked: string,
   if (origin.origin?.kind === 'job') file.pending.push({ kind: 'run', runId: origin.origin.run_id })
   if (origin.hop) file.pending.push({ kind: 'version', id: origin.hop.from, role: 'Synced from' })
   add(graph, parent, file)
+  // A device upload names the device by node id; the view shows its name.
+  const device = origin.origin?.kind === 'upload' ? origin.origin.device : null
+  if (device) add(graph, id, box(`device:${device}`, 'device', 'Uploaded from device', device))
   // Identifiers belong to this file; the database box is shared by every file it lists.
   file.identifiers = origin.identifiers ?? []
   const metadata = origin.bucket_metadata
