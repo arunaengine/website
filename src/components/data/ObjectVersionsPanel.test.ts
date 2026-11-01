@@ -22,6 +22,7 @@ const deleteObjectVersion = vi.fn(async () => undefined)
 const canWrite = vi.fn(() => true)
 const activeContext = ref<{ nodeId: string } | null>({ nodeId: 'node-a' })
 class S3ContextMismatchError extends Error {}
+class S3SessionUnavailableError extends Error {}
 
 const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
 const slotted = (tag: string) =>
@@ -55,6 +56,7 @@ const panel = compileClientComponent(new URL('./ObjectVersionsPanel.vue', import
   '@/lib/objectVersions': ObjectVersions,
   '@/composables/useS3': {
     S3ContextMismatchError,
+    S3SessionUnavailableError,
     s3ErrorMessage: (error: unknown) => String(error),
     useS3: () => ({ listObjectVersions, deleteObjectVersion, canWrite, activeContext, downloadUrl: async () => 'url' }),
   },
@@ -208,5 +210,26 @@ describe('object versions panel', () => {
     await flush()
     expect(listObjectVersions).toHaveBeenCalledTimes(2)
     expect(content(root)).toContain('Current')
+  })
+
+  it('waits once for a session that is not open yet, then shows a second miss', async () => {
+    const missing = () => new S3SessionUnavailableError('No valid S3 session is available for this node and group.')
+    listObjectVersions.mockClear()
+    listObjectVersions.mockRejectedValueOnce(missing())
+    const { root } = await render([current], 'node-c')
+    expect(content(root)).not.toContain('No valid S3 session')
+
+    activeContext.value = { nodeId: 'node-c' }
+    await flush()
+    expect(listObjectVersions).toHaveBeenCalledTimes(2)
+    expect(content(root)).toContain('Current')
+
+    listObjectVersions.mockClear()
+    listObjectVersions.mockRejectedValueOnce(missing()).mockRejectedValueOnce(missing())
+    const again = await render([current], 'node-d')
+    activeContext.value = { nodeId: 'node-d' }
+    await flush()
+    expect(listObjectVersions).toHaveBeenCalledTimes(2)
+    expect(content(again.root)).toContain('No valid S3 session')
   })
 })
