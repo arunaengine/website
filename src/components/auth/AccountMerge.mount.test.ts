@@ -23,15 +23,11 @@ const Notice = defineComponent({
   props: { title: String },
   setup: (props, { slots }) => () => h('div', [props.title, slots.default?.()]),
 })
-const DetailList = defineComponent({
-  props: { items: Array },
-  setup: (props) => () => h('dl', (props.items as Array<{ label: string; value: string }>).map((item) => `${item.label}: ${item.value};`)),
-})
 const AccountMerge = compileClientComponent(new URL('./AccountMerge.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => null) }),
   '@/components/ui/Button.vue': moduleDefault(Button),
-  '@/components/ui/DetailList.vue': moduleDefault(DetailList),
+  '@/components/ui/IconTile.vue': moduleDefault(defineComponent(() => () => null)),
   '@/components/ui/Dialog.vue': moduleDefault(DialogStub),
   '@/components/ui/DialogContent.vue': moduleDefault(Passthrough),
   '@/components/ui/DialogDescription.vue': moduleDefault(Passthrough),
@@ -95,9 +91,9 @@ describe('adding another account', () => {
     const { root, app } = await render()
     const text = content(root)
     expect(text).toContain('Merge Bob into this account?')
-    expect(text).toContain('Sign-ins: 2;')
-    expect(text).toContain('Groups: 1;')
-    expect(text).toContain('Devices: 1, they sign in again;')
+    expect(text).toContain('Sign-ins2')
+    expect(text).toContain('Groups1')
+    expect(text).toContain('Devices1, they sign in again')
     for (const ended of ['Its sessions', 'Its S3 keys', 'Its share links']) expect(text).toContain(ended)
     expect(text).not.toContain('You confirm with your own login first.')
     await click(button(root, 'Merge'))
@@ -123,7 +119,7 @@ describe('adding another account', () => {
     const { root, app } = await render()
     const text = content(root)
     expect(text).toContain('Accounts merged')
-    expect(text).toContain('Preferences copied: 3;')
+    expect(text).toContain('Preferences copied3')
     expect(text).toContain('theme, orcid')
     await click(button(root, 'Done'))
     expect(actions.cancel).toHaveBeenCalledTimes(1)
