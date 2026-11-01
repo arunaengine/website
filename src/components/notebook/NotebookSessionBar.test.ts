@@ -109,6 +109,7 @@ function fakeContext(overrides: { state?: Record<string, unknown> | null; runnin
       restarting: ref(false),
       error: ref(null),
       notice: ref(null),
+      startFailed: ref(false),
       idlePickMs: ref(null),
       live: computed(() => (state.value as { state?: string } | null)?.state === 'ready'),
       ended: computed(() => (state.value as { state?: string } | null)?.state === 'ended'),
@@ -260,6 +261,16 @@ describe('the session bar', () => {
     expect(content(root)).not.toContain('The session ended (idle).')
     await openOptions(root)
     expect(content(root)).toContain('The session ended (idle).')
+  })
+
+  it('says a kernel failed to start and names the reason on the Kernel button', async () => {
+    const root = await render({ state: { state: 'ended' } })
+    ;(context.session.error as { value: string }).value = 'The kernel did not start: session kernel exited.'
+    ;(context.session.startFailed as { value: boolean }).value = true
+    await flush()
+    const kernel = element(root, (node) => node.props['aria-label'] === 'Kernel')
+    expect(content(kernel)).toContain('Failed to start')
+    expect(kernel.props.title).toBe('The kernel did not start: session kernel exited.')
   })
 
   it('calls a live kernel running, not idle', async () => {

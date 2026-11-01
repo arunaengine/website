@@ -210,14 +210,18 @@ const stateVariant = computed(() =>
   toneVariant(session.ended.value ? 'count' : session.live.value ? 'done' : 'attention'),
 )
 
+// The Kernel menu names the reason.
+const startFailed = computed(() => session.startFailed.value)
 // The kernel light and its word, in the portal's shared state tones.
 const kernelLabel = computed(() => {
   if (notebook.loading.value) return 'Loading'
+  if (startFailed.value) return 'Failed to start'
   if (session.live.value) return session.kernel.value === 'busy' ? 'Running a cell' : 'Running'
   if (unattachedSession.value) return `${sessionRows.value.length} running`
   return session.running.value || session.starting.value ? stateLabel.value : 'Stopped'
 })
 const kernelTone = computed<StateTone>(() => {
+  if (startFailed.value) return 'failed'
   if (session.live.value) return session.kernel.value === 'busy' ? 'progress' : 'done'
   if (unattachedSession.value) return 'attention'
   return session.running.value || session.starting.value ? 'progress' : 'idle'
@@ -347,7 +351,7 @@ defineExpose({ runNotebook })
         variant="outline"
         aria-label="Kernel"
         :class="unattachedSession && !session.live.value ? 'border-amber-500/50' : ''"
-        :title="unattachedSession ? hintTitle(unattachedSession) : undefined"
+        :title="unattachedSession ? hintTitle(unattachedSession) : startFailed ? session.error.value ?? undefined : undefined"
         @click="kernelOpen = true"
       >
         Kernel

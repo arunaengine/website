@@ -34,6 +34,8 @@ const NODE_LOOKUP_TRIES = 20
 const NODE_LOOKUP_DELAY_MS = 1_500
 /** Wait before resending a cell the node rate limited, without a Retry-After. */
 const RATE_LIMIT_WAIT_MS = 2_000
+/** How often the job of a starting kernel is read, so a failed start shows. */
+const START_CHECK_MS = 5_000
 
 /** The submit, plus the dependency file the portal writes before it. The
  * idempotency key is the store's, so a retry keeps the same one. */
@@ -57,6 +59,8 @@ export function createNotebookSession(notebook: NotebookStore) {
   const attaching = ref(false)
   const error = ref<string | null>(null)
   const notice = ref<string | null>(null)
+  /** The session job ended before its kernel came up. */
+  const startFailed = ref(false)
   const streamOpen = ref(false)
   watch(state, (next) => {
     kernel.value = next?.state === 'ready' ? 'idle' : next?.state === 'ended' ? 'dead' : next?.state ?? 'starting'
@@ -242,6 +246,39 @@ export function createNotebookSession(notebook: NotebookStore) {
     }
   }
 
+  // A kernel that never comes up ends with a failed job, which the session stream does not report.
+  let startCheck: ReturnType<typeof setTimeout> | undefined
+  function stopStartCheck() {
+    clearTimeout(startCheck)
+    startCheck = undefined
+  }
+  async function checkStart(): Promise<void> {
+    startCheck = undefined
+    const active = current()
+    const id = jobId.value
+    try {
+      const job = await getJob(id, homeClient.value)
+      if (!active() || id !== jobId.value || state.value?.state !== 'starting') return
+      if (['succeeded', 'failed', 'cancelled'].includes(job.state)) {
+        closeStream()
+        state.value = { ...state.value, state: 'ended', ended: { reason: 'kernel_exit' } }
+        kernel.value = 'dead'
+        startFailed.value = true
+        error.value = `The kernel did not start: ${job.error?.message?.trim() || `the session job is ${job.state}`}.`
+        return
+      }
+    } catch {
+      if (!active()) return
+    }
+    if (!startCheck && state.value?.state === 'starting' && id === jobId.value) {
+      startCheck = setTimeout(checkStart, START_CHECK_MS)
+    }
+  }
+  watch(() => (state.value?.state === 'starting' ? jobId.value : ''), (id) => {
+    stopStartCheck()
+    if (id) startCheck = setTimeout(checkStart, START_CHECK_MS)
+  })
+
   /** Picks up the session the notebook names, once the document is read. */
   async function attachSaved(): Promise<void> {
     const meta = notebook.meta.value
@@ -309,6 +346,7 @@ export function createNotebookSession(notebook: NotebookStore) {
     const origin = homeClient.value
     const storageNode = notebook.nodeId.value ?? nodeInfo.value?.node.peer_id ?? null
     starting.value = true
+    startFailed.value = false
     error.value = null
     notice.value = null
     // Set once this attempt admitted a job; a job from before is not ours.
@@ -512,6 +550,7 @@ export function createNotebookSession(notebook: NotebookStore) {
 
   function detach(): void {
     keepResumePoint.flush()
+    stopStartCheck()
     generation += 1
     closeStream()
     resumeScope = notebook.scope.value
@@ -527,6 +566,7 @@ export function createNotebookSession(notebook: NotebookStore) {
     attaching.value = false
     error.value = null
     notice.value = null
+    startFailed.value = false
   }
 
   watch(notebook.generation, detach, { flush: 'sync' })
@@ -548,6 +588,7 @@ export function createNotebookSession(notebook: NotebookStore) {
     attaching,
     error,
     notice,
+    startFailed,
     streamOpen,
     idlePickMs,
     client,

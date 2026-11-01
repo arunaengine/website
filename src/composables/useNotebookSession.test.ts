@@ -206,6 +206,28 @@ describe('createNotebookSession', () => {
     scope.stop()
   })
 
+  it('shows the job error when the kernel never starts', async () => {
+    vi.useFakeTimers()
+    const { session: store, scope } = await setup()
+    jobs.submitJob.mockResolvedValue({ job_id: '01JOB' })
+    jobs.getJob.mockResolvedValue({ job_id: '01JOB', state: 'running', family: { execution_list: [{ executor_node_id: 'node-a', canonical: true }] } })
+    session.getSessionState.mockResolvedValue(state({ state: 'starting' }))
+    await store.start({ groupId: 'group-1', name: 'counts', runtime: 'python-notebook', workspaceBucket: 'lab-data' })
+    expect(store.kernel.value).toBe('starting')
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(store.startFailed.value).toBe(false)
+    jobs.getJob.mockResolvedValue({ job_id: '01JOB', state: 'failed', error: { kind: 'permanent', message: 'session kernel exited' } })
+    await vi.advanceTimersByTimeAsync(5_000)
+
+    expect(store.startFailed.value).toBe(true)
+    expect(store.ended.value).toBe(true)
+    expect(store.running.value).toBe(false)
+    expect(store.error.value).toBe('The kernel did not start: session kernel exited.')
+    scope.stop()
+    vi.useRealTimers()
+  })
+
   it('does not submit after a dependency write outlives the document', async () => {
     const { notebook, session: store, scope } = await setup()
     let finish = () => {}
