@@ -25,12 +25,16 @@ import { errorMessage, relativeTime } from '@/lib/utils'
 import { ChevronRight, Plus, RefreshCw, Search, ShieldCheck, ShieldQuestion, Star } from '@lucide/vue'
 
 // `checkPick: false` hands a chosen realm on at the click, so a popup can open at once; the
-// consumer then checks the realm itself before it uses it.
-const props = withDefaults(defineProps<{ actionLabel?: string; excludeRealmId?: string; checkPick?: boolean }>(), {
-  actionLabel: 'Open',
-  excludeRealmId: '',
-  checkPick: true,
-})
+// consumer then checks the realm itself before it uses it. `onlyRealmIds` limits the rows to those realms.
+const props = withDefaults(
+  defineProps<{ actionLabel?: string; excludeRealmId?: string; checkPick?: boolean; onlyRealmIds?: string[] }>(),
+  {
+    actionLabel: 'Open',
+    excludeRealmId: '',
+    checkPick: true,
+    onlyRealmIds: undefined,
+  },
+)
 const emit = defineEmits<{ (e: 'pick', realm: VerifiedRealm): void }>()
 
 const query = ref('')
@@ -44,14 +48,15 @@ const problem = ref<(Exclude<RealmCheck, { status: 'ok' }> & { retry?: () => voi
 let generation = 0
 const registryAbort = new AbortController()
 
+function offered(realm: VerifiedRealm) {
+  if (realm.realmId === props.excludeRealmId) return false
+  return !props.onlyRealmIds || props.onlyRealmIds.includes(realm.realmId)
+}
+
 const registryRows = computed(() =>
-  (registry.value ?? []).filter(
-    (entry) => entry.realm.realmId !== props.excludeRealmId && matchesQuery(entry.realm, query.value),
-  ),
+  (registry.value ?? []).filter((entry) => offered(entry.realm) && matchesQuery(entry.realm, query.value)),
 )
-const savedRows = computed(() =>
-  savedRealms.value.filter((realm) => realm.realmId !== props.excludeRealmId && matchesQuery(realm, query.value)),
-)
+const savedRows = computed(() => savedRealms.value.filter((realm) => offered(realm) && matchesQuery(realm, query.value)))
 const savedIds = computed(() => new Set(savedRealms.value.map((realm) => realm.realmId)))
 
 onMounted(async () => {

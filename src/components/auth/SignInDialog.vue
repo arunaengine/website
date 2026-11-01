@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// The login chooser: the configured logins, or the realm's plain sign-in, then another Aruna realm.
+// The login chooser: the configured logins, or the realm's plain sign-in, then another Aruna realm
+// when this realm accepts logins from other realms.
 import { computed, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -21,7 +22,7 @@ import type { VerifiedRealm } from '@/lib/federation/descriptor'
 import { Globe2, RefreshCw } from '@lucide/vue'
 
 const { signIn } = useAuth()
-const { realm } = useAruna()
+const { realm, realmInfo } = useAruna()
 const router = useRouter()
 
 const PLAIN_SIGN_IN: LoginOption = {
@@ -52,6 +53,9 @@ function choose(choice: LoginOption) {
 }
 
 // Login with an account of another realm: a popup at that realm, then a session here.
+// A backend without the field accepts none as far as the portal knows.
+const accepted = computed(() => realmInfo.value?.accepted_realms ?? { mode: 'none' as const })
+const acceptedIds = computed(() => (accepted.value.mode === 'only' ? accepted.value.realms : undefined))
 const pickerOpen = ref(false)
 const homeRealm = shallowRef<VerifiedRealm | null>(null)
 const federating = ref(false)
@@ -86,7 +90,7 @@ async function loginElsewhere(home: VerifiedRealm) {
             <span class="w-44 text-left">{{ choice.name }}</span>
           </button>
         </li>
-        <li>
+        <li v-if="accepted.mode !== 'none'">
           <button
             type="button"
             title="Use your account of another Aruna realm"
@@ -102,8 +106,14 @@ async function loginElsewhere(home: VerifiedRealm) {
           </button>
         </li>
       </ul>
-      <div v-if="pickerOpen && !federating" class="rounded-lg border border-border bg-muted/30 p-1">
-        <RealmPicker action-label="Choose" :exclude-realm-id="realm.id" :check-pick="false" @pick="loginElsewhere" />
+      <div v-if="pickerOpen && !federating && accepted.mode !== 'none'" class="rounded-lg border border-border bg-muted/30 p-1">
+        <RealmPicker
+          action-label="Choose"
+          :exclude-realm-id="realm.id"
+          :only-realm-ids="acceptedIds"
+          :check-pick="false"
+          @pick="loginElsewhere"
+        />
       </div>
       <Spinner v-if="federating && homeRealm" show-label :label="`Waiting for ${homeRealm.name}…`" class="text-xs" />
       <Notice v-if="federationError" tone="error" class="flex items-center justify-between gap-3">

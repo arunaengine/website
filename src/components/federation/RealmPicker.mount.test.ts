@@ -2,7 +2,7 @@ import * as VueRuntime from 'vue'
 import { computed, defineComponent, h } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Utils from '@/lib/utils'
-import { button, compileClientComponent, flush, moduleDefault, mountApp } from '@/test/clientRender'
+import { button, compileClientComponent, content, flush, moduleDefault, mountApp } from '@/test/clientRender'
 
 const realm = { realmId: 'A', name: 'Giessen Data', portalUrl: 'https://a.example/', saved: true }
 const checkRealm = vi.fn()
@@ -50,5 +50,15 @@ describe('RealmPicker', () => {
     expect(onPick).toHaveBeenCalledWith(realm)
     expect(checkRealm).not.toHaveBeenCalled()
     app.unmount()
+  })
+
+  it('offers only the listed realms', async () => {
+    const listed = await mountApp(RealmPicker, { props: { onlyRealmIds: ['A'] } })
+    expect(content(listed.root)).toContain('Giessen Data')
+    listed.app.unmount()
+    const other = await mountApp(RealmPicker, { props: { onlyRealmIds: ['B'] } })
+    expect(content(other.root)).not.toContain('Giessen Data')
+    expect(content(other.root)).toContain('No saved realm matches.')
+    other.app.unmount()
   })
 })

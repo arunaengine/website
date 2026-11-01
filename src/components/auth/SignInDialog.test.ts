@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, flush, moduleDefault, mountApp } from '@/test/clientRender'
 import type { SignInOptions } from '@/composables/useAuth'
 import { DEFAULT_PORTAL_CONFIG, type LoginOption, type PortalRuntimeConfig } from '@/lib/config'
+import type { AcceptedRealmsSetting } from '@/lib/api/federation'
 import type { VerifiedRealm } from '@/lib/federation/descriptor'
 
 const signInChoice = ref<SignInOptions | null>(null)
@@ -11,6 +12,7 @@ const signIn = vi.fn()
 const push = vi.fn()
 const loginWithRealm = vi.fn()
 let config: PortalRuntimeConfig = DEFAULT_PORTAL_CONFIG
+const realmInfo = ref<{ accepted_realms?: AcceptedRealmsSetting } | null>(null)
 const HOME = { realmId: 'home', name: 'Home realm' } as VerifiedRealm
 const Passthrough = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
@@ -20,8 +22,10 @@ const DialogStub = defineComponent({
   setup: (props, { slots }) => () => (props.open ? h('div', slots.default?.()) : null),
 })
 const PickerStub = defineComponent({
+  props: { onlyRealmIds: { type: Array, default: undefined } },
   emits: ['pick'],
-  setup: (_, { emit }) => () => h('button', { onClick: () => emit('pick', HOME) }, 'Pick home realm'),
+  setup: (props, { emit }) => () =>
+    h('button', { 'data-only': props.onlyRealmIds?.join(','), onClick: () => emit('pick', HOME) }, 'Pick home realm'),
 })
 const dialog = compileClientComponent(new URL('./SignInDialog.vue', import.meta.url), {
   vue: VueRuntime,
@@ -38,7 +42,7 @@ const dialog = compileClientComponent(new URL('./SignInDialog.vue', import.meta.
   '@/components/federation/RealmPicker.vue': moduleDefault(PickerStub),
   '@/components/auth/ProviderLogo.vue': moduleDefault(defineComponent(() => () => null)),
   '@/composables/signInChoice': { signInChoice },
-  '@/composables/useAruna': { useAruna: () => ({ realm: ref({ id: 'here', name: 'Demo realm' }) }) },
+  '@/composables/useAruna': { useAruna: () => ({ realm: ref({ id: 'here', name: 'Demo realm' }), realmInfo }) },
   '@/composables/useAuth': { useAuth: () => ({ signIn }) },
   '@/composables/useFederation': { loginWithRealm },
   '@/lib/config': { portalConfig: () => config },
@@ -59,6 +63,7 @@ beforeEach(() => {
   push.mockReset()
   loginWithRealm.mockReset()
   config = DEFAULT_PORTAL_CONFIG
+  realmInfo.value = { accepted_realms: { mode: 'any' } }
   signInChoice.value = { redirectTo: '/app/data', onboardingSecret: 's1' }
 })
 
@@ -100,6 +105,24 @@ describe('sign-in dialog', () => {
     expect(push).toHaveBeenCalledWith('/app/data')
     expect(signInChoice.value).toBeNull()
     expect(signIn).not.toHaveBeenCalled()
+    app.unmount()
+  })
+
+  it('hides another realm when this realm accepts none or does not say', async () => {
+    for (const info of [{ accepted_realms: { mode: 'none' as const } }, {}, null]) {
+      realmInfo.value = info
+      const { root, app } = await render()
+      expect(content(root)).toContain('Realm account')
+      expect(content(root)).not.toContain('Another Aruna realm')
+      app.unmount()
+    }
+  })
+
+  it('offers only the accepted realms in the picker', async () => {
+    realmInfo.value = { accepted_realms: { mode: 'only', realms: ['home', 'archive'] } }
+    const { root, app } = await render()
+    await click(button(root, 'Another Aruna realm'))
+    expect(button(root, 'Pick home realm').props['data-only']).toBe('home,archive')
     app.unmount()
   })
 

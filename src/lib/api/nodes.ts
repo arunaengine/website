@@ -1,4 +1,5 @@
 import { apiRequest, type ApiClientOptions } from './client'
+import type { AcceptedRealmsSetting } from './federation'
 
 export interface InfoResponse {
   node: {
@@ -95,6 +96,8 @@ export interface RealmInfoResponse {
   management_urls?: string[]
   // Public: each server and management node's id and api base url, so a share link reaches it.
   public_nodes?: Array<{ node_id: string; api_url: string }>
+  // Public: which other realms' users may log in here; absent on older backends.
+  accepted_realms?: AcceptedRealmsSetting
   oidc_providers: Array<{
     id: string
     issuer: string
