@@ -39,8 +39,18 @@ describe('set deletion preflight', () => {
     const { lookup, scope } = start()
     await vi.waitFor(() => expect(lookup.loading.value).toBe(false))
 
-    expect(aruna.getSetDeletion).toHaveBeenCalledWith('spire')
+    expect(aruna.getSetDeletion).toHaveBeenCalledWith('spire', null)
     expect(lookup.preflight.value?.linked_datasets?.map((document) => document.document_id)).toEqual(['d1'])
+    scope.stop()
+  })
+
+  it('asks the member node it is given', async () => {
+    aruna.getSetDeletion.mockResolvedValue(answer())
+    const scope = effectScope()
+    const lookup = scope.run(() => useSetPreflight(ref('spire'), ref('n2')))!
+    await vi.waitFor(() => expect(lookup.loading.value).toBe(false))
+
+    expect(aruna.getSetDeletion).toHaveBeenCalledWith('spire', 'n2')
     scope.stop()
   })
 

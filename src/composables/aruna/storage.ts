@@ -94,9 +94,12 @@ export async function listBucketObjects(
   return requestObjects(bucket, query, await nodeClientReady(nodeId, undefined, signal), signal)
 }
 
-/** What deleting a whole bucket removes; a bucket stored on more nodes also lists the datasets that link it. */
-export function getSetDeletion(bucket: string): Promise<StorageDeletionPreflight> {
-  return getStorageDeletionPreflight({ kind: 'bucket', bucket }, refreshContext().client)
+/**
+ * What deleting a whole bucket removes; a bucket stored on more nodes also lists the datasets that
+ * link it. `nodeId` names a member to ask when the connected node holds no part of the bucket.
+ */
+export async function getSetDeletion(bucket: string, nodeId?: string | null): Promise<StorageDeletionPreflight> {
+  return getStorageDeletionPreflight({ kind: 'bucket', bucket }, nodeId ? await nodeClientReady(nodeId) : refreshContext().client)
 }
 
 /** Datasets that link a file, a folder or the root of a bucket on one node, this one unless named. */

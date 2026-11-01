@@ -13,6 +13,7 @@ const lookup = {
   reload: vi.fn(),
 }
 const remove = vi.fn()
+let askedNode: { value: string | null } = { value: null }
 
 const Slotted = (tag: string) =>
   defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()) })
@@ -37,9 +38,9 @@ const component = compileClientComponent(new URL('./SetDeleteDialog.vue', import
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(defineComponent({ props: { lines: Array }, setup: (props, { slots }) => () => h('aside', [slots.default?.(), ...(props.lines ?? []).map((line) => h('p', String(line)))]) })),
   '@/components/ui/Spinner.vue': moduleDefault(Slotted('i')),
-  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id }) },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id, isLocalNode: (id: string) => id === 'n1' }) },
   '@/composables/useSetChanges': { useSetChanges: () => ({ busy: ref(false), failure: ref(null), remove }) },
-  '@/composables/useSetPreflight': { coverageNotes: Preflight.coverageNotes, excludedNotes: Preflight.excludedNotes, useSetPreflight: () => lookup },
+  '@/composables/useSetPreflight': { coverageNotes: Preflight.coverageNotes, excludedNotes: Preflight.excludedNotes, useSetPreflight: (_bucket: unknown, node: { value: string | null }) => ((askedNode = node), lookup) },
   '@/lib/distributedMockData': MockData,
   '@/lib/distribution': Distribution,
 })
@@ -69,6 +70,15 @@ async function render() {
 }
 
 describe('set delete dialog', () => {
+  it('asks a member node for the datasets when the connected node holds no part', async () => {
+    const member = (nodeId: string) => ({ nodeId }) as Distribution.DistributedMember
+    await mountApp(component, { props: { open: true, bucket: { ...bucket, members: [member('n2'), member('n3')] } } })
+    expect(askedNode.value).toBe('n2')
+
+    await mountApp(component, { props: { open: true, bucket: { ...bucket, members: [member('n2'), member('n1')] } } })
+    expect(askedNode.value).toBeNull()
+  })
+
   it('lists the datasets the node names and deletes once the name is typed', async () => {
     lookup.preflight.value = answer({})
     const root = await render()

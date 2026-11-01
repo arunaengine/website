@@ -5,6 +5,7 @@ import { ref } from 'vue'
 import DeletionNotice from '@/components/distributed/DeletionNotice.vue'
 import SetDeleteDialog from '@/components/distributed/SetDeleteDialog.vue'
 import Button from '@/components/ui/Button.vue'
+import Notice from '@/components/ui/Notice.vue'
 import type { DistributedBucket } from '@/lib/distribution'
 import { Trash2 } from '@lucide/vue'
 
@@ -13,6 +14,12 @@ defineProps<{ bucket: DistributedBucket; admin: boolean; bare?: boolean }>()
 const emit = defineEmits<{ (e: 'changed'): void }>()
 
 const open = ref(false)
+// The node took the deletion; the bucket state may name it only a moment later.
+const requested = ref(false)
+function deleted() {
+  requested.value = true
+  emit('changed')
+}
 </script>
 
 <template>
@@ -23,7 +30,7 @@ const open = ref(false)
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Delete bucket</h2>
       </template>
       <Button
-        v-if="admin && !bucket.live?.deletion"
+        v-if="admin && !bucket.live?.deletion && !requested"
         variant="destructive"
         size="sm"
         class="ml-auto"
@@ -34,9 +41,10 @@ const open = ref(false)
     </header>
     <div class="px-5 py-4 text-sm text-muted-foreground">
       <DeletionNotice v-if="bucket.live?.deletion" :deletion="bucket.live.deletion" />
+      <Notice v-else-if="requested" tone="warning" title="Deleting">Writes have stopped. Every node deletes its bucket, which can take a minute.</Notice>
       <p v-else-if="admin">Removes the bucket and all its files on every node.</p>
       <p v-else>Only group admins can delete this bucket.</p>
     </div>
-    <SetDeleteDialog v-model:open="open" :bucket="bucket" @changed="emit('changed')" />
+    <SetDeleteDialog v-model:open="open" :bucket="bucket" @changed="deleted" />
   </section>
 </template>

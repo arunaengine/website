@@ -24,7 +24,8 @@ export function excludedNotes(coverage: StorageDeletionReferenceCoverage): strin
   return coverage.excluded.map((code) => EXCLUDED_TEXT[code] ?? `Not listed: ${code.replaceAll('_', ' ')}.`)
 }
 
-export function useSetPreflight(bucket: Ref<string | null>) {
+/** `nodeId` is a member node to ask; null asks the connected node. */
+export function useSetPreflight(bucket: Ref<string | null>, nodeId: Ref<string | null> = ref(null)) {
   const { getSetDeletion, sessionEpoch } = useAruna()
   const preflight = ref<StorageDeletionPreflight | null>(null)
   const loading = ref(false)
@@ -40,7 +41,7 @@ export function useSetPreflight(bucket: Ref<string | null>) {
     loading.value = Boolean(name)
     if (!name) return
     try {
-      const answer = await getSetDeletion(name)
+      const answer = await getSetDeletion(name, nodeId.value)
       if (run === runs && epoch === sessionEpoch.value) preflight.value = answer
     } catch (cause) {
       if (run === runs && epoch === sessionEpoch.value) error.value = errorMessage(cause)
@@ -49,7 +50,7 @@ export function useSetPreflight(bucket: Ref<string | null>) {
     }
   }
 
-  watch([bucket, sessionEpoch], load, { immediate: true })
+  watch([bucket, nodeId, sessionEpoch], load, { immediate: true })
 
   return { preflight, loading, error, reload: load }
 }

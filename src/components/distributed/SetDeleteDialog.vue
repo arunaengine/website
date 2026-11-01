@@ -26,7 +26,7 @@ const emit = defineEmits<{
   (e: 'changed'): void
 }>()
 
-const { displayName } = useRealmNodes()
+const { displayName, isLocalNode } = useRealmNodes()
 const changes = useSetChanges(computed(() => props.bucket.live))
 
 const typed = ref('')
@@ -34,7 +34,9 @@ const understood = ref(false)
 
 const preview = computed(() => DELETE_PREVIEWS[props.bucket.name] ?? { datasets: [], reasons: [] })
 // A real bucket asks the node, which names the datasets and says if every node answered.
-const lookup = useSetPreflight(computed(() => (props.open && props.bucket.live ? props.bucket.name : null)))
+// The connected node answers when it holds part of the bucket, else a member does.
+const member = computed(() => (props.bucket.members.some((entry) => isLocalNode(entry.nodeId)) ? null : props.bucket.members[0]?.nodeId ?? null))
+const lookup = useSetPreflight(computed(() => (props.open && props.bucket.live ? props.bucket.name : null)), member)
 const linked = computed(() => lookup.preflight.value?.linked_datasets ?? [])
 const notes = computed(() => {
   if (lookup.error.value) return [`The datasets could not be read: ${lookup.error.value}`]
