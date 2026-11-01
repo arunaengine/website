@@ -434,7 +434,6 @@ describe('guest dashboard truth', () => {
     expect(text).toContain('Objects Unknown')
     expect(text).toContain('Datasets Unknown')
     expect(text).toContain('Realm Unknown')
-    expect(text).toContain('Public counts are unavailable from this node')
     expect(text).not.toContain('0 / 0')
   })
 })

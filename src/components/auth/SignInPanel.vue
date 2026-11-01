@@ -16,6 +16,9 @@ import { featureEnabled } from '@/lib/config'
 import iconMark from '@/assets/brand/icon-mark.avif'
 import { ChevronRight, LogIn, RefreshCw } from '@lucide/vue'
 
+// `compact` is the slim banner the dashboard shows guests; the sign-in page keeps the full frame.
+const props = defineProps<{ compact?: boolean }>()
+
 const { realm, realmInfo } = useAruna()
 const { signIn, stage, stageError } = useAuth()
 
@@ -56,14 +59,14 @@ function startSignIn() {
 </script>
 
 <template>
-  <section aria-labelledby="signin-realm-name" class="surface relative overflow-hidden">
+  <section :aria-labelledby="props.compact ? undefined : 'signin-realm-name'" :aria-label="props.compact ? 'Sign in' : undefined" class="surface relative overflow-hidden">
     <div
       aria-hidden="true"
       class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-aruna-aqua/60 to-transparent"
     />
-    <div class="grid md:grid-cols-[1.1fr_1fr]">
+    <div :class="props.compact ? '' : 'grid md:grid-cols-[1.1fr_1fr]'">
       <!-- The realm the visitor is about to enter. -->
-      <div class="relative overflow-hidden border-b border-border/70 p-6 md:border-b-0 md:border-r md:p-7">
+      <div v-if="!props.compact" class="relative overflow-hidden border-b border-border/70 p-6 md:border-b-0 md:border-r md:p-7">
         <div
           aria-hidden="true"
           class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_0%_0%,black_35%,transparent_80%)]"
@@ -97,25 +100,40 @@ function startSignIn() {
         </div>
       </div>
 
-      <div class="flex flex-col justify-center gap-4 p-6 md:p-7">
-        <div>
-          <h3 class="font-display text-base font-semibold text-foreground">Sign in</h3>
-          <p class="mt-1 text-sm leading-relaxed text-muted-foreground">{{ signInHint }}</p>
+      <div :class="['flex flex-col justify-center', props.compact ? 'gap-3 px-5 py-4' : 'gap-4 p-6 md:p-7']">
+        <div v-if="props.compact" class="flex flex-wrap items-center justify-between gap-3">
+          <p class="text-sm text-muted-foreground">Sign in to upload data, run analyses and work with your groups.</p>
+          <div class="flex shrink-0 flex-wrap items-center gap-2">
+            <Button size="sm" :disabled="signingIn" @click="startSignIn">
+              <LogIn class="h-4 w-4" /> {{ signingIn ? 'Opening sign-in…' : 'Sign in' }}
+            </Button>
+            <Button size="sm" variant="outline" :aria-expanded="pickerOpen" :disabled="federating" @click="pickerOpen = !pickerOpen">
+              Log in with another realm
+            </Button>
+          </div>
         </div>
-        <Button class="w-full sm:w-auto sm:self-start" :disabled="signingIn" @click="startSignIn">
-          <LogIn class="h-4 w-4" /> {{ signingIn ? 'Opening sign-in…' : 'Sign in' }}
-        </Button>
+        <template v-else>
+          <div>
+            <h3 class="font-display text-base font-semibold text-foreground">Sign in</h3>
+            <p class="mt-1 text-sm leading-relaxed text-muted-foreground">{{ signInHint }}</p>
+          </div>
+          <Button class="w-full sm:w-auto sm:self-start" :disabled="signingIn" @click="startSignIn">
+            <LogIn class="h-4 w-4" /> {{ signingIn ? 'Opening sign-in…' : 'Sign in' }}
+          </Button>
+        </template>
         <Notice v-if="stageError" tone="error">{{ stageError }}</Notice>
-        <div class="flex items-center gap-2.5 text-[11px] text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">or</div>
-        <Button
-          variant="outline"
-          class="w-full sm:w-auto sm:self-start"
-          :aria-expanded="pickerOpen"
-          :disabled="federating"
-          @click="pickerOpen = !pickerOpen"
-        >
-          Log in with another realm
-        </Button>
+        <template v-if="!props.compact">
+          <div class="flex items-center gap-2.5 text-[11px] text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">or</div>
+          <Button
+            variant="outline"
+            class="w-full sm:w-auto sm:self-start"
+            :aria-expanded="pickerOpen"
+            :disabled="federating"
+            @click="pickerOpen = !pickerOpen"
+          >
+            Log in with another realm
+          </Button>
+        </template>
         <div v-if="pickerOpen && !federating" class="rounded-lg border border-border bg-muted/30 p-1">
           <RealmPicker action-label="Choose" :exclude-realm-id="realm.id" :check-pick="false" @pick="loginElsewhere" />
         </div>
@@ -126,7 +144,7 @@ function startSignIn() {
             <RefreshCw class="h-3.5 w-3.5" /> Try again
           </Button>
         </Notice>
-        <div class="border-t border-border/70 pt-3">
+        <div v-if="!props.compact" class="border-t border-border/70 pt-3">
           <button
             type="button"
             class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"

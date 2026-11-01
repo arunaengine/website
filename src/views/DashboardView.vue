@@ -312,7 +312,7 @@ const pageDescription = computed(() =>
       </div>
 
       <template v-else>
-      <SignInPanel v-if="!currentUser" />
+      <SignInPanel v-if="!currentUser" compact />
 
       <!-- First visit on the web: the docs and the short tour first, tutorials behind them. -->
       <section
