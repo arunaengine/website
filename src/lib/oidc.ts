@@ -56,10 +56,8 @@ export function buildAuthorizationUrl(input: {
   scope?: string
   /** Asks the provider to log the user in again, so its `auth_time` is now. */
   freshLogin?: boolean
-  /** Keycloak: goes straight to this identity provider (`kc_idp_hint`). */
-  idpHint?: string
-  /** Keycloak: runs this action for the signed-in user (`kc_action`). */
-  action?: string
+  /** Extra request parameters from the portal config, such as Keycloak's `kc_idp_hint`. */
+  params?: Record<string, string>
 }): string {
   const url = new URL(input.authorizationEndpoint)
   url.searchParams.set('response_type', 'code')
@@ -73,8 +71,10 @@ export function buildAuthorizationUrl(input: {
     url.searchParams.set('prompt', 'login')
     url.searchParams.set('max_age', '0')
   }
-  if (input.idpHint) url.searchParams.set('kc_idp_hint', input.idpHint)
-  if (input.action) url.searchParams.set('kc_action', input.action)
+  // Extra params never replace the request's own, such as state or redirect_uri.
+  for (const [key, value] of Object.entries(input.params ?? {})) {
+    if (!url.searchParams.has(key)) url.searchParams.set(key, value)
+  }
   return url.toString()
 }
 

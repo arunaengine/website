@@ -2,11 +2,22 @@ import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
-import * as loginProviders from '@/lib/loginProviders'
 import type { ProviderLink } from '@/composables/useAuth'
+import type { LoginConfig, LoginOption } from '@/lib/config'
 
-const ISSUER = 'https://keycloak.v3.aruna-engine.org/realms/aruna'
-const issuer = ref(ISSUER)
+const ACCOUNT_URL = 'https://idp.example.org/realms/aruna/account/account-security/linked-accounts'
+const NFDI: LoginOption = {
+  name: 'NFDI AAI',
+  description: 'NFDI and German research institutions',
+  logo: '/brand/providers/iam4nfdi.webp',
+  params: { kc_idp_hint: 'iam4nfdi' },
+  linkParams: { kc_action: 'idp_link:iam4nfdi' },
+}
+const CONFIGURED: LoginConfig = {
+  options: [{ ...NFDI, name: 'GFBio SSO', linkParams: { kc_action: 'idp_link:gfbio' } }, NFDI, { ...NFDI, name: 'Aruna (legacy)', params: {}, linkParams: {} }],
+  accountUrl: ACCOUNT_URL,
+}
+let login: LoginConfig = CONFIGURED
 const userId = ref('u1@R')
 const providerLink = ref<ProviderLink | null>(null)
 const linkProvider = vi.fn()
@@ -30,13 +41,12 @@ const ProviderLinks = compileClientComponent(new URL('./ProviderLinks.vue', impo
     useAruna: () => ({
       currentUser: VueRuntime.computed(() => ({ id: userId.value })),
       realm: ref({ id: 'R' }),
-      realmInfo: VueRuntime.computed(() => ({ oidc_providers: [{ issuer: issuer.value }] })),
     }),
   },
   '@/composables/useAuth': { useAuth: () => ({ linkProvider, providerLink, stage: ref('idle') }) },
   // A user id of another realm is a session from that realm.
   '@/composables/useFederation': { homeRealmLabel: (id: string) => (id.endsWith('@R') ? null : 'Other realm') },
-  '@/lib/loginProviders': loginProviders,
+  '@/lib/config': { portalConfig: () => ({ login }) },
   '@/components/auth/ProviderLogo.vue': { __esModule: true, default: VueRuntime.defineComponent(() => () => null) },
   '@/components/auth/AccountMerge.vue': moduleDefault(defineComponent(() => () => h('p', 'Add another account'))),
 })
@@ -48,28 +58,37 @@ async function render() {
 }
 
 beforeEach(() => {
-  issuer.value = ISSUER
+  login = CONFIGURED
   userId.value = 'u1@R'
   providerLink.value = null
   linkProvider.mockReset()
 })
 
 describe('linked logins in settings', () => {
-  it('offers to link each login and points to the account page for the list', async () => {
+  it('offers to link each linkable login and points to the account page for the list', async () => {
     const { root, app } = await render()
     const text = content(root)
     expect(text).toContain('Linked logins')
-    for (const name of ['LifeScience RI', 'GFBio SSO', 'NFDI AAI']) expect(text).toContain(name)
+    for (const name of ['GFBio SSO', 'NFDI AAI']) expect(text).toContain(name)
+    expect(text).not.toContain('Aruna (legacy)')
     expect(text).toContain('Logins you already linked are not shown here.')
     const account = element(root, (node) => node.tag === 'a')
-    expect(account.props.href).toBe(`${ISSUER}/account/account-security/linked-accounts`)
+    expect(account.props.href).toBe(ACCOUNT_URL)
     app.unmount()
   })
 
-  it('starts the Keycloak link for the chosen login', async () => {
+  it('hides the account page link without a configured URL', async () => {
+    login = { ...CONFIGURED, accountUrl: '' }
+    const { root, app } = await render()
+    expect(content(root)).toContain('NFDI AAI')
+    expect(() => element(root, (node) => node.tag === 'a')).toThrow()
+    app.unmount()
+  })
+
+  it('starts the link for the chosen login', async () => {
     const { root, app } = await render()
     await click(element(root, (node) => node.tag === 'button' && node.props['aria-label'] === 'Link NFDI AAI'))
-    expect(linkProvider).toHaveBeenCalledWith('iam4nfdi')
+    expect(linkProvider).toHaveBeenCalledWith(NFDI)
     app.unmount()
   })
 
@@ -83,8 +102,8 @@ describe('linked logins in settings', () => {
     app.unmount()
   })
 
-  it('offers only another account for realms on another identity provider', async () => {
-    issuer.value = 'https://login.example.org/realms/aruna'
+  it('offers only another account without linkable logins', async () => {
+    login = { options: [], accountUrl: '' }
     const { root, app } = await render()
     expect(content(root)).toContain('Add another account')
     expect(content(root)).not.toContain('NFDI AAI')

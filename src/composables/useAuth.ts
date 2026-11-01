@@ -4,7 +4,7 @@ import { restoring } from '@/composables/aruna/state'
 import { tokenClaims } from '@/composables/aruna/renewal'
 import { ApiError, apiRequest } from '@/lib/api'
 import type { RealmInfoResponse } from '@/lib/api'
-import { featureEnabled, portalConfig } from '@/lib/config'
+import { featureEnabled, portalConfig, type LoginOption } from '@/lib/config'
 import { desktopBridge } from '@/lib/desktop'
 import { DESKTOP_CALLBACK_URI, DESKTOP_STATE_PREFIX } from '@/lib/desktopHandoff'
 import {
@@ -17,7 +17,6 @@ import {
   type OidcDiscoveryDocument,
 } from '@/lib/oidc'
 import { errorMessage } from '@/lib/utils'
-import { LOGIN_PROVIDERS, offersProviders } from '@/lib/loginProviders'
 import { signInChoice } from '@/composables/signInChoice'
 
 const VERIFIER_KEY = 'aruna.oidc.verifier'
@@ -36,8 +35,8 @@ export interface SignInOptions {
   onboardingSecret?: string
   redirectTo?: string
   freshLogin?: boolean
-  /** Keycloak alias of the login to go straight to. */
-  idpHint?: string
+  /** Extra authorization request parameters of the chosen login option. */
+  params?: Record<string, string>
 }
 
 /** The outcome of linking another login, shown once back in Settings. */
@@ -157,8 +156,8 @@ async function signIn(options: SignInOptions = {}) {
   return authorize(options)
 }
 
-// `link` runs Keycloak's idp_link action: the current Keycloak user signs in at that
-// provider, which links it. The Aruna session and its ID token stay as they are.
+// `link` names a login whose params link it, such as Keycloak's idp_link action.
+// The Aruna session and its ID token stay as they are.
 async function authorize(options: SignInOptions & { link?: string }) {
   stage.value = 'redirecting'
   stageError.value = null
@@ -188,8 +187,7 @@ async function authorize(options: SignInOptions & { link?: string }) {
         state,
         codeChallenge: await pkceChallengeS256(verifier),
         freshLogin: options.freshLogin,
-        idpHint: options.idpHint,
-        action: options.link ? `idp_link:${options.link}` : undefined,
+        params: options.params,
       }),
     )
   } catch (err) {
@@ -199,27 +197,22 @@ async function authorize(options: SignInOptions & { link?: string }) {
 }
 
 /** Links another login to the signed-in account, then returns to `redirectTo`. */
-async function linkProvider(alias: string, redirectTo = '/app/settings') {
+async function linkProvider(option: LoginOption, redirectTo = '/app/settings') {
   providerLink.value = null
-  return authorize({ redirectTo, link: alias })
+  return authorize({ redirectTo, link: option.name, params: option.linkParams })
 }
 
-/** Opens the login chooser when the realm's Keycloak offers other logins, else signs in. */
+/** Opens the login chooser when the portal config lists logins, else signs in. */
 async function requestSignIn(options: SignInOptions = {}) {
-  try {
-    if (offersProviders((await resolveProvider()).issuer)) {
-      signInChoice.value = options
-      return
-    }
-  } catch {
-    // signIn reports why the realm cannot sign in.
+  if (portalConfig().login.options.length) {
+    signInChoice.value = options
+    return
   }
   await signIn(options)
 }
 
 // Keycloak returns from an action with `kc_action_status`; the session is untouched.
-function finishLink(params: URLSearchParams, alias: string): string {
-  const name = LOGIN_PROVIDERS.find((provider) => provider.alias === alias)?.name ?? alias
+function finishLink(params: URLSearchParams, name: string): string {
   const status = params.get('kc_action_status')
   if (status === 'success') providerLink.value = { name, linked: true }
   else if (status === 'cancelled') providerLink.value = null

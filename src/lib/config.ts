@@ -11,6 +11,26 @@ export interface TerminologyConfig {
   gatewayUrl: string
 }
 
+/** One row of the login chooser; an option without params is the realm's plain sign-in. */
+export interface LoginOption {
+  name: string
+  description: string
+  logo: string
+  // A copy for light backgrounds when the logo is drawn in white.
+  logoLight?: string
+  // Extra authorization request parameters, such as Keycloak's kc_idp_hint.
+  params: Record<string, string>
+  // Parameters that link this login to the signed-in account; empty means not linkable.
+  linkParams: Record<string, string>
+}
+
+export interface LoginConfig {
+  // Empty shows only the realm's plain sign-in.
+  options: LoginOption[]
+  // Identity provider page that lists and removes linked logins; empty hides the link.
+  accountUrl: string
+}
+
 export interface PortalRuntimeConfig {
   apiBaseUrl: string
   // Origin the OIDC redirect_uri is built on; empty means this page's origin.
@@ -20,6 +40,7 @@ export interface PortalRuntimeConfig {
   terminology: TerminologyConfig
   // Realm registry the realm picker lists; empty means no registry list.
   registryUrl: string
+  login: LoginConfig
 }
 
 export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
@@ -28,6 +49,7 @@ export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
   features: {},
   terminology: { gatewayUrl: 'https://terminology.services.base4nfdi.de/api-gateway' },
   registryUrl: '',
+  login: { options: [], accountUrl: '' },
 }
 
 // Per-flag defaults are layered under the served `features` map, so deployments
@@ -94,6 +116,7 @@ function mergeConfig(raw: Record<string, unknown>): PortalRuntimeConfig {
     merged.authCallbackOrigin = raw.authCallbackOrigin.trim().replace(/\/+$/, '')
   }
   if (typeof raw.registryUrl === 'string') merged.registryUrl = raw.registryUrl.trim()
+  merged.login = loginConfig(raw.login)
   if (raw.features && typeof raw.features === 'object' && !Array.isArray(raw.features)) {
     for (const [key, value] of Object.entries(raw.features as Record<string, unknown>)) {
       if (typeof value === 'boolean') merged.features[key] = value
@@ -106,4 +129,30 @@ function mergeConfig(raw: Record<string, unknown>): PortalRuntimeConfig {
     }
   }
   return merged
+}
+
+function stringMap(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  return Object.fromEntries(Object.entries(raw).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+}
+
+function loginConfig(raw: unknown): LoginConfig {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { options: [], accountUrl: '' }
+  const login = raw as Record<string, unknown>
+  const options = (Array.isArray(login.options) ? login.options : []).flatMap((entry): LoginOption[] => {
+    if (!entry || typeof entry !== 'object') return []
+    const option = entry as Record<string, unknown>
+    if (typeof option.name !== 'string' || !option.name.trim()) return []
+    return [
+      {
+        name: option.name.trim(),
+        description: typeof option.description === 'string' ? option.description : '',
+        logo: typeof option.logo === 'string' ? option.logo : '',
+        logoLight: typeof option.logoLight === 'string' && option.logoLight ? option.logoLight : undefined,
+        params: stringMap(option.params),
+        linkParams: stringMap(option.linkParams),
+      },
+    ]
+  })
+  return { options, accountUrl: typeof login.accountUrl === 'string' ? login.accountUrl.trim() : '' }
 }

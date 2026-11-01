@@ -53,25 +53,33 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('sign-in with a provider hint', () => {
-  it('sends the Keycloak hint for the chosen login', async () => {
+describe('sign-in with login option params', () => {
+  it('sends the params of the chosen login', async () => {
     await setup(ARUNA_ISSUER)
-    await useAuth().signIn({ idpHint: 'lifescience' })
+    await useAuth().signIn({ params: { kc_idp_hint: 'lifescience' } })
     const url = redirected()
     expect(url.searchParams.get('kc_idp_hint')).toBe('lifescience')
     expect(url.searchParams.has('kc_action')).toBe(false)
   })
 
-  it('hands the hint to the desktop sign-in window', async () => {
+  it('never lets the params replace the request own parameters', async () => {
+    await setup(ARUNA_ISSUER)
+    await useAuth().signIn({ params: { redirect_uri: 'https://evil.example', kc_idp_hint: 'sso' } })
+    const url = redirected()
+    expect(url.searchParams.get('redirect_uri')).not.toBe('https://evil.example')
+    expect(url.searchParams.get('kc_idp_hint')).toBe('sso')
+  })
+
+  it('hands the params to the desktop sign-in window', async () => {
     await setup(ARUNA_ISSUER, {}, { features: { embeddedAuth: true } })
     const opener = vi.fn()
     setAuthOpener(opener)
-    await useAuth().signIn({ idpHint: 'orcid' })
+    await useAuth().signIn({ params: { kc_idp_hint: 'orcid' } })
     expect(assign).not.toHaveBeenCalled()
     expect(new URL(opener.mock.calls[0][0] as string).searchParams.get('kc_idp_hint')).toBe('orcid')
   })
 
-  it('sends no hint for the plain account', async () => {
+  it('sends no params for the plain sign-in', async () => {
     await setup(ARUNA_ISSUER)
     await useAuth().signIn({})
     expect(redirected().searchParams.has('kc_idp_hint')).toBe(false)
@@ -79,15 +87,15 @@ describe('sign-in with a provider hint', () => {
 })
 
 describe('requestSignIn', () => {
-  it('opens the chooser for an aruna-engine.org realm', async () => {
-    await setup(ARUNA_ISSUER)
+  it('opens the chooser when the portal config lists logins', async () => {
+    await setup('https://login.example.org/realms/aruna', {}, { login: { options: [{ name: 'SSO' }] } })
     await useAuth().requestSignIn({ redirectTo: '/app/data' })
     expect(signInChoice.value).toEqual({ redirectTo: '/app/data' })
     expect(assign).not.toHaveBeenCalled()
   })
 
-  it('signs in directly at any other realm', async () => {
-    await setup('https://login.example.org/realms/aruna')
+  it('signs in directly without configured logins', async () => {
+    await setup(ARUNA_ISSUER)
     await useAuth().requestSignIn({ redirectTo: '/app/data' })
     expect(signInChoice.value).toBeNull()
     expect(redirected().searchParams.has('kc_idp_hint')).toBe(false)
@@ -95,14 +103,20 @@ describe('requestSignIn', () => {
 })
 
 describe('linkProvider', () => {
-  it('runs the Keycloak link action and keeps the current session token', async () => {
+  it('sends the link params of the login and keeps the current session token', async () => {
     await setup(ARUNA_ISSUER, { 'aruna.oidc.idToken': 'id-1' })
-    await useAuth().linkProvider('orcid')
+    await useAuth().linkProvider({
+      name: 'ORCID',
+      description: '',
+      logo: '',
+      params: { kc_idp_hint: 'orcid' },
+      linkParams: { kc_action: 'idp_link:orcid' },
+    })
     const url = redirected()
     expect(url.searchParams.get('kc_action')).toBe('idp_link:orcid')
     expect(url.searchParams.has('kc_idp_hint')).toBe(false)
     expect(storage.get('aruna.oidc.idToken')).toBe('id-1')
-    expect(storage.get('aruna.oidc.link')).toBe('orcid')
+    expect(storage.get('aruna.oidc.link')).toBe('ORCID')
   })
 
   it('drops a stale link mark on a normal sign-in', async () => {
@@ -118,7 +132,7 @@ describe('completeSignIn after linking', () => {
     'aruna.oidc.state': 's1',
     'aruna.oidc.verifier': 'v1',
     'aruna.oidc.redirect': '/app/settings',
-    'aruna.oidc.link': 'lifescience',
+    'aruna.oidc.link': 'LifeScience RI',
     'aruna.oidc.idToken': 'id-1',
   }
 
