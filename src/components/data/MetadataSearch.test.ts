@@ -387,7 +387,7 @@ describe('bucket search results by record folder', () => {
     await expand(root)
     expect(element(root, (node) => node.props['aria-expanded'] !== undefined).props['aria-expanded']).toBe(true)
     // The open group names its files without the folder name they repeat.
-    await click(element(root, (node) => node.tag === 'tr' && content(node).trim() === '_ani_report.txt'))
+    await click(element(root, (node) => node.tag === 'tr' && content(node).trim() === '…_ani_report.txt'))
     expect(opened.at(-1)).toEqual(found(`${FOLDER}/${FOLDER}_ani_report.txt`, ECOLI))
     app.unmount()
     searchObjects.mockReset().mockImplementation(async () => ({ hits: [hit] as unknown[], next_cursor: null, coverage: { complete: true } }))

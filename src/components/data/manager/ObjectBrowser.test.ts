@@ -887,7 +887,7 @@ describe('object browser names', () => {
     const root = await render({ objects, visibleObjects: objects, prefix: ref('GCF_000005845.2_ASM584v2') })
     const name = element(root, (node) => node.tag === 'button' && node.props.title === file.name)
 
-    expect(content(name)).toBe('_genomic.fna.gz')
+    expect(content(name)).toBe('…_genomic.fna.gz')
   })
 })
 

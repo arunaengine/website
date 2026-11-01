@@ -175,7 +175,7 @@ const morePages = computed(() => Boolean(cursor.value) || nameCursor.value !== n
 // Inside the group the files drop the folder name they repeat; the title keeps the full key.
 function fileName(group: Group, file: ObjectSearchHit): string {
   const name = file.key.slice(group.folder.length + 1)
-  return name.startsWith(group.folder) && '_.-'.includes(name[group.folder.length] ?? '') ? name.slice(group.folder.length) : name
+  return name.startsWith(group.folder) && '_.-'.includes(name[group.folder.length] ?? '') ? `…${name.slice(group.folder.length)}` : name
 }
 function fileCount(group: Group): string {
   const count = groupFiles(group).length

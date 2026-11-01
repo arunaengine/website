@@ -536,9 +536,10 @@ function showWholeFolder() {
   void router.push({ query: rest })
 }
 // Inside a record folder the files repeat its name; the rest of the name says what each is.
+// The ellipsis keeps a name such as "_ani_report.txt" from reading as a hidden file.
 function shortName(name: string): string {
   const folder = prefix.value.split('/').at(-1) ?? ''
-  return folder.length >= 8 && name.length > folder.length + 1 && name.startsWith(folder) && '_.-'.includes(name[folder.length]) ? name.slice(folder.length) : name
+  return folder.length >= 8 && name.length > folder.length + 1 && name.startsWith(folder) && '_.-'.includes(name[folder.length]) ? `…${name.slice(folder.length)}` : name
 }
 const fileFacts = (object: ObjectEntry) =>
   [object.size !== undefined ? formatBytes(object.size) : '', object.lastModified ? relativeTime(object.lastModified.toISOString()) : ''].filter(Boolean).join(', ')
