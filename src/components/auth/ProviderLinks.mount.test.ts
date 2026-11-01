@@ -38,6 +38,7 @@ const ProviderLinks = compileClientComponent(new URL('./ProviderLinks.vue', impo
   '@/composables/useFederation': { homeRealmLabel: (id: string) => (id.endsWith('@R') ? null : 'Other realm') },
   '@/lib/loginProviders': loginProviders,
   '@/components/auth/ProviderLogo.vue': { __esModule: true, default: VueRuntime.defineComponent(() => () => null) },
+  '@/components/auth/AccountMerge.vue': moduleDefault(defineComponent(() => () => h('p', 'Add another account'))),
 })
 
 async function render() {
@@ -82,10 +83,12 @@ describe('linked logins in settings', () => {
     app.unmount()
   })
 
-  it('stays hidden for realms on another identity provider', async () => {
+  it('offers only another account for realms on another identity provider', async () => {
     issuer.value = 'https://login.example.org/realms/aruna'
     const { root, app } = await render()
-    expect(content(root)).toBe('')
+    expect(content(root)).toContain('Add another account')
+    expect(content(root)).not.toContain('NFDI AAI')
+    expect(() => button(root, 'Link')).toThrow()
     app.unmount()
   })
 
