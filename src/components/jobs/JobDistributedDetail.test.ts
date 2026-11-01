@@ -308,6 +308,9 @@ function panelModules(
     '@/components/compute/RunLogDialog.vue': moduleDefault(PassThroughStub),
     '@/components/compute/TaskHeader.vue': moduleDefault(PassThroughStub),
     '@/components/compute/SaveRunDialog.vue': moduleDefault(PassThroughStub),
+    '@/components/compute/RunDatasetForm.vue': moduleDefault(
+      defineComponent({ props: { recordId: String, groupId: String }, setup: (props) => () => h('form', `results form ${props.recordId} in ${props.groupId}`) }),
+    ),
     '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ deviceClient: { value: null } }) },
     '@/composables/s3/endpoints': {
       resolveObjectUrl: (url: string) => (url.startsWith('https://owner.node.test/') ? { bucket: 'reads', key: 'out/count.txt', nodeId: 'owner-node' } : null),
@@ -1323,6 +1326,44 @@ describe('distributed job detail components', () => {
     const quiet = await open(record())
     expect(content(quiet.root)).not.toContain('Read from')
     quiet.app.unmount()
+  })
+
+  it('offers a results dataset for a finished run with a record of its results', async () => {
+    const task = (state: string) => ({
+      id: 'run',
+      state,
+      executors: [{ image: 'alpine', command: ['sh'] }],
+      inputs: [],
+      outputs: [],
+      logs: [],
+      tags: { [Tes.TES_GROUP_TAG]: 'g1' },
+    })
+    const record = {
+      '@graph': [
+        { '@id': 'ro-crate-metadata.json', about: { '@id': 'rec' } },
+        { '@id': 'rec', '@type': 'Dataset', conformsTo: { '@id': 'https://w3id.org/ro/wfrun/process/0.5' }, mentions: { '@id': '#run-run' } },
+        { '@id': '#run-run', '@type': 'CreateAction', result: [{ '@id': 'gff' }] },
+        { '@id': 'gff', '@type': 'File', name: 'genome.gff3' },
+      ],
+    }
+    const metadataAtPath = vi.fn(async () => ({ document_id: 'rec-1' }))
+    const open = async (state: string) => {
+      loadRoCrate.mockReset().mockResolvedValue(record)
+      const mounted = await mount(taskPanel(vi.fn(async () => task(state)), vi.fn(async () => ({ family: null })), vi.fn(), metadataAtPath), { taskId: 'run', open: true })
+      await flushPanel()
+      await flushPanel()
+      return mounted
+    }
+
+    const done = await open('COMPLETE')
+    await press(done.root, 'Create results dataset')
+    await flushPanel()
+    expect(content(done.root)).toContain('results form rec-1 in g1')
+    done.app.unmount()
+
+    const running = await open('RUNNING')
+    expect(content(running.root)).not.toContain('Create results dataset')
+    running.app.unmount()
   })
 
   it('offers Run again only once the run ended', async () => {

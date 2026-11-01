@@ -344,6 +344,7 @@ const TaskDetailPanel = compileClientComponent(url('components/compute/TaskDetai
   '@/components/compute/RunLogDialog.vue': moduleDefault(GenericStub),
   '@/components/compute/TaskHeader.vue': moduleDefault(TaskHeaderStub),
   '@/components/compute/SaveRunDialog.vue': moduleDefault(GenericStub),
+  '@/components/compute/RunDatasetForm.vue': moduleDefault(GenericStub),
   '@/components/assistant/AskAiButton.vue': moduleDefault(GenericStub),
   '@/components/onboarding/ClaimWatchStep.vue': moduleDefault(StagesStub),
   '@/components/preview/PreviewBody.vue': moduleDefault(PreviewStub),

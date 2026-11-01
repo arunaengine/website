@@ -25,6 +25,7 @@ import JobPlacementFigure from '@/components/jobs/JobPlacementFigure.vue'
 import RunLogDialog, { type LogStream } from '@/components/compute/RunLogDialog.vue'
 import TaskHeader from '@/components/compute/TaskHeader.vue'
 import SaveRunDialog from '@/components/compute/SaveRunDialog.vue'
+import RunDatasetForm from '@/components/compute/RunDatasetForm.vue'
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import type { WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
@@ -78,6 +79,7 @@ import {
   FileText,
   Flag,
   Folder,
+  FolderPlus,
   Hourglass,
   Info,
   LogIn,
@@ -115,6 +117,7 @@ const nativeJob = ref<JobStatusResponse | null>(null)
 const nativeDetailUnavailable = ref(false)
 const runCrate = ref<{ document_id: string } | null>(null)
 const runCrateLoading = ref(false)
+const resultsFormOpen = ref(false)
 let crateTask: string | null = null
 const loadState = ref<'idle' | 'loading' | 'ready' | 'error' | 'unsupported'>('idle')
 const loadError = ref<string | null>(null)
@@ -206,6 +209,7 @@ watch(
     nativeJob.value = null
     nativeDetailUnavailable.value = false
     runCrate.value = null
+    resultsFormOpen.value = false
     if (!open || !id) return
     void initialLoad()
     void loadNativeJob(id, requestId)
@@ -757,6 +761,14 @@ function readFrom(url: string | undefined): string | undefined {
   return servedSource(runRecord.value, [url, `https://w3id.org/aruna/data/${url}`, s3Url])
 }
 
+// A finished run with a record can describe its results as a dataset of its group.
+const canCreateResults = computed(() =>
+  task.value?.state === 'COMPLETE' && Boolean(runCrate.value && runRecord.value?.outputs.length && groupTagId.value))
+function openResults(documentId: string) {
+  resultsFormOpen.value = false
+  void router.push({ name: 'dataset', params: { id: documentId } })
+}
+
 // A finished run, or one whose output just became known, may have its record now.
 watch([crateJob, () => isTerminalTesState(task.value?.state)], ([job, done], [previousJob, wasDone]) => {
   if (props.open && !runCrate.value && (job !== previousJob || (done && !wasDone))) void findRunCrate()
@@ -1054,7 +1066,31 @@ async function confirmDelete() {
               </div>
               <ChevronRight v-if="runCrate" class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             </component>
+            <button
+              v-if="canCreateResults"
+              type="button"
+              class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+              :aria-expanded="resultsFormOpen"
+              @click="resultsFormOpen = !resultsFormOpen"
+            >
+              <IconTile :icon="FolderPlus" tone="aqua" size="sm" />
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-foreground">Create results dataset</p>
+                <p class="text-xs text-muted-foreground">The results as a dataset, linked to this run</p>
+              </div>
+            </button>
           </div>
+          <RunDatasetForm
+            v-if="resultsFormOpen && canCreateResults"
+            class="mt-3"
+            :run="runRecord!"
+            :record-id="runCrate!.document_id"
+            :task-id="props.taskId"
+            :group-id="groupTagId!"
+            :run-name="task.name || props.taskId"
+            @created="openResults"
+            @close="resultsFormOpen = false"
+          />
           <details v-if="outputRows.length" class="mt-3 text-sm">
             <summary class="cursor-pointer font-medium text-foreground">{{ outputSummary }}</summary>
             <div class="mt-2 space-y-1.5">
