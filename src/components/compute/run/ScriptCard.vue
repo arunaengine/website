@@ -84,9 +84,6 @@ const checkLabel = computed(() => {
   if (unassigned.value) return `${unassigned.value} path${unassigned.value === 1 ? '' : 's'} not assigned`
   return 'Complete'
 })
-function addInputFor(path: string) {
-  openInputDialog(path.slice(0, path.lastIndexOf('/') + 1))
-}
 </script>
 
 <template>
@@ -250,7 +247,7 @@ function addInputFor(path: string) {
       label="Paths in the script:"
       :checks="scriptPaths"
       @capture="capturePath"
-      @add-input="addInputFor"
+      @add-input="openInputDialog()"
     />
   </RunSection>
 </template>

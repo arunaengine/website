@@ -78,9 +78,6 @@ function removeEnv(index: number) {
   envRows.value.splice(index, 1)
   markTouched('env')
 }
-function addInputFor(path: string) {
-  openInputDialog(path.slice(0, path.lastIndexOf('/') + 1))
-}
 </script>
 
 <template>
@@ -178,7 +175,7 @@ function addInputFor(path: string) {
           :checks="commandPaths"
           :can-mount-script="hasScript"
           @capture="capturePath"
-          @add-input="addInputFor"
+          @add-input="openInputDialog()"
           @mount-script="setScriptPath"
         />
       </div>

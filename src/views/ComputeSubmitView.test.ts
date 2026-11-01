@@ -934,6 +934,26 @@ describe('run page', () => {
     mounted.app.unmount()
   })
 
+  it('mounts a pick from a path chip where the Inputs card button mounts it', async () => {
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?template=bakta')
+    const mountDir = () => {
+      const dialog = element(mounted.root, (node) => 'mount-default' in node.props || 'mountDefault' in node.props)
+      return dialog.props['mount-default'] ?? dialog.props.mountDefault
+    }
+    const chip = element(
+      mounted.root,
+      (node) => node.tag === 'button' && content(node).trim() === 'Add input' && content(node.parent!).includes('/work/in/db/'),
+    )
+
+    await click(chip)
+    const fromChip = mountDir()
+    await click(element(mounted.root, (node) => node.props.variant === 'outline' && content(node).trim() === 'Add input'))
+
+    expect(fromChip).toBe(mountDir())
+    expect(fromChip).toBe('/work/in/')
+    mounted.app.unmount()
+  })
+
   it('captures the Bakta output folder as a folder', async () => {
     const mounted = await mount(ComputeSubmitView, '/app/compute/new?template=bakta')
     await click(button(mounted.root, 'Capture'))
