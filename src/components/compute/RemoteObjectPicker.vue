@@ -3,6 +3,7 @@
 // of other groups and nodes work without an S3 session. Picks keep the listed version.
 import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
+import Input from '@/components/ui/Input.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useAruna } from '@/composables/useAruna'
 import type { ListedObject } from '@/lib/api'
@@ -19,6 +20,9 @@ const emit = defineEmits<{ add: [pick: RemotePick] }>()
 
 const { listBucketObjects } = useAruna()
 const prefix = ref('')
+// The start of a name in the open folder; the listing then holds only names that start with it.
+const query = ref('')
+const asked = ref('')
 const objects = ref<ListedObject[]>([])
 const prefixes = ref<string[]>([])
 const cursor = ref<string | null>(null)
@@ -36,7 +40,7 @@ async function load(more = false) {
   loading.value = true
   failure.value = null
   try {
-    const page = await listBucketObjects(props.bucket, { prefix: prefix.value || undefined, delimiter: '/', cursor: more ? cursor.value ?? undefined : undefined }, props.nodeId)
+    const page = await listBucketObjects(props.bucket, { prefix: prefix.value + asked.value || undefined, delimiter: '/', cursor: more ? cursor.value ?? undefined : undefined }, props.nodeId)
     if (run !== runs) return
     // A folder's own empty marker object is the folder, not a file in it.
     const files = page.objects.filter((item) => !item.key.endsWith('/'))
@@ -54,6 +58,11 @@ async function load(more = false) {
 // The rows and cursor of the folder before never show under the new one, also after a failure.
 function open(next: string) {
   prefix.value = next
+  query.value = ''
+  find()
+}
+function find() {
+  asked.value = query.value
   objects.value = []
   prefixes.value = []
   cursor.value = null
@@ -103,6 +112,13 @@ function add() {
         <button type="button" class="font-mono text-primary hover:underline" @click="open(crumb.prefix)">{{ crumb.name }}</button>
       </template>
     </nav>
+    <Input
+      v-model="query"
+      class="h-8 font-mono text-xs"
+      placeholder="Name starts with, then Enter"
+      aria-label="Find a name in this folder"
+      @keydown.enter="find"
+    />
     <p v-if="failure" class="text-xs text-destructive">{{ failure }}</p>
     <ul class="max-h-72 divide-y divide-border overflow-y-auto rounded-md border border-border text-xs">
       <li v-for="path in prefixes" :key="path" class="flex items-center gap-2 px-3 py-1.5">
@@ -117,7 +133,7 @@ function add() {
           <span class="truncate font-mono">{{ tail(item.key) }}</span>
         </label>
       </li>
-      <li v-if="!loading && !objects.length && !prefixes.length && !failure" class="px-3 py-3 text-muted-foreground">This folder is empty.</li>
+      <li v-if="!loading && !objects.length && !prefixes.length && !failure" class="px-3 py-3 text-muted-foreground">{{ asked ? 'No name here starts with that.' : 'This folder is empty.' }}</li>
     </ul>
     <p v-if="stale" class="text-[11px] text-muted-foreground">Part of this list comes from a copy and may miss recent changes.</p>
     <div class="flex items-center gap-2">
