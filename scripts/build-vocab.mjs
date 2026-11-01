@@ -61,6 +61,8 @@ function summary(value) {
     .split(/\n\s*\n/)[0]
     .replace(/<[^>]*>/g, '')
     .replace(/\[\[([^\]]+)\]\]/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/\s*&#x2014;\s*/gi, ', ')
     .replace(/```+/g, '')
     .replace(/\\([().*_])/g, '$1')
     .replace(/&amp;/g, '&')

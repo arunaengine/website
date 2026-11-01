@@ -509,13 +509,15 @@ describe('AddEntityDialog', () => {
     mounted.app.unmount()
   })
 
-  it('pins the common types above everything else', async () => {
+  it('offers the common types and leaves every other type to a search', async () => {
     const mounted = await mount()
     const text = content(mounted.root)
 
-    expect(text.indexOf('Common')).toBeLessThan(text.indexOf('Everything else'))
+    expect(text).toContain('Common')
     expect(text).toContain('Person')
+    expect(text).not.toContain('Everything else')
     expect(text).toContain('ContactPoint')
+    expect(text).toContain('Search to see every other type.')
     mounted.app.unmount()
   })
 

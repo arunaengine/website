@@ -63,6 +63,8 @@ function outside(options: TypeOption[], taken: TypeOption[]): TypeOption[] {
 const results = computed(() => {
   if (!text.value) {
     const shortlist = outside(curated.value.filter((option) => allowed(option.type)), profiled.value)
+    // A short list stays short: every other type, such as each kind of Organization, is searched for.
+    if (shortlist.length || profiled.value.length) return { profile: profiled.value, shortlist, all: [] }
     const all = outside((props.vocab?.classes ?? [])
       .filter((term) => allowed(term.uri) && !CURATED_TYPES.includes(term.name))
       .slice(0, ALL_LIMIT)
@@ -134,6 +136,9 @@ function isSelected(type: string): boolean {
       </button>
     </div>
 
+    <p v-if="!text && !results.all.length && (results.profile.length || results.shortlist.length)" class="px-2.5 py-2 text-xs text-muted-foreground">
+      Search to see every other type.
+    </p>
     <p v-if="!results.profile.length && !results.shortlist.length && !results.all.length" class="px-2.5 py-2 text-xs text-muted-foreground">
       No type matches that search.
     </p>

@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { datatypeKind, loadVocabIndex, type VocabIndex } from './vocabulary'
+import { datatypeKind, loadVocabIndex, loadVocabulary, type VocabIndex } from './vocabulary'
 import { SCHEMA_ORG } from './uri'
 
 let vocab: VocabIndex
@@ -76,5 +76,13 @@ describe('vocabulary index', () => {
     expect(datatypeKind(uri('Text'))).toBe('text')
     expect(datatypeKind(uri('DateTime'))).toBe('datetime')
     expect(datatypeKind(uri('Person'))).toBeUndefined()
+  })
+
+  it('describes every term in plain text, without HTML entities or markdown links', async () => {
+    const data = await loadVocabulary()
+    const raw = [...data.properties, ...data.classes].filter((term) => /&#x?\w+;|\]\(/.test(term.description))
+
+    expect(raw.map((term) => term.name)).toEqual([])
+    expect(vocab.class(uri('DanceGroup'))?.description).toBe('A dance group, for example, the Alvin Ailey Dance Theater or Riverdance.')
   })
 })

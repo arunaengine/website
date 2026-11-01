@@ -2,7 +2,7 @@ import * as DataEntities from '@/lib/dataEntities'
 import * as VueRuntime from 'vue'
 import { defineComponent, h } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { button, click, compileClientComponent, moduleDefault, mountApp } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, moduleDefault, mountApp, typeValue, element } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
 import * as Uri from '@/lib/profiles/uri'
 import type { VocabIndex, VocabTerm } from '@/lib/profiles/vocabulary'
@@ -72,6 +72,25 @@ describe('TypeBrowser', () => {
     await click(button(mounted.root, 'Agent'))
 
     expect(updates).toEqual([agent.uri])
+    mounted.app.unmount()
+  })
+
+  it('offers only the common types of a range until a search asks for the others', async () => {
+    const term = (name: string): VocabTerm => ({ uri: `http://schema.org/${name}`, name, label: name, description: '', source: 'schema.org' })
+    const people = [term('Person'), term('Organization'), term('DanceGroup'), term('Casino')]
+    const index = {
+      classes: people,
+      class: () => undefined,
+      classesInRange: () => people,
+      searchClasses: (query: string) => people.filter((entry) => entry.name.toLowerCase().includes(query.toLowerCase())),
+    } as unknown as VocabIndex
+    const mounted = await mountApp(TypeBrowser, { props: { vocab: index, modelValue: '', range: ['http://schema.org/Person'], onlyMatching: true, autoSelect: false } })
+
+    expect(content(mounted.root)).toContain('PersonOrganization')
+    expect(content(mounted.root)).not.toContain('Dance')
+    expect(content(mounted.root)).toContain('Search to see every other type.')
+    await typeValue(element(mounted.root, (node) => node.tag === 'input' && node.props['aria-label'] === 'Search entity types'), 'dance')
+    expect(content(mounted.root)).toContain('Dance')
     mounted.app.unmount()
   })
 })
