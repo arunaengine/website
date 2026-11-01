@@ -25,6 +25,7 @@ import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useComputeDataView } from '@/composables/useComputeDataView'
 import { useCustomRun } from '@/composables/useCustomRun'
+import { useDatabases } from '@/composables/useDatabases'
 import { useRealm } from '@/composables/useRealm'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useRunTarget } from '@/composables/useRunTarget'
@@ -61,6 +62,7 @@ const store = useCustomRun({
   getTask,
   dataView,
   realmName: computed(() => realm.value.shortName),
+  databases: useDatabases(),
 })
 const {
   groupId,

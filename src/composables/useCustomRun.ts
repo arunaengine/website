@@ -70,6 +70,7 @@ import { useSavedRuns } from '@/composables/useSavedRuns'
 import { targetProblems as collectTargetProblems } from '@/lib/runTarget'
 import type { useAruna } from '@/composables/useAruna'
 import type { useComputeDataView } from '@/composables/useComputeDataView'
+import type { useDatabases } from '@/composables/useDatabases'
 import type { useRealmNodes } from '@/composables/useRealmNodes'
 import type { useRunTarget } from '@/composables/useRunTarget'
 import { s3ErrorMessage, type useS3 } from '@/composables/useS3'
@@ -87,6 +88,8 @@ export interface CustomRunDeps {
   getTask: ReturnType<typeof useTes>['getTask']
   dataView: ReturnType<typeof useComputeDataView>
   realmName: ComputedRef<string>
+  /** The realm's databases; results never default to one. */
+  databases?: Pick<ReturnType<typeof useDatabases>, 'rows' | 'state' | 'ensure'>
 }
 
 export const U32_MAX = 4_294_967_295
@@ -693,9 +696,8 @@ function createStore(deps: CustomRunDeps) {
       bucketNodes.value = found
       // A partial list never rejects a typed name.
       bucketsLoaded.value = listing.complete
-      // Results never default to a distributed bucket, which holds shared reference data.
-      const distributed = new Set(listing.hits.filter((hit) => hit.set_id).map((hit) => hit.bucket))
-      if (!stagingBucket.value) stagingBucket.value = buckets.value.find((name) => !distributed.has(name)) ?? ''
+      sharedBuckets.value = new Set(listing.hits.filter((hit) => hit.set_id).map((hit) => hit.bucket))
+      pickResultsBucket()
     } catch {
       if (!current()) return
       bucketNodes.value = new Map()
@@ -705,6 +707,17 @@ function createStore(deps: CustomRunDeps) {
     }
   }
   watch(groupId, () => void loadBuckets())
+  // Results never default to a distributed bucket or a database, which hold shared reference data.
+  const sharedBuckets = ref(new Set<string>())
+  function pickResultsBucket() {
+    const databases = deps.databases
+    if (stagingBucket.value) return
+    if (databases && databases.state.value !== 'ready' && databases.state.value !== 'failed') return
+    const shared = new Set([...sharedBuckets.value, ...(databases?.rows.value.map((row) => row.bucket) ?? [])])
+    stagingBucket.value = buckets.value.find((name) => !shared.has(name)) ?? ''
+  }
+  deps.databases?.ensure()
+  watch(() => deps.databases?.state.value, pickResultsBucket)
   // Creating the first bucket from the run page; the script always stages on
   // the connected node, so the session check needs no node id.
   const creatingBucket = ref(false)

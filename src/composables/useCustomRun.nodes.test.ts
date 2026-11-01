@@ -112,4 +112,43 @@ describe('run buckets', () => {
     expect(store.outputRows.value[0]?.bucket).toBe('lab')
     scope.stop()
   })
+
+  it('never takes a database as the default for results, and leaves it empty without a plain bucket', async () => {
+    const run = (names: string[]) => {
+      const databases = { rows: ref([{ bucket: 'bakta-database' }]), state: ref('loading'), ensure: vi.fn() }
+      const scope = effectScope()
+      const store = scope.run(() =>
+        createCustomRun({
+          runTarget: { local: computed(() => false), available: computed(() => true), target: ref('realm') } as never,
+          s3: { activeContext: ref(null), hasActiveKey: ref(false), endpoint: ref(null), ensureSession: async () => {} } as never,
+          myGroups: ref([]) as never,
+          currentUser: ref({ id: 'user-1' }) as never,
+          searchBuckets: (async () => ({ hits: names.map((bucket) => ({ bucket, node_id: 'node-2', group_id: 'g1' })), nodes_failed: 0, next_cursor: null })) as never,
+          isTarget: () => true,
+          isLocalNode: () => false,
+          nodes: computed(() => []),
+          getTask: (async () => ({})) as never,
+          dataView: ref('tree') as never,
+          realmName: computed(() => 'Realm'),
+          databases: databases as never,
+        }),
+      )!
+      store.groupId.value = 'g1'
+      return { store, scope, databases }
+    }
+
+    const plain = run(['bakta-database', 'bakta-results'])
+    await vi.waitFor(() => expect(plain.store.bucketsLoaded.value).toBe(true))
+    expect(plain.store.stagingBucket.value).toBe('')
+    plain.databases.state.value = 'ready'
+    await vi.waitFor(() => expect(plain.store.stagingBucket.value).toBe('bakta-results'))
+    expect(plain.databases.ensure).toHaveBeenCalled()
+    plain.scope.stop()
+
+    const only = run(['bakta-database'])
+    only.databases.state.value = 'ready'
+    await vi.waitFor(() => expect(only.store.bucketsLoaded.value).toBe(true))
+    expect(only.store.stagingBucket.value).toBe('')
+    only.scope.stop()
+  })
 })

@@ -340,6 +340,7 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
   '@/components/data/CreateCredentialDialog.vue': moduleDefault(DialogStub),
   '@/components/assistant/AskAiButton.vue': moduleDefault(GenericStub),
   '@/composables/useCustomRun': CustomRun,
+  '@/composables/useDatabases': { useDatabases: () => ({ rows: ref([]), state: ref('ready'), ensure: () => {} }) },
   '@/composables/useTes': {
     isTesUnsupported: () => false,
     useTes: () => ({ tesEnabled: ref(true), busy: ref(false), createTask, getTask: vi.fn() }),
