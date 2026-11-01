@@ -329,6 +329,22 @@ describe('welcome guard', () => {
     expect(router.currentRoute.value.query.tab).toBe('enroll')
   })
 
+  it('hands the callback of a second sign-in to it and stays on the page', async () => {
+    const receiveCallback = vi.fn((params: URLSearchParams) => params.get('state') === 'popup.s1')
+    vi.doMock('@/composables/popupSignIn', () => ({ receiveCallback, cancelPopup: vi.fn() }))
+    const welcome = await load({ state: 'running', enrolled: true, apiBaseUrl: LOCAL }, LOCAL, 'https://aruna.example')
+    const router = await routerWith(welcome, '/app/settings')
+
+    await emit('navigate', { path: '/auth/callback?code=c1&state=popup.s1' })
+    await vi.waitFor(() => expect(receiveCallback).toHaveBeenCalledTimes(1))
+    await turns()
+    expect(router.currentRoute.value.name).toBe('settings')
+
+    await emit('navigate', { path: '/auth/callback?code=c2&state=s2' })
+    await lands(router, 'auth-callback')
+    vi.doUnmock('@/composables/popupSignIn')
+  })
+
   it('refuses a destination outside this window', async () => {
     // Nothing the shell pushes may send the window at a foreign origin.
     const welcome = await load({ state: 'running', enrolled: true, apiBaseUrl: LOCAL }, LOCAL, 'https://aruna.example')

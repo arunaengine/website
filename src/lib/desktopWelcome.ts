@@ -179,6 +179,15 @@ async function signedOut(rerun: () => void): Promise<boolean> {
 
 let knownOnce: boolean | null = null
 
+// A callback of a second sign-in goes to it, so the page that asked stays open.
+async function handOnCallback(router: Router, path: string): Promise<void> {
+  if (path.startsWith('/auth/callback')) {
+    const { receiveCallback } = await import('@/composables/popupSignIn')
+    if (receiveCallback(new URL(path, 'aruna://shell').searchParams)) return
+  }
+  await router.push(path)
+}
+
 /**
  * Holds desktop navigation at the welcome routes until the app has a realm to
  * talk to, a signed-in owner, and an answer to the device prompt. Both probes
@@ -213,8 +222,11 @@ export function installDesktopGuard(router: Router): void {
   // A deep link the shell followed is a route change, never a reload; a
   // sign-in window closed early puts the sign-in button back.
   void import('./desktopEvents').then(({ onAuthCancelled, onShellNavigate }) => {
-    void onShellNavigate((path) => void router.push(path))
-    void onAuthCancelled(() => void import('@/composables/useAuth').then((auth) => auth.cancelSignIn()))
+    void onShellNavigate((path) => void handOnCallback(router, path))
+    void onAuthCancelled(() => {
+      void import('@/composables/useAuth').then((auth) => auth.cancelSignIn())
+      void import('@/composables/popupSignIn').then((popup) => popup.cancelPopup())
+    })
   })
   router.beforeEach(async (to) => {
     // The system browser returns through the callback whatever else is true.

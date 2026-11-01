@@ -77,8 +77,8 @@ export function callbackUri(): string {
 
 // A desktop sign-in that returns through a website carries the mark; nothing
 // secret goes into the state, the verifier stays in this window.
-function signInState(): string {
-  const state = randomUrlSafeString(16)
+export function signInState(mark = ''): string {
+  const state = mark + randomUrlSafeString(16)
   if (!featureEnabled('desktop')) return state
   const { protocol } = new URL(callbackUri())
   return protocol === 'https:' || protocol === 'http:' ? `${DESKTOP_STATE_PREFIX}${state}` : state
@@ -90,11 +90,16 @@ function signInState(): string {
  * own, so the login never runs inside this webview.
  */
 export function beginAuthRedirect(url: string): void {
-  if ((featureEnabled('systemBrowserAuth') || featureEnabled('embeddedAuth')) && authOpener) {
-    authOpener(url)
+  if (opensOutside()) {
+    authOpener!(url)
     return
   }
   window.location.assign(url)
+}
+
+/** True when a desktop shell opens sign-ins outside this window. */
+export function opensOutside(): boolean {
+  return (featureEnabled('systemBrowserAuth') || featureEnabled('embeddedAuth')) && authOpener !== null
 }
 
 /** Drops a sign-in the provider never answered, such as a closed login window. */
@@ -131,6 +136,12 @@ async function resolveProvider() {
   // The realm announces the audience its tokens must carry; for the Keycloak
   // public client this doubles as the client id (same convention as aruna-doctor).
   return { clientId: provider.audience, discoveryUrl: provider.discovery_url, issuer: provider.issuer }
+}
+
+/** The realm's OIDC client, the provider's endpoints and the shell's token sender. */
+export async function oidcClient() {
+  const { clientId, discoveryUrl } = await resolveProvider()
+  return { clientId, discovery: await discover(discoveryUrl), send: (await nativeOidc())?.oidcToken }
 }
 
 /** Redirects the browser to the realm's Keycloak login page (code + PKCE). */

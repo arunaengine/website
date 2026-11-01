@@ -35,11 +35,21 @@ async function load(location: { pathname: string; search: string; hash?: string 
     return {}
   })
   const replace = vi.fn()
+  const close = vi.fn()
+  const posted: Array<{ name: string; message: unknown }> = []
+  vi.stubGlobal('BroadcastChannel', class {
+    constructor(private name: string) {}
+    postMessage(message: unknown) {
+      posted.push({ name: this.name, message })
+    }
+    close() {}
+  })
   const blocked = (): never => {
     throw new Error('storage is blocked')
   }
   vi.stubGlobal('window', {
     location: { hash: '', ...location, replace },
+    close,
     __ARUNA_DESKTOP__: shell,
     get localStorage() {
       return blocked()
@@ -52,7 +62,7 @@ async function load(location: { pathname: string; search: string; hash?: string 
   vi.stubGlobal('document', { createElement: fakeNode, getElementById: (id: string) => (id === 'app' ? root : null) })
   await import('./entry')
   await vi.dynamicImportSettled()
-  return { booted, replace, root }
+  return { booted, replace, root, close, posted }
 }
 
 afterEach(() => {
@@ -87,15 +97,31 @@ describe('the portal entry', () => {
     expect(booted).not.toHaveBeenCalled()
   })
 
+  it('hands a popup callback to the waiting tab and closes the popup', async () => {
+    const search = '?state=popup.s1&code=c1'
+    const { booted, replace, root, close, posted } = await load({ pathname: '/auth/callback', search })
+
+    expect(posted).toEqual([{ name: 'aruna.popup-sign-in', message: { search } }])
+    expect(booted).not.toHaveBeenCalled()
+    expect(replace).not.toHaveBeenCalled()
+    expect(close).toHaveBeenCalledTimes(1)
+    expect(nodes(root).map((node) => node.textContent).filter(Boolean)).toEqual([
+      'Sign-in done',
+      'You can close this window.',
+    ])
+  })
+
   it.each([
     ['an unmarked web callback', { pathname: '/auth/callback', search: '?code=c1&state=s1' }, undefined],
     ['a marked state on another page', { pathname: '/app', search: '?state=desktop.s1' }, undefined],
+    ['a popup state on another page', { pathname: '/app', search: '?state=popup.s1' }, undefined],
     ['a marked callback inside the desktop', { pathname: '/auth/callback', search: '?state=desktop.s1' }, { apiBaseUrl: '/api' }],
   ])('boots the portal for %s', async (_, location, shell) => {
-    const { booted, replace, root } = await load(location, shell)
+    const { booted, replace, root, posted } = await load(location, shell)
 
     expect(booted).toHaveBeenCalledTimes(1)
     expect(replace).not.toHaveBeenCalled()
+    expect(posted).toEqual([])
     expect(root.children).toEqual([])
   })
 })

@@ -2,5 +2,6 @@
 // handed on without the portal's boot, which reads and writes storage.
 import './assets/main.css'
 import { handOffDesktop } from './lib/desktopHandoff'
+import { handOffPopup } from './lib/popupHandoff'
 
-if (!handOffDesktop()) void import('./main')
+if (!handOffDesktop() && !handOffPopup()) void import('./main')
