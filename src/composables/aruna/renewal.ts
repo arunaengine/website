@@ -9,12 +9,14 @@ const RETRY_MS = 5 * 60_000
 // Requests still carrying the old token finish before its session is revoked.
 const RETIRE_DELAY_MS = 2 * 60_000
 
-interface TokenClaims {
+export interface TokenClaims {
   sub: string
   iat: number
   exp: number
   sid?: string
   session_kind?: string
+  /** The login this token descends from; renewal keeps it. */
+  auth_time?: number
 }
 
 /** The unverified claims of an Aruna bearer token; only the node checks its signature. */

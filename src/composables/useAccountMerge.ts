@@ -1,0 +1,255 @@
+// Merges another account the person can sign in with into the signed-in one. The other
+// account's tokens stay in memory, and both logins must be at most 5 minutes old.
+import { ref, shallowRef } from 'vue'
+import {
+  ApiError,
+  apiErrorMessage,
+  apiRequest,
+  attachSignIn,
+  deleteVault,
+  issueToken,
+  mergeAccount,
+  readVault,
+  saveVault,
+  type ApiClientOptions,
+  type MergeAccountResponse,
+  type UserDevicesResponse,
+  type UserInfoResponse,
+  type UserVaultHead,
+} from '@/lib/api'
+import { assertCurrentSession, refreshContext, userInfo } from './aruna/state'
+import { refresh, replaceToken } from './aruna/session'
+import { tokenClaims } from './aruna/renewal'
+import { SignInCancelled, cancelPopup, popupSignIn } from './popupSignIn'
+
+/** The server takes logins up to 5 minutes old; this leaves time for the request. */
+const FRESH_SECS = 4 * 60
+/** The other account's token is only needed for the merge. */
+const OTHER_TOKEN_SECS = 15 * 60
+
+export type MergeStep =
+  | 'idle'
+  | 'signing'
+  | 'loading'
+  | 'unregistered'
+  | 'copy-vault'
+  | 'vault-blocked'
+  | 'confirm'
+  | 'merging'
+  | 'merged'
+  | 'attached'
+
+export interface OtherAccount {
+  info: UserInfoResponse
+  devices: number
+  vault: UserVaultHead[]
+  /** This account has a vault of its own. */
+  ownVault: boolean
+}
+
+/** Seconds since the login a JWT descends from; null when it names none. */
+export function loginAge(token: string, now = Date.now()): number | null {
+  const time = tokenClaims(token)?.auth_time
+  return typeof time === 'number' ? Math.floor(now / 1000) - time : null
+}
+
+function fresh(token: string): boolean {
+  const age = loginAge(token)
+  return age !== null && age <= FRESH_SECS
+}
+
+/** Short words for a refused merge or attach. */
+export function mergeFailure(error: unknown): string {
+  if (!(error instanceof ApiError)) return apiErrorMessage(error)
+  if (error.code === 'merge_refused') return `Merge refused: ${error.message}.`
+  if (error.code === 'vault_present') return 'That account still has a vault. Copy or delete it first.'
+  if (error.code === 'role_conflict') {
+    const role = /the role (.+?) of the other account/.exec(error.message)?.[1]
+    return `The role ${role ? `"${role}" ` : ''}of that account would cut your own access. Remove it there first.`
+  }
+  if (error.status === 404) return 'This node does not know one of the accounts yet. Try again later.'
+  if (error.status === 429) return 'Too many attempts. Wait a minute.'
+  if (error.status === 503) return 'Merging is not available right now. Try again later.'
+  return apiErrorMessage(error)
+}
+
+export function useAccountMerge() {
+  const step = ref<MergeStep>('idle')
+  const failure = ref<string | null>(null)
+  const other = shallowRef<OtherAccount | null>(null)
+  const result = shallowRef<MergeAccountResponse | null>(null)
+  let otherToken = ''
+  let signInToken = ''
+  let run = 0
+
+  function reset(next: MergeStep = 'idle') {
+    run++
+    step.value = next
+    other.value = null
+    otherToken = ''
+    signInToken = ''
+  }
+
+  function fail(error: unknown, next: MergeStep) {
+    if (error instanceof DOMException && error.name === 'AbortError') return reset()
+    step.value = next
+    failure.value = error instanceof SignInCancelled ? null : mergeFailure(error)
+  }
+
+  // A run that was cancelled or whose session changed ends quietly.
+  function guard(id: number, epoch: number) {
+    if (id !== run) throw new DOMException('Cancelled.', 'AbortError')
+    assertCurrentSession(epoch)
+  }
+
+  async function load(id: number, context: { epoch: number; client: ApiClientOptions }) {
+    step.value = 'loading'
+    const client = { baseUrl: context.client.baseUrl, token: otherToken }
+    const [info, devices, vault, ownVault] = await Promise.all([
+      apiRequest<UserInfoResponse>('/access/users/me', {}, client),
+      apiRequest<UserDevicesResponse>('/access/users/me/devices', {}, client),
+      readVault(client),
+      readVault(context.client),
+    ])
+    guard(id, context.epoch)
+    if (info.user.user_id === userInfo.value?.user.user_id) {
+      reset()
+      failure.value = 'This is the account you are signed in with.'
+      return
+    }
+    const own = ownVault.heads.length > 0
+    other.value = { info, devices: devices.devices.length, vault: vault.heads, ownVault: own }
+    // Several heads are merged by an unlock of that vault, so only a single head is copied.
+    if (!vault.heads.length) step.value = 'confirm'
+    else step.value = own || vault.heads.length > 1 ? 'vault-blocked' : 'copy-vault'
+  }
+
+  async function exchange(id: number, context: { epoch: number; client: ApiClientOptions }) {
+    try {
+      otherToken = await issueToken(signInToken, context.client.baseUrl ?? '', OTHER_TOKEN_SECS)
+    } catch (error) {
+      guard(id, context.epoch)
+      if (error instanceof ApiError && error.status === 401) {
+        step.value = 'unregistered'
+        return
+      }
+      throw error
+    }
+    guard(id, context.epoch)
+    await load(id, context)
+  }
+
+  /** Signs in with the other account; call it in a click handler. */
+  async function start() {
+    reset('signing')
+    failure.value = null
+    const id = run
+    const context = refreshContext()
+    try {
+      const tokens = await popupSignIn()
+      guard(id, context.epoch)
+      signInToken = tokens.id_token ?? tokens.access_token
+      await exchange(id, context)
+    } catch (error) {
+      if (id === run) fail(error, 'idle')
+    }
+  }
+
+  // A login older than 5 minutes signs in again first; a token of another account is refused.
+  async function ownClient(id: number, context: { epoch: number; client: ApiClientOptions }) {
+    const token = context.client.token ?? ''
+    if (fresh(token)) return context.client
+    const tokens = await popupSignIn()
+    guard(id, context.epoch)
+    const baseUrl = context.client.baseUrl ?? ''
+    const renewed = await issueToken(tokens.id_token ?? tokens.access_token, baseUrl)
+    guard(id, context.epoch)
+    const user = userInfo.value?.user
+    if (tokenClaims(renewed)?.sub !== user?.user_id) {
+      throw new Error(`You signed in with another account. Sign in as ${user?.name ?? 'yourself'}.`)
+    }
+    replaceToken(renewed)
+    return { baseUrl, token: renewed }
+  }
+
+  /** Copies the other account's sealed vault here unchanged and deletes it there. */
+  async function copyVault() {
+    const head = other.value?.vault[0]
+    if (step.value !== 'copy-vault' || !head) return
+    const id = run
+    const context = refreshContext()
+    failure.value = null
+    step.value = 'loading'
+    try {
+      await saveVault({ payload: head.payload, predecessors: [] }, context.client)
+      guard(id, context.epoch)
+      await deleteVault({ baseUrl: context.client.baseUrl, token: otherToken })
+      guard(id, context.epoch)
+      await load(id, context)
+    } catch (error) {
+      if (id === run) fail(error, 'copy-vault')
+    }
+  }
+
+  /** Merges after the confirmation; call it in a click handler, it may sign in again. */
+  async function merge() {
+    if (step.value !== 'confirm') return
+    if (!fresh(otherToken)) {
+      reset()
+      failure.value = 'The other sign-in is older than 5 minutes. Start again.'
+      return
+    }
+    const id = run
+    const context = refreshContext()
+    failure.value = null
+    step.value = 'merging'
+    try {
+      const client = await ownClient(id, context)
+      result.value = await mergeAccount(otherToken, client)
+      guard(id, context.epoch)
+      step.value = 'merged'
+      otherToken = ''
+      await refresh()
+    } catch (error) {
+      if (id === run) fail(error, 'confirm')
+    }
+  }
+
+  /** Attaches a sign-in that has no account yet; call it in a click handler. */
+  async function attach() {
+    if (step.value !== 'unregistered') return
+    if (!fresh(signInToken)) {
+      reset()
+      failure.value = 'That sign-in is older than 5 minutes. Add it again.'
+      return
+    }
+    const id = run
+    const context = refreshContext()
+    failure.value = null
+    step.value = 'loading'
+    try {
+      const client = await ownClient(id, context)
+      await attachSignIn(signInToken, client)
+      guard(id, context.epoch)
+      reset('attached')
+      await refresh()
+    } catch (error) {
+      if (id !== run) return
+      if (error instanceof ApiError && error.code === 'subject_taken') {
+        failure.value = 'This sign-in has its own account. You can merge it instead.'
+        await exchange(id, context).catch((cause) => id === run && fail(cause, 'idle'))
+        return
+      }
+      fail(error, 'unregistered')
+    }
+  }
+
+  function cancel() {
+    cancelPopup()
+    reset()
+    failure.value = null
+    result.value = null
+  }
+
+  return { step, failure, other, result, start, copyVault, merge, attach, cancel }
+}
