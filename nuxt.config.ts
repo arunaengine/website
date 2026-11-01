@@ -89,7 +89,8 @@ export default defineNuxtConfig({
       }
     },
     v3Bridge: {
-      // e.g. https://keycloak.v3.aruna-engine.org/realms/aruna, empty disables the v3 login bridge
+      // Default realm, e.g. https://keycloak.v3.aruna-engine.org/realms/aruna; empty disables the bridge.
+      // Keycloak may also ask for other https realms on aruna-engine.org or its subdomains.
       realmUrl: '',
       providers: 'lifescience,iam4nfdi,gfbio'
     },

@@ -22,10 +22,12 @@ export default defineEventHandler(async event => {
   const query = getQuery(event)
   const {code, state} = query
 
-  // v3 login bridge: forward the response to the fixed v3 Keycloak broker URL, no v2 login
+  // v3 login bridge: forward the response to the checked v3 Keycloak broker URL, no v2 login
   if (typeof state === 'string' && state.startsWith('v3.')) {
-    const [, alias = '', bridgedState = ''] = /^v3\.([^.]+)\.(.+)$/s.exec(state) ?? []
-    const brokerUrl = bridgeTarget(alias)?.brokerUrl
+    const [, alias = '', realm, bridgedState = ''] =
+      /^v3\.([^.@]+)(?:@([\w-]+))?\.(.+)$/s.exec(state) ?? []
+    const realmUrl = realm === undefined ? undefined : Buffer.from(realm, 'base64url').toString()
+    const brokerUrl = bridgeTarget(alias, realmUrl)?.brokerUrl
     if (!bridgedState || !brokerUrl) {
       throw createError({statusCode: 400, statusMessage: 'Invalid login bridge request'})
     }

@@ -1,4 +1,4 @@
-import {bridgeTarget, fetchCachedOidcMetadata} from "~/server/utils/oidc";
+import {bridgeTarget, brokerRealm, fetchCachedOidcMetadata} from "~/server/utils/oidc";
 
 const TOKEN_FIELDS = ['grant_type', 'code', 'redirect_uri', 'code_verifier', 'client_id', 'client_secret']
 
@@ -15,13 +15,13 @@ function basicClientId(authorization: string | undefined): string[] {
 // v3 Keycloak token URL: forwards the code exchange with the registered v2 redirect URI.
 // Client authentication passes through unchanged; bodies and tokens are never logged.
 export default defineEventHandler(async event => {
-  const target = bridgeTarget(getRouterParam(event, 'provider') ?? '')
-  if (!target) {
+  const provider = getRouterParam(event, 'provider') ?? ''
+  if (!bridgeTarget(provider)) {
     throw createError({statusCode: 404, statusMessage: 'Not Found'})
   }
-  const oauthError = (statusCode: number, error: string) => {
+  const oauthError = (statusCode: number, error: string, error_description?: string) => {
     setResponseStatus(event, statusCode)
-    return {error}
+    return error_description ? {error, error_description} : {error}
   }
 
   const form = new URLSearchParams(await readRawBody(event) ?? '')
@@ -32,7 +32,11 @@ export default defineEventHandler(async event => {
     if (value !== undefined) body.set(field, value)
   }
   if (body.get('grant_type') !== 'authorization_code') return oauthError(400, 'unsupported_grant_type')
-  if (!body.get('code') || body.get('redirect_uri') !== target.brokerUrl) return oauthError(400, 'invalid_request')
+  if (!body.get('code')) return oauthError(400, 'invalid_request')
+  const target = bridgeTarget(provider, brokerRealm(body.get('redirect_uri'), provider))
+  if (!target || body.get('redirect_uri') !== target.brokerUrl) {
+    return oauthError(400, 'invalid_request', 'Login bridge target not allowed')
+  }
 
   const authorization = getHeader(event, 'authorization')
   const basicIds = basicClientId(authorization)

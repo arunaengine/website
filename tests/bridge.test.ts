@@ -170,7 +170,6 @@ describe('bridge token', () => {
   test('rejects invalid requests without forwarding', async () => {
     const cases: [Record<string, string> | string, Record<string, string>, number, string][] = [
       [{...codeExchange, grant_type: 'refresh_token', refresh_token: 'r'}, basicAuth, 400, 'unsupported_grant_type'],
-      [{...codeExchange, redirect_uri: 'https://evil.test/cb'}, basicAuth, 400, 'invalid_request'],
       [{...codeExchange, code: ''}, basicAuth, 400, 'invalid_request'],
       [`${new URLSearchParams(codeExchange)}&code=c-2`, basicAuth, 400, 'invalid_request'],
       [codeExchange, {}, 401, 'invalid_client'],
@@ -178,6 +177,9 @@ describe('bridge token', () => {
       [codeExchange, {authorization: 'Bearer ls-client'}, 401, 'invalid_client'],
       [{...codeExchange, client_id: 'other'}, basicAuth, 401, 'invalid_client'],
     ]
+    const evil = await token('lifescience', {...codeExchange, redirect_uri: 'https://evil.test/cb'}, basicAuth)
+    expect(evil.status).toBe(400)
+    expect(await evil.json()).toEqual({error: 'invalid_request', error_description: 'Login bridge target not allowed'})
     for (const [params, headers, status, error] of cases) {
       const response = await token('lifescience', params, headers)
       expect(response.status).toBe(status)
@@ -202,4 +204,81 @@ test('full bridge login returns keycloak state intact', async () => {
   expect(forwarded.searchParams.get('state')).toBe(keycloakState)
   const exchange = {...codeExchange, code: forwarded.searchParams.get('code')!}
   expect((await token('lifescience', exchange, basicAuth)).status).toBe(200)
+})
+
+describe('bridge to other realms', () => {
+  const debugRealm = 'https://keycloak.v3-debug.aruna-engine.org/realms/aruna'
+  const debugBroker = `${debugRealm}/broker/lifescience/endpoint`
+  const debugState = `v3.lifescience@${Buffer.from(debugRealm).toString('base64url')}.${keycloakState}`
+  const refused = [
+    'https://keycloak.aruna-engine.org.evil.com/realms/aruna',
+    'https://evil-aruna-engine.org/realms/aruna',
+    'https://aruna-engine.org.evil.com/realms/aruna',
+    'https://evilaruna-engine.org/realms/aruna',
+    'http://keycloak.v3.aruna-engine.org/realms/aruna',
+    'https://keycloak.v3.aruna-engine.org:8443/realms/aruna',
+    'https://user@keycloak.v3.aruna-engine.org/realms/aruna',
+    'https://keycloak.v3.aruna-engine.org',
+    'https://keycloak.v3.aruna-engine.org/admin/realms/aruna',
+    'https://keycloak.v3.aruna-engine.org/realms/aruna/../evil',
+    'https://evil.test/realms/aruna',
+  ]
+
+  test('allowed realm gets its own broker url back', async () => {
+    const start = await authorize('lifescience', {...lifescienceAuth, redirect_uri: debugBroker})
+    expect(start.status).toBe(302)
+    const sent = new URL(start.headers.get('location')!).searchParams
+    expect(sent.get('redirect_uri')).toBe('https://web.test/callback')
+    expect(sent.get('state')).toBe(debugState)
+
+    const back = await callback(`code=c-9&state=${encodeURIComponent(debugState)}`)
+    const forwarded = new URL(back.headers.get('location')!)
+    expect(forwarded.origin + forwarded.pathname).toBe(debugBroker)
+    expect(Object.fromEntries(forwarded.searchParams)).toEqual({code: 'c-9', state: keycloakState})
+
+    const exchange = {...codeExchange, redirect_uri: debugBroker}
+    expect((await token('lifescience', exchange, basicAuth)).status).toBe(200)
+    const call = fetchCalls.find(c => c.url === 'https://lifescience.test/token')!
+    expect(call.options.body.get('redirect_uri')).toBe('https://web.test/callback')
+  })
+
+  test('apex domain realm is allowed', async () => {
+    const redirect_uri = 'https://aruna-engine.org/realms/test/broker/lifescience/endpoint'
+    expect((await authorize('lifescience', {...lifescienceAuth, redirect_uri})).status).toBe(302)
+  })
+
+  test('refuses look-alike and malformed realms', async () => {
+    for (const realm of refused) {
+      const redirect_uri = `${realm}/broker/lifescience/endpoint`
+      const start = await authorize('lifescience', {...lifescienceAuth, redirect_uri})
+      expect(start.status).toBe(400)
+      expect(start.headers.get('location')).toBeNull()
+      expect((await start.json()).statusMessage).toContain('not allowed')
+
+      const exchange = await token('lifescience', {...codeExchange, redirect_uri}, basicAuth)
+      expect(exchange.status).toBe(400)
+
+      const state = `v3.lifescience@${Buffer.from(realm).toString('base64url')}.${keycloakState}`
+      const back = await callback(`code=c-1&state=${encodeURIComponent(state)}`)
+      expect(back.status).toBe(400)
+      expect(back.headers.get('location')).toBeNull()
+    }
+    expect(fetchCalls.filter(c => c.url.endsWith('/token'))).toHaveLength(0)
+  })
+
+  test('default realm keeps old state and needs no listed host', async () => {
+    const start = await authorize('lifescience', lifescienceAuth)
+    expect(new URL(start.headers.get('location')!).searchParams.get('state'))
+      .toBe(`v3.lifescience.${keycloakState}`)
+    const encoded = `v3.lifescience@${Buffer.from('https://kc.test/realms/aruna').toString('base64url')}.s`
+    const back = await callback(`code=c-1&state=${encodeURIComponent(encoded)}`)
+    expect(new URL(back.headers.get('location')!).origin).toBe('https://kc.test')
+  })
+
+  test('other realms are off when the bridge is off', async () => {
+    await withoutBridge(async () => {
+      expect((await authorize('lifescience', {...lifescienceAuth, redirect_uri: debugBroker})).status).toBe(404)
+      expect((await callback(`code=c-1&state=${encodeURIComponent(debugState)}`)).status).toBe(400)
+    })
+  })
 })

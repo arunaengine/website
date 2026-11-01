@@ -40,16 +40,44 @@ export const fetchCachedOidcMetadata = defineCachedFunction(async (wellKnowUrl: 
   getKey: (identityProvider: string) => identityProvider,
 })
 
-// Provider config and fixed v3 Keycloak broker URL of a bridged provider, else undefined
-export function bridgeTarget(provider: string) {
-  const {realmUrl, providers: bridged} = useRuntimeConfig().v3Bridge
+// True only for an https Keycloak realm URL on aruna-engine.org or one of its subdomains
+export function allowedRealm(realmUrl: string) {
+  let url: URL
+  try {
+    url = new URL(realmUrl)
+  } catch {
+    return false
+  }
+  const host = url.hostname
+  return url.protocol === 'https:' && url.href === realmUrl && !url.port && !url.username &&
+    (host === 'aruna-engine.org' || host.endsWith('.aruna-engine.org')) &&
+    /^\/realms\/[\w.-]+$/.test(url.pathname)
+}
+
+// Realm URL of a Keycloak broker endpoint URL for the provider, else undefined
+export function brokerRealm(redirectUri: unknown, provider: string) {
+  const suffix = `/broker/${provider}/endpoint`
+  return typeof redirectUri === 'string' && redirectUri.endsWith(suffix)
+    ? redirectUri.slice(0, -suffix.length)
+    : undefined
+}
+
+// Provider config and v3 Keycloak broker URL of a bridged provider, else undefined.
+// The realm defaults to the configured one; any other realm must pass allowedRealm.
+export function bridgeTarget(provider: string, realmUrl?: string) {
+  const {realmUrl: defaultRealm, providers: bridged} = useRuntimeConfig().v3Bridge
   const providers = useRuntimeConfig().provider
-  if (!realmUrl || !bridged.split(',').includes(provider) || !Object.hasOwn(providers, provider)) {
+  if (!defaultRealm || !bridged.split(',').includes(provider) || !Object.hasOwn(providers, provider)) {
     return undefined
   }
   const config = providers[provider as keyof typeof providers]
   if (!config.clientId) {
     return undefined
   }
-  return {config, brokerUrl: `${realmUrl.replace(/\/+$/, '')}/broker/${provider}/endpoint`}
+  const fallback = defaultRealm.replace(/\/+$/, '')
+  const realm = realmUrl ?? fallback
+  if (realm !== fallback && !allowedRealm(realm)) {
+    return undefined
+  }
+  return {config, realm, isDefault: realm === fallback, brokerUrl: `${realm}/broker/${provider}/endpoint`}
 }
