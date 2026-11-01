@@ -1062,11 +1062,14 @@ describe('distributed job detail components', () => {
       tags: {},
     }
     const started = new Date(Date.now() - 60000).toISOString()
-    const cases: Array<[Record<string, unknown>, Record<string, unknown>, string]> = [
+    const cases: Array<[Record<string, unknown>, Record<string, unknown>, string | RegExp]> = [
       [{ state: 'QUEUED', tags: { [nodeTag]: 'node-2' } }, {}, 'Waiting for a response from node-2'],
       [{ state: 'QUEUED' }, {}, 'Queued, waiting for a node'],
       [{ state: 'INITIALIZING' }, { progress: { current: 2, total: 5, unit: 'inputs' } }, 'Copying inputs, 2 / 5 inputs'],
       [{ state: 'INITIALIZING' }, {}, 'Copying inputs'],
+      [{ state: 'QUEUED', creation_time: new Date(Date.now() - 20000).toISOString() }, {}, /Queued, waiting for a node, 2\ds so far/],
+      [{ state: 'INITIALIZING', creation_time: new Date(Date.now() - 95000).toISOString() }, {}, /Copying inputs, 1m 3\ds so far/],
+      [{ state: 'RUNNING', logs: [{ start_time: new Date(Date.now() - 125000).toISOString(), logs: [], outputs: [] }] }, {}, /Running2m 0\ds\d{2}:\d{2}/],
       [{ state: 'RUNNING', logs: [{ start_time: started, logs: [], outputs: [] }] }, {}, 'Running for'],
       [
         { state: 'RUNNING', logs: [{ start_time: new Date(Date.now() - 300000).toISOString(), logs: [], outputs: [] }, { start_time: new Date(Date.now() - 10000).toISOString(), logs: [], outputs: [] }] },
@@ -1089,7 +1092,7 @@ describe('distributed job detail components', () => {
       const text = content(mounted.root).replace(/\s+/g, ' ')
 
       expect(mounted.errors).toEqual([])
-      expect(text, `state ${task.state}`).toContain(expected)
+      expect(text, `state ${task.state}`).toMatch(expected)
       mounted.app.unmount()
     }
     wake.mockRestore()

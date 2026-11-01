@@ -475,6 +475,13 @@ const copyProgress = computed(() => {
   return progress && progress.total != null ? formatJobProgress(progress) : ''
 })
 
+// How long a run that has not started yet has waited since it was sent.
+const waited = computed(() => {
+  const created = task.value?.creation_time ? Date.parse(task.value.creation_time) : NaN
+  const time = Number.isFinite(created) ? formatDuration(now.value - created) : ''
+  return time ? `, ${time} so far` : ''
+})
+
 interface Summary {
   tone: 'error' | 'warning' | 'info' | 'success'
   headline: string
@@ -496,12 +503,12 @@ const summary = computed<Summary | null>(() => {
     case 'QUEUED':
       return {
         tone: 'info',
-        headline: nodeConstraint.value
+        headline: (nodeConstraint.value
           ? `Waiting for a response from ${displayName(nodeConstraint.value)}`
-          : 'Queued, waiting for a node',
+          : 'Queued, waiting for a node') + waited.value,
       }
     case 'INITIALIZING':
-      return { tone: 'info', headline: copyProgress.value ? `Copying inputs, ${copyProgress.value}` : 'Copying inputs' }
+      return { tone: 'info', headline: (copyProgress.value ? `Copying inputs, ${copyProgress.value}` : 'Copying inputs') + waited.value }
     case 'RUNNING':
       return { tone: 'info', headline: duration ? `Running for ${duration}${where}` : `Running${where}` }
     case 'PAUSED':
@@ -562,8 +569,11 @@ function stagesFor(state: TesState | undefined): WatchStage[] {
 const STAGE_ICONS = [Hourglass, Container, Play, Flag]
 const stages = computed(() => {
   const times = [task.value?.creation_time, undefined, latestLog.value?.start_time, latestLog.value?.end_time]
+  const running = task.value?.state === 'RUNNING' ? runDuration.value : null
   return stagesFor(task.value?.state).map((stage, i) => ({
     ...stage,
+    // The running step counts up while the run works, so its progress shows at a glance.
+    detail: (stage.key === 'running' && running) || stage.detail,
     icon: STAGE_ICONS[i]!,
     time: stage.state === 'pending' ? '' : clock(times[i]),
   }))
