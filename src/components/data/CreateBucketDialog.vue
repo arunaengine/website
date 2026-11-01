@@ -49,11 +49,13 @@ const resultsOpen = ref(false)
 // Space left per node; a missing entry is still being read.
 const free = ref(new Map<string, number | null>())
 
-// The reachable realm nodes, the open node first; devices hold no new buckets here.
+// The reachable realm nodes, the open node first and a management node last, as it usually
+// holds no data; devices hold no new buckets here.
+const rank = (node: { nodeId: string; kind: string }) => (node.kind === 'management' ? 2 : node.nodeId === props.nodeId ? 0 : 1)
 const places = computed(() =>
   realmNodes.nodes.value
     .filter((node) => node.kind !== 'user' && node.reachable)
-    .sort((a, b) => Number(b.nodeId === props.nodeId) - Number(a.nodeId === props.nodeId)),
+    .sort((a, b) => rank(a) - rank(b)),
 )
 const trimmed = computed(() => name.value.trim())
 const nameProblem = computed(() => (trimmed.value ? bucketNameProblem(trimmed.value) : null))

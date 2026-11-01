@@ -102,6 +102,16 @@ describe('new bucket dialog', () => {
     expect(content(root)).toContain('The address will be s3://my-results')
   })
 
+  it('chooses a storage node before the management node, even when the management node is open', async () => {
+    nodeList.value = [{ nodeId: 'mgmt', kind: 'management', reachable: true, isLocal: true, apiBase: 'https://mgmt' }, ...nodeList.value]
+    const { place } = await mount('mgmt')
+    const values = nodes(place()).filter((node) => node.tag === 'option').map((option) => option.props.value)
+    nodeList.value = nodeList.value.slice(1)
+
+    expect(values.slice(0, 3)).toEqual(['two', 'one', 'mgmt'])
+    expect(place().props.value).toBe('two')
+  })
+
   it('needs a source address for a referenced bucket and hands it on after creating it', async () => {
     s3.activateContext.mockResolvedValueOnce({ issuerNodeId: 'one', accessKeyId: 'k1' })
     s3.createBucket.mockResolvedValueOnce(undefined)
