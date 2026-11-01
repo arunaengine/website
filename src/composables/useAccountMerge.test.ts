@@ -195,6 +195,10 @@ describe('account merge', () => {
       'The role "no-secret" of that account would cut your own access. Remove it there first.'],
     [503, { error: 'this node does not coordinate account merges; retry the request' },
       'Merging is not available right now. Try again later.'],
+    [503, { error: 'this node does not run merges', code: 'not_coordinator' },
+      'This node does not handle account merges right now. Try again in a moment.'],
+    [503, { error: 'no management node was reachable', code: 'no_management_node' },
+      'This node does not handle account merges right now. Try again in a moment.'],
     [409, { error: 'the other account holds a vault that differs', code: 'vault_present' },
       'The vaults of the two accounts differ. Merge the vaults first.'],
     [403, { error: 'service accounts are never merged', code: 'merge_refused' },
@@ -207,6 +211,45 @@ describe('account merge', () => {
 
     expect(merge.step.value).toBe('confirm')
     expect(merge.failure.value).toBe(message)
+  })
+
+  it('reloads the profile before it shows that a merge answer was lost', async () => {
+    const merge = await confirmed()
+    answer('POST', '/access/users/me/merge', json({ error: 'Bad gateway', code: 'relay_failed' }, 502))
+    refresh.mockClear()
+    let shown: string | null = 'unset'
+    refresh.mockImplementationOnce(async () => {
+      shown = merge.failure.value
+    })
+
+    await merge.merge()
+
+    expect(refresh).toHaveBeenCalledTimes(1)
+    expect(shown).toBeNull()
+    expect(merge.step.value).toBe('confirm')
+    expect(merge.failure.value).toBe(
+      'The answer was lost, so it may have worked. Your account was reloaded. Check it, then try again if needed.',
+    )
+  })
+
+  it('names the coordinator and reloads for a lost answer when attaching', async () => {
+    answer('GET', '/access/token', json(MISSING, 401))
+    const merge = useAccountMerge()
+    await merge.start()
+    answer('POST', '/access/users/me/subjects', json({ error: 'not run here', code: 'not_coordinator' }, 503))
+
+    await merge.attach()
+
+    expect(merge.step.value).toBe('unregistered')
+    expect(merge.failure.value).toBe('This node does not handle account merges right now. Try again in a moment.')
+    expect(refresh).not.toHaveBeenCalled()
+
+    answer('POST', '/access/users/me/subjects', json({ error: 'Bad gateway', code: 'relay_failed' }, 502))
+    await merge.attach()
+
+    expect(refresh).toHaveBeenCalledTimes(1)
+    expect(merge.step.value).toBe('unregistered')
+    expect(merge.failure.value).toContain('The answer was lost')
   })
 
   it('stops at the account this session belongs to', async () => {

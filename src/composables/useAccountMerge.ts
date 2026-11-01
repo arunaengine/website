@@ -61,9 +61,15 @@ export function loginFresh(token: string): boolean {
   return age !== null && age <= FRESH_SECS
 }
 
+const NOT_COORDINATOR = 'This node does not handle account merges right now. Try again in a moment.'
+const RELAY_LOST =
+  'The answer was lost, so it may have worked. Your account was reloaded. Check it, then try again if needed.'
+
 /** Short words for a refused merge or attach. */
 export function mergeFailure(error: unknown): string {
   if (!(error instanceof ApiError)) return apiErrorMessage(error)
+  if (error.code === 'not_coordinator' || error.code === 'no_management_node') return NOT_COORDINATOR
+  if (error.code === 'relay_failed') return RELAY_LOST
   if (error.code === 'merge_refused') return `Merge refused: ${error.message}.`
   if (error.code === 'vault_present') return 'The vaults of the two accounts differ. Merge the vaults first.'
   if (error.code === 'role_conflict') {
@@ -101,6 +107,11 @@ export function useAccountMerge() {
     other.value = null
     otherToken = ''
     signInToken = ''
+  }
+
+  // The call was passed on and its answer lost, so it may have been applied.
+  async function reloadLost(error: unknown) {
+    if (error instanceof ApiError && error.code === 'relay_failed') await refresh().catch(() => undefined)
   }
 
   function fail(error: unknown, next: MergeStep) {
@@ -240,6 +251,7 @@ export function useAccountMerge() {
       otherToken = ''
       await refresh()
     } catch (error) {
+      await reloadLost(error)
       if (id === run) fail(error, 'confirm')
     }
   }
@@ -269,7 +281,8 @@ export function useAccountMerge() {
         await exchange(id, context).catch((cause) => id === run && fail(cause, 'idle'))
         return
       }
-      fail(error, 'unregistered')
+      await reloadLost(error)
+      if (id === run) fail(error, 'unregistered')
     }
   }
 
