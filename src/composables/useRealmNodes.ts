@@ -118,7 +118,11 @@ export function useRealmNodes() {
   // an honest short-id label.
   function displayName(nodeId: string | null | undefined): string {
     if (!nodeId) return 'this node'
-    return nodeById(nodeId)?.label ?? truncateMiddle(nodeId, 8, 6)
+    const known = nodeById(nodeId)?.label
+    if (known) return known
+    // Signed out, the realm lists only the public address of each node.
+    const published = realmInfo.value?.public_nodes?.find((entry) => entry.node_id === nodeId)
+    return published ? nodeName({ kind: 'server', rest_url: published.api_url }) : truncateMiddle(nodeId, 8, 6)
   }
 
   // A device is a person's own computer, never a place to pick for data or runs; inside the

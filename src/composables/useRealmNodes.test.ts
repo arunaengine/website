@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RealmNodeInfo } from '@/lib/api'
 
 const desktop = vi.hoisted(() => ({ on: true }))
-const realmInfo = ref<{ nodes: RealmNodeInfo[] } | null>(null)
+const realmInfo = ref<{ nodes: RealmNodeInfo[]; public_nodes?: Array<{ node_id: string; api_url: string }> } | null>(null)
 const identity = ref<{ nodeId: string; realm: string } | null>(null)
 const nodeInfo = ref<{ node: { peer_id: string } } | null>(null)
 
@@ -79,6 +79,17 @@ describe('place names in the desktop', () => {
     expect(useRealmNodes().nodeById('node1aaaa0001')?.given).toBe('Giessen storage')
     realmInfo.value = { nodes: [node('node1aaaa0002', 'user', {})] }
     expect(useRealmNodes().nodeById('node1aaaa0002')?.given).toBeNull()
+  })
+})
+
+describe('names for visitors', () => {
+  it('names a node by its public address when the realm lists no nodes', () => {
+    desktop.on = false
+    realmInfo.value = { nodes: [], public_nodes: [{ node_id: 'node2bbbb0002', api_url: 'https://api.node-2.example.org' }] }
+    const { displayName } = useRealmNodes()
+
+    expect(displayName('node2bbbb0002')).toBe('node-2')
+    expect(displayName('node3cccc0003cccc')).toBe('node3ccc…03cccc')
   })
 })
 
