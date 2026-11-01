@@ -1,15 +1,17 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 import { useUnifiedSearch } from './useUnifiedSearch'
 
-const mocks = vi.hoisted(() => ({ searchUnified: vi.fn(), searchObjects: vi.fn() }))
+const mocks = vi.hoisted(() => ({ searchUnified: vi.fn(), searchObjects: vi.fn(), searchMetadata: vi.fn() }))
 
 vi.mock('@/composables/useAruna', async () => {
   const { ref } = await import('vue')
   return {
     useAruna: () => ({
       searchUnified: mocks.searchUnified,
-      searchObjects: mocks.searchObjects,
+      // The metadata search has its own mock, so the name search keeps its call order.
+      searchObjects: (term: string, options: { match?: string }) =>
+        (options.match === 'metadata' ? mocks.searchMetadata : mocks.searchObjects)(term, options),
       authToken: ref('token'),
       apiBaseUrl: ref('/api/v1'),
     }),
@@ -19,7 +21,13 @@ vi.mock('@/composables/useAruna', async () => {
 afterEach(() => {
   mocks.searchUnified.mockReset()
   mocks.searchObjects.mockReset()
+  mocks.searchMetadata.mockReset()
   vi.restoreAllMocks()
+})
+
+beforeEach(() => {
+  const coverage = { scope: 'realm', mode: 'distributed_best_effort', complete: true, truncated: false, partitions: [] }
+  mocks.searchMetadata.mockResolvedValue({ hits: [], next_cursor: null, coverage })
 })
 
 describe('unified document coverage', () => {
@@ -195,6 +203,38 @@ describe('unified document coverage', () => {
     mocks.searchObjects.mockResolvedValue({ hits: [{ kind: 'object', issuer_node_id: 'node-a', group_id: 'group-a', bucket: 'raw-data', key: 'rare.txt' }], next_cursor: null, coverage })
     search.retry()
     await vi.waitFor(() => expect(search.objects.value.map((object) => object.key)).toEqual(['rare.txt']))
+  })
+
+  it('finds files by their searchable metadata as well as by name, each paging on its own', async () => {
+    const coverage = { scope: 'realm', mode: 'distributed_best_effort', complete: true, truncated: false, partitions: [] }
+    const hit = (key: string) => ({ kind: 'object', issuer_node_id: 'node-2', group_id: 'group-a', bucket: 'ncbi-refseq', key })
+    mocks.searchObjects.mockResolvedValueOnce({ hits: [hit('coli/a.fna')], next_cursor: null, coverage })
+    mocks.searchMetadata
+      .mockResolvedValueOnce({ hits: [hit('coli/a.fna'), hit('coli/b.fna')], next_cursor: 'm2', coverage })
+      .mockResolvedValueOnce({ hits: [hit('coli/c.fna')], next_cursor: null, coverage })
+
+    const search = useUnifiedSearch(ref('Escherichia coli'), { types: [], includeObjects: true })
+    await vi.waitFor(() => expect(search.objectSearched.value).toBe(true))
+    expect(mocks.searchMetadata).toHaveBeenCalledWith('Escherichia coli', expect.objectContaining({ match: 'metadata' }))
+    expect(search.objects.value.map((object) => object.key)).toEqual(['coli/a.fna', 'coli/b.fna'])
+    expect(search.objectCursor.value).toBe('m2')
+
+    await search.loadMore('objects')
+    expect(mocks.searchObjects).toHaveBeenCalledOnce()
+    expect(mocks.searchMetadata).toHaveBeenLastCalledWith('Escherichia coli', expect.objectContaining({ match: 'metadata', cursor: 'm2' }))
+    expect(search.objects.value.map((object) => object.key)).toEqual(['coli/a.fna', 'coli/b.fna', 'coli/c.fna'])
+    expect(search.objectCursor.value).toBeNull()
+  })
+
+  it('keeps the name hits when the node refuses the metadata search', async () => {
+    const coverage = { scope: 'realm', mode: 'distributed_best_effort', complete: true, truncated: false, partitions: [] }
+    mocks.searchObjects.mockResolvedValueOnce({ hits: [{ kind: 'object', issuer_node_id: 'node-a', group_id: 'g', bucket: 'b', key: 'SAMD1.fna' }], next_cursor: null, coverage })
+    mocks.searchMetadata.mockRejectedValueOnce(new Error('unknown match'))
+
+    const search = useUnifiedSearch(ref('SAMD1'), { types: [], includeObjects: true })
+    await vi.waitFor(() => expect(search.objectSearched.value).toBe(true))
+    expect(search.objects.value.map((object) => object.key)).toEqual(['SAMD1.fna'])
+    expect(search.objectError.value).toBeNull()
   })
 
   it('schedules no search for a change while it is not active', async () => {
