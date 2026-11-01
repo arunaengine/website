@@ -9,6 +9,7 @@ let opened: unknown = null
 const DeleteDialogStub = defineComponent({ props: { request: Object }, setup: (props) => () => ((opened = props.request), null) })
 const canDeletePrefix = vi.fn(() => false)
 const refresh = vi.fn()
+const forgetBucket = vi.fn()
 
 const Section = compileClientComponent(new URL('./BucketDeleteSection.vue', import.meta.url), {
   vue: VueRuntime,
@@ -18,6 +19,7 @@ const Section = compileClientComponent(new URL('./BucketDeleteSection.vue', impo
   '@/components/distributed/SetDeleteDialog.vue': moduleDefault(Empty),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/composables/useBuckets': { useBuckets: () => ({ refresh }) },
+  '@/composables/useAllBuckets': { forgetBucket },
   '@/composables/useBucketShortcuts': { useBucketShortcuts: () => ({ remove: vi.fn(), recent: ref([]), pinned: ref([]) }) },
   '@/composables/useS3': { useS3: () => ({ canDeletePrefix }) },
   '@/lib/distributedMock': { mockEnabled: () => false },
