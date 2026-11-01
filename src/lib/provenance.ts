@@ -115,7 +115,8 @@ function add(graph: Graph, parent: string | null, child: Box): string {
 
 /** A file's box, with its database and source added at once and its other links waiting. */
 function fileBox(graph: Graph, parent: string | null, id: string, asked: string, role: string, name: string, origin: OriginResponse) {
-  const file = fileNamed(id, 'file', role, name, { detail: formatDate(origin.created_at) })
+  const date = formatDate(origin.created_at)
+  const file = fileNamed(id, 'file', role, name, { detail: origin.origin?.kind === 'source' ? `Downloaded ${date}` : date })
   const made = origin.origin?.kind === 'job' ? origin.origin : null
   if (made) file.pending.push({ kind: 'run', runId: made.run_id, ...(made.started_by ? { startedBy: made.started_by } : {}) })
   add(graph, parent, file)
@@ -129,10 +130,13 @@ function fileBox(graph: Graph, parent: string | null, id: string, asked: string,
     // A release that pins this exact version names it; one box per release file version.
     for (const release of releases) {
       const upstream = release.upstream[0]
+      // Its frame opens the dataset; the upstream page, such as a DOI, when no dataset is linked.
+      const dataset = metadata.dataset ? { document: metadata.dataset } : {}
       const named = box(`release:${release.crate_version}`, 'database', 'Database release', `${title} ${release.label}`, {
         detail: unchecked,
         release: { name: title, label: release.label },
-        ...(upstream ? { link: { label: upstream.name === 'DOI' ? `doi:${upstream.value}` : upstream.value, url: upstream.url } } : {}),
+        ...(upstream ? { link: { label: upstream.name === 'DOI' ? `doi:${upstream.value}` : upstream.value, url: upstream.url, ...dataset } } : {}),
+        ...(!upstream && metadata.dataset ? { link: { label: 'Open the dataset', document: metadata.dataset } } : {}),
       })
       add(graph, id, named)
     }
@@ -161,16 +165,15 @@ function placeBox(url: string, role: string): Box {
 }
 
 /**
- * Where a version came from outside the graph: the person who uploaded it, or the system job
- * that made it, with the external source an import read. Files of one import share its boxes.
+ * Where a version came from outside the graph: the person who uploaded it, the external source an
+ * import read, or the system job that copied or synced it. Files of one import share its source.
  */
 function addOrigin(graph: Graph, id: string, asked: string, response: OriginResponse) {
   const origin = response.origin
   const bucket = bucketOf(asked) ?? id
-  // A system job's box links to the job; files of one job share it.
+  // A copy's box links to its system job.
   const job = origin && 'job_id' in origin ? (origin.job_id ?? undefined) : undefined
   const ran = job ? { job } : {}
-  const ofJob = job ? `\n${job}` : ''
   if (origin?.kind === 'upload') {
     const device = origin.device ?? undefined
     const client = origin.client ?? undefined
@@ -188,10 +191,10 @@ function addOrigin(graph: Graph, id: string, asked: string, response: OriginResp
       ...(connector ? { connector } : {}),
       ...(connectorName ? { connectorName } : {}),
     })
-    add(graph, add(graph, id, box(`import:${bucket}\n${source.id}${ofJob}`, 'system', 'System job', 'Import', ran)), source)
+    add(graph, id, source)
   } else if (origin?.kind === 'storage') {
     const folder = box(`storage:${origin.backend_id}`, 'source', 'External source', 'Storage folder', { detail: shortName(origin.backend_id) })
-    add(graph, add(graph, id, box(`import:${bucket}\n${folder.id}${ofJob}`, 'system', 'System job', 'Registration in place', ran)), folder)
+    add(graph, id, folder)
   } else if (origin?.kind === 'copy') {
     add(graph, id, box(`copy:${id}`, 'system', 'System job', 'Copy', { ...ran, pending: [{ kind: 'version', id: origin.from, role: 'Copied from' }] }))
   }
@@ -474,8 +477,8 @@ export function drawnChain(graph: Graph): DrawnNode[] {
     const groups = new Map<string, string[]>()
     for (const id of ids) {
       const item = graph.boxes[id]
-      // A box already on this path is not drawn again, so a cycle ends.
-      if (!item || trail.includes(id)) continue
+      // A box already on this path is not drawn again, so a cycle ends. A database is a frame.
+      if (!item || trail.includes(id) || item.kind === 'database') continue
       const from = [...item.from].sort().join('\n')
       const leaf = (item.kind === 'file' || item.kind === 'unversioned') && !from
       const key = item.kind === 'file' && from ? `${item.role}\n${from}` : leaf ? `leaf:${item.kind}\n${item.role}` : `box:${id}`
@@ -562,6 +565,31 @@ export function chainColumns(graph: Graph, chain: DrawnNode[], direct: boolean, 
   const deepest = Math.max(0, ...placed.map((card) => card.depth))
   const cards: ChainCard[] = placed.map(({ depth, ...card }) => ({ ...card, column: deepest - depth }))
   return { cards, columns: deepest + 1, rows: Math.max(1, next) }
+}
+
+/** A dataset or its release drawn as a frame around a file card and the external sources beside it. */
+export interface ChainFrame {
+  /** The file card's id. */
+  id: string
+  /** The database and release boxes the file belongs to. */
+  boxes: string[]
+  first: number
+  last: number
+  top: number
+  bottom: number
+}
+
+/** One frame per drawn file card of a database dataset; it disappears with that card. */
+export function databaseFrames(graph: Graph, cards: ChainCard[]): ChainFrame[] {
+  const kind = (card: ChainCard) => graph.boxes[card.node.ids[0]!]?.kind
+  return cards.flatMap((card) => {
+    const boxes = kind(card) === 'file' ? graph.boxes[card.node.ids[0]!]!.from.filter((id) => graph.boxes[id]?.kind === 'database') : []
+    if (!boxes.length) return []
+    const members = [card, ...cards.filter((each) => each.into === card.id && kind(each) === 'source')]
+    const columns = members.map((each) => each.column)
+    const rows = members.map((each) => each.row)
+    return [{ id: card.id, boxes, first: Math.min(...columns), last: Math.max(...columns), top: Math.min(...rows), bottom: Math.max(...rows) }]
+  })
 }
 
 /** Whether any box still has links to read. */

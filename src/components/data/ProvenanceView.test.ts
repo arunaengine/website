@@ -97,29 +97,37 @@ describe('provenance view', () => {
     expect(run?.props.to).toEqual({ name: 'dataset', params: { id: 'doc1' } })
   })
 
-  it('shows the import and external source of an input, also when the input is closed', async () => {
+  it('frames an input and its external source with their dataset, until the input is hidden', async () => {
     const source = { url: 'https://example.org/in.faa', path: 'in.faa', digests: [], sources: [{ url: 'https://example.org/in.faa', path: 'in.faa', connector_id: 'c1' }] }
     const database = { bucket_metadata: { database: true, dataset: 'd1' }, description: { title: 'BakRep', identifiers: [] } }
     aruna.getVersionOrigin.mockReset().mockResolvedValue(origin({ origin: { kind: 'source' }, source, ...database }))
     const root = await render()
     await vi.waitFor(() => expect(content(root)).toContain('Connector: NCBI FTP'))
-    expect(content(root)).toContain('in.faa')
-    expect(content(root)).toContain('System jobImport')
+    expect(content(root)).toContain('in.fa')
+    expect(content(root)).toContain('Downloaded')
+    expect(content(root)).not.toContain('System job')
     expect(aruna.listGroupConnectors).toHaveBeenCalledWith('g1')
     const link = nodes(root).find((node) => node.tag === 'a' && node.props.href === 'https://example.org')
     expect(content(link!)).toBe('example.org')
 
-    // Closing the input hides its database but keeps where it came from.
-    const toggle = () => nodes(root).find((node) => node.tag === 'button' && node.props['aria-expanded'] !== undefined && content(node) !== 'Show the files')!
+    // The whole frame title is one link to the dataset, around the source and file columns.
+    const frames = () => nodes(root).filter((node) => node.props['data-frame'])
+    expect(frames()).toHaveLength(1)
+    expect(frames()[0]!.props.style).toMatchObject({ gridColumn: '1 / 4' })
+    const title = nodes(frames()[0]!).find((node) => node.tag === 'a')!
+    expect(content(title)).toBe('DatasetBakRep')
+    expect(title.props.to).toEqual({ name: 'dataset', params: { id: 'd1' } })
+    expect(String(title.props.class)).toContain('focus-visible:ring-2')
+    expect(content(root)).toContain('Dataset with its source and files')
+
+    // Hiding the run's inputs takes the frame with them.
+    const toggle = () => nodes(root).find((node) => node.tag === 'button' && node.props['aria-expanded'] !== undefined)!
     expect(toggle().props['aria-label']).toBe('Hide earlier steps')
     await click(toggle())
+    expect(frames()).toHaveLength(0)
     expect(content(root)).not.toContain('BakRep')
-    expect(content(root)).toContain('example.org')
-    expect(toggle().props['aria-label']).toBe('Show 1 step before this')
     await click(toggle())
-    await vi.waitFor(() => expect(content(root)).toContain('BakRep'))
-    expect(content(root)).toContain('System job')
-    expect(content(root)).toContain('External source')
+    await vi.waitFor(() => expect(frames()).toHaveLength(1))
   })
 
   it('shows the runs that wrote into the bucket a dataset names, asked on its node', async () => {
@@ -149,13 +157,19 @@ describe('provenance view', () => {
     await vi.waitFor(() => expect(content(root)).toContain('Uploaded byAda LovelaceVia S3'))
   })
 
-  it('links a system job to its job by name, and names who started a run', async () => {
+  it('links a copy to its system job by name, and names who started a run', async () => {
+    const OTHER = 'https://w3id.org/aruna/data/arn:aruna:r:n:s3/lab/in.faa@01K8W1B3D5F7H9KMQ1S3V5X7Z3'
     const source = { path: 'in.faa', digests: [], sources: [{ path: 'in.faa', connector_id: 'c9', connector_name: 'Lab archive' }] }
-    aruna.getVersionOrigin.mockReset().mockResolvedValue(origin({ origin: { kind: 'source', job_id: 'j1' }, source }))
+    aruna.getVersionOrigin.mockReset().mockImplementation(async (id: string) =>
+      origin(id === INPUT ? { origin: { kind: 'copy', from: OTHER, job_id: 'j1' } } : { origin: { kind: 'source', job_id: 'j0' }, source }))
     aruna.listGroupConnectors.mockClear()
+    getJob.mockClear()
     const root = await render({ origin: { kind: 'job', run_id: 'r1', started_by: 'u' } })
-    await vi.waitFor(() => expect(content(root)).toContain('System jobImport RO-Crate'))
+    await vi.waitFor(() => expect(content(root)).toContain('Connector: Lab archive'))
+    expect(content(root)).toContain('System jobHideImport RO-Crate')
+    // A download is an arrow from its source, so its job is not drawn or asked for.
     expect(getJob).toHaveBeenCalledWith('j1')
+    expect(getJob).not.toHaveBeenCalledWith('j0')
     const job = nodes(root).find((node) => node.tag === 'a' && content(node) === 'Import RO-Crate')
     expect(job?.props.to).toEqual({ name: 'job', params: { jobId: 'j1' } })
     expect(content(root)).toContain('Connector: Lab archive')
@@ -317,31 +331,34 @@ describe('provenance view', () => {
       })
     })
     const root = await render()
-    // Directly, the database files show their release and the run that made them, marked upstream.
+    // Directly, the database files sit in their release's frame, made by a run marked upstream.
     await vi.waitFor(() => expect(content(root)).toContain('Prepare Bakta DB 6.0 light'))
-    expect(content(root)).toContain('66 filesShow the filesRelease 6.0 light')
+    expect(content(root)).toContain('66 filesShow the files')
+    expect(content(root)).not.toContain('Release 6.0 light')
     expect(content(root)).toContain('UpstreamHidePrepare Bakta DB 6.0 light')
-    // The archive the run unpacked is closed but shows the import it came from.
+    // The archive the run unpacked is closed but shows the source it was downloaded from.
     await vi.waitFor(() => expect(content(root)).toContain('External sourcezenodo.org'))
-    expect(content(root)).toContain('System jobImport')
+    expect(content(root)).not.toContain('System job')
     await openAll(root)
     await vi.waitFor(() => expect(content(root)).toContain('zenodo.org'))
     const text = content(root)
 
-    expect(text).toContain('66 filesShow the filesRelease 6.0 light')
+    expect(text).toContain('66 filesShow the files')
+    expect(text).toContain('Downloaded')
     expect(text).toContain('genome.fasta')
     expect(text).not.toContain('work/in/genome.fasta')
     expect(nodes(root).some((node) => node.props.title === 'work/in/genome.fasta')).toBe(true)
-    expect(text.split('Database release')).toHaveLength(2)
+    expect(text.split('DatasetBakta database (light) 6.0 light')).toHaveLength(2)
     expect(text.split('Prepare Bakta DB 6.0 light')).toHaveLength(2)
     expect(text).toContain('zenodo.org')
     expect(text).not.toContain('/work/in/db/f3')
-    // Sources at the left, the file in the last of seven columns.
+    // Sources at the left, the file in the last of six columns.
     const column = (label: string) => nodes(root).find((node) => node.props['data-box'] && content(node).includes(label))?.props.style
     expect(column('zenodo.org')).toMatchObject({ gridColumn: 1 })
-    expect(column('This file')).toMatchObject({ gridColumn: 13 })
-    const doi = nodes(root).find((node) => node.tag === 'a' && node.props.href === 'https://doi.org/10.5281/zenodo.14916843')
-    expect(content(doi!)).toContain('Bakta database (light) 6.0 light')
+    expect(column('This file')).toMatchObject({ gridColumn: 11 })
+    // The release frame opens the dataset, not its DOI.
+    const release = nodes(root).find((node) => node.tag === 'a' && content(node) === 'DatasetBakta database (light) 6.0 light')
+    expect(release?.props.to).toEqual({ name: 'dataset', params: { id: 'd1' } })
     expect(nodes(root).some((node) => String(node.props.class).split(' ').includes('break-all'))).toBe(false)
 
     await click(button(root, 'Show the files'))
@@ -366,8 +383,8 @@ describe('provenance view', () => {
     await vi.waitFor(() => expect(content(root)).toContain('Their provenance is shown elsewhere.'))
     const text = content(root)
 
-    expect(text.split('Release 6.0 light')).toHaveLength(3)
-    expect(text.split('Database release')).toHaveLength(2)
+    // Both drawings of the files keep their frame.
+    expect(text.split('DatasetBakta database (light) 6.0 light')).toHaveLength(3)
   })
 
   it('shows a run record\'s results as the record\'s own card, linked to their folder', async () => {

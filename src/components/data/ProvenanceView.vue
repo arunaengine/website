@@ -10,7 +10,7 @@ import ExternalLink from '@/components/ui/ExternalLink.vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
-import { ArrowDown, CloudOff, Database, Download, EyeOff, File, FileText, Files, GitBranch, Globe, Info, ListTodo, Minus, MoveRight, Network, Plus, RotateCw, UserRound, Workflow } from '@lucide/vue'
+import { ArrowDown, CloudOff, Database, Download, EyeOff, File, FileJson2, FileText, Files, GitBranch, Globe, Info, ListTodo, Minus, MoveRight, Network, Plus, RotateCw, UserRound, Workflow } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJobs } from '@/composables/useJobs'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -24,6 +24,7 @@ import { shortUserId } from '@/lib/utils'
 import {
   addWriters,
   chainColumns,
+  databaseFrames,
   drawnChain,
   emptyGraph,
   expand,
@@ -34,6 +35,7 @@ import {
   startFile,
   type Box,
   type ChainCard,
+  type ChainFrame,
   type DrawnNode,
   type Graph,
   type Hop,
@@ -189,17 +191,21 @@ async function findUses() {
 }
 
 // Cards are 104 px high in rows of 120 px; a half row lets a card sit between two sources.
-const PITCH = 120
+// With a dataset frame drawn, rows are 164 px and leave 30 px above each card for its header.
 const GAP = 48
 
 const chain = computed(() => intoRecord(graph, drawnChain(graph)))
 const layout = computed(() => chainColumns(graph, chain.value, !full.value, opened.value))
+const frames = computed(() => databaseFrames(graph, layout.value.cards))
+const pitch = computed(() => (frames.value.length ? 164 : 120))
+const cardTop = computed(() => (frames.value.length ? 38 : 8))
 const gridStyle = computed(() => ({
   gridTemplateColumns: Array.from({ length: layout.value.columns }, () => 'minmax(9rem, 16rem)').join(` ${GAP}px `),
-  gridTemplateRows: `repeat(${layout.value.rows * 2}, ${PITCH / 2}px)`,
+  gridTemplateRows: `repeat(${layout.value.rows * 2}, ${pitch.value / 2}px)`,
+  ...(frames.value.length ? { padding: '0 12px' } : {}),
 }))
 const byId = computed(() => new Map(layout.value.cards.map((card) => [card.id, card])))
-const centre = (card: ChainCard) => card.row * PITCH + PITCH / 2
+const centre = (card: ChainCard) => card.row * pitch.value + cardTop.value + 52
 function edgesFrom(column: number) {
   return layout.value.cards.flatMap((card) => {
     const target = card.column === column && card.into ? byId.value.get(card.into) : undefined
@@ -347,18 +353,9 @@ function shown(card: ChainCard): Shown {
     return { ...base, icon: Files, role: 'Files', title: `${files} result ${files === 1 ? 'file' : 'files'}`, detail: props.record.path, mono: true, to: props.record.to ?? undefined }
   }
   if (items.length > 1) {
-    const release = item.from.map((id) => graph.boxes[id]).find((each) => each?.kind === 'database')
-    const open = openFolds.value.has(card.node.key)
-    const files = `${items.length} files`
-    const fold = { key: card.node.key, open }
-    // The files of one database read as that database, with its release and their count, unless
-    // the database is drawn beside them.
-    if (release && !layout.value.cards.some((each) => each.node.ids.includes(release.id))) {
-      const facts = release.release ? `Release ${release.release.label}, ${files}` : files
-      return { ...base, icon: Database, role: 'Database', title: release.release?.name ?? release.title, detail: [facts, repeat].filter(Boolean).join('. '), fold }
-    }
-    const of = release?.release ? `Release ${release.release.label}` : release ? `Of ${release.title}` : ''
-    return { ...base, icon: Files, role: item.role, title: files, detail: [of, repeat].filter(Boolean).join('. '), fold }
+    // The frame around the files names their database.
+    const fold = { key: card.node.key, open: openFolds.value.has(card.node.key) }
+    return { ...base, icon: Files, role: item.role, title: `${items.length} files`, detail: repeat, fold }
   }
   const document = item.link?.document
   const run = item.kind === 'run' ? item.id.replace(/^run:/, '') : ''
@@ -378,6 +375,41 @@ function shown(card: ChainCard): Shown {
     muted: item.kind === 'hidden' || item.kind === 'unversioned' || item.kind === 'silent',
   }
 }
+
+// A frame's header: the dataset or release its file belongs to; the whole title opens the dataset.
+function frameNames(frame: ChainFrame) {
+  return frame.boxes.flatMap((id) => {
+    const item = graph.boxes[id]
+    if (!item) return []
+    const document = item.link?.document
+    const to = document ? { name: 'dataset', params: { id: document } } : placeOf(item)
+    return [{ id, title: item.title, detail: item.detail, to, href: to ? undefined : item.link?.url }]
+  })
+}
+const frameOf = computed(() => new Map(frames.value.map((frame) => [frame.id, frame])))
+
+const FrameHead = defineComponent({
+  props: { frame: { type: Object as PropType<ChainFrame>, required: true } },
+  setup(head) {
+    return () => {
+      const titles = frameNames(head.frame).map((name) => {
+        const inner = [
+          h(FileJson2, { class: 'h-3.5 w-3.5 shrink-0', 'aria-hidden': 'true' }),
+          h('span', { class: 'shrink-0' }, 'Dataset'),
+          h('span', { class: 'truncate font-medium text-foreground group-hover:underline' }, name.title),
+        ]
+        const link = 'group inline-flex min-w-0 items-center gap-1.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+        const title = name.to
+          ? h(RouterLink, { to: name.to, class: link, title: name.title }, () => inner)
+          : name.href
+            ? h('a', { href: name.href, target: '_blank', rel: 'noopener noreferrer', class: link, title: name.title }, inner)
+            : h('span', { class: 'inline-flex min-w-0 items-center gap-1.5' }, inner)
+        return [title, name.detail ? h('span', { class: 'truncate' }, name.detail) : null]
+      })
+      return h('span', { class: 'flex min-w-0 items-center gap-x-3 text-xs text-muted-foreground' }, titles.flat())
+    }
+  },
+})
 
 // Sibling files folded into one card list their names below the chain on request.
 const openFolds = ref(new Set<string>())
@@ -462,10 +494,15 @@ const ListBranch: ReturnType<typeof defineComponent> = defineComponent({
     return () => {
       const card = branch.card
       const sources = layout.value.cards.filter((each) => each.into === card.id)
-      const self = h(CardView, { card })
       const down = h('div', { class: 'grid h-6 place-items-center text-muted-foreground', 'aria-hidden': 'true' }, [h(ArrowDown, { class: 'h-4 w-4' })])
-      if (!sources.length) return h('div', { class: 'flex flex-col' }, [self])
-      if (sources.length === 1) return h('div', { class: 'flex flex-col' }, [h(ListBranch, { card: sources[0] }), down, self])
+      // A dataset frame is a heading above its source and file, or above the file alone.
+      const frame = frameOf.value.get(card.id)
+      const head = frame ? [h(FrameHead, { frame, class: 'mb-2' })] : []
+      const framed = sources.every((each) => graph.boxes[each.node.ids[0]!]?.kind === 'source')
+      const top = framed ? head : []
+      const self = [...(framed ? [] : head), h(CardView, { card })]
+      if (!sources.length) return h('div', { class: 'flex flex-col' }, [...top, ...self])
+      if (sources.length === 1) return h('div', { class: 'flex flex-col' }, [...top, h(ListBranch, { card: sources[0] }), down, ...self])
       const run = graph.boxes[card.node.ids[0]!]?.kind === 'run'
       const groups = sources.map((source, index) =>
         h('div', { key: source.id, class: 'mb-4 border-l-2 border-border pl-3' }, [
@@ -474,7 +511,7 @@ const ListBranch: ReturnType<typeof defineComponent> = defineComponent({
         ]),
       )
       const join = sources.length === 2 ? (run ? 'Both inputs go into' : 'Both go into') : run ? 'All inputs go into' : 'All go into'
-      return h('div', { class: 'flex flex-col' }, [...groups, h('p', { class: 'mb-2 flex items-center gap-1.5 text-xs text-muted-foreground' }, [h(ArrowDown, { class: 'h-3.5 w-3.5 text-aruna-aqua', 'aria-hidden': 'true' }), join]), self])
+      return h('div', { class: 'flex flex-col' }, [...top, ...groups, h('p', { class: 'mb-2 flex items-center gap-1.5 text-xs text-muted-foreground' }, [h(ArrowDown, { class: 'h-3.5 w-3.5 text-aruna-aqua', 'aria-hidden': 'true' }), join]), ...self])
     }
   },
 })
@@ -491,12 +528,13 @@ const LEGEND = [
   { icon: Globe, label: 'External source' },
   { icon: File, label: 'File' },
   { icon: FileText, label: 'Dataset' },
-  { icon: Database, label: 'Database' },
+  { icon: FileJson2, label: 'Dataset with its source and files' },
 ]
 // The legend names only what the graph draws; the arrow is always drawn.
 const legend = computed(() => {
   const drawn = new Set(layout.value.cards.map((card) => shown(card).icon))
   if (drawn.has(Files)) drawn.add(File)
+  if (frames.value.length) drawn.add(FileJson2)
   return LEGEND.filter((item) => item.icon === MoveRight || drawn.has(item.icon))
 })
 </script>
@@ -535,11 +573,20 @@ const legend = computed(() => {
         </div>
         <div v-else class="overflow-x-auto">
           <div class="grid justify-center" :style="gridStyle">
+            <div
+              v-for="frame in frames"
+              :key="`frame:${frame.id}`"
+              class="min-w-0 rounded-xl border border-border bg-muted/40 px-3 pt-1.5"
+              :style="{ gridColumn: `${frame.first * 2 + 1} / ${frame.last * 2 + 2}`, gridRow: `${frame.top * 2 + 1} / ${frame.bottom * 2 + 3}`, margin: '8px -12px 10px' }"
+              :data-frame="frame.id"
+            >
+              <FrameHead :frame="frame" />
+            </div>
             <svg
               v-for="column in layout.columns - 1"
               :key="column"
               :width="GAP"
-              :height="layout.rows * PITCH"
+              :height="layout.rows * pitch"
               :style="{ gridColumn: column * 2, gridRow: '1 / -1' }"
               class="overflow-visible"
               aria-hidden="true"
@@ -553,8 +600,8 @@ const legend = computed(() => {
               v-for="card in layout.cards"
               :key="card.id"
               :card="card"
-              class="my-2 h-[104px]"
-              :style="{ gridColumn: card.column * 2 + 1, gridRow: `${card.row * 2 + 1} / span 2` }"
+              class="h-[104px]"
+              :style="{ gridColumn: card.column * 2 + 1, gridRow: `${card.row * 2 + 1} / span 2`, marginTop: `${cardTop}px` }"
             />
           </div>
         </div>
