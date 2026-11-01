@@ -8,6 +8,7 @@ import { button, click, compileClientComponent, content, flush, mountApp, module
 const aruna = vi.hoisted(() => ({
   getVersionOrigin: vi.fn(),
   getRun: vi.fn(),
+  getBucketRuns: vi.fn(async () => ({ runs: [] as Array<{ run_id: string }>, complete: true })),
   fetchRoCrateRaw: vi.fn(),
   downloadProvenanceCrate: vi.fn(),
   runSparql: vi.fn(),
@@ -100,6 +101,19 @@ describe('provenance view', () => {
     expect(toggle().props['aria-label']).toBe('Show 1 step before this')
     await click(toggle())
     await vi.waitFor(() => expect(content(root)).toContain('example.org'))
+  })
+
+  it('shows the runs that wrote into the bucket a dataset names, asked on its node', async () => {
+    aruna.getRun.mockImplementation(async (runId: string) => ({ run_id: runId, run_crate: runId }))
+    aruna.fetchRoCrateRaw.mockImplementation(async () => ({ '@graph': [{ '@id': '#run', '@type': 'CreateAction', name: 'Bakta K-12' }] }))
+    aruna.getBucketRuns.mockResolvedValueOnce({ runs: [{ run_id: 'k12' }], complete: true })
+    const part = 'arn:aruna:r:n2:s3/bakta-results/'
+    const crate = { '@graph': [{ '@id': './', '@type': 'Dataset', hasPart: [{ '@id': part }] }, { '@id': part, '@type': 'Dataset', name: 'bakta-results' }] }
+    const { root } = await mountApp(component, { props: { start: { kind: 'dataset', documentId: 'd5', title: 'Bakta annotation results', crate } } })
+
+    await vi.waitFor(() => expect(content(root)).toContain('Bakta K-12'))
+    expect(aruna.getBucketRuns).toHaveBeenCalledWith('bakta-results', '', 'n2')
+    expect(aruna.getRun).toHaveBeenCalledWith('k12')
   })
 
   it('draws the run that made an input one level up, and reads every level on request', async () => {

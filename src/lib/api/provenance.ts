@@ -16,6 +16,17 @@ export interface RunResponse {
   run_crate_status?: { status: string; message?: string; resource?: string } | null
 }
 
+export interface BucketRunsResponse {
+  /** The runs that wrote into the bucket or folder, newest first. */
+  runs: Array<{ run_id: string; name?: string | null }>
+  complete: boolean
+}
+
+/** The runs whose results went into a bucket or one of its folders; asked on a node holding it. */
+export function getBucketRuns(bucket: string, prefix: string, client: ApiClientOptions = {}, signal?: AbortSignal): Promise<BucketRunsResponse> {
+  return apiRequest(`/data/buckets/${encodeURIComponent(bucket)}/runs`, { query: { prefix: prefix || undefined }, signal }, client)
+}
+
 /** The origin of one exact version: a global id URL or a versioned object w3id. */
 export function getVersionOrigin(version: string, client: ApiClientOptions = {}, signal?: AbortSignal): Promise<OriginResponse> {
   return apiRequest('/data/origin', { query: { version }, signal }, client)

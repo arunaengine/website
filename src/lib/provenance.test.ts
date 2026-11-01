@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError, type OriginResponse } from '@/lib/api'
-import { bucketOf, chainColumns, dataParts, drawnChain, emptyGraph, expand, expandAll, hasPending, intoRecord, runInputs, runRecordDetail, startDataset, startFile, type Box, type Readers } from './provenance'
+import { addWriters, bucketOf, chainColumns, dataParts, drawnChain, emptyGraph, expand, expandAll, hasPending, intoRecord, linkedBuckets, runInputs, runRecordDetail, startDataset, startFile, type Box, type Readers } from './provenance'
 
 const bakrep = { database: true, dataset: 'd1' }
 // The title comes from the dataset the bucket links.
@@ -106,6 +106,25 @@ describe('provenance graph', () => {
 
     await expandAll(graph, read, () => graph.steps >= 1)
     expect(graph.steps).toBe(2)
+  })
+
+  it('hangs the runs that wrote into a linked bucket under the dataset and reads them as runs', async () => {
+    const bucket = {
+      '@graph': [
+        { '@id': './', '@type': 'Dataset', hasPart: [{ '@id': 'arn:aruna:realm:n2:s3/bakta-results/' }] },
+        { '@id': 'arn:aruna:realm:n2:s3/bakta-results/', '@type': 'Dataset', name: 'bakta-results' },
+      ],
+    }
+    expect(linkedBuckets(bucket)).toEqual([{ bucket: 'bakta-results', prefix: '', nodeId: 'n2' }])
+    const graph = emptyGraph()
+    startDataset(graph, 'Bakta annotation results', 'd5', bucket)
+    addWriters(graph, 'd5', ['r1', 'r2', 'r1'])
+    expect(graph.boxes['dataset:d5'].pending).toEqual([{ kind: 'run', runId: 'r1' }, { kind: 'run', runId: 'r2' }])
+
+    const read = readers({}, runCrate)
+    await expand(graph, 'dataset:d5', read, () => true)
+    expect(read.run).toHaveBeenCalledWith('r1')
+    expect(graph.boxes['run:r1']).toBeDefined()
   })
 
   it('starts a run record from its results, its inputs showing through the run only', () => {

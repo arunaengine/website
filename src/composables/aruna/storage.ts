@@ -12,6 +12,8 @@ import {
   getVersionOrigin as requestVersionOrigin,
   getRun as requestRun,
   downloadProvenanceCrate as requestProvenanceCrate,
+  getBucketRuns as requestBucketRuns,
+  type BucketRunsResponse,
   type RunResponse,
   resolveVersion as requestResolve,
   getPartTarget as requestTarget,
@@ -119,6 +121,11 @@ export function getVersionOrigin(version: string, signal?: AbortSignal): Promise
 
 export function getRun(runId: string, signal?: AbortSignal): Promise<RunResponse> {
   return requestRun(runId, refreshContext().client, signal)
+}
+
+/** The runs that wrote into a bucket or folder, asked on the node that holds the bucket. */
+export async function getBucketRuns(bucket: string, prefix: string, nodeId?: string | null, signal?: AbortSignal): Promise<BucketRunsResponse> {
+  return requestBucketRuns(bucket, prefix, await nodeClientReady(nodeId, undefined, signal), signal)
 }
 
 export function downloadProvenanceCrate(start: { version: string } | { dataset: string }, signal?: AbortSignal): Promise<Blob> {

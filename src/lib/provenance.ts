@@ -2,6 +2,8 @@
 // the node answered; a link the user may not read is named by its global id or content id only.
 import { ApiError, type OriginIdentifier, type OriginResponse, type RunResponse } from '@/lib/api'
 import { isContentId, isExactId } from '@/lib/crate/dataIdentity'
+import { looksLikePart } from '@/lib/linkedPart'
+import { parseArunaArn } from '@/lib/sync'
 import { formatDate } from '@/lib/utils'
 
 const DATA_PREFIX = 'https://w3id.org/aruna/data/'
@@ -174,6 +176,26 @@ export function startDataset(graph: Graph, title: string, documentId: string, cr
       const file = add(graph, root.id, fileNamed(part.id, 'unversioned', 'File', part.name, { detail: 'No exact version recorded' }))
       if (run && results.has(part.id)) add(graph, file, run)
     }
+  }
+}
+
+/** The buckets and folders a dataset links by a node ARN, where the runs that wrote into them are asked. */
+export function linkedBuckets(crate: unknown): Array<{ bucket: string; prefix: string; nodeId: string }> {
+  return graphNodes(crate)
+    .filter((node) => isType(node, 'Dataset') && looksLikePart(String(node['@id'])))
+    .flatMap((node) => {
+      const arn = parseArunaArn(String(node['@id']))
+      return arn?.resourceType === 's3' ? [{ bucket: arn.bucket, prefix: arn.prefix, nodeId: arn.nodeId }] : []
+    })
+}
+
+/** Hangs each run that wrote into the dataset's buckets under the dataset, to be read as a run record. */
+export function addWriters(graph: Graph, documentId: string, runIds: string[]) {
+  const root = graph.boxes[`dataset:${documentId}`]
+  if (!root) return
+  for (const runId of runIds) {
+    if (graph.seen[`run:${runId}`] || root.pending.some((hop) => hop.kind === 'run' && hop.runId === runId)) continue
+    root.pending.push({ kind: 'run', runId })
   }
 }
 

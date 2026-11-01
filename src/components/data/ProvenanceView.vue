@@ -16,11 +16,13 @@ import { apiErrorMessage } from '@/lib/api'
 import { folderRoute, objectRoute } from '@/lib/crate/dataIdentity'
 import { splitName } from '@/lib/objectListing'
 import {
+  addWriters,
   chainColumns,
   drawnChain,
   emptyGraph,
   expand,
   intoRecord,
+  linkedBuckets,
   startDataset,
   startFile,
   type Box,
@@ -37,7 +39,7 @@ const props = defineProps<{
   record?: { files: number; path: string; to: RouteLocationRaw | null; runId?: string; where?: string } | null
 }>()
 
-const { getVersionOrigin, getRun, fetchRoCrateRaw, downloadProvenanceCrate, runSparql, sessionEpoch } = useAruna()
+const { getVersionOrigin, getRun, getBucketRuns, fetchRoCrateRaw, downloadProvenanceCrate, runSparql, sessionEpoch } = useAruna()
 
 const readers: Readers = {
   origin: (version) => getVersionOrigin(version),
@@ -76,10 +78,23 @@ watch(
     full.value = false
     Object.assign(graph, emptyGraph())
     if (props.start.kind === 'file') startFile(graph, props.start.id, props.start.name, props.start.origin)
-    else startDataset(graph, props.start.title, props.start.documentId, props.start.crate)
+    else {
+      startDataset(graph, props.start.title, props.start.documentId, props.start.crate)
+      void readWriters(props.start.documentId, props.start.crate)
+    }
   },
   { immediate: true },
 )
+
+// A dataset that names a bucket shows the runs that wrote into it; a node without the lookup adds none.
+async function readWriters(documentId: string, crate: unknown) {
+  const current = fenced()
+  const answers = await Promise.all(linkedBuckets(crate).map((part) => getBucketRuns(part.bucket, part.prefix, part.nodeId).catch(() => null)))
+  const runIds = answers.flatMap((answer) => answer?.runs.map((run) => run.run_id) ?? [])
+  if (!current() || !runIds.length) return
+  addWriters(graph, documentId, runIds)
+  void readDirect()
+}
 
 // The open cards; a run record's results are not read, its card counts them.
 const waiting = (item: Box | undefined) => Boolean(item?.pending.length) && item!.kind !== 'silent' && !(item!.id.startsWith('dataset:') && props.record)
