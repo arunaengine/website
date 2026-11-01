@@ -19,6 +19,8 @@ export interface RunCrateFileRef {
   partOf?: RunCratePart[]
   /** The device the file came from, by its node id. */
   device?: string
+  /** The public source that delivered the bytes of a reference input, such as a mirror. */
+  servedBy?: string
 }
 
 /** A dataset an input belongs to: its bucket's database metadata or a release. */
@@ -151,6 +153,12 @@ function deviceOf(value: unknown, byId: Map<string, Record<string, unknown>>): s
   return device ? stringOf(device.identifier) : undefined
 }
 
+// The node names this property `<file id>#source-served-by`, with the source URL as its value.
+function servedByOf(id: string, value: unknown, byId: Map<string, Record<string, unknown>>): string | undefined {
+  const property = refIdsOf(value).find((ref) => ref === `${id}#source-served-by`)
+  return property ? stringOf(byId.get(property)?.value) : undefined
+}
+
 function fileRef(id: string, byId: Map<string, Record<string, unknown>>): RunCrateFileRef {
   const entity = byId.get(id)
   const parts = refIdsOf(entity?.isPartOf).map((partId) => partOf(partId, byId)).filter((part): part is RunCratePart => part !== null)
@@ -167,6 +175,7 @@ function fileRef(id: string, byId: Map<string, Record<string, unknown>>): RunCra
     version: stringOf(entity?.version),
     partOf: parts.length ? parts : undefined,
     device: deviceOf(entity?.isBasedOn, byId),
+    servedBy: servedByOf(id, entity?.additionalProperty, byId),
   }
 }
 

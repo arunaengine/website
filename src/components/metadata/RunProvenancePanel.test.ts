@@ -128,6 +128,16 @@ describe('RunProvenancePanel', () => {
   })
 })
 
+describe('RunProvenancePanel served inputs', () => {
+  it('names the source that served an input in plain words', async () => {
+    const run = { inputs: [{ id: 'db', name: 'db-light.tar.xz', servedBy: 'https://mirror.example/files/db-light.tar.xz' }], outputs: [] }
+    const mounted = await mountApp(RunProvenancePanel, { props: { run } })
+
+    expect(content(mounted.root)).toContain('Read from mirror.example')
+    mounted.app.unmount()
+  })
+})
+
 describe('RunProvenancePanel record facts', () => {
   it('names the record id and its API address with copy buttons, without a provenance button', async () => {
     const run = { inputs: [], outputs: [], command: 'run.sh' }

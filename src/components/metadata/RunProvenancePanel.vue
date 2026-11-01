@@ -182,6 +182,11 @@ function deviceName(nodeId: string): string {
   return realmNodes.value.find((node) => node.nodeId === nodeId)?.given ?? ''
 }
 
+/** The host of a source URL, or the URL itself when it has none. */
+function sourceHost(url: string): string {
+  return URL.canParse(url) ? new URL(url).host || url : url
+}
+
 function inputNote(row: FileRow): string {
   if (row.device) return `from ${deviceName(row.device) || 'a device'}`
   const group = groupFiles([row], s3.endpoint.value)[0]
@@ -304,6 +309,7 @@ function groupSize(group: FileGroup): string {
                     <span class="truncate">{{ entry.label }}</span>
                   </span>
                   <span v-if="!entry.nested && inputNote(entry.row)" class="mt-0.5 block text-xs text-muted-foreground">{{ inputNote(entry.row) }}</span>
+                  <span v-if="entry.row.servedBy" class="mt-0.5 block text-xs text-muted-foreground" :title="entry.row.servedBy">Read from {{ sourceHost(entry.row.servedBy) }}</span>
                   <span v-if="entry.row.link.kind === 'drs'" class="mt-0.5 flex items-center gap-2 text-xs">
                     <a class="inline-flex items-center gap-1 text-primary hover:underline" :href="entry.row.link.object" target="_blank" rel="noopener noreferrer">Open the object <ExternalLinkIcon class="h-3 w-3" /></a>
                     <a class="inline-flex items-center gap-1 text-primary hover:underline" :href="entry.row.link.download" target="_blank" rel="noopener noreferrer" :aria-label="`Download ${entry.row.name}`"><Download class="h-3 w-3" /> Download</a>

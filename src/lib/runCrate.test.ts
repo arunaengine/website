@@ -29,6 +29,15 @@ describe('run crate', () => {
     expect(run.inputs[0]).toMatchObject({ name: 'bakta-db', identifier: '10.5281/zenodo.14916843', version: '6.0 light' })
   })
 
+  it('reads the source that served an input', () => {
+    const graph = crate['@graph'].map((entity) => (entity['@id'] === 'input-db' ? { ...entity, additionalProperty: [{ '@id': 'input-db#source-served-by' }] } : entity))
+    graph.push({ '@id': 'input-db#source-served-by', '@type': 'PropertyValue', name: 'Served by', value: 'https://mirror.example/db.tar.xz' })
+    const run = parseRunCrate({ '@graph': graph }, 'runs/01EXEC')!
+
+    expect(run.inputs[0]?.servedBy).toBe('https://mirror.example/db.tar.xz')
+    expect(parseRunCrate(crate, 'runs/01EXEC')!.inputs[0]?.servedBy).toBeUndefined()
+  })
+
   it('leaves what the crate does not say unset', () => {
     const graph = crate['@graph'].filter((entity) => !['#execution-site', '#cpu-cores', '#ram-bytes'].includes(entity['@id']))
     const run = parseRunCrate({ '@graph': graph }, 'runs/01EXEC')!
