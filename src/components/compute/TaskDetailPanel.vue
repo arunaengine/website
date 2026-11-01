@@ -39,6 +39,7 @@ import { resolveObjectUrl } from '@/composables/s3/endpoints'
 import { downloadCrateJson } from '@/lib/crateImport'
 import { getLocalRunCrate, requireDevice } from '@/lib/deviceApi'
 import { deleteErrorMessage, formatJobProgress, type JobStatusResponse } from '@/lib/jobs'
+import { groupInputs, type FileGroup } from '@/lib/fileGroups'
 import { POLL_ACTIVE_MS, follow, onWake } from '@/lib/poll'
 import { parseRunCrate, servedSource, sourceHost, type RunCrateModel } from '@/lib/runCrate'
 import {
@@ -449,6 +450,24 @@ function inputLink(url: string | undefined) {
   if (link.kind !== 's3') return null
   const route = bucketRoute(link.bucketId, link.prefix)
   return native.source_node_id ? { ...route, query: { ...route.query, node: native.source_node_id } } : route
+}
+// Inputs of one bucket folder read as one row, as the run record lists them, opened on request.
+const inputGroups = computed(() => groupInputs(task.value?.inputs ?? []))
+const openedInputs = ref(new Set<string>())
+function toggleInputs(key: string) {
+  const next = new Set(openedInputs.value)
+  if (!next.delete(key)) next.add(key)
+  openedInputs.value = next
+}
+function groupLink(group: FileGroup) {
+  if (!group.bucket) return null
+  const route = bucketRoute(group.bucket, group.folder.replace(/\/$/, ''))
+  return group.nodeId ? { ...route, query: { ...route.query, node: group.nodeId } } : route
+}
+// The source a whole group was read from, when every file names the same one.
+function groupSource(urls: (string | undefined)[]): string {
+  const hosts = new Set(urls.map((url) => (readFrom(url) ? sourceHost(readFrom(url)!) : '')))
+  return hosts.size === 1 ? [...hosts][0]! : ''
 }
 // The node holding each output bucket, read from where the run wrote, so its folder opens there.
 const outputNodes = computed(() => new Map((nativeFamily.value?.outputs ?? []).flatMap((output) => {
@@ -1020,8 +1039,23 @@ async function confirmDelete() {
                 <tr><th scope="col" class="h-9 px-3 text-left font-medium">Input</th><th scope="col" class="h-9 px-3 text-left font-medium">From</th></tr>
               </thead>
               <tbody class="divide-y divide-border-subtle">
-                <tr v-for="(input, i) in task.inputs" :key="`${input.path}:${i}`" class="h-10 text-xs">
-                  <td class="max-w-0 px-3 py-1.5"><span class="block truncate font-mono text-foreground" :title="input.path">{{ input.path }}</span></td>
+                <template v-for="entry in inputGroups" :key="entry.group.key">
+                <tr v-if="entry.inputs.length > 1" class="h-10 text-xs">
+                  <td class="max-w-0 px-3 py-1.5">
+                    <button type="button" class="flex max-w-full items-center gap-1 text-left font-mono text-foreground hover:text-primary" :aria-expanded="openedInputs.has(entry.group.key)" :title="entry.mount" @click="toggleInputs(entry.group.key)">
+                      <ChevronRight class="h-3.5 w-3.5 shrink-0 transition-transform" :class="openedInputs.has(entry.group.key) ? 'rotate-90' : ''" aria-hidden="true" />
+                      <span class="truncate">{{ entry.mount || 'Inputs' }}</span>
+                    </button>
+                    <span class="block pl-[1.125rem] text-muted-foreground">{{ entry.inputs.length }} files</span>
+                  </td>
+                  <td class="max-w-0 px-3 py-1.5">
+                    <RouterLink v-if="groupLink(entry.group)" :to="groupLink(entry.group)!" class="block truncate font-mono text-primary hover:underline">{{ entry.group.bucket }}/{{ entry.group.folder }}</RouterLink>
+                    <span v-if="entry.group.nodeId" class="block truncate text-muted-foreground">on {{ displayName(entry.group.nodeId) }}</span>
+                    <span v-if="groupSource(entry.inputs.map((input) => input.url))" class="block truncate text-muted-foreground">Read from {{ groupSource(entry.inputs.map((input) => input.url)) }}</span>
+                  </td>
+                </tr>
+                <tr v-for="(input, i) in entry.inputs.length === 1 || openedInputs.has(entry.group.key) ? entry.inputs : []" :key="`${input.path}:${i}`" class="h-10 text-xs">
+                  <td class="max-w-0 px-3 py-1.5" :class="entry.inputs.length > 1 ? 'pl-8' : ''"><span class="block truncate font-mono text-foreground" :title="input.path">{{ input.path }}</span></td>
                   <td class="max-w-0 px-3 py-1.5">
                     <RouterLink v-if="inputLink(input.url)" :to="inputLink(input.url)!" class="block truncate font-mono text-primary hover:underline" :title="input.url">{{ inputPlace(input.url!).text }}</RouterLink>
                     <span v-else-if="input.url" class="block truncate font-mono text-muted-foreground" :title="input.url">{{ inputPlace(input.url).text }}</span>
@@ -1030,6 +1064,7 @@ async function confirmDelete() {
                     <span v-if="readFrom(input.url)" class="block truncate text-muted-foreground" :title="readFrom(input.url)">Read from {{ sourceHost(readFrom(input.url)!) }}</span>
                   </td>
                 </tr>
+                </template>
               </tbody>
             </table>
           </div>

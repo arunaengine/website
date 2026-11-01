@@ -11,6 +11,7 @@ import { ApiError } from '@/lib/api'
 import * as Jobs from '@/lib/jobs'
 import * as ObjectLinks from '@/lib/assistant/objectLinks'
 import * as Poll from '@/lib/poll'
+import * as FileGroups from '@/lib/fileGroups'
 import * as RunCrate from '@/lib/runCrate'
 import * as Tes from '@/lib/tes'
 import * as Utils from '@/lib/utils'
@@ -353,6 +354,7 @@ function panelModules(
     '@/lib/quickRuntimes': { detectQuickRun: () => false },
     '@/lib/jobs': Jobs,
     '@/lib/poll': Poll,
+    '@/lib/fileGroups': FileGroups,
     '@/lib/runCrate': RunCrate,
     '@/lib/tes': Tes,
     '@/lib/notebook/submit': { sessionRuntime: () => null },
@@ -1326,6 +1328,34 @@ describe('distributed job detail components', () => {
     const quiet = await open(record())
     expect(content(quiet.root)).not.toContain('Read from')
     quiet.app.unmount()
+  })
+
+  it('folds the many files of one bucket folder into one input row until it is opened', async () => {
+    const pin = (key: string) => `arn:aruna:realm-1:node-2:s3/bakta-database/db/${key}@01M69M40GW80DTHHG98J4653CV`
+    const database = Array.from({ length: 66 }, (_, index) => ({ path: `/work/in/db/part-${index}.bin`, url: pin(`part-${index}.bin`) }))
+    const task = {
+      id: 'run',
+      state: 'COMPLETE',
+      executors: [{ image: 'alpine', command: ['sh'] }],
+      inputs: [{ path: '/work/in/genome.fna', url: 's3://genomes/genome.fna' }, ...database],
+      outputs: [],
+      logs: [],
+      tags: {},
+    }
+    const mounted = await mount(taskPanel(vi.fn(async () => task), vi.fn(async () => ({ family: null }))), { taskId: 'run', open: true })
+    await flushPanel()
+    const links = () => findAll(mounted.root, (node) => node.tag === 'a' && Boolean(node.props.to))
+    const [folder] = links().filter((node) => content(node) === 'bakta-database/db/')
+
+    expect(content(mounted.root)).toContain('66 files')
+    expect(folder?.props.to).toMatchObject({ name: 'bucket', params: { bucketId: 'bakta-database' }, query: { prefix: 'db', node: 'node-2' } })
+    expect(links().map(content)).toContain('genomes/genome.fna')
+    expect(content(mounted.root)).not.toContain('part-0.bin')
+
+    await press(mounted.root, '/work/in/db/')
+    expect(content(mounted.root)).toContain('/work/in/db/part-0.bin')
+    expect(links().filter((node) => content(node).startsWith('bakta-database/db/part-'))).toHaveLength(66)
+    mounted.app.unmount()
   })
 
   it('offers a results dataset for a finished run with a record of its results', async () => {

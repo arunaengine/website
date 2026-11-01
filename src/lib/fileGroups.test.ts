@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FOLDER_GROUP_MIN, groupFiles } from './fileGroups'
+import { FOLDER_GROUP_MIN, groupFiles, groupInputs } from './fileGroups'
 import type { RunCrateFileRef } from './runCrate'
 
 const file = (bucket: string, key: string, size?: string, extra: Partial<RunCrateFileRef> = {}): RunCrateFileRef => ({
@@ -48,5 +48,18 @@ describe('run file groups', () => {
       ['new', 'db', 1],
       [null, 'other', 2],
     ])
+  })
+
+  it('groups run inputs as sent by the node and bucket an ARN names, with their shared mount', () => {
+    const pin = (node: string, key: string) => `arn:aruna:realm-1:${node}:s3/bakta-database/${key}@01M69M40GW80DTHHG98J4653CV`
+    const database = Array.from({ length: FOLDER_GROUP_MIN }, (_, index) => ({ path: `/work/in/db/sub/f${index}`, url: pin('node-2', `db/sub/f${index}`) }))
+    const genome = { path: '/work/in/genome.fna', url: 's3://genomes/genome.fna' }
+    const elsewhere = { path: '/work/in/other', url: pin('node-3', 'db/other') }
+    const groups = groupInputs([genome, ...database, elsewhere, { path: '/work/in/inline' }])
+
+    expect(groups.map((group) => group.inputs.length)).toEqual([1, FOLDER_GROUP_MIN, 1, 1])
+    expect(groups[1]).toMatchObject({ mount: '/work/in/db/sub/', group: { bucket: 'bakta-database', nodeId: 'node-2', folder: 'db/sub/' } })
+    expect(groups[1]!.inputs).toEqual(database)
+    expect(groups[2]!.inputs).toEqual([elsewhere])
   })
 })

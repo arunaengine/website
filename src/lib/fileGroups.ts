@@ -1,5 +1,6 @@
 // Run inputs and results as rows: the files of one database collapse into one row, as do the
 // many files of one bucket; a single file stays its own row.
+import { ARUNA_CONTENT_W3ID_PREFIX } from '@/lib/contentIdentity'
 import { parseDataIdentity } from '@/lib/crate/dataIdentity'
 import type { RunCrateFileRef, RunCratePart } from '@/lib/runCrate'
 
@@ -61,5 +62,28 @@ export function groupFiles(files: RunCrateFileRef[], endpoint?: string | null): 
   return [...byKey].flatMap(([key, members]) => {
     if (!key.startsWith('bucket:') || members.length >= FOLDER_GROUP_MIN) return [groupOf(key, members, endpoint)]
     return members.map((file) => groupOf(`file:${file.id}`, [file], endpoint))
+  })
+}
+
+/** Run inputs as sent to the node, in the same groups; `mount` is the container folder they share. */
+export interface InputGroup<T> {
+  group: FileGroup
+  inputs: T[]
+  mount: string
+}
+
+export function groupInputs<T extends { url?: string; path: string }>(inputs: readonly T[]): InputGroup<T>[] {
+  const byRef = new Map<RunCrateFileRef, T>()
+  const refs = inputs.map((input, index) => {
+    const url = input.url ?? ''
+    // An ARN names the node holding the file, read as the content id of a run file.
+    const id = url.startsWith('arn:aruna:') ? `${ARUNA_CONTENT_W3ID_PREFIX}${url}` : `#input-${index}`
+    const ref: RunCrateFileRef = { id, name: input.path, ...(url.startsWith('s3://') ? { contentUrl: url } : {}) }
+    byRef.set(ref, input)
+    return ref
+  })
+  return groupFiles(refs).map((group) => {
+    const members = group.files.map((file) => byRef.get(file)!)
+    return { group, inputs: members, mount: sharedFolder(members.map((input) => input.path)) }
   })
 }
