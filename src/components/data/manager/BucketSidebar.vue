@@ -169,6 +169,10 @@ function databaseOf(name: string, nodeId: string | null): { title: string; datas
   return { title: version && !title.includes(version) ? `${title} ${version}` : title, dataset: row.datasetId, public: row.public }
 }
 
+// A database row says whether it is public; the group's public role covers the others.
+const rowPublic = (name: string, node: string | null) =>
+  Boolean(databaseOf(name, node)?.public) || props.manager.publicAccess.isPublic(node, { kind: 'bucket', bucket: name, key: '' })
+
 // A row passes the node and fact filters; a fact its node has not reported yet does not pass.
 // `nodeId` is null for this node; `nodeIds` are every node of the row by id.
 function passesFilters(name: string, node: string | null, nodeIds: string[], pinned: boolean): boolean {
@@ -176,7 +180,7 @@ function passesFilters(name: string, node: string | null, nodeIds: string[], pin
   const database = databaseOf(name, node)
   const checks: Record<Fact, () => boolean> = {
     pinned: () => pinned,
-    public: () => Boolean(database?.public) || props.manager.publicAccess.isPublic(node, { kind: 'bucket', bucket: name, key: '' }),
+    public: () => rowPublic(name, node),
     dataset: () => Boolean(database?.dataset),
     // Read in place is checked per page, as it reads each bucket's usage from its node.
     inPlace: () => true,
@@ -500,6 +504,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                 v-if="row.hit"
                 :bucket="row.bucket"
                 :database="Boolean(databaseOf(row.bucket, row.hit.node_id))"
+                :is-public="rowPublic(row.bucket, row.hit.node_id)"
                 :parts="usage.partsOf(row.bucket, usageNode(row.hit.node_id))"
                 :pinned="row.pinned"
                 option
@@ -525,6 +530,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                 :bucket="row.bucket"
                 :node-id="row.nodeId"
                 :database="Boolean(databaseOf(row.bucket, row.nodeId))"
+                :is-public="rowPublic(row.bucket, row.nodeId)"
                 :parts="usage.partsOf(row.bucket, usageNode(row.nodeId))"
                 pinned
                 option
@@ -582,6 +588,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                   :bucket="entry.bucket"
                   option
                   :database="Boolean(databaseOf(entry.bucket, entry.nodeId ?? null))"
+                  :is-public="rowPublic(entry.bucket, entry.nodeId ?? null)"
                   :parts="usage.partsOf(entry.bucket, usageNode(entry.nodeId ?? null))"
                   :highlighted="entryIndex(entry) === activeIndex"
                   :node-id="entry.nodeId"

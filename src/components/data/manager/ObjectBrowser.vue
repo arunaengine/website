@@ -291,12 +291,15 @@ function publicTargets(): PublicTarget[] {
   ]
 }
 
+// A public bucket is marked once in its header; entries are marked only inside a private bucket.
+const bucketPublic = computed(() => publicAccess.isPublic(remoteNodeId.value, { kind: 'bucket', bucket: bucket.value, key: '' }))
+
 function filePublic(key: string): boolean {
-  return publicAccess.isPublic(remoteNodeId.value, { kind: 'file', bucket: bucket.value, key })
+  return !bucketPublic.value && publicAccess.isPublic(remoteNodeId.value, { kind: 'file', bucket: bucket.value, key })
 }
 
 function folderPublic(prefix: string): boolean {
-  return publicAccess.isPublic(remoteNodeId.value, { kind: 'folder', bucket: bucket.value, key: prefix })
+  return !bucketPublic.value && publicAccess.isPublic(remoteNodeId.value, { kind: 'folder', bucket: bucket.value, key: prefix })
 }
 
 // With the notebooks flag a notebook row stands out and opens the notebook
@@ -651,7 +654,7 @@ async function onDrop(event: DragEvent) {
         </template>
       </SectionHeading>
       <!-- One card for every bucket: its source, sync and size; the slot adds what is wrong. -->
-      <DatabaseHeader :bucket="bucket" :node-id="remoteNodeId" :set-id="setId" :synced-with="syncPartners">
+      <DatabaseHeader :bucket="bucket" :node-id="remoteNodeId" :set-id="setId" :synced-with="syncPartners" :is-public="bucketPublic">
         <template v-if="syncPartners.length">
           <StatusPill v-if="syncProblem" :state="syncProblem" />
           <span v-else class="inline-flex items-center gap-1.5">

@@ -90,6 +90,7 @@ const RowStub = defineComponent({
     nodes: { type: Array, default: () => [] },
     placeNode: { type: String, default: null },
     syncedWith: { type: Array, default: () => [] },
+    isPublic: Boolean,
   },
   emits: ['open', 'toggle-pin'],
   setup: (props, { slots, emit }) => () =>
@@ -101,6 +102,7 @@ const RowStub = defineComponent({
       ),
       h('span', { role: 'tooltip' }, slots.tooltip?.()),
       props.database ? h('i', { 'data-testid': 'database-icon' }, `${props.bucket} is a database`) : null,
+      props.isPublic ? h('i', { 'data-testid': 'public-mark' }, props.bucket) : null,
       props.subtitle ? h('small', { 'data-testid': 'row-subtitle' }, `${props.bucket}: ${props.subtitle}`) : null,
       props.parts ? h('small', { 'data-testid': 'row-facts' }, `${props.bucket}: ${[props.parts.files, props.parts.stored, props.parts.referenced].filter(Boolean).join(' | ')}`) : null,
       props.nodes.length ? h('small', { 'data-testid': 'row-nodes' }, `${props.bucket}: ${props.nodes.join(', ')}`) : null,
@@ -1025,6 +1027,12 @@ describe('bucket filters', () => {
 
     await pick(root, 'menuitemcheckbox', 'Read in place')
     expect(opened(root)).toEqual(['refseq'])
+  })
+
+  it('marks the public buckets on their rows', async () => {
+    const root = await mounted()
+    const marked = nodes(root).filter((node) => node.props['data-testid'] === 'public-mark').map((node) => content(node))
+    expect(marked).toEqual(['bakta-database', 'images'])
   })
 
   it('reads usage for read in place only for the rows of the current page', async () => {

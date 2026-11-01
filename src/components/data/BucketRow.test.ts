@@ -97,6 +97,13 @@ describe('BucketRow lines and marks', () => {
     expect(nodes(unlinked).some((node) => node.props['aria-label'] === 'Link a local folder')).toBe(true)
   })
 
+  it('marks a public bucket with its own icon before the place', async () => {
+    const root = await mount({ isPublic: true, nodeId: 'node-2' })
+    expect(marks(root)).toEqual(['Public', 'Stored on node-2'])
+    expect(content(root)).toContain('Everyone can read this bucket')
+    expect(marks(await mount({ nodeId: 'node-2' }))).toEqual(['Stored on node-2'])
+  })
+
   it('keeps the pin with the row actions, always visible', async () => {
     const root = await mount({ nodeId: 'node-2' })
     const pin = nodes(root).find((node) => node.props['aria-label'] === 'Pin genes')!

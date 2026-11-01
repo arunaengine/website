@@ -5,7 +5,7 @@ import Tooltip from '@/components/ui/Tooltip.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import type { BucketJob } from '@/lib/api'
 import type { UsageParts } from '@/composables/useBucketUsage'
-import { Database, Files, FolderSync, HardDrive, Link2, Network, Package, Pin, Server, TriangleAlert } from '@lucide/vue'
+import { Database, Files, FolderSync, Globe, HardDrive, Link2, Network, Package, Pin, Server, TriangleAlert } from '@lucide/vue'
 import { computed, onMounted, ref, watch, type Component } from 'vue'
 import { RouterLink } from 'vue-router'
 
@@ -55,6 +55,8 @@ const props = withDefaults(
     placeNode?: string | null
     /** Desktop: the linked folder's name; null for a bucket without a link. */
     linkedTo?: string | null
+    /** A public role lets everyone read the whole bucket. */
+    isPublic?: boolean
   }>(),
   {
     nodeId: null,
@@ -77,6 +79,7 @@ const props = withDefaults(
     place: null,
     placeTitle: null,
     placeNode: null,
+    isPublic: false,
   },
 )
 
@@ -98,6 +101,7 @@ interface Mark {
 }
 const marks = computed<Mark[]>(() => {
   const list: Mark[] = []
+  if (props.isPublic) list.push({ id: 'public', icon: Globe, tooltip: 'Public', heading: 'Public', links: [], note: 'Everyone can read this bucket' })
   if (props.linkedTo) {
     list.push({ id: 'sync', icon: FolderSync, tooltip: 'Synced with this computer', heading: 'Synced with this computer', links: [], note: `Folder ${props.linkedTo}` })
   } else if (props.synced) {

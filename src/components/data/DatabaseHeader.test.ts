@@ -52,6 +52,9 @@ describe('database header', () => {
       const plain = await renderToString(createSSRApp(DatabaseHeader, { bucket: 'indexes', nodeId: null }))
       expect(plain.replace(/<[^>]+>/g, ' ')).toContain('indexes')
       expect(plain).not.toContain('Open the license')
+      expect(plain.replace(/<[^>]+>/g, ' ')).not.toContain('Public')
+      const open = await renderToString(createSSRApp(DatabaseHeader, { bucket: 'indexes', nodeId: null, isPublic: true }))
+      expect(open.replace(/<[^>]+>/g, ' ')).toContain('Public')
     } finally {
       found = entry
     }

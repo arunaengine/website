@@ -1097,6 +1097,18 @@ describe('object browser public access', () => {
     expect(marked(fileRow)).toBe(true)
     expect(marked(folderRow)).toBe(false)
   })
+
+  it('marks a public bucket once in its header, not on its entries', async () => {
+    const root = await render({
+      folders: ref([listedFolder]),
+      publicAccess: { isPublic: () => true },
+    })
+
+    const header = element(root, (node) => node.tag === 'section' && 'is-public' in node.props)
+    expect(header.props['is-public']).toBe(true)
+    const marked = nodes(root).some((node) => String(node.props.title ?? '').startsWith('Everyone can read'))
+    expect(marked).toBe(false)
+  })
 })
 
 describe('object browser name filter', () => {

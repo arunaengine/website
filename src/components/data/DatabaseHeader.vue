@@ -11,7 +11,7 @@ import { useDatabases } from '@/composables/useDatabases'
 import { identifierUrl } from '@/lib/databases'
 import { licenseText, licenseUrl } from '@/lib/licenses'
 import { cn, isHttpUrl } from '@/lib/utils'
-import { Database, ExternalLink, FileText, FolderSync, Package, Scale } from '@lucide/vue'
+import { Database, ExternalLink, FileText, FolderSync, Globe, Package, Scale } from '@lucide/vue'
 
 const props = withDefaults(
   defineProps<{
@@ -22,6 +22,8 @@ const props = withDefaults(
     bare?: boolean
     /** The nodes this bucket syncs with, linked in the title. */
     syncedWith?: { id: string; name: string }[]
+    /** A public role lets everyone read the whole bucket. */
+    isPublic?: boolean
   }>(),
   { setId: undefined, syncedWith: () => [] },
 )
@@ -30,6 +32,7 @@ const databases = useDatabases()
 onMounted(() => databases.ensure())
 
 const entry = computed(() => databases.find(props.bucket, props.nodeId, props.setId))
+const shownPublic = computed(() => Boolean(entry.value?.public || props.isPublic))
 // Everything but the flag, the rules and the dataset link comes from the linked dataset.
 const described = computed(() => entry.value?.description ?? null)
 const title = computed(() => {
@@ -78,9 +81,9 @@ const identifiers = computed(() => (described.value?.identifiers ?? []).map((ite
           @click="descriptionOpen = !descriptionOpen"
         >{{ descriptionOpen ? 'Less' : 'More' }}</button>
       </p>
-      <p v-if="$slots.default || entry?.public || identifiers.length" class="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      <p v-if="$slots.default || shownPublic || identifiers.length" class="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <slot />
-        <span v-if="entry?.public">Public</span>
+        <span v-if="shownPublic" class="inline-flex items-center gap-1.5" title="Everyone can read this bucket"><Globe class="h-3.5 w-3.5" aria-hidden="true" />Public</span>
         <span v-for="item in identifiers" :key="`${item.name}:${item.value}`">{{ item.name }} <ExternalLinkText :href="item.url" :label="item.value" :show-icon="false" class="font-mono" /></span>
       </p>
     </div>
