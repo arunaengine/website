@@ -32,7 +32,7 @@ const settledEmpty = computed(() => {
       <LinkedDatasets
         v-if="all"
         heading="All datasets"
-        :target="{ bucket: target.bucket, key: target.key, folder: false, node: null }"
+        :target="{ bucket: target.bucket, key: target.key, folder: false, node: target.node ?? null }"
       />
       <template v-else>
         <ul class="space-y-1 text-xs">

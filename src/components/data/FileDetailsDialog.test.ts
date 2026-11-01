@@ -209,6 +209,23 @@ describe('file details storage tab', () => {
     expect(headObject).toHaveBeenCalledTimes(2)
   })
 
+  it('drops the error of the node asked before the bucket node was known and shows the origin', async () => {
+    const shown = VueRuntime.reactive<Record<string, unknown>>({ nodeId: null })
+    headObject.mockRejectedValueOnce(new Error('The node refused the request with the code NotFound.'))
+    const host = defineComponent({
+      setup: () => () => h(dialog, { open: true, tab: 'general', bucket: 'laptop', objectKey: 'raw/a.fastq', name: 'a.fastq', groupId: 'g-1', ...shown }),
+    })
+    const { root } = await mountApp(host)
+    await flush()
+    expect(content(root)).toContain('code NotFound')
+
+    shown.nodeId = 'node-2'
+    await flush()
+    expect(content(root)).not.toContain('code NotFound')
+    expect(content(root)).toContain('origin of this version')
+    expect(content(root)).toContain('datasets this file is part of')
+  })
+
   it('puts the rules beside the copies of the chosen version', async () => {
     const text = await render('storage')
 

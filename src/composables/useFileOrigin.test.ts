@@ -27,10 +27,20 @@ describe('file origin', () => {
     aruna.getFileOrigin.mockResolvedValue(answer('v1'))
     const { asked, found, scope } = start()
     await vi.waitFor(() => expect(found.state.value).toBe('ready'))
-    expect(aruna.getFileOrigin).toHaveBeenLastCalledWith('lab', { key: 'raw/a.fq' })
+    expect(aruna.getFileOrigin).toHaveBeenLastCalledWith('lab', { key: 'raw/a.fq' }, undefined, null)
 
     asked.value = { ...target, versionId: 'v0' }
-    await vi.waitFor(() => expect(aruna.getFileOrigin).toHaveBeenLastCalledWith('lab', { key: 'raw/a.fq', version_id: 'v0' }))
+    await vi.waitFor(() => expect(aruna.getFileOrigin).toHaveBeenLastCalledWith('lab', { key: 'raw/a.fq', version_id: 'v0' }, undefined, null))
+    scope.stop()
+  })
+
+  it('asks the node that holds the bucket, again when that node becomes known', async () => {
+    aruna.getFileOrigin.mockResolvedValue(answer('v1'))
+    const { asked, found, scope } = start()
+    await vi.waitFor(() => expect(found.state.value).toBe('ready'))
+
+    asked.value = { ...target, node: 'n2' }
+    await vi.waitFor(() => expect(aruna.getFileOrigin).toHaveBeenLastCalledWith('lab', { key: 'raw/a.fq' }, undefined, 'n2'))
     scope.stop()
   })
 

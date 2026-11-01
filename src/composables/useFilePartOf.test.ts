@@ -31,8 +31,18 @@ describe('file part of', () => {
     const { part, scope } = start()
     await vi.waitFor(() => expect(part.state.value).toBe('ready'))
 
-    expect(aruna.getFilePartOf).toHaveBeenCalledWith('lab', 'raw/a.fq')
+    expect(aruna.getFilePartOf).toHaveBeenCalledWith('lab', 'raw/a.fq', undefined, null)
     expect(part.found.value?.more).toBe(true)
+    scope.stop()
+  })
+
+  it('asks the node that holds the bucket, again when that node becomes known', async () => {
+    aruna.getFilePartOf.mockResolvedValue(answer(['d1']))
+    const { asked, part, scope } = start()
+    await vi.waitFor(() => expect(part.state.value).toBe('ready'))
+
+    asked.value = { ...target, node: 'n2' }
+    await vi.waitFor(() => expect(aruna.getFilePartOf).toHaveBeenLastCalledWith('lab', 'raw/a.fq', undefined, 'n2'))
     scope.stop()
   })
 

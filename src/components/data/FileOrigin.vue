@@ -51,8 +51,9 @@ const startId = computed(() => {
   const realm = realmInfo.value?.realm_id
   if (!answer) return null
   if (answer.global_id) return answer.global_id
-  if (!realm || !localNodeId.value) return null
-  return `${ARUNA_CONTENT_W3ID_PREFIX}${versionObjectId(realm, localNodeId.value, props.target.bucket, props.target.key, answer.version_id)}`
+  const node = props.target.node ?? localNodeId.value
+  if (!realm || !node) return null
+  return `${ARUNA_CONTENT_W3ID_PREFIX}${versionObjectId(realm, node, props.target.bucket, props.target.key, answer.version_id)}`
 })
 // One start object per answer, so a re-render keeps what the view has read.
 const start = computed<ProvenanceStart | null>(() => {
@@ -68,7 +69,7 @@ async function download() {
   try {
     const name = props.target.key.split('/').pop() || props.target.key
     const anchor = document.createElement('a')
-    anchor.href = await s3.downloadUrl(props.target.bucket, props.target.key, null, version, name)
+    anchor.href = await s3.downloadUrl(props.target.bucket, props.target.key, props.target.node ?? null, version, name)
     anchor.download = name
     anchor.rel = 'noopener'
     document.body.append(anchor)

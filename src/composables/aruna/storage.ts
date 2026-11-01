@@ -127,9 +127,9 @@ export function resolveVersion(realmId: string, versionId: string, signal?: Abor
   return requestResolve(realmId, versionId, refreshContext().client, signal)
 }
 
-/** The datasets whose linked parts contain a file of a bucket on this node. */
-export function getFilePartOf(bucket: string, key: string, signal?: AbortSignal): Promise<PartOfResponse> {
-  return requestPartOf(bucket, key, refreshContext().client, signal)
+/** The datasets whose linked parts contain a file of a bucket on one node, this one unless named. */
+export async function getFilePartOf(bucket: string, key: string, signal?: AbortSignal, nodeId?: string | null): Promise<PartOfResponse> {
+  return requestPartOf(bucket, key, nodeId ? await nodeClientReady(nodeId, undefined, signal) : refreshContext().client, signal)
 }
 
 /** The incoming syncs and storage folders of a bucket on one node, this one unless named. */

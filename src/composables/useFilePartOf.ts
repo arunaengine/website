@@ -10,6 +10,8 @@ export type PartOfState = 'loading' | 'ready' | 'missing' | 'failed'
 export interface PartOfTarget {
   bucket: string
   key: string
+  /** The node that holds the bucket; this node when absent. */
+  node?: string | null
 }
 
 export function useFilePartOf(target: Ref<PartOfTarget | null>) {
@@ -31,7 +33,7 @@ export function useFilePartOf(target: Ref<PartOfTarget | null>) {
     }
     state.value = 'loading'
     try {
-      const answer = await getFilePartOf(asked.bucket, asked.key)
+      const answer = await getFilePartOf(asked.bucket, asked.key, undefined, asked.node ?? null)
       if (run !== runs || epoch !== sessionEpoch.value) return
       found.value = answer
       state.value = 'ready'
@@ -44,7 +46,7 @@ export function useFilePartOf(target: Ref<PartOfTarget | null>) {
   }
 
   // Separate sources compare by value, so a new target object for the same file asks nothing.
-  const sources = [() => target.value?.bucket, () => target.value?.key, () => sessionEpoch.value]
+  const sources = [() => target.value?.bucket, () => target.value?.key, () => target.value?.node, () => sessionEpoch.value]
   watch(sources, () => void load(), { immediate: true })
 
   return { found, state, error, reload: load }

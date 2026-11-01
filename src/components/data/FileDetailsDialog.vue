@@ -123,18 +123,19 @@ const notebookLink = computed(() => !remote.value && !pinnedVersion.value && pro
   : null)
 
 async function loadHead() {
+  // A deep link opens before the bucket's node is known; that node's answer replaces this one.
+  const seq = ++headSeq
+  headError.value = null
+  headBusy.value = false
   if (!props.objectKey || remote.value || mock.value) return
   // A folder may have a marker object that carries metadata, such as a folder row of a list import.
   if (props.folder) {
-    const seq = ++headSeq
     const marker = props.objectKey.endsWith('/') ? props.objectKey : `${props.objectKey}/`
     const response = await s3.headObject(props.bucket, marker, props.nodeId ?? null).catch(() => null)
     if (seq === headSeq) head.value = response ? { metadata: response.metadata } : null
     return
   }
-  const seq = ++headSeq
   headBusy.value = true
-  headError.value = null
   try {
     const response = await s3.headObject(props.bucket, props.objectKey, props.nodeId ?? null)
     if (seq !== headSeq) return
@@ -264,7 +265,7 @@ async function loadReferences() {
 }
 
 watch(
-  () => [props.open, props.bucket, props.objectKey, props.revision, props.versionId],
+  () => [props.open, props.bucket, props.objectKey, props.nodeId, props.revision, props.versionId],
   () => {
     pinnedVersion.value = props.versionId ?? null
     if (props.open) {
@@ -485,15 +486,15 @@ const generalItems = computed<Detail[]>(() => [
         </div>
         <ObjectMetadata v-if="head?.metadata" class="mt-4" :metadata="head.metadata" />
         <FileOrigin
-          v-if="props.open && !mock && !remote && !props.folder"
+          v-if="props.open && !mock && !props.folder"
           class="mt-4"
-          :target="{ bucket: props.bucket, key: props.objectKey, versionId: pinnedVersion }"
+          :target="{ bucket: props.bucket, key: props.objectKey, versionId: pinnedVersion, node: props.nodeId ?? null }"
           @origin="(value) => (origin = value)"
         />
         <FilePartOf
-          v-if="props.open && !mock && !remote && !props.folder"
+          v-if="props.open && !mock && !props.folder"
           class="mt-4"
-          :target="{ bucket: props.bucket, key: props.objectKey }"
+          :target="{ bucket: props.bucket, key: props.objectKey, node: props.nodeId ?? null }"
         />
         <LinkedDatasets
           v-if="props.open && !mock && !remote && props.folder"

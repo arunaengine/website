@@ -12,6 +12,8 @@ export interface OriginTarget {
   key: string
   /** A version chosen in the version list; the current version when absent. */
   versionId: string | null
+  /** The node that holds the bucket; this node when absent. */
+  node?: string | null
 }
 
 export function useFileOrigin(target: Ref<OriginTarget | null>) {
@@ -23,7 +25,7 @@ export function useFileOrigin(target: Ref<OriginTarget | null>) {
 
   watch(
     // Separate sources compare by value, so a new target object for the same file asks nothing.
-    [() => target.value?.bucket, () => target.value?.key, () => target.value?.versionId, () => sessionEpoch.value],
+    [() => target.value?.bucket, () => target.value?.key, () => target.value?.versionId, () => target.value?.node, () => sessionEpoch.value],
     async () => {
       const asked = target.value
       const run = ++runs
@@ -36,7 +38,7 @@ export function useFileOrigin(target: Ref<OriginTarget | null>) {
       }
       state.value = 'loading'
       try {
-        const answer = await getFileOrigin(asked.bucket, { key: asked.key, ...(asked.versionId ? { version_id: asked.versionId } : {}) })
+        const answer = await getFileOrigin(asked.bucket, { key: asked.key, ...(asked.versionId ? { version_id: asked.versionId } : {}) }, undefined, asked.node ?? null)
         if (run !== runs || epoch !== sessionEpoch.value) return
         origin.value = answer
         state.value = 'ready'
