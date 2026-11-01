@@ -45,6 +45,8 @@ export interface NavOptions {
   assistant?: boolean
   /** The user's feature switches; without it every feature is shown. */
   shown?: (feature: PortalFeature) => boolean
+  /** Signed out on the web: only the sections that work without a session. */
+  visitor?: boolean
 }
 
 /** One Compute entry as soon as either compute plane answers; the view degrades per flag. */
@@ -64,6 +66,7 @@ function adminItems(options: NavOptions): NavItem[] {
 export function navEntries(options: NavOptions): NavEntry[] {
   const admin = adminItems(options)
   const shown = options.shown ?? (() => true)
+  if (options.visitor) return visitorEntries(shown)
   return [
     {
       to: '/app',
@@ -90,6 +93,18 @@ export function navEntries(options: NavOptions): NavEntry[] {
     { to: '/app/settings', icon: Settings, label: 'Settings' },
     { to: '/app/docs/v1', icon: BookOpen, label: 'Docs', match: ['/app/docs'] },
     ...(admin.length ? [navSeparator, ...admin] : []),
+  ]
+}
+
+// Public data, datasets, profiles and the docs; everything else needs a session.
+function visitorEntries(shown: (feature: PortalFeature) => boolean): NavEntry[] {
+  return [
+    { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true, primary: true },
+    { to: '/app/buckets', icon: Boxes, label: 'Data', primary: true },
+    { to: '/app/datasets', icon: FileJson2, label: 'Datasets', match: ['/app/datasets'], primary: true },
+    ...(shown('profiles') ? [{ to: '/app/profiles', icon: ListChecks, label: 'Profiles', primary: true }] : []),
+    navSeparator,
+    { to: '/app/docs/v1', icon: BookOpen, label: 'Docs', match: ['/app/docs'] },
   ]
 }
 

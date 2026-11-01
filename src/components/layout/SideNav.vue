@@ -3,6 +3,7 @@ import AppLogo from '@/components/layout/AppLogo.vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { useAuth } from '@/composables/useAuth'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { assistantAvailable } from '@/composables/assistantState'
 import { isDesktop } from '@/lib/desktop'
@@ -14,7 +15,8 @@ import { useMediaQuery } from '@vueuse/core'
 // without them the sidebar builds the portal's own from the one definition.
 const props = defineProps<{ items?: NavEntry[]; backLink?: boolean }>()
 
-const { isRealmAdmin, canInspectUsers } = useAruna()
+const { currentUser, isRealmAdmin, canInspectUsers } = useAruna()
+const { authPending } = useAuth()
 const { shown } = usePortalFeatures()
 
 // The shell has no landing page to go back to.
@@ -29,6 +31,7 @@ const items = computed<NavEntry[]>(
       canInspectUsers: canInspectUsers.value,
       assistant: assistantAvailable.value,
       shown,
+      visitor: !currentUser.value && !authPending.value,
     }),
 )
 const showBackLink = computed(() => props.backLink ?? !desktop)

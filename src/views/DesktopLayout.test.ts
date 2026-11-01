@@ -12,6 +12,8 @@ const permissions = {
   isRealmAdmin: ref(false),
   canInspectUsers: ref(false),
   isManagementNode: ref(false),
+  currentUser: ref({ id: 'u1' }),
+  authToken: ref('t'),
 }
 const probeRealm = vi.fn(async () => undefined)
 const appQuit = vi.fn(async () => undefined)

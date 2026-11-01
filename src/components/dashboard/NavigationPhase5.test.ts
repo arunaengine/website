@@ -10,6 +10,8 @@ const permissions = {
   canInspectUsers: ref(false),
   isManagementNode: ref(false),
 }
+// A signed-in session; the visitor list has its own test.
+const session = { currentUser: ref({ id: 'u1' }), authToken: ref('t') }
 const enabledFeatures = new Set(['tes', 'jobs'])
 const portalConfig = () => ({
   apiBaseUrl: '/api/v1',
@@ -35,7 +37,7 @@ beforeAll(async () => {
     RouterLink: RouterLinkStub,
     useRoute: () => route,
   }))
-  vi.doMock('@/composables/useAruna', () => ({ useAruna: () => permissions }))
+  vi.doMock('@/composables/useAruna', () => ({ useAruna: () => ({ ...permissions, ...session }) }))
   vi.doMock('@/composables/usePortalFeatures', () => ({ usePortalFeatures: () => ({ shown: () => true }) }))
   vi.doMock('@/lib/config', () => ({
     featureEnabled: (flag: string) => enabledFeatures.has(flag),

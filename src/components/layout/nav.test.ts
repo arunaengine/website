@@ -69,3 +69,18 @@ describe('navigation feature switches', () => {
     expect(navItemActive(compute, '/app/buckets', true)).toBe(true)
   })
 })
+
+describe('visitor navigation', () => {
+  const visitorPaths = (hidden: PortalFeature[] = []) =>
+    navEntries({ desktop: false, isRealmAdmin: true, canInspectUsers: true, assistant: true, visitor: true, shown: (feature) => !hidden.includes(feature) })
+      .filter((entry): entry is NavItem => !('separator' in entry))
+      .map((entry) => entry.to)
+
+  it('offers only the sections that work signed out', () => {
+    expect(visitorPaths()).toEqual(['/app', '/app/buckets', '/app/datasets', '/app/profiles', '/app/docs/v1'])
+  })
+
+  it('still follows the feature switches', () => {
+    expect(visitorPaths(['profiles'])).not.toContain('/app/profiles')
+  })
+})
