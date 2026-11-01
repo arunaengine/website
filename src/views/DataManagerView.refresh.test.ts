@@ -51,6 +51,7 @@ const children = [
   'data/manager/DistributionBanner',
   'data/manager/ObjectBrowser',
   'data/manager/UploadPanel',
+  'data/VisitorData',
   'notebook/NewNotebookDialog',
 ]
 
@@ -296,5 +297,22 @@ describe('Data view on another node', () => {
     booted.value = false
     endpoint.value = null
     viewWidth.value = 0
+  })
+})
+
+describe('Data view for a visitor', () => {
+  it('shows the public browser instead of a sign-in wall, with or without an S3 endpoint', async () => {
+    manager = fakeManager(null)
+    user.value = null
+    booted.value = true
+    endpoint.value = null
+    const { root, app } = await mountApp(DataManagerView)
+    const stubs = (name: string) => nodes(root).filter((node) => node.props['data-stub'] === name)
+
+    expect(stubs('VisitorData')).toHaveLength(1)
+    expect(stubs('BucketSidebar')).toHaveLength(0)
+    expect(content(root)).not.toContain('Sign in to browse data')
+    app.unmount()
+    booted.value = false
   })
 })

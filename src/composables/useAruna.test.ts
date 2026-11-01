@@ -821,7 +821,9 @@ describe('initial refresh coordination', () => {
     const second = aruna.refresh()
 
     expect(second).toBe(first)
-    expect(vi.mocked(apiRequest)).toHaveBeenCalledTimes(6)
+    // Signed out, the usage read that needs a session is left out.
+    expect(vi.mocked(apiRequest)).toHaveBeenCalledTimes(5)
+    expect(vi.mocked(apiRequest).mock.calls.map(([path]) => path)).not.toContain('/system/usage')
     release()
     await first
   })
