@@ -86,10 +86,12 @@ describe('classifyPath', () => {
     const folderTargets = { workdir: '/work', inputs: [], inputDirs: ['/work/in/ui-list'], outputs: [] }
     expect(classifyPath('/work/in/ui-list/*', folderTargets)).toMatchObject({ kind: 'input-folder', label: 'in input folder', fix: null })
     expect(classifyPath('/work/in/ui-list/', folderTargets)).toMatchObject({ kind: 'input-folder', label: 'input folder' })
+    expect(classifyPath('/work/in/ui-list', folderTargets)).toMatchObject({ kind: 'input-folder', label: 'input folder', fix: null })
   })
 
   it('counts the inputs staged in a folder that is read whole', () => {
     expect(classifyPath('/work/in/', targets).label).toBe('2 inputs')
+    expect(classifyPath('/work/in', targets).label).toBe('2 inputs')
   })
 })
 

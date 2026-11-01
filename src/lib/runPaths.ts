@@ -78,6 +78,8 @@ function folderOf(path: string): string {
 /** Where one container path stands: covered by the run, or still unassigned. */
 export function classifyPath(path: string, targets: RunPathTargets): RunPathCheck {
   const isDir = path.endsWith('/')
+  // A folder named without its trailing slash, such as `ls /work/in/db`.
+  const asDir = isDir ? path : `${path}/`
   if (targets.scriptPath && path === targets.scriptPath.trim()) {
     return { path, kind: 'script', label: 'script', fix: null }
   }
@@ -93,17 +95,15 @@ export function classifyPath(path: string, targets: RunPathTargets): RunPathChec
   if (targets.outputs.some((output) => output.trim() === path)) {
     return { path, kind: 'captured', label: 'captured', fix: null }
   }
-  if (isDir) {
-    const staged = targets.inputs.filter((input) => folderOf(input.trim()) === path).length
-    if (staged) {
-      return { path, kind: 'input-folder', label: `${staged} input${staged === 1 ? '' : 's'}`, fix: null }
-    }
+  const staged = targets.inputs.filter((input) => folderOf(input.trim()) === asDir).length
+  if (staged) {
+    return { path, kind: 'input-folder', label: `${staged} input${staged === 1 ? '' : 's'}`, fix: null }
   }
   const inputFolder = (targets.inputDirs ?? [])
     .map((dir) => dir.trim().replace(/\/*$/, '/'))
-    .find((dir) => path === dir || path.startsWith(dir))
+    .find((dir) => asDir === dir || path.startsWith(dir))
   if (inputFolder) {
-    return { path, kind: 'input-folder', label: path === inputFolder ? 'input folder' : 'in input folder', fix: null }
+    return { path, kind: 'input-folder', label: asDir === inputFolder ? 'input folder' : 'in input folder', fix: null }
   }
   const inputDir = `${normWorkdir(targets.workdir)}/in/`
   if (path.startsWith(inputDir)) {
