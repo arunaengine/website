@@ -13,6 +13,8 @@ import Progress from '@/components/ui/Progress.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import JobDetailPanel from '@/components/jobs/JobDetailPanel.vue'
 import { useJobsList } from '@/composables/useJobs'
+import { useAruna } from '@/composables/useAruna'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useRefresh } from '@/composables/useRefresh'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 import {
@@ -48,7 +50,14 @@ function closeJob() {
   else void router.push({ name: 'compute', query: { tab: 'jobs' } })
 }
 
-const list = useJobsList()
+// Each node lists only the jobs it runs, such as the imports of the buckets it holds.
+const { authToken } = useAruna()
+const { targets: realmNodes } = useRealmNodes()
+const list = useJobsList({
+  others: () => realmNodes.value
+    .filter((node) => !node.isLocal && node.apiBase)
+    .map((node) => ({ baseUrl: node.apiBase!, token: authToken.value })),
+})
 const {
   jobs,
   listState,

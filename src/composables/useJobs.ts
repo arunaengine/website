@@ -91,6 +91,8 @@ export interface JobsListOptions {
   pollWhile?: () => boolean
   /** API holding these jobs; defaults to the realm the portal talks to. */
   client?: JobClient
+  /** The other nodes of the realm; each lists only its own jobs, so page one reads them too. */
+  others?: () => ApiClientOptions[]
 }
 
 // Per-instance list state; call from setup. The jobs view and the staging
@@ -140,9 +142,17 @@ export function useJobsList(options: JobsListOptions = {}) {
     if (!silent) refreshing.value = true
     if (!silent && !jobs.value.length) listState.value = 'loading'
     try {
-      const page = await listJobs({ limit: pageSize, state: stateFilter.value || undefined }, resolveClient())
+      const params = { limit: pageSize, state: stateFilter.value || undefined }
+      // A list pointed at another API, such as a device, has no realm nodes to add.
+      const others = resolveClient === client ? (options.others?.() ?? []) : []
+      const [page, ...remote] = await Promise.all([
+        listJobs(params, resolveClient()),
+        ...others.map((other) => listJobs(params, other).catch(() => null)),
+      ])
       if (id !== requestId) return
-      jobs.value = page.jobs
+      const known = new Set(page.jobs.map((job) => job.job_id))
+      const added = remote.flatMap((other) => other?.jobs ?? []).filter((job) => !known.has(job.job_id) && known.add(job.job_id))
+      jobs.value = added.length ? [...page.jobs, ...added].sort((a, b) => b.created_at.localeCompare(a.created_at)) : page.jobs
       nextCursor.value = page.next_cursor ?? null
       pagesLoaded.value = 1
       moreError.value = null
