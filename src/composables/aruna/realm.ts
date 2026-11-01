@@ -62,7 +62,8 @@ export async function loadInfo(context = refreshContext()) {
   const [info, realm, usage, descriptor] = await Promise.allSettled([
     apiRequest<InfoResponse>('/system/info', {}, context.client),
     apiRequest<RealmInfoResponse>('/system/realm', {}, context.client),
-    apiRequest<UsageResponse>('/system/usage', {}, context.client),
+    // Usage needs a session, so a visitor never asks for it.
+    context.client.token ? apiRequest<UsageResponse>('/system/usage', {}, context.client) : Promise.reject(new Error('Signed out')),
     // The federation name; a realm without federation settings answers 404.
     apiRequest<Signed<RealmDescriptor>>('/system/realm/descriptor', {}, context.client),
   ])

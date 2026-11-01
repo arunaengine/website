@@ -36,6 +36,19 @@ beforeEach(() => {
   state.federationName.value = ''
 })
 
+describe('signed-out reads', () => {
+  it('asks for usage only with a session', async () => {
+    serve(signed('Realm A'))
+    state.authToken.value = ''
+    await loadInfo()
+    expect(vi.mocked(apiRequest).mock.calls.map(([path]) => path)).not.toContain('/system/usage')
+    state.authToken.value = 't'
+    await loadInfo()
+    expect(vi.mocked(apiRequest).mock.calls.map(([path]) => path)).toContain('/system/usage')
+    state.authToken.value = ''
+  })
+})
+
 describe('realm name', () => {
   it('shows the federation name instead of the description', async () => {
     serve(signed(' Realm A '))
