@@ -1,7 +1,7 @@
 // The two answers to a first sign-in whose email or name matches an existing account: add the
 // sign-in to that account, or create a new one anyway.
 import { ref, watch } from 'vue'
-import { ApiError, apiErrorMessage, apiRequest, attachSignIn, issueToken } from '@/lib/api'
+import { ApiError, apiErrorMessage, apiRequest, attachSignIn, issueToken, signInHasNoAccount } from '@/lib/api'
 import { useAruna } from './useAruna'
 import { accountMatch, adoptSession } from './useAuth'
 import { loginFresh, mergeFailure } from './useAccountMerge'
@@ -50,8 +50,9 @@ export async function joinExistingAccount(): Promise<string | null> {
     const tokens = await popupSignIn()
     const baseUrl = useAruna().apiBaseUrl.value
     const token = await issueToken(tokens.id_token ?? tokens.access_token, baseUrl).catch((error: unknown) => {
-      if (!(error instanceof ApiError && error.status === 401)) throw error
-      throw new Error('That sign-in has no account either. Choose the one you used before.')
+      if (signInHasNoAccount(error)) throw new Error('That sign-in has no account either. Choose the one you used before.')
+      if (error instanceof ApiError && error.status === 401) throw new Error('That sign-in was refused. Try again.')
+      throw error
     })
     await attachSignIn(match.oidcToken, { baseUrl, token }).catch((error: unknown) => {
       if (!(error instanceof ApiError && error.code === 'subject_taken')) throw error

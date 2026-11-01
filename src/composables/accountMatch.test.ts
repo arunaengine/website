@@ -53,6 +53,7 @@ let storage: Map<string, string>
 let calls: Call[]
 let register: (call: Call) => Response
 let attach: (call: Call) => Response
+let refuseToken: Response | null
 
 beforeEach(async () => {
   vi.stubGlobal('fetch', vi.fn(async () => json({})))
@@ -76,6 +77,7 @@ beforeEach(async () => {
     (body as { create_new?: boolean }).create_new
       ? json({ id: 'n1@R', name: 'New' }, 201)
       : json({ error: 'an account matches', code: 'account_match' }, 409)
+  refuseToken = null
   attach = () => json({ user_id: 'a1@R', name: 'Alice', subject_ids: [], attributes: {} })
   const discoveryUrl = `${ISSUER}/${Math.random()}/.well-known/openid-configuration`
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -93,6 +95,7 @@ beforeEach(async () => {
     calls.push(call)
     if (call.path === '/access/users/register') return register(call)
     if (call.path === '/access/users/me/subjects') return attach(call)
+    if (call.path === '/access/token' && refuseToken && bearer === EXISTING_SIGN_IN) return refuseToken.clone()
     if (call.path === '/access/token') return json({ token: `realm-of-${bearer === NEW_SIGN_IN ? 'new' : 'existing'}` })
     return json({ error: 'unexpected' }, 500)
   }))
@@ -131,6 +134,27 @@ describe('a first sign-in that matches an account', () => {
     expect(authToken.value).toBe('realm-of-existing')
     expect(storage.get('aruna.oidc.idToken')).toBe(EXISTING_SIGN_IN)
     expect(accountMatch.value).toBeNull()
+  })
+
+  it('says the existing sign-in has no account when the server names account_missing', async () => {
+    refuseToken = json({ error: 'no account is registered for this sign-in', code: 'account_missing' }, 401)
+    await matched()
+
+    await expect(joinExistingAccount()).resolves.toBeNull()
+
+    expect(matchStale.value).toBe(false)
+    expect(matchFailure.value).toBe('That sign-in has no account either. Choose the one you used before.')
+    expect(calls.some((call) => call.path === '/access/users/me/subjects')).toBe(false)
+  })
+
+  it('does not call a refused token a missing account', async () => {
+    refuseToken = json({ error: 'Unauthorized', code: 'Not authorized' }, 401)
+    await matched()
+
+    await expect(joinExistingAccount()).resolves.toBeNull()
+
+    expect(matchStale.value).toBe(false)
+    expect(matchFailure.value).toBe('That sign-in was refused. Try again.')
   })
 
   it('asks for a new sign-in when the server finds it too old', async () => {

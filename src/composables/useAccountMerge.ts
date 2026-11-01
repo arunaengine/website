@@ -11,6 +11,7 @@ import {
   mergeAccount,
   readVault,
   saveVault,
+  signInHasNoAccount,
   type ApiClientOptions,
   type MergeAccountResponse,
   type UserDevicesResponse,
@@ -68,6 +69,7 @@ export function mergeFailure(error: unknown): string {
     const role = /the role (.+?) of the other account/.exec(error.message)?.[1]
     return `The role ${role ? `"${role}" ` : ''}of that account would cut your own access. Remove it there first.`
   }
+  if (error.status === 401) return 'That sign-in was refused. Sign in again.'
   if (error.status === 404) return 'This node does not know one of the accounts yet. Try again later.'
   if (error.status === 429) return 'Too many attempts. Wait a minute.'
   if (error.status === 503) return 'Merging is not available right now. Try again later.'
@@ -130,7 +132,7 @@ export function useAccountMerge() {
       otherToken = await issueToken(signInToken, context.client.baseUrl ?? '', OTHER_TOKEN_SECS)
     } catch (error) {
       guard(id, context.epoch)
-      if (error instanceof ApiError && error.status === 401) {
+      if (signInHasNoAccount(error)) {
         step.value = 'unregistered'
         return
       }

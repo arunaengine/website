@@ -16,6 +16,7 @@ const { authToken, apiBaseUrl, sessionEpoch, userInfo } = await import('./aruna/
 const { mergeFailure, useAccountMerge } = await import('./useAccountMerge')
 
 const BASE = 'https://api.test'
+const MISSING = { error: 'no account is registered for this sign-in', code: 'account_missing' }
 const A = 'a1@R'
 const B = 'b1@R'
 
@@ -208,7 +209,7 @@ describe('account merge', () => {
   })
 
   it('offers to attach a sign-in that has no account yet', async () => {
-    answer('GET', '/access/token', json({ error: 'Unauthorized' }, 401))
+    answer('GET', '/access/token', json(MISSING, 401))
     answer('POST', '/access/users/me/subjects', json(info(A, 'Alice').user))
     const merge = useAccountMerge()
     await merge.start()
@@ -223,9 +224,19 @@ describe('account merge', () => {
     expect(merge.step.value).toBe('attached')
   })
 
+  it('asks to sign in again when the sign-in is refused, not unregistered', async () => {
+    answer('GET', '/access/token', json({ error: 'Unauthorized', code: 'Not authorized' }, 401))
+    const merge = useAccountMerge()
+    await merge.start()
+    expect(merge.step.value).toBe('idle')
+    expect(merge.failure.value).toBe('That sign-in was refused. Sign in again.')
+    await merge.attach()
+    expect(requests('POST', '/access/users/me/subjects')).toEqual([])
+  })
+
   it('offers the merge when the sign-in turns out to have an account', async () => {
     let issued = 0
-    answer('GET', '/access/token', () => (issued++ ? json({ token: TOKEN_B }) : json({ error: 'Unauthorized' }, 401)))
+    answer('GET', '/access/token', () => (issued++ ? json({ token: TOKEN_B }) : json(MISSING, 401)))
     answer('POST', '/access/users/me/subjects', json({ error: 'taken', code: 'subject_taken' }, 409))
     const merge = useAccountMerge()
     await merge.start()

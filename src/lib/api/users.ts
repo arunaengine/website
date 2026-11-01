@@ -1,4 +1,4 @@
-import { apiRequest, type ApiClientOptions } from './client'
+import { ApiError, apiRequest, type ApiClientOptions } from './client'
 
 export interface UserInfoResponse {
   user: ApiUser
@@ -109,6 +109,11 @@ export function attachSignIn(token: string, client: ApiClientOptions): Promise<G
     { method: 'POST', body: JSON.stringify({ token }) },
     client,
   )
+}
+
+/** True when `GET /access/token` refused a sign-in because no account is registered for it. */
+export function signInHasNoAccount(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401 && error.code === 'account_missing'
 }
 
 /** Exchanges an OIDC or realm token for a realm token of its account. */
