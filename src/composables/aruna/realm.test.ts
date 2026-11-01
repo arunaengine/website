@@ -47,13 +47,13 @@ describe('realm name', () => {
   it('falls back to the description when the realm has no federation settings', async () => {
     serve(new ApiError(404, 'No federation settings'))
     await loadInfo()
-    expect(realm.value.name).toBe('Test_Deploy_Realm')
+    expect(realm.value.name).toBe('Test Deploy Realm')
   })
 
   it('ignores a descriptor that names another realm', async () => {
     serve(signed('Realm B', BYTES.map((byte) => 255 - byte)))
     await loadInfo()
-    expect(realm.value.name).toBe('Test_Deploy_Realm')
+    expect(realm.value.name).toBe('Test Deploy Realm')
   })
 
   it('keeps a known name until the node says there is none', async () => {
@@ -67,7 +67,7 @@ describe('realm name', () => {
     expect(realm.value.name).toBe('Realm A')
     serve(new ApiError(404, 'No federation settings'))
     await loadInfo()
-    expect(realm.value.name).toBe('Test_Deploy_Realm')
+    expect(realm.value.name).toBe('Test Deploy Realm')
   })
 
   it('drops a known name when the realm changed', async () => {

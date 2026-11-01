@@ -184,8 +184,8 @@ export async function setRealmQuota(config: RealmQuotaConfig): Promise<RealmQuot
 export const realm = computed<Realm>(() => {
   const id = realmInfo.value?.realm_id ?? nodeInfo.value?.node.realm_id ?? 'unknown'
   const description = realmInfo.value?.description?.trim() ?? ''
-  // The federation name, then the realm description, then the short id.
-  const displayName = federationName.value || description || shortId(id)
+  // The federation name, then the realm description with its underscores read as spaces, then the short id.
+  const displayName = federationName.value || description.replace(/_+/g, ' ').trim() || shortId(id)
   return {
     id,
     name: displayName,

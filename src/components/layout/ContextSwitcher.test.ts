@@ -166,6 +166,9 @@ describe('ContextSwitcher', () => {
     expect(content(line)).toContain('Demo realm')
     expect(content(line)).toContain('· AbCdEfGh')
     expect(content(line)).not.toContain('full-realm-id')
+    // A phone keeps the room for the realm name; the id stays in the title.
+    const id = element(line, (node) => node.tag === 'span' && content(node).trim() === '· AbCdEfGh')
+    expect(String(id.props.class)).toContain('max-sm:hidden')
   })
 
   it('shows the realm in its own colour', async () => {
