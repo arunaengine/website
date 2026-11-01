@@ -47,12 +47,15 @@ const busy = ref(false)
 const opened = ref(new Set<string>())
 let runs = 0
 let unmounted = false
+// The words of the last search; after a search of chips alone, new text in the box is a new query.
+let searchedWords: string | null = null
 
 // Another bucket, node or session drops every answer still on its way, and the paging.
 watch(() => [props.bucket, props.nodeId, sessionEpoch.value], () => {
   runs++
   typed.value = ''
   chips.value = []
+  searchedWords = null
   hits.value = null
   cursor.value = null
   nameCursor.value = null
@@ -83,9 +86,11 @@ function takeChips() {
 async function search(more = false) {
   if (unmounted) return
   if (quoteOpen()) typed.value += '"'
+  if (!more && searchedWords === '' && typed.value.trim()) chips.value = []
   takeChips()
   searchSoon.cancel()
   if (query.value.trim().length < 2) return
+  if (!more) searchedWords = typed.value.trim()
   const run = ++runs
   busy.value = true
   failure.value = null

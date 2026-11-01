@@ -307,6 +307,25 @@ describe('bucket metadata search', () => {
     expect(searchObjects).toHaveBeenCalledOnce()
   })
 
+  it('starts a new query after a search of a chip alone, and keeps a chip searched with words', async () => {
+    searchObjects.mockClear()
+    const { root } = await mountApp(component, { props: { bucket: 'ncbi', nodeId: null } })
+    const type = async (value: string) => {
+      ;(element(root, (node) => node.tag === 'input').props['onUpdate:modelValue'] as (value: string) => void)(value)
+      await flush()
+      ;(element(root, (node) => node.tag === 'form').props.onSubmit as (event: Event) => void)({ preventDefault: () => {} } as Event)
+      await flush()
+    }
+    await type('species_taxid=562')
+    await type('GCF_000006765')
+    expect(searchObjects).toHaveBeenCalledWith('GCF_000006765', expect.objectContaining({ match: 'metadata' }))
+    expect(content(root)).not.toContain('species_taxid = 562')
+
+    await type('coli species_taxid=562')
+    await type('coli k12')
+    expect(searchObjects).toHaveBeenCalledWith('coli k12 species_taxid=562', expect.objectContaining({ match: 'metadata' }))
+  })
+
   it('searches with the box text as soon as it opens, and goes back on request', async () => {
     searchObjects.mockClear()
     const back = vi.fn()
