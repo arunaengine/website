@@ -26,8 +26,9 @@ export function useRepositoryConnectors(groupId: () => string) {
     const group = groupId()
     connectors.value = null
     error.value = null
-    loading.value = Boolean(group)
-    if (!group) return
+    // A visitor has no group rights, so the token-only list is never asked for.
+    loading.value = Boolean(group && authToken.value)
+    if (!group || !authToken.value) return
     try {
       const list = await listRepositoryConnectors(group, { baseUrl: apiBaseUrl.value, token: authToken.value })
       if (current === generation) connectors.value = list
@@ -58,6 +59,8 @@ export function useRepositoryKinds() {
     const key = `${apiBaseUrl.value}|${sessionEpoch.value}`
     kinds.value = null
     error.value = null
+    // Signed out the node refuses the kinds, so they stay unknown.
+    if (!authToken.value) return
     let request = kindRequests.get(key)
     if (!request) {
       request = listRepositoryKinds({ baseUrl: apiBaseUrl.value, token: authToken.value })

@@ -2,12 +2,13 @@ import { effectScope, nextTick, ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const sessionEpoch = ref(0)
+const authToken = ref('bearer')
 const searchRepositoryRecords = vi.fn()
 const listRepositoryConnectors = vi.fn()
 const listRepositoryKinds = vi.fn()
 
 vi.mock('@/composables/useAruna', () => ({
-  useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch }),
+  useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken, sessionEpoch }),
 }))
 vi.mock('@/lib/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/api')>()),
@@ -179,5 +180,20 @@ describe('repository kinds', () => {
     expect(state.kinds.value).toEqual([])
     expect(listRepositoryKinds).toHaveBeenCalledTimes(2)
     scope.stop()
+  })
+})
+
+describe('signed out', () => {
+  it('asks for neither the connectors nor the kinds without a token', async () => {
+    authToken.value = ''
+    const scope = effectScope()
+    const state = scope.run(() => ({ connectors: useRepositoryConnectors(() => 'g1'), kinds: useRepositoryKinds() }))!
+    await settle()
+    expect(listRepositoryConnectors).not.toHaveBeenCalled()
+    expect(listRepositoryKinds).not.toHaveBeenCalled()
+    expect(state.connectors.loading.value).toBe(false)
+    expect(state.kinds.kinds.value).toBeNull()
+    scope.stop()
+    authToken.value = 'bearer'
   })
 })
