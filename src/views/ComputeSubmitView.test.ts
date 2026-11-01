@@ -920,6 +920,20 @@ describe('run page', () => {
     mounted.app.unmount()
   })
 
+  it('captures the Bakta output folder as a folder', async () => {
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?template=bakta')
+    await click(button(mounted.root, 'Capture'))
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    const [submitted] = createTask.mock.calls.at(-1) as unknown as [Tes.TesTask]
+    expect(submitted.outputs).toEqual([
+      { url: 's3://results/quickruns/run/out', path: '/work/out/*', path_prefix: '/work/out', type: 'FILE' },
+    ])
+    mounted.app.unmount()
+  })
+
   it('names an uploaded script by its version on the node it was uploaded to', async () => {
     const mounted = await mount(ComputeSubmitView, '/app/compute/new?template=python')
     await click(button(mounted.root, 'Add output'))

@@ -438,7 +438,8 @@ function createStore(deps: CustomRunDeps) {
     return relative.replace(/^out\//, '') || baseNameOf(containerPath)
   }
   function defaultOutputKey(containerPath: string): string {
-    return `${runKey.value}/${outputTail(containerPath)}`
+    const key = `${runKey.value}/${outputTail(containerPath)}`
+    return isDirCapture(containerPath) && !key.endsWith('/') ? `${key}/` : key
   }
   function lastBucket(): string {
     return outputRows.value.at(-1)?.bucket || stagingBucket.value.trim()

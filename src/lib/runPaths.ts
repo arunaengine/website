@@ -51,9 +51,12 @@ export function scanPaths(text: string, workdir: string): string[] {
   const base = normWorkdir(workdir)
   const found: string[] = []
   let previous = ''
+  let last = ''
   for (const raw of text.split(SPLIT)) {
-    const folder = FOLDER_COMMANDS.has(previous)
+    // An option value without a file extension, such as `--output /work/out`, names a folder.
+    const folder = FOLDER_COMMANDS.has(previous) || (last.startsWith('-') && /\/[\w-]+$/.test(raw))
     if (raw && !raw.startsWith('-')) previous = raw
+    if (raw) last = raw
     if (!raw || raw.startsWith('-') || raw.includes('://') || !raw.includes('/')) continue
     const token = raw.replace(/^\.\//, '').replace(/[.,:]+$/, '')
     if (!token || /^[\d./]+$/.test(token) || token.startsWith('@') || token.startsWith('jsr:')) continue

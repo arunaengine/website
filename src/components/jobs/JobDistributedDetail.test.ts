@@ -1476,6 +1476,23 @@ describe('distributed job detail components', () => {
 })
 
 describe('the run facts', () => {
+  it('says a running run retries a failed attempt, with the error', async () => {
+    const wake = vi.spyOn(Poll, 'onWake').mockImplementation(() => () => {})
+    const followSpy = vi.spyOn(Poll, 'follow').mockImplementation(() => () => {})
+    const getTask = vi.fn(async () => ({ id: 'run', state: 'UNKNOWN', executors: [], inputs: [], outputs: [], logs: [], tags: {} }))
+    const error = { kind: 'retryable', message: 'container output read failed' }
+    const getJob = vi.fn(async () => ({ job_id: 'run', state: 'indeterminate', attempts: 2, error, family }))
+    const mounted = await mount(taskPanel(getTask, getJob), { taskId: 'run', open: true })
+    await flushPanel()
+    const text = content(mounted.root)
+
+    expect(text).toContain('Retrying after a failed attempt')
+    expect(text).toContain('Attempt 2 failed, retrying: container output read failed')
+    wake.mockRestore()
+    followSpy.mockRestore()
+    mounted.app.unmount()
+  })
+
   it('names the node, the resources and the times once, without a success notice', async () => {
     const wake = vi.spyOn(Poll, 'onWake').mockImplementation(() => () => {})
     const followSpy = vi.spyOn(Poll, 'follow').mockImplementation(() => () => {})

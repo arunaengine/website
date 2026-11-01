@@ -474,6 +474,10 @@ interface Summary {
 }
 // TES has no state for a run that waits for a locked bucket; the native job says so.
 const awaitingKey = computed(() => nativeJob.value?.state === 'awaiting_key' && !isTerminalTesState(task.value?.state))
+// An active run that carries an error is retrying a failed attempt, such as a failed results upload.
+const retryError = computed(() =>
+  task.value && !isTerminalTesState(task.value.state) ? nativeJob.value?.error?.message?.trim() ?? '' : '',
+)
 
 const summary = computed<Summary | null>(() => {
   const state = task.value?.state
@@ -507,7 +511,9 @@ const summary = computed<Summary | null>(() => {
     case 'PREEMPTED':
       return { tone: 'warning', headline: 'Preempted' }
     default:
-      return { tone: 'info', headline: 'State unknown' }
+      return retryError.value
+        ? { tone: 'warning', headline: 'Retrying after a failed attempt' }
+        : { tone: 'info', headline: 'State unknown' }
   }
 })
 
@@ -908,6 +914,9 @@ async function confirmDelete() {
         <Notice v-if="summary && showSummary" :tone="summary.tone" class="space-y-2 px-4 py-3">
           <p class="text-sm font-semibold">{{ summary.headline }}</p>
           <p v-if="failed" class="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed">{{ failureMessage }}</p>
+          <p v-if="retryError" class="whitespace-pre-wrap break-words text-[11px] leading-relaxed">
+            Attempt {{ nativeJob?.attempts }} failed, retrying: <span class="font-mono">{{ retryError }}</span>
+          </p>
           <div v-if="failed || nodeConstraint" class="flex flex-wrap items-center gap-1.5 text-[11px]">
             <Badge v-if="failed && nativeJob?.error?.kind" variant="destructive" size="sm" class="uppercase">{{ nativeJob.error.kind }}</Badge>
             <Badge v-if="failed && exitCode !== undefined" variant="outline" size="sm">exit {{ exitCode }}</Badge>
