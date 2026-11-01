@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // The labeled facts of one dataset in a row or card, the same for every type; a missing fact shows a dash.
+// A size is shown only when known.
 import { computed, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useUserDirectory } from '@/composables/useUserDirectory'
@@ -16,7 +17,7 @@ const facts = computed(() =>
   datasetFacts(props.doc, {
     group: (id) => myGroups.value.find((group) => group.id === id)?.name ?? '',
     person: (id) => userDir.cachedUser(id)?.name ?? '',
-  }),
+  }).filter((fact) => fact.label !== 'Size' || fact.value),
 )
 </script>
 
