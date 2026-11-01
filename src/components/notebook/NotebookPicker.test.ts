@@ -78,6 +78,13 @@ describe('the notebook picker', () => {
     expect(rows(root).join(' ')).toContain('readme.md')
   })
 
+  it('offers every bucket as the place of a new notebook', async () => {
+    const { root } = await mountApp(component, { props: { open: true, finder, mode: 'new' } })
+
+    expect(rows(root)).toEqual([expect.stringContaining('lab'), expect.stringContaining('empty'), expect.stringContaining('far')])
+    expect(content(root)).not.toContain('Hidden because they hold no notebooks')
+  })
+
   it('finds notebooks in all buckets and opens one directly', async () => {
     const { root } = await mountApp(component, { props: { open: true, finder } })
     const search = nodes(root).find((node) => node.tag === 'input')!

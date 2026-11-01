@@ -36,7 +36,8 @@ const s3 = useS3()
 const finder = props.finder ?? useNotebookFinder()
 const bucket = ref<string | null>(null)
 const prefix = ref('')
-const showAll = ref(false)
+// A new notebook may go in any bucket, also one that holds no notebook yet.
+const showAll = ref(props.mode === 'new')
 const query = ref('')
 
 watch(() => props.open, (open) => {
