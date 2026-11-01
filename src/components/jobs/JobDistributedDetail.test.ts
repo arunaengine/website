@@ -1250,6 +1250,28 @@ describe('distributed job detail components', () => {
     followSpy.mockRestore()
   })
 
+  it('names a pinned input by its bucket, path and node, not its ARN', async () => {
+    const arn = 'arn:aruna:realm-1:node-2:s3/bakta-database/src/db-light.tar.xz@01M69M40GW80DTHHG98J4653CV'
+    const task = {
+      id: 'run',
+      state: 'COMPLETE',
+      executors: [{ image: 'alpine', command: ['sh'] }],
+      inputs: [{ path: '/work/in/db-light.tar.xz', url: arn }],
+      outputs: [],
+      logs: [],
+      tags: {},
+    }
+    const mounted = await mount(taskPanel(vi.fn(async () => task), vi.fn(async () => ({ family: null }))), { taskId: 'run', open: true })
+    await flushPanel()
+    const [link] = findAll(mounted.root, (node) => node.tag === 'a' && content(node) === 'bakta-database/src/db-light.tar.xz')
+
+    expect(link?.props.title).toBe(arn)
+    expect(link?.props.to).toMatchObject({ name: 'bucket', params: { bucketId: 'bakta-database' }, query: { prefix: 'src', node: 'node-2' } })
+    expect(content(mounted.root)).toContain('on node-2')
+    expect(content(mounted.root)).not.toContain(arn)
+    mounted.app.unmount()
+  })
+
   it('offers Run again only once the run ended', async () => {
     const base = {
       id: 'run',

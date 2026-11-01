@@ -47,7 +47,9 @@ import {
   drsDownloadHref,
   drsObjectHref,
   isDrsReference,
+  inputPlace,
   isTerminalTesState,
+  nativeInput,
   parseS3Url,
   isLocalRun,
   startedRunId,
@@ -434,11 +436,14 @@ function executorDetails(i: number): Detail[] {
     { key: 'command', label: 'Command', value: executor.command.join(' '), mono: true },
   ]
 }
-// An input from a bucket opens the folder it came from.
+// An input from a bucket opens the folder it came from, on the node a pinned input names.
 function inputLink(url: string | undefined) {
   if (!url) return null
-  const link = resolveUrl(url)
-  return link.kind === 's3' ? bucketRoute(link.bucketId, link.prefix) : null
+  const native = nativeInput({ url, path: '' })
+  const link = resolveUrl(native.url ?? url)
+  if (link.kind !== 's3') return null
+  const route = bucketRoute(link.bucketId, link.prefix)
+  return native.source_node_id ? { ...route, query: { ...route.query, node: native.source_node_id } } : route
 }
 // The node holding each output bucket, read from where the run wrote, so its folder opens there.
 const outputNodes = computed(() => new Map((nativeFamily.value?.outputs ?? []).flatMap((output) => {
@@ -981,9 +986,10 @@ async function confirmDelete() {
                 <tr v-for="(input, i) in task.inputs" :key="`${input.path}:${i}`" class="h-10 text-xs">
                   <td class="max-w-0 px-3 py-1.5"><span class="block truncate font-mono text-foreground" :title="input.path">{{ input.path }}</span></td>
                   <td class="max-w-0 px-3 py-1.5">
-                    <RouterLink v-if="inputLink(input.url)" :to="inputLink(input.url)!" class="block truncate font-mono text-primary hover:underline" :title="input.url">{{ input.url }}</RouterLink>
-                    <span v-else-if="input.url" class="block truncate font-mono text-muted-foreground" :title="input.url">{{ input.url }}</span>
+                    <RouterLink v-if="inputLink(input.url)" :to="inputLink(input.url)!" class="block truncate font-mono text-primary hover:underline" :title="input.url">{{ inputPlace(input.url!).text }}</RouterLink>
+                    <span v-else-if="input.url" class="block truncate font-mono text-muted-foreground" :title="input.url">{{ inputPlace(input.url).text }}</span>
                     <span v-else class="text-muted-foreground">Inline content</span>
+                    <span v-if="input.url && inputPlace(input.url).nodeId" class="block truncate text-muted-foreground">on {{ displayName(inputPlace(input.url).nodeId!) }}</span>
                   </td>
                 </tr>
               </tbody>
