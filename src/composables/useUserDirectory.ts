@@ -69,7 +69,10 @@ export function useUserDirectory() {
   }
 
   function cachedUser(userId: string): ResolveUserResult | null {
-    return fullCache.get(userId) ?? liteCache.get(userId) ?? null
+    const lite = liteCache.get(userId)
+    // A merged account resolves to the account it belongs to now; a full lookup keeps its old name.
+    if (lite?.merged_into) return lite
+    return fullCache.get(userId) ?? lite ?? null
   }
 
   return { resolveUser, resolveUsers, cachedUser }

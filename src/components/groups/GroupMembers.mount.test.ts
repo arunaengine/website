@@ -7,6 +7,7 @@ import * as Utils from '@/lib/utils'
 import { searchUsers } from '@/composables/aruna/users'
 
 const search = vi.fn(searchUsers)
+const directory = new Map<string, { user_id: string; name: string; attributes: Record<string, string>; merged_into?: string }>()
 const addGroupMember = vi.fn(async () => undefined)
 const removeGroupMember = vi.fn(async (..._args: unknown[]) => undefined)
 const Empty = defineComponent(() => () => null)
@@ -29,18 +30,19 @@ const GroupMembers = compileClientComponent(new URL('./GroupMembers.vue', import
   },
   '@/composables/useFederation': { homeRealmLabel: (id: string) => (id.endsWith('@other') ? 'Giessen Data' : null) },
   '@/composables/useUserDirectory': {
-    useUserDirectory: () => ({ resolveUsers: vi.fn(), cachedUser: () => undefined }),
+    useUserDirectory: () => ({ resolveUsers: vi.fn(), cachedUser: (id: string) => directory.get(id) }),
   },
   '@/components/ui/Button.vue': moduleDefault(Button),
   '@/components/ui/Input.vue': moduleDefault(Input),
   '@/components/ui/Select.vue': moduleDefault(Empty),
   '@/components/ui/AccessBadge.vue': moduleDefault(Empty),
-  '@/components/ui/Popover.vue': moduleDefault(Empty),
+  '@/components/ui/Popover.vue': moduleDefault(defineComponent((_, { slots }) => () => h('div', slots.default?.()))),
   '@/components/ui/CopyButton.vue': moduleDefault(Empty),
   '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('i', p.label) })),
 })
 
 afterEach(() => {
+  directory.clear()
   vi.unstubAllGlobals()
   vi.clearAllMocks()
 })
@@ -95,6 +97,17 @@ describe('group member picker', () => {
     expect(removeButton().props['aria-busy']).toBe(false)
     expect(removeButton().props.disabled).toBe(false)
     expect(content(mounted.root)).toContain('last admin')
+    mounted.app.unmount()
+  })
+
+  it('names the account a merged member now belongs to', async () => {
+    directory.set('b1@own', { user_id: 'b1@own', name: 'Alice', attributes: {}, merged_into: 'a1@own' })
+    const members = [{ user_id: 'b1@own', name: 'Bob', roles: [{ role_id: 'r1', name: 'user' }] }]
+    const mounted = await mountApp(GroupMembers, {
+      props: { groupId: 'g1', members, roles: [{ role_id: 'r1', name: 'user' }], canManage: false },
+    })
+    expect(content(mounted.root)).toContain('Alice (merged)')
+    expect(content(mounted.root)).not.toContain('Bob')
     mounted.app.unmount()
   })
 })

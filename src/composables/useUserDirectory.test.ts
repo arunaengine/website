@@ -32,4 +32,18 @@ describe('profile directory cache', () => {
     expect(await pending).toBeNull()
     expect(directory.cachedUser('user-1')).toBeNull()
   })
+
+  it('shows the account a merged account belongs to over its own old name', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const resolved = String(input).endsWith('/access/users/resolve')
+      const body = resolved
+        ? [{ user_id: 'b1', name: 'Alice', attributes: {}, merged_into: 'a1' }]
+        : { user_id: 'b1', name: 'Bob', attributes: {}, subject_ids: [] }
+      return new Response(JSON.stringify(body), { status: 200 })
+    }))
+    const directory = useUserDirectory()
+    await directory.resolveUsers(['b1', 'b2'])
+    await directory.resolveUser('b1')
+    expect(directory.cachedUser('b1')).toMatchObject({ name: 'Alice', merged_into: 'a1' })
+  })
 })

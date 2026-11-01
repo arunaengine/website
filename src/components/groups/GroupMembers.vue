@@ -37,11 +37,14 @@ watch(
 
 const memberIdList = computed(() => props.members.map((member) => member.user_id))
 
-// A member of another realm reads `name (realm name)`.
+// A member of another realm reads `name (realm name)`; a merged account names its new account.
 function displayName(member: GroupMember): string {
-  const name = member.name ?? cachedUser(member.user_id)?.name ?? shortUserId(member.user_id, memberIdList.value)
+  const cached = cachedUser(member.user_id)
+  const merged = Boolean(cached?.merged_into)
+  const name = (merged ? cached?.name : member.name) ?? cached?.name ?? shortUserId(member.user_id, memberIdList.value)
   const home = homeRealmLabel(member.user_id, realm.value.id)
-  return home ? `${name} (${home})` : name
+  const shown = home ? `${name} (${home})` : name
+  return merged ? `${shown} (merged)` : shown
 }
 
 function shortId(userId: string): string {

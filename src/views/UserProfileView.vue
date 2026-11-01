@@ -8,6 +8,7 @@ import CopyButton from '@/components/ui/CopyButton.vue'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import IconTile from '@/components/ui/IconTile.vue'
+import Notice from '@/components/ui/Notice.vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import { useAruna, colorFor, initials } from '@/composables/useAruna'
@@ -18,7 +19,7 @@ import { Building2, ChevronRight, ExternalLink, Mail, Pencil, RefreshCw, ShieldC
 
 const route = useRoute()
 const { currentUser, sessionEpoch, apiGroups, canInspectUsers } = useAruna()
-const { resolveUser } = useUserDirectory()
+const { resolveUser, resolveUsers, cachedUser } = useUserDirectory()
 
 const userId = computed(() => (route.params.id as string) || '')
 const user = ref<GetUserResponse | null>(null)
@@ -43,6 +44,10 @@ watch([userId, sessionEpoch], ([id]) => { if (id) void load(id) }, { immediate: 
 
 const attributes = computed(() => user.value?.attributes ?? {})
 const isSelf = computed(() => currentUser.value?.id === userId.value)
+// A merged account is closed; its sign-ins and roles moved to the account it names.
+const mergedInto = computed(() => attributes.value['aruna-engine.org/merged-into'] || null)
+watch(mergedInto, (id) => { if (id) void resolveUsers([id]) }, { immediate: true })
+const mergedName = computed(() => (mergedInto.value ? cachedUser(mergedInto.value)?.name || shortUserId(mergedInto.value) : ''))
 const crumbs = computed(() => [
   ...(canInspectUsers.value ? [{ label: 'Users', to: { name: 'admin-users' } }] : []),
   { label: user.value?.name ?? 'User profile' },
@@ -99,6 +104,10 @@ const askPrompt = computed(() =>
     </PageHeader>
 
     <div class="w-full px-4 py-6 sm:px-6">
+      <Notice v-if="!loading && mergedInto" class="mb-6">
+        This account was merged into
+        <RouterLink :to="{ name: 'user', params: { id: mergedInto } }" class="font-medium text-primary hover:underline">{{ mergedName }}</RouterLink>.
+      </Notice>
       <div v-if="loading" class="space-y-3">
         <Skeleton class="h-20" />
         <Skeleton class="h-32" />
