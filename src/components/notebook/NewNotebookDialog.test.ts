@@ -7,6 +7,9 @@ import { button, click, compileClientComponent, content, flush, input, moduleDef
 const context = ref<{ groupId: string } | null>(null)
 const writable = ref(true)
 const push = vi.fn()
+const activateContext = vi.fn(async (_node: string | null, groupId: string) => {
+  context.value = { groupId }
+})
 
 const Slotted = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const Button = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
@@ -32,6 +35,8 @@ const modules: Record<string, unknown> = {
   '@/composables/useS3': {
     useS3: () => ({
       activeContext: context,
+      activateContext,
+      canRead: (bucket: string) => Boolean(bucket && context.value),
       canWrite: (bucket: string) => Boolean(bucket && writable.value),
     }),
   },
@@ -46,9 +51,10 @@ beforeEach(() => {
   context.value = { groupId: 'group-1' }
   writable.value = true
   push.mockReset()
+  activateContext.mockClear()
 })
 
-async function render(prefix = '') {
+async function render(prefix = '', nodeId: string | null = null) {
   const open = ref(true)
   const host = defineComponent({
     setup: () => () => h(dialog, {
@@ -56,6 +62,7 @@ async function render(prefix = '') {
       bucket: 'reef',
       prefix,
       groupId: 'group-1',
+      nodeId,
       'onUpdate:open': (value: boolean) => { open.value = value },
     }),
   })
@@ -96,6 +103,19 @@ describe('new notebook dialog', () => {
     expect(button(root, 'Open').props.disabled).toBe(true)
     await click(button(root, 'Open'))
     expect(push).not.toHaveBeenCalled()
+    app.unmount()
+  })
+
+  it('opens the storage session of the bucket node when none is open yet', async () => {
+    context.value = null
+    const { root, app, open } = await render('notebooks/', 'node-2')
+    await flush()
+    expect(activateContext).toHaveBeenCalledWith('node-2', 'group-1')
+    expect(open.value).toBe(true)
+    await typeValue(input(root, 'aria-label', 'Notebook name'), 'First look')
+    expect(button(root, 'Open').props.disabled).toBeFalsy()
+    await click(button(root, 'Open'))
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({ query: { group: 'group-1', node: 'node-2' } }))
     app.unmount()
   })
 

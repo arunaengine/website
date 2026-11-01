@@ -28,12 +28,20 @@ const canCreate = computed(() => Boolean(
   name.value.trim() &&
   props.bucket &&
   s3.activeContext.value?.groupId === props.groupId &&
-  s3.canWrite(props.bucket, target.value),
+  s3.canWrite(props.bucket, target.value, props.nodeId ?? null),
 ))
 
-watch(() => props.open, (open) => { if (open) name.value = '' })
+// Opened before any storage session of the bucket's node, the dialog opens that session itself.
+let activating = false
+watch(() => props.open, (open) => {
+  if (!open) return
+  name.value = ''
+  if (s3.activeContext.value?.groupId === props.groupId && s3.canRead(props.bucket, undefined, props.nodeId ?? null)) return
+  activating = true
+  void s3.activateContext(props.nodeId ?? null, props.groupId).catch(() => {}).finally(() => { activating = false })
+}, { immediate: true })
 // A different storage session may not write here at all.
-watch(s3.activeContext, () => emit('update:open', false))
+watch(s3.activeContext, () => { if (!activating) emit('update:open', false) }, { flush: 'sync' })
 
 function create() {
   if (!props.open || !canCreate.value) return
