@@ -101,7 +101,12 @@ export function portalRoutes(): RouteRecordRaw[] {
         homeRoute(),
         // Data: buckets and objects, the primary research surface.
         { path: 'buckets', name: 'buckets', component: () => import('@/views/DataManagerView.vue') },
-        { path: 'buckets/:bucketId', name: 'bucket', component: () => import('@/views/DataManagerView.vue') },
+        {
+          path: 'buckets/:bucketId',
+          name: 'bucket',
+          component: () => import('@/views/DataManagerView.vue'),
+          beforeEnter: (to) => import('./bucketNode').then((module) => module.bucketNodeRoute(to)),
+        },
         // Everything one bucket stores: backend, placement policies and syncs.
         {
           path: 'buckets/:bucketId/storage',
