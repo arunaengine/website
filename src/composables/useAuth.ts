@@ -17,17 +17,37 @@ import {
   type OidcDiscoveryDocument,
 } from '@/lib/oidc'
 import { errorMessage } from '@/lib/utils'
+import { LOGIN_PROVIDERS, offersProviders } from '@/lib/loginProviders'
+import { signInChoice } from '@/composables/signInChoice'
 
 const VERIFIER_KEY = 'aruna.oidc.verifier'
 const STATE_KEY = 'aruna.oidc.state'
 const REDIRECT_KEY = 'aruna.oidc.redirect'
 const ONBOARDING_KEY = 'aruna.oidc.onboardingSecret'
 const ID_TOKEN_KEY = 'aruna.oidc.idToken'
+const LINK_KEY = 'aruna.oidc.link'
 
 export type SignInStage = 'idle' | 'redirecting' | 'exchanging' | 'registering' | 'done' | 'error'
 
 const stage = ref<SignInStage>('idle')
 const stageError = ref<string | null>(null)
+
+export interface SignInOptions {
+  onboardingSecret?: string
+  redirectTo?: string
+  freshLogin?: boolean
+  /** Keycloak alias of the login to go straight to. */
+  idpHint?: string
+}
+
+/** The outcome of linking another login, shown once back in Settings. */
+export interface ProviderLink {
+  name: string
+  linked: boolean
+  message?: string
+}
+
+const providerLink = ref<ProviderLink | null>(null)
 
 interface RegisterUserResponse {
   id: string
@@ -110,11 +130,17 @@ async function resolveProvider() {
   }
   // The realm announces the audience its tokens must carry; for the Keycloak
   // public client this doubles as the client id (same convention as aruna-doctor).
-  return { clientId: provider.audience, discoveryUrl: provider.discovery_url }
+  return { clientId: provider.audience, discoveryUrl: provider.discovery_url, issuer: provider.issuer }
 }
 
 /** Redirects the browser to the realm's Keycloak login page (code + PKCE). */
-async function signIn(options: { onboardingSecret?: string; redirectTo?: string; freshLogin?: boolean } = {}) {
+async function signIn(options: SignInOptions = {}) {
+  return authorize(options)
+}
+
+// `link` runs Keycloak's idp_link action: the current Keycloak user signs in at that
+// provider, which links it. The Aruna session and its ID token stay as they are.
+async function authorize(options: SignInOptions & { link?: string }) {
   stage.value = 'redirecting'
   stageError.value = null
   try {
@@ -122,7 +148,11 @@ async function signIn(options: { onboardingSecret?: string; redirectTo?: string;
     const discovery = await discover(discoveryUrl)
     const verifier = randomUrlSafeString(48)
     const state = signInState()
-    window.sessionStorage.removeItem(ID_TOKEN_KEY)
+    if (options.link) window.sessionStorage.setItem(LINK_KEY, options.link)
+    else {
+      window.sessionStorage.removeItem(LINK_KEY)
+      window.sessionStorage.removeItem(ID_TOKEN_KEY)
+    }
     window.sessionStorage.setItem(VERIFIER_KEY, verifier)
     window.sessionStorage.setItem(STATE_KEY, state)
     window.sessionStorage.setItem(REDIRECT_KEY, options.redirectTo ?? '/app')
@@ -139,12 +169,47 @@ async function signIn(options: { onboardingSecret?: string; redirectTo?: string;
         state,
         codeChallenge: await pkceChallengeS256(verifier),
         freshLogin: options.freshLogin,
+        idpHint: options.idpHint,
+        action: options.link ? `idp_link:${options.link}` : undefined,
       }),
     )
   } catch (err) {
     stage.value = 'error'
     stageError.value = errorMessage(err)
   }
+}
+
+/** Links another login to the signed-in account, then returns to `redirectTo`. */
+async function linkProvider(alias: string, redirectTo = '/app/settings') {
+  providerLink.value = null
+  return authorize({ redirectTo, link: alias })
+}
+
+/** Opens the login chooser when the realm's Keycloak offers other logins, else signs in. */
+async function requestSignIn(options: SignInOptions = {}) {
+  try {
+    if (offersProviders((await resolveProvider()).issuer)) {
+      signInChoice.value = options
+      return
+    }
+  } catch {
+    // signIn reports why the realm cannot sign in.
+  }
+  await signIn(options)
+}
+
+// Keycloak returns from an action with `kc_action_status`; the session is untouched.
+function finishLink(params: URLSearchParams, alias: string): string {
+  const name = LOGIN_PROVIDERS.find((provider) => provider.alias === alias)?.name ?? alias
+  const status = params.get('kc_action_status')
+  if (status === 'success') providerLink.value = { name, linked: true }
+  else if (status === 'cancelled') providerLink.value = null
+  else {
+    const reason = params.get('error_description') ?? params.get('error')
+    providerLink.value = { name, linked: false, message: reason ?? undefined }
+  }
+  stage.value = 'idle'
+  return window.sessionStorage.getItem(REDIRECT_KEY) || '/app/settings'
 }
 
 /**
@@ -163,6 +228,8 @@ async function completeSignIn(params: URLSearchParams): Promise<string> {
     if (!expectedState) throw new Error('This sign-in attempt was not started here, please try again.')
     if (state !== expectedState) throw new Error('State mismatch, please try signing in again.')
     consumeTransaction = true
+    const linking = window.sessionStorage.getItem(LINK_KEY)
+    if (linking) return finishLink(params, linking)
 
     const oidcError = params.get('error')
     if (oidcError) {
@@ -225,6 +292,7 @@ async function completeSignIn(params: URLSearchParams): Promise<string> {
       window.sessionStorage.removeItem(STATE_KEY)
       window.sessionStorage.removeItem(REDIRECT_KEY)
       window.sessionStorage.removeItem(ONBOARDING_KEY)
+      window.sessionStorage.removeItem(LINK_KEY)
     }
   }
 }
@@ -283,6 +351,9 @@ export function useAuth() {
     stage,
     stageError,
     signIn,
+    requestSignIn,
+    linkProvider,
+    providerLink,
     cancelSignIn,
     completeSignIn,
     signOut,
