@@ -6,6 +6,8 @@ export interface UserInfoResponse {
   linked_logins?: string[]
   /** Accounts merged into this one; their ids resolve to this account. */
   merged_user_ids?: string[]
+  /** The same accounts with their own names; `name` is null when the node holds no record. */
+  merged_users?: MergedUser[]
   realm: { realm_id: string; roles: ApiRole[] }
   groups: ApiUserGroup[]
   preferences: {
@@ -13,6 +15,11 @@ export interface UserInfoResponse {
     favourite_metadata_ids: string[]
     theme?: string | null
   }
+}
+
+export interface MergedUser {
+  user_id: string
+  name: string | null
 }
 
 export interface ApiUser {

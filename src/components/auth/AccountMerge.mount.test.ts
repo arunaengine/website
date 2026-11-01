@@ -85,6 +85,19 @@ describe('adding another account', () => {
     app.unmount()
   })
 
+  it('names merged accounts and falls back to the short id', async () => {
+    userInfo.value = {
+      merged_user_ids: ['b0@R', 'c0@R'],
+      merged_users: [{ user_id: 'b0@R', name: 'Bob' }, { user_id: 'c0@R', name: null }],
+    }
+    const { root, app } = await render()
+    const text = content(root)
+    expect(text).toContain('Bob')
+    expect(text).not.toContain('b0@R')
+    expect(text).toContain('c0@R')
+    app.unmount()
+  })
+
   it('lists what moves and what ends before the merge', async () => {
     step.value = 'confirm'
     other.value = account()

@@ -38,7 +38,10 @@ const { step, failure, other, result, start, copyVault, merge, attach, cancel } 
 
 const open = computed(() => step.value !== 'idle' || failure.value !== null)
 const name = computed(() => other.value?.info.user.name ?? 'That account')
-const merged = computed(() => userInfo.value?.merged_user_ids ?? [])
+// A node without the names still lists the ids.
+const merged = computed(
+  () => userInfo.value?.merged_users ?? (userInfo.value?.merged_user_ids ?? []).map((user_id) => ({ user_id, name: null })),
+)
 const busy = computed(() => ['signing', 'loading', 'merging'].includes(step.value))
 // The merge then asks for this account's login first.
 const loginOld = computed(() => step.value === 'confirm' && !loginFresh(authToken.value))
@@ -115,9 +118,10 @@ function close(value: boolean) {
     <div v-if="merged.length" class="border-t border-border px-5 py-3">
       <div class="type-label">Merged accounts</div>
       <ul class="mt-1 space-y-1">
-        <li v-for="id in merged" :key="id" class="flex items-center gap-2 font-mono text-xs text-muted-foreground" :title="id">
+        <li v-for="account in merged" :key="account.user_id" class="flex items-center gap-2 text-xs text-muted-foreground" :title="account.user_id">
           <UserRound class="size-3.5 shrink-0" aria-hidden="true" />
-          {{ truncateMiddle(id, 12, 8) }}
+          <span v-if="account.name">{{ account.name }}</span>
+          <span v-else class="font-mono">{{ truncateMiddle(account.user_id, 12, 8) }}</span>
         </li>
       </ul>
     </div>
