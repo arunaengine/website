@@ -83,7 +83,7 @@ async function loginElsewhere(home: VerifiedRealm) {
         <li v-for="choice in choices" :key="choice.name">
           <button type="button" :title="choice.description || undefined" :class="rowClass" @click="choose(choice)">
             <ProviderLogo :logo="choice.logo" :logo-light="choice.logoLight" />
-            <span class="w-36 text-left">{{ choice.name }}</span>
+            <span class="w-44 text-left">{{ choice.name }}</span>
           </button>
         </li>
         <li>
@@ -98,7 +98,7 @@ async function loginElsewhere(home: VerifiedRealm) {
             <span class="flex h-8 w-14 shrink-0 items-center justify-center">
               <Globe2 class="h-6 w-6 text-muted-foreground" aria-hidden="true" />
             </span>
-            <span class="w-36 text-left">Another Aruna realm</span>
+            <span class="w-44 text-left">Another Aruna realm</span>
           </button>
         </li>
       </ul>
