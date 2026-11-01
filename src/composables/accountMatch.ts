@@ -1,0 +1,89 @@
+// The two answers to a first sign-in whose email or name matches an existing account: add the
+// sign-in to that account, or create a new one anyway.
+import { ref, watch } from 'vue'
+import { ApiError, apiErrorMessage, apiRequest, attachSignIn, issueToken } from '@/lib/api'
+import { useAruna } from './useAruna'
+import { accountMatch, adoptSession } from './useAuth'
+import { loginFresh, mergeFailure } from './useAccountMerge'
+import { SignInCancelled, popupSignIn } from './popupSignIn'
+
+export const matchBusy = ref(false)
+export const matchFailure = ref<string | null>(null)
+/** The new sign-in is too old to attach or register; only a new sign-in helps. */
+export const matchStale = ref(false)
+
+const STALE = 'Your new sign-in is older than 5 minutes. Sign in again.'
+
+// Another sign-in brings its own match, or none.
+watch(accountMatch, () => {
+  matchFailure.value = null
+  matchStale.value = false
+})
+
+function failed(error: unknown, describe: (error: unknown) => string) {
+  if (error instanceof SignInCancelled) return
+  const stale = error instanceof ApiError && (error.status === 401 || error.code === 'merge_refused')
+  matchStale.value = stale
+  matchFailure.value = stale ? STALE : describe(error)
+}
+
+function begin() {
+  matchBusy.value = true
+  matchFailure.value = null
+  matchStale.value = false
+}
+
+/**
+ * Signs in with the existing account in a popup and adds the new sign-in to it. Call it in a
+ * click handler. Returns the route to continue to, or null when it did not finish.
+ */
+export async function joinExistingAccount(): Promise<string | null> {
+  const match = accountMatch.value
+  if (!match || matchBusy.value) return null
+  if (!loginFresh(match.oidcToken)) {
+    matchStale.value = true
+    matchFailure.value = STALE
+    return null
+  }
+  begin()
+  try {
+    const tokens = await popupSignIn()
+    const baseUrl = useAruna().apiBaseUrl.value
+    const token = await issueToken(tokens.id_token ?? tokens.access_token, baseUrl).catch((error: unknown) => {
+      if (!(error instanceof ApiError && error.status === 401)) throw error
+      throw new Error('That sign-in has no account either. Choose the one you used before.')
+    })
+    await attachSignIn(match.oidcToken, { baseUrl, token }).catch((error: unknown) => {
+      if (!(error instanceof ApiError && error.code === 'subject_taken')) throw error
+      throw new Error('Your new sign-in already has an account. Sign in with it instead.')
+    })
+    await adoptSession(token, tokens.id_token)
+    accountMatch.value = null
+    return match.redirectTo
+  } catch (error) {
+    failed(error, mergeFailure)
+    return null
+  } finally {
+    matchBusy.value = false
+  }
+}
+
+/** Creates a new account for the sign-in although one matches. */
+export async function createNewAccount(): Promise<string | null> {
+  const match = accountMatch.value
+  if (!match || matchBusy.value) return null
+  begin()
+  try {
+    const client = { baseUrl: useAruna().apiBaseUrl.value, token: match.oidcToken }
+    const body = JSON.stringify({ create_new: true })
+    await apiRequest('/access/users/register', { method: 'POST', body }, client)
+    await adoptSession(await issueToken(match.oidcToken, client.baseUrl))
+    accountMatch.value = null
+    return match.redirectTo
+  } catch (error) {
+    failed(error, apiErrorMessage)
+    return null
+  } finally {
+    matchBusy.value = false
+  }
+}

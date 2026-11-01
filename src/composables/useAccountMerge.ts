@@ -53,7 +53,8 @@ export function loginAge(token: string, now = Date.now()): number | null {
   return typeof time === 'number' ? Math.floor(now / 1000) - time : null
 }
 
-function fresh(token: string): boolean {
+/** True when the login of `token` leaves time for a request that takes 5 minutes at most. */
+export function loginFresh(token: string): boolean {
   const age = loginAge(token)
   return age !== null && age <= FRESH_SECS
 }
@@ -158,7 +159,7 @@ export function useAccountMerge() {
   // A login older than 5 minutes signs in again first; a token of another account is refused.
   async function ownClient(id: number, context: { epoch: number; client: ApiClientOptions }) {
     const token = context.client.token ?? ''
-    if (fresh(token)) return context.client
+    if (loginFresh(token)) return context.client
     const tokens = await popupSignIn()
     guard(id, context.epoch)
     const baseUrl = context.client.baseUrl ?? ''
@@ -194,7 +195,7 @@ export function useAccountMerge() {
   /** Merges after the confirmation; call it in a click handler, it may sign in again. */
   async function merge() {
     if (step.value !== 'confirm') return
-    if (!fresh(otherToken)) {
+    if (!loginFresh(otherToken)) {
       reset()
       failure.value = 'The other sign-in is older than 5 minutes. Start again.'
       return
@@ -218,7 +219,7 @@ export function useAccountMerge() {
   /** Attaches a sign-in that has no account yet; call it in a click handler. */
   async function attach() {
     if (step.value !== 'unregistered') return
-    if (!fresh(signInToken)) {
+    if (!loginFresh(signInToken)) {
       reset()
       failure.value = 'That sign-in is older than 5 minutes. Add it again.'
       return

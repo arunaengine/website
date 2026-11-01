@@ -13,7 +13,7 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useAruna } from '@/composables/useAruna'
-import { loginAge, useAccountMerge } from '@/composables/useAccountMerge'
+import { loginFresh, useAccountMerge } from '@/composables/useAccountMerge'
 import { truncateMiddle } from '@/lib/utils'
 import { UserPlus } from '@lucide/vue'
 
@@ -25,7 +25,7 @@ const name = computed(() => other.value?.info.user.name ?? 'That account')
 const merged = computed(() => userInfo.value?.merged_user_ids ?? [])
 const busy = computed(() => ['signing', 'loading', 'merging'].includes(step.value))
 // The merge then asks for this account's login first.
-const loginOld = computed(() => step.value === 'confirm' && !((loginAge(authToken.value) ?? Infinity) <= 240))
+const loginOld = computed(() => step.value === 'confirm' && !loginFresh(authToken.value))
 
 const title = computed(() => {
   switch (step.value) {

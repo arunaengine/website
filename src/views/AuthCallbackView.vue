@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import AppLogo from '@/components/layout/AppLogo.vue'
 import Button from '@/components/ui/Button.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import { createNewAccount, joinExistingAccount, matchBusy, matchFailure, matchStale } from '@/composables/accountMatch'
 import { useAuth } from '@/composables/useAuth'
 import { isDesktop } from '@/lib/desktop'
 import { onMounted, watch } from 'vue'
@@ -37,10 +39,15 @@ async function exchange(): Promise<void> {
   stageError.value = null
   try {
     const target = await completeSignIn(searchOf(route.query))
-    await router.replace(target)
+    if (target) await router.replace(target)
   } catch {
     // stageError is rendered below.
   }
+}
+
+async function settle(answer: Promise<string | null>) {
+  const target = await answer
+  if (target) await router.replace(target)
 }
 
 onMounted(exchange)
@@ -62,7 +69,19 @@ watch(
         <AppLogo :size="26" />
       </div>
       <div class="surface p-8">
-        <template v-if="stage !== 'error'">
+        <template v-if="stage === 'match'">
+          <h1 class="font-display text-base font-semibold text-foreground">An account with this email or name already exists</h1>
+          <p class="mt-2 text-sm text-muted-foreground">Is it yours? Sign in with it to add this sign-in.</p>
+          <Notice v-if="matchFailure" tone="error" class="mt-4 text-left">{{ matchFailure }}</Notice>
+          <div class="mt-6 flex flex-wrap justify-center gap-2">
+            <Button v-if="matchStale" @click="retry">Sign in again</Button>
+            <template v-else>
+              <Button :disabled="matchBusy" @click="settle(joinExistingAccount())">This is me</Button>
+              <Button variant="outline" :disabled="matchBusy" @click="settle(createNewAccount())">Create a new account</Button>
+            </template>
+          </div>
+        </template>
+        <template v-else-if="stage !== 'error'">
           <Spinner
             show-label
             class="flex-col gap-4 text-sm [&>svg]:size-6 [&>svg]:text-primary"

@@ -2,7 +2,7 @@ import { computed, ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { restoring } from '@/composables/aruna/state'
 import { tokenClaims } from '@/composables/aruna/renewal'
-import { apiRequest } from '@/lib/api'
+import { ApiError, apiRequest } from '@/lib/api'
 import type { RealmInfoResponse } from '@/lib/api'
 import { featureEnabled, portalConfig } from '@/lib/config'
 import { desktopBridge } from '@/lib/desktop'
@@ -27,7 +27,7 @@ const ONBOARDING_KEY = 'aruna.oidc.onboardingSecret'
 const ID_TOKEN_KEY = 'aruna.oidc.idToken'
 const LINK_KEY = 'aruna.oidc.link'
 
-export type SignInStage = 'idle' | 'redirecting' | 'exchanging' | 'registering' | 'done' | 'error'
+export type SignInStage = 'idle' | 'redirecting' | 'exchanging' | 'registering' | 'match' | 'done' | 'error'
 
 const stage = ref<SignInStage>('idle')
 const stageError = ref<string | null>(null)
@@ -48,6 +48,14 @@ export interface ProviderLink {
 }
 
 const providerLink = ref<ProviderLink | null>(null)
+
+/** A new sign-in whose email or name matches an account; its token stays in memory. */
+export interface AccountMatch {
+  oidcToken: string
+  redirectTo: string
+}
+
+export const accountMatch = ref<AccountMatch | null>(null)
 
 interface RegisterUserResponse {
   id: string
@@ -223,16 +231,32 @@ function finishLink(params: URLSearchParams, alias: string): string {
   return window.sessionStorage.getItem(REDIRECT_KEY) || '/app/settings'
 }
 
+/** Opens a session with a realm token, whose account must load; `idToken` ends it at the provider. */
+export async function adoptSession(token: string, idToken?: string): Promise<void> {
+  const aruna = useAruna()
+  aruna.setAuthToken(token)
+  try {
+    await aruna.refresh()
+    if (!aruna.currentUser.value) {
+      throw new Error(aruna.authError.value || 'The issued session could not be validated by this Aruna node.')
+    }
+  } catch (err) {
+    aruna.setAuthToken('')
+    throw err
+  }
+  if (idToken) window.sessionStorage.setItem(ID_TOKEN_KEY, idToken)
+}
+
 /**
  * Completes the flow on /auth/callback: code → Keycloak ID token →
  * register-or-get the Aruna user → exchange for a long-lived Aruna API token.
- * Returns the route to continue to.
+ * Returns the route to continue to, or null when the sign-in matches an account.
  */
-async function completeSignIn(params: URLSearchParams): Promise<string> {
+async function completeSignIn(params: URLSearchParams): Promise<string | null> {
   const aruna = useAruna()
   stageError.value = null
+  accountMatch.value = null
   let consumeTransaction = false
-  let appliedArunaToken = false
   try {
     const state = params.get('state')
     const expectedState = window.sessionStorage.getItem(STATE_KEY)
@@ -272,27 +296,28 @@ async function completeSignIn(params: URLSearchParams): Promise<string> {
     stage.value = 'registering'
     const client = { baseUrl: aruna.apiBaseUrl.value, token: oidcToken }
     const onboardingSecret = window.sessionStorage.getItem(ONBOARDING_KEY)
-    await apiRequest<RegisterUserResponse>(
-      '/access/users/register',
-      {
-        method: 'POST',
-        body: JSON.stringify(onboardingSecret ? { onboarding_secret: onboardingSecret } : {}),
-      },
-      client,
-    )
-    const issued = await apiRequest<GetTokenResponse>('/access/token', {}, client)
-    aruna.setAuthToken(issued.token)
-    appliedArunaToken = true
-    await aruna.refresh()
-    if (!aruna.currentUser.value) {
-      throw new Error(aruna.authError.value || 'The issued session could not be validated by this Aruna node.')
+    try {
+      await apiRequest<RegisterUserResponse>(
+        '/access/users/register',
+        {
+          method: 'POST',
+          body: JSON.stringify(onboardingSecret ? { onboarding_secret: onboardingSecret } : {}),
+        },
+        client,
+      )
+    } catch (err) {
+      if (!(err instanceof ApiError && err.code === 'account_match')) throw err
+      accountMatch.value = { oidcToken, redirectTo: window.sessionStorage.getItem(REDIRECT_KEY) || '/app' }
+      stage.value = 'match'
+      return null
     }
+    const issued = await apiRequest<GetTokenResponse>('/access/token', {}, client)
+    await adoptSession(issued.token)
 
     stage.value = 'done'
     const redirectTo = window.sessionStorage.getItem(REDIRECT_KEY) || '/app'
     return redirectTo
   } catch (err) {
-    if (appliedArunaToken) aruna.setAuthToken('')
     window.sessionStorage.removeItem(ID_TOKEN_KEY)
     stage.value = 'error'
     stageError.value = errorMessage(err)

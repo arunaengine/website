@@ -43,7 +43,7 @@ const AccountMerge = compileClientComponent(new URL('./AccountMerge.vue', import
   '@/composables/useAruna': { useAruna: () => ({ authToken: ref('t'), userInfo }) },
   '@/composables/useAccountMerge': {
     useAccountMerge: () => ({ step, failure, other, result, ...actions }),
-    loginAge: () => age.value,
+    loginFresh: () => age.value <= 240,
   },
   '@/lib/utils': { truncateMiddle: (value: string) => value },
 })
