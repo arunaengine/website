@@ -36,6 +36,7 @@ import MockSidebar from '@/components/data/manager/MockSidebar.vue'
 import DistributionBanner from '@/components/data/manager/DistributionBanner.vue'
 import ObjectBrowser from '@/components/data/manager/ObjectBrowser.vue'
 import UploadPanel from '@/components/data/manager/UploadPanel.vue'
+import VisitorData from '@/components/data/VisitorData.vue'
 import NewNotebookDialog from '@/components/notebook/NewNotebookDialog.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDataManager } from '@/composables/useDataManager'
@@ -53,7 +54,7 @@ import { computed, ref, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import { RouterLink } from 'vue-router'
 import type { ObjectSearchHit, ShareTarget } from '@/lib/api'
-import { ChevronDown, KeyRound, LogIn, Server, ShieldAlert } from '@lucide/vue'
+import { ChevronDown, KeyRound, Server, ShieldAlert } from '@lucide/vue'
 
 const { bootstrapped, currentUser, myGroups } = useAruna()
 const s3 = useS3()
@@ -441,6 +442,12 @@ async function createFolder() {
         <EmptyState v-else title="Pick an example bucket" description="The buckets on the left show example data. Nothing here talks to a node." />
       </section>
 
+      <VisitorData v-else-if="!currentUser">
+        <template #header>
+          <DistributionBanner v-if="storedBucket" :bucket="storedBucket" />
+        </template>
+      </VisitorData>
+
       <Notice v-else-if="!s3.connectedEndpoint.value" tone="warning" class="flex items-start gap-3 p-5 text-sm">
         <ShieldAlert class="mt-0.5 h-4 w-4 shrink-0" />
         <p>
@@ -448,18 +455,6 @@ async function createFolder() {
           <template v-if="desktop">Turn the local S3 endpoint on under This computer.</template>
         </p>
       </Notice>
-
-      <section v-else-if="!currentUser" class="surface p-6">
-        <div class="flex items-start gap-3">
-          <LogIn class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-          <div>
-            <h2 class="font-display text-base font-semibold text-aruna-navy">Sign in to browse data</h2>
-            <p class="mt-2 text-sm text-muted-foreground">
-              The portal then opens a temporary S3 session for your group on {{ requiredNodeName }} and keeps it in memory only.
-            </p>
-          </div>
-        </div>
-      </section>
 
       <section v-else-if="contextError && !contextReady" class="surface p-6">
         <div class="flex items-start gap-3">
