@@ -837,7 +837,7 @@ async function confirmCancel() {
   window.clearTimeout(cancelResetTimer)
   cancelError.value = null
   try {
-    await cancelTask(props.taskId)
+    await cancelTask(props.taskId, props.apiBase)
     task.value = await getTask(props.taskId, 'FULL')
     emit('canceled')
   } catch (err) {

@@ -104,14 +104,15 @@ async function createTask(task: TesTask, baseUrl?: string): Promise<TesCreateTas
 
 // POST /ga4gh/tes/v1/tasks/{id}:cancel (api/src/routes/tes.rs cancel_task). The
 // literal ':cancel' action suffix is required; the handler rejects it otherwise.
-async function cancelTask(id: string): Promise<void> {
+// `baseUrl` names the node that owns the task.
+async function cancelTask(id: string, baseUrl?: string): Promise<void> {
   assertEnabled()
   busy.value = true
   try {
     await request<Record<string, never>>(`/ga4gh/tes/v1/tasks/${encodeURIComponent(id)}:cancel`, {
       method: 'POST',
       body: JSON.stringify({}),
-    })
+    }, baseUrl)
   } finally {
     busy.value = false
   }

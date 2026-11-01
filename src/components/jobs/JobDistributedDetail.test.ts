@@ -253,6 +253,7 @@ const family: JobFamilyResponse = {
 const downloadProvenanceCrate = vi.fn()
 const getFileOrigin = vi.fn(async (..._args: unknown[]) => ({ origin: { kind: 'job', run_id: 'node-job-1' } }))
 
+const cancelTask = vi.fn(async () => undefined)
 function taskPanel(
   getTask: unknown,
   getJob: unknown,
@@ -317,7 +318,7 @@ function panelModules(
     '@/components/onboarding/ClaimWatchStep.vue': moduleDefault(StagesStub),
     '@/composables/useTes': {
       isTesUnsupported: () => false,
-      useTes: () => ({ getTask, cancelTask: vi.fn(), listTasks, busy: ref(false) }),
+      useTes: () => ({ getTask, cancelTask, listTasks, busy: ref(false) }),
     },
     '@/composables/useJobs': { useJobs: () => ({ getJob, deleteJob }) },
     '@/composables/useRealmNodes': {
@@ -1269,6 +1270,21 @@ describe('distributed job detail components', () => {
     expect(content(running.root)).not.toContain('Run again')
     expect(content(running.root)).toContain('Cancel run')
     running.app.unmount()
+
+    // A run another node owns is cancelled on that node.
+    cancelTask.mockClear()
+    vi.stubGlobal('window', { setTimeout: () => 0, clearTimeout: () => undefined })
+    const far = await mount(taskPanel(vi.fn(async () => ({ ...base, state: 'RUNNING' })), getJob), {
+      taskId: 'run',
+      open: true,
+      apiBase: 'https://n2.test/api/v1',
+    })
+    await press(far.root, 'Cancel run')
+    await press(far.root, 'Confirm cancel')
+    await flushPanel()
+    expect(cancelTask).toHaveBeenCalledWith('run', 'https://n2.test/api/v1')
+    far.app.unmount()
+    vi.unstubAllGlobals()
 
     const done = await mount(taskPanel(vi.fn(async () => ({ ...base, state: 'COMPLETE' })), getJob), {
       taskId: 'run',
