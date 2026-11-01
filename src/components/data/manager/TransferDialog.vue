@@ -135,11 +135,11 @@ async function confirm() {
       <DialogHeader>
         <DialogTitle>{{ title }}</DialogTitle>
         <DialogDescription>
-          {{ renaming ? 'Give it a new name.' : `Pick the folder to ${mode} to. Files stay on this node.` }}
+          {{ renaming ? 'Give it a new name.' : `Type the bucket and folder to ${mode} to, such as other-bucket/raw/. Files stay on this node.` }}
         </DialogDescription>
       </DialogHeader>
       <label class="block space-y-1.5">
-        <span class="text-xs font-medium text-foreground">{{ renaming ? 'Name' : 'Folder' }}</span>
+        <span class="text-xs font-medium text-foreground">{{ renaming ? 'Name' : 'Bucket and folder' }}</span>
         <Input
           v-model="text"
           class="font-mono text-xs"

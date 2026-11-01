@@ -53,6 +53,13 @@ async function open() {
 }
 
 describe('transfer dialog', () => {
+  it('says that any bucket of this node may be the target', async () => {
+    const text = content(await open())
+
+    expect(text).toContain('Type the bucket and folder to copy to, such as other-bucket/raw/.')
+    expect(text).toContain('Bucket and folder')
+  })
+
   it('offers the copy online and blocks it offline', async () => {
     expect(button(await open(), 'Copy').props.disabled).toBe(false)
 
