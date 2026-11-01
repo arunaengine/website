@@ -9,12 +9,16 @@ import { formatDate } from '@/lib/utils'
 const DATA_PREFIX = 'https://w3id.org/aruna/data/'
 const GLOBAL_VERSION = /^https:\/\/w3id\.org\/aruna\/data\/[A-Za-z0-9_-]+\/[0-9A-HJKMNP-TV-Z]{26}$/
 
-export type BoxKind = 'file' | 'run' | 'database' | 'source' | 'device' | 'hidden' | 'unversioned' | 'silent'
+export type BoxKind = 'file' | 'dataset' | 'run' | 'system' | 'database' | 'source' | 'person' | 'hidden' | 'unversioned' | 'silent'
 
-/** A link still to read: an exact version, or a run. */
+/** Where a box came from outside the graph: a person, a run, a system job or an external source. */
+export const ORIGIN_KINDS: readonly BoxKind[] = ['person', 'run', 'system', 'source']
+
+/** A link still to read: an exact version, a run, or a dataset's record. */
 export type Hop =
   | { kind: 'version'; id: string; name?: string; digest?: string; role: string }
   | { kind: 'run'; runId: string }
+  | { kind: 'dataset'; documentId: string; role: string }
 
 export interface Box {
   id: string
@@ -30,6 +34,10 @@ export interface Box {
   link?: { label: string; document?: string; url?: string }
   /** A database release: the database's name and the release label, for a box of its files. */
   release?: { name: string; label: string }
+  /** A person's upload: the device it came from, by node id. */
+  device?: string
+  /** An external source: the connector of the node that reads it. */
+  connector?: string
   /** The boxes this one came from. */
   from: string[]
   pending: Hop[]
@@ -39,6 +47,8 @@ export interface Readers {
   origin: (version: string) => Promise<OriginResponse>
   run: (runId: string) => Promise<RunResponse>
   crate: (documentId: string) => Promise<unknown>
+  /** The runs that wrote into a bucket folder a nested dataset links; none when absent. */
+  writers?: (bucket: string, prefix: string, nodeId: string) => Promise<string[]>
 }
 
 export type ProvenanceStart =
@@ -101,14 +111,8 @@ function add(graph: Graph, parent: string | null, child: Box): string {
 /** A file's box, with its database and source added at once and its other links waiting. */
 function fileBox(graph: Graph, parent: string | null, id: string, asked: string, role: string, name: string, origin: OriginResponse) {
   const file = fileNamed(id, 'file', role, name, { detail: formatDate(origin.created_at) })
-  const kind = origin.origin?.kind
-  if (origin.origin?.kind === 'copy') file.pending.push({ kind: 'version', id: origin.origin.from, role: 'Copied from' })
   if (origin.origin?.kind === 'job') file.pending.push({ kind: 'run', runId: origin.origin.run_id })
-  if (origin.hop) file.pending.push({ kind: 'version', id: origin.hop.from, role: 'Synced from' })
   add(graph, parent, file)
-  // A device upload names the device by node id; the view shows its name.
-  const device = origin.origin?.kind === 'upload' ? origin.origin.device : null
-  if (device) add(graph, id, box(`device:${device}`, 'device', 'Uploaded from device', device))
   // Identifiers belong to this file; the database box is shared by every file it lists.
   file.identifiers = origin.identifiers ?? []
   const metadata = origin.bucket_metadata
@@ -126,27 +130,58 @@ function fileBox(graph: Graph, parent: string | null, id: string, asked: string,
       })
       add(graph, id, named)
     }
-    if (releases.length) return addSource(graph, id, kind, origin)
+    if (releases.length) return addOrigin(graph, id, asked, origin)
     // One box per bucket; a file known only by a global id gets its own, never one by title.
     const database = box(`database:${bucketOf(asked) ?? id}`, 'database', 'Bucket with database metadata', title, { detail: unchecked })
     if (metadata.dataset) database.link = { label: 'Open the dataset', document: metadata.dataset }
     add(graph, id, database)
   }
-  addSource(graph, id, kind, origin)
+  addOrigin(graph, id, asked, origin)
 }
 
-function addSource(graph: Graph, id: string, kind: string | undefined, origin: OriginResponse) {
-  const url = kind === 'source' ? origin.source?.url : null
-  if (url) {
-    const title = (() => {
-      try {
-        return new URL(url).host
-      } catch {
-        return url
-      }
-    })()
-    add(graph, id, box(`source:${url}`, 'source', 'Source', title, { link: { label: 'Open the source', url } }))
+function hostOf(url: string): string | null {
+  try {
+    return new URL(url).host || null
+  } catch {
+    return null
   }
+}
+
+/** An external place a link points to, such as a DOI or a web page. */
+function placeBox(url: string, role: string): Box {
+  const doi = /^https?:\/\/(?:dx\.)?doi\.org\/(.+)$/.exec(url)?.[1]
+  const title = doi ? `doi:${doi}` : (hostOf(url) ?? url)
+  return box(`source:${url}`, 'source', role, title, { link: { label: 'Open the source', url } })
+}
+
+/**
+ * Where a version came from outside the graph: the person who uploaded it, or the system job
+ * that made it, with the external source an import read. Files of one import share its boxes.
+ */
+function addOrigin(graph: Graph, id: string, asked: string, response: OriginResponse) {
+  const origin = response.origin
+  const bucket = bucketOf(asked) ?? id
+  if (origin?.kind === 'upload') {
+    const device = origin.device ?? undefined
+    add(graph, id, box(`person:${response.created_by}\n${device ?? ''}`, 'person', 'Uploaded by', response.created_by, device ? { device } : {}))
+  } else if (origin?.kind === 'source') {
+    const place = response.source?.sources?.[0]
+    const url = response.source?.url ?? place?.url ?? null
+    const connector = place?.connector_id ?? undefined
+    const host = url ? hostOf(url) : null
+    const home = host && url ? new URL(url).origin : null
+    const source = box(`source:${host ?? (connector ? '' : bucket)}\n${connector ?? ''}`, 'source', 'External source', host ?? 'External source', {
+      ...(home ? { link: { label: 'Open the source', url: home } } : {}),
+      ...(connector ? { connector } : {}),
+    })
+    add(graph, add(graph, id, box(`import:${bucket}\n${source.id}`, 'system', 'System job', 'Import')), source)
+  } else if (origin?.kind === 'storage') {
+    const folder = box(`storage:${origin.backend_id}`, 'source', 'External source', 'Storage folder', { detail: shortName(origin.backend_id) })
+    add(graph, add(graph, id, box(`import:${bucket}\n${folder.id}`, 'system', 'System job', 'Registration in place')), folder)
+  } else if (origin?.kind === 'copy') {
+    add(graph, id, box(`copy:${id}`, 'system', 'System job', 'Copy', { pending: [{ kind: 'version', id: origin.from, role: 'Copied from' }] }))
+  }
+  if (response.hop) add(graph, id, box(`sync:${id}`, 'system', 'System job', 'Sync', { pending: [{ kind: 'version', id: response.hop.from, role: 'Synced from' }] }))
 }
 
 export function emptyGraph(): Graph {
@@ -164,6 +199,21 @@ export function startFile(graph: Graph, id: string, name: string, origin: Origin
 export function startDataset(graph: Graph, title: string, documentId: string, crate: unknown) {
   const root = box(`dataset:${documentId}`, 'file', 'Dataset', title, { link: { label: 'Open the dataset', document: documentId } })
   add(graph, null, root)
+  graph.seen[root.id] = root.id
+  fillDataset(graph, root, crate)
+}
+
+const DOCUMENT = /^https:\/\/w3id\.org\/aruna\/([0-9A-HJKMNP-TV-Z]{26})$/
+
+// The entity the crate describes: the one its metadata descriptor is about, or `./`.
+function rootEntity(crate: unknown): Record<string, unknown> | undefined {
+  const nodes = graphNodes(crate)
+  const about = values(nodes.find((node) => node['@id'] === 'ro-crate-metadata.json')?.about)[0] ?? './'
+  return nodes.find((node) => node['@id'] === about)
+}
+
+/** A dataset's links: its file parts, its run, the datasets it is based on or holds. */
+function fillDataset(graph: Graph, root: Box, crate: unknown) {
   // A run record lists its run's inputs as parts too; with results they show through the run only.
   const actions = graphNodes(crate).filter((node) => isType(node, 'CreateAction'))
   const results = new Set(actions.flatMap((action) => values(action.result)))
@@ -179,6 +229,17 @@ export function startDataset(graph: Graph, title: string, documentId: string, cr
       const file = add(graph, root.id, fileNamed(part.id, 'unversioned', 'File', part.name, { detail: 'No exact version recorded' }))
       if (run && results.has(part.id)) add(graph, file, run)
     }
+  }
+  const top = rootEntity(crate)
+  for (const target of values(top?.isBasedOn)) {
+    const document = DOCUMENT.exec(target)?.[1]
+    if (document) root.pending.push({ kind: 'dataset', documentId: document, role: 'Based on' })
+    else if (isExactId(target)) root.pending.push({ kind: 'version', id: target, role: 'Based on' })
+    else if (/^https?:\/\//.test(target)) add(graph, root.id, placeBox(target, 'Based on'))
+  }
+  for (const target of values(top?.hasPart)) {
+    const document = DOCUMENT.exec(target)?.[1]
+    if (document) root.pending.push({ kind: 'dataset', documentId: document, role: 'Part' })
   }
 }
 
@@ -272,7 +333,7 @@ const always: Current = () => true
 
 /** Reads one waiting link of `boxId`. */
 async function follow(graph: Graph, boxId: string, hop: Hop, readers: Readers, current: Current) {
-  const asked = hop.kind === 'version' ? hop.id : `run:${hop.runId}`
+  const asked = hop.kind === 'version' ? hop.id : hop.kind === 'run' ? `run:${hop.runId}` : `dataset:${hop.documentId}`
   const known = graph.seen[asked]
   if (known) {
     add(graph, boxId, graph.boxes[known])
@@ -289,6 +350,7 @@ async function follow(graph: Graph, boxId: string, hop: Hop, readers: Readers, c
       else fileBox(graph, boxId, canonical, hop.id, hop.role, hop.name ?? shortName(hop.id), origin)
       return
     }
+    if (hop.kind === 'dataset') return await followDataset(graph, boxId, hop, readers, current)
     const run = await readers.run(hop.runId)
     const crate = run.run_crate ? await readers.crate(run.run_crate) : null
     if (!current()) return
@@ -314,6 +376,25 @@ async function follow(graph: Graph, boxId: string, hop: Hop, readers: Readers, c
   }
 }
 
+async function followDataset(graph: Graph, boxId: string, hop: Hop & { kind: 'dataset' }, readers: Readers, current: Current) {
+  const crate = await readers.crate(hop.documentId)
+  // A nested dataset's linked buckets name the runs that wrote into them; a failed ask adds none.
+  const buckets = readers.writers ? linkedBuckets(crate) : []
+  const writers = await Promise.all(buckets.map((part) => readers.writers!(part.bucket, part.prefix, part.nodeId).catch(() => [])))
+  if (!current()) return
+  const id = `dataset:${hop.documentId}`
+  graph.seen[id] = id
+  const name = rootEntity(crate)?.name
+  const created = box(id, 'dataset', hop.role, typeof name === 'string' ? name : `Dataset ${shortName(hop.documentId)}`, {
+    link: { label: 'Open the dataset', document: hop.documentId },
+  })
+  add(graph, boxId, created)
+  fillDataset(graph, created, crate)
+  for (const runId of new Set(writers.flat())) {
+    if (!created.pending.some((each) => each.kind === 'run' && each.runId === runId)) created.pending.push({ kind: 'run', runId })
+  }
+}
+
 /** Why a run shows no record: its crate state, as its node reported it to the submitter. */
 export function runRecordDetail(status: RunResponse['run_crate_status']): string {
   if (status?.status === 'local') return 'Run record kept on the device'
@@ -326,17 +407,18 @@ export function runRecordDetail(status: RunResponse['run_crate_status']): string
 /** A link the user may not read: named by a global id or content id, never by bucket or key. */
 function hiddenBox(graph: Graph, parent: string, hop: Hop): string {
   const role = hop.kind === 'run' ? 'Run' : hop.role
-  const label = hop.kind === 'run' ? '' : GLOBAL_VERSION.test(hop.id) ? hop.id : isContentId(hop.digest) ? hop.digest : ''
+  const label = hop.kind !== 'version' ? '' : GLOBAL_VERSION.test(hop.id) ? hop.id : isContentId(hop.digest) ? hop.digest : ''
   const id = label || `hidden:${Object.keys(graph.boxes).length}`
   const detail = label ? shortName(label) : undefined
   return add(graph, parent, box(id, 'hidden', role, 'Not visible to you', { detail }))
 }
 
-/** Reads every waiting link of one box. */
-export async function expand(graph: Graph, boxId: string, readers: Readers, current: Current = always) {
+/** Reads the waiting links of one box: every one, or those `only` picks. */
+export async function expand(graph: Graph, boxId: string, readers: Readers, current: Current = always, only?: (hop: Hop) => boolean) {
   const opened = graph.boxes[boxId]
   if (!opened) return
-  const hops = opened.pending.splice(0)
+  const hops = opened.pending.filter((hop) => !only || only(hop))
+  opened.pending = opened.pending.filter((hop) => !hops.includes(hop))
   if (opened.kind === 'silent') {
     // A retry replaces the box that did not answer.
     const parent = Object.values(graph.boxes).find((item) => item.from.includes(boxId))
@@ -432,22 +514,32 @@ export interface ChainCard {
   upstream: boolean
 }
 
+/** Whether a drawn entry says where its target came from, so a closed card still shows it. */
+export function isOrigin(graph: Graph, node: DrawnNode): boolean {
+  const item = graph.boxes[node.ids[0]!]
+  if (!item) return false
+  return ORIGIN_KINDS.includes(item.kind) || ((item.kind === 'hidden' || item.kind === 'silent') && item.role === 'Run')
+}
+
 /**
  * Places the drawn chain in columns; `direct` keeps the start, its runs, their inputs, and the run
  * that made each input with that run's inputs. `opened` opens or closes single cards over that.
+ * A closed card still shows where it came from, closed in turn.
  */
 export function chainColumns(graph: Graph, chain: DrawnNode[], direct: boolean, opened?: ReadonlyMap<string, boolean>) {
-  const isRun = (node: DrawnNode) => graph.boxes[node.ids[0]!]?.kind === 'run'
+  // A system job made its files as a run made its results.
+  const isRun = (node: DrawnNode) => ['run', 'system'].includes(graph.boxes[node.ids[0]!]?.kind ?? '')
   const placed: (Omit<ChainCard, 'column'> & { depth: number })[] = []
   let next = 0
   // `runs` counts the runs between the start and this card; `byRun` says a run used this card.
-  const place = (node: DrawnNode, depth: number, into: string | null, runs: number, byRun: boolean): number => {
+  const place = (node: DrawnNode, depth: number, into: string | null, runs: number, byRun: boolean, peek = false): number => {
     const id = `${into ?? ''}>${node.key}`
     const run = isRun(node)
     const crossed = runs + Number(run)
     const shown = depth === 0 || (run && crossed <= 2) || (byRun && crossed === 1)
-    const open = opened?.get(id) ?? (!direct || shown)
-    const rows = (open ? node.sources : []).map((source) => place(source, depth + 1, id, crossed, run))
+    const open = opened?.get(id) ?? (!peek && (!direct || shown))
+    const sources = open ? node.sources : node.sources.filter((source) => isOrigin(graph, source))
+    const rows = sources.map((source) => place(source, depth + 1, id, crossed, run, !open))
     const row = rows.length ? Math.round(rows[0]! + rows[rows.length - 1]!) / 2 : next++
     placed.push({ id, node, depth, row, into, open, upstream: crossed >= 2 })
     return row

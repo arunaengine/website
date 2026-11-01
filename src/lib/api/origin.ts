@@ -37,6 +37,8 @@ export interface OriginSource {
   path: string
   etag?: string | null
   digests: OriginSourceDigest[]
+  /** Every source of the version, all equal; the first is the one `url` and `path` name. */
+  sources?: Array<{ url?: string | null; path: string; connector_id?: string | null }>
 }
 
 export type OriginProjection =

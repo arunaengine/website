@@ -10,12 +10,14 @@ import ExternalLink from '@/components/ui/ExternalLink.vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
-import { ArrowDown, CloudOff, Database, Download, EyeOff, File, FileText, Files, GitBranch, Globe, Info, Laptop, Minus, MoveRight, Network, Plus, RotateCw, Workflow } from '@lucide/vue'
+import { ArrowDown, CloudOff, Database, Download, EyeOff, File, FileText, Files, GitBranch, Globe, Info, ListTodo, Minus, MoveRight, Network, Plus, RotateCw, UserRound, Workflow } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import { useUserDirectory } from '@/composables/useUserDirectory'
 import { apiErrorMessage } from '@/lib/api'
 import { folderRoute, objectRoute } from '@/lib/crate/dataIdentity'
 import { splitName } from '@/lib/objectListing'
+import { shortUserId } from '@/lib/utils'
 import {
   addWriters,
   chainColumns,
@@ -23,6 +25,7 @@ import {
   emptyGraph,
   expand,
   intoRecord,
+  isOrigin,
   linkedBuckets,
   startDataset,
   startFile,
@@ -30,6 +33,7 @@ import {
   type ChainCard,
   type DrawnNode,
   type Graph,
+  type Hop,
   type ProvenanceStart,
   type Readers,
 } from '@/lib/provenance'
@@ -40,13 +44,15 @@ const props = defineProps<{
   record?: { files: number; path: string; to: RouteLocationRaw | null; runId?: string; where?: string } | null
 }>()
 
-const { getVersionOrigin, getRun, getBucketRuns, fetchRoCrateRaw, downloadProvenanceCrate, runSparql, sessionEpoch } = useAruna()
+const { getVersionOrigin, getRun, getBucketRuns, fetchRoCrateRaw, downloadProvenanceCrate, runSparql, listGroupConnectors, myGroups, sessionEpoch } = useAruna()
 const { displayName } = useRealmNodes()
+const users = useUserDirectory()
 
 const readers: Readers = {
   origin: (version) => getVersionOrigin(version),
   run: (runId) => getRun(runId),
   crate: (documentId) => fetchRoCrateRaw(documentId),
+  writers: async (bucket, prefix, nodeId) => (await getBucketRuns(bucket, prefix, nodeId)).runs.map((run) => run.run_id),
 }
 
 const graph = reactive<Graph>(emptyGraph())
@@ -99,16 +105,25 @@ async function readWriters(documentId: string, crate: unknown) {
 }
 
 // The open cards; a run record's results are not read, its card counts them.
-const waiting = (item: Box | undefined) => Boolean(item?.pending.length) && item!.kind !== 'silent' && !(item!.id.startsWith('dataset:') && props.record)
-const unread = computed(() => layout.value.cards.some((card) => card.open && card.node.ids.some((id) => waiting(graph.boxes[id]))))
+const waiting = (item: Box | undefined) => Boolean(item?.pending.length) && item!.kind !== 'silent' && !(item!.id === graph.roots[0] && props.record)
+// A closed card reads only the run that made it, which it shows.
+const ownRun = (hop: Hop) => hop.kind === 'run'
+const readable = (card: ChainCard, item: Box | undefined) => waiting(item) && (card.open || item!.pending.some(ownRun))
+const unread = computed(() => layout.value.cards.some((card) => card.node.ids.some((id) => readable(card, graph.boxes[id]))))
+// The level being read, counted from the start, and the links still waiting on the drawn cards.
+const level = ref(0)
+const left = computed(() => layout.value.cards.flatMap((card) => card.node.ids.filter((id) => readable(card, graph.boxes[id])).map((id) => graph.boxes[id]!.pending.filter((hop) => card.open || ownRun(hop)).length)).reduce((sum, count) => sum + count, 0))
+// Reads level by level: the waiting card nearest the start goes first, so the graph grows outward.
 async function readDirect() {
   const current = fenced()
   const run = ++reading
   walking.value = true
   for (;;) {
-    const next = layout.value.cards.filter((card) => card.open).flatMap((card) => card.node.ids).find((id) => waiting(graph.boxes[id]))
+    const cards = layout.value.cards
+    const next = cards.flatMap((card) => card.node.ids.filter((id) => readable(card, graph.boxes[id])).map((id) => ({ id, card }))).sort((a, b) => b.card.column - a.card.column)[0]
     if (!next || run !== reading || !current()) break
-    await expand(graph, next, readers, current)
+    level.value = layout.value.columns - next.card.column
+    await expand(graph, next.id, readers, current, next.card.open ? undefined : ownRun)
   }
   if (run === reading) walking.value = false
 }
@@ -207,7 +222,50 @@ function placeOf(item: Box): RouteLocationRaw | undefined {
   return bucket ? folderRoute(bucket, '') : undefined
 }
 
-const ICONS: Record<Box['kind'], Component> = { file: File, unversioned: File, run: Workflow, database: Database, source: Globe, device: Laptop, hidden: EyeOff, silent: CloudOff }
+// Boxes outside the data keep their role, also upstream: a person, a system job, a source.
+const OUTSIDE: Box['kind'][] = ['person', 'system', 'source']
+const ICONS: Record<Box['kind'], Component> = {
+  file: File,
+  dataset: FileText,
+  unversioned: File,
+  run: Workflow,
+  system: ListTodo,
+  database: Database,
+  source: Globe,
+  person: UserRound,
+  hidden: EyeOff,
+  silent: CloudOff,
+}
+
+// People and connectors are named by id; their names are looked up once per view.
+watch(
+  () => [...new Set(Object.values(graph.boxes).filter((item) => item.kind === 'person').map((item) => item.title))],
+  (ids) => {
+    if (ids.length) void users.resolveUsers(ids)
+  },
+)
+const connectorNames = ref(new Map<string, string>())
+let namesEpoch = -1
+watch(
+  () => [sessionEpoch.value, Object.values(graph.boxes).some((item) => item.connector)] as const,
+  async ([epoch, wanted]) => {
+    if (!wanted || namesEpoch === epoch) return
+    namesEpoch = epoch
+    connectorNames.value = new Map()
+    const answers = await Promise.all(myGroups.value.map((group) => listGroupConnectors(group.id).catch(() => null)))
+    if (epoch !== sessionEpoch.value) return
+    connectorNames.value = new Map(answers.flatMap((answer) => answer?.connectors.map((each) => [each.connector_id, each.name] as const) ?? []))
+  },
+)
+
+function originDetail(item: Box): string {
+  if (item.kind === 'person' && item.device) return `Device: ${displayName(item.device)}`
+  if (item.connector) {
+    const name = connectorNames.value.get(item.connector)
+    return name ? `Connector: ${name}` : 'Through a connector'
+  }
+  return item.detail ?? ''
+}
 
 interface Shown {
   icon: Component
@@ -227,15 +285,17 @@ interface Shown {
 }
 
 // What a closed card holds back: the cards before it, and whether links there are still unread.
-function before(node: DrawnNode): { count: number; unread: boolean } {
+// `shown` leaves out the sources a closed card draws anyway: where it came from.
+function before(node: DrawnNode, shown = false): { count: number; unread: boolean } {
   const unread = node.ids.some((id) => graph.boxes[id]?.pending.length && graph.boxes[id]!.kind !== 'silent')
-  return node.sources.map(before).reduce((sum, each) => ({ count: sum.count + 1 + each.count, unread: sum.unread || each.unread }), { count: 0, unread })
+  const hidden = shown ? node.sources.filter((source) => !isOrigin(graph, source)) : node.sources
+  return hidden.map((source) => before(source)).reduce((sum, each) => ({ count: sum.count + 1 + each.count, unread: sum.unread || each.unread }), { count: 0, unread })
 }
 
 // Every card but the start opens and closes what came before it, in place.
 function earlierOf(card: ChainCard): Shown['earlier'] {
   if (!card.into || card.node.repeat) return undefined
-  const { count, unread } = before(card.node)
+  const { count, unread } = before(card.node, true)
   if (!count && !unread) return undefined
   if (card.open) return { open: true, text: 'Hide', label: 'Hide earlier steps' }
   const steps = `${count}${unread ? '+' : ''} ${count === 1 && !unread ? 'step' : 'steps'}`
@@ -278,8 +338,8 @@ function shown(card: ChainCard): Shown {
     ...base,
     icon: me && props.start.kind === 'dataset' ? FileText : ICONS[item.kind],
     role: item.role,
-    title: item.kind === 'device' ? displayName(item.title) : item.title,
-    detail: repeat || item.detail || (run && run === props.record?.runId ? props.record.where ?? '' : ''),
+    title: item.kind === 'person' ? (users.cachedUser(item.title)?.name || shortUserId(item.title)) : item.title,
+    detail: repeat || originDetail(item) || (run && run === props.record?.runId ? props.record.where ?? '' : ''),
     mono: item.kind === 'hidden',
     path: item.path,
     identifiers: item.identifiers,
@@ -331,7 +391,7 @@ const CardView = defineComponent({
       // Steps made by a run of an input read as upstream; the icon still tells a run from a file.
       const head = [
         h(view.icon, { class: ['h-3.5 w-3.5 shrink-0', view.me ? 'text-aruna-navy dark:text-aruna-aqua' : 'text-muted-foreground'], 'aria-hidden': 'true' }),
-        h('span', { class: 'truncate' }, cardProps.card.upstream ? 'Upstream' : view.role),
+        h('span', { class: 'truncate' }, cardProps.card.upstream && !OUTSIDE.includes(graph.boxes[cardProps.card.node.ids[0]!]?.kind ?? 'file') ? 'Upstream' : view.role),
       ]
       if (view.me && props.start.kind === 'dataset') head.push(h('span', { class: 'ml-auto shrink-0 font-medium text-aruna-navy dark:text-aruna-aqua' }, 'This record'))
       if (view.action) {
@@ -395,16 +455,18 @@ watch(() => [props.start, sessionEpoch.value, opened.value], () => void readDire
 const INFO = 'You only see what you are allowed to read.'
 const LEGEND = [
   { icon: MoveRight, label: 'Flows from source to result' },
-  { icon: Globe, label: 'Source' },
-  { icon: Laptop, label: 'Device' },
-  { icon: File, label: 'File' },
-  { icon: Database, label: 'Database' },
+  { icon: UserRound, label: 'Uploaded by a person' },
   { icon: Workflow, label: 'Run' },
+  { icon: ListTodo, label: 'System job' },
+  { icon: Globe, label: 'External source' },
+  { icon: File, label: 'File' },
+  { icon: FileText, label: 'Dataset' },
+  { icon: Database, label: 'Database' },
 ]
 // The legend names only what the graph draws; the arrow is always drawn.
 const legend = computed(() => {
   const drawn = new Set(layout.value.cards.map((card) => shown(card).icon))
-  if (drawn.has(Files) || drawn.has(FileText)) drawn.add(File)
+  if (drawn.has(Files)) drawn.add(File)
   return LEGEND.filter((item) => item.icon === MoveRight || drawn.has(item.icon))
 })
 </script>
@@ -423,7 +485,10 @@ const legend = computed(() => {
       <Tooltip :label="INFO">
         <button type="button" class="inline-flex rounded-full text-muted-foreground hover:text-foreground" aria-label="About provenance"><Info class="size-4" /></button>
       </Tooltip>
-      <Button size="sm" variant="outline" class="ml-auto" :disabled="exporting" @click="exportCrate"><Download class="h-4 w-4" /> Export as crate</Button>
+      <Button v-if="!full" size="sm" variant="outline" class="ml-auto" @click="showFull(true)"><Network class="h-4 w-4" /> Show full graph</Button>
+      <Button v-else-if="!walking && unread" size="sm" variant="outline" class="ml-auto" @click="readDirect"><Network class="h-4 w-4" /> Read the rest</Button>
+      <Button v-else-if="!walking" size="sm" variant="outline" class="ml-auto" @click="showFull(false)"><Network class="h-4 w-4" /> Show direct steps</Button>
+      <Button size="sm" variant="outline" :class="full && walking ? 'ml-auto' : ''" :disabled="exporting" @click="exportCrate"><Download class="h-4 w-4" /> Export as crate</Button>
     </div>
     <Notice v-if="exportError" tone="error">{{ exportError }}</Notice>
     <p v-else-if="exported" role="status" class="text-xs text-muted-foreground">Saved as provenance.zip.</p>
@@ -431,7 +496,7 @@ const legend = computed(() => {
     <div :class="start.kind === 'dataset' ? 'surface overflow-hidden' : ''">
       <div v-if="walking" role="status" class="flex flex-wrap items-center gap-2 px-4 pt-3 text-xs text-muted-foreground">
         <Spinner v-if="full" />
-        {{ full ? 'Reading the full graph' : 'Reading' }}: {{ graph.steps }} steps read
+        {{ full ? `Reading the full graph, level ${level}` : 'Reading' }}: {{ graph.steps }} {{ graph.steps === 1 ? 'step' : 'steps' }} read, {{ left }} waiting
         <button type="button" class="text-primary hover:underline" @click="stop">Stop</button>
       </div>
       <div ref="pane" :class="start.kind === 'dataset' ? 'p-4' : 'py-2'">
@@ -470,9 +535,9 @@ const legend = computed(() => {
           <li v-for="name in fold.names" :key="name" class="break-words [overflow-wrap:anywhere]">{{ name }}</li>
         </ul>
       </div>
-      <div v-if="!narrow && start.kind === 'dataset'" class="flex flex-wrap gap-x-5 gap-y-1 border-t border-border-subtle px-5 py-3 text-xs text-muted-foreground">
+      <div v-if="!narrow" class="flex flex-wrap gap-x-5 gap-y-1 border-t border-border-subtle text-xs text-muted-foreground" :class="start.kind === 'dataset' ? 'px-5 py-3' : 'pt-3'">
         <span v-for="item in legend" :key="item.label" class="inline-flex items-center gap-1.5"><component :is="item.icon" class="h-3.5 w-3.5" aria-hidden="true" />{{ item.label }}</span>
-        <span class="inline-flex items-center gap-1.5"><span class="inline-block h-2.5 w-3.5 rounded-sm border-2 border-aruna-aqua" aria-hidden="true" />This record</span>
+        <span v-if="start.kind === 'dataset'" class="inline-flex items-center gap-1.5"><span class="inline-block h-2.5 w-3.5 rounded-sm border-2 border-aruna-aqua" aria-hidden="true" />This record</span>
       </div>
     </div>
 

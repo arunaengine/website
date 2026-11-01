@@ -68,14 +68,14 @@ describe('provenance graph', () => {
     expect(hasPending(graph)).toBe(false)
   })
 
-  it('names the device a run input was uploaded from', async () => {
+  it('names the person and device a run input was uploaded from', async () => {
     const read = readers({ [arn('b.faa', V2)]: origin({ origin: { kind: 'upload', node_id: 'n1', device: 'd1' } }) }, runCrate)
     const graph = emptyGraph()
     startFile(graph, arn('out.tsv', V1), 'out.tsv', origin({ origin: { kind: 'job', run_id: 'r1' } }))
     await expandAll(graph, read, () => false)
 
-    expect(graph.boxes[arn('b.faa', V2)].from).toEqual(['device:d1'])
-    expect(graph.boxes['device:d1']).toMatchObject({ kind: 'device', role: 'Uploaded from device', title: 'd1' })
+    expect(graph.boxes[arn('b.faa', V2)].from).toEqual(['person:u1\nd1'])
+    expect(graph.boxes['person:u1\nd1']).toMatchObject({ kind: 'person', role: 'Uploaded by', title: 'u1', device: 'd1' })
   })
 
   it('reads each version once, also in a cycle', async () => {
@@ -86,7 +86,10 @@ describe('provenance graph', () => {
     await expandAll(graph, read, () => false)
 
     expect(read.origin).toHaveBeenCalledTimes(1)
-    expect(graph.boxes[b].from).toEqual([a])
+    expect(graph.boxes[b].from).toEqual([`copy:${b}`])
+    expect(graph.boxes[`copy:${b}`]).toMatchObject({ kind: 'system', title: 'Copy', from: [a] })
+    expect(graph.boxes[`copy:${a}`].from).toEqual([b])
+    expect(drawnChain(graph)[0]!.sources[0]!.sources[0]!.sources[0]!.sources).toEqual([])
   })
 
   it('names a hidden file by its content id only, and lets a silent node be asked again', async () => {
@@ -296,6 +299,94 @@ describe('provenance graph', () => {
     expect(unchecked.boxes['database:node/lab'].detail).toBe('Release membership could not be checked everywhere.')
   })
 
+  it('gives every file the person, system job or external source it came from', () => {
+    const graph = emptyGraph()
+    const ncbi = (key: string) => origin({
+      origin: { kind: 'source' },
+      source: { url: `https://ftp.ncbi.nlm.nih.gov/genomes/${key}`, path: key, digests: [], sources: [{ url: `https://ftp.ncbi.nlm.nih.gov/genomes/${key}`, path: key, connector_id: 'c1' }] },
+    })
+    startFile(graph, arn('a.fna', V1), 'a.fna', ncbi('a.fna'))
+    startFile(graph, arn('b.fna', V2), 'b.fna', ncbi('b.fna'))
+    const [a, b] = [graph.boxes[arn('a.fna', V1)]!, graph.boxes[arn('b.fna', V2)]!]
+    // Files of one import share its boxes, so they fold into one card.
+    expect(a.from).toEqual(b.from)
+    const job = graph.boxes[a.from[0]!]!
+    expect(job).toMatchObject({ kind: 'system', role: 'System job', title: 'Import' })
+    expect(graph.boxes[job.from[0]!]).toMatchObject({ kind: 'source', title: 'ftp.ncbi.nlm.nih.gov', connector: 'c1', link: { url: 'https://ftp.ncbi.nlm.nih.gov' } })
+
+    // A private source without a URL is still drawn, by its connector.
+    startFile(graph, arn('c', V1), 'c', origin({ origin: { kind: 'source' }, source: { path: 'c', digests: [], sources: [{ path: 'c', connector_id: 'c2' }] } }))
+    const hidden = graph.boxes[graph.boxes[graph.boxes[arn('c', V1)]!.from[0]!]!.from[0]!]!
+    expect(hidden).toMatchObject({ kind: 'source', title: 'External source', connector: 'c2' })
+    expect(hidden.link).toBeUndefined()
+
+    startFile(graph, arn('d', V1), 'd', origin({ origin: { kind: 'upload', node_id: 'n1' } }))
+    expect(graph.boxes[graph.boxes[arn('d', V1)]!.from[0]!]).toMatchObject({ kind: 'person', role: 'Uploaded by', title: 'u1' })
+    startFile(graph, arn('e', V1), 'e', origin({ origin: { kind: 'storage', backend_id: '01K8W1B3D5F7H9KMQ1S3V5X7ZB', key: 'raw/e' } }))
+    const registration = graph.boxes[graph.boxes[arn('e', V1)]!.from[0]!]!
+    expect(registration).toMatchObject({ kind: 'system', title: 'Registration in place' })
+    expect(graph.boxes[registration.from[0]!]).toMatchObject({ kind: 'source', title: 'Storage folder' })
+    startFile(graph, arn('f', V1), 'f', origin({ origin: { kind: 'upload', node_id: 'n1' }, hop: { relationship_id: 's1', from: arn('g', V2) } }))
+    const sync = graph.boxes[`sync:${arn('f', V1)}`]!
+    expect(sync).toMatchObject({ kind: 'system', title: 'Sync', pending: [{ kind: 'version', id: arn('g', V2), role: 'Synced from' }] })
+  })
+
+  it('follows what a dataset is based on and the datasets it holds, and stops at a cycle', async () => {
+    const DOC = '01K8W1B3D5F7H9KMQ1S3V5X7ZD'
+    const PART = '01K8W1B3D5F7H9KMQ1S3V5X7ZE'
+    const root = {
+      '@graph': [
+        { '@id': 'ro-crate-metadata.json', about: { '@id': './' } },
+        {
+          '@id': './',
+          '@type': 'Dataset',
+          isBasedOn: [{ '@id': `https://w3id.org/aruna/${DOC}` }, { '@id': arn('a.faa', V1) }, { '@id': 'https://doi.org/10.5281/zenodo.1' }],
+          hasPart: [{ '@id': `https://w3id.org/aruna/${PART}` }],
+        },
+      ],
+    }
+    const graph = emptyGraph()
+    startDataset(graph, 'Annotations', 'd0', root)
+    const start = graph.boxes['dataset:d0']!
+    expect(start.pending).toEqual([
+      { kind: 'dataset', documentId: DOC, role: 'Based on' },
+      { kind: 'version', id: arn('a.faa', V1), role: 'Based on' },
+      { kind: 'dataset', documentId: PART, role: 'Part' },
+    ])
+    expect(graph.boxes['source:https://doi.org/10.5281/zenodo.1']).toMatchObject({ kind: 'source', role: 'Based on', title: 'doi:10.5281/zenodo.1' })
+
+    // The first dataset is based on the start again and names a bucket written by a run.
+    const based = {
+      '@graph': [
+        { '@id': './', '@type': 'Dataset', name: 'Bakta database', isBasedOn: { '@id': 'https://w3id.org/aruna/d0' }, hasPart: { '@id': 'arn:aruna:realm:n2:s3/bakta-db/' } },
+        { '@id': 'arn:aruna:realm:n2:s3/bakta-db/', '@type': 'Dataset' },
+      ],
+    }
+    const read = readers({ [arn('a.faa', V1)]: origin({ origin: { kind: 'upload', node_id: 'n1' } }) })
+    read.crate = vi.fn(async (doc: string) => (doc === DOC ? based : { '@graph': [{ '@id': './', '@type': 'Dataset', isBasedOn: { '@id': `https://w3id.org/aruna/${DOC}` } }] }))
+    read.writers = vi.fn(async () => ['prep'])
+    await expandAll(graph, read, () => false)
+
+    const database = graph.boxes[`dataset:${DOC}`]!
+    expect(database).toMatchObject({ kind: 'dataset', role: 'Based on', title: 'Bakta database', link: { document: DOC } })
+    expect(read.writers).toHaveBeenCalledWith('bakta-db', '', 'n2')
+    expect(database.from).toContain('run:prep')
+    // The nested part is based on the first dataset, read once and drawn without its chain again.
+    expect(graph.boxes[`dataset:${PART}`]!.from).toEqual([`dataset:${DOC}`])
+    expect(read.crate).toHaveBeenCalledTimes(3)
+    expect(hasPending(graph)).toBe(false)
+  })
+
+  it('reads only the links a closed card asks for', async () => {
+    const graph = emptyGraph()
+    graph.boxes.x = { id: 'x', kind: 'file', role: 'File', title: 'x', identifiers: [], from: [], pending: [{ kind: 'version', id: arn('a.faa', V1), role: 'Input file' }, { kind: 'run', runId: 'r1' }] }
+    const read = readers({}, runCrate)
+    await expand(graph, 'x', read, () => true, (hop) => hop.kind === 'run')
+    expect(read.run).toHaveBeenCalledWith('r1')
+    expect(read.origin).not.toHaveBeenCalled()
+    expect(graph.boxes.x!.pending).toEqual([{ kind: 'version', id: arn('a.faa', V1), role: 'Input file' }])
+  })
+
   it('drops an answer that comes back after the view moved on', async () => {
     let answer: (value: OriginResponse) => void = () => {}
     const read = readers({})
@@ -398,6 +489,7 @@ describe('chain columns', () => {
     const direct = chainColumns(graph, [later!], true)
     expect(direct.cards.map((card) => [card.node.ids[0], card.open, card.upstream])).toEqual([
       ['genome', true, false],
+      ['source:zenodo', false, false],
       ['release:6', false, false],
       ['tarball', false, true],
       ['run:prep', true, true],
@@ -410,7 +502,7 @@ describe('chain columns', () => {
     const db = direct.cards.find((card) => card.node.ids[0] === 'db')!
     const run = direct.cards.find((card) => card.node.ids[0] === 'run:r1')!
     const shut = chainColumns(graph, [later!], true, new Map([[db.id, false]]))
-    expect(shut.cards.map((card) => [card.node.ids[0], card.open])).toEqual([['genome', true], ['db', false], ['run:r1', true], ['dataset:d1', true]])
+    expect(shut.cards.map((card) => [card.node.ids[0], card.open])).toEqual([['genome', true], ['run:prep', false], ['db', false], ['run:r1', true], ['dataset:d1', true]])
     const closed = chainColumns(graph, [later!], true, new Map([[run.id, false]]))
     expect(closed.cards.map((card) => card.node.ids[0])).toEqual(['run:r1', 'dataset:d1'])
   })
@@ -428,7 +520,9 @@ describe('chain columns', () => {
 
     const chain = drawnChain(graph)
     const direct = chainColumns(graph, chain, true)
+    // The closed input still shows the run that made it, closed too.
     expect(direct.cards.map((card) => [card.node.ids[0], card.open, card.upstream])).toEqual([
+      ['run:c', false, true],
       ['y', false, true],
       ['run:b', true, true],
       ['x', true, false],

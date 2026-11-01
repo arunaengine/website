@@ -12,8 +12,11 @@ const aruna = vi.hoisted(() => ({
   fetchRoCrateRaw: vi.fn(),
   downloadProvenanceCrate: vi.fn(),
   runSparql: vi.fn(),
+  listGroupConnectors: vi.fn(async () => ({ connectors: [{ connector_id: 'c1', name: 'NCBI FTP' }] })),
+  myGroups: { value: [{ id: 'g1' }] },
   sessionEpoch: { value: 1 },
 }))
+const resolveUsers = vi.hoisted(() => vi.fn(async () => []))
 
 const Slotted = (tag: string) =>
   defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()) })
@@ -21,7 +24,7 @@ const Slotted = (tag: string) =>
 const component = compileClientComponent(new URL('./ProvenanceView.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/ExternalLink.vue': { __esModule: true, default: defineComponent({ props: { href: String, label: String }, setup: (props) => () => h('a', { href: props.href }, props.label) }) },
-  '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => h('i')) }),
+  '@lucide/vue': new Proxy({} as Record<string | symbol, unknown>, { get: (icons, name) => (icons[name] ??= defineComponent(() => () => h('i'))) }),
   '@vueuse/core': { useElementSize: () => ({ width: ref(0) }) },
   'vue-router': { RouterLink: defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => h('a', { to: props.to }, slots.default?.()) }) },
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
@@ -33,6 +36,8 @@ const component = compileClientComponent(new URL('./ProvenanceView.vue', import.
   '@/lib/objectListing': { splitName: (name: string) => [name, ''] },
   '@/composables/useAruna': { useAruna: () => aruna },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => `node ${id}` }) },
+  '@/composables/useUserDirectory': { useUserDirectory: () => ({ resolveUsers, cachedUser: (id: string) => (id === 'u' ? { user_id: 'u', name: 'Ada Lovelace' } : null) }) },
+  '@/lib/utils': { shortUserId: (id: string) => `user ${id}` },
   '@/composables/useDatabases': { useDatabases: () => ({ rows: ref([]) }) },
   '@/lib/api': { apiErrorMessage: (cause: unknown) => (cause as Error).message },
   '@/lib/provenance': Provenance,
@@ -86,22 +91,29 @@ describe('provenance view', () => {
     expect(run?.props.to).toEqual({ name: 'dataset', params: { id: 'doc1' } })
   })
 
-  it('shows where an input came from at once, and closes and opens it in place', async () => {
-    aruna.getVersionOrigin.mockReset().mockResolvedValue(origin({ origin: { kind: 'source' } as never, source: { url: 'https://example.org/in.faa' } as never }))
+  it('shows the import and external source of an input, also when the input is closed', async () => {
+    const source = { url: 'https://example.org/in.faa', path: 'in.faa', digests: [], sources: [{ url: 'https://example.org/in.faa', path: 'in.faa', connector_id: 'c1' }] }
+    const database = { bucket_metadata: { database: true, dataset: 'd1' }, description: { title: 'BakRep', identifiers: [] } }
+    aruna.getVersionOrigin.mockReset().mockResolvedValue(origin({ origin: { kind: 'source' }, source, ...database }))
     const root = await render()
-    await vi.waitFor(() => expect(content(root)).toContain('example.org'))
+    await vi.waitFor(() => expect(content(root)).toContain('Connector: NCBI FTP'))
     expect(content(root)).toContain('in.faa')
-    expect(content(root)).not.toContain('Full chain')
-    const source = nodes(root).find((node) => node.tag === 'a' && node.props.href === 'https://example.org/in.faa')
-    expect(content(source!)).toContain('example.org')
+    expect(content(root)).toContain('System jobImport')
+    expect(aruna.listGroupConnectors).toHaveBeenCalledWith('g1')
+    const link = nodes(root).find((node) => node.tag === 'a' && node.props.href === 'https://example.org')
+    expect(content(link!)).toBe('example.org')
 
+    // Closing the input hides its database but keeps where it came from.
     const toggle = () => nodes(root).find((node) => node.tag === 'button' && node.props['aria-expanded'] !== undefined && content(node) !== 'Show the files')!
     expect(toggle().props['aria-label']).toBe('Hide earlier steps')
     await click(toggle())
-    expect(content(root)).not.toContain('example.org')
+    expect(content(root)).not.toContain('BakRep')
+    expect(content(root)).toContain('example.org')
     expect(toggle().props['aria-label']).toBe('Show 1 step before this')
     await click(toggle())
-    await vi.waitFor(() => expect(content(root)).toContain('example.org'))
+    await vi.waitFor(() => expect(content(root)).toContain('BakRep'))
+    expect(content(root)).toContain('System job')
+    expect(content(root)).toContain('External source')
   })
 
   it('shows the runs that wrote into the bucket a dataset names, asked on its node', async () => {
@@ -117,11 +129,12 @@ describe('provenance view', () => {
     expect(aruna.getRun).toHaveBeenCalledWith('k12')
   })
 
-  it('names the device an input was uploaded from', async () => {
+  it('names the person and the device an input was uploaded from', async () => {
     aruna.getVersionOrigin.mockReset().mockResolvedValue(origin({ origin: { kind: 'upload', node_id: 'n2', device: 'd1' } }))
     const root = await render()
-    await vi.waitFor(() => expect(content(root)).toContain('node d1'))
-    expect(content(root)).toContain('Uploaded from device')
+    await vi.waitFor(() => expect(content(root)).toContain('Uploaded byAda LovelaceDevice: node d1'))
+    expect(resolveUsers).toHaveBeenCalledWith(['u'])
+    expect(content(root)).toContain('Uploaded by a person')
   })
 
   it('draws the run that made an input one level up, and reads every level on request', async () => {
@@ -141,11 +154,12 @@ describe('provenance view', () => {
     }
     const { root } = await mountApp(component, { props: { start: { kind: 'dataset', documentId: 'd1', title: 'Assembly result', crate } } })
 
-    await vi.waitFor(() => expect(content(root)).toContain('UpstreamMorey.fa'))
+    // The closed input still shows the run that made it, closed with its inputs unread.
+    await vi.waitFor(() => expect(content(root)).toContain('UpstreamMoreDownload'))
     expect(content(root)).toContain('UpstreamHideTrimming')
+    expect(content(root)).toContain('Upstreamy.fa')
     expect(content(root)).not.toContain('Reading')
-    expect(content(root)).not.toContain('Download')
-    expect(aruna.getRun).not.toHaveBeenCalledWith('c')
+    expect(aruna.getVersionOrigin).not.toHaveBeenCalledWith(z)
 
     await click(button(root, 'Show full graph'))
     await vi.waitFor(() => expect(content(root)).toContain('Show direct steps'))
@@ -154,7 +168,63 @@ describe('provenance view', () => {
     expect(content(root)).toContain('z.fa')
 
     await click(button(root, 'Show direct steps'))
-    expect(content(root)).not.toContain('Download')
+    expect(content(root)).not.toContain('z.fa')
+  })
+
+  // A chain of runs: each run has the inputs named here, each file the run that made it.
+  function chainOfRuns(gate?: Promise<void>) {
+    const version = (name: string) => `https://w3id.org/aruna/data/arn:aruna:r:n:s3/lab/${name}@01K8W1B3D5F7H9KMQ1S3V5X7Z1`
+    const made: Record<string, string> = { x1: 'a', x2: 'b', y1: 'c', y2: 'd', z1: 'e' }
+    const inputs: Record<string, string[]> = { doc1: ['x1', 'x2'], a: ['y1'], b: ['y2'], c: ['z1'], d: ['z2'], e: ['q1'] }
+    const calls: string[] = []
+    aruna.getRun.mockImplementation(async (runId: string) => {
+      calls.push(`run ${runId}`)
+      return { run_id: runId, run_crate: runId === 'r1' ? 'doc1' : runId }
+    })
+    aruna.fetchRoCrateRaw.mockImplementation(async (doc: string) => ({
+      '@graph': [
+        { '@id': '#run', '@type': 'CreateAction', name: `Run ${doc}`, object: inputs[doc]!.map((name) => ({ '@id': name })) },
+        ...inputs[doc]!.map((name) => ({ '@id': name, '@type': 'File', name: `${name}.fa`, contentUrl: [`s3://lab/${name}.fa`, version(name)] })),
+      ],
+    }))
+    aruna.getVersionOrigin.mockImplementation(async (id: string) => {
+      const name = /lab\/(\w+)@/.exec(id)![1]!
+      calls.push(name)
+      if (gate && name === 'z1') await gate
+      return origin({ origin: made[name] ? { kind: 'job', run_id: made[name] } : { kind: 'upload', node_id: 'n' } })
+    })
+    return calls
+  }
+
+  it('reads the full graph level by level', async () => {
+    const calls = chainOfRuns()
+    const root = await render()
+    await vi.waitFor(() => expect(content(root)).not.toContain('Reading'))
+    expect(calls).toContain('run d')
+    expect(calls).not.toContain('z1')
+
+    await click(button(root, 'Show full graph'))
+    await vi.waitFor(() => expect(content(root)).toContain('Show direct steps'))
+    // Both files of one level are read before the run that made one of them.
+    expect(calls.indexOf('z2')).toBeLessThan(calls.indexOf('run e'))
+    expect(content(root)).toContain('Upstreamq1')
+    expect(content(root)).toContain('Uploaded byAda Lovelace')
+  })
+
+  it('shows the level and the links still waiting, and stops on request', async () => {
+    let release = () => {}
+    const calls = chainOfRuns(new Promise<void>((resolve) => (release = resolve)))
+    const root = await render()
+    await vi.waitFor(() => expect(content(root)).not.toContain('Reading'))
+    expect(calls).toContain('run d')
+
+    await click(button(root, 'Show full graph'))
+    await vi.waitFor(() => expect(content(root)).toMatch(/Reading the full graph, level 6: \d+ steps read, 1 waiting/))
+    await click(button(root, 'Stop'))
+    release()
+    await vi.waitFor(() => expect(content(root)).toContain('Read the rest'))
+    expect(calls).not.toContain('z2')
+    expect(calls).not.toContain('run e')
   })
 
   it('exports the crate of the start version', async () => {
@@ -225,7 +295,9 @@ describe('provenance view', () => {
     await vi.waitFor(() => expect(content(root)).toContain('Prepare Bakta DB 6.0 light'))
     expect(content(root)).toContain('66 filesShow the filesRelease 6.0 light')
     expect(content(root)).toContain('UpstreamHidePrepare Bakta DB 6.0 light')
-    expect(content(root)).not.toContain('zenodo.org')
+    // The archive the run unpacked is closed but shows the import it came from.
+    await vi.waitFor(() => expect(content(root)).toContain('External sourcezenodo.org'))
+    expect(content(root)).toContain('System jobImport')
     await openAll(root)
     await vi.waitFor(() => expect(content(root)).toContain('zenodo.org'))
     const text = content(root)
@@ -238,10 +310,10 @@ describe('provenance view', () => {
     expect(text.split('Prepare Bakta DB 6.0 light')).toHaveLength(2)
     expect(text).toContain('zenodo.org')
     expect(text).not.toContain('/work/in/db/f3')
-    // Sources at the left, the file in the last of six columns.
+    // Sources at the left, the file in the last of seven columns.
     const column = (label: string) => nodes(root).find((node) => node.props['data-box'] && content(node).includes(label))?.props.style
     expect(column('zenodo.org')).toMatchObject({ gridColumn: 1 })
-    expect(column('This file')).toMatchObject({ gridColumn: 11 })
+    expect(column('This file')).toMatchObject({ gridColumn: 13 })
     const doi = nodes(root).find((node) => node.tag === 'a' && node.props.href === 'https://doi.org/10.5281/zenodo.14916843')
     expect(content(doi!)).toContain('Bakta database (light) 6.0 light')
     expect(nodes(root).some((node) => String(node.props.class).split(' ').includes('break-all'))).toBe(false)
