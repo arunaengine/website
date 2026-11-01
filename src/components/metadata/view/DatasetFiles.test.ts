@@ -1,7 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { compileClientComponent, content, element, mountApp, moduleDefault, nodes } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 import * as DataIdentity from '@/lib/crate/dataIdentity'
 import * as DataEntities from '@/lib/dataEntities'
 import * as LinkedPart from '@/lib/linkedPart'
@@ -15,6 +15,10 @@ const load = vi.fn()
 // What the realm answered for the linked parts, and the part ids the files section asked about.
 const partFacts = ref(new Map<string, unknown>())
 let askedParts: { value: string[] } = { value: [] }
+const user = ref<{ id: string } | null>({ id: 'u1' })
+// The folders a visitor opened in place, keyed by part and prefix, and the folders asked to open.
+const openedFolders = ref(new Map<string, unknown>())
+const toggledFolders: string[] = []
 const Slot = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
 const LinkStub = defineComponent({
   props: { to: { type: Object, required: true } },
@@ -43,7 +47,7 @@ const DatasetFiles = compileClientComponent(new URL('./DatasetFiles.vue', import
   '@/lib/bucketLayout': BucketLayout,
   '@/lib/formatCount': FormatCount,
   '@/composables/useAruna': {
-    useAruna: () => ({ currentUser: ref({ id: 'u1' }), apiBaseUrl: ref('https://api.test') }),
+    useAruna: () => ({ currentUser: user, apiBaseUrl: ref('https://api.test') }),
   },
   '@/composables/useBacklinks': {
     useBacklinks: () => ({ result: ref(null), error: ref(null), busy: ref(false), load, reset: vi.fn() }),
@@ -53,6 +57,12 @@ const DatasetFiles = compileClientComponent(new URL('./DatasetFiles.vue', import
       askedParts = ids
       return partFacts
     },
+    usePartFolders: () => ({
+      folders: openedFolders,
+      keyOf: (part: { target: { id: string } }, prefix: string) => `${part.target.id}\n${prefix}`,
+      toggle: (_part: unknown, prefix: string) => toggledFolders.push(prefix),
+      more: vi.fn(),
+    }),
   },
   '@/composables/useCrateReferences': { useCrateReferences: () => ({ referencesFor: () => [] }) },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ localNodeId: ref('n1'), displayName: () => 'Node one' }) },
@@ -231,6 +241,36 @@ describe('DatasetFiles', () => {
     expect(file.props.href).toBe(download)
     expect(file.props.to).toBeUndefined()
     expect(element(mounted.root, (node) => node.tag === 'a' && content(node) === 'genomes').props.to).toEqual(folderRoute)
+    mounted.app.unmount()
+  })
+
+  it('opens a folder of a linked bucket in place for a visitor and downloads its files', async () => {
+    const part = 'arn:aruna:r:n2:s3/raw/'
+    const download = 'https://n2.test/api/v1/ga4gh/drs/v1/download?object_id=y'
+    const genomes = { name: 'genomes', folder: true, size: null, route: { name: 'bucket' }, prefix: 'genomes/' }
+    partFacts.value = new Map([[part, {
+      target: { id: part, bucket: 'raw', prefix: '', node_id: 'n2', held_here: false },
+      problem: null,
+      route: { name: 'bucket', params: { bucketId: 'raw' }, query: { node: 'n2' } },
+      nodes: ['n2'],
+      usage: null,
+      entries: { list: [genomes], more: true },
+      others: [],
+    }]])
+    openedFolders.value = new Map([[`${part}\ngenomes/`, { list: [{ name: 'a.fna', folder: false, size: 3, route: OBJECT_ROUTE, download }], more: false, loading: false }]])
+    user.value = null
+    const mounted = await render({ '@id': part, '@type': 'Dataset', name: 'raw' })
+    partFacts.value = new Map()
+    openedFolders.value = new Map()
+    user.value = { id: 'u1' }
+
+    const text = content(mounted.root)
+    expect(element(mounted.root, (node) => node.tag === 'a' && content(node) === 'a.fna').props.href).toBe(download)
+    expect(nodes(mounted.root).some((node) => node.tag === 'a' && content(node) === 'raw')).toBe(false)
+    expect(text).toContain('Show more')
+    expect(text).not.toContain('More in Data')
+    await click(button(mounted.root, 'genomes'))
+    expect(toggledFolders).toEqual(['genomes/'])
     mounted.app.unmount()
   })
 

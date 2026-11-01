@@ -20,7 +20,7 @@ import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useBacklinks } from '@/composables/useBacklinks'
-import { useLinkedParts } from '@/composables/useLinkedParts'
+import { useLinkedParts, usePartFolders, type PartEntry } from '@/composables/useLinkedParts'
 import { usePagedList } from '@/composables/usePagedList'
 import { useS3 } from '@/composables/useS3'
 import type { DatasetViewState } from '@/composables/useDatasetView'
@@ -130,6 +130,28 @@ const partIds = computed(() => shown.value.filter(linkedPart).map((row) => row.i
 const parts = useLinkedParts(partIds, detailId, (id) => !byId.value.get(id)?.childIds.length && !layout.value.rows.length)
 const partOf = (row: DataEntityNode) => parts.value.get(row.id)
 const entriesOf = (row: DataEntityNode) => partOf(row)?.entries?.list ?? []
+
+// Signed out, a visitor opens the folders below a part in place, as Data needs a session.
+const { folders, keyOf, toggle: toggleFolder, more: moreFolder } = usePartFolders(detailId)
+type EntryRow =
+  | { kind: 'entry'; key: string; entry: PartEntry; depth: number; open: boolean; loading: boolean }
+  | { kind: 'more'; key: string; prefix: string; depth: number; shown: number; loading: boolean }
+function entryRows(row: DataEntityNode): EntryRow[] {
+  const part = partOf(row)
+  if (!part?.target) return []
+  const rows: EntryRow[] = []
+  const walk = (prefix: string, list: PartEntry[], more: boolean, depth: number, loading = false) => {
+    for (const entry of list) {
+      const opened = entry.prefix ? folders.value.get(keyOf(part, entry.prefix)) : undefined
+      rows.push({ kind: 'entry', key: `${prefix}${entry.name}`, entry, depth, open: Boolean(opened), loading: Boolean(opened?.loading) })
+      if (opened && entry.prefix) walk(entry.prefix, opened.list, opened.more, depth + 1, opened.loading)
+    }
+    if (more && !currentUser.value) rows.push({ kind: 'more', key: `${prefix}\n`, prefix, depth, shown: list.length, loading })
+  }
+  const root = folders.value.get(keyOf(part, part.target.prefix))
+  walk(part.target.prefix, root?.list ?? entriesOf(row), root ? root.more : Boolean(part.entries?.more), row.depth + 1, root?.loading)
+  return rows
+}
 
 // A folder's file count: what the dataset lists and declares, or the bucket's own larger count.
 function filesOf(row: DataEntityNode): string {
@@ -295,7 +317,7 @@ function openPreview(row: DataEntity) {
                     </span>
                     <component :is="row.directory ? (isOpen(row) ? FolderOpen : Folder) : FileIcon" class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                     <RouterLink
-                      v-if="partOf(row)?.route"
+                      v-if="partOf(row)?.route && currentUser"
                       :to="partOf(row)!.route!"
                       class="min-w-0 truncate underline decoration-border underline-offset-4 hover:decoration-foreground"
                       :title="`Open ${row.name} in Data`"
@@ -351,20 +373,35 @@ function openPreview(row: DataEntity) {
                 </td>
               </tr>
               <template v-if="isOpen(row)">
-                <tr v-for="entry in entriesOf(row)" :key="`${row.id}:${entry.name}`" class="border-t border-border-subtle">
-                  <td class="max-w-0 py-1.5 pr-3">
-                    <span class="flex min-w-0 items-center gap-2" :style="{ paddingLeft: `${2.5 + (row.depth + 1) * 1.5}rem` }">
-                      <component :is="entry.folder ? Folder : FileIcon" class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                      <a v-if="entry.download" :href="entry.download" download class="min-w-0 truncate underline decoration-border underline-offset-4 hover:decoration-foreground" :title="`Download ${entry.name}`">{{ entry.name }}</a>
-                      <RouterLink v-else :to="entry.route" class="min-w-0 truncate underline decoration-border underline-offset-4 hover:decoration-foreground" :title="entry.name">{{ entry.name }}</RouterLink>
-                    </span>
-                  </td>
-                  <td class="max-sm:hidden"></td>
-                  <td class="max-sm:hidden"></td>
-                  <td class="whitespace-nowrap px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground">{{ entry.size !== null ? formatBinary(entry.size) : '' }}</td>
-                  <td :colspan="columns - 4"></td>
-                </tr>
-                <tr v-if="partOf(row)?.entries?.more && dataRoute(row)" class="border-t border-border-subtle">
+                <template v-for="item in entryRows(row)" :key="`${row.id}:${item.key}`">
+                  <tr v-if="item.kind === 'entry'" class="border-t border-border-subtle">
+                    <td class="max-w-0 py-1.5 pr-3">
+                      <span class="flex min-w-0 items-center gap-2" :style="{ paddingLeft: `${2.5 + item.depth * 1.5}rem` }">
+                        <component :is="item.entry.folder ? (item.open ? FolderOpen : Folder) : FileIcon" class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                        <a v-if="item.entry.download" :href="item.entry.download" download class="min-w-0 truncate underline decoration-border underline-offset-4 hover:decoration-foreground" :title="`Download ${item.entry.name}`">{{ item.entry.name }}</a>
+                        <button
+                          v-else-if="!currentUser && item.entry.prefix"
+                          type="button"
+                          class="min-w-0 truncate text-left underline decoration-border underline-offset-4 hover:decoration-foreground"
+                          :aria-expanded="item.open"
+                          :title="item.open ? `Close ${item.entry.name}` : `Open ${item.entry.name}`"
+                          @click="toggleFolder(partOf(row)!, item.entry.prefix)"
+                        >{{ item.entry.name }}</button>
+                        <RouterLink v-else :to="item.entry.route" class="min-w-0 truncate underline decoration-border underline-offset-4 hover:decoration-foreground" :title="item.entry.name">{{ item.entry.name }}</RouterLink>
+                      </span>
+                    </td>
+                    <td class="max-sm:hidden"></td>
+                    <td class="max-sm:hidden"></td>
+                    <td class="whitespace-nowrap px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground">{{ item.entry.size !== null ? formatBinary(item.entry.size) : '' }}</td>
+                    <td :colspan="columns - 4"></td>
+                  </tr>
+                  <tr v-else class="border-t border-border-subtle">
+                    <td :colspan="columns" class="py-1.5 pr-3" :style="{ paddingLeft: `${2.5 + item.depth * 1.5}rem` }">
+                      <button type="button" class="text-xs text-primary hover:underline disabled:opacity-60" :disabled="item.loading" @click="moreFolder(partOf(row)!, item.prefix, item.shown)">Show more</button>
+                    </td>
+                  </tr>
+                </template>
+                <tr v-if="partOf(row)?.entries?.more && dataRoute(row) && currentUser" class="border-t border-border-subtle">
                   <td :colspan="columns" class="py-1.5 pr-3" :style="{ paddingLeft: `${2.5 + (row.depth + 1) * 1.5}rem` }">
                     <RouterLink :to="dataRoute(row)!" class="text-xs text-primary hover:underline">More in Data</RouterLink>
                   </td>

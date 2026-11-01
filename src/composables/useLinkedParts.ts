@@ -5,7 +5,7 @@ import { ref, watch, type Ref } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { apiErrorMessage, type BucketUsageResponse, type DataLinkDocument, type PartTargetResponse } from '@/lib/api'
+import { apiErrorMessage, type BucketUsageResponse, type DataLinkDocument, type ObjectListResponse, type PartTargetResponse } from '@/lib/api'
 import { objectRoute } from '@/lib/crate/dataIdentity'
 import { browseProblem, browseRoute } from '@/lib/linkedPart'
 import { parseArunaArn } from '@/lib/sync'
@@ -18,7 +18,12 @@ export interface PartEntry {
   route: RouteLocationRaw
   /** Signed out, the download of a file from the node that holds it. */
   download?: string
+  /** A folder's full prefix, so a visitor can open it in place. */
+  prefix?: string
 }
+
+/** Signed out, where the files below a part download: DRS on the bucket's node, S3 on a set member. */
+export type PartDownload = { drs: string; arn: string } | { s3: string }
 
 export interface LinkedPartFacts {
   target: PartTargetResponse | null
@@ -32,16 +37,56 @@ export interface LinkedPartFacts {
   /** The first entries below the part, when asked for; `more` when the bucket holds further ones. */
   entries: { list: PartEntry[]; more: boolean } | null
   others: DataLinkDocument[]
+  /** Signed out, how a visitor downloads the files below the part. */
+  download?: PartDownload | null
 }
 
 const SHOWN = 10
+
+function downloadHref(where: PartDownload | null | undefined, bucket: string, key: string, version: string) {
+  if (!where) return {}
+  if ('s3' in where) return { download: `${where.s3}/${bucket}/${key.split('/').map(encodeURIComponent).join('/')}` }
+  return { download: drsDownloadHref(where.drs, `${where.arn}${key}@${version}`) }
+}
+
+// One listed level below `prefix`: its folders open in Data, or in place for a visitor.
+function entryList(
+  target: PartTargetResponse,
+  prefix: string,
+  page: ObjectListResponse,
+  isLocalNode: (nodeId: string) => boolean,
+  where?: PartDownload | null,
+): PartEntry[] {
+  const bucket = target.bucket ?? ''
+  const node = target.node_id && !isLocalNode(target.node_id) ? { node: target.node_id } : {}
+  return [
+    ...page.prefixes.map((folder) => ({
+      name: folder.slice(prefix.length).replace(/\/$/, ''),
+      folder: true,
+      size: null,
+      route: browseRoute({ ...target, prefix: folder }, isLocalNode),
+      prefix: folder,
+    })),
+    // The folder's own empty marker object is no file of it.
+    ...page.objects.filter((object) => object.key !== prefix).map((object) => {
+      const route = objectRoute(bucket, object.key)
+      return {
+        name: object.key.slice(prefix.length),
+        folder: false,
+        size: object.size ?? null,
+        route: { ...route, query: { ...route.query, ...node } },
+        ...downloadHref(where, bucket, object.key, object.version_id),
+      }
+    }),
+  ]
+}
 // The last facts of each part per dataset, kept for the session, so a new visit shows them at once
 // while they are read again.
 const remembered = new Map<string, LinkedPartFacts>()
 let rememberedEpoch = -1
 
 export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wantsEntries: (id: string) => boolean) {
-  const { getPartTarget, getBucketUsage, getBucketDistribution, listBucketObjects, getDataLinks, searchBuckets, sessionEpoch, authToken, nodeClientReady } = useAruna()
+  const { getPartTarget, getBucketUsage, getBucketDistribution, listBucketObjects, getDataLinks, searchBuckets, sessionEpoch, authToken, nodeClientReady, getNodeInfo, nodeInfo } = useAruna()
   const { isLocalNode } = useRealmNodes()
   const facts = ref(new Map<string, LinkedPartFacts>())
   let generation = 0
@@ -59,6 +104,18 @@ export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wants
     const found = await searchBuckets(target.bucket, { limit: 50 }).catch(() => null)
     const member = found?.hits.find((hit) => hit.set_id === target.set_id && !isLocalNode(hit.node_id))
     return member ? { ...target, node_id: member.node_id } : target
+  }
+
+  // A node bucket downloads by DRS on its node; a set's files by plain S3 on the member listed.
+  async function visitorDownload(target: PartTargetResponse, arn: ReturnType<typeof parseArunaArn>): Promise<PartDownload | null> {
+    if (!target.bucket) return null
+    if (arn) {
+      const api = (await nodeClientReady(arn.nodeId).catch(() => null))?.baseUrl
+      return api ? { drs: api, arn: `arn:aruna:${arn.realmId}:${arn.nodeId}:s3/${target.bucket}/` } : null
+    }
+    const info = target.node_id ? await getNodeInfo(target.node_id).catch(() => null) : nodeInfo.value
+    const s3 = info?.services?.interfaces?.s3?.url
+    return s3 ? { s3: s3.replace(/\/+$/, '') } : null
   }
 
   async function load(id: string, round: number) {
@@ -90,33 +147,12 @@ export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wants
       getDataLinks(id, { parts_only: true }).catch(() => null),
       bucket && target.set_id ? getBucketDistribution(bucket, undefined, node).catch(() => null) : null,
     ])
-    const holderApi = arn && page ? (await nodeClientReady(arn.nodeId).catch(() => null))?.baseUrl : null
+    const download = authToken.value || problem ? null : await visitorDownload(target, arn)
     if (!current()) return
-    const nodeQuery = node ? { node } : {}
-    const download = (key: string, version: string) =>
-      holderApi && arn ? { download: drsDownloadHref(holderApi, `arn:aruna:${arn.realmId}:${arn.nodeId}:s3/${bucket}/${key}@${version}`) } : {}
-    const list: PartEntry[] = page
-      ? [
-          ...page.prefixes.map((prefix) => ({
-            name: prefix.slice(target.prefix.length).replace(/\/$/, ''),
-            folder: true,
-            size: null,
-            route: browseRoute({ ...target, prefix }, isLocalNode),
-          })),
-          ...page.objects.map((object) => {
-            const route = objectRoute(bucket, object.key)
-            return {
-              name: object.key.slice(target.prefix.length),
-              folder: false,
-              size: object.size ?? null,
-              route: { ...route, query: { ...route.query, ...nodeQuery } },
-              ...download(object.key, object.version_id),
-            }
-          }),
-        ]
-      : []
+    const list = page ? entryList(target, target.prefix, page, isLocalNode, download) : []
     put(id, {
       ...base,
+      download,
       nodes: distribution ? [...new Set(distribution.members.map((member) => member.node_id))] : nodes,
       usage,
       entries: page ? { list: list.slice(0, SHOWN), more: list.length > SHOWN || Boolean(page.next_cursor) } : null,
@@ -150,4 +186,55 @@ export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wants
   )
 
   return facts
+}
+
+const MORE = 50
+
+/**
+ * Signed out, the folders below linked parts that a visitor opened in place, keyed by part and
+ * prefix. "Show more" lists the folder again with more entries. Answers of an earlier dataset drop.
+ */
+export function usePartFolders(datasetId: Ref<string>) {
+  const { listBucketObjects, sessionEpoch } = useAruna()
+  const { isLocalNode } = useRealmNodes()
+  const folders = ref(new Map<string, { list: PartEntry[]; more: boolean; loading: boolean }>())
+  let generation = 0
+  watch([datasetId, sessionEpoch], () => {
+    generation++
+    folders.value = new Map()
+  })
+
+  const keyOf = (part: LinkedPartFacts, prefix: string) => `${part.target?.id ?? ''}\n${prefix}`
+
+  async function list(part: LinkedPartFacts, prefix: string, limit: number) {
+    const target = part.target
+    if (!target?.bucket) return
+    const key = keyOf(part, prefix)
+    const round = generation
+    const known = folders.value.get(key)
+    folders.value = new Map(folders.value).set(key, { list: known?.list ?? [], more: false, loading: true })
+    const node = target.node_id && !isLocalNode(target.node_id) ? target.node_id : null
+    const page = await listBucketObjects(target.bucket, { prefix: prefix || undefined, delimiter: '/', limit: limit + 1 }, node).catch(() => null)
+    if (round !== generation || !folders.value.has(key)) return
+    const entries = page ? entryList(target, prefix, page, isLocalNode, part.download) : []
+    folders.value = new Map(folders.value).set(key, {
+      list: entries.slice(0, limit),
+      more: entries.length > limit || Boolean(page?.next_cursor),
+      loading: false,
+    })
+  }
+
+  function toggle(part: LinkedPartFacts, prefix: string) {
+    const key = keyOf(part, prefix)
+    if (!folders.value.has(key)) return void list(part, prefix, MORE)
+    const next = new Map(folders.value)
+    next.delete(key)
+    folders.value = next
+  }
+
+  function more(part: LinkedPartFacts, prefix: string, shown: number) {
+    void list(part, prefix, shown + MORE)
+  }
+
+  return { folders, keyOf, toggle, more }
 }
