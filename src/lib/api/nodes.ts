@@ -1,3 +1,5 @@
+import { apiRequest, type ApiClientOptions } from './client'
+
 export interface InfoResponse {
   node: {
     status: string
@@ -192,4 +194,23 @@ export interface RealmNodeInfo {
   info?: RealmNodePublishedInfo | null
   /** Not served by current backends; the portal fills it from `public_nodes` for visitors. */
   rest_url?: string | null
+}
+
+// GET /system/jobs on the node that runs the jobs. A visitor gets only `kind` per job.
+export interface NodeJobsResponse {
+  jobs: NodeJob[]
+  /** Jobs the caller may not see in detail. */
+  hidden: number
+}
+
+export interface NodeJob {
+  kind: string
+  target?: { bucket: string; path?: string } | { dataset_id: string }
+  /** Absent while the job counts nothing; `total` is absent when only a count exists. */
+  progress?: { current: number; total?: number; unit: string }
+  started_at?: string
+}
+
+export function getNodeJobs(client: ApiClientOptions, signal?: AbortSignal): Promise<NodeJobsResponse> {
+  return apiRequest<NodeJobsResponse>('/system/jobs', { signal }, client)
 }

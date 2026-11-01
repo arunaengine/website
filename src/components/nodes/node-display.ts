@@ -20,6 +20,27 @@ export function nodeActivity(node: Pick<RealmNodeInfo, 'info'>): string | null {
   return null
 }
 
+const jobLabels: Record<string, string> = {
+  import_rocrate: 'Importing records',
+  export_rocrate: 'Exporting a dataset',
+  staging: 'Importing files',
+  copy_object: 'Copying data',
+  storage_purge: 'Removing deleted data',
+  execution: 'Running a workflow',
+  probe: 'Checking the node',
+  backend_import: 'Importing storage files',
+  harvest: 'Harvesting records',
+  write_run_crate: 'Writing run record',
+  register_identifiers: 'Registering identifiers',
+  mint_persistent_id: 'Creating a persistent ID',
+  terminal_cleanup: 'Cleaning up a run',
+}
+
+/** A running job's kind for people; an unknown kind reads as its wire name in words. */
+export function jobLabel(kind: string): string {
+  return jobLabels[kind] ?? kind.replace(/_/g, ' ')
+}
+
 /** The name a node was given: the realm's display name, then its name labels; null without one. */
 export function givenName(node: Pick<RealmNodeInfo, 'display_name' | 'info'>): string | null {
   const labels = node.info?.labels ?? {}
