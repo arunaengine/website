@@ -4,7 +4,6 @@ import { computed, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { datasetFacts, makersOf } from '@/lib/datasetFacts'
-import { truncateMiddle } from '@/lib/utils'
 import type { MetadataDoc } from '@/data/types'
 
 const props = defineProps<{ doc: MetadataDoc }>()
@@ -15,7 +14,7 @@ watch(() => makersOf(props.doc).flatMap((person) => person.userId ?? []), (ids) 
 }, { immediate: true })
 const facts = computed(() =>
   datasetFacts(props.doc, {
-    group: (id) => myGroups.value.find((group) => group.id === id)?.name ?? truncateMiddle(id),
+    group: (id) => myGroups.value.find((group) => group.id === id)?.name ?? '',
     person: (id) => userDir.cachedUser(id)?.name ?? '',
   }),
 )

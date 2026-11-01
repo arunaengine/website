@@ -9,7 +9,6 @@ import { useAruna } from '@/composables/useAruna'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { crateTypeOf } from '@/lib/crateType'
 import { datasetFacts, makersOf } from '@/lib/datasetFacts'
-import { truncateMiddle } from '@/lib/utils'
 import type { MetadataDoc } from '@/data/types'
 import { FileJson2, ListChecks, Play } from '@lucide/vue'
 
@@ -23,7 +22,8 @@ const emit = defineEmits<{ (e: 'toggle-favourite', id: string): void }>()
 
 const router = useRouter()
 const { myGroups } = useAruna()
-const groupName = (id: string) => myGroups.value.find((group) => group.id === id)?.name ?? truncateMiddle(id)
+// A group the caller cannot name, such as every group for a visitor, is no raw id under By.
+const groupName = (id: string) => myGroups.value.find((group) => group.id === id)?.name ?? ''
 const userDir = useUserDirectory()
 watch(() => props.docs.flatMap((doc) => makersOf(doc).flatMap((person) => person.userId ?? [])), (ids) => {
   if (ids.length) void userDir.resolveUsers(ids)

@@ -50,7 +50,7 @@ describe('dataset table', () => {
     const sized = { roCrate: { '@graph': [{ '@id': './', contentSize: '2048' }] }, realmId: 'g2' }
     const text = await render([doc('a', 'Reef census'), doc('b', 'Coral survey', sized)], false)
     expect(text).toContain('Name Type Status License By Size Updated')
-    expect(text).toContain('Coral survey Dataset CC BY 4.0 g2 2.0 KiB')
+    expect(text).toContain('Coral survey Dataset CC BY 4.0 - 2.0 KiB')
     expect(text).not.toContain('favourites')
   })
 })

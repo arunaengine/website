@@ -44,4 +44,10 @@ describe('datasetFacts', () => {
     const unknown = [{ ...graph[0], agent: { '@id': `#agent-01M63KXP71RJ4MJAEDT9ZJ1VXQ@${REALM}` } }, { ...graph[1], identifier: `01M63KXP71RJ4MJAEDT9ZJ1VXQ@${REALM}`, '@id': `#agent-01M63KXP71RJ4MJAEDT9ZJ1VXQ@${REALM}` }]
     expect(datasetFacts(run({ '@graph': unknown }), names)[1]).toEqual({ label: 'By', value: '' })
   })
+
+  it('names the publisher before the group, and no group it cannot name', () => {
+    const published = { '@graph': [{ '@id': 'ro-crate-metadata.json', about: { '@id': './' } }, { '@id': './', publisher: { '@id': 'https://ror.org/x' } }, { '@id': 'https://ror.org/x', name: 'NCBI' }] }
+    expect(datasetFacts(doc({ roCrate: published }), names)[1]).toEqual({ label: 'By', value: 'NCBI' })
+    expect(datasetFacts(doc({}), { ...names, group: () => '' })[1]).toEqual({ label: 'By', value: '' })
+  })
 })
