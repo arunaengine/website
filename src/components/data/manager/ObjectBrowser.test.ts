@@ -221,7 +221,7 @@ describe('object browser row actions', () => {
     ])
   })
 
-  it('shows Share disabled with the reason in a distributed bucket', async () => {
+  it('says in one line that a distributed bucket has no share links', async () => {
     const root = await render({ folders: ref([listedFolder]) }, { setId: 's1' })
     const reason = 'Share links are not available for distributed buckets yet.'
 
@@ -229,8 +229,9 @@ describe('object browser row actions', () => {
       expect(menuItem(root, 'Share', name).props.disabled).toBe(true)
       expect(content(element(root, (node) => node.tag === 'tr' && content(node).includes(name)))).toContain(reason)
     }
-    expect(action(root, 'Share bucket').props.disabled).toBe(true)
-    expect(action(root, 'Share bucket').props.title).toBe(reason)
+    expect(nodes(root).some((node) => node.props['aria-label'] === 'Share bucket')).toBe(false)
+    const note = element(root, (node) => node.tag === 'span' && content(node).trim() === 'No share links for distributed buckets')
+    expect(note.props.title).toBe(reason)
   })
 
   it('links the realm website from the desktop and names the node that serves the bucket', async () => {

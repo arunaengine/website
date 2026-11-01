@@ -257,6 +257,8 @@ const linkReason = computed(() => {
   if (onThisComputer.value) return 'Share links need a bucket on a realm node, not on this computer.'
   return props.setId ? 'Share links are not available for distributed buckets yet.' : null
 })
+// Where links are not offered, one short line says so in place of a greyed-out button.
+const linkNote = computed(() => (onThisComputer.value ? 'No share links on this computer' : 'No share links for distributed buckets'))
 
 // A bucket on this computer: its files are already here, so no folder can be linked.
 const onThisComputer = computed(
@@ -629,9 +631,12 @@ async function onDrop(event: DragEvent) {
             bell
             :label-class="toolbarLabel"
           />
-          <Tooltip v-if="linksShown" :label="linkReason ?? 'Share this bucket with a link'">
-            <span class="inline-flex" :tabindex="linkReason ? 0 : undefined">
-              <Button variant="outline" size="sm" aria-label="Share bucket" :disabled="Boolean(linkReason)" :title="linkReason ?? 'Share this bucket with a link'" @click="emit('share-link', { kind: 'bucket', bucket })">
+          <span v-if="linksShown && linkReason" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground" :title="linkReason">
+            <Share2 class="h-3.5 w-3.5" aria-hidden="true" />{{ linkNote }}
+          </span>
+          <Tooltip v-else-if="linksShown" label="Share this bucket with a link">
+            <span class="inline-flex">
+              <Button variant="outline" size="sm" aria-label="Share bucket" title="Share this bucket with a link" @click="emit('share-link', { kind: 'bucket', bucket })">
                 <Share2 class="h-4 w-4" /><span :class="toolbarLabel">Share</span>
               </Button>
             </span>
