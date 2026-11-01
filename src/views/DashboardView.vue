@@ -412,7 +412,7 @@ const pageDescription = computed(() =>
           <OverviewCell v-else label="Datasets" :icon="FileJson2" tone="ok" :to="{ name: 'datasets' }">
             <template #value>{{ guestRecords !== null ? formatCount(guestRecords) : 'Unknown' }}</template>
           </OverviewCell>
-          <OverviewCell label="Realm" :icon="Network" :tone="offlineNodes ? 'failed' : 'ok'" :to="{ name: 'status' }">
+          <OverviewCell label="Realm" :icon="Network" :tone="offlineNodes ? 'failed' : 'ok'" :to="currentUser ? { name: 'status' } : undefined">
             <template #value>{{ realmNodeCount !== null ? formatCount(realmNodeCount) : 'Unknown' }}</template>
             <template v-if="realmNodeCount !== null" #unit>{{ plural(realmNodeCount, 'node', 'nodes') }}</template>
             <!-- One state signal: the online count, a warning when nodes are offline; the realm scope
@@ -442,7 +442,7 @@ const pageDescription = computed(() =>
       <!-- The topology on the left, the table on the right; both open a node's details. -->
       <section v-else-if="(currentUser ? scope === 'realm' : !authPending) && (infraNodes.length || deviceRecord)" aria-labelledby="realm-heading">
         <SectionHeading id="realm-heading" title="Realm" :icon="Network">
-          <template #actions>
+          <template v-if="currentUser" #actions>
             <Button variant="outline" size="sm" as-child><RouterLink :to="{ name: 'status' }"><Activity class="h-4 w-4" /> Status</RouterLink></Button>
           </template>
         </SectionHeading>
@@ -453,11 +453,11 @@ const pageDescription = computed(() =>
               :local-peer-id="(realmView?.info ?? nodeInfo)?.node.peer_id"
               :computer="mapComputer"
               :highlight="hoveredNode"
-              @select="openNode"
+              @select="currentUser && openNode($event)"
               @hover="hoveredNode = $event"
             />
           </div>
-          <NodeTable :nodes="infraNodes" :computer="desktop ? deviceRecord : null" :highlight="hoveredNode" @hover="hoveredNode = $event" />
+          <NodeTable :linked="Boolean(currentUser)" :nodes="infraNodes" :computer="desktop ? deviceRecord : null" :highlight="hoveredNode" @hover="hoveredNode = $event" />
         </div>
       </section>
 

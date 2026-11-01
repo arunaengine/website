@@ -71,6 +71,17 @@ const row = (root: Parameters<typeof content>[0], name: string) =>
   element(root, (node) => node.tag === 'tr' && content(node).includes(name))
 
 describe('the realm node table', () => {
+  it('opens nothing for a visitor, whom the node details have nothing to show', async () => {
+    push.mockClear()
+    const mounted = await mountApp(NodeTable, { props: { nodes: many(2), linked: false } })
+
+    expect(names(mounted.root)).toEqual([])
+    expect(content(mounted.root)).toContain('Giessen storage 1')
+    await click(row(mounted.root, 'Giessen storage 1'))
+    expect(push).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
   it('states each fact once per row: type, location, stored, CPU, activity and the state', async () => {
     const mounted = await mountApp(NodeTable, { props: { nodes: many(5) } })
     const text = (name: string) => content(row(mounted.root, name)).replace(/\s+/g, '')

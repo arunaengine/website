@@ -455,6 +455,8 @@ describe('visitor dashboard', () => {
     expect(text).not.toContain('row phone')
     expect(text).toContain('recent datasets')
     expect(text).not.toContain('recent runs')
+    // The Status page has nothing to show without a session, so nothing links there.
+    expect(text).not.toContain('Status')
   })
 })
 

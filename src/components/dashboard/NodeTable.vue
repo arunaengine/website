@@ -16,13 +16,15 @@ import { LOCATION_AFFINITY_KEY } from '@/lib/placement'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { Download, Laptop, MapPin, Server } from '@lucide/vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   nodes: RealmNodeInfo[]
   /** This computer's own device record in the desktop, listed first. */
   computer?: RealmNodeInfo | null
   /** The node lit up on the topology. */
   highlight?: string | null
-}>()
+  /** False for a visitor, whom the node details have nothing to show. */
+  linked?: boolean
+}>(), { computer: null, highlight: null, linked: true })
 const emit = defineEmits<{ hover: [nodeId: string | null] }>()
 
 const PAGE_SIZE = 5
@@ -79,7 +81,7 @@ const cpu = (node: RealmNodeInfo) => {
   const permille = node.info?.utilization.load_permille
   return permille === undefined ? null : Math.round(permille / 10)
 }
-const open = (row: Row) => void router.push({ name: 'node', params: { nodeId: row.node.node_id } })
+const open = (row: Row) => props.linked && void router.push({ name: 'node', params: { nodeId: row.node.node_id } })
 const typeLabel = (row: Row) => `${roleLabel[row.node.kind].charAt(0).toUpperCase()}${roleLabel[row.node.kind].slice(1)}`
 // When an offline node was last heard of: a device by its last contact, a node by its heartbeat.
 function lastSeen(node: RealmNodeInfo): string | null {
@@ -116,9 +118,8 @@ function lastSeen(node: RealmNodeInfo): string | null {
           <tr
             v-for="row in pageRows"
             :key="row.node.node_id"
-            class="cursor-pointer"
-            :class="highlight === row.node.node_id ? 'bg-muted/60' : ''"
-            tabindex="0"
+            :class="[highlight === row.node.node_id ? 'bg-muted/60' : '', linked ? 'cursor-pointer' : '']"
+            :tabindex="linked ? 0 : undefined"
             @click="open(row)"
             @keydown.enter="open(row)"
             @mouseenter="emit('hover', row.node.node_id)"
@@ -131,6 +132,7 @@ function lastSeen(node: RealmNodeInfo): string | null {
                 <IconTile :icon="row.here ? Laptop : Server" :tone="row.here ? 'aqua' : nodeOnline(row.node) ? 'royal' : 'muted'" size="sm" />
                 <span class="min-w-0">
                   <RouterLink
+                    v-if="linked"
                     :to="{ name: 'node', params: { nodeId: row.node.node_id } }"
                     class="block truncate font-medium text-foreground hover:underline max-sm:whitespace-normal"
                     :title="`${row.name} (${row.node.node_id})`"
@@ -138,6 +140,7 @@ function lastSeen(node: RealmNodeInfo): string | null {
                   >
                     {{ row.name }}
                   </RouterLink>
+                  <span v-else class="block truncate font-medium text-foreground max-sm:whitespace-normal" :title="row.name">{{ row.name }}</span>
                   <!-- What the hidden columns would say, in a small line under the name. -->
                   <span class="flex flex-wrap gap-x-2 text-[11px] text-muted-foreground">
                     <span class="sm:hidden lg:inline xl:hidden">{{ typeLabel(row) }}</span>
