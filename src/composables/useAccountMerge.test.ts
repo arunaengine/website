@@ -60,6 +60,7 @@ function json(body: unknown, status = 200): Response {
 let calls: Call[]
 let answers: Map<string, Answer>
 let vaults: Record<string, Array<{ revision: string; predecessors: string[]; payload: string; updated_at: string }>>
+let keys: Record<string, Array<{ record_id: string; key_id: string; public_key: string; has_recovery: boolean }>>
 
 function answer(method: string, path: string, reply: Answer) {
   answers.set(`${method} ${path}`, reply)
@@ -69,6 +70,7 @@ beforeEach(() => {
   calls = []
   answers = new Map()
   vaults = { [OWN_FRESH]: [], [TOKEN_B]: [] }
+  keys = { [A]: [], [B]: [] }
   apiBaseUrl.value = BASE
   authToken.value = OWN_FRESH
   userInfo.value = info(A, 'Alice')
@@ -97,6 +99,13 @@ beforeEach(() => {
       heads.push({ revision: 'r9', predecessors: [], payload, updated_at: 'now' })
       return json({ heads })
     }
+    if (call.path === '/access/users/me/keys' && method === 'POST' && !answers.has('POST /access/users/me/keys')) {
+      const record = { record_id: 'k9', ...(call.body as { key_id: string; public_key: string; has_recovery: boolean }) }
+      keys[A].unshift(record)
+      return json(record, 201)
+    }
+    const listed = /^\/access\/users\/(.+)\/keys$/.exec(call.path)
+    if (listed && method === 'GET') return json({ keys: keys[decodeURIComponent(listed[1])] ?? [] })
     const reply = answers.get(`${method} ${url.pathname}`)
     const response = typeof reply === 'function' ? reply(call) : reply?.clone()
     return response ?? json({ error: 'unexpected' }, 500)
@@ -186,8 +195,8 @@ describe('account merge', () => {
       'The role "no-secret" of that account would cut your own access. Remove it there first.'],
     [503, { error: 'this node does not coordinate account merges; retry the request' },
       'Merging is not available right now. Try again later.'],
-    [409, { error: 'the other account still holds a vault', code: 'vault_present' },
-      'That account still has a vault. Copy or delete it first.'],
+    [409, { error: 'the other account holds a vault that differs', code: 'vault_present' },
+      'The vaults of the two accounts differ. Merge the vaults first.'],
     [403, { error: 'service accounts are never merged', code: 'merge_refused' },
       'Merge refused: service accounts are never merged.'],
   ])('keeps the confirmation and explains a %i refusal', async (status, body, message) => {
@@ -247,8 +256,9 @@ describe('account merge', () => {
     expect(merge.failure.value).toBe('This sign-in has its own account. You can merge it instead.')
   })
 
-  it('copies the sealed vault of the other account when this one has none', async () => {
+  it('copies the sealed vault and the key of the other account, and keeps its vault there', async () => {
     vaults[TOKEN_B] = [{ revision: 'r1', predecessors: [], payload: 'sealed-b', updated_at: 'then' }]
+    keys[B] = [{ record_id: 'k1', key_id: 'key-b', public_key: 'pub-b', has_recovery: true }]
     const merge = useAccountMerge()
     await merge.start()
     expect(merge.step.value).toBe('copy-vault')
@@ -258,22 +268,78 @@ describe('account merge', () => {
     const [saved] = requests('PUT', '/access/users/me/vault')
     expect(saved.bearer).toBe(OWN_FRESH)
     expect(saved.body).toEqual({ payload: 'sealed-b', predecessors: [] })
-    expect(requests('DELETE', '/access/users/me/vault')[0].bearer).toBe(TOKEN_B)
+    const [published] = requests('POST', '/access/users/me/keys')
+    expect(published.bearer).toBe(OWN_FRESH)
+    expect(published.body).toEqual({ key_id: 'key-b', public_key: 'pub-b', has_recovery: true })
+    expect(requests('DELETE', '/access/users/me/vault')).toEqual([])
     expect(vaults[OWN_FRESH].map((head) => head.payload)).toEqual(['sealed-b'])
+    expect(vaults[TOKEN_B].map((head) => head.payload)).toEqual(['sealed-b'])
     expect(merge.step.value).toBe('confirm')
   })
 
-  it.each([
-    ['both accounts have a vault', [{ payload: 'own' }], [{ payload: 'b' }]],
-    ['the other vault has two heads', [], [{ payload: 'b1' }, { payload: 'b2' }]],
-  ])('stops when %s', async (_, own, theirs) => {
-    const head = (entry: { payload: string }) => ({ revision: 'r', predecessors: [], updated_at: 'then', ...entry })
-    vaults[OWN_FRESH] = own.map(head)
-    vaults[TOKEN_B] = theirs.map(head)
+  it('saves every head of the other vault unchanged, never combined', async () => {
+    const head = (payload: string) => ({ revision: payload, predecessors: [], updated_at: 'then', payload })
+    vaults[TOKEN_B] = [head('b1'), head('b2')]
+    const merge = useAccountMerge()
+    await merge.start()
+    expect(merge.step.value).toBe('copy-vault')
+
+    await merge.copyVault()
+
+    expect(requests('PUT', '/access/users/me/vault').map((call) => call.body)).toEqual([
+      { payload: 'b1', predecessors: [] },
+      { payload: 'b2', predecessors: [] },
+    ])
+    expect(requests('POST', '/access/users/me/keys')).toEqual([])
+    expect(merge.step.value).toBe('confirm')
+  })
+
+  it('saves only what did not arrive when the copy is repeated', async () => {
+    const head = (payload: string) => ({ revision: payload, predecessors: [], updated_at: 'then', payload })
+    vaults[TOKEN_B] = [head('b1'), head('b2')]
+    keys[B] = [{ record_id: 'k1', key_id: 'key-b', public_key: 'pub-b', has_recovery: false }]
+    keys[A] = [{ record_id: 'k2', key_id: 'key-b', public_key: 'pub-b', has_recovery: false }]
+    vaults[OWN_FRESH] = [head('b1')]
+    const merge = useAccountMerge()
+    await merge.start()
+    expect(merge.step.value).toBe('copy-vault')
+
+    await merge.copyVault()
+
+    expect(requests('PUT', '/access/users/me/vault').map((call) => call.body)).toEqual([{ payload: 'b2', predecessors: [] }])
+    expect(requests('POST', '/access/users/me/keys')).toEqual([])
+  })
+
+  it('keeps the copy step with the reason when the key is refused', async () => {
+    vaults[TOKEN_B] = [{ revision: 'r1', predecessors: [], payload: 'sealed-b', updated_at: 'then' }]
+    keys[B] = [{ record_id: 'k1', key_id: 'key-b', public_key: 'pub-b', has_recovery: false }]
+    answer('POST', '/access/users/me/keys', json({ error: 'the user has published the most key records allowed' }, 409))
+    const merge = useAccountMerge()
+    await merge.start()
+
+    await merge.copyVault()
+
+    expect(merge.step.value).toBe('copy-vault')
+    expect(merge.failure.value).toBe('the user has published the most key records allowed')
+  })
+
+  it('goes straight to the merge when this account holds the other vault unchanged', async () => {
+    const head = (payload: string) => ({ revision: payload, predecessors: [], updated_at: 'then', payload })
+    vaults[TOKEN_B] = [head('b1')]
+    vaults[OWN_FRESH] = [head('mine'), head('b1')]
+    const merge = useAccountMerge()
+    await merge.start()
+    expect(merge.step.value).toBe('confirm')
+  })
+
+  it('stops when the two vaults differ', async () => {
+    const head = (payload: string) => ({ revision: 'r', predecessors: [], updated_at: 'then', payload })
+    vaults[OWN_FRESH] = [head('own')]
+    vaults[TOKEN_B] = [head('b')]
     const merge = useAccountMerge()
     await merge.start()
     expect(merge.step.value).toBe('vault-blocked')
-    expect(merge.other.value?.ownVault).toBe(own.length > 0)
+    expect(merge.other.value?.ownVault).toBe(true)
     expect(requests('PUT', '/access/users/me/vault')).toEqual([])
   })
 

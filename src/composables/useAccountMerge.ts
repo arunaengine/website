@@ -6,9 +6,10 @@ import {
   apiErrorMessage,
   apiRequest,
   attachSignIn,
-  deleteVault,
   issueToken,
+  listUserKeys,
   mergeAccount,
+  publishUserKey,
   readVault,
   saveVault,
   signInHasNoAccount,
@@ -64,7 +65,7 @@ export function loginFresh(token: string): boolean {
 export function mergeFailure(error: unknown): string {
   if (!(error instanceof ApiError)) return apiErrorMessage(error)
   if (error.code === 'merge_refused') return `Merge refused: ${error.message}.`
-  if (error.code === 'vault_present') return 'That account still has a vault. Copy or delete it first.'
+  if (error.code === 'vault_present') return 'The vaults of the two accounts differ. Merge the vaults first.'
   if (error.code === 'role_conflict') {
     const role = /the role (.+?) of the other account/.exec(error.message)?.[1]
     return `The role ${role ? `"${role}" ` : ''}of that account would cut your own access. Remove it there first.`
@@ -74,6 +75,15 @@ export function mergeFailure(error: unknown): string {
   if (error.status === 429) return 'Too many attempts. Wait a minute.'
   if (error.status === 503) return 'Merging is not available right now. Try again later.'
   return apiErrorMessage(error)
+}
+
+// The merge takes the other vault when this account holds every payload of it unchanged.
+function vaultStep(theirs: UserVaultHead[], own: UserVaultHead[]): MergeStep {
+  if (!theirs.length) return 'confirm'
+  const held = new Set(own.map((head) => head.payload))
+  const sent = new Set(theirs.map((head) => head.payload))
+  if (own.every((head) => sent.has(head.payload))) return 'copy-vault'
+  return theirs.every((head) => held.has(head.payload)) ? 'confirm' : 'vault-blocked'
 }
 
 export function useAccountMerge() {
@@ -120,11 +130,8 @@ export function useAccountMerge() {
       failure.value = 'This is the account you are signed in with.'
       return
     }
-    const own = ownVault.heads.length > 0
-    other.value = { info, devices: devices.devices.length, vault: vault.heads, ownVault: own }
-    // Several heads are merged by an unlock of that vault, so only a single head is copied.
-    if (!vault.heads.length) step.value = 'confirm'
-    else step.value = own || vault.heads.length > 1 ? 'vault-blocked' : 'copy-vault'
+    other.value = { info, devices: devices.devices.length, vault: vault.heads, ownVault: ownVault.heads.length > 0 }
+    step.value = vaultStep(vault.heads, ownVault.heads)
   }
 
   async function exchange(id: number, context: { epoch: number; client: ApiClientOptions }) {
@@ -175,20 +182,39 @@ export function useAccountMerge() {
     return { baseUrl, token: renewed }
   }
 
-  /** Copies the other account's sealed vault here unchanged and deletes it there. */
+  // Publishes the newest key of the other account here, unless this account has it already.
+  async function moveKey(id: number, context: { epoch: number; client: ApiClientOptions }) {
+    const theirs = await listUserKeys(other.value?.info.user.user_id ?? '', { baseUrl: context.client.baseUrl, token: otherToken })
+    guard(id, context.epoch)
+    const key = theirs.keys[0]
+    if (!key) return
+    const own = await listUserKeys(userInfo.value?.user.user_id ?? '', context.client)
+    guard(id, context.epoch)
+    if (own.keys.some((held) => held.key_id === key.key_id && held.public_key === key.public_key)) return
+    await publishUserKey({ key_id: key.key_id, public_key: key.public_key, has_recovery: key.has_recovery }, context.client)
+  }
+
+  /** Saves every payload of the other account's sealed vault here unchanged, with its key. */
   async function copyVault() {
-    const head = other.value?.vault[0]
-    if (step.value !== 'copy-vault' || !head) return
+    const account = other.value
+    if (step.value !== 'copy-vault' || !account) return
     const id = run
     const context = refreshContext()
     failure.value = null
     step.value = 'loading'
     try {
-      await saveVault({ payload: head.payload, predecessors: [] }, context.client)
+      // A repeat after a failure saves only what did not arrive.
+      const held = new Set((await readVault(context.client)).heads.map((head) => head.payload))
       guard(id, context.epoch)
-      await deleteVault({ baseUrl: context.client.baseUrl, token: otherToken })
-      guard(id, context.epoch)
-      await load(id, context)
+      for (const head of account.vault) {
+        if (held.has(head.payload)) continue
+        await saveVault({ payload: head.payload, predecessors: [] }, context.client)
+        held.add(head.payload)
+        guard(id, context.epoch)
+      }
+      await moveKey(id, context)
+      other.value = { ...account, ownVault: true }
+      step.value = 'confirm'
     } catch (error) {
       if (id === run) fail(error, 'copy-vault')
     }
