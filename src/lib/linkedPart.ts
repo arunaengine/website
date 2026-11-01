@@ -2,6 +2,7 @@
 // under it is part of the dataset, and the files are always the current ones.
 import type { PartTargetResponse } from '@/lib/api'
 import { folderRoute } from '@/lib/crate/dataIdentity'
+import { parseArunaArn } from '@/lib/sync'
 
 const W3ID_DATA = 'https://w3id.org/aruna/data/'
 const CONTENT_ID = /^[0-9a-f]{64}$/
@@ -38,6 +39,20 @@ export function partId(where: { realmId: string; nodeId: string; bucket: string;
   const prefix = where.prefix
   if (where.setId) return `${W3ID_DATA}${where.realmId}/${where.setId}/${prefix ? encodePrefix(prefix) : ''}`
   return `arn:aruna:${where.realmId}:${where.nodeId}:s3/${where.bucket}/${prefix}`
+}
+
+/** The one node that the node ARNs among `ids` name; null for none, several, or a set part. */
+export function soleNode(ids: string[]): string | null {
+  const nodes = new Set<string>()
+  for (const id of ids) {
+    if (!isNodeArn(id)) {
+      if (looksLikePart(id)) return null
+      continue
+    }
+    const node = parseArunaArn(id.startsWith(W3ID_DATA) ? id.slice(W3ID_DATA.length) : id)?.nodeId
+    if (node) nodes.add(node)
+  }
+  return nodes.size === 1 ? [...nodes][0] : null
 }
 
 // The Data section lists the folder `<prefix>/`, so only a prefix of that shape is listed exactly.

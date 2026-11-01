@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PartTargetResponse } from '@/lib/api'
-import { browseProblem, browseRoute, isNodeArn, looksLikePart, partId } from './linkedPart'
+import { browseProblem, browseRoute, isNodeArn, looksLikePart, partId, soleNode } from './linkedPart'
 
 const set = 'https://w3id.org/aruna/data/k3V9xQ2m/01K8Y2B6D8/'
 const target = (extra: Partial<PartTargetResponse>): PartTargetResponse => ({ id: set, bucket: 'bakrep', prefix: 'raw/2026/', held_here: true, ...extra })
@@ -75,5 +75,18 @@ describe('linked part', () => {
     const id = partId({ realmId: 'r', nodeId: 'n', bucket: 'b', prefix: 'a\u00e9?>/x', setId: 's' })
 
     expect(id.split('/').pop()).toMatch(/^[A-Za-z0-9_-]+$/)
+  })
+})
+
+describe('soleNode', () => {
+  it('names the node when every node ARN names the same one', () => {
+    const ids = ['./', '#author', 'arn:aruna:r:n2:s3/laptop/', 'https://w3id.org/aruna/data/arn:aruna:r:n2:s3/laptop/raw/a.fq@01K8Y2B6D8F0H2K4M6P8R0T2V4']
+    expect(soleNode(ids)).toBe('n2')
+  })
+
+  it('names no node for files on several nodes, a set part, or no stored file', () => {
+    expect(soleNode(['arn:aruna:r:n2:s3/laptop/', 'arn:aruna:r:n3:s3/results/'])).toBeNull()
+    expect(soleNode(['arn:aruna:r:n2:s3/laptop/', 'https://w3id.org/aruna/data/r/set-1/'])).toBeNull()
+    expect(soleNode(['./', 'https://example.org/src/one.csv'])).toBeNull()
   })
 })

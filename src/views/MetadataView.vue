@@ -60,6 +60,7 @@ import { mainAction } from '@/lib/datasetFacts'
 import { crateGraph, crateRootId, stringProp } from '@/lib/dataEntities'
 import { resultsFolder, runState } from '@/lib/runCrate'
 import { folderRoute, parseDataIdentity } from '@/lib/crate/dataIdentity'
+import { soleNode } from '@/lib/linkedPart'
 import { useS3 } from '@/composables/useS3'
 import { type MetadataDocumentSummary, type RepositoryLink, type ShareTarget, type StorageLocation } from '@/lib/api'
 import { publishedLinks } from '@/lib/repository'
@@ -272,6 +273,11 @@ watch(tab, async (value) => {
 const showCite = ref(false)
 const showShare = ref(false)
 const shareTarget = computed<ShareTarget>(() => ({ kind: 'dataset', dataset_id: detailId.value }))
+// The link is made on the node that holds the files, so a visitor can list them there.
+const shareNode = computed(() => {
+  const node = soleNode(crateGraph(currentCrate.value).map((entity) => String(entity['@id'])))
+  return node && !isLocalNode(node) ? node : null
+})
 const citation = computed(() => {
   const root = crateGraph(currentCrate.value).find((entity) => entity['@id'] === crateRootId(currentCrate.value))
   const publisher = presentation.value.organizations.find((entity) => entity.roles.includes('Publisher'))?.name
@@ -520,7 +526,7 @@ function jumpTo(entityId: string) {
     />
 
     <CiteDialog v-model:open="showCite" :citation="citation" />
-    <ShareLinkDialog v-model:open="showShare" :target="shareTarget" :node-id="null" :name="current?.title ?? 'dataset'" />
+    <ShareLinkDialog v-model:open="showShare" :target="shareTarget" :node-id="shareNode" :name="current?.title ?? 'dataset'" />
     <CrateTransferDialog v-model:open="showCrateExport" :document-id="detailId" :document-path="currentPath" />
     <RepositoryPublishDialog
       v-if="fetchedSummary"
