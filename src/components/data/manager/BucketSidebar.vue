@@ -14,9 +14,11 @@ import Spinner from '@/components/ui/Spinner.vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
+import BucketOrderHandle from '@/components/data/manager/BucketOrderHandle.vue'
 import { useBucketJobs } from '@/composables/useBucketJobs'
 import DatabaseRows from '@/components/data/manager/DatabaseRows.vue'
 import MockBucketRows from '@/components/data/manager/MockBucketRows.vue'
+import { useBucketOrder } from '@/composables/useBucketOrder'
 import { useBucketSearch } from '@/composables/useBucketSearch'
 import { useListedUsage } from '@/composables/useBucketUsage'
 import { useDatabases } from '@/composables/useDatabases'
@@ -33,9 +35,10 @@ import { exampleBuckets } from '@/lib/distributedMockData'
 import { folderName } from '@/lib/deviceApi'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
 import { isFolderBucket, isHiddenBucket } from '@/lib/workspaces'
+import { moveBucket, orderCompare } from '@/lib/bucketOrder'
 import type { BucketShortcut } from '@/composables/useBucketShortcuts'
-import { Boxes, Check, ChevronLeft, ChevronRight, FolderPlus, FolderSync, History, KeyRound, ListFilter, Trash2, X } from '@lucide/vue'
-import { computed, ref, useId, watch } from 'vue'
+import { Boxes, Check, ChevronLeft, ChevronRight, FolderPlus, FolderSync, History, KeyRound, ListFilter, RotateCcw, Trash2, X } from '@lucide/vue'
+import { computed, nextTick, ref, useId, watch } from 'vue'
 
 // `sheet`: the list inside the bucket picker of a narrow view, without its card and header.
 const props = defineProps<{ manager: DataManager; sheet?: boolean }>()
@@ -192,8 +195,14 @@ const readsInPlace = (name: string, node: string | null) => !inPlaceOn.value || 
 const realNode = (nodeId: string | null) => nodeId ?? realmNodes.localNodeId.value ?? ''
 const rowNodes = (row: AllRow) => (row.hit ? row.hit.nodes : [realNode(row.nodeId)])
 
-// All nodes rows: pins first, then the rest in the nodes' name order, so opening a bucket never
-// moves a row. A row's node is named only when it is not this node, as the pins are keyed.
+// All nodes rows: pins first, then the rest, each in the user's order and then the nodes' name
+// order, so opening a bucket never moves a row. A row's node is named only when it is not this node, as the pins are keyed.
+const order = useBucketOrder(selectedGroupId)
+const { names: orderNames, canSave: canOrder, reset: resetOrder } = order
+const ranked = <R extends { bucket: string }>(rows: R[]) => {
+  const compare = orderCompare(orderNames.value)
+  return [...rows].sort((a, b) => compare(a.bucket, b.bucket))
+}
 const shortcutNode = (hit: ListedBucket) => (realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id)
 type AllRow = { key: string; bucket: string; nodeId: string | null; hit: ListedBucket | null; pinned: boolean }
 const allRows = computed<AllRow[]>(() => {
@@ -215,7 +224,7 @@ const allRows = computed<AllRow[]>(() => {
     !isFolderBucket(entry.bucket) && realmNodes.isTarget(entry.nodeId) && entry.bucket.toLowerCase().includes(term)
   const pins = shortcuts.pinned.value.filter(shownPin).flatMap(take)
   const rest = hits.filter((hit) => !used.has(hit)).map((hit) => ({ key: `${hit.node_id}/${hit.bucket}`, bucket: hit.bucket, nodeId: shortcutNode(hit), hit, pinned: false }))
-  const rows = [...pins, ...rest].filter((row) => passesFilters(row.bucket, row.hit?.node_id ?? row.nodeId, rowNodes(row), row.pinned))
+  const rows = [...ranked(pins), ...ranked(rest)].filter((row) => passesFilters(row.bucket, row.hit?.node_id ?? row.nodeId, rowNodes(row), row.pinned))
   return hideDatabases.value ? rows.filter((row) => !databaseOf(row.bucket, row.hit?.node_id ?? row.nodeId)) : rows
 })
 // The nodes the listed rows are on, for the node filter.
@@ -277,13 +286,15 @@ function listPlace(nodeId: string | null): RowPlace {
   return other(nodeId) === other(remoteNodeId.value) ? { place: null, placeTitle: null, placeNode: null } : rowPlace(nodeId)
 }
 
-// Pinned rows first under their label, then every other bucket, each part by name. The database
-// icon tells databases apart; an empty label marks the rest.
+// Pinned rows first under their label, then every other bucket, each part in the user's order,
+// then by name. The database icon tells databases apart; an empty label marks the rest.
 type Named = { bucket: string; nodeId?: string | null }
 const byName = (a: Named, b: Named) => a.bucket.localeCompare(b.bucket) || (a.nodeId ?? '').localeCompare(b.nodeId ?? '')
 function sectioned<R extends Named>(rows: R[], pinned: (row: R) => boolean): { label: string; rows: R[] }[] {
-  const pins = rows.filter(pinned).sort(byName)
-  const rest = rows.filter((row) => !pinned(row)).sort(byName)
+  const compare = orderCompare(orderNames.value)
+  const sorted = (part: R[]) => part.sort((a, b) => compare(a.bucket, b.bucket) || byName(a, b))
+  const pins = sorted(rows.filter(pinned))
+  const rest = sorted(rows.filter((row) => !pinned(row)))
   return [{ label: 'Pinned', rows: pins }, { label: '', rows: rest }].filter((section) => section.rows.length)
 }
 const rowNodeId = (row: AllRow) => row.hit?.node_id ?? row.nodeId
@@ -296,6 +307,49 @@ const shownEntries = computed(() => nodeSections.value.flatMap((section) => sect
 // The position of a row in the shown order, for the arrow key highlight.
 const rowIndex = (row: AllRow) => shownRows.value.indexOf(row)
 const entryIndex = (entry: NodeEntry) => shownEntries.value.indexOf(entry)
+const entryKey = (entry: NodeEntry) => `${entry.nodeId ?? 'local'}/${entry.bucket}`
+
+// A row moves within its section, by dragging its handle onto another row or with the arrow keys.
+const dragging = ref<{ section: string; bucket: string } | null>(null)
+const dropKey = ref<string | null>(null)
+const orderNote = ref('')
+function moveRow(rows: Named[], from: number, to: number): boolean {
+  if (from < 0 || to < 0 || to >= rows.length || from === to) return false
+  const name = rows[from].bucket
+  void order.save(moveBucket(orderNames.value, rows.map((row) => row.bucket), name, rows[to].bucket))
+  orderNote.value = `${name} moved to position ${to + 1} of ${rows.length}`
+  return true
+}
+function moveByKey(rows: Named[], index: number, step: number, key: string) {
+  if (!moveRow(rows, index, index + step) || typeof document === 'undefined') return
+  void nextTick(() => document.querySelector<HTMLElement>(`[data-order-handle="${CSS.escape(key)}"]`)?.focus())
+}
+function startDrag(event: DragEvent, section: string, bucket: string) {
+  dragging.value = { section, bucket }
+  if (!event.dataTransfer) return
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData('text/plain', bucket)
+  const row = (event.target as HTMLElement | null)?.closest?.('li')
+  if (row) event.dataTransfer.setDragImage(row, 16, 16)
+}
+function dragOver(event: DragEvent, section: string, key: string) {
+  if (dragging.value?.section !== section) return
+  event.preventDefault()
+  dropKey.value = key
+}
+function dropOn(event: DragEvent, section: string, rows: Named[], index: number) {
+  const drag = dragging.value
+  endDrag()
+  if (drag?.section !== section) return
+  event.preventDefault()
+  moveRow(rows, rows.findIndex((row) => row.bucket === drag.bucket), index)
+}
+function endDrag() {
+  dragging.value = null
+  dropKey.value = null
+}
+const dropClass = (key: string, bucket: string) =>
+  dropKey.value === key && dragging.value?.bucket !== bucket ? 'bg-primary/10' : dragging.value?.bucket === bucket ? 'opacity-50' : ''
 
 // Each shown row names its files and size once its node answered.
 const usage = useListedUsage()
@@ -471,6 +525,10 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               <DropdownMenuSeparator />
               <DropdownMenuItem @click="clearFilters"><X class="h-3.5 w-3.5" /> Clear filters</DropdownMenuItem>
             </template>
+            <template v-if="canOrder && orderNames.length">
+              <DropdownMenuSeparator />
+              <DropdownMenuItem @click="resetOrder"><RotateCcw class="h-3.5 w-3.5" /> Reset order</DropdownMenuItem>
+            </template>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -488,6 +546,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         </Button>
         <button type="button" class="ml-auto text-xs text-primary hover:underline" @click="clearFilters">Clear</button>
       </div>
+      <p class="sr-only" aria-live="polite">{{ orderNote }}</p>
       <Spinner v-if="checkingUsage" show-label label="Checking which buckets read in place…" class="px-3.5 pt-2" />
       <ul v-if="databaseMode" :id="`${listId}-group`" role="listbox" :class="listClass">
         <DatabaseRows ref="databaseRows" :filter="bucketNameFilter" :active="bucket" :highlighted="activeIndex" @open="openBucketOn" />
@@ -499,7 +558,14 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           <template v-for="section in allSections" :key="section.label">
             <li v-if="section.label" role="presentation" class="px-3.5 pb-1 pt-3 text-xs font-medium text-muted-foreground">{{ section.label }}</li>
             <li v-else-if="allSections.length > 1" role="presentation" class="mx-3.5 my-2 border-t border-border-subtle" />
-            <li v-for="row in section.rows" :key="row.key" role="presentation">
+            <li
+              v-for="(row, index) in section.rows"
+              :key="row.key"
+              role="presentation"
+              :class="dropClass(row.key, row.bucket)"
+              @dragover="dragOver($event, section.label, row.key)"
+              @drop="dropOn($event, section.label, section.rows, index)"
+            >
               <BucketRow
                 v-if="row.hit"
                 :bucket="row.bucket"
@@ -524,6 +590,15 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                     <FolderSync class="h-3 w-3" />
                   </IconButton>
                 </template>
+                <template v-if="canOrder" #handle>
+                  <BucketOrderHandle
+                    :bucket="row.bucket"
+                    :row-key="row.key"
+                    @move="(step: number) => moveByKey(section.rows, index, step, row.key)"
+                    @dragstart="startDrag($event, section.label, row.bucket)"
+                    @dragend="endDrag"
+                  />
+                </template>
               </BucketRow>
               <BucketRow
                 v-else
@@ -539,7 +614,17 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                 v-bind="rowPlace(row.nodeId)"
                 @open="openRow(row)"
                 @toggle-pin="shortcuts.togglePin(row.bucket, row.nodeId)"
-              />
+              >
+                <template v-if="canOrder" #handle>
+                  <BucketOrderHandle
+                    :bucket="row.bucket"
+                    :row-key="row.key"
+                    @move="(step: number) => moveByKey(section.rows, index, step, row.key)"
+                    @dragstart="startDrag($event, section.label, row.bucket)"
+                    @dragend="endDrag"
+                  />
+                </template>
+              </BucketRow>
             </li>
           </template>
           <MockBucketRows :filter="bucketNameFilter" :active="bucket" @open="openBucket" />
@@ -580,9 +665,12 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               <li v-if="section.label" role="presentation" class="px-3.5 pb-1 pt-3 text-xs font-medium text-muted-foreground">{{ section.label }}</li>
               <li v-else-if="nodeSections.length > 1" role="presentation" class="mx-3.5 my-2 border-t border-border-subtle" />
               <li
-                v-for="entry in section.rows"
-                :key="`${entry.nodeId ?? 'local'}/${entry.bucket}`"
+                v-for="(entry, index) in section.rows"
+                :key="entryKey(entry)"
                 role="presentation"
+                :class="dropClass(entryKey(entry), entry.bucket)"
+                @dragover="dragOver($event, section.label, entryKey(entry))"
+                @drop="dropOn($event, section.label, section.rows, index)"
               >
                 <BucketRow
                   :bucket="entry.bucket"
@@ -622,6 +710,15 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                     >
                       <Trash2 class="h-3 w-3" />
                     </IconButton>
+                  </template>
+                  <template v-if="canOrder" #handle>
+                    <BucketOrderHandle
+                      :bucket="entry.bucket"
+                      :row-key="entryKey(entry)"
+                      @move="(step: number) => moveByKey(section.rows, index, step, entryKey(entry))"
+                      @dragstart="startDrag($event, section.label, entry.bucket)"
+                      @dragend="endDrag"
+                    />
                   </template>
                 </BucketRow>
               </li>

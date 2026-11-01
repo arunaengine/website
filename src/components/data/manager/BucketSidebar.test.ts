@@ -25,8 +25,13 @@ const aruna = vi.hoisted(() => ({ authToken: { value: 'token' }, searchBuckets: 
 const listJobs = vi.hoisted(() => vi.fn())
 vi.mock('@/composables/useAruna', () => ({
   isUnsupportedEndpoint: () => false,
-  useAruna: () => ({ ...aruna, apiBaseUrl: ref('https://api.test'), sessionEpoch: ref(0) }),
+  useAruna: () => ({ ...aruna, ...account, apiBaseUrl: ref('https://api.test'), sessionEpoch: ref(0) }),
 }))
+// The signed-in profile whose attributes hold the bucket order; null while signed out.
+const account = {
+  userInfo: ref<{ user: { attributes: Record<string, string> } } | null>(null),
+  updateUserProfile: vi.fn(async (_body: unknown) => undefined),
+}
 // Only the listing the step labels are read from; everything else of the API stays real.
 vi.mock('@/lib/api', async (original) => ({
   ...(await original<typeof import('@/lib/api')>()),
@@ -34,6 +39,8 @@ vi.mock('@/lib/api', async (original) => ({
 }))
 const RealSearch = await import('@/composables/useBucketSearch')
 const RealJobs = await import('@/composables/useBucketJobs')
+const RealOrder = await import('@/composables/useBucketOrder')
+const RealOrderLib = await import('@/lib/bucketOrder')
 
 const createBucket = vi.fn()
 const requestDelete = vi.fn()
@@ -116,6 +123,7 @@ const RowStub = defineComponent({
             props.linkedTo ? h('span', { role: 'img', 'aria-label': `Linked to ${props.linkedTo}` }) : slots.link?.(),
           ]),
       slots.actions?.(),
+      slots.handle?.(),
     ]),
 })
 const IconButtonStub = defineComponent({
@@ -164,6 +172,11 @@ const sidebarModules = {
   '@/components/ui/Spinner.vue': moduleDefault(Empty),
   '@/components/ui/IconButton.vue': moduleDefault(IconButtonStub),
   '@/components/data/BucketRow.vue': moduleDefault(RowStub),
+  '@/components/data/manager/BucketOrderHandle.vue': moduleDefault(
+    compileClientComponent(new URL('./BucketOrderHandle.vue', import.meta.url), { vue: VueRuntime, '@lucide/vue': icons }),
+  ),
+  '@/composables/useBucketOrder': RealOrder,
+  '@/lib/bucketOrder': RealOrderLib,
   '@/composables/useBucketJobs': { useBucketJobs: () => stepJobs },
   '@/components/data/manager/MockBucketRows.vue': moduleDefault(Empty),
   '@/components/data/manager/DatabaseRows.vue': moduleDefault(Empty),
@@ -908,6 +921,115 @@ describe('All nodes list order and pins', () => {
     await click(element(root, (node) => node.props['aria-label'] === 'Pin alpha'))
     expect(state.shortcuts.togglePin.mock.calls).toEqual([['beta', 'node-2'], ['alpha', null]])
     allBuckets.hits.value = []
+  })
+})
+
+describe('own bucket order', () => {
+  const order = (root: Parameters<typeof content>[0]) =>
+    nodes(root).filter((node) => String(node.props['aria-label'] ?? '').startsWith('Open ')).map((node) => content(node))
+  const handle = (root: Parameters<typeof content>[0], name: string) =>
+    element(root, (node) => node.props['aria-label'] === `Move ${name}`)
+  const row = (root: Parameters<typeof content>[0], name: string) =>
+    element(root, (node) => node.tag === 'li' && nodes(node).some((child) => child.props['aria-label'] === `Open ${name}`))
+  const dragEvent = () => ({ preventDefault: vi.fn(), dataTransfer: null })
+
+  async function mounted(stored: string | null) {
+    nodeChoice.value = null
+    allBuckets.needsName.value = false
+    allBuckets.more.value = false
+    allBuckets.hits.value = ['alpha', 'beta', 'gamma', 'delta'].map((bucket) => ({ bucket, node_id: 'home', group_id: 'g1' }))
+    account.userInfo.value = { user: { attributes: stored === null ? {} : { 'ui.bucket_order.g1': stored } } }
+    account.updateUserProfile.mockReset()
+    // The node answers with the stored attribute, as the refreshed profile does.
+    account.updateUserProfile.mockImplementation(async (body: unknown) => {
+      const { set_attributes: set = {}, remove_attributes: removed = [] } = body as { set_attributes?: Record<string, string>; remove_attributes?: string[] }
+      const attributes = { ...account.userInfo.value!.user.attributes, ...set }
+      for (const key of removed) delete attributes[key]
+      account.userInfo.value = { user: { attributes } }
+    })
+    const mounted = await mountApp(BucketSidebar, { props: { manager: manager() } })
+    await flush()
+    return mounted
+  }
+  afterEach(() => {
+    account.userInfo.value = null
+    allBuckets.hits.value = []
+  })
+
+  it('lists the saved order first and new buckets after it by name', async () => {
+    const { root, app } = await mounted('gamma,alpha')
+    expect(order(root)).toEqual(['gamma', 'alpha', 'beta', 'delta'])
+    app.unmount()
+  })
+
+  it('moves a bucket with the arrow keys on its handle and saves the order', async () => {
+    const { root, app } = await mounted(null)
+    expect(order(root)).toEqual(['alpha', 'beta', 'delta', 'gamma'])
+    const keydown = (name: string, key: string) =>
+      (handle(root, name).props.onKeydown as (event: unknown) => void)({ key, preventDefault: () => {}, stopPropagation: () => {} })
+
+    keydown('delta', 'ArrowUp')
+    await flush()
+    expect(order(root)).toEqual(['alpha', 'delta', 'beta', 'gamma'])
+    expect(account.updateUserProfile).toHaveBeenLastCalledWith({ set_attributes: { 'ui.bucket_order.g1': 'alpha,delta,beta,gamma' } })
+    expect(content(root)).toContain('delta moved to position 2 of 4')
+
+    // The first row cannot move up, and other keys do nothing.
+    keydown('alpha', 'ArrowUp')
+    keydown('alpha', 'Enter')
+    await flush()
+    expect(account.updateUserProfile).toHaveBeenCalledTimes(1)
+    app.unmount()
+  })
+
+  it('moves a dragged bucket onto the row it is dropped on', async () => {
+    const { root, app } = await mounted(null)
+    ;(handle(root, 'alpha').props.onDragstart as (event: unknown) => void)(dragEvent())
+    const over = dragEvent()
+    ;(row(root, 'gamma').props.onDragover as (event: unknown) => void)(over)
+    expect(over.preventDefault).toHaveBeenCalled()
+    ;(row(root, 'gamma').props.onDrop as (event: unknown) => void)(dragEvent())
+    await flush()
+    expect(order(root)).toEqual(['beta', 'delta', 'gamma', 'alpha'])
+    app.unmount()
+  })
+
+  it('does not take a drop from another section', async () => {
+    const state = manager()
+    state.shortcuts.pinned.value = [{ bucket: 'alpha', nodeId: null }]
+    nodeChoice.value = null
+    allBuckets.needsName.value = false
+    allBuckets.hits.value = ['alpha', 'beta'].map((bucket) => ({ bucket, node_id: 'home', group_id: 'g1' }))
+    account.userInfo.value = { user: { attributes: {} } }
+    account.updateUserProfile.mockReset()
+    const { root, app } = await mountApp(BucketSidebar, { props: { manager: state } })
+    await flush()
+    ;(handle(root, 'alpha').props.onDragstart as (event: unknown) => void)(dragEvent())
+    const over = dragEvent()
+    ;(row(root, 'beta').props.onDragover as (event: unknown) => void)(over)
+    ;(row(root, 'beta').props.onDrop as (event: unknown) => void)(dragEvent())
+    await flush()
+    expect(over.preventDefault).not.toHaveBeenCalled()
+    expect(account.updateUserProfile).not.toHaveBeenCalled()
+    app.unmount()
+  })
+
+  it('resets the order from the filter menu, which offers it only while one is saved', async () => {
+    const { root, app } = await mounted('gamma')
+    await click(element(root, (node) => content(node).trim() === 'Reset order' && 'onClick' in node.props))
+    await flush()
+    expect(account.updateUserProfile).toHaveBeenLastCalledWith({ remove_attributes: ['ui.bucket_order.g1'] })
+    expect(order(root)).toEqual(['alpha', 'beta', 'delta', 'gamma'])
+    expect(content(root)).not.toContain('Reset order')
+    app.unmount()
+  })
+
+  it('offers no handles while signed out', async () => {
+    const { root, app } = await mounted(null)
+    account.userInfo.value = null
+    await flush()
+    expect(nodes(root).some((node) => String(node.props['aria-label'] ?? '').startsWith('Move '))).toBe(false)
+    app.unmount()
   })
 })
 

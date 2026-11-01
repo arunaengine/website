@@ -110,6 +110,14 @@ describe('BucketRow lines and marks', () => {
     expect(String(pin.parent!.props.class)).not.toContain('opacity-0')
   })
 
+  it('keeps the move handle visible in the action column after the pin', async () => {
+    const root = await mount({}, { handle: () => h('button', { 'aria-label': 'Move genes' }) })
+    const pin = nodes(root).find((node) => node.props['aria-label'] === 'Pin genes')!
+    const column = pin.parent!
+    expect(column.children.map((node) => node.props['aria-label']).filter(Boolean)).toEqual(['Pin genes', 'Move genes'])
+    expect(String(column.props.class)).not.toContain('opacity-0')
+  })
+
   it('pins on a long press and does not open the bucket then', async () => {
     vi.useFakeTimers()
     try {

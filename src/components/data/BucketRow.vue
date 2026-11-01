@@ -222,7 +222,7 @@ function onClick() {
         </template>
       </Popover>
     </div>
-    <div v-if="$slots.link || $slots.actions || pinnable" class="relative flex shrink-0 items-center gap-0.5">
+    <div v-if="$slots.link || $slots.actions || $slots.handle || pinnable" class="relative flex shrink-0 items-center gap-0.5">
       <slot v-if="!linkedTo" name="link" />
       <slot name="actions" />
       <button
@@ -237,6 +237,7 @@ function onClick() {
       >
         <Pin class="h-3.5 w-3.5" :fill="pinned ? 'currentColor' : 'none'" />
       </button>
+      <slot name="handle" />
     </div>
     <p v-if="parts" class="flex min-w-0 items-center gap-2.5 [grid-column:2/-1] overflow-hidden whitespace-nowrap text-xs tabular-nums text-muted-foreground">
       <span class="inline-flex shrink-0 items-center gap-1" :title="`${parts.files} files`"><Files class="h-3 w-3" aria-hidden="true" /><span class="sr-only">Files: </span>{{ parts.files }}</span>
