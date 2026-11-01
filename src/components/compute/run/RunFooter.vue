@@ -8,7 +8,8 @@ import { injectCustomRun, outputFolder } from '@/composables/useCustomRun'
 import { atOrBelow } from '@/lib/tes'
 import { ArrowLeft, Braces, CircleCheck, CircleDashed, Play, Star, TriangleAlert } from '@lucide/vue'
 
-const props = defineProps<{ running?: boolean; saved?: boolean }>()
+/** `error` is why the last Run did not start, shown next to Run. */
+const props = defineProps<{ running?: boolean; saved?: boolean; error?: string | null }>()
 const emit = defineEmits<{
   (e: 'run'): void
   (e: 'cancel'): void
@@ -82,6 +83,7 @@ const noOutputs = computed(() => outputRows.value.length === 0)
       Results go to <span class="break-all font-mono text-foreground">{{ resultFolders.join(', ') }}</span>
     </p>
     <div class="mt-4 flex flex-col gap-2">
+      <p v-if="props.error" role="alert" class="break-words text-xs text-destructive">{{ props.error }}</p>
       <Button data-tutorial="run-submit" class="max-lg:hidden" :disabled="props.running" @click="emit('run')">
         <Play class="size-4" /> {{ props.running ? 'Starting…' : 'Run' }}
       </Button>
@@ -98,7 +100,8 @@ const noOutputs = computed(() => outputRows.value.length === 0)
 
   <!-- Narrow screens: Run stays in reach above the mobile navigation. -->
   <div class="fixed inset-x-0 bottom-[4.5rem] z-30 flex items-center gap-3 border-t border-border/80 bg-background/90 px-4 py-3 backdrop-blur-xl md:bottom-0 lg:hidden">
-    <span class="flex-1 text-sm text-muted-foreground">{{ problems.length ? `${problems.length} still needed` : 'Ready to run' }}</span>
+    <span v-if="props.error" role="alert" class="line-clamp-2 flex-1 text-xs text-destructive" :title="props.error">{{ props.error }}</span>
+    <span v-else class="flex-1 text-sm text-muted-foreground">{{ problems.length ? `${problems.length} still needed` : 'Ready to run' }}</span>
     <Button class="min-w-28" :disabled="props.running" @click="emit('run')">
       <Play class="size-4" /> {{ props.running ? 'Starting…' : 'Run' }}
     </Button>

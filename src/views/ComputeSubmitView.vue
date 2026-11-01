@@ -407,6 +407,7 @@ async function run() {
         <RunFooter
           :running="submitting || busy"
           :saved="savedRun"
+          :error="submitError"
           @run="run"
           @cancel="router.push({ name: 'compute' })"
           @save="saveOpen = true"

@@ -646,6 +646,19 @@ describe('run page', () => {
     mounted.app.unmount()
   })
 
+  it('names the node refusal next to Run', async () => {
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
+    await fillValidRun(mounted.root)
+
+    createTask.mockRejectedValueOnce(new Api.ApiError(400, 'invalid workspace: input object not found'))
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    const summary = element(mounted.root, (node) => node.tag === 'aside' && node.props['aria-labelledby'] === 'run-summary-heading')
+    expect(content(summary)).toContain('invalid workspace: input object not found')
+    mounted.app.unmount()
+  })
+
   it('calls a sent run unknown when its answer is lost, and quiet after the session changed', async () => {
     const mounted = await mount(ComputeSubmitView, '/app/compute/new')
     await fillValidRun(mounted.root)
