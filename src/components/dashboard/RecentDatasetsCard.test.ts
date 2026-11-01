@@ -6,6 +6,7 @@ import { PROCESS_RUN_PROFILE_URI } from '@/lib/profiles/builtinProfiles'
 import { compileClientComponent, content, element, flush, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 
 const metadata = ref<unknown[]>([])
+const currentUser = ref<{ id: string } | null>({ id: 'u1' })
 const listRecentMetadata = vi.fn()
 const LinkStub = defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()) })
 const Pass = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
@@ -17,7 +18,7 @@ const RecentDatasetsCard = compileClientComponent(new URL('./RecentDatasetsCard.
   '@/components/ui/Button.vue': moduleDefault(Pass),
   '@/components/ui/SectionHeading.vue': moduleDefault(HeadingStub),
   '@/components/ui/StatusMark.vue': moduleDefault(defineComponent(() => () => null)),
-  '@/composables/useAruna': { useAruna: () => ({ metadata, myGroups: ref([{ id: 'g1', name: 'demo' }]), listRecentMetadata, sessionEpoch: ref(1) }) },
+  '@/composables/useAruna': { useAruna: () => ({ currentUser, metadata, myGroups: ref([{ id: 'g1', name: 'demo' }]), listRecentMetadata, sessionEpoch: ref(1) }) },
   '@/lib/datasetFacts': DatasetFacts,
   '@/lib/utils': { relativeTime: (value: string) => `at ${value}` },
 })
@@ -72,6 +73,17 @@ describe('recent datasets', () => {
     const create = element(none.root, (node) => node.tag === 'a' && content(node) === 'Create dataset')
     expect(JSON.parse(String(create.props['data-to']))).toEqual({ name: 'dataset-new' })
     none.app.unmount()
+  })
+
+  it('names the list public for a visitor and offers no dataset creation', async () => {
+    currentUser.value = null
+    listRecentMetadata.mockResolvedValueOnce({ documents: [], complete: true })
+    const visitor = await mountApp(RecentDatasetsCard)
+    await flush()
+    expect(content(visitor.root)).toContain('Recent public datasets')
+    expect(content(visitor.root)).not.toContain('Create dataset')
+    visitor.app.unmount()
+    currentUser.value = { id: 'u1' }
   })
 
   it('never claims there are none when the walk stopped early or only the loaded window was read', async () => {

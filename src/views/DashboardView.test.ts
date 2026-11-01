@@ -4,6 +4,7 @@ import { renderToString } from '@vue/server-renderer'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, content, compileClientComponent, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
 import * as NodeDisplay from '@/components/nodes/node-display'
+import { formatBytes } from '@/lib/utils'
 const RealmNodes = await vi.importActual<typeof import('@/composables/useRealmNodes')>('@/composables/useRealmNodes')
 
 const firstPaintMock = vi.hoisted(() => ({
@@ -293,6 +294,7 @@ beforeAll(async () => {
     '@/components/dashboard/NodeCards.vue': moduleDefault(NodeCardsStub),
     '@/composables/useNodeNames': nodeNamesStub,
     '@/composables/useRecentRuns': recentRunsStub,
+    '@/composables/usePublicNodes': { usePublicNodes: (recorded: unknown) => recorded },
     '@/composables/useMyGroupsUsage': groupsUsageStub,
     '@/components/dashboard/RealmTopology.vue': moduleDefault(MapStub),
     '@/components/dashboard/NodeTable.vue': moduleDefault(TableStub),
@@ -397,19 +399,22 @@ describe('guest dashboard truth', () => {
     expect(refresh).toHaveBeenCalledOnce()
   })
 
-  it('renders the three public_overview counts instead of guest-filtered zeros', async () => {
+  it('renders the realm-wide totals instead of guest-filtered zeros', async () => {
     realm.value = { id: 'realm-public', name: 'Gaia realm', description: 'Shared science data' }
     realmInfo.value = {
       metadata_replication: { default_replication_factor: null },
       nodes: [],
-      public_overview: { live_datasets: 23, groups: 8, nodes_configured: 4 },
+      public_overview: { live_datasets: 23, groups: 8, nodes_configured: 4, data_bytes: 5000, objects: 70 },
     }
     profiles.value = Array.from({ length: 12 })
 
     const text = await renderedText()
 
-    // The public count covers every record kind, runs too, so it names no datasets.
-    expect(text).toContain('Records 23')
+    // Data is one total, never split into stored and referenced.
+    expect(text).toContain(`Data ${formatBytes(5000).replace(/\s/g, ' ')}`)
+    expect(text).not.toContain('referenced')
+    expect(text).toContain('Objects 70')
+    expect(text).toContain('Datasets 23')
     expect(text).toContain('Realm 4 nodes')
     expect(text).toContain('Sign in')
     // Storage and data are figures of a signed-in session.
@@ -425,10 +430,31 @@ describe('guest dashboard truth', () => {
   it('renders absent public counts as unknown rather than zero', async () => {
     const text = await renderedText()
 
-    expect(text).toContain('Records Unknown')
+    expect(text).toContain('Data Unknown')
+    expect(text).toContain('Objects Unknown')
+    expect(text).toContain('Datasets Unknown')
     expect(text).toContain('Realm Unknown')
     expect(text).toContain('Public counts are unavailable from this node')
     expect(text).not.toContain('0 / 0')
+  })
+})
+
+describe('visitor dashboard', () => {
+  it('lists the realm nodes and the recent public datasets without a session', async () => {
+    realmInfo.value = {
+      metadata_replication: { default_replication_factor: 3 },
+      nodes: [
+        { node_id: 'node-a', kind: 'server', present: true, connection_status: 'connected', configured: true },
+        { node_id: 'phone', kind: 'user', present: true, connection_status: 'seen', configured: true },
+      ],
+    }
+
+    const text = await renderedText()
+
+    expect(text).toContain('row node-a')
+    expect(text).not.toContain('row phone')
+    expect(text).toContain('recent datasets')
+    expect(text).not.toContain('recent runs')
   })
 })
 

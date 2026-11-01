@@ -31,6 +31,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useMyGroupsUsage } from '@/composables/useMyGroupsUsage'
 import { useRecentRuns } from '@/composables/useRecentRuns'
+import { usePublicNodes } from '@/composables/usePublicNodes'
 import { useDatabases } from '@/composables/useDatabases'
 import { computerName } from '@/composables/useRealmNodes'
 import { useViewMode } from '@/composables/useViewMode'
@@ -173,7 +174,8 @@ const panelRealm = computed(() => realmView.value?.realm ?? realmInfo.value)
 
 // Devices (kind 'user') run on their owner's computer, not on realm
 // infrastructure: they are never listed or aggregated with the nodes.
-const infraNodes = computed(() => (panelRealm.value?.nodes ?? []).filter((node) => node.kind !== 'user'))
+// Signed out, the nodes come from their published addresses until the realm lists them.
+const infraNodes = usePublicNodes(computed(() => (panelRealm.value?.nodes ?? []).filter((node) => node.kind !== 'user')))
 
 // This computer by its own /system/info, the device node, named by its own realm record first and
 // by a realm node's copy when its own has no name yet.
@@ -265,7 +267,10 @@ watch(myUsage.membershipKey, () => void myUsage.load(), { immediate: true })
 watch(cardsRevision, () => {
   if (scope.value === 'realm') void myUsage.refresh()
 })
+// A visitor sees the realm-wide totals: data in one byte total, objects and datasets.
 const guestRecords = computed(() => publicOverview.value?.live_datasets ?? null)
+const guestBytes = computed(() => publicOverview.value?.data_bytes ?? null)
+const guestObjects = computed(() => publicOverview.value?.objects ?? null)
 // Without node records (a guest) the realm still names how many nodes it has configured.
 const realmNodeCount = computed(() => infraNodes.value.length || (publicOverview.value?.nodes_configured ?? null))
 
@@ -355,7 +360,7 @@ const pageDescription = computed(() =>
             <DashboardScopeToggle :model-value="scope" @update:model-value="setScope" />
           </template>
         </SectionHeading>
-        <div class="grid grid-cols-2 gap-3 sm:gap-4" :class="currentUser ? 'xl:grid-cols-4' : ''">
+        <div class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
           <template v-if="currentUser && scope === 'personal'">
             <MyStatsCards v-if="myGroups.length" :refresh-revision="quotaRevision" />
             <div v-else class="surface col-span-2 grid place-items-center p-4"><EmptyState compact title="You do not belong to any groups yet." /></div>
@@ -377,6 +382,14 @@ const pageDescription = computed(() =>
               <span v-if="realmBucketsLine"><Package /><b>{{ realmBucketsLine.value }}</b> {{ realmBucketsLine.word }}</span>
             </OverviewCell>
           </template>
+          <template v-else>
+            <OverviewCell label="Data" :icon="HardDrive">
+              <template #value>{{ guestBytes !== null ? formatBytes(guestBytes) : 'Unknown' }}</template>
+            </OverviewCell>
+            <OverviewCell label="Objects" :icon="Files" tone="aqua" :to="{ name: 'buckets' }">
+              <template #value>{{ guestObjects !== null ? formatCount(guestObjects) : 'Unknown' }}</template>
+            </OverviewCell>
+          </template>
           <!-- Totals wait for every group, so a partial sum never reads as the count. -->
           <template v-if="currentUser">
             <Skeleton v-if="groupsUsage.pending" class="h-[132px] rounded-xl" />
@@ -396,7 +409,7 @@ const pageDescription = computed(() =>
               </span>
             </OverviewCell>
           </template>
-          <OverviewCell v-else label="Records" :icon="FileJson2" tone="ok" :to="{ name: 'datasets' }">
+          <OverviewCell v-else label="Datasets" :icon="FileJson2" tone="ok" :to="{ name: 'datasets' }">
             <template #value>{{ guestRecords !== null ? formatCount(guestRecords) : 'Unknown' }}</template>
           </OverviewCell>
           <OverviewCell label="Realm" :icon="Network" :tone="offlineNodes ? 'failed' : 'ok'" :to="{ name: 'status' }">
@@ -427,7 +440,7 @@ const pageDescription = computed(() =>
       </section>
 
       <!-- The topology on the left, the table on the right; both open a node's details. -->
-      <section v-else-if="currentUser && scope === 'realm' && (infraNodes.length || deviceRecord)" aria-labelledby="realm-heading">
+      <section v-else-if="(currentUser ? scope === 'realm' : !authPending) && (infraNodes.length || deviceRecord)" aria-labelledby="realm-heading">
         <SectionHeading id="realm-heading" title="Realm" :icon="Network">
           <template #actions>
             <Button variant="outline" size="sm" as-child><RouterLink :to="{ name: 'status' }"><Activity class="h-4 w-4" /> Status</RouterLink></Button>
@@ -448,8 +461,8 @@ const pageDescription = computed(() =>
         </div>
       </section>
 
-      <div v-if="currentUser" class="grid gap-6" :class="recentRuns.state.value !== 'off' ? 'lg:grid-cols-2' : ''">
-        <RecentRunsCard v-if="recentRuns.state.value !== 'off'" :runs="recentRuns.runs.value" :state="recentRuns.state.value" />
+      <div class="grid gap-6" :class="currentUser && recentRuns.state.value !== 'off' ? 'lg:grid-cols-2' : ''">
+        <RecentRunsCard v-if="currentUser && recentRuns.state.value !== 'off'" :runs="recentRuns.runs.value" :state="recentRuns.state.value" />
         <RecentDatasetsCard :refresh-revision="quotaRevision" />
       </div>
       </template>

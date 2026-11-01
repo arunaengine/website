@@ -82,6 +82,10 @@ export interface RealmInfoResponse {
     live_datasets: number | null
     groups: number | null
     nodes_configured: number | null
+    /** Realm-wide stored plus referenced bytes; absent on older backends. */
+    data_bytes?: number | null
+    /** Realm-wide object count; absent on older backends. */
+    objects?: number | null
   }
   // Public on newer backends: whether this node is a management node, and the
   // api base urls of the realm's management nodes, this node's own first.

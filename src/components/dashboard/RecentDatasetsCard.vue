@@ -16,7 +16,7 @@ import { relativeTime } from '@/lib/utils'
 const props = withDefaults(defineProps<{ refreshRevision?: number }>(), { refreshRevision: 0 })
 const SHOWN = 5
 
-const { metadata, myGroups, listRecentMetadata, sessionEpoch } = useAruna()
+const { currentUser, metadata, myGroups, listRecentMetadata, sessionEpoch } = useAruna()
 const recent = ref<{ documents: MetadataDoc[]; complete: boolean } | null>(null)
 const settled = ref(false)
 let round = 0
@@ -45,7 +45,7 @@ const files = (doc: MetadataDoc) => doc.linkedObjects?.length ?? 0
 
 <template>
   <section class="flex flex-col" aria-labelledby="recent-datasets-heading">
-    <SectionHeading id="recent-datasets-heading" title="Recent datasets" :icon="FileJson2">
+    <SectionHeading id="recent-datasets-heading" :title="currentUser ? 'Recent datasets' : 'Recent public datasets'" :icon="FileJson2">
       <template #actions>
         <Button variant="outline" size="sm" as-child><RouterLink :to="{ name: 'datasets' }">All datasets</RouterLink></Button>
       </template>
@@ -56,7 +56,7 @@ const files = (doc: MetadataDoc) => doc.linkedObjects?.length ?? 0
       <p v-else-if="!shown.length && !knownNone" class="px-5 py-4 text-xs text-muted-foreground">No recent datasets.</p>
       <div v-else-if="!shown.length" class="flex items-center justify-between gap-3 px-5 py-4 text-xs text-muted-foreground">
         <span>No datasets you can see yet.</span>
-        <RouterLink :to="{ name: 'dataset-new' }" class="font-medium text-primary hover:underline">Create dataset</RouterLink>
+        <RouterLink v-if="currentUser" :to="{ name: 'dataset-new' }" class="font-medium text-primary hover:underline">Create dataset</RouterLink>
       </div>
       <ul v-else class="divide-y divide-border-subtle">
         <li v-for="doc in shown" :key="doc.ulid" class="flex items-start gap-3 px-5 py-3 hover:bg-muted/40">
