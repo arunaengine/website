@@ -289,6 +289,7 @@ const ComputeSubmitView = compileClientComponent(url('views/ComputeSubmitView.vu
   '@/components/data/CreateCredentialDialog.vue': moduleDefault(GenericStub),
   '@/components/assistant/AskAiButton.vue': moduleDefault(GenericStub),
   '@/composables/useCustomRun': CustomRun,
+  '@/composables/useDatabases': { useDatabases: () => ({ rows: ref([]), state: ref('ready'), ensure: () => {} }) },
   '@/composables/useTes': Tes,
   '@/composables/useAruna': arunaModule,
   '@/composables/useComputeDataView': { useComputeDataView: () => ref('tree') },
