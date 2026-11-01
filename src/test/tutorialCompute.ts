@@ -23,6 +23,7 @@ import * as Shellwords from '@/lib/shellwords'
 import * as BucketName from '@/lib/bucketName'
 import * as ContentIdentity from '@/lib/contentIdentity'
 import * as ApiLib from '@/lib/api'
+import * as DistributionLib from '@/lib/distribution'
 import * as RunPaths from '@/lib/runPaths'
 import * as TesLib from '@/lib/tes'
 import * as Utils from '@/lib/utils'
@@ -252,6 +253,8 @@ const TesDataRefDialog = compileClientComponent(url('components/compute/TesDataR
   '@/lib/tes': TesLib,
   '@/lib/notebook/submit': { sessionRuntime: () => null },
   '@/lib/utils': Utils,
+  '@/lib/api': ApiLib,
+  '@/lib/distribution': DistributionLib,
 })
 const RequestDialog = compileClientComponent(url('components/compute/run/RequestDialog.vue'), {
   vue: VueRuntime,
@@ -310,6 +313,7 @@ const ComputeSubmitView = compileClientComponent(url('views/ComputeSubmitView.vu
   '@/lib/workspaces': Workspaces,
   '@/lib/nativeSubmit': NativeSubmit,
   '@/lib/runTarget': RunTargetLib,
+  '@/lib/distribution': DistributionLib,
   '@/lib/jobs': JobsLib,
 })
 const TaskDetailPanel = compileClientComponent(url('components/compute/TaskDetailPanel.vue'), {
