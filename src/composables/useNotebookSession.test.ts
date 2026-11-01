@@ -73,14 +73,14 @@ function state(overrides: Record<string, unknown> = {}) {
   }
 }
 
-async function setup() {
+async function setup(node: string | null = null) {
   s3.getObjectText.mockRejectedValue({ name: 'NoSuchKey' })
   const scope = effectScope()
   // The notebook lives in the scope too, so stopping it cancels its save timer.
   const notebook = scope.run(() => createNotebook(ref('lab-data'), ref('notebooks/counts.ipynb'), () => ({
     runtime: 'python-notebook',
     group_id: 'group-1',
-  })))!
+  }), ref(node)))!
   await notebook.load()
   const store = scope.run(() => createNotebookSession(notebook))!
   return { notebook, session: store, scope }
@@ -461,6 +461,34 @@ describe('createNotebookSession', () => {
     expect(s3.putTextObject.mock.invocationCallOrder[0]).toBeLessThan(
       jobs.submitJob.mock.invocationCallOrder[0],
     )
+    scope.stop()
+  })
+
+  it('starts the session on the node that holds the notebook bucket', async () => {
+    const { session: store, scope } = await setup('node-b')
+    s3.putTextObject.mockResolvedValue({ versionId: 'v1' })
+    jobs.submitJob.mockResolvedValue({ job_id: '01NEW' })
+    jobs.getJob.mockResolvedValue({
+      state: 'running',
+      family: { execution_list: [{ executor_node_id: 'node-b', canonical: true }] },
+    })
+    session.getSessionState.mockResolvedValue(state({ job_id: '01NEW', executor_node_id: 'node-b' }))
+
+    await store.start({
+      groupId: 'group-1',
+      name: 'counts',
+      runtime: 'python-notebook',
+      workspaceBucket: 'lab-data',
+      dependencyKey: 'notebooks/counts.requirements.txt',
+      dependencyKind: 'requirements',
+      dependencyText: 'pandas>=2\n',
+    })
+
+    expect(s3.putTextObject).toHaveBeenCalledWith(
+      'lab-data', 'notebooks/counts.requirements.txt', 'pandas>=2\n', 'text/plain', 'node-b',
+      { nodeId: 'node-b', groupId: 'group-1', accessKeyId: 'temporary' },
+    )
+    expect(jobs.submitJob).toHaveBeenCalledWith(expect.anything(), { baseUrl: 'https://node-b.example/api/v1', token: 'bearer-token' })
     scope.stop()
   })
 

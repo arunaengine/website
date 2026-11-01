@@ -418,6 +418,7 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     generation,
     bucket,
     key,
+    nodeId,
     name,
     notebook,
     cells,

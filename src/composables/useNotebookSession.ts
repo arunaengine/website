@@ -81,8 +81,9 @@ export function createNotebookSession(notebook: NotebookStore) {
     writeResumePoint(resumeScope, jobId.value, seenEventId)
   }, 1_000)
 
+  // The node holding the notebook's bucket admits its session; null is the connected node.
   const homeClient = computed<ApiClientOptions>(() => ({
-    baseUrl: apiBaseUrl.value,
+    baseUrl: (notebook.nodeId.value ? nodeById(notebook.nodeId.value)?.apiBase : null) ?? apiBaseUrl.value,
     token: authToken.value,
   }))
   // The session routes are served by the executing node alone.
@@ -306,7 +307,7 @@ export function createNotebookSession(notebook: NotebookStore) {
     if (starting.value || running.value) return
     const active = current()
     const origin = homeClient.value
-    const storageNode = nodeInfo.value?.node.peer_id ?? null
+    const storageNode = notebook.nodeId.value ?? nodeInfo.value?.node.peer_id ?? null
     starting.value = true
     error.value = null
     notice.value = null
