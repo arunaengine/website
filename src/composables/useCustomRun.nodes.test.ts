@@ -76,4 +76,40 @@ describe('run buckets', () => {
     expect(getObjectText).toHaveBeenCalledWith('demo', 'tools/a.py', 'node-2')
     scope.stop()
   })
+
+  it('never takes a distributed bucket as the default for results', async () => {
+    const searchBuckets = vi.fn(async () => ({
+      hits: [
+        { bucket: 'bakrep', node_id: 'node-2', group_id: 'g1', set_id: 's1' },
+        { bucket: 'bakrep', node_id: 'node-3', group_id: 'g1', set_id: 's1' },
+        { bucket: 'lab', node_id: 'node-2', group_id: 'g1' },
+      ],
+      nodes_failed: 0,
+      next_cursor: null,
+    }))
+    const scope = effectScope()
+    const store = scope.run(() =>
+      createCustomRun({
+        runTarget: { local: computed(() => false), available: computed(() => true), target: ref('realm') } as never,
+        s3: { activeContext: ref(null), hasActiveKey: ref(false), endpoint: ref(null), ensureSession: async () => {} } as never,
+        myGroups: ref([]) as never,
+        currentUser: ref({ id: 'user-1' }) as never,
+        searchBuckets: searchBuckets as never,
+        isTarget: () => true,
+        isLocalNode: () => false,
+        nodes: computed(() => []),
+        getTask: (async () => ({})) as never,
+        dataView: ref('tree') as never,
+        realmName: computed(() => 'Realm'),
+      }),
+    )!
+    store.groupId.value = 'g1'
+    await vi.waitFor(() => expect(store.bucketsLoaded.value).toBe(true))
+
+    expect(store.buckets.value).toEqual(['bakrep', 'lab'])
+    expect(store.stagingBucket.value).toBe('lab')
+    store.addCapture('/work/out')
+    expect(store.outputRows.value[0]?.bucket).toBe('lab')
+    scope.stop()
+  })
 })

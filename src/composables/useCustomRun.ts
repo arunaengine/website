@@ -438,7 +438,7 @@ function createStore(deps: CustomRunDeps) {
     return `${runKey.value}/${outputTail(containerPath)}`
   }
   function lastBucket(): string {
-    return outputRows.value.at(-1)?.bucket || stagingBucket.value.trim() || buckets.value[0] || ''
+    return outputRows.value.at(-1)?.bucket || stagingBucket.value.trim()
   }
   function addCapture(containerPath: string) {
     outputRows.value.push({
@@ -689,7 +689,9 @@ function createStore(deps: CustomRunDeps) {
       bucketNodes.value = found
       // A partial list never rejects a typed name.
       bucketsLoaded.value = listing.complete
-      if (!stagingBucket.value && found.size) stagingBucket.value = buckets.value[0]
+      // Results never default to a distributed bucket, which holds shared reference data.
+      const distributed = new Set(listing.hits.filter((hit) => hit.set_id).map((hit) => hit.bucket))
+      if (!stagingBucket.value) stagingBucket.value = buckets.value.find((name) => !distributed.has(name)) ?? ''
     } catch {
       if (!current()) return
       bucketNodes.value = new Map()
