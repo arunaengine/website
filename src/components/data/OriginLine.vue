@@ -3,11 +3,12 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { stamp } from '@/lib/distributedMock'
-import type { Origin } from '@/lib/fileOrigin'
+import { uploadVia, type Origin } from '@/lib/fileOrigin'
 
 const props = defineProps<{ origin: Origin; short?: boolean }>()
 
 const host = computed(() => (props.origin.kind === 'source' ? props.origin.source.replace(/^https?:\/\//, '') : ''))
+const uploader = computed(() => (props.origin.kind === 'upload' ? [props.origin.user, uploadVia(props.origin)].filter(Boolean).join(' ') : ''))
 // An id from the node is a full URL; the example data names versions by their short form.
 const w3id = (id: string) => (id.startsWith('http') ? id : `https://w3id.org/aruna/data${id}`)
 const link = computed(() => {
@@ -27,23 +28,23 @@ const link = computed(() => {
       <a v-if="link" :href="link.href" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">
         From {{ origin.database ?? host }}<template v-if="origin.database && host">, {{ host }}</template>
       </a>
-      <template v-else>From {{ origin.database ?? 'an external source' }}</template>
+      <template v-else>From {{ origin.database ?? origin.connector ?? 'an external source' }}</template>
     </template>
     <template v-else-if="origin.kind === 'upload'">
-      Uploaded by {{ origin.user }}, {{ stamp(origin.time).slice(0, 10) }}<template v-if="origin.device">, {{ origin.device }}</template>
+      Uploaded by {{ uploader }}, {{ stamp(origin.time).slice(0, 10) }}
     </template>
     <a v-else-if="origin.kind === 'copy' && link" :href="link.href" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Copy of another version</a>
     <a v-else-if="origin.kind === 'sync' && link" :href="link.href" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Synced from {{ origin.sync.includes(' to ') ? origin.sync.split(' ')[0] : 'another bucket' }}</a>
     <template v-else-if="origin.kind === 'storage'">Registered from storage folder {{ origin.folder }}</template>
     <template v-else-if="origin.kind === 'job'">
-      Written by the run <RouterLink :to="{ name: 'compute', query: { tab: 'jobs' } }" class="font-mono text-primary hover:underline">{{ origin.run }}</RouterLink>
+      Written by the run <RouterLink :to="{ name: 'compute', query: { tab: 'jobs' } }" class="font-mono text-primary hover:underline">{{ origin.run }}</RouterLink><template v-if="origin.startedBy">. Started by {{ origin.startedBy }}</template>
     </template>
   </p>
   <div v-else class="space-y-0.5">
     <p v-if="origin.kind === 'upload'">
-      Uploaded by {{ origin.user }} on {{ origin.node }}, {{ stamp(origin.time) }}<template v-if="origin.device">, from the device {{ origin.device }}</template>.
+      Uploaded by {{ uploader }} on {{ origin.node }}, {{ stamp(origin.time) }}.
     </p>
-    <p v-else-if="origin.kind === 'source'">From the source <template v-if="origin.source">{{ origin.source }}, </template>path:
+    <p v-else-if="origin.kind === 'source'">From the source <template v-if="origin.source || origin.connector">{{ origin.source || origin.connector }}, </template>path:
       <a v-if="link" :href="link.href" target="_blank" rel="noopener noreferrer" class="break-all font-mono text-primary hover:underline">{{ link.label }}</a>
       <span v-else class="break-all font-mono">{{ origin.path }}</span>
     </p>
@@ -59,6 +60,7 @@ const link = computed(() => {
     <p v-else>
       Result of the run
       <RouterLink :to="{ name: 'compute', query: { tab: 'jobs' } }" class="font-mono text-primary hover:underline">{{ origin.run }}</RouterLink>.
+      <template v-if="origin.startedBy">Started by {{ origin.startedBy }}.</template>
     </p>
     <p v-if="origin.kind === 'source' && (origin.etag || origin.digest)" class="text-muted-foreground">
       At registration:

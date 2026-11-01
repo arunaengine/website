@@ -331,6 +331,30 @@ describe('provenance graph', () => {
     expect(sync).toMatchObject({ kind: 'system', title: 'Sync', pending: [{ kind: 'version', id: arn('g', V2), role: 'Synced from' }] })
   })
 
+  it('keeps the system job, upload client, connector name and run starter the node recorded', async () => {
+    const graph = emptyGraph()
+    const imported = (key: string, job: string) => origin({
+      origin: { kind: 'source', job_id: job },
+      source: { path: key, digests: [], sources: [{ path: key, connector_id: 'c1', connector_name: 'Lab archive' }] },
+    })
+    startFile(graph, arn('a', V1), 'a', imported('a', 'j1'))
+    startFile(graph, arn('b', V1), 'b', imported('b', 'j2'))
+    const [a, b] = [graph.boxes[arn('a', V1)]!, graph.boxes[arn('b', V1)]!]
+    // Two imports of one source are two jobs; both read through the same connector.
+    expect(a.from).not.toEqual(b.from)
+    expect(graph.boxes[a.from[0]!]).toMatchObject({ kind: 'system', title: 'Import', job: 'j1' })
+    expect(graph.boxes[graph.boxes[a.from[0]!]!.from[0]!]).toMatchObject({ kind: 'source', connector: 'c1', connectorName: 'Lab archive' })
+    startFile(graph, arn('c', V1), 'c', origin({ origin: { kind: 'copy', from: arn('d', V2), job_id: 'j3' } }))
+    expect(graph.boxes[`copy:${arn('c', V1)}`]).toMatchObject({ job: 'j3' })
+    startFile(graph, arn('e', V1), 'e', origin({ origin: { kind: 'upload', node_id: 'n1', client: 'portal' } }))
+    expect(graph.boxes['person:u1\n\nportal']).toMatchObject({ kind: 'person', client: 'portal' })
+
+    const run = readers({}, runCrate)
+    startFile(graph, arn('f', V1), 'f', origin({ origin: { kind: 'job', run_id: 'r1', started_by: 'u2' } }))
+    await expand(graph, arn('f', V1), run)
+    expect(graph.boxes['run:r1']).toMatchObject({ kind: 'run', startedBy: 'u2' })
+  })
+
   it('follows what a dataset is based on and the datasets it holds, and stops at a cycle', async () => {
     const DOC = '01K8W1B3D5F7H9KMQ1S3V5X7ZD'
     const PART = '01K8W1B3D5F7H9KMQ1S3V5X7ZE'

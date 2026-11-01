@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { OriginResponse } from '@/lib/api'
-import { hopFrom, originFrom, projectionRows, type OriginLabels } from './fileOrigin'
+import { hopFrom, originFrom, projectionRows, uploadVia, type OriginLabels } from './fileOrigin'
 
 const labels: OriginLabels = {
   user: (id) => `user ${id}`,
@@ -63,6 +63,19 @@ describe('file origin', () => {
     expect(originFrom(response({ origin: { kind: 'copy', from: 'https://w3id.org/aruna/data/r/v0' } }), labels)).toEqual({ kind: 'copy', from: 'https://w3id.org/aruna/data/r/v0' })
     expect(originFrom(response({ origin: { kind: 'storage', backend_id: 'b1', key: 'share/a' } }), labels)).toEqual({ kind: 'storage', folder: 'folder b1', key: 'share/a' })
     expect(originFrom(response({ origin: { kind: 'job', run_id: 'run1' } }), labels)).toEqual({ kind: 'job', run: 'run1' })
+  })
+
+  it('says which client an upload came through, who started a run and the connector of a source', () => {
+    expect(originFrom(response({ origin: { kind: 'upload', node_id: 'n1', client: 'portal' } }), labels)).toMatchObject({ kind: 'upload', client: 'portal' })
+    expect(uploadVia({ client: 'portal' })).toBe('from the portal')
+    expect(uploadVia({ client: 's3' })).toBe('via S3')
+    expect(uploadVia({ client: 'device', device: 'node laptop' })).toBe('from device node laptop')
+    expect(uploadVia({ client: 'device' })).toBe('from a device')
+    expect(uploadVia({})).toBe('')
+    expect(originFrom(response({ origin: { kind: 'job', run_id: 'run1', started_by: 'u2' } }), labels)).toEqual({ kind: 'job', run: 'run1', startedBy: 'user u2' })
+    expect(originFrom(response({ origin: { kind: 'job', run_id: 'run1', started_by: null } }), labels)).toEqual({ kind: 'job', run: 'run1' })
+    const source = { path: 'a.bin', digests: [], sources: [{ path: 'a.bin', connector_id: 'c1', connector_name: 'Lab archive' }] }
+    expect(originFrom(response({ origin: { kind: 'source', job_id: 'j1' }, source }), labels)).toEqual({ kind: 'source', source: '', path: 'a.bin', connector: 'Lab archive' })
   })
 
   it('gives no origin for a version minted without one, and a hop apart from the origin', () => {

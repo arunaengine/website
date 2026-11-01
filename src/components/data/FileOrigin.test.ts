@@ -162,6 +162,17 @@ describe('file origin run', () => {
     expect(getTask).toHaveBeenCalledWith('t1', 'BASIC')
   })
 
+  it('names the person who started the run beside its chip', async () => {
+    state.value = 'ready'
+    getRun.mockResolvedValueOnce({ logical_job_id: 't1' })
+    origin.value = response({ created_by: 'u1', origin: { kind: 'job', run_id: 'r1', started_by: 'u7' } })
+    const root = await render()
+    await flush()
+
+    expect(resolveUsers).toHaveBeenCalledWith(['u1', 'u7'])
+    expect(content(root)).toContain('Started by Ada Lovelace')
+  })
+
   it('keeps the run id line when the run cannot be read', async () => {
     state.value = 'ready'
     getRun.mockRejectedValueOnce(new Error('403'))

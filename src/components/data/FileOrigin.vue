@@ -31,11 +31,16 @@ const { displayName, localNodeId } = useRealmNodes()
 const s3 = useS3()
 const found = useFileOrigin(computed(() => props.target))
 watch(() => found.origin.value, (value) => emit('origin', value), { immediate: true })
-// An upload names its user by id; the shared directory gives the name, the short id stays the fallback.
+// An upload and a run's starter name their user by id; the shared directory gives the name, the
+// short id stays the fallback.
 const userDir = useUserDirectory()
-watch(() => found.origin.value?.created_by, (id) => {
-  if (id) void userDir.resolveUsers([id])
+watch(() => [found.origin.value?.created_by, startedBy(found.origin.value)], (ids) => {
+  const wanted = ids.filter((id): id is string => Boolean(id))
+  if (wanted.length) void userDir.resolveUsers(wanted)
 }, { immediate: true })
+function startedBy(answer: OriginResponse | null | undefined): string | null {
+  return answer?.origin?.kind === 'job' ? (answer.origin.started_by ?? null) : null
+}
 
 const origin = computed(() =>
   found.origin.value
@@ -132,6 +137,7 @@ const recorded = computed(() => Boolean(origin.value || hop.value))
             <component :is="runMark.icon" v-if="runMark" :class="['size-3.5 shrink-0', runMark.color]" role="img" :aria-label="runMark.label" />
             {{ run.name }}
           </RouterLink>
+          <span v-if="origin?.kind === 'job' && origin.startedBy">Started by {{ origin.startedBy }}</span>
         </p>
         <OriginLine v-else-if="origin" short :origin="origin" />
         <OriginLine v-if="hop" short :origin="hop" />

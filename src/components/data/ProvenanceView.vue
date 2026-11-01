@@ -12,9 +12,12 @@ import Spinner from '@/components/ui/Spinner.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import { ArrowDown, CloudOff, Database, Download, EyeOff, File, FileText, Files, GitBranch, Globe, Info, ListTodo, Minus, MoveRight, Network, Plus, RotateCw, UserRound, Workflow } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
+import { useJobs } from '@/composables/useJobs'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { apiErrorMessage } from '@/lib/api'
+import { uploadVia } from '@/lib/fileOrigin'
+import { jobLabel } from '@/lib/jobs'
 import { folderRoute, objectRoute } from '@/lib/crate/dataIdentity'
 import { splitName } from '@/lib/objectListing'
 import { shortUserId } from '@/lib/utils'
@@ -47,6 +50,7 @@ const props = defineProps<{
 const { getVersionOrigin, getRun, getBucketRuns, fetchRoCrateRaw, downloadProvenanceCrate, runSparql, listGroupConnectors, myGroups, sessionEpoch } = useAruna()
 const { displayName } = useRealmNodes()
 const users = useUserDirectory()
+const { jobsEnabled, getJob } = useJobs()
 
 const readers: Readers = {
   origin: (version) => getVersionOrigin(version),
@@ -237,17 +241,18 @@ const ICONS: Record<Box['kind'], Component> = {
   silent: CloudOff,
 }
 
-// People and connectors are named by id; their names are looked up once per view.
+// People, connectors and system jobs are named by id; their names are looked up once per view.
 watch(
-  () => [...new Set(Object.values(graph.boxes).filter((item) => item.kind === 'person').map((item) => item.title))],
+  () => [...new Set(Object.values(graph.boxes).flatMap((item) => (item.kind === 'person' ? [item.title] : item.startedBy ? [item.startedBy] : [])))],
   (ids) => {
     if (ids.length) void users.resolveUsers(ids)
   },
 )
+const userName = (id: string) => users.cachedUser(id)?.name || shortUserId(id)
 const connectorNames = ref(new Map<string, string>())
 let namesEpoch = -1
 watch(
-  () => [sessionEpoch.value, Object.values(graph.boxes).some((item) => item.connector)] as const,
+  () => [sessionEpoch.value, Object.values(graph.boxes).some((item) => item.connector && !item.connectorName)] as const,
   async ([epoch, wanted]) => {
     if (!wanted || namesEpoch === epoch) return
     namesEpoch = epoch
@@ -258,12 +263,36 @@ watch(
   },
 )
 
+// A job's name is its kind in words, read once per job id and session.
+const jobNames = ref(new Map<string, string>())
+let jobsEpoch = -1
+let jobsAsked = new Set<string>()
+watch(
+  () => [sessionEpoch.value, [...new Set(Object.values(graph.boxes).flatMap((item) => (item.job ? [item.job] : [])))]] as const,
+  async ([epoch, ids]) => {
+    if (jobsEpoch !== epoch) [jobNames.value, jobsAsked] = [new Map(), new Set()]
+    jobsEpoch = epoch
+    const wanted = ids.filter((id) => !jobsAsked.has(id))
+    if (!wanted.length || !jobsEnabled.value) return
+    for (const id of wanted) jobsAsked.add(id)
+    const answers = await Promise.all(wanted.map((id) => getJob(id).catch(() => null)))
+    if (epoch !== sessionEpoch.value) return
+    const next = new Map(jobNames.value)
+    for (const job of answers) if (job) next.set(job.job_id, jobLabel(job))
+    jobNames.value = next
+  },
+)
+
 function originDetail(item: Box): string {
-  if (item.kind === 'person' && item.device) return `Device: ${displayName(item.device)}`
+  if (item.kind === 'person') {
+    const via = uploadVia({ device: item.device ? displayName(item.device) : undefined, client: item.client })
+    if (via) return via.charAt(0).toUpperCase() + via.slice(1)
+  }
   if (item.connector) {
-    const name = connectorNames.value.get(item.connector)
+    const name = item.connectorName ?? connectorNames.value.get(item.connector)
     return name ? `Connector: ${name}` : 'Through a connector'
   }
+  if (item.startedBy) return [`Started by ${userName(item.startedBy)}`, item.detail].filter(Boolean).join('. ')
   return item.detail ?? ''
 }
 
@@ -333,12 +362,13 @@ function shown(card: ChainCard): Shown {
   }
   const document = item.link?.document
   const run = item.kind === 'run' ? item.id.replace(/^run:/, '') : ''
-  const to = document ? { name: 'dataset', params: { id: document } } : run ? { name: 'task', params: { taskId: run } } : placeOf(item)
+  const job = item.kind === 'system' ? item.job : undefined
+  const to = document ? { name: 'dataset', params: { id: document } } : run ? { name: 'task', params: { taskId: run } } : job ? { name: 'job', params: { jobId: job } } : placeOf(item)
   return {
     ...base,
     icon: me && props.start.kind === 'dataset' ? FileText : ICONS[item.kind],
     role: item.role,
-    title: item.kind === 'person' ? (users.cachedUser(item.title)?.name || shortUserId(item.title)) : item.title,
+    title: item.kind === 'person' ? userName(item.title) : (job && jobNames.value.get(job)) || item.title,
     detail: repeat || originDetail(item) || (run && run === props.record?.runId ? props.record.where ?? '' : ''),
     mono: item.kind === 'hidden',
     path: item.path,

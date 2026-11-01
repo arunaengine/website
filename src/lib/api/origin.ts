@@ -1,20 +1,25 @@
 // ── Where a file version came from ──────────────────────────────────────────
-// Verified against aruna api/src/routes/storage/origin.rs (feat/run-provenance-gaps).
+// Verified against aruna api/src/routes/storage/origin.rs (feat/realm-data-features).
 // The server sets the origin when it mints the version and never changes it. A sync adds a hop.
 // Readers of the file see the full record; `projection` is what a dataset may say about it.
 import { apiRequest, type ApiClientOptions } from './client'
 import type { BucketIdentifier, BucketMetadata, DatasetDescription } from './databases'
 
+/** `portal`: a temporary session only the portal requests; `s3`: an access key; `device`: a desktop device. */
+export type UploadClient = 'portal' | 's3' | 'device'
+
+/** `job_id` is the system job that wrote the version; null when no job did. */
 export type OriginBody =
-  /** Uploaded directly; the uploader is `created_by`. */
-  | { kind: 'upload'; node_id: string; device?: string | null }
+  /** Uploaded directly; the uploader is `created_by`. `client` is null when not recorded. */
+  | { kind: 'upload'; node_id: string; device?: string | null; client?: UploadClient | null }
   /** From an external source; the details are under `source`. */
-  | { kind: 'source' }
+  | { kind: 'source'; job_id?: string | null }
   /** Copied from another exact version (global id URL or versioned node id). */
-  | { kind: 'copy'; from: string }
+  | { kind: 'copy'; from: string; job_id?: string | null }
   /** Registered in place from a storage backend folder. */
-  | { kind: 'storage'; backend_id: string; key: string }
-  | { kind: 'job'; run_id: string }
+  | { kind: 'storage'; backend_id: string; key: string; job_id?: string | null }
+  /** Written by a run; `started_by` is the person who submitted it, null when the system did. */
+  | { kind: 'job'; run_id: string; started_by?: string | null }
 
 export interface OriginHop {
   relationship_id: string
@@ -38,7 +43,7 @@ export interface OriginSource {
   etag?: string | null
   digests: OriginSourceDigest[]
   /** Every source of the version, all equal; the first is the one `url` and `path` name. */
-  sources?: Array<{ url?: string | null; path: string; connector_id?: string | null }>
+  sources?: Array<{ url?: string | null; path: string; connector_id?: string | null; connector_name?: string | null }>
 }
 
 export type OriginProjection =

@@ -2,6 +2,8 @@ import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, type OriginResponse } from '@/lib/api'
+import * as FileOrigin from '@/lib/fileOrigin'
+import * as Jobs from '@/lib/jobs'
 import * as Provenance from '@/lib/provenance'
 import { button, click, compileClientComponent, content, flush, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 
@@ -17,6 +19,7 @@ const aruna = vi.hoisted(() => ({
   sessionEpoch: { value: 1 },
 }))
 const resolveUsers = vi.hoisted(() => vi.fn(async () => []))
+const getJob = vi.hoisted(() => vi.fn(async (jobId: string) => ({ job_id: jobId, kind: 'import_rocrate' })))
 
 const Slotted = (tag: string) =>
   defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()) })
@@ -35,6 +38,9 @@ const component = compileClientComponent(new URL('./ProvenanceView.vue', import.
   '@/lib/crate/dataIdentity': { folderRoute: (bucket: string) => ({ name: 'bucket', params: { bucketId: bucket } }), objectRoute: (bucket: string, key: string) => ({ name: 'bucket', params: { bucketId: bucket }, query: { object: key } }) },
   '@/lib/objectListing': { splitName: (name: string) => [name, ''] },
   '@/composables/useAruna': { useAruna: () => aruna },
+  '@/composables/useJobs': { useJobs: () => ({ jobsEnabled: { value: true }, getJob }) },
+  '@/lib/fileOrigin': FileOrigin,
+  '@/lib/jobs': Jobs,
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => `node ${id}` }) },
   '@/composables/useUserDirectory': { useUserDirectory: () => ({ resolveUsers, cachedUser: (id: string) => (id === 'u' ? { user_id: 'u', name: 'Ada Lovelace' } : null) }) },
   '@/lib/utils': { shortUserId: (id: string) => `user ${id}` },
@@ -132,9 +138,29 @@ describe('provenance view', () => {
   it('names the person and the device an input was uploaded from', async () => {
     aruna.getVersionOrigin.mockReset().mockResolvedValue(origin({ origin: { kind: 'upload', node_id: 'n2', device: 'd1' } }))
     const root = await render()
-    await vi.waitFor(() => expect(content(root)).toContain('Uploaded byAda LovelaceDevice: node d1'))
+    await vi.waitFor(() => expect(content(root)).toContain('Uploaded byAda LovelaceFrom device node d1'))
     expect(resolveUsers).toHaveBeenCalledWith(['u'])
     expect(content(root)).toContain('Uploaded by a person')
+  })
+
+  it('says which client an upload came through', async () => {
+    aruna.getVersionOrigin.mockReset().mockResolvedValue(origin({ origin: { kind: 'upload', node_id: 'n2', client: 's3' } }))
+    const root = await render()
+    await vi.waitFor(() => expect(content(root)).toContain('Uploaded byAda LovelaceVia S3'))
+  })
+
+  it('links a system job to its job by name, and names who started a run', async () => {
+    const source = { path: 'in.faa', digests: [], sources: [{ path: 'in.faa', connector_id: 'c9', connector_name: 'Lab archive' }] }
+    aruna.getVersionOrigin.mockReset().mockResolvedValue(origin({ origin: { kind: 'source', job_id: 'j1' }, source }))
+    aruna.listGroupConnectors.mockClear()
+    const root = await render({ origin: { kind: 'job', run_id: 'r1', started_by: 'u' } })
+    await vi.waitFor(() => expect(content(root)).toContain('System jobImport RO-Crate'))
+    expect(getJob).toHaveBeenCalledWith('j1')
+    const job = nodes(root).find((node) => node.tag === 'a' && content(node) === 'Import RO-Crate')
+    expect(job?.props.to).toEqual({ name: 'job', params: { jobId: 'j1' } })
+    expect(content(root)).toContain('Connector: Lab archive')
+    expect(aruna.listGroupConnectors).not.toHaveBeenCalled()
+    expect(content(root)).toContain('Started by Ada Lovelace')
   })
 
   it('draws the run that made an input one level up, and reads every level on request', async () => {

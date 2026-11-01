@@ -1,6 +1,6 @@
 // Where data came from, read one link at a time with the user's own access. Each box is a record
 // the node answered; a link the user may not read is named by its global id or content id only.
-import { ApiError, type OriginIdentifier, type OriginResponse, type RunResponse } from '@/lib/api'
+import { ApiError, type OriginIdentifier, type OriginResponse, type RunResponse, type UploadClient } from '@/lib/api'
 import { isContentId, isExactId } from '@/lib/crate/dataIdentity'
 import { looksLikePart } from '@/lib/linkedPart'
 import { parseArunaArn } from '@/lib/sync'
@@ -17,7 +17,7 @@ export const ORIGIN_KINDS: readonly BoxKind[] = ['person', 'run', 'system', 'sou
 /** A link still to read: an exact version, a run, or a dataset's record. */
 export type Hop =
   | { kind: 'version'; id: string; name?: string; digest?: string; role: string }
-  | { kind: 'run'; runId: string }
+  | { kind: 'run'; runId: string; startedBy?: string }
   | { kind: 'dataset'; documentId: string; role: string }
 
 export interface Box {
@@ -34,10 +34,15 @@ export interface Box {
   link?: { label: string; document?: string; url?: string }
   /** A database release: the database's name and the release label, for a box of its files. */
   release?: { name: string; label: string }
-  /** A person's upload: the device it came from, by node id. */
+  /** A person's upload: the device it came from, by node id, and the client it came through. */
   device?: string
-  /** An external source: the connector of the node that reads it. */
+  client?: UploadClient
+  /** An external source: the connector of the node that reads it, and its name when known. */
   connector?: string
+  connectorName?: string
+  /** A system job's id; a run's starter by user id. */
+  job?: string
+  startedBy?: string
   /** The boxes this one came from. */
   from: string[]
   pending: Hop[]
@@ -111,7 +116,8 @@ function add(graph: Graph, parent: string | null, child: Box): string {
 /** A file's box, with its database and source added at once and its other links waiting. */
 function fileBox(graph: Graph, parent: string | null, id: string, asked: string, role: string, name: string, origin: OriginResponse) {
   const file = fileNamed(id, 'file', role, name, { detail: formatDate(origin.created_at) })
-  if (origin.origin?.kind === 'job') file.pending.push({ kind: 'run', runId: origin.origin.run_id })
+  const made = origin.origin?.kind === 'job' ? origin.origin : null
+  if (made) file.pending.push({ kind: 'run', runId: made.run_id, ...(made.started_by ? { startedBy: made.started_by } : {}) })
   add(graph, parent, file)
   // Identifiers belong to this file; the database box is shared by every file it lists.
   file.identifiers = origin.identifiers ?? []
@@ -161,25 +167,33 @@ function placeBox(url: string, role: string): Box {
 function addOrigin(graph: Graph, id: string, asked: string, response: OriginResponse) {
   const origin = response.origin
   const bucket = bucketOf(asked) ?? id
+  // A system job's box links to the job; files of one job share it.
+  const job = origin && 'job_id' in origin ? (origin.job_id ?? undefined) : undefined
+  const ran = job ? { job } : {}
+  const ofJob = job ? `\n${job}` : ''
   if (origin?.kind === 'upload') {
     const device = origin.device ?? undefined
-    add(graph, id, box(`person:${response.created_by}\n${device ?? ''}`, 'person', 'Uploaded by', response.created_by, device ? { device } : {}))
+    const client = origin.client ?? undefined
+    const extra = { ...(device ? { device } : {}), ...(client ? { client } : {}) }
+    add(graph, id, box(`person:${response.created_by}\n${device ?? ''}${client ? `\n${client}` : ''}`, 'person', 'Uploaded by', response.created_by, extra))
   } else if (origin?.kind === 'source') {
     const place = response.source?.sources?.[0]
     const url = response.source?.url ?? place?.url ?? null
     const connector = place?.connector_id ?? undefined
+    const connectorName = place?.connector_name ?? undefined
     const host = url ? hostOf(url) : null
     const home = host && url ? new URL(url).origin : null
     const source = box(`source:${host ?? (connector ? '' : bucket)}\n${connector ?? ''}`, 'source', 'External source', host ?? 'External source', {
       ...(home ? { link: { label: 'Open the source', url: home } } : {}),
       ...(connector ? { connector } : {}),
+      ...(connectorName ? { connectorName } : {}),
     })
-    add(graph, add(graph, id, box(`import:${bucket}\n${source.id}`, 'system', 'System job', 'Import')), source)
+    add(graph, add(graph, id, box(`import:${bucket}\n${source.id}${ofJob}`, 'system', 'System job', 'Import', ran)), source)
   } else if (origin?.kind === 'storage') {
     const folder = box(`storage:${origin.backend_id}`, 'source', 'External source', 'Storage folder', { detail: shortName(origin.backend_id) })
-    add(graph, add(graph, id, box(`import:${bucket}\n${folder.id}`, 'system', 'System job', 'Registration in place')), folder)
+    add(graph, add(graph, id, box(`import:${bucket}\n${folder.id}${ofJob}`, 'system', 'System job', 'Registration in place', ran)), folder)
   } else if (origin?.kind === 'copy') {
-    add(graph, id, box(`copy:${id}`, 'system', 'System job', 'Copy', { pending: [{ kind: 'version', id: origin.from, role: 'Copied from' }] }))
+    add(graph, id, box(`copy:${id}`, 'system', 'System job', 'Copy', { ...ran, pending: [{ kind: 'version', id: origin.from, role: 'Copied from' }] }))
   }
   if (response.hop) add(graph, id, box(`sync:${id}`, 'system', 'System job', 'Sync', { pending: [{ kind: 'version', id: response.hop.from, role: 'Synced from' }] }))
 }
@@ -357,7 +371,7 @@ async function follow(graph: Graph, boxId: string, hop: Hop, readers: Readers, c
     const id = `run:${hop.runId}`
     graph.seen[asked] = id
     const { name, parts } = runInputs(crate)
-    const created = box(id, 'run', 'Run', name ?? `Run ${shortName(hop.runId)}`)
+    const created = box(id, 'run', 'Run', name ?? `Run ${shortName(hop.runId)}`, hop.startedBy ? { startedBy: hop.startedBy } : {})
     if (run.run_crate) created.link = { label: 'Open the run record', document: run.run_crate }
     else created.detail = runRecordDetail(run.run_crate_status)
     add(graph, boxId, created)
