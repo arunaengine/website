@@ -39,6 +39,7 @@ import { downloadCrateJson } from '@/lib/crateImport'
 import { getLocalRunCrate, requireDevice } from '@/lib/deviceApi'
 import { deleteErrorMessage, formatJobProgress, type JobStatusResponse } from '@/lib/jobs'
 import { POLL_ACTIVE_MS, follow, onWake } from '@/lib/poll'
+import { parseRunCrate, servedSource, sourceHost, type RunCrateModel } from '@/lib/runCrate'
 import {
   TES_GROUP_TAG,
   TES_IDEMPOTENCY_TAG,
@@ -105,7 +106,7 @@ const emit = defineEmits<{
 const router = useRouter()
 const { getTask, cancelTask, listTasks, busy } = useTes()
 const { getJob: getNativeJob, deleteJob } = useJobs()
-const { myGroups, apiBaseUrl, metadataAtPath, downloadProvenanceCrate, getFileOrigin, getRun } = useAruna()
+const { myGroups, apiBaseUrl, metadataAtPath, downloadProvenanceCrate, getFileOrigin, getRun, loadRoCrate } = useAruna()
 const { displayName, targets: realmTargets } = useRealmNodes()
 const s3 = useS3()
 
@@ -732,6 +733,20 @@ async function findRunCrate() {
   }
 }
 
+// The run record, read for what it says about each input, such as the source that served it.
+const runRecord = ref<RunCrateModel | null>(null)
+watch(runCrate, async (record) => {
+  runRecord.value = null
+  if (!record) return
+  const crate = await loadRoCrate(record.document_id).catch(() => null)
+  if (runCrate.value === record) runRecord.value = parseRunCrate(crate, `runs/${props.taskId}`)
+})
+function readFrom(url: string | undefined): string | undefined {
+  if (!url) return undefined
+  const s3Url = nativeInput({ url, path: '' }).url ?? url
+  return servedSource(runRecord.value, [url, `https://w3id.org/aruna/data/${url}`, s3Url])
+}
+
 // A finished run, or one whose output just became known, may have its record now.
 watch([crateJob, () => isTerminalTesState(task.value?.state)], ([job, done], [previousJob, wasDone]) => {
   if (props.open && !runCrate.value && (job !== previousJob || (done && !wasDone))) void findRunCrate()
@@ -990,6 +1005,7 @@ async function confirmDelete() {
                     <span v-else-if="input.url" class="block truncate font-mono text-muted-foreground" :title="input.url">{{ inputPlace(input.url).text }}</span>
                     <span v-else class="text-muted-foreground">Inline content</span>
                     <span v-if="input.url && inputPlace(input.url).nodeId" class="block truncate text-muted-foreground">on {{ displayName(inputPlace(input.url).nodeId!) }}</span>
+                    <span v-if="readFrom(input.url)" class="block truncate text-muted-foreground" :title="readFrom(input.url)">Read from {{ sourceHost(readFrom(input.url)!) }}</span>
                   </td>
                 </tr>
               </tbody>

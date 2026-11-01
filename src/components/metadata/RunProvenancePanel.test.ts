@@ -5,6 +5,7 @@ import { compileClientComponent, content, mountApp, moduleDefault, nodes } from 
 import * as DataIdentity from '@/lib/crate/dataIdentity'
 import * as FileGroups from '@/lib/fileGroups'
 import * as Identifiers from '@/lib/identifiers'
+import * as RunCrate from '@/lib/runCrate'
 import * as Tes from '@/lib/tes'
 import * as Utils from '@/lib/utils'
 
@@ -48,6 +49,7 @@ const RunProvenancePanel = compileClientComponent(new URL('./RunProvenancePanel.
     }),
   },
   '@/lib/config': { featureEnabled: () => false },
+  '@/lib/runCrate': RunCrate,
   '@/lib/tes': Tes,
   '@/lib/crate/dataIdentity': DataIdentity,
   '@/lib/fileGroups': FileGroups,

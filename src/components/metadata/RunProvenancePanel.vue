@@ -19,7 +19,7 @@ import { drsDownloadHref, drsObjectHref, isDrsReference } from '@/lib/tes'
 import { parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { isArunaUserId } from '@/lib/identifiers'
 import { groupFiles, type FileGroup } from '@/lib/fileGroups'
-import type { RunCrateFileRef, RunCrateModel } from '@/lib/runCrate'
+import { sourceHost, type RunCrateFileRef, type RunCrateModel } from '@/lib/runCrate'
 import { formatBytes, formatDateTime, formatResourceGb, isHttpUrl, shortUserId, truncateMiddle } from '@/lib/utils'
 import { ChevronDown, ChevronRight, Database, Download, ExternalLink as ExternalLinkIcon, File as FileIcon, Files, Folder, LogIn, Terminal } from '@lucide/vue'
 
@@ -180,11 +180,6 @@ const savedTo = computed(() => {
 // The device's name by the shared rule (its realm display name first), if the realm lists one.
 function deviceName(nodeId: string): string {
   return realmNodes.value.find((node) => node.nodeId === nodeId)?.given ?? ''
-}
-
-/** The host of a source URL, or the URL itself when it has none. */
-function sourceHost(url: string): string {
-  return URL.canParse(url) ? new URL(url).host || url : url
 }
 
 function inputNote(row: FileRow): string {

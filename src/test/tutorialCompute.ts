@@ -25,6 +25,7 @@ import * as ContentIdentity from '@/lib/contentIdentity'
 import * as ApiLib from '@/lib/api'
 import * as DistributionLib from '@/lib/distribution'
 import * as RunPaths from '@/lib/runPaths'
+import * as RunCrateLib from '@/lib/runCrate'
 import * as TesLib from '@/lib/tes'
 import * as Utils from '@/lib/utils'
 import * as Workspaces from '@/lib/workspaces'
@@ -364,6 +365,7 @@ const TaskDetailPanel = compileClientComponent(url('components/compute/TaskDetai
   '@/lib/poll': Poll,
   '@/lib/quickRuntimes': QuickRuntimes,
   '@/lib/jobs': JobsLib,
+  '@/lib/runCrate': RunCrateLib,
   '@/lib/tes': TesLib,
   '@/lib/notebook/submit': { sessionRuntime: () => null },
   '@/lib/utils': Utils,

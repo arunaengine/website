@@ -11,6 +11,7 @@ import { ApiError } from '@/lib/api'
 import * as Jobs from '@/lib/jobs'
 import * as ObjectLinks from '@/lib/assistant/objectLinks'
 import * as Poll from '@/lib/poll'
+import * as RunCrate from '@/lib/runCrate'
 import * as Tes from '@/lib/tes'
 import * as Utils from '@/lib/utils'
 import type { JobAuditResponse, JobFamilyResponse, JobStatusResponse } from '@/lib/jobs'
@@ -254,6 +255,7 @@ const downloadProvenanceCrate = vi.fn()
 const getFileOrigin = vi.fn(async (..._args: unknown[]) => ({ origin: { kind: 'job', run_id: 'node-job-1' } }))
 
 const cancelTask = vi.fn(async () => undefined)
+const loadRoCrate = vi.fn(async (_id: string): Promise<unknown> => null)
 function taskPanel(
   getTask: unknown,
   getJob: unknown,
@@ -336,6 +338,7 @@ function panelModules(
         downloadProvenanceCrate,
         getFileOrigin,
         getRun: vi.fn(async (runId: string) => ({ run_id: runId, run_crate: runId === 'node-job-1' ? 'record-1' : null })),
+        loadRoCrate,
       }),
     },
     '@/composables/useS3': {
@@ -347,6 +350,7 @@ function panelModules(
     '@/lib/quickRuntimes': { detectQuickRun: () => false },
     '@/lib/jobs': Jobs,
     '@/lib/poll': Poll,
+    '@/lib/runCrate': RunCrate,
     '@/lib/tes': Tes,
     '@/lib/notebook/submit': { sessionRuntime: () => null },
     '@/lib/utils': Utils,
@@ -1270,6 +1274,52 @@ describe('distributed job detail components', () => {
     expect(content(mounted.root)).toContain('on node-2')
     expect(content(mounted.root)).not.toContain(arn)
     mounted.app.unmount()
+  })
+
+  it('names the source that served an input once the run record says so', async () => {
+    const arn = 'arn:aruna:realm-1:node-2:s3/bakta-database/src/db-light.tar.xz@01M69M40GW80DTHHG98J4653CV'
+    const task = {
+      id: 'run',
+      state: 'COMPLETE',
+      executors: [{ image: 'alpine', command: ['sh'] }],
+      inputs: [{ path: '/work/in/db-light.tar.xz', url: arn }, { path: '/work/in/genome.fna', url: 's3://genomes/genome.fna' }],
+      outputs: [],
+      logs: [],
+      tags: {},
+    }
+    const record = (servedBy?: string) => ({
+      '@graph': [
+        { '@id': 'ro-crate-metadata.json', about: { '@id': 'rec' } },
+        { '@id': 'rec', '@type': 'Dataset', conformsTo: { '@id': 'https://w3id.org/ro/wfrun/process/0.5' }, mentions: { '@id': '#run-run' } },
+        { '@id': '#run-run', '@type': 'CreateAction', object: [{ '@id': 'db' }, { '@id': 'genome' }] },
+        {
+          '@id': 'db',
+          '@type': 'File',
+          contentUrl: ['s3://bakta-database/src/db-light.tar.xz', `https://w3id.org/aruna/data/${arn}`],
+          ...(servedBy ? { additionalProperty: { '@id': 'db#source-served-by' } } : {}),
+        },
+        { '@id': 'db#source-served-by', '@type': 'PropertyValue', name: 'Served by', value: servedBy },
+        { '@id': 'genome', '@type': 'File', contentUrl: 's3://genomes/genome.fna' },
+      ],
+    })
+    const metadataAtPath = vi.fn(async () => ({ document_id: 'rec-1' }))
+    const open = async (crate: unknown) => {
+      loadRoCrate.mockReset().mockResolvedValue(crate)
+      const mounted = await mount(taskPanel(vi.fn(async () => task), vi.fn(async () => ({ family: null })), vi.fn(), metadataAtPath), { taskId: 'run', open: true })
+      await flushPanel()
+      await flushPanel()
+      return mounted
+    }
+
+    const served = await open(record('https://mirror.example/files/db-light.tar.xz'))
+    expect(loadRoCrate).toHaveBeenCalledWith('rec-1')
+    expect(content(served.root).match(/Read from/g)).toHaveLength(1)
+    expect(content(served.root)).toContain('Read from mirror.example')
+    served.app.unmount()
+
+    const quiet = await open(record())
+    expect(content(quiet.root)).not.toContain('Read from')
+    quiet.app.unmount()
   })
 
   it('offers Run again only once the run ended', async () => {

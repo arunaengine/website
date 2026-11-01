@@ -324,6 +324,16 @@ export function runDuration(run: RunCrateModel): string {
   return `${Math.floor(min / 60)}h ${min % 60}m`
 }
 
+/** The host of a source URL, or the URL itself when it has none. */
+export function sourceHost(url: string): string {
+  return URL.canParse(url) ? new URL(url).host || url : url
+}
+
+/** The source that served an input of the record, found by any URL the run gives the input. */
+export function servedSource(run: RunCrateModel | null, urls: string[]): string | undefined {
+  return run?.inputs.find((input) => input.servedBy && input.contentUrls?.some((url) => urls.includes(url)))?.servedBy
+}
+
 /** The one bucket folder every result went to; null when they are spread out or not in a bucket. */
 export function resultsFolder(run: RunCrateModel, endpoint?: string | null): { bucket: string; prefix: string } | null {
   const places = run.outputs.map((file) => {
