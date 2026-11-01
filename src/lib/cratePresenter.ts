@@ -461,6 +461,10 @@ export function presentCrate(crate: unknown, options: PresentOptions = {}): Crat
     cardIds.push(id)
   }
 
+  // Cards keep the order the dataset names them in; the stored graph is sorted by id.
+  const named = [...roleIndex.keys()]
+  const rank = (id: string) => (named.includes(id) ? named.indexOf(id) : named.length)
+  cardIds.sort((a, b) => rank(a) - rank(b))
   const people: ContextualEntity[] = []
   const organizations: ContextualEntity[] = []
   for (const id of cardIds) {

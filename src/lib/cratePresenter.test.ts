@@ -126,6 +126,17 @@ describe('presentCrate', () => {
     expect(result.organizations).toEqual([])
   })
 
+  it('keeps the stored author order, not the graph order', () => {
+    const result = presentCrate(
+      crate({ author: [{ '@id': 'https://orcid.org/0000-0003' }, { '@id': 'https://orcid.org/0000-0001' }, { '@id': 'https://orcid.org/0000-0002' }] }, [
+        { '@id': 'https://orcid.org/0000-0001', '@type': 'Person', name: 'Linda Fenske' },
+        { '@id': 'https://orcid.org/0000-0002', '@type': 'Person', name: 'Alexander Goesmann' },
+        { '@id': 'https://orcid.org/0000-0003', '@type': 'Person', name: 'Oliver Schwengers' },
+      ]),
+    )
+    expect(result.people.map((row) => row.name)).toEqual(['Oliver Schwengers', 'Linda Fenske', 'Alexander Goesmann'])
+  })
+
   it('files organization authors', () => {
     const result = presentCrate(
       crate({ author: { '@id': '#lab' } }, [{ '@id': '#lab', '@type': 'Organization', name: 'Example Lab' }]),
