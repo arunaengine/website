@@ -18,6 +18,7 @@ import {
   savedRealms,
   setRealmSaved,
   type RealmCheck,
+  totalsLine,
   type RegistryRealm,
 } from '@/lib/federation/realms'
 import { errorMessage, relativeTime } from '@/lib/utils'
@@ -148,6 +149,7 @@ function addAddress() {
           </div>
           <p v-if="entry.realm.description" class="mt-0.5 text-xs text-foreground/80">{{ entry.realm.description }}</p>
           <p class="mt-0.5 text-[11px] text-muted-foreground">{{ registryMeta(entry) }}</p>
+          <p v-if="entry.totals" class="mt-0.5 text-[11px] text-muted-foreground">{{ totalsLine(entry.totals) }}</p>
           <p v-if="!entry.verified" class="mt-0.5 text-[11px] text-muted-foreground">The registry could not reach this realm.</p>
           <p v-else-if="entry.stale" class="mt-0.5 text-[11px] text-amber-700 dark:text-amber-300">Counts may be out of date.</p>
         </div>

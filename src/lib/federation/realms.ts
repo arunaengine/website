@@ -3,6 +3,8 @@
 // A stored descriptor is identity data, not proof that the realm is reachable now.
 import { computed, ref } from 'vue'
 import { fetchWithTimeout } from '@/lib/fetch'
+import { formatCount } from '@/lib/formatCount'
+import { formatBytes } from '@/lib/utils'
 import {
   DescriptorError,
   loadRealm,
@@ -127,6 +129,14 @@ export interface RealmKpis {
   nodes_configured: number | null
 }
 
+/** Self-reported realm-wide totals; data counts stored and referenced bytes together. */
+export interface RealmTotals {
+  data_bytes: number
+  objects: number
+  datasets: number
+  observed_at: number
+}
+
 interface RegistryEntry {
   realm_id: string
   registration: {
@@ -135,6 +145,7 @@ interface RegistryEntry {
   received_at: number
   verified: boolean
   stale: boolean
+  totals?: RealmTotals | null
 }
 
 export interface RegistryRealm {
@@ -143,6 +154,7 @@ export interface RegistryRealm {
   observedAt: number
   verified: boolean
   stale: boolean
+  totals: RealmTotals | null
 }
 
 /**
@@ -171,6 +183,7 @@ export async function listRegistry(registryUrl: string, signal?: AbortSignal): P
           observedAt: payload.observed_at,
           verified: entry.verified === true,
           stale: entry.stale === true,
+          totals: entry.totals ?? null,
         }
       } catch {
         return null
@@ -178,6 +191,16 @@ export async function listRegistry(registryUrl: string, signal?: AbortSignal): P
     }),
   )
   return listed.filter((entry): entry is RegistryRealm => entry !== null)
+}
+
+/** "12.3 TiB data · 1,234 objects · 42 datasets", or empty when the realm sent no totals. */
+export function totalsLine(totals: RealmTotals | null): string {
+  if (!totals) return ''
+  return [
+    `${formatBytes(totals.data_bytes)} data`,
+    `${formatCount(totals.objects)} ${totals.objects === 1 ? 'object' : 'objects'}`,
+    `${formatCount(totals.datasets)} ${totals.datasets === 1 ? 'dataset' : 'datasets'}`,
+  ].join(' · ')
 }
 
 /** Realms whose name, description or id contains the query, without case. */

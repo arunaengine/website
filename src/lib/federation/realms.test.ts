@@ -5,6 +5,7 @@ import {
   checkRealm,
   knownRealm,
   listRegistry,
+  totalsLine,
   recheckRealm,
   rememberRealm,
   reloadRealms,
@@ -60,7 +61,8 @@ describe('listRegistry', () => {
     const good = await signedRealm()
     const other = await signedRealm()
     const goodId = (await verifyDescriptor(good.signed)).realmId
-    const entry = (descriptor: unknown, realmId: string) => ({
+    const totals = { data_bytes: 2048, objects: 1234567, datasets: 1, observed_at: 7 }
+    const entry = (descriptor: unknown, realmId: string, sent: unknown = totals) => ({
       realm_id: realmId,
       registration: {
         payload: {
@@ -72,6 +74,7 @@ describe('listRegistry', () => {
       received_at: 6,
       verified: true,
       stale: false,
+      totals: sent,
     })
     const tampered = { ...good.signed, payload: { ...good.signed.payload, name: 'Fake' } }
     vi.stubGlobal('fetch', vi.fn(async () =>
@@ -79,7 +82,32 @@ describe('listRegistry', () => {
     ))
     const listed = await listRegistry('https://registry.example')
     expect(listed).toHaveLength(1)
-    expect(listed[0]).toMatchObject({ verified: true, kpis: { groups: null } })
+    expect(listed[0]).toMatchObject({ verified: true, kpis: { groups: null }, totals })
+  })
+
+  it('keeps missing totals empty, never zero', async () => {
+    const good = await signedRealm()
+    const realmId = (await verifyDescriptor(good.signed)).realmId
+    const payload = { descriptor: good.signed, kpis: { live_datasets: 1, groups: 1, nodes_configured: 1 }, observed_at: 5 }
+    const entries = [null, undefined].map((totals) => ({
+      realm_id: realmId,
+      registration: { payload },
+      received_at: 6,
+      verified: true,
+      stale: false,
+      totals,
+    }))
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(entries))))
+    const listed = await listRegistry('https://registry.example')
+    expect(listed.map((entry) => entry.totals)).toEqual([null, null])
+    expect(totalsLine(null)).toBe('')
+  })
+})
+
+describe('totalsLine', () => {
+  it('shows data as one size with object and dataset counts', () => {
+    const line = totalsLine({ data_bytes: 2048, objects: 1234567, datasets: 1, observed_at: 7 })
+    expect(line).toBe('2\u00a0KiB data · 1,234,567 objects · 1 dataset')
   })
 })
 
