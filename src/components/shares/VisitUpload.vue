@@ -62,7 +62,7 @@ const percent = (sentBytes: number, size: number) => (size ? Math.round((sentByt
           <span v-if="entry.state === 'done' && entry.landed && entry.landed !== entry.name" class="block truncate text-xs text-muted-foreground">Uploaded as {{ entry.landed }}</span>
           <span v-else-if="entry.state === 'failed'" class="block text-xs text-status-failed">{{ entry.error }}</span>
           <Progress v-else-if="entry.state === 'sending'" :value="percent(entry.sent, entry.size)" :warn="101" :critical="101" class="mt-1 h-1.5" :label="`Uploading ${entry.name}`" />
-          <span v-else class="block text-xs text-muted-foreground">Waiting</span>
+          <span v-else-if="entry.state === 'waiting'" class="block text-xs text-muted-foreground">Waiting</span>
         </span>
         <span class="whitespace-nowrap text-xs tabular-nums text-muted-foreground">{{ formatBytes(entry.size) }}</span>
       </li>
