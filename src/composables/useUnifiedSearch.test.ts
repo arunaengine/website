@@ -226,6 +226,23 @@ describe('unified document coverage', () => {
     expect(search.objectCursor.value).toBeNull()
   })
 
+  it('counts a full answer with more pages as complete, and a partial metadata answer as partial', async () => {
+    const paged = { scope: 'realm', mode: 'distributed_best_effort', complete: true, truncated: true, partitions: [] }
+    const hit = (key: string) => ({ kind: 'object', issuer_node_id: 'node-2', group_id: 'group-a', bucket: 'ncbi-refseq', key })
+    mocks.searchObjects.mockResolvedValue({ hits: [hit('coli/a.fna')], next_cursor: 'n2', coverage: paged })
+    mocks.searchMetadata.mockResolvedValueOnce({ hits: [hit('coli/b.fna')], next_cursor: 'm2', coverage: paged })
+
+    const search = useUnifiedSearch(ref('Escherichia coli'), { types: [], includeObjects: true })
+    await vi.waitFor(() => expect(search.objectSearched.value).toBe(true))
+    expect(search.objectCursor.value).not.toBeNull()
+    expect(search.partial.value).toBe(false)
+
+    mocks.searchMetadata.mockResolvedValueOnce({ hits: [hit('coli/c.fna')], next_cursor: null, coverage: { ...paged, complete: false } })
+    search.retry()
+    await vi.waitFor(() => expect(search.objects.value.map((object) => object.key)).toContain('coli/c.fna'))
+    expect(search.partial.value).toBe(true)
+  })
+
   it('keeps the name hits when the node refuses the metadata search', async () => {
     const coverage = { scope: 'realm', mode: 'distributed_best_effort', complete: true, truncated: false, partitions: [] }
     mocks.searchObjects.mockResolvedValueOnce({ hits: [{ kind: 'object', issuer_node_id: 'node-a', group_id: 'g', bucket: 'b', key: 'SAMD1.fna' }], next_cursor: null, coverage })

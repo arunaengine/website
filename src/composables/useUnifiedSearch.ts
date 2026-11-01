@@ -35,10 +35,10 @@ export const OBJECT_SEARCH_MODE_LABELS: Record<ObjectSearchMode, string> = {
 const ALL_TYPES: SearchSectionType[] = ['documents', 'buckets', 'groups', 'users']
 export type UnifiedSearchSection = SearchSectionType | 'objects'
 
-// The single completeness rule for object coverage: every partition answered
-// and nothing cut off.
+// The single completeness rule for object coverage: every partition answered.
+// `truncated` only says another page exists, which Load more reads.
 export function coverageComplete(coverage: ObjectSearchCoverage | null | undefined): boolean {
-  return Boolean(coverage?.complete && !coverage.truncated)
+  return Boolean(coverage?.complete)
 }
 
 export interface UnifiedSearchConfig {
