@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MetadataDoc } from '@/data/types'
-import { datasetFacts } from './datasetFacts'
+import { datasetFacts, licenseOf } from './datasetFacts'
 import { formatDate } from './utils'
 
 const REALM = 'Q0iiGwoTikaR1gx2t9n6V5yqcDbN0FGLVvxnOYRdsB4'
@@ -49,5 +49,12 @@ describe('datasetFacts', () => {
     const published = { '@graph': [{ '@id': 'ro-crate-metadata.json', about: { '@id': './' } }, { '@id': './', publisher: { '@id': 'https://ror.org/x' } }, { '@id': 'https://ror.org/x', name: 'NCBI' }] }
     expect(datasetFacts(doc({ roCrate: published }), names)[1]).toEqual({ label: 'By', value: 'NCBI' })
     expect(datasetFacts(doc({}), { ...names, group: () => '' })[1]).toEqual({ label: 'By', value: '' })
+  })
+
+  it('names a license by its crate entity, not by the last part of its address', () => {
+    const policies = 'https://www.ncbi.nlm.nih.gov/home/about/policies/'
+    const crate = { '@graph': [{ '@id': policies, '@type': 'CreativeWork', name: 'NCBI policies' }] }
+    expect(licenseOf(doc({ license: policies, roCrate: crate }))).toBe('NCBI policies')
+    expect(licenseOf(doc({ license: 'https://creativecommons.org/licenses/by/4.0/' }))).toBe('CC BY 4.0')
   })
 })

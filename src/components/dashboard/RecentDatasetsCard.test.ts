@@ -1,7 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import * as Licenses from '@/lib/licenses'
+import * as DatasetFacts from '@/lib/datasetFacts'
 import { PROCESS_RUN_PROFILE_URI } from '@/lib/profiles/builtinProfiles'
 import { compileClientComponent, content, element, flush, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 
@@ -18,7 +18,7 @@ const RecentDatasetsCard = compileClientComponent(new URL('./RecentDatasetsCard.
   '@/components/ui/SectionHeading.vue': moduleDefault(HeadingStub),
   '@/components/ui/StatusMark.vue': moduleDefault(defineComponent(() => () => null)),
   '@/composables/useAruna': { useAruna: () => ({ metadata, myGroups: ref([{ id: 'g1', name: 'demo' }]), listRecentMetadata, sessionEpoch: ref(1) }) },
-  '@/lib/licenses': Licenses,
+  '@/lib/datasetFacts': DatasetFacts,
   '@/lib/utils': { relativeTime: (value: string) => `at ${value}` },
 })
 

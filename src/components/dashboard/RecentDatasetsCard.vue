@@ -10,7 +10,7 @@ import SectionHeading from '@/components/ui/SectionHeading.vue'
 import StatusMark from '@/components/ui/StatusMark.vue'
 import type { MetadataDoc } from '@/data/types'
 import { useAruna } from '@/composables/useAruna'
-import { licenseLabelOf } from '@/lib/licenses'
+import { licenseOf } from '@/lib/datasetFacts'
 import { relativeTime } from '@/lib/utils'
 
 const props = withDefaults(defineProps<{ refreshRevision?: number }>(), { refreshRevision: 0 })
@@ -68,7 +68,7 @@ const files = (doc: MetadataDoc) => doc.linkedObjects?.length ?? 0
             <p class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs tabular-nums text-muted-foreground">
               <span v-if="files(doc)" class="inline-flex items-center gap-1"><FileText class="h-3 w-3" />{{ files(doc) }} {{ files(doc) === 1 ? 'file' : 'files' }}</span>
               <span v-if="groupName(doc)" class="inline-flex items-center gap-1"><Users class="h-3 w-3" />{{ groupName(doc) }}</span>
-              <span v-if="doc.license" class="inline-flex items-center gap-1"><Scale class="h-3 w-3" />{{ licenseLabelOf(doc.license) }}</span>
+              <span v-if="doc.license" class="inline-flex items-center gap-1"><Scale class="h-3 w-3" />{{ licenseOf(doc) }}</span>
               <span class="inline-flex items-center gap-1"><Clock class="h-3 w-3" />Updated {{ relativeTime(doc.updatedAt) }}</span>
             </p>
           </div>

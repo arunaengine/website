@@ -36,6 +36,14 @@ export function actionDuration(action: Entity | undefined): string {
 
 type Names = { group: (id: string) => string; person: (userId: string) => string }
 
+/** A dataset's license by the name its crate gives it, else by its known or readable address. */
+export function licenseOf(doc: MetadataDoc): string {
+  if (!doc.license) return ''
+  const graph = (doc.roCrate as Entity | null)?.['@graph']
+  const entity = Array.isArray(graph) ? (graph.find((item) => (item as Entity)?.['@id'] === doc.license) as Entity | undefined) : undefined
+  return licenseLabelOf(doc.license, text(entity?.name))
+}
+
 /** The name of the root's publisher, as a named entity or a plain name; never a web address. */
 function publisherOf(crate: unknown): string {
   const value = rootOf(crate)?.publisher
@@ -60,7 +68,7 @@ export function datasetFacts(doc: MetadataDoc, names: Names): ListFact[] {
   const people = makersOf(doc).map((person) => (person.userId ? names.person(person.userId) : person.name)).filter(Boolean)
   const group = crateTypeOf(doc).endsWith('-run') || !doc.realmId ? '' : publisherOf(doc.roCrate) || names.group(doc.realmId)
   return [
-    { label: 'License', value: doc.license ? licenseLabelOf(doc.license) : '', title: doc.license },
+    { label: 'License', value: licenseOf(doc), title: doc.license },
     { label: 'By', value: people.join(', ') || group },
     { label: 'Size', value: sizeText && Number.isFinite(size) ? formatBinary(size) : '' },
     { label: 'Updated', value: doc.updatedAt ? formatDate(doc.updatedAt) : '', title: doc.updatedAt },
