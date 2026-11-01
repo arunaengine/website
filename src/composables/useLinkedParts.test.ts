@@ -9,6 +9,8 @@ const aruna = vi.hoisted(() => ({
   getDataLinks: vi.fn(),
   searchBuckets: vi.fn(),
   sessionEpoch: { value: 1 },
+  authToken: { value: 't' },
+  nodeClientReady: vi.fn(async (node: string) => ({ baseUrl: `https://${node}.test/api/v1` })),
 }))
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
 vi.mock('@/composables/useRealmNodes', () => ({ useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'n1' }) }))
@@ -21,6 +23,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 beforeEach(() => {
   vi.clearAllMocks()
   aruna.sessionEpoch.value++
+  aruna.authToken.value = 't'
   aruna.getBucketUsage.mockResolvedValue({ bucket: 'refseq', objects: 120, logical_bytes: 1024, complete: true })
   aruna.listBucketObjects.mockResolvedValue({ bucket: 'refseq', prefixes: ['genomes/'], objects: [{ key: 'README.md', version_id: 'v', size: 12 }] })
   aruna.getDataLinks.mockResolvedValue({ documents: [{ document_id: 'd1' }, { document_id: 'd2', title: 'Other' }], complete: true })
@@ -44,6 +47,44 @@ describe('useLinkedParts', () => {
     expect(part.entries?.list[0].route).toEqual({ name: 'bucket', params: { bucketId: 'refseq' }, query: { prefix: 'genomes', node: 'n2' } })
     expect(part.others.map((other) => other.document_id)).toEqual(['d2'])
     scope.stop()
+  })
+
+  it('lists a node ARN part signed out without the refused lookup and downloads its files there', async () => {
+    aruna.authToken.value = ''
+    const scope = effectScope()
+    const facts = scope.run(() => useLinkedParts(ref([PART]), ref('d1'), () => true))!
+    await settle()
+
+    const part = facts.value.get(PART)!
+    expect(aruna.getPartTarget).not.toHaveBeenCalled()
+    expect(part.problem).toBeNull()
+    expect(aruna.listBucketObjects).toHaveBeenCalledWith('refseq', { prefix: undefined, delimiter: '/', limit: 11 }, 'n2')
+    expect(part.entries?.list.map((entry) => entry.download)).toEqual([
+      undefined,
+      `https://n2.test/api/v1/ga4gh/drs/v1/download?object_id=${encodeURIComponent('arn:aruna:r:n2:s3/refseq/README.md@v')}`,
+    ])
+    scope.stop()
+  })
+
+  it('still asks the node for a set part signed out and links files to Data signed in', async () => {
+    const SET = 'https://w3id.org/aruna/data/r/s1/'
+    aruna.authToken.value = ''
+    aruna.getPartTarget.mockRejectedValue(new Error('Unauthorized'))
+    const signedOut = effectScope()
+    const refused = signedOut.run(() => useLinkedParts(ref([SET]), ref('d1'), () => true))!
+    await settle()
+    expect(aruna.getPartTarget).toHaveBeenCalledWith(SET)
+    expect(refused.value.get(SET)?.problem).toBe('Unauthorized')
+    signedOut.stop()
+
+    aruna.authToken.value = 't'
+    aruna.sessionEpoch.value++
+    aruna.getPartTarget.mockResolvedValue({ id: PART, bucket: 'refseq', prefix: '', node_id: 'n2', held_here: false })
+    const signedIn = effectScope()
+    const facts = signedIn.run(() => useLinkedParts(ref([PART]), ref('d1'), () => true))!
+    await settle()
+    expect(facts.value.get(PART)?.entries?.list.every((entry) => !entry.download)).toBe(true)
+    signedIn.stop()
   })
 
   it('names every member node of a bucket stored on more nodes', async () => {

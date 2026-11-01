@@ -205,6 +205,35 @@ describe('DatasetFiles', () => {
     mounted.app.unmount()
   })
 
+  it('downloads a listed file of a linked bucket when the entry names a download', async () => {
+    const part = 'arn:aruna:r:n2:s3/raw/'
+    const download = 'https://n2.test/api/v1/ga4gh/drs/v1/download?object_id=x'
+    const folderRoute = { name: 'bucket', params: { bucketId: 'raw' }, query: { prefix: 'genomes', node: 'n2' } }
+    partFacts.value = new Map([[part, {
+      target: { id: part, bucket: 'raw', prefix: '', node_id: 'n2', held_here: false },
+      problem: null,
+      route: { name: 'bucket', params: { bucketId: 'raw' }, query: { node: 'n2' } },
+      nodes: ['n2'],
+      usage: null,
+      entries: {
+        list: [
+          { name: 'genomes', folder: true, size: null, route: folderRoute },
+          { name: 'README.md', folder: false, size: 12, route: OBJECT_ROUTE, download },
+        ],
+        more: false,
+      },
+      others: [],
+    }]])
+    const mounted = await render({ '@id': part, '@type': 'Dataset', name: 'raw' })
+    partFacts.value = new Map()
+
+    const file = element(mounted.root, (node) => node.tag === 'a' && content(node) === 'README.md')
+    expect(file.props.href).toBe(download)
+    expect(file.props.to).toBeUndefined()
+    expect(element(mounted.root, (node) => node.tag === 'a' && content(node) === 'genomes').props.to).toEqual(folderRoute)
+    mounted.app.unmount()
+  })
+
   it('asks the realm about nothing for a file, or a Dataset that is not a bucket', async () => {
     const file = await render({ '@id': 's3://reads/raw/one.csv' })
     expect(askedParts.value).toEqual([])

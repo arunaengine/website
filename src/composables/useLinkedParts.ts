@@ -8,12 +8,16 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { apiErrorMessage, type BucketUsageResponse, type DataLinkDocument, type PartTargetResponse } from '@/lib/api'
 import { objectRoute } from '@/lib/crate/dataIdentity'
 import { browseProblem, browseRoute } from '@/lib/linkedPart'
+import { parseArunaArn } from '@/lib/sync'
+import { drsDownloadHref } from '@/lib/tes'
 
 export interface PartEntry {
   name: string
   folder: boolean
   size: number | null
   route: RouteLocationRaw
+  /** Signed out, the download of a file from the node that holds it. */
+  download?: string
 }
 
 export interface LinkedPartFacts {
@@ -37,7 +41,7 @@ const remembered = new Map<string, LinkedPartFacts>()
 let rememberedEpoch = -1
 
 export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wantsEntries: (id: string) => boolean) {
-  const { getPartTarget, getBucketUsage, getBucketDistribution, listBucketObjects, getDataLinks, searchBuckets, sessionEpoch } = useAruna()
+  const { getPartTarget, getBucketUsage, getBucketDistribution, listBucketObjects, getDataLinks, searchBuckets, sessionEpoch, authToken, nodeClientReady } = useAruna()
   const { isLocalNode } = useRealmNodes()
   const facts = ref(new Map<string, LinkedPartFacts>())
   let generation = 0
@@ -59,9 +63,14 @@ export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wants
 
   async function load(id: string, round: number) {
     const current = () => round === generation
+    // Signed out, the nodes refuse the part lookup, but a node ARN names its node and bucket itself.
+    const parsed = authToken.value ? null : parseArunaArn(id)
+    const arn = parsed?.resourceType === 's3' ? parsed : null
     let target: PartTargetResponse
     try {
-      target = await memberOf(await getPartTarget(id))
+      target = arn
+        ? { id, bucket: arn.bucket, prefix: arn.prefix, set_id: null, node_id: arn.nodeId, held_here: isLocalNode(arn.nodeId) }
+        : await memberOf(await getPartTarget(id))
     } catch (cause) {
       if (current()) put(id, { target: null, problem: apiErrorMessage(cause), route: null, nodes: [], usage: null, entries: null, others: [] })
       return
@@ -81,8 +90,11 @@ export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wants
       getDataLinks(id, { parts_only: true }).catch(() => null),
       bucket && target.set_id ? getBucketDistribution(bucket, undefined, node).catch(() => null) : null,
     ])
+    const holderApi = arn && page ? (await nodeClientReady(arn.nodeId).catch(() => null))?.baseUrl : null
     if (!current()) return
     const nodeQuery = node ? { node } : {}
+    const download = (key: string, version: string) =>
+      holderApi && arn ? { download: drsDownloadHref(holderApi, `arn:aruna:${arn.realmId}:${arn.nodeId}:s3/${bucket}/${key}@${version}`) } : {}
     const list: PartEntry[] = page
       ? [
           ...page.prefixes.map((prefix) => ({
@@ -93,7 +105,13 @@ export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wants
           })),
           ...page.objects.map((object) => {
             const route = objectRoute(bucket, object.key)
-            return { name: object.key.slice(target.prefix.length), folder: false, size: object.size ?? null, route: { ...route, query: { ...route.query, ...nodeQuery } } }
+            return {
+              name: object.key.slice(target.prefix.length),
+              folder: false,
+              size: object.size ?? null,
+              route: { ...route, query: { ...route.query, ...nodeQuery } },
+              ...download(object.key, object.version_id),
+            }
           }),
         ]
       : []

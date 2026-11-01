@@ -355,7 +355,8 @@ function openPreview(row: DataEntity) {
                   <td class="max-w-0 py-1.5 pr-3">
                     <span class="flex min-w-0 items-center gap-2" :style="{ paddingLeft: `${2.5 + (row.depth + 1) * 1.5}rem` }">
                       <component :is="entry.folder ? Folder : FileIcon" class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                      <RouterLink :to="entry.route" class="min-w-0 truncate underline decoration-border underline-offset-4 hover:decoration-foreground" :title="entry.name">{{ entry.name }}</RouterLink>
+                      <a v-if="entry.download" :href="entry.download" download class="min-w-0 truncate underline decoration-border underline-offset-4 hover:decoration-foreground" :title="`Download ${entry.name}`">{{ entry.name }}</a>
+                      <RouterLink v-else :to="entry.route" class="min-w-0 truncate underline decoration-border underline-offset-4 hover:decoration-foreground" :title="entry.name">{{ entry.name }}</RouterLink>
                     </span>
                   </td>
                   <td class="max-sm:hidden"></td>

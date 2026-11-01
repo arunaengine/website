@@ -138,7 +138,9 @@ function client() {
 export function nodeClient(nodeId?: string | null) {
   const local = !nodeId || nodeId === nodeInfo.value?.node.peer_id
   const node = local ? null : (realmInfo.value?.nodes ?? []).find((entry) => entry.node_id === nodeId)
-  const baseUrl = local ? apiBaseUrl.value : node ? nodeApiBase(node) : null
+  // Signed out, the realm names its nodes only in its public list.
+  const published = local || node ? null : realmInfo.value?.public_nodes?.find((entry) => entry.node_id === nodeId)
+  const baseUrl = local ? apiBaseUrl.value : node ? nodeApiBase(node) : published ? nodeApiBase({ rest_url: published.api_url }) : null
   if (!baseUrl) throw new Error('The node publishes no API address.')
   return { baseUrl, token: authToken.value }
 }

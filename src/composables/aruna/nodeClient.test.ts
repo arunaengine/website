@@ -34,6 +34,17 @@ describe('requests to another node on a fresh load', () => {
     await expect(answer).rejects.toThrow('The node publishes no API address.')
   })
 
+  it('reach another node signed out through the realm\'s public node list', async () => {
+    state.authToken.value = ''
+    state.sessionEpoch.value = 13
+    state.realmInfo.value = { realm_id: 'r', nodes: [], public_nodes: [{ node_id: 'node-2', api_url: 'https://api.node-2.test' }] } as never
+    vi.mocked(apiRequest).mockClear()
+
+    await expect(state.request('/data/buckets/bakta-results/objects', {}, 'node-2')).resolves.toBe('answer')
+    expect(apiRequest).toHaveBeenCalledWith('/data/buckets/bakta-results/objects', {}, { baseUrl: 'https://api.node-2.test/api/v1', token: '' })
+    expect(() => state.nodeClient('node-9')).toThrow('The node publishes no API address.')
+  })
+
   it('drop a waiting write when the session changes, never sending it with the new token', async () => {
     state.authToken.value = 'token-a'
     state.sessionEpoch.value = 9
