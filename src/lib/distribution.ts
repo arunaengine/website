@@ -158,6 +158,11 @@ export function degradedRanges(bucket: DistributedBucket): DistributedRange[] {
   return bucket.ranges.filter(isDegraded)
 }
 
+/** The node that coordinates the range of a key: it holds the key, so a run reads it there. */
+export function keyHolder(bucket: Pick<DistributedBucket, 'ranges'>, key: string): string | undefined {
+  return bucket.ranges.find((range) => range.lower <= key && (!range.upper || key < range.upper))?.coordinator
+}
+
 /** Role paths like data/node-1/bakrep/** by bucket: the nodes each one names. */
 export function grantTargets(suffixes: readonly string[]): Map<string, string[]> {
   const named = new Map<string, string[]>()

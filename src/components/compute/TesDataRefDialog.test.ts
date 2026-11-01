@@ -2,6 +2,8 @@ import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as Tes from '@/lib/tes'
+import * as Distribution from '@/lib/distribution'
+import { ApiError, type DistributedResponse } from '@/lib/api'
 import { button, click, compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
 
 const Passthrough = defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h('div', attrs, slots.default?.()) })
@@ -13,6 +15,9 @@ const listBucketObjects = vi.fn(async () => ({ bucket: 'far-db', objects: [{ key
 const currentUser = ref<{ id: string } | null>(null)
 const myGroups = ref<Array<{ id: string; name: string }>>([])
 const sessionEpoch = ref(0)
+const getBucketDistribution = vi.fn(async (_bucket: string, _signal?: AbortSignal, _node?: string | null): Promise<DistributedResponse> => {
+  throw new ApiError(404, 'Not found')
+})
 const searchBuckets = vi.fn(async (_q: string, _options: unknown) => ({ hits: [] as unknown[], nodes_queried: 0, nodes_failed: 0, failed_nodes: [] as string[] }))
 
 const component = compileClientComponent(new URL('./TesDataRefDialog.vue', import.meta.url), {
@@ -52,7 +57,7 @@ const component = compileClientComponent(new URL('./TesDataRefDialog.vue', impor
     ]),
   })),
   '@/composables/useS3': { useS3: () => s3State },
-  '@/composables/useAruna': { useAruna: () => ({ currentUser, myGroups, nodeInfo: ref({ node: { realm_id: 'realm' } }), listBucketObjects, searchBuckets, sessionEpoch }) },
+  '@/composables/useAruna': { useAruna: () => ({ currentUser, myGroups, getBucketDistribution, nodeInfo: ref({ node: { realm_id: 'realm' } }), listBucketObjects, searchBuckets, sessionEpoch }) },
   '@/composables/useBucketCount': {
     listBuckets: async (search: typeof searchBuckets) => {
       const answer = await search('', {})
@@ -64,6 +69,8 @@ const component = compileClientComponent(new URL('./TesDataRefDialog.vue', impor
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ isLocalNode: (id: string) => id === 'n1', isTarget: (id: string) => id !== 'device-1' }) },
   '@/lib/utils': { errorMessage: (cause: unknown) => String(cause) },
   '@/lib/tes': Tes,
+  '@/lib/api': { ApiError },
+  '@/lib/distribution': Distribution,
 })
 
 describe('TES input picker my buckets', () => {
@@ -183,6 +190,34 @@ describe('TES input picker databases', () => {
     expect(added).toEqual([
       { kind: 'file', url: `arn:aruna:realm:n2:s3/far-db/db/x.tsv@${V1}`, path: '/inputs/x.tsv', name: 'x.tsv' },
       { kind: 'file', url: `arn:aruna:realm:n2:s3/far-db/db/6.0/y.tsv@${V2}`, path: '/inputs/6.0/y.tsv', name: '6.0/y.tsv' },
+    ])
+  })
+
+  it('pins each pick of a distributed bucket on the node that holds its range', async () => {
+    getBucketDistribution.mockResolvedValueOnce({
+      set_id: 's1', bucket: 'far-db', group_id: 'g2', publisher: 'n3', revision: 1, phase: 'active', serving: true, conflicted: false,
+      configuration_changes_unavailable: false, degraded: false, recommended_grant: '',
+      members: [
+        { member_id: 'm2', node_id: 'n2', state: 'ready', coverage: 'assigned', strategy: 'copy', admitted: true },
+        { member_id: 'm3', node_id: 'n3', state: 'ready', coverage: 'assigned', strategy: 'copy', admitted: true },
+      ],
+      ranges: [
+        { range_id: 'r1', lower: '', upper: 'db/w', coordinator: 'm3', epoch: 1, replicas: [], degraded: false },
+        { range_id: 'r2', lower: 'db/w', coordinator: 'm2', epoch: 1, replicas: [], degraded: false },
+      ],
+    })
+    const added: unknown[] = []
+    const { root } = await mountApp(component, { props: { open: true, mode: 'input', onAdd: (entry: unknown) => added.push(entry) } })
+    ;(element(root, (node) => node.props.role === 'radiogroup').props['onUpdate:modelValue'] as (value: string) => void)('databases')
+    await flush()
+
+    await click(button(root, 'Far database'))
+    await click(button(root, 'pick far-db n2'))
+    await flush()
+    expect(getBucketDistribution).toHaveBeenLastCalledWith('far-db', undefined, 'n2')
+    expect(added).toEqual([
+      { kind: 'file', url: `arn:aruna:realm:n2:s3/far-db/db/x.tsv@${V1}`, path: '/inputs/x.tsv', name: 'x.tsv' },
+      { kind: 'file', url: `arn:aruna:realm:n3:s3/far-db/db/6.0/y.tsv@${V2}`, path: '/inputs/6.0/y.tsv', name: '6.0/y.tsv' },
     ])
   })
 

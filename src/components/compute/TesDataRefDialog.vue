@@ -25,7 +25,8 @@ import { useAruna } from '@/composables/useAruna'
 import { activeGroupId } from '@/composables/useGroupSelection'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { errorMessage } from '@/lib/utils'
-import type { BucketSearchHit } from '@/lib/api'
+import { ApiError, type BucketSearchHit } from '@/lib/api'
+import { fromStatus, keyHolder } from '@/lib/distribution'
 import {
   normalizeContainerDir,
   pickedEntries,
@@ -54,7 +55,7 @@ const emit = defineEmits<{
 }>()
 
 const s3 = useS3()
-const { currentUser, myGroups, listBucketObjects, nodeInfo, searchBuckets, sessionEpoch } = useAruna()
+const { currentUser, myGroups, getBucketDistribution, listBucketObjects, nodeInfo, searchBuckets, sessionEpoch } = useAruna()
 const { isLocalNode, isTarget } = useRealmNodes()
 const credentialDialogOpen = ref(false)
 
@@ -183,7 +184,7 @@ async function addSelection(selection: Selection) {
 }
 
 // Every file below a folder of another node, with its version, read page by page.
-async function folderFiles(bucket: string, nodeId: string, prefix: string) {
+async function folderFiles(bucket: string, nodeId: string | null, prefix: string) {
   const files: { key: string; versionId: string }[] = []
   let cursor: string | undefined
   do {
@@ -205,11 +206,19 @@ async function addRemote(pick: RemotePick) {
   folderBusy.value = true
   folderError.value = null
   try {
-    const local = isLocalNode(place.nodeId)
+    // Each key of a distributed bucket is pinned on the node that holds its range.
+    const node = isLocalNode(place.nodeId) ? null : place.nodeId
+    const status = await getBucketDistribution(place.bucket, undefined, node).catch((cause) => {
+      if (cause instanceof ApiError && cause.status === 404) return null
+      throw cause
+    })
+    const view = status && fromStatus(status)
+    const holder = view ? (key: string) => keyHolder(view, key) ?? place.nodeId : undefined
+    const local = !node && !view
     const folders = local
       ? pick.folders
-      : await Promise.all(pick.folders.map(async (folder) => ({ ...folder, files: await folderFiles(place.bucket, place.nodeId, folder.prefix) })))
-    const entries = pickedEntries({ realmId, nodeId: place.nodeId, bucket: place.bucket, local }, pick.files, folders, mountDirNormalized.value)
+      : await Promise.all(pick.folders.map(async (folder) => ({ ...folder, files: await folderFiles(place.bucket, node, folder.prefix) })))
+    const entries = pickedEntries({ realmId, nodeId: place.nodeId, bucket: place.bucket, local, holder }, pick.files, folders, mountDirNormalized.value)
     if (!entries.length) {
       folderError.value = 'The selection contains no files.'
       return

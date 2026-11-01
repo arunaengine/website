@@ -32,6 +32,7 @@ import * as RunPaths from '@/lib/runPaths'
 import * as RunTarget from '@/lib/runTarget'
 import * as Shellwords from '@/lib/shellwords'
 import * as ContentIdentity from '@/lib/contentIdentity'
+import * as Distribution from '@/lib/distribution'
 import * as Tes from '@/lib/tes'
 import * as Utils from '@/lib/utils'
 import * as Workspaces from '@/lib/workspaces'
@@ -152,7 +153,8 @@ const searchBuckets = vi.fn(async (q: string, _options?: { cursor?: string; grou
   next_cursor: null as string | null,
 }))
 const getBucketDistribution = vi.fn(async (_bucket: string, _signal?: AbortSignal, _nodeId?: string | null) => ({
-  members: [] as Array<{ node_id: string; state: string }>,
+  members: [] as Array<{ node_id: string; state: string; member_id?: string }>,
+  ranges: [] as Array<{ range_id: string; lower: string; upper?: string; coordinator: string; replicas: string[] }>,
 }))
 type ObjectPage = { objects: Array<{ key: string; version_id: string }>; next_cursor: string | null; stale_ranges?: unknown[] }
 const listBucketObjects = vi.fn(async (_bucket: string, _query: { prefix?: string }, _nodeId?: string | null): Promise<ObjectPage> => ({
@@ -344,6 +346,7 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
   },
   '@/composables/useAruna': useArunaModule,
   '@/lib/contentIdentity': ContentIdentity,
+  '@/lib/distribution': Distribution,
   '@/lib/api': Api,
   '@/composables/useComputeDataView': { useComputeDataView: () => ref('table') },
   '@/composables/useS3': { useS3: () => s3, s3ErrorMessage: (error: unknown) => String(error) },
@@ -550,7 +553,7 @@ describe('run page', () => {
 
   it('counts every ready member of a distributed bucket the search shows once', async () => {
     // The search answers one hit per set, from the member that sorts first.
-    getBucketDistribution.mockResolvedValueOnce({ members: [{ node_id: 'node-b', state: 'ready' }, { node_id: 'node-id', state: 'ready' }] })
+    getBucketDistribution.mockResolvedValueOnce({ members: [{ node_id: 'node-b', state: 'ready' }, { node_id: 'node-id', state: 'ready' }], ranges: [] })
     const mounted = await mount(ComputeSubmitView, '/app/compute/new')
     await fillValidRun(mounted.root)
     searchBuckets.mockImplementationOnce(async (q: string) => ({
@@ -781,6 +784,49 @@ describe('run page', () => {
     searchBuckets.mockReset()
     searchBuckets.mockImplementation(async (q: string) => ({ hits: [{ bucket: q || 'results', node_id: 'node-id', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
     useSavedRuns().remove('r4')
+    mounted.app.unmount()
+  })
+
+  it('pins an input of a distributed bucket on the node that holds its range', async () => {
+    const version = '01K8W1B3D5F7H9KMQ1S3V5X7Z1'
+    searchBuckets.mockImplementation(async (q: string) => ({
+      hits: q === 'refs'
+        ? [{ bucket: q, node_id: 'node-c', group_id: 'group-id', set_id: 'set-1' }]
+        : [{ bucket: q, node_id: 'node-b', group_id: 'group-id' }],
+      nodes_failed: 0,
+      next_cursor: null,
+    }))
+    getBucketDistribution.mockResolvedValueOnce({
+      members: [{ member_id: 'm-c', node_id: 'node-c', state: 'ready' }, { member_id: 'm-d', node_id: 'node-d', state: 'ready' }],
+      ranges: [
+        { range_id: 'r1', lower: '', upper: 'j', coordinator: 'm-c', replicas: [] },
+        { range_id: 'r2', lower: 'j', coordinator: 'm-d', replicas: [] },
+      ],
+    })
+    listBucketObjects.mockResolvedValueOnce({ objects: [{ key: 'k12.fna', version_id: version }], next_cursor: null })
+    createTask.mockClear()
+    useSavedRuns().save({
+      id: 'r5', name: 'Ranged', savedAt: '2026-10-30T10:00:00Z',
+      task: {
+        name: 'Ranged',
+        executors: [{ image: 'alpine:3.20', command: ['cat', '/work/in/k12.fna'] }],
+        inputs: [{ name: 'k12.fna', path: '/work/in/k12.fna', url: 's3://refs/k12.fna', type: 'FILE' }],
+        outputs: [{ url: 's3://results/ranged/', path: '/work/out/', type: 'DIRECTORY' }],
+      },
+      ask: { inputs: [], results: false },
+    })
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?saved=r5')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    const [submitted] = createTask.mock.calls.at(-1) as unknown as [Tes.TesTask, string]
+    expect(submitted.inputs?.[0]?.url).toBe(ContentIdentity.versionObjectId('realm', 'node-d', 'refs', 'k12.fna', version))
+    searchBuckets.mockReset()
+    searchBuckets.mockImplementation(async (q: string) => ({ hits: [{ bucket: q || 'results', node_id: 'node-id', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
+    useSavedRuns().remove('r5')
     mounted.app.unmount()
   })
 

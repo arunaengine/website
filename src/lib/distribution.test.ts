@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { BucketSearchHit, DistributedResponse } from '@/lib/api'
 import { defaultSettings, type Placement, type PresetId } from '@/lib/distributedMock'
-import { createRequest, defaultDraft, degradedRanges, distinctCount, draftProblem, fromStatus, isDeleting, leaveBlock, mergeSets, openTransfers, placementProblem, settingsBody, transferBlock, transferChoice, withMembers } from './distribution'
+import { createRequest, defaultDraft, degradedRanges, distinctCount, draftProblem, fromStatus, isDeleting, keyHolder, leaveBlock, mergeSets, openTransfers, placementProblem, settingsBody, transferBlock, transferChoice, withMembers } from './distribution'
 
 const NODE_A = 'a'.repeat(64)
 const NODE_B = 'b'.repeat(64)
@@ -50,6 +50,15 @@ describe('status to view', () => {
     expect(view.ranges[1].degradedSince).toBe('2023-11-14T22:13:20.000Z')
     expect(view.members[1]).toMatchObject({ unreachable: true, state: 'catching up', admitted: false })
     expect(view.members[0].unreachable).toBe(false)
+  })
+
+  it('names the coordinator of the range a key falls in', () => {
+    const view = fromStatus(status())
+
+    expect(keyHolder(view, 'GCF_1')).toBe(NODE_A)
+    expect(keyHolder(view, 'l/zz')).toBe(NODE_A)
+    expect(keyHolder(view, 'm')).toBe(NODE_B)
+    expect(keyHolder(view, 'zz')).toBe(NODE_B)
   })
 
   it('reads a degraded range as degraded when the time of the last contact is unknown', () => {

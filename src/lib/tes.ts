@@ -370,7 +370,13 @@ export function runRoute(
   localNodeId: string | null,
 ): RunRoute | null {
   const { inputs, outputs } = taskBuckets(task)
-  if (!inputs.length && !outputs.length) return { node: null, pin: [] }
+  if (!inputs.length && !outputs.length) {
+    // Pinned inputs alone: the node that holds the most of them takes the run.
+    const named = (task.inputs ?? []).map((input) => parseArunaArn(input.url ?? '')?.nodeId).filter((node): node is string => Boolean(node))
+    const count = (node: string) => named.filter((entry) => entry === node).length
+    const best = [...new Set(named)].sort((a, b) => count(b) - count(a) || a.localeCompare(b))[0]
+    return { node: !best || named.includes(localNodeId ?? '') ? null : best, pin: [] }
+  }
   const holding = (name: string) => holders.get(name) ?? []
   const candidates = [...new Set([...inputs, ...outputs].flatMap(holding))]
     .filter((node) => outputs.every((name) => holding(name).includes(node)))
@@ -458,6 +464,8 @@ export interface PickPlace {
   nodeId: string
   bucket: string
   local: boolean
+  /** The node holding each key of a distributed bucket; absent when one node holds them all. */
+  holder?: (key: string) => string
 }
 
 /**
@@ -471,7 +479,7 @@ export function pickedEntries(
   folders: ReadonlyArray<{ prefix: string; name: string; files?: ReadonlyArray<{ key: string; versionId: string }> }>,
   mount: string,
 ): TesDataRefEntry[] {
-  const pinned = (key: string, versionId: string) => versionObjectId(place.realmId, place.nodeId, place.bucket, key, versionId)
+  const pinned = (key: string, versionId: string) => versionObjectId(place.realmId, place.holder?.(key) ?? place.nodeId, place.bucket, key, versionId)
   const entries: TesDataRefEntry[] = files.map((file) => ({ kind: 'file', url: pinned(file.key, file.versionId), path: `${mount}${file.name}`, name: file.name }))
   for (const folder of folders) {
     if (place.local) {

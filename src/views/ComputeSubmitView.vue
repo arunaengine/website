@@ -35,6 +35,7 @@ import { defaultPlacement, isNativeBlocked, tesFormToExecutionRequest } from '@/
 import { submitJob } from '@/lib/jobs'
 import { TES_GROUP_TAG, nativeInput, parseS3Url, runRoute, taskBuckets, type TesInput, type TesTask } from '@/lib/tes'
 import { versionObjectId } from '@/lib/contentIdentity'
+import { fromStatus, keyHolder, type DistributedBucket } from '@/lib/distribution'
 import { errorMessage } from '@/lib/utils'
 import { ApiError, type BucketSearchHit } from '@/lib/api'
 
@@ -158,10 +159,11 @@ async function submitLocally(draft: TesTask, submission: Submission): Promise<bo
 const HOLDER_PAGES = 10
 
 /** Every node holding a bucket of this name, of one group when given, read to the last page. */
-async function bucketHolders(name: string, groupId?: string): Promise<{ nodes: string[]; partial: boolean }> {
+async function bucketHolders(name: string, groupId?: string): Promise<{ nodes: string[]; partial: boolean; ranges?: DistributedBucket }> {
   const nodes = new Set<string>()
   let partial = false
   const sets: BucketSearchHit[] = []
+  let ranges: DistributedBucket | undefined
   let cursor: string | undefined
   let pages = 0
   do {
@@ -177,9 +179,10 @@ async function bucketHolders(name: string, groupId?: string): Promise<{ nodes: s
   // The search shows a distributed bucket once; its node names every ready member.
   for (const hit of new Map(sets.map((entry) => [entry.set_id, entry])).values()) {
     const status = await getBucketDistribution(name, undefined, isLocalNode(hit.node_id) ? null : hit.node_id)
+    ranges = fromStatus(status)
     for (const member of status.members) if (member.state === 'ready' && isTarget(member.node_id)) nodes.add(member.node_id)
   }
-  return { nodes: [...nodes], partial }
+  return { nodes: [...nodes], partial, ranges }
 }
 
 /** Every current version below a key prefix on one node; `stale` when a lagging copy answered. */
@@ -197,11 +200,13 @@ async function listedVersions(bucket: string, prefix: string, nodeId: string) {
 }
 
 /** An input of another node, named by the exact versions it reads there; a folder becomes its files. */
-async function pinInput(input: TesInput, holders: ReadonlyMap<string, readonly string[]>, realmId: string): Promise<TesInput[]> {
+async function pinInput(input: TesInput, holders: ReadonlyMap<string, readonly string[]>, realmId: string, ranges?: DistributedBucket): Promise<TesInput[]> {
   const { bucket, key } = parseS3Url(input.url ?? '')!
   const node = [...(holders.get(bucket) ?? [])].sort()[0]
   if (!node) throw new Error(`No node holds bucket ${bucket}, so the run was not started.`)
-  const pinned = (file: { key: string; versionId: string }) => versionObjectId(realmId, node, bucket, file.key, file.versionId)
+  // A key of a distributed bucket is pinned on the node that holds its range.
+  const holder = (file: { key: string }) => (ranges && keyHolder(ranges, file.key)) || node
+  const pinned = (file: { key: string; versionId: string }) => versionObjectId(realmId, holder(file), bucket, file.key, file.versionId)
   if (input.type !== 'DIRECTORY' && !key.endsWith('/')) {
     const file = (await listedVersions(bucket, key, node)).files.find((entry) => entry.key === key)
     if (!file) throw new Error(`${bucket}/${key} was not found on ${displayName(node)}, so the run was not started.`)
@@ -268,7 +273,7 @@ async function routeRun(draft: TesTask): Promise<{ draft: TesTask; base: string 
     if (!realmId) throw new Error('The realm of this node is not known yet, so the run was not started. Try again.')
     const read = (input: TesInput) => {
       const bucket = parseS3Url(input.url ?? '')?.bucket
-      return bucket && input.url?.startsWith('s3://') && route.pin.includes(bucket) ? pinInput(input, holders, realmId) : Promise.resolve([input])
+      return bucket && input.url?.startsWith('s3://') && route.pin.includes(bucket) ? pinInput(input, holders, realmId, found.get(bucket)?.ranges) : Promise.resolve([input])
     }
     draft = { ...draft, inputs: (await Promise.all((draft.inputs ?? []).map(read))).flat() }
   }

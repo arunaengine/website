@@ -39,6 +39,13 @@ describe('run holder node', () => {
     expect(runRoute(align, holders, 'node-a')).toEqual({ node: 'node-b', pin: ['ncbi-refseq'] })
   })
 
+  it('sends a run of pinned inputs alone to the node they name', () => {
+    const pinned = { inputs: [align.inputs![2]!], outputs: [] }
+    expect(runRoute(pinned, new Map(), 'node-a')).toEqual({ node: 'node-c', pin: [] })
+    expect(runRoute(pinned, new Map(), 'node-c')).toEqual({ node: null, pin: [] })
+    expect(runRoute({ inputs: [], outputs: [] }, new Map(), 'node-a')).toEqual({ node: null, pin: [] })
+  })
+
   it('finds no route when no node holds every output bucket', () => {
     const split = { ...align, outputs: [...align.outputs!, { url: 's3://ncbi-refseq/out/', path: '/work/out2', type: 'DIRECTORY' as const }] }
     const holders = new Map([
