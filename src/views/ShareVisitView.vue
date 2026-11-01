@@ -20,7 +20,7 @@ import { MODE_LABELS } from '@/lib/shareLinks'
 import { formatDateTime } from '@/lib/utils'
 
 const route = useRoute()
-const { signIn } = useAuth()
+const { requestSignIn } = useAuth()
 const { phase, share, error, busy, start, open, visit } = useShareVisit()
 const password = ref('')
 
@@ -40,7 +40,7 @@ function submitPassword() {
       <div class="flex h-14 w-full items-center gap-3 px-4 sm:px-6">
         <RouterLink to="/" aria-label="Aruna home"><AppLogo :size="22" /></RouterLink>
         <span class="flex-1"></span>
-        <Button size="sm" class="h-9" aria-label="Sign in" @click="signIn({ redirectTo: '/app' })">
+        <Button size="sm" class="h-9" aria-label="Sign in" @click="requestSignIn({ redirectTo: '/app' })">
           <LogIn class="h-4 w-4" /> <span class="hidden min-[480px]:inline">Sign in</span>
         </Button>
       </div>

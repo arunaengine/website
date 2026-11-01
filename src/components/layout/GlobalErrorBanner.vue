@@ -13,11 +13,11 @@ const BANNER = 'flex items-center justify-between gap-3 rounded-none border-x-0 
 
 const route = useRoute()
 const { error, authError, refresh } = useAruna()
-const { signIn } = useAuth()
+const { requestSignIn } = useAuth()
 const { errors, dismissGlobalError } = useGlobalErrors()
 
 function onSignIn() {
-  void signIn({ redirectTo: route.fullPath })
+  void requestSignIn({ redirectTo: route.fullPath })
 }
 </script>
 

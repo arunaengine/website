@@ -65,7 +65,7 @@ const {
   setApiBaseUrl,
   updateUserProfile,
 } = useAruna()
-const { signIn, isAuthenticated, authPending, stage, stageError } = useAuth()
+const { requestSignIn, isAuthenticated, authPending, stage, stageError } = useAuth()
 // Account-dependent panels paint together with the shared session bootstrap;
 // later refreshes update the rendered tab in place.
 const painted = useFirstPaint(
@@ -109,7 +109,7 @@ const onboardingSecret = ref('')
 const signingIn = computed(() => stage.value === 'redirecting')
 
 function startSignIn() {
-  void signIn({ onboardingSecret: onboardingSecret.value, redirectTo: '/app/settings' })
+  void requestSignIn({ onboardingSecret: onboardingSecret.value, redirectTo: '/app/settings' })
 }
 const identityOpen = ref(false)
 const name = ref('')

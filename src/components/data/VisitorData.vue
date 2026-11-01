@@ -32,7 +32,7 @@ import { Boxes, ChevronLeft, ChevronRight, Download, FolderOpen, LogIn } from '@
 const route = useRoute()
 const router = useRouter()
 const { getNodeInfo, nodeInfo } = useAruna()
-const { signIn } = useAuth()
+const { requestSignIn } = useAuth()
 const realmNodes = useRealmNodes()
 const usage = useListedUsage()
 const text = (value: unknown) => (typeof value === 'string' ? value : '')
@@ -139,7 +139,7 @@ watch([bucket, s3Prefix], () => (details.value = null))
         <div v-if="denied" class="border-t border-border px-4 py-6 text-sm">
           <p class="font-medium text-foreground">This bucket is not public.</p>
           <p class="mt-1 text-muted-foreground">Sign in to see the data of your groups.</p>
-          <Button size="sm" class="mt-3" @click="signIn({ redirectTo: route.fullPath })"><LogIn class="h-4 w-4" /> Sign in</Button>
+          <Button size="sm" class="mt-3" @click="requestSignIn({ redirectTo: route.fullPath })"><LogIn class="h-4 w-4" /> Sign in</Button>
         </div>
         <p v-else-if="error" class="border-t border-border px-4 py-3 text-xs text-destructive">{{ error }}</p>
         <table v-else class="w-full table-fixed text-sm @max-[600px]:block">

@@ -19,11 +19,11 @@ const props = defineProps<{
 }>()
 
 const { currentUser } = useAruna()
-const { signIn, stage, authPending } = useAuth()
+const { requestSignIn, stage, authPending } = useAuth()
 
 const signingIn = computed(() => stage.value === 'redirecting')
 function startSignIn() {
-  void signIn({ redirectTo: props.redirectTo })
+  void requestSignIn({ redirectTo: props.redirectTo })
 }
 </script>
 

@@ -31,7 +31,7 @@ const props = withDefaults(defineProps<{ variant?: 'portal' | 'desktop' }>(), { 
 
 const { realm, role } = useRealm()
 const { currentUser, authError, loading } = useAruna()
-const { hasSession, signIn, signOut, stage, authPending } = useAuth()
+const { hasSession, requestSignIn, signOut, stage, authPending } = useAuth()
 const { isDark, toggleTheme } = useTheme()
 const { label: nodeLabel, state: nodeState, start: watchNode, stop: unwatchNode } = useDeviceStatus()
 const route = useRoute()
@@ -85,7 +85,7 @@ onUnmounted(() => {
 })
 
 function onSignIn() {
-  void signIn({ redirectTo: route.fullPath })
+  void requestSignIn({ redirectTo: route.fullPath })
 }
 
 // Signing out of the shell lands on its own sign-in step; there is no landing

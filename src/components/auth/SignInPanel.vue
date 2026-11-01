@@ -20,7 +20,7 @@ import { ChevronRight, LogIn, RefreshCw } from '@lucide/vue'
 const props = defineProps<{ compact?: boolean }>()
 
 const { realm, realmInfo } = useAruna()
-const { signIn, stage, stageError } = useAuth()
+const { requestSignIn, stage, stageError } = useAuth()
 
 const secretOpen = ref(false)
 const onboardingSecret = ref('')
@@ -54,7 +54,7 @@ async function loginElsewhere(home: VerifiedRealm) {
 }
 
 function startSignIn() {
-  void signIn({ onboardingSecret: onboardingSecret.value, redirectTo: '/app' })
+  void requestSignIn({ onboardingSecret: onboardingSecret.value, redirectTo: '/app' })
 }
 </script>
 

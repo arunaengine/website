@@ -1,12 +1,13 @@
 import * as VueRuntime from 'vue'
 import { computed, defineComponent, h, ref } from 'vue'
-import { describe, expect, it } from 'vitest'
-import { compileClientComponent, content, flush, mountApp } from '@/test/clientRender'
+import { describe, expect, it, vi } from 'vitest'
+import { button, click, compileClientComponent, content, flush, mountApp } from '@/test/clientRender'
 
 const Stub = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
-const ButtonStub = defineComponent((_, { slots }) => () => h('button', slots.default?.()))
+const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
+const requestSignIn = vi.fn()
 
-async function render(compact: boolean): Promise<string> {
+async function mount(compact: boolean) {
   const panel = compileClientComponent(new URL('./SignInPanel.vue', import.meta.url), {
     vue: VueRuntime,
     'vue-router': { useRouter: () => ({ push: () => undefined }) },
@@ -23,12 +24,17 @@ async function render(compact: boolean): Promise<string> {
         realmInfo: ref(null),
       }),
     },
-    '@/composables/useAuth': { useAuth: () => ({ signIn: async () => undefined, stage: ref('idle'), stageError: ref(null) }) },
+    '@/composables/useAuth': { useAuth: () => ({ requestSignIn, stage: ref('idle'), stageError: ref(null) }) },
     '@/lib/config': { featureEnabled: () => false },
     '@/assets/brand/icon-mark.avif': { __esModule: true, default: 'icon.avif' },
   })
-  const { root, app } = await mountApp(defineComponent({ setup: () => () => h(panel, { compact }) }))
+  const mounted = await mountApp(defineComponent({ setup: () => () => h(panel, { compact }) }))
   await flush()
+  return mounted
+}
+
+async function render(compact: boolean): Promise<string> {
+  const { root, app } = await mount(compact)
   const text = content(root)
   app.unmount()
   return text
@@ -47,5 +53,13 @@ describe('sign-in panel', () => {
     expect(text).toContain('Log in with another realm')
     expect(text).not.toContain('Demo realm')
     expect(text).not.toContain('First user on a fresh realm?')
+  })
+
+  it.each([false, true])('opens the login chooser from the sign-in button (compact %s)', async (compact) => {
+    requestSignIn.mockReset()
+    const { root, app } = await mount(compact)
+    await click(button(root, 'Sign in'))
+    expect(requestSignIn).toHaveBeenCalledWith({ onboardingSecret: '', redirectTo: '/app' })
+    app.unmount()
   })
 })

@@ -9,12 +9,12 @@ import { useRoute, useRouter, RouterLink, type LocationQuery } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
-const { completeSignIn, signIn, stage, stageError } = useAuth()
+const { completeSignIn, requestSignIn, stage, stageError } = useAuth()
 // The shell has no guest surface to fall back to: signing in is the way in.
 const inDesktop = isDesktop()
 
 function retry() {
-  void signIn({ redirectTo: '/app' })
+  void requestSignIn({ redirectTo: '/app' })
 }
 
 const stageLabels: Record<string, string> = {

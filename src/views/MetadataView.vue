@@ -70,7 +70,7 @@ import { AppWindow, ArrowLeft, Braces, GitBranch, History as HistoryIcon, Layout
 
 const router = useRouter()
 const route = useRoute()
-const { signIn } = useAuth()
+const { requestSignIn } = useAuth()
 const { currentUser, saving, deleteMetadataDocument, fullCrates, sessionEpoch, realm } = useAruna()
 const { shown } = usePortalFeatures()
 
@@ -486,7 +486,7 @@ function jumpTo(entityId: string) {
         :title="currentUser ? 'This dataset does not exist or has been deleted.' : 'This dataset is not public, or it does not exist.'"
         :description="currentUser ? detailId : 'Sign in to see it if you have access.'"
       >
-        <Button v-if="!currentUser" size="sm" @click="signIn({ redirectTo: route.fullPath })"><LogIn class="h-4 w-4" /> Sign in</Button>
+        <Button v-if="!currentUser" size="sm" @click="requestSignIn({ redirectTo: route.fullPath })"><LogIn class="h-4 w-4" /> Sign in</Button>
         <Button variant="outline" as-child>
           <RouterLink :to="{ name: 'datasets' }"><ArrowLeft class="h-4 w-4" /> Datasets</RouterLink>
         </Button>

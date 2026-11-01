@@ -21,7 +21,7 @@ async function onSignIn() {
   signingIn.value = true
   try {
     const { useAuth } = await import('@/composables/useAuth')
-    await useAuth().signIn({ redirectTo: '/app' })
+    await useAuth().requestSignIn({ redirectTo: '/app' })
   } finally {
     signingIn.value = false
   }
