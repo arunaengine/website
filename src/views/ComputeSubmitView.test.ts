@@ -911,6 +911,15 @@ describe('run page', () => {
     mounted.app.unmount()
   })
 
+  it('prefills a Bakta run from its template', async () => {
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?template=bakta')
+
+    expect((input(mounted.root, 'placeholder', 'ubuntu:22.04') as unknown as { value: string }).value).toContain('/aruna/bakta-rs@sha256:2bf286e6')
+    expect(content(mounted.root)).toContain('/work/in/db')
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
   it('names an uploaded script by its version on the node it was uploaded to', async () => {
     const mounted = await mount(ComputeSubmitView, '/app/compute/new?template=python')
     await click(button(mounted.root, 'Add output'))
