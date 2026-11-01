@@ -30,6 +30,15 @@ describe('remote object picker', () => {
     expect(content(root)).not.toContain('Show more')
   })
 
+  it('lists no folder marker as a file of its folder', async () => {
+    listBucketObjects.mockResolvedValueOnce({ bucket: 'db', objects: [{ key: 'db/', version_id: 'm' }, { key: 'db/version.json', version_id: 'v' }], prefixes: [] })
+    const { root } = await mountApp(component, { props: { bucket: 'db', nodeId: 'n2' } })
+    await flush()
+
+    const files = nodes(root).filter((node) => node.tag === 'label').map(content)
+    expect(files).toEqual(['version.json'])
+  })
+
   it('selects a file by its name and says how to enable Add', async () => {
     listBucketObjects.mockResolvedValueOnce({ bucket: 'laptop', objects: [{ key: 'genome.fasta', version_id: 'v' }], prefixes: [] })
     const { root } = await mountApp(component, { props: { bucket: 'laptop', nodeId: 'n2' } })

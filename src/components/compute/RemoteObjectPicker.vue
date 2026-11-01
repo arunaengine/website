@@ -38,7 +38,9 @@ async function load(more = false) {
   try {
     const page = await listBucketObjects(props.bucket, { prefix: prefix.value || undefined, delimiter: '/', cursor: more ? cursor.value ?? undefined : undefined }, props.nodeId)
     if (run !== runs) return
-    objects.value = more ? [...objects.value, ...page.objects] : page.objects
+    // A folder's own empty marker object is the folder, not a file in it.
+    const files = page.objects.filter((item) => !item.key.endsWith('/'))
+    objects.value = more ? [...objects.value, ...files] : files
     prefixes.value = more ? [...prefixes.value, ...page.prefixes] : page.prefixes
     cursor.value = page.next_cursor ?? null
     stale.value = Boolean(page.stale_ranges?.length)
