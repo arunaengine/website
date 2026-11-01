@@ -25,6 +25,17 @@ import {
   usageInfo,
 } from './state'
 
+/** Gives each listed node without an address the one the realm publishes, as a visitor sees it. */
+export function withPublicAddresses(realm: RealmInfoResponse): RealmInfoResponse {
+  const published = new Map((realm.public_nodes ?? []).map((entry) => [entry.node_id, entry.api_url]))
+  if (!published.size || !realm.nodes) return realm
+  const nodes = realm.nodes.map((node) => {
+    const url = published.get(node.node_id)
+    return nodeApiBase(node) || !url ? node : { ...node, rest_url: url }
+  })
+  return { ...realm, nodes }
+}
+
 type RealmPart = Pick<UsageResponse, 'realm' | 'metadata_documents'>
 
 // The realm totals last read from a realm node, for one session and realm.
@@ -71,7 +82,7 @@ export async function loadInfo(context = refreshContext()) {
   if (context.client.token) realmReadEpoch.value = context.epoch
   const known = realmInfo.value?.realm_id
   if (info.status === 'fulfilled') nodeInfo.value = info.value
-  if (realm.status === 'fulfilled') realmInfo.value = realm.value
+  if (realm.status === 'fulfilled') realmInfo.value = withPublicAddresses(realm.value)
   const key = usageKey(context)
   const onDesktop = isDesktop()
   if (usage.status !== 'fulfilled') usageInfo.value = null

@@ -190,6 +190,6 @@ export interface RealmNodeInfo {
   placement?: RealmNodePlacement | null
   // Latest self-published node document; null until the node publishes one.
   info?: RealmNodePublishedInfo | null
-  /** @deprecated older field, never served by current backends */
+  /** Not served by current backends; the portal fills it from `public_nodes` for visitors. */
   rest_url?: string | null
 }

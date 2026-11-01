@@ -49,6 +49,23 @@ describe('signed-out reads', () => {
   })
 })
 
+describe('visitor node addresses', () => {
+  it('gives a listed node without an address the one the realm publishes', async () => {
+    const node = { node_id: 'n2', kind: 'server', configured: true, present: true, connection_status: 'connected', info: null }
+    vi.mocked(apiRequest).mockImplementation(async (path) => {
+      if (path === '/system/realm') {
+        return { realm_id: REALM_ID, description: 'd', nodes: [node], oidc_providers: [], public_nodes: [{ node_id: 'n2', api_url: 'https://api.node-2.example.org' }] }
+      }
+      throw new ApiError(404, 'Not found')
+    })
+    state.authToken.value = ''
+    await loadInfo()
+    state.nodeInfo.value = null
+    expect(state.realmInfo.value?.nodes[0]?.rest_url).toBe('https://api.node-2.example.org')
+    expect(state.nodeClient('n2').baseUrl).toBe('https://api.node-2.example.org/api/v1')
+  })
+})
+
 describe('realm name', () => {
   it('shows the federation name instead of the description', async () => {
     serve(signed(' Realm A '))

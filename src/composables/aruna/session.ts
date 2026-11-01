@@ -4,7 +4,7 @@ import { errorMessage } from '@/lib/utils'
 import { loadMetadata, resetRecentOrderProbe } from './catalog'
 import { bootstrapGate, closeGate, openGate, pendingGate } from './restoreGate'
 import { loadAuthenticated } from './identity'
-import { loadInfo } from './realm'
+import { loadInfo, withPublicAddresses } from './realm'
 import {
   apiBaseKey,
   apiBaseUrl,
@@ -117,7 +117,7 @@ async function restoreToken(context: ReturnType<typeof refreshContext>, restored
   try {
     const realm = await apiRequest<RealmInfoResponse>('/system/realm', {}, { baseUrl: context.client.baseUrl })
     if (context.epoch !== sessionEpoch.value) return
-    realmInfo.value = realm
+    realmInfo.value = withPublicAddresses(realm)
     const moved = carried?.baseUrl === context.client.baseUrl && carried.realm.realm_id === realm.realm_id ? carried : null
     const held = moved && (await trustedBase(moved.baseUrl, moved.realm)) ? moved.token : ''
     if (context.epoch !== sessionEpoch.value) return
