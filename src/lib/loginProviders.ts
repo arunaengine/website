@@ -4,19 +4,23 @@
 import lifescienceLogo from '@/assets/brand/providers/ls-ri.webp'
 import gfbioLogo from '@/assets/brand/providers/gfbio.webp'
 import nfdiLogo from '@/assets/brand/providers/iam4nfdi.webp'
+import gfbioLight from '@/assets/brand/providers/gfbio-light.webp'
+import nfdiLight from '@/assets/brand/providers/iam4nfdi-light.webp'
 
 export interface LoginProvider {
   alias: string
   name: string
   description: string
   logo: string
+  // A copy for light backgrounds when the logo is drawn in white.
+  logoLight?: string
 }
 
 // ORCID and GitHub come in through LS Login and NFDI AAI, so they are not offered on their own.
 export const LOGIN_PROVIDERS: LoginProvider[] = [
   { alias: 'lifescience', name: 'LifeScience RI', description: 'Life Science Login (LS AAI)', logo: lifescienceLogo },
-  { alias: 'gfbio', name: 'GFBio SSO', description: 'German Federation for Biological Data', logo: gfbioLogo },
-  { alias: 'iam4nfdi', name: 'NFDI AAI', description: 'NFDI and German research institutions', logo: nfdiLogo },
+  { alias: 'gfbio', name: 'GFBio SSO', description: 'German Federation for Biological Data', logo: gfbioLogo, logoLight: gfbioLight },
+  { alias: 'iam4nfdi', name: 'NFDI AAI', description: 'NFDI and German research institutions', logo: nfdiLogo, logoLight: nfdiLight },
 ]
 
 /** Only realms whose issuer lives under this domain have the providers above. */

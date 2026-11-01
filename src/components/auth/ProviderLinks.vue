@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Other logins for the same Keycloak account. Keycloak keeps the list; the portal links
 // a login by sending the signed-in person through it once (Keycloak's idp_link action).
+import ProviderLogo from '@/components/auth/ProviderLogo.vue'
 import { computed } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
@@ -33,9 +34,7 @@ const busy = computed(() => stage.value === 'redirecting')
       </p>
       <ul class="divide-y divide-border border-t border-border">
         <li v-for="provider in LOGIN_PROVIDERS" :key="provider.alias" class="flex items-center gap-3 px-5 py-3">
-          <span class="flex h-8 w-14 shrink-0 items-center justify-center rounded bg-zinc-950 px-1 dark:bg-transparent">
-            <img :src="provider.logo" alt="" class="max-h-6 max-w-full object-contain" />
-          </span>
+          <ProviderLogo :logo="provider.logo" :logo-light="provider.logoLight" />
           <div class="min-w-0 flex-1">
             <div class="text-sm font-medium text-foreground">{{ provider.name }}</div>
             <div class="text-xs text-muted-foreground">{{ provider.description }}</div>

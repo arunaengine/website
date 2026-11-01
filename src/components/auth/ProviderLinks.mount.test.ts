@@ -37,6 +37,7 @@ const ProviderLinks = compileClientComponent(new URL('./ProviderLinks.vue', impo
   // A user id of another realm is a session from that realm.
   '@/composables/useFederation': { homeRealmLabel: (id: string) => (id.endsWith('@R') ? null : 'Other realm') },
   '@/lib/loginProviders': loginProviders,
+  '@/components/auth/ProviderLogo.vue': { __esModule: true, default: VueRuntime.defineComponent(() => () => null) },
 })
 
 async function render() {

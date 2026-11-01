@@ -24,6 +24,7 @@ const dialog = compileClientComponent(new URL('./SignInDialog.vue', import.meta.
   '@/composables/signInChoice': { signInChoice },
   '@/composables/useAuth': { useAuth: () => ({ signIn }) },
   '@/lib/loginProviders': loginProviders,
+  '@/components/auth/ProviderLogo.vue': { __esModule: true, default: VueRuntime.defineComponent(() => () => null) },
   '@/assets/brand/icon-mark.avif': { __esModule: true, default: 'icon.avif' },
 })
 

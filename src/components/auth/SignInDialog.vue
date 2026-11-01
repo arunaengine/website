@@ -10,12 +10,13 @@ import { signInChoice } from '@/composables/signInChoice'
 import { useAuth } from '@/composables/useAuth'
 import { LOGIN_PROVIDERS } from '@/lib/loginProviders'
 import iconMark from '@/assets/brand/icon-mark.avif'
+import ProviderLogo from '@/components/auth/ProviderLogo.vue'
 
 const { signIn } = useAuth()
 
 const choices = [
   ...LOGIN_PROVIDERS,
-  { alias: '', name: 'Aruna (legacy)', description: 'Aruna username and password', logo: iconMark },
+  { alias: '', name: 'Aruna (legacy)', description: 'Aruna username and password', logo: iconMark, logoLight: undefined },
 ]
 
 const open = computed({
@@ -48,10 +49,7 @@ function choose(alias: string) {
             class="flex w-full items-center justify-center gap-3 rounded-md border border-border px-4 py-2.5 text-base font-medium text-foreground transition-colors hover:bg-muted/50"
             @click="choose(choice.alias)"
           >
-            <span class="flex h-8 w-14 shrink-0 items-center justify-center overflow-hidden rounded bg-zinc-950 px-1 dark:bg-transparent">
-              <!-- The Aruna mark carries wide padding, so it is drawn larger and cropped by the tile. -->
-              <img :src="choice.logo" alt="" :class="choice.alias ? 'max-h-6 max-w-full object-contain' : 'h-12 max-w-none'" />
-            </span>
+            <ProviderLogo :logo="choice.logo" :logo-light="choice.logoLight" :large="!choice.alias" />
             <span class="w-36 text-left">{{ choice.name }}</span>
           </button>
         </li>
