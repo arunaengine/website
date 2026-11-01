@@ -50,13 +50,13 @@ function linkHere() {
 
 <template>
   <section aria-labelledby="linked-logins-title">
-    <SectionHeading id="linked-logins-title" title="Linked logins" :icon="Link2" info="Removing a login ends its open sessions." />
+    <SectionHeading id="linked-logins-title" title="Logins from other realms" :icon="Link2" info="Removing a login ends its open sessions." />
     <div class="surface overflow-hidden">
     <div v-if="foreign" class="flex flex-wrap items-center justify-between gap-3 p-5">
       <p class="text-sm text-muted-foreground">Have an account here too? Log in to link it.</p>
       <Button size="sm" @click="linkHere">Link to my account here</Button>
     </div>
-    <p v-else-if="!logins.length" class="p-5 text-sm text-muted-foreground">No linked logins.</p>
+    <p v-else-if="!logins.length" class="p-5 text-sm text-muted-foreground">No logins from other realms.</p>
     <ul v-else class="divide-y divide-border">
       <li v-for="entry in logins" :key="entry.login" class="flex flex-wrap items-center gap-3 px-5 py-3">
         <RealmTag :realm-id="entry.realmId" :name="entry.name" />

@@ -281,6 +281,7 @@ const SettingsView = compileClientComponent(new URL('./SettingsView.vue', import
   '@/components/settings/McpConnect.vue': moduleDefault(Empty),
   '@/components/federation/LinkAccount.vue': moduleDefault(Empty),
   '@/components/federation/LinkedLogins.vue': moduleDefault(Empty),
+  '@/components/auth/ProviderLinks.vue': moduleDefault(Empty),
   '@/components/settings/ConnectTools.vue': moduleDefault(labelled('Connect tools section')),
   '@/lib/chunk-recovery': { asyncChunkError: vi.fn() },
 })

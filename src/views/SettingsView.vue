@@ -16,6 +16,7 @@ import SharedLinksPanel from '@/components/settings/SharedLinksPanel.vue'
 import McpConnect from '@/components/settings/McpConnect.vue'
 import LinkAccount from '@/components/federation/LinkAccount.vue'
 import LinkedLogins from '@/components/federation/LinkedLogins.vue'
+import ProviderLinks from '@/components/auth/ProviderLinks.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import { isAssignableProfile, PROFILE_SCOPE_REASON } from '@/lib/profiles/assignable'
 import SectionSkeleton from '@/components/ui/SectionSkeleton.vue'
@@ -432,6 +433,7 @@ const { mode: appearance, setTheme } = useTheme()
           <div v-if="preferredProfile" class="border-t border-border bg-muted/20 px-5 py-3 text-xs text-muted-foreground">Selected: <span class="font-medium text-foreground">{{ preferredProfile.name }}</span><span v-if="profileDirty">, apply with "Save profile" above.</span></div>
           </div>
         </section>
+        <ProviderLinks />
         <LinkedLogins />
       </TabsContent>
 
