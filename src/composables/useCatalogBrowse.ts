@@ -57,6 +57,7 @@ export function useCatalogBrowse() {
     hasCached: (key: string) => cache.scope.value === key && cache.loaded.value,
     /** Serves a fresh window without a request and revalidates a stale one. */
     load: (params: CatalogPageParams, force = false) =>
-      cache.revalidate(keyOf(params), () => listCatalogPage(params), onFailure, force),
+      // The latest change first, so new datasets lead the list instead of the oldest.
+      cache.revalidate(keyOf(params), () => listCatalogPage({ ...params, order: 'recent' }), onFailure, force),
   }
 }
