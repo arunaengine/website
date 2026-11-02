@@ -639,6 +639,14 @@ describe('the final store rules', () => {
     }
   }
 
+  function refuse(name: string) {
+    const setItem = backing.setItem.bind(backing)
+    backing.setItem = (key, value) => {
+      if (key.endsWith(name)) throw new Error('QuotaExceededError')
+      setItem(key, value)
+    }
+  }
+
   it('keeps the stored copy and the change of a chat that no longer fits', () => {
     const store = createAssistantChatStore(user, backing)
     const small = sized('b-1', 10, 1_000)
@@ -649,5 +657,20 @@ describe('the final store rules', () => {
     expect(store.unsavedChats().has('b-1')).toBe(true)
     const stored = createAssistantChatStore(user, backing).load().chats.find((entry) => entry.id === 'b-1')
     expect(stored?.updatedAt).toBe(10)
+  })
+
+  it('does not bring back a moved chat that was deleted while the move was unfinished', () => {
+    const store = createAssistantChatStore(user, backing)
+    backing.setItem(store.key, JSON.stringify({
+      version: 1,
+      state: { activeChatId: 'c-1', chats: [sized('c-1', 20, 10), sized('c-2', 10, 10)] },
+    }))
+    refuse(':chat:c-2')
+
+    const held = store.load()
+    expect(held.chats.map((entry) => entry.id).sort()).toEqual(['c-1', 'c-2'])
+    store.save({ ...held, activeChatId: 'c-2', chats: held.chats.filter((entry) => entry.id !== 'c-1') }, ['c-1'])
+
+    expect(createAssistantChatStore(user, backing).load().chats.map((entry) => entry.id)).toEqual(['c-2'])
   })
 })

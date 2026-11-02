@@ -407,16 +407,32 @@ export function createAssistantChatStore(
       } catch {
         // The newest chat shows instead.
       }
-      // A chat another tab already stored keeps that copy, which may hold a newer answer.
-      const failed = write(state, state.chats.map((chat) => chat.id), true)
-      if (failed.length) return state.chats.filter((chat) => failed.includes(chat.id))
+      // One chat at a time, the old key gives up each chat right before it is stored on its
+      // own, so a chat moved and then deleted cannot come back from it.
+      let left = state.chats
+      for (const chat of state.chats) {
+        const rest = left.filter((entry) => entry.id !== chat.id)
+        if (!keepOld(state.activeChatId, rest)) break
+        // A chat another tab already stored keeps that copy, which may hold a newer answer.
+        if (write({ activeChatId: state.activeChatId, chats: [chat] }, [chat.id], true).length) {
+          keepOld(state.activeChatId, left)
+        } else left = rest
+      }
+      return left
     }
-    try {
-      storage.removeItem(key)
-    } catch {
-      // Every chat is stored per key now; the old key is read again but changes nothing.
-    }
+    keepOld('', [])
     return []
+  }
+
+  /** Rewrites the old key with only the chats not moved yet; false when storage refused it. */
+  function keepOld(activeChatId: string, chats: AssistantChatRecord[]): boolean {
+    try {
+      if (chats.length) storage?.setItem(key, serialize({ version: 1, state: { activeChatId, chats } }) ?? '')
+      else storage?.removeItem(key)
+      return true
+    } catch {
+      return false
+    }
   }
 
   /** The state as this tab holds it; the changed chats are in storage when this returns. */
