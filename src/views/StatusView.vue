@@ -307,19 +307,19 @@ function closeNode() {
       </Notice>
 
       <div class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <OverviewCell label="Nodes" :icon="Server" tone="ok">
+        <OverviewCell label="Nodes" :icon="Server">
           <template #value>{{ onlineCount }}/{{ cardNodes.length }}</template>
           <template #unit>online</template>
           <span v-if="onlineCount === cardNodes.length && cardNodes.length"><CircleCheck class="text-status-ok" />All reachable</span>
           <span v-else-if="cardNodes.length" class="text-status-warn"><TriangleAlert /><b>{{ cardNodes.length - onlineCount }}</b> offline</span>
           <span v-if="metadataCopies"><Copy />{{ metadataCopies }}</span>
         </OverviewCell>
-        <OverviewCell label="Locations" :icon="MapPinned" tone="sky">
+        <OverviewCell label="Locations" :icon="MapPinned">
           <template #value>{{ formatNumber(mappedLocationCount) }}</template>
           <template #unit>{{ mappedLocationCount === 1 ? 'location' : 'locations' }}</template>
           <span v-for="place in locationAggregates.filter((a) => a.mapped).slice(0, 3)" :key="place.location"><MapPinned />{{ place.location }}, <b>{{ place.nodeCount }}</b> {{ place.nodeCount === 1 ? 'node' : 'nodes' }}</span>
         </OverviewCell>
-        <OverviewCell v-if="deviceNodes.length" label="Devices" :icon="Laptop" tone="aqua" info="Devices do not announce themselves; activity is what this node last heard from them.">
+        <OverviewCell v-if="deviceNodes.length" label="Devices" :icon="Laptop" info="Devices do not announce themselves; activity is what this node last heard from them.">
           <template #value>{{ formatNumber(deviceNodes.length) }}</template>
           <template #unit>enrolled</template>
           <span><Activity /><b>{{ activeDevices }}</b> active</span>

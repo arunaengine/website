@@ -354,7 +354,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
               :class="isSelected(profile) ? 'border-primary bg-primary/5' : 'border-transparent'"
               @click="select(profile)"
             >
-              <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" :style="{ backgroundColor: profile.iconColor }">
+              <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
                 <ListChecks class="h-4 w-4" />
               </div>
               <div class="min-w-0 flex-1">
@@ -381,7 +381,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
         <div class="surface p-6">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="flex min-w-0 items-start gap-3">
-              <div class="grid h-12 w-12 shrink-0 place-items-center rounded-xl text-white" :style="{ backgroundColor: selected.iconColor }">
+              <div class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
                 <ListChecks class="h-6 w-6" />
               </div>
               <div class="min-w-0">
@@ -458,11 +458,11 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
           </OverviewCell>
           <!-- "Used by" needs a server-side count: the catalog is paged, so it
                cannot be counted client-side. Hidden until one is served. -->
-          <OverviewCell v-if="selected.usedCount !== undefined" label="Used by" :icon="FileJson2" tone="sky">
+          <OverviewCell v-if="selected.usedCount !== undefined" label="Used by" :icon="FileJson2">
             <template #value>{{ selected.usedCount }}</template>
             <template #unit>datasets</template>
           </OverviewCell>
-          <OverviewCell label="Suggested keywords" :icon="Tag" tone="aqua">
+          <OverviewCell label="Suggested keywords" :icon="Tag">
             <template #value>{{ selected.suggestedKeywords.length }}</template>
             <span v-for="keyword in selected.suggestedKeywords.slice(0, 6)" :key="keyword">#{{ keyword }}</span>
           </OverviewCell>

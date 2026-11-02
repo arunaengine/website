@@ -422,7 +422,7 @@ const { mode: appearance, setTheme } = useTheme()
           <div class="surface">
           <div class="grid gap-2 p-5 sm:grid-cols-2">
             <button v-for="profile in defaultProfiles" :key="profile.id" type="button" class="flex items-start gap-3 rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-primary/40" :class="preferredProfileId === profile.id ? 'border-primary/60 ring-1 ring-primary/30' : ''" @click="preferredProfileId = profile.id">
-              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" :style="{ backgroundColor: profile.iconColor }"><ListChecks class="h-4 w-4" /></span>
+              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground"><ListChecks class="h-4 w-4" /></span>
               <div class="min-w-0 flex-1"><div class="flex items-center gap-2"><span class="text-sm font-medium text-foreground">{{ profile.name }}</span><CircleCheck v-if="preferredProfileId === profile.id" class="size-4 shrink-0 text-status-ok" aria-label="Default" /></div><p class="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{{ profile.description }}</p></div>
             </button>
             <div v-if="!defaultProfiles.length" class="text-sm text-muted-foreground">No profile you can use is visible to you.</div>

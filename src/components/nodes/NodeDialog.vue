@@ -216,10 +216,10 @@ const bucketLink = (hit: BucketSearchHit) => ({
             <template #value>{{ node.info ? formatBytes(node.info.utilization.storage_bytes_used) : 'Unknown' }}</template>
             <span v-if="buckets !== null"><Package /><b>{{ moreBuckets ? 'at least ' : '' }}{{ formatCount(buckets.length) }}</b> {{ buckets.length === 1 ? 'bucket' : 'buckets' }}</span>
           </OverviewCell>
-          <OverviewCell label="CPU" :icon="Cpu" tone="sky" info="The 1-minute load of the node's CPU cores.">
+          <OverviewCell label="CPU" :icon="Cpu" info="The 1-minute load of the node's CPU cores.">
             <template #value>{{ cpu !== null ? `${cpu}%` : 'Unknown' }}</template>
           </OverviewCell>
-          <OverviewCell v-if="recentRuns.state.value !== 'off'" label="Runs" :icon="Workflow" tone="ok" info="Runs among your recent ones that ran on this node.">
+          <OverviewCell v-if="recentRuns.state.value !== 'off'" label="Runs" :icon="Workflow" info="Runs among your recent ones that ran on this node.">
             <template #value>{{ runsLine ? formatCount(runsLine.total) : 'Reading' }}</template>
             <template v-if="runsLine" #unit>recent</template>
             <span v-if="runsLine?.running"><LoaderCircle /><b>{{ formatCount(runsLine.running) }}</b> running</span>

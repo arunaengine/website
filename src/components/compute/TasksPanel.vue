@@ -511,23 +511,23 @@ onUnmounted(() => {
     <section v-if="painted && shellState === 'ready'">
     <SectionHeading title="Overview" :icon="Gauge" />
     <div class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-      <OverviewCell label="Runs" :icon="Workflow" tone="ok" :info="statsNote">
+      <OverviewCell label="Runs" :icon="Workflow" :info="statsNote">
         <template #value>{{ stats.total }}</template>
         <span><CircleCheck class="text-status-ok" /><b>{{ stats.completed }}/{{ stats.total }}</b> completed</span>
       </OverviewCell>
-      <OverviewCell label="Active" :icon="Activity" tone="aqua">
+      <OverviewCell label="Active" :icon="Activity">
         <template #value>{{ stats.active }}</template>
         <span><Hourglass /><b>{{ stats.waiting }}</b> waiting to start</span>
       </OverviewCell>
-      <OverviewCell label="Compute time" :icon="Timer" tone="sky">
+      <OverviewCell label="Compute time" :icon="Timer">
         <template #value>{{ stats.time }}</template>
         <span><Workflow /><b>{{ stats.started }}</b> {{ stats.started === 1 ? 'run' : 'runs' }} started</span>
       </OverviewCell>
-      <OverviewCell v-if="desktop" label="On this computer" :icon="Laptop" tone="royal">
+      <OverviewCell v-if="desktop" label="On this computer" :icon="Laptop">
         <template #value>{{ stats.local }}</template>
         <span><Server /><b>{{ stats.total - stats.local }}</b> in the realm</span>
       </OverviewCell>
-      <OverviewCell v-else label="Nodes used" :icon="Server" tone="royal">
+      <OverviewCell v-else label="Nodes used" :icon="Server">
         <template #value>{{ stats.nodes.length }}</template>
         <span v-for="id in stats.nodes.slice(0, 2)" :key="id" class="min-w-0">
           <Server /><RouterLink :to="{ name: 'node', params: { nodeId: id } }" class="truncate hover:text-foreground hover:underline">{{ displayName(id) }}</RouterLink>
