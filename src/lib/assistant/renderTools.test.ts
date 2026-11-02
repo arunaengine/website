@@ -554,6 +554,17 @@ describe('show_html_figure', () => {
     expect(kept).toEqual([])
   })
 
+  it('refuses a name two figures share even when a larger figure matches it loosely', async () => {
+    const image = (fill: string, size: number) => `<img alt="x" src="data:image/png;base64,${fill.repeat(size)}">`
+    const { tools, kept } = harness(null, {}, `<h2>Coverage</h2>${image('A', 4000)}<h2>Coverage</h2>${image('B', 4000)}<h2>Coverage detail</h2>${image('C', 9000)}`)
+
+    const output = await runTool(tools.show_html_figure, { bucket: 'work', key: 'r.html', figure: 'Coverage' })
+    expect(output).toMatchObject({ figures: [{ id: 'f1' }, { id: 'f2' }] })
+    expect(kept).toEqual([])
+    await runTool(tools.show_html_figure, { bucket: 'work', key: 'r.html', figure: 'Coverage detail' })
+    expect(kept[0][1]).toMatchObject({ artifact: { url: expect.stringContaining('CCCC') } })
+  })
+
   it('shows the figure a report holds and names it', async () => {
     const { tools, kept } = harness()
 

@@ -607,15 +607,21 @@ export function renderTools(host: RenderHost): ToolSet {
           const listed = figures.map((figure, index) => ({ id: `f${index + 1}`, name: cleanValue(figureName(figure), 120) }))
           const wanted = text(input.figure)
           const byId = /^f(\d+)$/i.exec(wanted)
+          // An exact name decides before the loose match; a name several figures share picks none.
+          const exact = listed.filter((entry) => entry.name.toLowerCase() === cleanValue(wanted, 120).toLowerCase())
+          if (!byId && exact.length > 1) {
+            return { error: 'Several figures have that name. Pick one by its id.', figures: exact }
+          }
+          const exactPick = exact.length === 1 ? figures[listed.indexOf(exact[0])] : null
           const picked = byId
             ? figures[Number(byId[1]) - 1] ?? null
-            : wanted ? pickFigure(figures, wanted) : figures.length === 1 ? figures[0] : null
+            : exactPick ?? (wanted ? pickFigure(figures, wanted) : figures.length === 1 ? figures[0] : null)
           if (!picked) {
             return wanted
               ? { error: `No figure matches ${quoted(wanted)}.`, figures: listed }
               : { error: 'Name the figure to show.', figures: listed }
           }
-          // A name several figures share picks none of them; their ids tell them apart.
+          // A loose match onto a name several figures share picks none of them either.
           const shared = byId ? [] : listed.filter((entry) => entry.name === listed[figures.indexOf(picked)]?.name)
           if (shared.length > 1) return { error: 'Several figures have that name. Pick one by its id.', figures: shared }
           const name = figureName(picked)
