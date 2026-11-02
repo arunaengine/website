@@ -51,7 +51,12 @@ const stateLabel = (run: RecentRun) => TES_STATE_META[run.task.state ?? 'UNKNOWN
       <p v-else-if="!shown.length" class="px-5 py-4 text-xs text-muted-foreground">No runs yet.</p>
       <ul v-else class="divide-y divide-border-subtle">
         <li v-for="run in shown" :key="run.task.id" class="flex items-start gap-3 px-5 py-3 hover:bg-muted/40">
-          <StatusMark v-if="run.task.state === 'COMPLETE'" :label="stateLabel(run)" class="mt-0.5" />
+          <StatusMark
+            v-if="run.task.state === 'COMPLETE' || run.task.state === 'EXECUTOR_ERROR' || run.task.state === 'SYSTEM_ERROR'"
+            :failed="run.task.state !== 'COMPLETE'"
+            :label="stateLabel(run)"
+            class="mt-0.5"
+          />
           <StatusPill v-else :state="stateLabel(run)" />
           <div class="min-w-0 flex-1">
             <RouterLink

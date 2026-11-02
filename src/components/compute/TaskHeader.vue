@@ -22,7 +22,11 @@ const label = computed(() => TES_STATE_META[props.state ?? 'UNKNOWN'].label)
       <h2 class="type-section-title break-words">
         {{ title }}
         <span class="ml-1 inline-flex align-[-2px]">
-          <StatusMark v-if="state === 'COMPLETE'" :label="label" />
+          <StatusMark
+            v-if="state === 'COMPLETE' || state === 'EXECUTOR_ERROR' || state === 'SYSTEM_ERROR'"
+            :failed="state !== 'COMPLETE'"
+            :label="label"
+          />
           <StatusPill v-else :state="label" />
         </span>
       </h2>
