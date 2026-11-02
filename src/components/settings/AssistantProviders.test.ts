@@ -132,7 +132,7 @@ const AssistantProviders = compileClientComponent(new URL('./AssistantProviders.
   },
   '@/composables/useUserVault': { useUserVault: () => ({ state: vaultState }) },
   '@/composables/aruna/state': { apiBaseUrl: ref('https://node.test'), authToken: ref('t') },
-  '@/lib/api': { testAssistantProvider },
+  '@/lib/api': { testAssistantProvider, CENTRAL_PROVIDER_ID: 'central' },
   '@/lib/stateBadge': StateBadge,
   '@/lib/utils': { errorMessage },
 })

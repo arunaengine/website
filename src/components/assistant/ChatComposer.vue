@@ -24,7 +24,9 @@ import { useAssistantProfileForm } from '@/composables/useAssistantProfileForm'
 import { useAssistantRunForm } from '@/composables/useAssistantRunForm'
 import { usePageContext } from '@/composables/usePageContext'
 import { useUserVault } from '@/composables/useUserVault'
-import { SendHorizontal, Settings2 } from '@lucide/vue'
+import { useAssistantProviders } from '@/composables/useAssistantProviders'
+import { CENTRAL_PROVIDER_ID } from '@/lib/api'
+import { Gauge, SendHorizontal, Settings2 } from '@lucide/vue'
 
 /** About eight rows; the card scrolls inside itself beyond that. */
 const MAX_HEIGHT = 200
@@ -70,8 +72,17 @@ const unlockOpen = ref(false)
 const keysLocked = computed(() =>
   vaultState.value === 'locked'
   && (!provider.value || (providerId.value !== '' && providerId.value !== provider.value.provider_id)))
+const { central } = useAssistantProviders()
+// Today's realm assistant calls, while it is the chosen provider and has a limit.
+const quota = computed(() => {
+  const setup = central.value
+  if (provider.value?.provider_id !== CENTRAL_PROVIDER_ID || setup?.daily_limit == null) return null
+  const reset = new Date(setup.resets_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return { left: Math.max(setup.daily_limit - setup.used_today, 0), limit: setup.daily_limit, reset }
+})
 const canSend = computed(() =>
-  historyReady.value && !busy.value && Boolean(provider.value) && Boolean(model.value) && Boolean(draft.value.trim()))
+  historyReady.value && !busy.value && Boolean(provider.value) && Boolean(model.value) && Boolean(draft.value.trim())
+  && quota.value?.left !== 0)
 
 function resize() {
   const field = box.value?.$el
@@ -199,7 +210,7 @@ function onKeydown(event: KeyboardEvent) {
         rows="1"
         class="max-h-[12.5rem] min-h-0 resize-none border-0 bg-transparent px-3.5 py-3 font-sans shadow-none focus-visible:border-0 focus-visible:ring-0"
         :class="props.size === 'full' ? 'text-sm' : 'text-xs'"
-        placeholder="Ask the assistant"
+        :placeholder="quota?.left === 0 ? `The realm assistant is back at ${quota.reset}` : 'Ask the assistant'"
         aria-label="Message"
         @keydown="onKeydown"
       />
@@ -220,8 +231,18 @@ function onKeydown(event: KeyboardEvent) {
         </Button>
       </div>
     </div>
-    <p v-if="props.size === 'full'" class="px-1 text-[11px] text-muted-foreground">
-      Enter sends, Shift+Enter starts a new line.
+    <p
+      v-if="props.size === 'full' || quota"
+      class="flex items-center justify-between gap-3 px-1 text-[11px] text-muted-foreground"
+    >
+      <span v-if="props.size === 'full'">Enter sends, Shift+Enter starts a new line.</span>
+      <span
+        v-if="quota"
+        class="ml-auto inline-flex items-center gap-1.5 whitespace-nowrap tabular-nums"
+        :class="quota.left === 0 ? 'text-status-warn' : ''"
+      >
+        <Gauge class="size-3.5" aria-hidden="true" />{{ quota.left }} of {{ quota.limit }} left today
+      </span>
     </p>
     <Dialog :open="unlockOpen" @update:open="(open: boolean) => (unlockOpen = open)">
       <DialogContent class="max-w-md">

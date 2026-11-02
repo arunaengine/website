@@ -38,6 +38,9 @@ const aruna = {
   usageInfo: ref<{ metadata_documents?: number; objects?: number; buckets?: number; stored_bytes?: number; realm?: { buckets: number; distinct_buckets?: number } } | null>(null),
 }
 
+const central = ref<{ daily_limit?: number | null; used_today: number; resets_at: string } | null>(null)
+const realmAssistant: AssistantProvider = { ...openai, provider_id: 'central', label: 'Realm assistant' }
+
 const vaultState = ref<'absent' | 'locked' | 'unlocked' | 'unsupported'>('absent')
 
 const chat = {
@@ -110,6 +113,8 @@ const ChatComposer = compileClientComponent(new URL('./ChatComposer.vue', import
   '@/composables/useRealm': { useRealm: () => ({ realmId: ref('r-1') }) },
   '@/composables/useGroupSelection': { activeGroupId: ref('') },
   '@/composables/useAssistantChat': { useAssistantChat: () => chat },
+  '@/composables/useAssistantProviders': { useAssistantProviders: () => ({ central }) },
+  '@/lib/api': { CENTRAL_PROVIDER_ID: 'central' },
   '@/composables/useAssistantRunForm': { useAssistantRunForm: () => ({ bridge: { value: null } }) },
   '@/composables/useAssistantProfileForm': { useAssistantProfileForm: () => ({ bridge: { value: null } }) },
   '@/composables/useAssistantEditor': { useAssistantEditor: () => ({ bridge: ref(null) }) },
@@ -133,6 +138,7 @@ beforeEach(() => {
   confirmSwitch.mockClear()
   keepCurrent.mockClear()
   vaultState.value = 'absent'
+  central.value = null
   aruna.currentUser.value = null
   aruna.profiles.value = []
   aruna.myGroups.value = []
@@ -142,6 +148,38 @@ beforeEach(() => {
 })
 
 describe('ChatComposer', () => {
+  it('shows the calls left today only for the realm assistant', async () => {
+    central.value = { daily_limit: 50, used_today: 12, resets_at: '2026-11-03T00:00:00Z' }
+    const own = await mountApp(ChatComposer, { props: { size: 'full' } })
+    expect(content(own.root)).not.toContain('left today')
+
+    chat.provider.value = realmAssistant
+    const { root } = await mountApp(ChatComposer, { props: { size: 'full' } })
+
+    expect(content(root)).toContain('38 of 50 left today')
+  })
+
+  it('waits for the reset once the realm assistant is used up', async () => {
+    chat.provider.value = realmAssistant
+    central.value = { daily_limit: 50, used_today: 50, resets_at: '2026-11-03T00:00:00Z' }
+    const reset = new Date('2026-11-03T00:00:00Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const { root } = await mountApp(ChatComposer)
+
+    await typeValue(control(root, 'Message'), 'hi')
+
+    expect(content(root)).toContain('0 of 50 left today')
+    expect(control(root, 'Message').props.placeholder).toBe(`The realm assistant is back at ${reset}`)
+    expect(control(root, 'Send').props.disabled).toBe(true)
+  })
+
+  it('shows no count without a daily limit', async () => {
+    chat.provider.value = realmAssistant
+    central.value = { daily_limit: null, used_today: 3, resets_at: '2026-11-03T00:00:00Z' }
+    const { root } = await mountApp(ChatComposer, { props: { size: 'full' } })
+
+    expect(content(root)).not.toContain('left today')
+  })
+
   it('sends only once a message is typed', async () => {
     const { root } = await mountApp(ChatComposer, { props: { size: 'full' } })
     expect(control(root, 'Send').props.disabled).toBe(true)

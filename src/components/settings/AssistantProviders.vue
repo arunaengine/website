@@ -30,7 +30,7 @@ import { useAssistantChat } from '@/composables/useAssistantChat'
 import { useAssistantProviders, type ProviderStorage } from '@/composables/useAssistantProviders'
 import { useUserVault } from '@/composables/useUserVault'
 import { apiBaseUrl, authToken } from '@/composables/aruna/state'
-import { testAssistantProvider, type AssistantProvider } from '@/lib/api'
+import { CENTRAL_PROVIDER_ID, testAssistantProvider, type AssistantProvider } from '@/lib/api'
 import { toneVariant } from '@/lib/stateBadge'
 import { errorMessage } from '@/lib/utils'
 import { Check, HardDrive, Lock, MoreHorizontal, Pencil, Plug2, Plus, Sparkles, Star, Trash2 } from '@lucide/vue'
@@ -102,6 +102,7 @@ function kindTitle(provider: AssistantProvider): string {
 function where(provider: AssistantProvider): string {
   const storage = storageOf(provider.provider_id)
   if (storage === 'session') return 'This browser session'
+  if (provider.provider_id === CENTRAL_PROVIDER_ID) return 'Set up by the realm admin'
   return storage === 'node' ? 'Sealed on this node' : 'Node'
 }
 
@@ -243,10 +244,14 @@ async function confirmRemove() {
                 >
                   <HardDrive class="size-3.5" /> Move to this browser session
                 </DropdownMenuItem>
-                <DropdownMenuItem :disabled="Boolean(testingId)" @click="test(provider)">
+                <DropdownMenuItem v-if="provider.provider_id !== CENTRAL_PROVIDER_ID" :disabled="Boolean(testingId)" @click="test(provider)">
                   <Plug2 class="size-3.5" /> Test connection
                 </DropdownMenuItem>
-                <DropdownMenuItem class="text-destructive" @click="removingId = provider.provider_id">
+                <DropdownMenuItem
+                  v-if="provider.provider_id !== CENTRAL_PROVIDER_ID"
+                  class="text-destructive"
+                  @click="removingId = provider.provider_id"
+                >
                   <Trash2 class="size-3.5" /> Remove
                 </DropdownMenuItem>
               </DropdownMenuContent>

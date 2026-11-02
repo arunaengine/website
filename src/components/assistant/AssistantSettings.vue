@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CENTRAL_PROVIDER_ID } from '@/lib/api'
 // The provider, model and approval choices, in one popover shared by the
 // composer cogwheel and the model pill in the chat header.
 import { computed } from 'vue'
@@ -89,7 +90,10 @@ const writeChoices = [
             required
             @update:model-value="selectModel"
           />
-          <p class="mt-1 text-[11px] text-muted-foreground">
+          <p v-if="shownProvider === CENTRAL_PROVIDER_ID" class="mt-1 text-[11px] text-muted-foreground">
+            The realm admin chose the models.
+          </p>
+          <p v-else class="mt-1 text-[11px] text-muted-foreground">
             Pick an id, or type one and press Enter. A change applies to the next turn; a chat with history asks first.
           </p>
           <p v-if="modelsError" class="mt-1 text-[11px] text-muted-foreground">{{ modelsError }}</p>

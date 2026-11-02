@@ -208,9 +208,12 @@ onUnmounted(() => listening?.removeEventListener('scroll', measure))
               :has-card="shownCards(message).length > 0"
             />
             <div v-if="message.error" class="flex items-start gap-2">
-              <Notice tone="error" class="min-w-0 flex-1">{{ message.error }}</Notice>
+              <Notice v-if="message.limited" tone="warning" title="Daily limit reached" class="min-w-0 flex-1">
+                {{ message.error }}
+              </Notice>
+              <Notice v-else tone="error" class="min-w-0 flex-1">{{ message.error }}</Notice>
               <Button
-                v-if="message.role === 'assistant' && !props.working"
+                v-if="message.role === 'assistant' && !props.working && !message.limited"
                 variant="outline"
                 size="sm"
                 class="shrink-0"

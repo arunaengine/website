@@ -100,6 +100,7 @@ const AssistantSettings = compileClientComponent(new URL('./AssistantSettings.vu
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/assistant/ModelCombobox.vue': moduleDefault(ComboboxStub),
   '@/composables/useAssistantChat': { useAssistantChat: () => chat },
+  '@/lib/api': { CENTRAL_PROVIDER_ID: 'central' },
   '@/lib/assistant/modelOptions': { effortLabel, isValidModelId, normalizeModelId },
   '@lucide/vue': icons,
 })
