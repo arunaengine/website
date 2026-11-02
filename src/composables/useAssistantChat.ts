@@ -746,6 +746,7 @@ function stopShownTurn(note: string) {
   if (!turn) return
   const message = messagesOf(turn.chatId).find((entry) => entry.id === turn.messageId)
   if (message && !message.error) message.error = note
+  persistChat(turn.chatId)
 }
 
 // ── Background watchers ────────────────────────────────────────────────────

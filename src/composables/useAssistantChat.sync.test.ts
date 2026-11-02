@@ -40,6 +40,7 @@ vi.mock('@/lib/assistant/chat', () => ({
   runTurn: async (options: { messages: Array<{ content: unknown }>; onText: (delta: string) => void }) => {
     const answer = `${String(options.messages.at(-1)?.content)} answered`
     options.onText(answer)
+    if (node.answerGate) await node.answerGate
     return { messages: [{ role: 'assistant', content: answer }], error: null }
   },
 }))
@@ -60,6 +61,7 @@ const node = vi.hoisted(() => ({
   clients: [] as Array<{ baseUrl?: string; token?: string }>,
   listStatus: 200,
   listGate: null as Promise<void> | null,
+  answerGate: null as Promise<void> | null,
   maxTurnChars: Infinity,
   fail: (status: number, message: string): Error => new Error(`${status} ${message}`),
   now: () => new Date().toISOString(),
@@ -302,6 +304,27 @@ describe('pushing', () => {
     } finally {
       node.maxTurnChars = Infinity
     }
+  })
+
+  it('writes the question of a stopped answer with its note', async () => {
+    await login()
+    const id: string = chat.activeChatId.value
+    let release = () => {}
+    node.answerGate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const running = chat.send('stopped question', { route: '/' })
+    await settle(0)
+
+    chat.closePanel()
+    node.answerGate = null
+    release()
+    await running
+    await settle()
+
+    expect(nodeTexts(id)).toEqual(['stopped question', 'stopped question answered'])
+    const stopped = decodeTurn(node.chats.get(id)?.turns.get(0) ?? '')
+    expect(stopped?.messages.at(-1)?.error).toBe('Closing the assistant stopped this answer.')
   })
 
   it('never creates an empty chat on the node', async () => {
