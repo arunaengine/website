@@ -52,11 +52,33 @@ describe('ObjectCard', () => {
     expect(markup).toContain('href="/app/buckets/test" data-bucket="test"')
   })
 
-  it('shortens the version and keeps it whole', async () => {
-    const markup = await render(stored)
+  it('leaves the version and node ids out', async () => {
+    const markup = await render({ ...stored, nodeId: 'b59346e577468dc9710076a7c483fccc1c2fea2a' })
 
-    expect(markup).toContain('01M1NXGE…QDWDS')
-    expect(markup).toContain('title="01M1NXGE23RMY4RFBRBYTQDWDS"')
+    expect(markup).not.toContain('Version')
+    expect(markup).not.toContain('01M1NXGE')
+    expect(markup).not.toContain('b59346e5')
+  })
+
+  it('shows a cut preview below the facts and offers the whole file', async () => {
+    const markup = await render({
+      ...stored,
+      key: 'notes/readme.md',
+      preview: { kind: 'markdown', language: 'markdown', text: '# Lahn samples', truncated: true },
+    })
+
+    expect(markup).toContain('Lahn samples')
+    expect(markup).toContain('Showing the start of the file.')
+    expect(markup).toContain('Open the whole file')
+  })
+
+  it('offers nothing more for a preview that holds the whole file', async () => {
+    const markup = await render({
+      ...stored,
+      preview: { kind: 'markdown', language: 'markdown', text: 'All of it', truncated: false },
+    })
+
+    expect(markup).not.toContain('Showing the start')
   })
 
   it('leaves out every fact it was not given', async () => {

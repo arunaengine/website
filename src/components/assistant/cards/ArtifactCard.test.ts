@@ -2,9 +2,11 @@ import * as VueRuntime from 'vue'
 import { defineComponent, h } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { classifyObject } from '@/composables/useObjectPreview'
+import { firstLines } from '@/lib/assistant/textLines'
 import * as Utils from '@/lib/utils'
 import {
   compileClientComponent,
+  click,
   content,
   element,
   flush,
@@ -30,6 +32,7 @@ const BucketStub = defineComponent({
   props: { bucket: { type: String, default: '' } },
   setup: (props, { slots }) => () => h('a', { 'data-bucket': props.bucket }, slots.default?.()),
 })
+const ButtonStub = defineComponent({ setup: (_, { slots, attrs }) => () => h('button', attrs, slots.default?.()) })
 const SpinnerStub = defineComponent({
   props: { label: { type: String, default: '' } },
   setup: (props) => () => h('span', {}, props.label),
@@ -53,6 +56,8 @@ const ArtifactCard = compileClientComponent(new URL('./ArtifactCard.vue', import
   '@/components/assistant/ObjectLink.vue': moduleDefault(LinkStub),
   '@/components/assistant/BucketLink.vue': moduleDefault(BucketStub),
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
+  '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/lib/assistant/textLines': { firstLines },
   '@/components/ui/Spinner.vue': moduleDefault(SpinnerStub),
   '@/composables/useObjectPreview': { classifyObject },
   '@/lib/assistant/types': { ARTIFACT_TEXT_CAP },
@@ -115,8 +120,9 @@ describe('ArtifactCard', () => {
     expect(image.props.src).toBe('blob:aruna/chart')
     expect(image.props.alt).toBe('chart.png')
     expect(content(root)).toContain('work/results/run-1/chart.png')
-    expect(content(root)).toContain('job-1')
-    expect(content(root)).toContain('image/png')
+    // The footer names the file and its size only.
+    expect(content(root)).not.toContain('job-1')
+    expect(content(root)).not.toContain('image/png')
   })
 
   it('shows the text it was given without fetching', async () => {
@@ -135,6 +141,23 @@ describe('ArtifactCard', () => {
 
     expect(fetchMock).not.toHaveBeenCalled()
     expect(content(root)).toContain('{"reads": 12}')
+  })
+
+  it('shows the first lines of a long text and the rest on request', async () => {
+    const lines = Array.from({ length: 60 }, (_, index) => `line ${index + 1}`)
+    const { root } = await card(artifact({
+      contentType: 'text/plain',
+      previewKind: 'text',
+      name: 'log.txt',
+      key: 'out/log.txt',
+      text: lines.join('\n'),
+    }))
+
+    expect(content(root)).toContain('line 40')
+    expect(content(root)).not.toContain('line 41')
+    await click(element(root, (node) => node.tag === 'button' && content(node).trim() === 'Show more'))
+    expect(content(root)).toContain('line 60')
+    expect(content(root)).toContain('Show less')
   })
 
   it('draws a restored card from its text alone', async () => {

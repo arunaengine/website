@@ -1,13 +1,18 @@
 <script setup lang="ts">
 // A stored object the assistant asked to show: where it lives, how big it is,
 // which version it is, and a link into the data browser.
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import BucketLink from '@/components/assistant/BucketLink.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import ObjectLink from '@/components/assistant/ObjectLink.vue'
 import type { ObjectView } from '@/lib/assistant/types'
-import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
+import { formatBytes, relativeTime } from '@/lib/utils'
 import { Eye, FileText } from '@lucide/vue'
+
+// The viewers pull in CodeMirror or a Markdown renderer, so they load only with a preview.
+const TextPreview = defineAsyncComponent(() => import('@/components/preview/TextPreview.vue'))
+const CsvPreview = defineAsyncComponent(() => import('@/components/preview/CsvPreview.vue'))
+const MarkdownPreview = defineAsyncComponent(() => import('@/components/preview/MarkdownPreview.vue'))
 
 const props = defineProps<{ view: ObjectView }>()
 
@@ -80,21 +85,28 @@ const facts = computed<Fact[]>(() => [
           <dt class="w-16 shrink-0 text-muted-foreground">{{ fact.label }}</dt>
           <dd class="min-w-0 truncate text-foreground/85" :title="fact.at">{{ fact.value }}</dd>
         </div>
-        <div v-if="view.versionId" class="flex items-center gap-2">
-          <dt class="w-16 shrink-0 text-muted-foreground">Version</dt>
-          <dd class="flex min-w-0 items-center gap-1">
-            <span class="hash truncate" :title="view.versionId">{{ truncateMiddle(view.versionId, 8, 5) }}</span>
-            <CopyButton :value="view.versionId" label="Copy the version id" />
-          </dd>
-        </div>
-        <div v-if="view.nodeId" class="flex items-center gap-2">
-          <dt class="w-16 shrink-0 text-muted-foreground">Node</dt>
-          <dd class="flex min-w-0 items-center gap-1">
-            <span class="hash truncate" :title="view.nodeId">{{ truncateMiddle(view.nodeId, 8, 5) }}</span>
-            <CopyButton :value="view.nodeId" label="Copy the node id" />
-          </dd>
-        </div>
       </dl>
+
+      <template v-if="view.preview">
+        <CsvPreview
+          v-if="view.preview.kind === 'table'"
+          :text="view.preview.text"
+          :delimiter="view.preview.language === 'tsv' ? '\t' : ','"
+        />
+        <MarkdownPreview v-else-if="view.preview.kind === 'markdown'" :text="view.preview.text" />
+        <TextPreview v-else :text="view.preview.text" :language="view.preview.language" />
+        <p v-if="view.preview.truncated" class="text-muted-foreground">
+          Showing the start of the file.
+          <ObjectLink
+            :bucket="view.bucket"
+            :object-key="view.key"
+            :name="name"
+            :size="view.size"
+            :node-id="view.nodeId"
+            class="font-medium text-primary hover:underline"
+          >Open the whole file</ObjectLink>
+        </p>
+      </template>
     </div>
   </div>
 </template>

@@ -4,11 +4,13 @@
 import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from 'vue'
 import BucketLink from '@/components/assistant/BucketLink.vue'
 import ImagePreview from '@/components/preview/ImagePreview.vue'
+import Button from '@/components/ui/Button.vue'
 import ObjectLink from '@/components/assistant/ObjectLink.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { classifyObject } from '@/composables/useObjectPreview'
-import { errorMessage, formatBytes, truncateMiddle } from '@/lib/utils'
+import { errorMessage, formatBytes } from '@/lib/utils'
+import { firstLines } from '@/lib/assistant/textLines'
 import { ARTIFACT_TEXT_CAP } from '@/lib/assistant/types'
 import type { ArtifactView } from '@/lib/assistant/types'
 import type { LoadedArtifact } from '@/lib/assistant/renderTools'
@@ -46,11 +48,16 @@ const isHtml = computed(() =>
 const delimiter = computed(() => (props.artifact.key.toLowerCase().endsWith('.tsv') ? '\t' : ','))
 const url = computed(() => loaded.value?.url ?? props.artifact.url)
 const size = computed(() => loaded.value?.size ?? props.artifact.size)
-const contentType = computed(() => loaded.value?.contentType ?? props.artifact.contentType)
 const isDownload = computed(() => kind.value !== 'image' && !isText.value)
 
 // The bytes normally arrive with the card; a card without them reads the URL.
 const text = computed(() => (isText.value ? props.artifact.text ?? loaded.value?.text ?? fetched.value : null))
+// A long text shows its first lines until the reader asks for the rest.
+const expanded = ref(false)
+const shown = computed(() => (text.value === null || expanded.value ? { text: text.value ?? '', cut: false } : firstLines(text.value)))
+// The download row names the size itself; a shown file needs it in the footer.
+const previewed = computed(() => !loading.value && !failed.value && (kind.value === 'image' || isText.value))
+
 // A stored card that has neither its URL nor its text reads the object again.
 const needsObject = computed(() =>
   !props.artifact.url && props.artifact.previewKind !== 'download' && !(isText.value && props.artifact.text !== undefined))
@@ -158,9 +165,18 @@ onBeforeUnmount(() => {
 
       <template v-else-if="isText && !failed">
         <HtmlPreview v-if="text !== null && isHtml" :text="text" :name="artifact.name" />
-        <CsvPreview v-else-if="text !== null && kind === 'table'" :text="text" :delimiter="delimiter" />
-        <MarkdownPreview v-else-if="text !== null && kind === 'markdown'" :text="text" />
-        <TextPreview v-else-if="text !== null" :text="text" :language="classified.language" />
+        <CsvPreview v-else-if="text !== null && kind === 'table'" :text="shown.text" :delimiter="delimiter" />
+        <MarkdownPreview v-else-if="text !== null && kind === 'markdown'" :text="shown.text" />
+        <TextPreview v-else-if="text !== null" :text="shown.text" :language="classified.language" />
+        <Button
+          v-if="text !== null && !isHtml && (shown.cut || expanded)"
+          variant="outline"
+          size="sm"
+          class="h-7 text-[11px]"
+          @click="expanded = !expanded"
+        >
+          {{ expanded ? 'Show less' : 'Show more' }}
+        </Button>
       </template>
 
       <template v-else>
@@ -206,10 +222,7 @@ onBeforeUnmount(() => {
             class="text-primary hover:underline"
           >{{ artifact.key }}</ObjectLink>
         </span>
-        <span v-if="artifact.versionId">version {{ truncateMiddle(artifact.versionId) }}</span>
-        <span v-if="artifact.jobId">job {{ artifact.jobId }}</span>
-        <span v-if="size !== undefined">{{ formatBytes(size) }}</span>
-        <span>{{ contentType }}</span>
+        <span v-if="previewed && size !== undefined" class="whitespace-nowrap">{{ formatBytes(size) }}</span>
       </p>
     </div>
   </div>
