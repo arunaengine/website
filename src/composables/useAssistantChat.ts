@@ -1459,7 +1459,8 @@ function syncChatScope() {
 /** Takes chats another tab added or deleted; the chat on screen and a running one stay as held. */
 function adoptStoredChats() {
   if (!chatStore || !historyReady.value) return
-  const held = new Set([activeChatId.value, activeTurn?.chatId ?? ''])
+  // Neither the chat on screen, a running one, nor one changed here and not stored yet is replaced.
+  const held = new Set([activeChatId.value, activeTurn?.chatId ?? '', ...changedChats, ...chatStore.unsavedChats()])
   const chats = chatStore.load().chats.map((chat) => (held.has(chat.id) ? chatById(chat.id) ?? chat : chat))
   for (const id of held) {
     const chat = chatById(id)

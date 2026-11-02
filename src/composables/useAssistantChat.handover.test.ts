@@ -54,6 +54,8 @@ vi.mock('@/lib/api', async (importOriginal) => ({
 }))
 
 const stored = new Map<string, string>()
+// Keys the browser refuses to store, as on a full storage quota.
+const refused = new Set<string>()
 const storageListeners: Array<(event: { key: string | null }) => void> = []
 vi.stubGlobal('window', {
   history: { length: 2 },
@@ -63,11 +65,16 @@ vi.stubGlobal('window', {
   localStorage: {
     getItem: (key: string) => stored.get(key) ?? null,
     setItem: (key: string, value: string) => {
+      if (refused.has(key)) throw new Error('QuotaExceededError')
       stored.set(key, value)
     },
     removeItem: (key: string) => {
       stored.delete(key)
     },
+    get length() {
+      return stored.size
+    },
+    key: (index: number) => [...stored.keys()][index] ?? null,
   },
 })
 
@@ -309,10 +316,31 @@ describe('another tab', () => {
     const added = { ...newAssistantChat('From the other tab'), id: 'c-tab', updatedAt: 20_000 }
     tab.save({ ...held, chats: [added, ...held.chats.filter((entry) => entry.id !== 'c-new')] }, ['c-tab', 'c-new'])
 
-    for (const listener of storageListeners) listener({ key: `${tab.key}:index` })
+    for (const listener of storageListeners) listener({ key: `${tab.key}:chat:c-tab` })
 
     expect(chat.chats.value.map((entry) => entry.id).sort()).toEqual(['c-old', 'c-tab'])
     expect(chat.activeChatId.value).toBe('c-old')
+  })
+})
+
+describe('a storage event', () => {
+  it('keeps a rename this tab could not store yet', () => {
+    login()
+    const scope = { apiBaseUrl: 'https://node.test', realmId: 'r-1', userId: `u-${users}` }
+    const tab = createAssistantChatStore(scope)
+    refused.add(`${tab.key}:chat:c-new`)
+    try {
+      chat.renameChat('c-new', 'Renamed here')
+      const held = tab.load()
+      tab.save({ ...held, chats: [{ ...newAssistantChat('From the other tab'), id: 'c-tab', updatedAt: 20_000 }, ...held.chats] }, ['c-tab'])
+
+      for (const listener of storageListeners) listener({ key: `${tab.key}:chat:c-tab` })
+
+      expect(chat.chats.value.map((entry) => entry.id)).toContain('c-tab')
+      expect(chat.chats.value.find((entry) => entry.id === 'c-new')?.title).toBe('Renamed here')
+    } finally {
+      refused.clear()
+    }
   })
 })
 
