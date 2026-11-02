@@ -1,25 +1,25 @@
 <script setup lang="ts">
-// A job the assistant asked to show: what state it is in, when it ran, and
-// which stored files it wrote.
+// A job the assistant asked to show: its state, when and where it ran, and
+// the stored files it wrote. Unknown facts are left out.
 import { computed, onMounted, watch } from 'vue'
 import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import { apiBaseUrl, authToken } from '@/composables/aruna/state'
 import Badge from '@/components/ui/Badge.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
-import Spinner from '@/components/ui/Spinner.vue'
 import ObjectLink from '@/components/assistant/ObjectLink.vue'
 import type { JobView } from '@/lib/assistant/types'
-import { jobFacts, jobWatched, liveJob, noteJob } from '@/lib/assistant/jobLive'
+import { jobFacts, jobTiming, jobWatched, liveJob, noteJob, outputSummary } from '@/lib/assistant/jobLive'
 import { getJob } from '@/lib/jobs'
 import { stateVariant } from '@/lib/stateBadge'
-import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
+import { formatDateTime, relativeTime } from '@/lib/utils'
 import { useNow } from '@/composables/useNow'
 import { Cpu } from '@lucide/vue'
 
 const props = defineProps<{ view: JobView }>()
 
-const OUTPUT_CAP = 6
+const OUTPUT_CAP = 3
 const TERMINAL = new Set(['succeeded', 'failed', 'cancelled'])
 
 // A watcher's last poll wins over the facts the card was drawn with, so the
@@ -42,8 +42,6 @@ const stateLabel = computed(() => {
   return value ? value.charAt(0).toUpperCase() + value.slice(1) : 'Unknown'
 })
 
-const shortJob = computed(() => truncateMiddle(props.view.jobId, 8, 5))
-const shortNode = computed(() => truncateMiddle(props.view.nodeId ?? '', 8, 5))
 // One attempt is the normal case and says nothing; more is worth naming.
 const attempts = computed(() => {
   const value = attemptCount.value
@@ -52,16 +50,21 @@ const attempts = computed(() => {
 
 // The clock is read so the labels move on while the card stays on screen.
 const now = useNow()
-const timings = computed(() => {
+const timing = computed(() => jobTiming({
+  state: state.value,
+  submittedAt: props.view.submittedAt,
+  startedAt: live.value?.startedAt || props.view.startedAt,
+  finishedAt: finishedAt.value,
+}))
+const when = computed(() => {
   void now.value
-  return [
-    { label: 'Submitted', at: props.view.submittedAt },
-    { label: 'Started', at: props.view.startedAt },
-    { label: 'Finished', at: finishedAt.value },
-  ].flatMap((entry) => (entry.at ? [{ ...entry, at: entry.at, ago: relativeTime(entry.at) }] : []))
+  const entry = timing.value.when
+  return entry ? { ...entry, text: formatDateTime(entry.at), ago: relativeTime(entry.at) } : null
 })
+const took = computed(() => timing.value.took)
 
 const outputs = computed(() => props.view.outputs.slice(0, OUTPUT_CAP))
+const outputText = computed(() => outputSummary(props.view.outputs))
 
 // A card restored after a reload, or read back from the node, holds the facts
 // from submission; one read brings it up to date. Polling is the watcher's job.
@@ -87,66 +90,49 @@ watch(() => props.view.jobId, readJob)
         class="min-w-0 flex-1 truncate font-medium text-foreground hover:text-primary hover:underline"
         :title="`Open ${view.jobId}`"
       >{{ view.title }}</RouterLink>
-      <Badge v-if="kind" size="sm" variant="secondary">{{ kind }}</Badge>
-      <Spinner v-if="following" label="Following this job" class="shrink-0 text-primary" />
       <Badge size="sm" :variant="stateVariant(state)">{{ stateLabel }}</Badge>
+      <CopyButton :value="view.jobId" label="Copy the job id" />
     </div>
     <div class="space-y-2 px-3 py-2.5">
-      <dl class="space-y-0.5">
-        <div class="flex items-center gap-2">
-          <dt class="w-16 shrink-0 text-muted-foreground">Job id</dt>
-          <dd class="flex min-w-0 items-center gap-1">
-            <RouterLink
-              :to="target"
-              class="hash truncate text-primary hover:underline"
-              :title="view.jobId"
-            >{{ shortJob }}</RouterLink>
-            <CopyButton :value="view.jobId" label="Copy the job id" />
+      <dl v-if="when || took || view.nodeId || view.outputs.length" class="space-y-1">
+        <div v-if="when" class="flex gap-2">
+          <dt class="w-16 shrink-0 text-muted-foreground">{{ when.label }}</dt>
+          <dd class="text-foreground/85" :title="when.at">
+            {{ when.text }} <span class="text-muted-foreground">({{ when.ago }})</span>
           </dd>
         </div>
-        <div v-if="view.nodeId" class="flex items-center gap-2">
-          <dt class="w-16 shrink-0 text-muted-foreground">Node</dt>
-          <dd class="flex min-w-0 items-center gap-1">
-            <span class="hash truncate" :title="view.nodeId">{{ shortNode }}</span>
-            <CopyButton :value="view.nodeId" label="Copy the node id" />
+        <div v-if="took" class="flex gap-2">
+          <dt class="w-16 shrink-0 text-muted-foreground">Took</dt>
+          <dd class="text-foreground/85">{{ took }}</dd>
+        </div>
+        <div v-if="view.nodeId" class="flex gap-2">
+          <dt class="w-16 shrink-0 text-muted-foreground">{{ timing.settled ? 'Ran on' : 'Runs on' }}</dt>
+          <dd class="min-w-0">
+            <RouterLink :to="{ name: 'status', query: { node: view.nodeId } }" class="text-primary hover:underline">
+              <NodeLabel :node-id="view.nodeId" />
+            </RouterLink>
+          </dd>
+        </div>
+        <div v-if="view.outputs.length" class="flex gap-2">
+          <dt class="w-16 shrink-0 text-muted-foreground">Outputs</dt>
+          <dd class="min-w-0 space-y-0.5">
+            <p class="text-foreground/85">{{ outputText }}</p>
+            <ObjectLink
+              v-for="output in outputs"
+              :key="`${output.bucket}/${output.key}`"
+              :bucket="output.bucket"
+              :object-key="output.key"
+              :size="output.size"
+              class="block truncate font-mono text-[11px] text-primary hover:underline"
+              :title="`${output.bucket}/${output.key}`"
+            >{{ output.key }}</ObjectLink>
           </dd>
         </div>
       </dl>
 
-      <p v-if="following" class="text-muted-foreground">Following this job; this card updates on its own.</p>
+      <p v-if="following" class="text-muted-foreground">This card updates on its own.</p>
       <p v-if="attempts" class="text-muted-foreground">{{ attempts }}</p>
-
-      <ul v-if="timings.length" class="space-y-0.5">
-        <li v-for="entry in timings" :key="entry.label" class="flex gap-2">
-          <span class="w-16 shrink-0 text-muted-foreground">{{ entry.label }}</span>
-          <span class="text-foreground/85" :title="entry.at">{{ entry.ago }}</span>
-        </li>
-      </ul>
-
       <Notice v-if="failure" tone="error">{{ failure }}</Notice>
-
-      <div v-if="view.outputs.length">
-        <p class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          {{ view.outputs.length }} {{ view.outputs.length === 1 ? 'output' : 'outputs' }}
-        </p>
-        <ul class="mt-1 space-y-0.5">
-          <li v-for="output in outputs" :key="`${output.bucket}/${output.key}`" class="flex items-baseline gap-2">
-            <ObjectLink
-              :bucket="output.bucket"
-              :object-key="output.key"
-              :size="output.size"
-              class="min-w-0 flex-1 truncate font-mono text-[11px] text-primary hover:underline"
-              :title="`${output.bucket}/${output.key}`"
-            >{{ output.key }}</ObjectLink>
-            <span v-if="output.size !== undefined" class="shrink-0 font-mono text-[10px] text-muted-foreground">
-              {{ formatBytes(output.size) }}
-            </span>
-          </li>
-          <li v-if="view.outputs.length > OUTPUT_CAP" class="text-muted-foreground">
-            and {{ view.outputs.length - OUTPUT_CAP }} more
-          </li>
-        </ul>
-      </div>
     </div>
   </div>
 </template>

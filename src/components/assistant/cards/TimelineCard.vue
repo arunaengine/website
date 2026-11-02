@@ -3,7 +3,7 @@
 // object's versions, or a sync's activity.
 import Badge from '@/components/ui/Badge.vue'
 import type { TimelineView } from '@/lib/assistant/types'
-import { stateTone, stateVariant, toneDot } from '@/lib/stateBadge'
+import { stateVariant } from '@/lib/stateBadge'
 import { relativeTime } from '@/lib/utils'
 import { History } from '@lucide/vue'
 
@@ -25,11 +25,8 @@ function label(state: string): string {
     </div>
     <ol class="scrollbar-thin ml-4 max-h-72 space-y-2.5 overflow-auto border-l border-border/60 py-2.5 pl-3.5 pr-3">
       <li v-for="(event, index) in view.events" :key="index" class="relative">
-        <span
-          class="absolute -left-[1.125rem] top-1 h-2 w-2 rounded-full ring-2 ring-card"
-          :class="event.state ? toneDot(stateTone(event.state)) : 'bg-border'"
-          aria-hidden="true"
-        />
+        <!-- The marker only places the event on the line; its badge carries the state. -->
+        <span class="absolute -left-[1.125rem] top-1 h-2 w-2 rounded-full bg-border ring-2 ring-card" aria-hidden="true" />
         <div class="flex items-baseline gap-2">
           <span class="min-w-0 flex-1 text-foreground/90">{{ event.label }}</span>
           <Badge v-if="event.state" size="sm" :variant="stateVariant(event.state)">{{ label(event.state) }}</Badge>

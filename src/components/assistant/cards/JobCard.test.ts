@@ -24,6 +24,7 @@ async function render(view: JobView): Promise<string> {
       { path: '/app/buckets/:bucketId', name: 'bucket', component: Stub },
       { path: '/app/jobs/:jobId', name: 'job', component: Stub },
       { path: '/app/compute/:taskId', name: 'task', component: Stub },
+      { path: '/app/status', name: 'status', component: Stub },
       { path: '/:rest(.*)', component: Stub },
     ],
   })
@@ -57,6 +58,7 @@ afterEach(() => {
 // The card mounted in the client renderer, so its mount hook runs.
 const Passthrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const LinkStub = defineComponent({ setup: (_, { slots }) => () => h('a', {}, slots.default?.()) })
+const NodeStub = defineComponent({ props: { nodeId: { type: String, default: '' } }, setup: (props) => () => h('span', {}, props.nodeId) })
 const ClientCard = compileClientComponent(new URL('./JobCard.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': { RouterLink: LinkStub },
@@ -64,6 +66,7 @@ const ClientCard = compileClientComponent(new URL('./JobCard.vue', import.meta.u
   '@/components/ui/Badge.vue': moduleDefault(Passthrough),
   '@/components/ui/CopyButton.vue': moduleDefault(Passthrough),
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
+  '@/components/ui/NodeLabel.vue': moduleDefault(NodeStub),
   '@/components/ui/Spinner.vue': moduleDefault(Passthrough),
   '@/components/assistant/ObjectLink.vue': moduleDefault(LinkStub),
   '@/composables/aruna/state': { apiBaseUrl: ref('https://node.test'), authToken: ref('token') },
@@ -86,19 +89,29 @@ describe('JobCard', () => {
 
     expect(markup).toContain('gc analysis')
     expect(markup).toContain('Succeeded')
-    expect(markup).toContain('Submitted')
+    expect(markup).toContain('Finished')
+    expect(markup).not.toContain('Submitted')
     expect(markup).toContain('href="/app/buckets/lorem?prefix=results&amp;object=results%2Fgc_analysis_rerun.json"')
-    expect(markup).toContain('1 output')
+    expect(markup).toContain('1\u00a0file, 82\u00a0B')
   })
 
-  it('shortens both ids, keeps them whole, and links the run page', async () => {
+  it('names where it ran and links the run page without printing the job id', async () => {
     const markup = await render(succeeded)
 
-    expect(markup).toContain('01M1NXNB…3D870')
-    expect(markup).toContain('b59346e5…740a2')
+    expect(markup).toContain('Ran on')
+    expect(markup).toContain(`href="/app/status?node=${NODE}"`)
     expect(markup).toContain(`title="${NODE}"`)
     expect(markup).toContain('href="/app/compute/01M1NXNBTN00030969DSD3D870"')
-    expect(markup).not.toContain(`>${NODE}<`)
+    expect(markup).not.toContain('>01M1NXNB')
+    expect(markup).not.toContain('Execution')
+  })
+
+  it('says how long a settled job took', async () => {
+    const startedAt = new Date(Date.now() - 90_000).toISOString()
+    const markup = await render({ ...succeeded, startedAt, finishedAt: new Date(Date.now() - 30_000).toISOString() })
+
+    expect(markup).toContain('Took')
+    expect(markup).toContain('1m 00s')
   })
 
   it('links a system job to the jobs page', async () => {
@@ -107,26 +120,27 @@ describe('JobCard', () => {
     expect(markup).toContain('href="/app/jobs/01M1NXNBTN00030969DSD3D870"')
   })
 
-  it('spins while a watcher follows the job', async () => {
+  it('says it follows a watched job', async () => {
     // A card drawn at submission must show the state the watcher last polled.
     setWatchedJobs([succeeded.jobId])
     noteJob(succeeded.jobId, { state: 'running', kind: 'execution', attempts: 2 })
     const markup = await render({ ...succeeded, state: 'queued' })
 
     expect(markup).toContain('Running')
-    expect(markup).toContain('Following this job')
+    expect(markup).toContain('This card updates on its own.')
+    expect(markup).toContain('Runs on')
     expect(markup).toContain('2 attempts')
     expect(markup).not.toContain('Queued')
   })
 
-  it('stops spinning once the watched job settles', async () => {
+  it('stops following once the watched job settles', async () => {
     setWatchedJobs([succeeded.jobId])
     noteJob(succeeded.jobId, { state: 'failed', kind: 'execution', error: 'exit code 2' })
     const markup = await render({ ...succeeded, state: 'running' })
 
     expect(markup).toContain('Failed')
     expect(markup).toContain('exit code 2')
-    expect(markup).not.toContain('Following this job')
+    expect(markup).not.toContain('updates on its own')
   })
 
   it('keeps the polled facts after the watch ended', async () => {
@@ -136,7 +150,7 @@ describe('JobCard', () => {
     const markup = await render({ ...succeeded, state: 'running' })
 
     expect(markup).toContain('Succeeded')
-    expect(markup).not.toContain('Following this job')
+    expect(markup).not.toContain('updates on its own')
   })
 
   it('reads the job once when a stale card mounts', async () => {
