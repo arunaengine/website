@@ -283,7 +283,7 @@
     @apply border-border;
   }
   /* The shared table: a 36 px header in 12 px medium muted, no fill, subtle dividers, 44 px rows
-     (56 with .data-table-tall), a hover fill, numbers right-aligned, row actions on hover or focus. */
+     (56 with .data-table-tall), a hover fill, numbers right-aligned. */
   .data-table {
     @apply w-full text-sm leading-5;
   }
@@ -304,13 +304,6 @@
   }
   .data-table :is(th, td).num {
     @apply text-right tabular-nums;
-  }
-  .data-table .row-actions {
-    @apply opacity-0 transition-opacity;
-  }
-  .data-table tr:hover .row-actions,
-  .data-table tr:focus-within .row-actions {
-    @apply opacity-100;
   }
 
   .chip {

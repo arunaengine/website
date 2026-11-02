@@ -310,7 +310,7 @@ function glossaryLink(anchor: string) {
                   <span class="min-w-0">{{ section.title }}</span>
                   <RouterLink
                     :to="{ name: 'docs', params: { topic: topic.slug }, hash: `#${sectionId(section.title)}` }"
-                    class="font-sans text-base font-normal text-muted-foreground opacity-0 transition-opacity hover:text-primary focus-visible:opacity-100 group-hover/section:opacity-100"
+                    class="font-sans text-base font-normal text-muted-foreground/60 transition-colors hover:text-primary"
                     aria-label="Link to this section"
                     >#</RouterLink
                   >

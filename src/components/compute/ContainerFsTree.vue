@@ -532,7 +532,7 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
             {{ marker.secondary }}
           </span>
 
-          <span class="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+          <span class="ml-auto flex shrink-0 items-center gap-0.5">
             <template v-if="!disabled">
               <DropdownMenu v-if="row.isDir">
                 <DropdownMenuTrigger as-child>

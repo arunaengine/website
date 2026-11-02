@@ -103,7 +103,7 @@ function when(updatedAt: number): string {
             <Button
               variant="ghost"
               size="icon-sm"
-              class="shrink-0 opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+              class="shrink-0 text-muted-foreground"
               :aria-label="`Rename ${chat.title}`"
               :title="`Rename ${chat.title}`"
               @click="beginRename(chat.id, chat.title)"
@@ -111,7 +111,7 @@ function when(updatedAt: number): string {
             <Button
               variant="ghost"
               size="icon-sm"
-              class="shrink-0 text-destructive opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+              class="shrink-0 text-muted-foreground hover:text-destructive"
               :aria-label="`Delete ${chat.title}`"
               :title="`Delete ${chat.title}`"
               @click="deleteChat(chat.id)"

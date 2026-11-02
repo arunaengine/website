@@ -14,7 +14,7 @@ const props = defineProps<{
   /** The display name the realm stores now; null when unset. */
   value?: string | null
   save: (name: string | null) => Promise<void>
-  /** Shows the Pencil only while the surrounding `group` is hovered or holds focus. */
+  /** Shows the Pencil in the muted text color. */
   quiet?: boolean
   /** An outline icon button, as it stands among the page header's buttons. */
   outline?: boolean
@@ -57,7 +57,7 @@ async function submit() {
     <IconButton
       :label="`Rename ${name}`"
       :variant="outline ? 'outline' : undefined"
-      :class="quiet ? 'opacity-0 focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100' : undefined"
+      :class="quiet ? 'text-muted-foreground' : undefined"
       @click="start"
     >
       <Pencil :class="outline ? 'size-4' : 'h-3 w-3'" />
