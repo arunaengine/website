@@ -161,11 +161,11 @@ async function submitLocally(draft: TesTask, submission: Submission): Promise<bo
 const HOLDER_PAGES = 10
 
 /** Every node holding a bucket of this name, of one group when given, read to the last page. */
-async function bucketHolders(name: string, groupId?: string): Promise<{ nodes: string[]; partial: boolean; ranges?: DistributedBucket }> {
+async function bucketHolders(name: string, groupId?: string): Promise<{ nodes: string[]; partial: boolean; ranges: DistributedBucket[] }> {
   const nodes = new Set<string>()
   let partial = false
   const sets: BucketSearchHit[] = []
-  let ranges: DistributedBucket | undefined
+  const ranges: DistributedBucket[] = []
   let cursor: string | undefined
   let pages = 0
   do {
@@ -181,7 +181,7 @@ async function bucketHolders(name: string, groupId?: string): Promise<{ nodes: s
   // The search shows a distributed bucket once; its node names every ready member.
   for (const hit of new Map(sets.map((entry) => [entry.set_id, entry])).values()) {
     const status = await getBucketDistribution(name, undefined, isLocalNode(hit.node_id) ? null : hit.node_id)
-    ranges = fromStatus(status)
+    ranges.push(fromStatus(status))
     for (const member of status.members) if (member.state === 'ready' && isTarget(member.node_id)) nodes.add(member.node_id)
   }
   return { nodes: [...nodes], partial, ranges }
@@ -202,11 +202,12 @@ async function listedVersions(bucket: string, prefix: string, nodeId: string) {
 }
 
 /** An input of another node, named by the exact versions it reads there; a folder becomes its files. */
-async function pinInput(input: TesInput, holders: ReadonlyMap<string, readonly string[]>, realmId: string, ranges?: DistributedBucket): Promise<TesInput[]> {
+async function pinInput(input: TesInput, holders: ReadonlyMap<string, readonly string[]>, realmId: string, sets: readonly DistributedBucket[] = []): Promise<TesInput[]> {
   const { bucket, key } = parseS3Url(input.url ?? '')!
   const node = [...(holders.get(bucket) ?? [])].sort()[0]
   if (!node) throw new Error(`No node holds bucket ${bucket}, so the run was not started.`)
-  // A key of a distributed bucket is pinned on the node that holds its range.
+  // A key of a distributed bucket is pinned on the node that holds its range, within the chosen node's set.
+  const ranges = sets.find((set) => set.members.some((member) => member.nodeId === node))
   const holder = (file: { key: string }) => (ranges && keyHolder(ranges, file.key)) || node
   const pinned = (file: { key: string; versionId: string }) => versionObjectId(realmId, holder(file), bucket, file.key, file.versionId)
   if (input.type !== 'DIRECTORY' && !key.endsWith('/')) {

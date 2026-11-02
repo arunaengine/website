@@ -844,6 +844,46 @@ describe('run page', () => {
     mounted.app.unmount()
   })
 
+  it('pins a plain bucket on its own node though a set elsewhere has the same name', async () => {
+    const version = '01K8W1B3D5F7H9KMQ1S3V5X7Z1'
+    searchBuckets.mockImplementation(async (q: string) => ({
+      hits: q === 'refs'
+        ? [{ bucket: q, node_id: 'node-a', group_id: 'other-group' }, { bucket: q, node_id: 'node-c', group_id: 'group-id', set_id: 'set-1' }]
+        : [{ bucket: q, node_id: 'node-b', group_id: 'group-id' }],
+      nodes_failed: 0,
+      next_cursor: null,
+    }))
+    getBucketDistribution.mockResolvedValueOnce({
+      members: [{ member_id: 'm-c', node_id: 'node-c', state: 'ready' }, { member_id: 'm-d', node_id: 'node-d', state: 'ready' }],
+      ranges: [{ range_id: 'r1', lower: '', coordinator: 'm-d', replicas: [] }],
+    })
+    listBucketObjects.mockResolvedValueOnce({ objects: [{ key: 'k12.fna', version_id: version }], next_cursor: null })
+    createTask.mockClear()
+    useSavedRuns().save({
+      id: 'r7', name: 'Same name', savedAt: '2026-10-30T10:00:00Z',
+      task: {
+        name: 'Same name',
+        executors: [{ image: 'alpine:3.20', command: ['cat', '/work/in/k12.fna'] }],
+        inputs: [{ name: 'k12.fna', path: '/work/in/k12.fna', url: 's3://refs/k12.fna', type: 'FILE' }],
+        outputs: [{ url: 's3://results/same/', path: '/work/out/', type: 'DIRECTORY' }],
+      },
+      ask: { inputs: [], results: false },
+    })
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?saved=r7')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+    await click(runButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flush()
+
+    const [submitted] = createTask.mock.calls.at(-1) as unknown as [Tes.TesTask, string]
+    expect(submitted.inputs?.[0]?.url).toBe(ContentIdentity.versionObjectId('realm', 'node-a', 'refs', 'k12.fna', version))
+    searchBuckets.mockReset()
+    searchBuckets.mockImplementation(async (q: string) => ({ hits: [{ bucket: q || 'results', node_id: 'node-id', group_id: 'group-id' }], nodes_failed: 0, next_cursor: null }))
+    useSavedRuns().remove('r7')
+    mounted.app.unmount()
+  })
+
   it('expands a folder of another node into its files, without folder markers', async () => {
     const version = '01K8W1B3D5F7H9KMQ1S3V5X7Z1'
     searchBuckets.mockImplementation(async (q: string) => ({
