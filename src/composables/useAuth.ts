@@ -264,7 +264,9 @@ async function revokeHelper(token: string, baseUrl: string) {
     if (!sid) throw new Error('The helper token names no session.')
     await revoke().catch(revoke)
   } catch (error) {
-    console.warn('aruna-auth: helper session not revoked', { baseUrl, session: sid ?? null, error: errorMessage(error) })
+    // Only the status: a node's error text may echo the bearer.
+    const status = error instanceof ApiError ? error.status : null
+    console.warn('aruna-auth: helper session not revoked', { baseUrl, session: sid ?? null, status })
   }
 }
 

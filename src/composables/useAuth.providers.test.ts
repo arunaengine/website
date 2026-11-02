@@ -202,7 +202,8 @@ describe('completeSignIn after linking', () => {
   })
 
   it('tries the revocation once more, then logs a session left open without its token', async () => {
-    const refused = async () => json({ error: 'busy' }, 503)
+    // The refusal echoes the bearer, as a misbehaving node might.
+    const refused = async () => json({ error: `busy ${realmToken('aruna-a')}` }, 503)
     revokeAnswers = [refused, async () => new Response(null, { status: 204 })]
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     await finish({ kc_action_status: 'success' })
