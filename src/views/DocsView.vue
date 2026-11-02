@@ -324,7 +324,7 @@ function glossaryLink(anchor: string) {
                 <ol v-if="section.steps" class="mt-3 max-w-prose space-y-2 text-sm leading-relaxed text-foreground/85">
                   <li v-for="(step, stepIndex) in section.steps" :key="step" class="flex items-start gap-3">
                     <span
-                      class="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-[11px] font-semibold tabular-nums text-primary"
+                      class="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-xs font-semibold tabular-nums text-primary"
                     >
                       {{ stepIndex + 1 }}
                     </span>
@@ -333,7 +333,7 @@ function glossaryLink(anchor: string) {
                 </ol>
                 <div v-if="section.table" class="mt-3 min-w-0 overflow-x-auto rounded-md border border-border">
                   <table class="w-full min-w-max text-sm">
-                    <thead class="bg-muted/20 text-[11px] text-muted-foreground">
+                    <thead class="bg-muted/20 text-xs text-muted-foreground">
                       <tr>
                         <th v-for="column in section.table.columns" :key="column" class="px-3 py-2 text-left font-semibold">
                           {{ column }}

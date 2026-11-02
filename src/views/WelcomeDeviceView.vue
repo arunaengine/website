@@ -115,7 +115,7 @@ function leave(): void {
             <div>
               <label class="text-xs font-medium text-foreground" for="setup-device-name">Device name</label>
               <Input id="setup-device-name" v-model="deviceName" class="mt-1" placeholder="work-laptop" />
-              <p class="mt-1 text-[11px] text-muted-foreground">
+              <p class="mt-1 text-xs text-muted-foreground">
                 Optional; only how the realm lists this device. Its storage location is set later under This computer.
               </p>
             </div>
@@ -129,7 +129,7 @@ function leave(): void {
 
           <div class="border-t border-border/70 pt-3">
             <Button variant="ghost" size="sm" class="-ml-2" @click="leave">Skip for now</Button>
-            <p class="mt-1 text-[11px] text-muted-foreground">
+            <p class="mt-1 text-xs text-muted-foreground">
               The portal opens without a node of your own. Enroll this device later under This computer.
             </p>
           </div>

@@ -359,11 +359,11 @@ const filesText = computed(() => {
 
       <dl v-if="folder" class="grid gap-3 md:grid-cols-3">
         <div class="surface px-4 py-3">
-          <dt class="text-[10px] text-muted-foreground">On this computer</dt>
+          <dt class="text-xs text-muted-foreground">On this computer</dt>
           <dd class="mt-0.5 truncate font-mono text-xs text-foreground" :title="folder.root">{{ folder.root }}</dd>
         </div>
         <div class="surface px-4 py-3">
-          <dt class="text-[10px] text-muted-foreground">In Aruna</dt>
+          <dt class="text-xs text-muted-foreground">In Aruna</dt>
           <dd class="mt-0.5 truncate text-sm text-foreground">
             <RouterLink v-if="bucketLink" :to="bucketLink" class="inline-flex items-center gap-1 font-medium text-primary hover:underline">
               {{ folder.remote.bucket }}<template v-if="folder.remote.prefix">/{{ folder.remote.prefix }}</template>
@@ -373,7 +373,7 @@ const filesText = computed(() => {
           </dd>
         </div>
         <div class="surface px-4 py-3">
-          <dt class="text-[10px] text-muted-foreground">Files</dt>
+          <dt class="text-xs text-muted-foreground">Files</dt>
           <dd class="mt-0.5 text-sm text-foreground">{{ filesText }}</dd>
         </div>
       </dl>
@@ -430,7 +430,7 @@ const filesText = computed(() => {
                       size="sm"
                     >{{ chipLabel(entry) }}</Badge>
                   </div>
-                  <p class="mt-0.5 text-[11px] leading-relaxed" :class="entry.state === 'error' ? 'text-destructive' : 'text-muted-foreground'">
+                  <p class="mt-0.5 text-xs leading-relaxed" :class="entry.state === 'error' ? 'text-destructive' : 'text-muted-foreground'">
                     {{ progressText(entry.path) || entry.message || entryMeta(entry.state).hint }}
                   </p>
                   <Progress
@@ -442,7 +442,7 @@ const filesText = computed(() => {
                     :critical="101"
                     class="mt-1.5 h-1.5 w-56"
                   />
-                  <div class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[10px] text-muted-foreground">
+                  <div class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-xs text-muted-foreground">
                     <span>here {{ side(entry.local, 'not on this computer') }}</span>
                     <span>Aruna {{ side(entry.remote, 'not there yet') }}</span>
                     <span v-if="entry.conflicted_copy" class="truncate">other copy: {{ entry.conflicted_copy }}</span>

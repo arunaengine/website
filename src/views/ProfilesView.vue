@@ -498,7 +498,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                 <b class="font-semibold text-aruna-navy">{{ entityTypeLabel(entry.rule.type) }}</b>
                 <span v-if="entry.rule.label && entry.rule.label.toLowerCase() !== entityTypeLabel(entry.rule.type).toLowerCase()" class="text-muted-foreground">- {{ entry.rule.label }}</span>
                 <!-- Derived obligation is explained by the property that references this type. -->
-                <span v-if="entry.via" class="text-[11px] text-muted-foreground">via <code class="hash rounded bg-muted px-1 py-0.5 text-foreground/70">{{ entry.via.valueName }}</code></span>
+                <span v-if="entry.via" class="text-xs text-muted-foreground">via <code class="hash rounded bg-muted px-1 py-0.5 text-foreground/70">{{ entry.via.valueName }}</code></span>
               </div>
               <p class="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                 {{ PROFILE_OBLIGATION_LABELS[entry.obligation].label }} entity<template v-if="entry.rule.description">, {{ entry.rule.description }}</template>
@@ -525,7 +525,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                         v-if="rule.propertyUri"
                         :href="rule.propertyUri"
                         :show-icon="false"
-                        class="inline-block max-w-[240px] truncate align-middle font-mono text-[10px] text-muted-foreground/70 hover:text-primary"
+                        class="inline-block max-w-[240px] truncate align-middle font-mono text-xs text-muted-foreground/70 hover:text-primary"
                         :title="rule.propertyUri"
                       />
                     </div>
@@ -536,7 +536,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                     <!-- What else the profile says of the value, as one plain line. -->
                     <p
                       v-if="(rule.kind === 'entity' && rule.entityTypes?.length) || rule.example || rule.enumOptions?.length || constraintSummary(rule).length"
-                      class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] text-muted-foreground"
+                      class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground"
                     >
                       <span v-if="rule.kind === 'entity' && rule.entityTypes?.length">References {{ rule.entityTypes.map(entityTypeLabel).join(', ') }}</span>
                       <span v-if="rule.example" class="font-mono">e.g. {{ rule.example }}</span>

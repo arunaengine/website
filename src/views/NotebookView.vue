@@ -247,7 +247,7 @@ const savedLabel = computed(() => {
             <NotebookSessionBar ref="sessionBar" />
             <Button size="sm" variant="outline" @click="addCell()"><Plus class="size-3.5" /> Add cell</Button>
             <span class="flex-1" />
-            <span class="text-[11px] text-muted-foreground">{{ savedLabel }}</span>
+            <span class="text-xs text-muted-foreground">{{ savedLabel }}</span>
             <NotebookCapture />
             <IconButton v-if="session.ended.value && session.jobId.value" label="Session report" @click="reportOpen = true"><FileText class="size-3.5" /></IconButton>
             <IconButton :label="markdownLocked ? 'Unlock Markdown' : 'Lock Markdown'" :aria-pressed="markdownLocked" @click="markdownLocked = !markdownLocked"><component :is="markdownLocked ? Lock : Unlock" class="size-3.5" /></IconButton>

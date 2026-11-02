@@ -184,7 +184,7 @@ async function allowLogin() {
         </span>
         <div class="min-w-0 leading-tight">
           <p class="truncate text-sm font-semibold text-foreground">{{ homeName || realm.name }}</p>
-          <p class="text-[9px] font-semibold text-muted-foreground">Realm {{ homeId.slice(0, 8) }}</p>
+          <p class="text-xs font-semibold text-muted-foreground">Realm {{ homeId.slice(0, 8) }}</p>
         </div>
       </header>
       <div class="p-5">

@@ -122,7 +122,7 @@ function toEnroll(): void {
               :invalid="failure ? 'error' : insecure ? 'warning' : undefined"
               @keyup.enter="connect"
             />
-            <p class="mt-1 text-[11px] text-muted-foreground">https:// is assumed.</p>
+            <p class="mt-1 text-xs text-muted-foreground">https:// is assumed.</p>
           </div>
 
           <Notice v-if="insecure" tone="warning">
@@ -144,7 +144,7 @@ function toEnroll(): void {
             <Button variant="ghost" size="sm" class="-ml-2" @click="toEnroll">
               <KeyRound class="h-4 w-4" /> I have an enrollment code
             </Button>
-            <p class="mt-1 text-[11px] text-muted-foreground">
+            <p class="mt-1 text-xs text-muted-foreground">
               Enrolls this computer’s node from the code alone.
             </p>
           </div>

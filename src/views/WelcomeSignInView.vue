@@ -33,7 +33,7 @@ onMounted(() => void probeRealm())
       <div class="flex flex-col items-center gap-1">
         <AppLogo :size="26" />
         <p class="hash break-all text-center">{{ origin }}</p>
-        <p v-if="followed" class="max-w-md text-center text-[11px] text-muted-foreground">
+        <p v-if="followed" class="max-w-md text-center text-xs text-muted-foreground">
           Aruna Desktop followed {{ followed }} here: this is one of the realm's management nodes, the only kind
           that signs a device in and enrolls it.
         </p>

@@ -466,7 +466,7 @@ async function submit() {
             <TabsTrigger value="import"><FileUp class="mr-1 size-3.5" /> Import existing</TabsTrigger>
           </TabsList>
           <TabsContent value="create" class="space-y-4">
-            <p v-if="!builder.importSummary" class="text-[11px] text-muted-foreground">
+            <p v-if="!builder.importSummary" class="text-xs text-muted-foreground">
               Starting from an existing profile RO-Crate or a Describo/Crate-O mode file? Switch to
               <button type="button" class="font-medium text-aruna-royal underline-offset-2 hover:underline" @click="startTab = 'import'">Import existing</button>
               above.
@@ -508,25 +508,25 @@ async function submit() {
            than an absent control. -->
       <div v-if="step === 3" class="surface px-3 py-2">
         <div class="text-xs font-medium text-foreground">Publish destination</div>
-        <p class="mt-0.5 text-[11px] text-muted-foreground">
+        <p class="mt-0.5 text-xs text-muted-foreground">
           Where this profile's artifacts (mode.json, schema.json, profile.html, shapes.ttl) are stored.
         </p>
 
         <!-- Group only: nothing is uploaded, so there is no bucket to choose. -->
-        <p v-if="!builder.isPublic" class="mt-2 flex items-start gap-1.5 text-[11px] text-muted-foreground">
+        <p v-if="!builder.isPublic" class="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
           <Lock class="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>This profile stays with its group, so its artifacts travel inside it and no bucket is used.</span>
         </p>
 
         <!-- Public, but nothing to publish with yet; the blocker list above says why. -->
-        <p v-else-if="publishBlocked" class="mt-2 flex items-start gap-1.5 text-[11px] text-muted-foreground">
+        <p v-else-if="publishBlocked" class="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
           <KeyRound class="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>No destination can be chosen until this group can write to S3 storage.</span>
         </p>
 
         <div v-else class="mt-2 grid gap-2 sm:grid-cols-2">
           <div>
-            <label class="text-[11px] font-medium text-muted-foreground">Bucket</label>
+            <label class="text-xs font-medium text-muted-foreground">Bucket</label>
             <Select
               class="mt-1"
               :options="destBucketOptions"
@@ -536,7 +536,7 @@ async function submit() {
             />
           </div>
           <div>
-            <label class="text-[11px] font-medium text-muted-foreground">Prefix</label>
+            <label class="text-xs font-medium text-muted-foreground">Prefix</label>
             <Input
               class="mt-1"
               :model-value="destPrefix"
@@ -547,10 +547,10 @@ async function submit() {
           </div>
         </div>
         <template v-if="builder.isPublic && !publishBlocked">
-          <p class="mt-2 text-[11px] text-muted-foreground">
+          <p class="mt-2 text-xs text-muted-foreground">
             Files go to <code class="text-foreground">{{ destExamplePath }}</code>
           </p>
-          <p class="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
+          <p class="mt-1 text-xs text-amber-800 dark:text-amber-300">
             Everything under this destination becomes publicly readable.
           </p>
         </template>
