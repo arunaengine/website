@@ -174,6 +174,22 @@ describe('useLinkedParts', () => {
     expect(facts.value.get(SET)?.entries?.list[0].download).toBe('https://s3.n3.test/refseq/GCF%201/a.txt')
     scope.stop()
   })
+
+  it('offers no visitor download from a node S3 address that is not HTTP(S)', async () => {
+    const SET = 'https://w3id.org/aruna/data/r/s1/'
+    aruna.authToken.value = ''
+    aruna.getNodeInfo.mockResolvedValueOnce({ services: { interfaces: { s3: { url: 'javascript:alert(1)//x' } } } })
+    aruna.getPartTarget.mockResolvedValue({ id: SET, bucket: 'refseq', prefix: '', set_id: 's1', held_here: false })
+    aruna.searchBuckets.mockResolvedValue({ hits: [{ bucket: 'refseq', set_id: 's1', node_id: 'n3' }] })
+    aruna.listBucketObjects.mockResolvedValue({ bucket: 'refseq', prefixes: [], objects: [{ key: 'a.txt', version_id: 'v', size: 3 }] })
+    const scope = effectScope()
+    const facts = scope.run(() => useLinkedParts(ref([SET]), ref('d1'), () => true))!
+    await settle()
+
+    expect(facts.value.get(SET)?.entries?.list[0].name).toBe('a.txt')
+    expect(facts.value.get(SET)?.entries?.list[0].download).toBeUndefined()
+    scope.stop()
+  })
 })
 
 describe('usePartFolders', () => {

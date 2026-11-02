@@ -133,4 +133,8 @@ describe('publicDownload', () => {
   it('names the file on the node S3 endpoint with each path part encoded', () => {
     expect(publicDownload('https://s3.n2.test/', 'b', 'db/a b#1.txt')).toBe('https://s3.n2.test/b/db/a%20b%231.txt')
   })
+
+  it('offers no download for an endpoint that is not HTTP(S)', () => {
+    expect(publicDownload('javascript:alert(1)//x', 'b', 'a.txt')).toBeNull()
+  })
 })

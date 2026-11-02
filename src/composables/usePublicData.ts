@@ -6,7 +6,7 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { ApiError, type BucketSearchHit } from '@/lib/api'
 import { mergeSets } from '@/lib/distribution'
 import { isHiddenBucket } from '@/lib/workspaces'
-import { errorMessage } from '@/lib/utils'
+import { errorMessage, isHttpUrl } from '@/lib/utils'
 
 export interface PublicFile {
   key: string
@@ -22,8 +22,9 @@ export interface PublicFolder {
   name: string
 }
 
-/** The download of a public file from the S3 endpoint of a node that holds it. */
-export function publicDownload(s3Url: string, bucket: string, key: string): string {
+/** The download of a public file from the S3 endpoint of a node that holds it; null unless HTTP(S). */
+export function publicDownload(s3Url: string, bucket: string, key: string): string | null {
+  if (!isHttpUrl(s3Url)) return null
   return `${s3Url.replace(/\/+$/, '')}/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`
 }
 

@@ -10,6 +10,7 @@ import { objectRoute } from '@/lib/crate/dataIdentity'
 import { browseProblem, browseRoute } from '@/lib/linkedPart'
 import { parseArunaArn } from '@/lib/sync'
 import { drsDownloadHref } from '@/lib/tes'
+import { isHttpUrl } from '@/lib/utils'
 
 export interface PartEntry {
   name: string
@@ -45,8 +46,11 @@ const SHOWN = 10
 
 function downloadHref(where: PartDownload | null | undefined, bucket: string, key: string, version: string) {
   if (!where) return {}
-  if ('s3' in where) return { download: `${where.s3}/${bucket}/${key.split('/').map(encodeURIComponent).join('/')}` }
-  return { download: drsDownloadHref(where.drs, `${where.arn}${key}@${version}`) }
+  const href = 's3' in where
+    ? `${where.s3}/${bucket}/${key.split('/').map(encodeURIComponent).join('/')}`
+    : drsDownloadHref(where.drs, `${where.arn}${key}@${version}`)
+  // A node publishes its own addresses; only HTTP(S) becomes a link.
+  return isHttpUrl(href) ? { download: href } : {}
 }
 
 // One listed level below `prefix`: its folders open in Data, or in place for a visitor.
