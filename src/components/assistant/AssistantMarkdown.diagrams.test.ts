@@ -3,6 +3,8 @@ import { defineComponent, h, ref } from 'vue'
 import MarkdownIt from 'markdown-it'
 import { describe, expect, it, vi } from 'vitest'
 import { compileClientComponent, element, flush, mountApp } from '@/test/clientRender'
+import * as CodeHighlight from '@/lib/codeHighlight'
+import * as CodeLanguage from '@/lib/codeLanguage'
 
 async function mount(render: ReturnType<typeof vi.fn>) {
   const initialize = vi.fn()
@@ -14,6 +16,8 @@ async function mount(render: ReturnType<typeof vi.fn>) {
     '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => null) }),
     '@/lib/assistant/citations': { citations: () => {} },
     '@/lib/assistant/objectLinks': { objectLinks: () => {} },
+    '@/lib/codeLanguage': CodeLanguage,
+    '@/lib/codeHighlight': CodeHighlight,
     '@/composables/usePageContext': { usePageContext: () => ({ currentPage: () => null }) },
     '@/composables/useAssistantObject': { useAssistantObject: () => ({ follow: vi.fn() }) },
     '@/composables/useTheme': { useTheme: () => ({ isDark: ref(true) }) },
@@ -50,6 +54,16 @@ describe('Markdown diagrams', () => {
     await flush()
     expect(view.html()).toContain('<h1>Changed</h1>')
     expect(view.html()).not.toContain('Mermaid diagram')
+    view.app.unmount()
+  })
+
+  it('highlights a fenced code block once its language has loaded', async () => {
+    const view = await mount(vi.fn().mockResolvedValue({ svg: '<svg/>' }))
+    view.text.value = '```json\n{"reads": 12}\n```'
+
+    // The language chunk loads on demand; the block stays plain until it has.
+    await vi.waitFor(() => expect(view.html()).toContain('<pre><code class="language-json"><span class='), { timeout: 30_000 })
+    expect(view.html()).toContain('data-copy')
     view.app.unmount()
   })
 })

@@ -17,8 +17,13 @@ const darkHighlight = HighlightStyle.define([
   { tag: t.invalid, color: '#e06c75' },
 ])
 
+/** The token style for the current theme, shared by editors and chat code blocks. */
+export function highlightStyle(dark: boolean): HighlightStyle {
+  return dark ? darkHighlight : defaultHighlightStyle
+}
+
 export function highlightExtension(dark: boolean): Extension {
-  return syntaxHighlighting(dark ? darkHighlight : defaultHighlightStyle, { fallback: true })
+  return syntaxHighlighting(highlightStyle(dark), { fallback: true })
 }
 
 // The app's font-mono stack (tailwind.config.js) for editor scrollers. Set on

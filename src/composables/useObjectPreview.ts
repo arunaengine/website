@@ -62,6 +62,8 @@ const CODE_LANG: Record<string, string> = {
   r: 'r',
   diff: 'diff', patch: 'diff',
   dockerfile: 'dockerfile',
+  fa: 'fasta', fasta: 'fasta', fna: 'fasta', faa: 'fasta', ffn: 'fasta',
+  fq: 'fastq', fastq: 'fastq',
 }
 
 // A minified JSON object is unreadable on one line, so the preview stores the

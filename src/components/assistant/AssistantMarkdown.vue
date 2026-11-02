@@ -3,6 +3,7 @@ import { computed, ref, useId, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import { citations, type MessageSource } from '@/lib/assistant/citations'
 import { objectLinks } from '@/lib/assistant/objectLinks'
+import { blockLanguage } from '@/lib/codeLanguage'
 import { useTheme } from '@/composables/useTheme'
 import { usePageContext } from '@/composables/usePageContext'
 import { useAssistantObject } from '@/composables/useAssistantObject'
@@ -23,6 +24,9 @@ const props = withDefaults(defineProps<{
 const refId = `ref-${useId()}`
 const { isDark } = useTheme()
 const diagrams = ref<Record<string, { url?: string; error?: string }>>({})
+// Highlighted code blocks by language and code; a block stays plain until its language loads.
+const highlighted = ref<Record<string, string>>({})
+const blockKey = (language: string, code: string) => `${language}\n${code}`
 
 // Prose shorter than this stays open even beside a card.
 const FOLD_ABOVE_CHARS = 400
@@ -62,9 +66,38 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) => {
   const diagram = props.mermaid && token.info.trim() === 'mermaid' ? diagrams.value[token.content] : undefined
   if (diagram?.url) return `<figure class="my-3 overflow-auto"><img src="${diagram.url}" alt="Mermaid diagram" /></figure>`
   const error = diagram?.error ? `<p role="alert">${md.utils.escapeHtml(diagram.error)}</p>` : ''
-  return error + `<div class="assistant-code">${renderFence(tokens, idx, options, env, self)}`
+  const language = blockLanguage(token.info)
+  const code = highlighted.value[blockKey(language, token.content)]
+  const block = code === undefined
+    ? renderFence(tokens, idx, options, env, self)
+    : `<pre><code class="language-${md.utils.escapeHtml(language)}">${code}</code></pre>\n`
+  return error + `<div class="assistant-code">${block}`
     + '<button type="button" data-copy class="assistant-copy">Copy</button></div>'
 }
+
+const codeBlocks = computed(() => {
+  const blocks = new Map<string, { language: string; code: string }>()
+  for (const token of md.parse(props.text, {})) {
+    const language = token.type === 'fence' ? blockLanguage(token.info) : ''
+    if (language && language !== 'mermaid') blocks.set(blockKey(language, token.content), { language, code: token.content })
+  }
+  return [...blocks.values()]
+})
+watch([codeBlocks, isDark], async ([blocks, dark], _previous, onCleanup) => {
+  let active = true
+  onCleanup(() => { active = false })
+  if (!blocks.length) {
+    highlighted.value = {}
+    return
+  }
+  const { highlightHtml } = await import('@/lib/codeHighlight')
+  const next: Record<string, string> = {}
+  for (const block of blocks) {
+    const html = await highlightHtml(block.code, block.language, dark).catch(() => null)
+    if (html !== null) next[blockKey(block.language, block.code)] = html
+  }
+  if (active) highlighted.value = next
+}, { immediate: true })
 
 const diagramSources = computed(() => props.mermaid
   ? [...new Set(md.parse(props.text, {}).filter((token) => token.type === 'fence' && token.info.trim() === 'mermaid').map((token) => token.content))]
@@ -289,13 +322,6 @@ function onClick(event: MouseEvent) {
   padding: 0.1em 0.45em;
   font-size: 0.75em;
   color: hsl(var(--muted-foreground));
-  opacity: 0;
-  transition: opacity 0.12s ease-in-out;
-}
-
-.assistant-markdown :deep(.assistant-code:hover .assistant-copy),
-.assistant-markdown :deep(.assistant-copy:focus-visible) {
-  opacity: 1;
 }
 
 .assistant-markdown :deep(pre) {
