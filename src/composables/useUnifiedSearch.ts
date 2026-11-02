@@ -68,7 +68,15 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
   const groupCursor = ref<string | null>(null)
   const userCursor = ref<string | null>(null)
   const objectCursor = ref<string | null>(null)
-  const objectCoverage = ref<ObjectSearchCoverage | null>(null)
+  // The name search's coverage; the metadata search adds its own failures and pages below.
+  const nameCoverage = ref<ObjectSearchCoverage | null>(null)
+  const metadataPartial = ref(false)
+  const metadataMore = ref(false)
+  const objectCoverage = computed<ObjectSearchCoverage | null>(() => {
+    const coverage = nameCoverage.value
+    if (!coverage || (!metadataPartial.value && !metadataMore.value)) return coverage
+    return { ...coverage, complete: coverage.complete && !metadataPartial.value, truncated: coverage.truncated || metadataMore.value }
+  })
   const objectError = ref<string | null>(null)
   const objectSearched = ref(false)
   const nodesQueried = ref(0)
@@ -126,7 +134,9 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
     objectCursor.value = null
     nameCursor = null
     metadataCursor = null
-    objectCoverage.value = null
+    nameCoverage.value = null
+    metadataPartial.value = false
+    metadataMore.value = false
     objectError.value = null
     objectSearched.value = false
     nodesQueried.value = 0
@@ -165,22 +175,24 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
   function applyObjects(response: { hits: ObjectSearchHit[]; next_cursor?: string | null; coverage: ObjectSearchCoverage }) {
     objects.value = response.hits
     nameCursor = response.next_cursor ?? null
-    objectCoverage.value = response.coverage
+    nameCoverage.value = response.coverage
     syncObjectCursor()
   }
 
-  // An older node may refuse the metadata match; the name hits stand alone then.
-  function metadataPage(term: string, signal: AbortSignal, cursor?: string): Promise<ObjectSearchResponse | null> {
-    return searchObjects(term, { mode: objectMode.value, match: 'metadata', limit, ...(cursor ? { cursor } : {}), signal }).catch(() => null)
+  // An older node may refuse the metadata match; the name hits stand alone then, as a partial answer.
+  function metadataPage(term: string, signal: AbortSignal, cursor?: string): Promise<ObjectSearchResponse | 'failed'> {
+    return searchObjects(term, { mode: objectMode.value, match: 'metadata', limit, ...(cursor ? { cursor } : {}), signal }).catch(() => 'failed' as const)
   }
 
-  function addMetadata(page: ObjectSearchResponse | null) {
-    if (!page) return
+  function addMetadata(page: ObjectSearchResponse | 'failed' | null) {
+    if (page === 'failed') metadataPartial.value = true
+    if (!page || page === 'failed') return
     const id = (hit: ObjectSearchHit) => `${hit.issuer_node_id}/${hit.bucket}/${hit.key}`
     const seen = new Set(objects.value.map(id))
     objects.value = [...objects.value, ...page.hits.filter((hit) => !seen.has(id(hit)))]
     metadataCursor = page.next_cursor ?? null
-    if (objectCoverage.value && !coverageComplete(page.coverage)) objectCoverage.value = { ...objectCoverage.value, complete: false }
+    metadataMore.value = Boolean(metadataCursor)
+    if (!coverageComplete(page.coverage)) metadataPartial.value = true
     syncObjectCursor()
   }
 
@@ -193,7 +205,7 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
       if (!current()) return
       objects.value = [...objects.value, ...response.hits]
       nameCursor = response.next_cursor ?? null
-      objectCoverage.value = response.coverage
+      nameCoverage.value = response.coverage
       syncObjectCursor()
       if (response.hits.length) return
     }
@@ -300,12 +312,12 @@ export function useUnifiedSearch(query: Ref<string>, config: UnifiedSearchConfig
         if (response) {
           objects.value = [...objects.value, ...response.hits]
           nameCursor = response.next_cursor ?? null
-          objectCoverage.value = response.coverage
+          nameCoverage.value = response.coverage
         }
         addMetadata(metadata)
         syncObjectCursor()
         objectError.value = null
-        if (response && !response.hits.length && !metadata?.hits.length) await followObjects(term, () => mySeq === seq && sectionController === pageController, pageController.signal)
+        if (response && !response.hits.length && !(metadata && metadata !== 'failed' && metadata.hits.length)) await followObjects(term, () => mySeq === seq && sectionController === pageController, pageController.signal)
         return
       }
       const response = await searchUnified(term, {

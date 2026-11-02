@@ -252,6 +252,25 @@ describe('unified document coverage', () => {
     await vi.waitFor(() => expect(search.objectSearched.value).toBe(true))
     expect(search.objects.value.map((object) => object.key)).toEqual(['SAMD1.fna'])
     expect(search.objectError.value).toBeNull()
+    expect(search.partial.value).toBe(true)
+    expect(search.objectCoverage.value?.complete).toBe(false)
+  })
+
+  it('keeps a partial metadata answer and its pages through later name pages', async () => {
+    const full = { scope: 'realm', mode: 'distributed_best_effort', complete: true, truncated: false, partitions: [] }
+    const hit = (key: string) => ({ kind: 'object', issuer_node_id: 'node-2', group_id: 'group-a', bucket: 'b', key })
+    mocks.searchObjects
+      .mockResolvedValueOnce({ hits: [hit('a.fna')], next_cursor: 'n2', coverage: { ...full, truncated: true } })
+      .mockResolvedValueOnce({ hits: [hit('b.fna')], next_cursor: null, coverage: full })
+    mocks.searchMetadata.mockResolvedValueOnce({ hits: [hit('c.fna')], next_cursor: 'm2', coverage: { ...full, complete: false } })
+
+    const search = useUnifiedSearch(ref('coli'), { types: [], includeObjects: true })
+    await vi.waitFor(() => expect(search.objectSearched.value).toBe(true))
+    mocks.searchMetadata.mockResolvedValueOnce({ hits: [], next_cursor: 'm3', coverage: full })
+    await search.loadMore('objects')
+
+    expect(search.partial.value).toBe(true)
+    expect(search.objectCoverage.value).toMatchObject({ complete: false, truncated: true })
   })
 
   it('schedules no search for a change while it is not active', async () => {
