@@ -34,6 +34,29 @@ export function looksBinary(bytes: Uint8Array): boolean {
   return control > bytes.length / 20
 }
 
+/** The text of bytes read from the start of a file; a cut read drops its last partial character and line. */
+export function decodeStart(bytes: Uint8Array, complete: boolean): string {
+  const text = new TextDecoder().decode(bytes, { stream: !complete })
+  return !complete && text.includes('\n') ? text.slice(0, text.lastIndexOf('\n')) : text
+}
+
+/** The bytes of a response up to `limit`; the rest of the body is never downloaded. */
+export async function readStart(response: Response, limit: number): Promise<Uint8Array<ArrayBuffer>> {
+  const reader = response.body?.getReader()
+  if (!reader) return new Uint8Array(await response.arrayBuffer()).slice(0, limit)
+  const bytes = new Uint8Array(limit)
+  let length = 0
+  while (length < limit) {
+    const { done, value } = await reader.read()
+    if (done) break
+    const part = value.subarray(0, limit - length)
+    bytes.set(part, length)
+    length += part.length
+  }
+  void reader.cancel().catch(() => undefined)
+  return bytes.slice(0, length)
+}
+
 /**
  * The preview of bytes read from the start of a file. `complete` says the read
  * reached the end; only then is JSON parsed and formatted.
@@ -46,9 +69,7 @@ export function contentPreview(
 ): ContentPreview | null {
   const format = previewFormat(name, contentType)
   if (!format || !bytes.length || looksBinary(bytes)) return null
-  // A cut read may end inside a character or a line; both are dropped.
-  let text = new TextDecoder().decode(bytes, { stream: !complete })
-  if (!complete && text.includes('\n')) text = text.slice(0, text.lastIndexOf('\n'))
+  let text = decodeStart(bytes, complete)
   if (complete && format.language === 'json') text = prettyJson(text).trimEnd()
   const shown = firstLines(text)
   return { ...format, text: shown.text, truncated: shown.cut || !complete }

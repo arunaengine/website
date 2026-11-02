@@ -606,73 +606,83 @@ function artifactNode(
 const INLINE_KINDS = new Set(['image', 'text', 'markdown', 'table'])
 const TEXT_KINDS = new Set(['text', 'markdown', 'table'])
 
-/**
- * Fetches one stored object for an artifact card: a blob URL for bytes small
- * enough to hold in the tab, a presigned link for everything else. The bytes
- * stay in the browser; only the content type and kind go back to the model.
- */
-export async function loadArtifact(ref: ArtifactRef): Promise<LoadedArtifact> {
-  const [{ useS3 }, { classifyObject, prettyJson }] = await Promise.all([
-    import('./useS3'),
-    import('./useObjectPreview'),
-  ])
+// The chat is open away from the data browser too, so this can be the first S3 use of the visit.
+async function readyS3() {
+  const { useS3 } = await import('./useS3')
   const s3 = useS3()
-  // The chat is open away from the data browser too, so this can be the first
-  // S3 use of the visit.
   if (!s3.hasActiveKey.value) {
     const { activeGroupId } = await import('./useGroupSelection')
     if (activeGroupId.value) await s3.ensureSession(activeGroupId.value)
   }
+  return s3
+}
+
+/**
+ * The first `limit` bytes of one stored object, asked for as a range so a large
+ * or misreported object is never downloaded whole, even by a store that ignores ranges.
+ */
+async function readObjectStart(ref: ArtifactRef, limit: number): Promise<{ bytes: Uint8Array<ArrayBuffer>; complete: boolean; type: string }> {
+  const [s3, { readStart }] = await Promise.all([readyS3(), import('@/lib/assistant/contentPreview')])
+  const url = await s3.downloadUrl(ref.bucket, ref.key, artifactNode(s3.resolveObjectUrl, ref), ref.versionId)
+  const response = await fetch(url, { headers: { Range: `bytes=0-${limit - 1}` } })
+  if (!response.ok) throw new Error(`The object could not be fetched (HTTP ${response.status}).`)
+  const bytes = await readStart(response, limit)
+  const total = Number(/\/(\d+)$/.exec(response.headers.get('content-range') ?? '')?.[1] ?? NaN)
+  // A body that ended before the limit is the whole object.
+  const complete = bytes.length < limit || (Number.isFinite(total) && total <= bytes.length)
+  return { bytes, complete, type: response.headers.get('content-type') ?? '' }
+}
+
+/**
+ * Fetches one stored object for an artifact card: a blob URL for an image small
+ * enough to hold in the tab, the start of a text file, or a presigned link for
+ * everything else. `textLimit` reads more of a text file when the reader asks.
+ */
+export async function loadArtifact(ref: ArtifactRef, textLimit?: number): Promise<LoadedArtifact> {
+  const [s3, { classifyObject, prettyJson }, { PREVIEW_BYTES, decodeStart }] = await Promise.all([
+    readyS3(),
+    import('./useObjectPreview'),
+    import('@/lib/assistant/contentPreview'),
+  ])
   const nodeId = artifactNode(s3.resolveObjectUrl, ref)
   const name = ref.filename || ref.key.split('/').pop() || ref.key
   const contentType = ref.contentType || 'application/octet-stream'
   const classified = classifyObject({ key: name, contentType: ref.contentType })
   const oversize = typeof ref.size === 'number' && ref.size > ARTIFACT_CAP
+  const download = async (size?: number): Promise<LoadedArtifact> => ({
+    url: await s3.downloadUrl(ref.bucket, ref.key, nodeId, ref.versionId),
+    contentType,
+    kind: oversize || size !== undefined ? 'download' : classified.kind,
+    name,
+    size: size ?? ref.size,
+  })
 
-  if (oversize || !INLINE_KINDS.has(classified.kind)) {
-    const url = await s3.downloadUrl(ref.bucket, ref.key, nodeId, ref.versionId)
-    return { url, contentType, kind: oversize ? 'download' : classified.kind, name, size: ref.size }
+  if (oversize || !INLINE_KINDS.has(classified.kind)) return download()
+
+  if (!TEXT_KINDS.has(classified.kind)) {
+    const read = await readObjectStart(ref, ARTIFACT_CAP + 1)
+    if (read.bytes.length > ARTIFACT_CAP) return download(ref.size ?? read.bytes.length)
+    const blob = new Blob([read.bytes], { type: ref.contentType || read.type || contentType })
+    const url = URL.createObjectURL(blob)
+    trackArtifact(url)
+    return { url, contentType: ref.contentType || read.type || contentType, kind: classified.kind, name, size: blob.size }
   }
 
-  const blob = await s3.getObjectBlob(ref.bucket, ref.key, nodeId, ref.versionId)
-  if (blob.size > ARTIFACT_CAP) {
-    const url = await s3.downloadUrl(ref.bucket, ref.key, nodeId, ref.versionId)
-    return { url, contentType, kind: 'download', name, size: blob.size }
-  }
-  const url = URL.createObjectURL(blob)
-  trackArtifact(url)
-  // The card reads the text from here: a blob URL cannot be fetched back under
-  // the node's connect-src policy, and the bytes are already in the tab. JSON is
-  // formatted first and capped after, the way the file dialog shows it.
-  const raw = TEXT_KINDS.has(classified.kind) ? await blob.text() : undefined
-  const body = raw === undefined
-    ? undefined
-    : (classified.language === 'json' ? prettyJson(raw) : raw).slice(0, ARTIFACT_TEXT_CAP)
+  // A report is shown as the page it is, so it needs more than the first lines of a text.
+  const html = /\.x?html?$/i.test(name) || contentType.toLowerCase().startsWith('text/html')
+  const limit = Math.min(textLimit ?? (html ? ARTIFACT_TEXT_CAP : PREVIEW_BYTES), ARTIFACT_TEXT_CAP)
+  const read = await readObjectStart(ref, limit)
+  // JSON is formatted only when it was read whole; a cut document is never parsed.
+  const raw = decodeStart(read.bytes, read.complete)
   return {
-    url,
-    contentType: ref.contentType || blob.type || contentType,
+    url: '',
+    contentType: ref.contentType || read.type || contentType,
     kind: classified.kind,
     name,
-    size: blob.size,
-    text: body,
+    size: ref.size ?? (read.complete ? read.bytes.length : undefined),
+    text: (read.complete && classified.language === 'json' ? prettyJson(raw) : raw).slice(0, ARTIFACT_TEXT_CAP),
+    truncated: !read.complete,
   }
-}
-
-// The bytes of a response up to `limit`; the rest of the body is never downloaded.
-async function readStart(response: Response, limit: number): Promise<Uint8Array> {
-  const reader = response.body?.getReader()
-  if (!reader) return new Uint8Array(await response.arrayBuffer()).slice(0, limit)
-  const bytes = new Uint8Array(limit)
-  let length = 0
-  while (length < limit) {
-    const { done, value } = await reader.read()
-    if (done) break
-    const part = value.subarray(0, limit - length)
-    bytes.set(part, length)
-    length += part.length
-  }
-  void reader.cancel().catch(() => undefined)
-  return bytes.slice(0, length)
 }
 
 /**
@@ -680,25 +690,11 @@ async function readStart(response: Response, limit: number): Promise<Uint8Array>
  * formats are not read at all; a failed read leaves the card without one.
  */
 export async function loadPreview(ref: ArtifactRef): Promise<ContentPreview | null> {
-  const [{ useS3 }, { PREVIEW_BYTES, contentPreview, previewFormat }] = await Promise.all([
-    import('./useS3'),
-    import('@/lib/assistant/contentPreview'),
-  ])
+  const { PREVIEW_BYTES, contentPreview, previewFormat } = await import('@/lib/assistant/contentPreview')
   const name = ref.filename || ref.key.split('/').pop() || ref.key
   if (!previewFormat(name, ref.contentType)) return null
-  const s3 = useS3()
-  if (!s3.hasActiveKey.value) {
-    const { activeGroupId } = await import('./useGroupSelection')
-    if (activeGroupId.value) await s3.ensureSession(activeGroupId.value)
-  }
-  const url = await s3.downloadUrl(ref.bucket, ref.key, artifactNode(s3.resolveObjectUrl, ref), ref.versionId)
-  const response = await fetch(url, { headers: { Range: `bytes=0-${PREVIEW_BYTES - 1}` } })
-  if (!response.ok) return null
-  const bytes = await readStart(response, PREVIEW_BYTES)
-  const ranged = /\/(\d+)$/.exec(response.headers.get('content-range') ?? '')?.[1]
-  const length = response.status === 200 ? response.headers.get('content-length') : null
-  const total = ranged ? Number(ranged) : length ? Number(length) : ref.size
-  return contentPreview(bytes, total !== undefined && total <= bytes.length, name, ref.contentType)
+  const read = await readObjectStart(ref, PREVIEW_BYTES)
+  return contentPreview(read.bytes, read.complete, name, ref.contentType)
 }
 
 /**
@@ -707,19 +703,10 @@ export async function loadPreview(ref: ArtifactRef): Promise<ContentPreview | nu
  * keeps its plots near the end; the markup never reaches the model.
  */
 export async function loadHtml(ref: ArtifactRef): Promise<string> {
-  const [{ useS3 }, { MAX_PREVIEW_HTML }] = await Promise.all([
-    import('./useS3'),
-    import('@/lib/htmlDocument'),
-  ])
-  const s3 = useS3()
-  if (!s3.hasActiveKey.value) {
-    const { activeGroupId } = await import('./useGroupSelection')
-    if (activeGroupId.value) await s3.ensureSession(activeGroupId.value)
-  }
-  const nodeId = artifactNode(s3.resolveObjectUrl, ref)
-  const blob = await s3.getObjectBlob(ref.bucket, ref.key, nodeId, ref.versionId)
-  if (blob.size > ARTIFACT_CAP) throw new Error('That file is too large to read here.')
-  return (await blob.text()).slice(0, MAX_PREVIEW_HTML)
+  const { MAX_PREVIEW_HTML } = await import('@/lib/htmlDocument')
+  const read = await readObjectStart(ref, ARTIFACT_CAP + 1)
+  if (read.bytes.length > ARTIFACT_CAP) throw new Error('That file is too large to read here.')
+  return new TextDecoder().decode(read.bytes).slice(0, MAX_PREVIEW_HTML)
 }
 
 // The registry facts a dataset card shows; a group is named only when the caller knows it.

@@ -10,6 +10,7 @@ import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { classifyObject } from '@/composables/useObjectPreview'
 import { errorMessage, formatBytes, isHttpUrl } from '@/lib/utils'
+import { decodeStart, readStart } from '@/lib/assistant/contentPreview'
 import { firstLines } from '@/lib/assistant/textLines'
 import { ARTIFACT_TEXT_CAP } from '@/lib/assistant/types'
 import type { ArtifactView } from '@/lib/assistant/types'
@@ -53,9 +54,13 @@ const size = computed(() => loaded.value?.size ?? props.artifact.size)
 const isDownload = computed(() => kind.value !== 'image' && !isText.value)
 
 // The bytes normally arrive with the card; a card without them reads the URL.
-const text = computed(() => (isText.value ? props.artifact.text ?? loaded.value?.text ?? fetched.value : null))
-// A long text shows its first lines until the reader asks for the rest.
+const text = computed(() => (isText.value ? more.value?.text ?? props.artifact.text ?? loaded.value?.text ?? fetched.value : null))
+// A long text shows its first lines until the reader asks for the rest; a cut
+// read fetches more of the file only then.
 const expanded = ref(false)
+const more = ref<{ text: string; truncated: boolean } | null>(null)
+const readingMore = ref(false)
+const truncated = computed(() => more.value?.truncated ?? loaded.value?.truncated ?? props.artifact.truncated ?? false)
 const shown = computed(() => (text.value === null || expanded.value ? { text: text.value ?? '', cut: false } : firstLines(text.value)))
 // The download row names the size itself; a shown file needs it in the footer.
 const previewed = computed(() => !loading.value && !failed.value && (kind.value === 'image' || isText.value))
@@ -74,11 +79,11 @@ async function readText(target: string) {
   failed.value = null
   fetched.value = null
   try {
-    const response = await fetch(target)
+    const response = await fetch(target, { headers: { Range: `bytes=0-${ARTIFACT_TEXT_CAP - 1}` } })
     if (!response.ok) throw new Error(`This file could not be read (HTTP ${response.status}).`)
-    const body = await response.text()
+    const bytes = await readStart(response, ARTIFACT_TEXT_CAP)
     if (id !== readId) return
-    fetched.value = body.length > ARTIFACT_TEXT_CAP ? body.slice(0, ARTIFACT_TEXT_CAP) : body
+    fetched.value = decodeStart(bytes, bytes.length < ARTIFACT_TEXT_CAP)
   } catch (cause) {
     if (id === readId) failed.value = errorMessage(cause)
   } finally {
@@ -113,6 +118,29 @@ async function readObject() {
   }
 }
 
+async function toggleMore() {
+  expanded.value = !expanded.value
+  if (!expanded.value || !truncated.value || more.value || readingMore.value) return
+  const id = readId
+  readingMore.value = true
+  try {
+    const { loadArtifact } = await import('@/composables/useAssistantChat')
+    const result = await loadArtifact({
+      bucket: props.artifact.bucket,
+      key: props.artifact.key,
+      versionId: props.artifact.versionId,
+      contentType: props.artifact.contentType || undefined,
+      filename: props.artifact.name || undefined,
+      size: props.artifact.size,
+    }, ARTIFACT_TEXT_CAP)
+    if (id === readId && result.text !== undefined) more.value = { text: result.text, truncated: Boolean(result.truncated) }
+  } catch (cause) {
+    if (id === readId) failed.value = errorMessage(cause)
+  } finally {
+    readingMore.value = false
+  }
+}
+
 watch(
   () => [props.artifact.url, props.artifact.text, props.artifact.previewKind] as const,
   () => {
@@ -120,6 +148,7 @@ watch(
     release(loaded.value)
     loaded.value = null
     fetched.value = null
+    more.value = null
     failed.value = null
     loading.value = false
     if (needsObject.value) void readObject()
@@ -171,13 +200,14 @@ onBeforeUnmount(() => {
         <MarkdownPreview v-else-if="text !== null && kind === 'markdown'" :text="shown.text" />
         <TextPreview v-else-if="text !== null" :text="shown.text" :language="classified.language" />
         <Button
-          v-if="text !== null && !isHtml && (shown.cut || expanded)"
+          v-if="text !== null && !isHtml && (shown.cut || expanded || truncated)"
           variant="outline"
           size="sm"
           class="h-7 text-[11px]"
-          @click="expanded = !expanded"
+          :disabled="readingMore"
+          @click="toggleMore"
         >
-          {{ expanded ? 'Show less' : 'Show more' }}
+          {{ readingMore ? 'Reading…' : expanded ? 'Show less' : 'Show more' }}
         </Button>
       </template>
 

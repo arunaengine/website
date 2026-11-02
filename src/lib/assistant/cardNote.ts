@@ -81,7 +81,7 @@ function facts(view: RenderView): string {
       ].filter(Boolean).join(', ')
     case 'artifact': {
       const text = view.artifact.text
-      const shown = text === undefined ? 'itself' : firstLines(text).cut ? 'with its first lines' : 'with its whole content'
+      const shown = text === undefined ? 'itself' : firstLines(text).cut || view.artifact.truncated ? 'with its first lines' : 'with its whole content'
       const size = view.artifact.size !== undefined ? `, size ${formatBytes(view.artifact.size)}` : ''
       return `the file ${view.artifact.bucket}/${view.artifact.key} ${shown}${view.caption ? ', a caption' : ''}${size}`
     }

@@ -46,6 +46,16 @@ const { loadArtifact, useAssistantChat, turnRequest } = await import('./useAssis
 
 const scope = { apiBaseUrl: 'https://node.test', realmId: 'r-1', userId: 'u-1' }
 
+// A store that answers a range request with that range, or the whole body when it ignores ranges.
+function serve(body: Uint8Array<ArrayBuffer>, ranges = true) {
+  return vi.fn(async (_url: string, init?: RequestInit) => {
+    const range = /bytes=0-(\d+)/.exec(String((init?.headers as Record<string, string> | undefined)?.Range ?? ''))
+    if (!range || !ranges) return new Response(body, { status: 200 })
+    const part = body.slice(0, Number(range[1]) + 1)
+    return new Response(part, { status: 206, headers: { 'content-range': `bytes 0-${part.length - 1}/${body.length}` } })
+  })
+}
+
 // Two chats written before the composable sees the scope: the older one is the
 // active record, so only selectLatestChat can move the session to the newer.
 function seed() {
@@ -117,6 +127,36 @@ describe('loadArtifact', () => {
     s3.resolveObjectUrl.mockReturnValue(null)
     s3.getObjectBlob.mockClear()
     s3.downloadUrl.mockClear()
+    vi.stubGlobal('fetch', serve(new Uint8Array(1024)))
+  })
+
+  it('reads only the start of a text file and marks it as cut', async () => {
+    const fetchMock = serve(new TextEncoder().encode('line\n'.repeat(10_000)))
+    vi.stubGlobal('fetch', fetchMock)
+    const loaded = await loadArtifact({ bucket: 'work', key: 'logs/run.log', contentType: 'text/plain' })
+
+    expect(s3.getObjectBlob).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledWith('https://s3.node.test/work/object?signature', { headers: { Range: 'bytes=0-16383' } })
+    expect(loaded.truncated).toBe(true)
+    expect(loaded.text?.length).toBeLessThanOrEqual(16_384)
+  })
+
+  it('reads more of a text file only when asked to', async () => {
+    const fetchMock = serve(new TextEncoder().encode('line\n'.repeat(10_000)))
+    vi.stubGlobal('fetch', fetchMock)
+    const loaded = await loadArtifact({ bucket: 'work', key: 'logs/run.log', contentType: 'text/plain' }, 200_000)
+
+    expect(fetchMock).toHaveBeenCalledWith(expect.any(String), { headers: { Range: 'bytes=0-199999' } })
+    expect(loaded.truncated).toBe(false)
+    expect(loaded.text).toBe('line\n'.repeat(10_000))
+  })
+
+  it('never holds an image of unknown size beyond the cap, even when ranges are ignored', async () => {
+    vi.stubGlobal('fetch', serve(new Uint8Array(26 * 1024 * 1024), false))
+    const loaded = await loadArtifact({ bucket: 'work', key: 'results/huge.png', contentType: 'image/png' })
+
+    expect(s3.getObjectBlob).not.toHaveBeenCalled()
+    expect(loaded).toMatchObject({ kind: 'download', url: 'https://s3.node.test/work/object?signature' })
   })
 
   it('holds a small image in the tab as a blob url', async () => {
@@ -127,7 +167,7 @@ describe('loadArtifact', () => {
       size: 1024,
     })
 
-    expect(s3.getObjectBlob).toHaveBeenCalledWith('work', 'results/run-1/chart.png', null, undefined)
+    expect(s3.downloadUrl).toHaveBeenCalledWith('work', 'results/run-1/chart.png', null, undefined)
     expect(loaded).toEqual({
       url: 'blob:aruna/0',
       contentType: 'image/png',
@@ -167,7 +207,7 @@ describe('loadArtifact', () => {
     })
 
     expect(s3.resolveObjectUrl).toHaveBeenCalledWith('https://s3.node.test/work/results/chart.png')
-    expect(s3.getObjectBlob).toHaveBeenCalledWith('work', 'results/chart.png', 'node-2', 'v-3')
+    expect(s3.downloadUrl).toHaveBeenCalledWith('work', 'results/chart.png', 'node-2', 'v-3')
   })
 
   it('keeps a blob url across a chat switch', async () => {

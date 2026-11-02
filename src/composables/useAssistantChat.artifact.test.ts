@@ -21,7 +21,7 @@ URL.revokeObjectURL = vi.fn()
 const { loadArtifact } = await import('@/composables/useAssistantChat')
 
 async function textOf(key: string, body: string, contentType: string): Promise<string | undefined> {
-  s3.getObjectBlob.mockResolvedValueOnce(new Blob([body], { type: contentType }))
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status: 200, headers: { 'content-type': contentType } })))
   const loaded = await loadArtifact({ bucket: 'work', key, contentType })
   return loaded.text
 }

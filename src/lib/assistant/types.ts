@@ -30,6 +30,8 @@ export interface ArtifactView {
   jobId?: string
   /** The file's own text, read from the bytes the tab already holds. */
   text?: string
+  /** True when `text` is only the start of the file. */
+  truncated?: boolean
 }
 
 /** One stored file a job wrote, as list_job_outputs names it. */

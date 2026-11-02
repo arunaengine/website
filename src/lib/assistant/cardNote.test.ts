@@ -52,4 +52,14 @@ describe('cardNote', () => {
 
     expect(note).toBe('Shown to the user as a card: object work/out/summary.json, size 2 KiB, a preview of its first lines.')
   })
+
+  it('says only the start of a cut file is shown', () => {
+    const note = cardNote({
+      kind: 'artifact',
+      title: 'run.log',
+      artifact: { url: '', contentType: 'text/plain', previewKind: 'text', name: 'run.log', bucket: 'work', key: 'run.log', text: 'start', truncated: true },
+    })
+
+    expect(note).toContain('with its first lines')
+  })
 })

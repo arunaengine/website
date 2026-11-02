@@ -3,6 +3,7 @@ import { defineComponent, h } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { classifyObject } from '@/composables/useObjectPreview'
 import { firstLines } from '@/lib/assistant/textLines'
+import * as ContentPreview from '@/lib/assistant/contentPreview'
 import * as Utils from '@/lib/utils'
 import {
   compileClientComponent,
@@ -58,6 +59,7 @@ const ArtifactCard = compileClientComponent(new URL('./ArtifactCard.vue', import
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/lib/assistant/textLines': { firstLines },
+  '@/lib/assistant/contentPreview': ContentPreview,
   '@/components/ui/Spinner.vue': moduleDefault(SpinnerStub),
   '@/composables/useObjectPreview': { classifyObject },
   '@/lib/assistant/types': { ARTIFACT_TEXT_CAP },
@@ -160,6 +162,26 @@ describe('ArtifactCard', () => {
     expect(content(root)).toContain('Show less')
   })
 
+  it('reads more of a cut file only when the reader asks', async () => {
+    loadArtifact.mockResolvedValue({ url: '', contentType: 'text/plain', kind: 'text', name: 'run.log', text: 'start\nrest of the log', truncated: false })
+    const { root } = await card(artifact({
+      contentType: 'text/plain', previewKind: 'text', name: 'run.log', key: 'logs/run.log', text: 'start', truncated: true,
+    }))
+
+    expect(loadArtifact).not.toHaveBeenCalled()
+    await click(element(root, (node) => node.tag === 'button' && content(node).trim() === 'Show more'))
+    await flush()
+
+    expect(loadArtifact).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'work', key: 'logs/run.log' }), ARTIFACT_TEXT_CAP)
+    expect(content(root)).toContain('rest of the log')
+  })
+
+  it('offers no more for a short file read whole', async () => {
+    const { root } = await card(artifact({ contentType: 'text/plain', previewKind: 'text', name: 'a.txt', key: 'a.txt', text: 'all' }))
+
+    expect(content(root)).not.toContain('Show more')
+  })
+
   it('draws a restored card from its text alone', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
@@ -223,7 +245,7 @@ describe('ArtifactCard', () => {
   })
 
   it('reads a json output and shows its text', async () => {
-    const fetchMock = vi.fn(async () => ({ ok: true, text: async () => '{"reads": 12}' }))
+    const fetchMock = vi.fn(async () => new Response('{"reads": 12}', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
     const { root } = await card(artifact({
@@ -234,7 +256,8 @@ describe('ArtifactCard', () => {
       key: 'out/summary.json',
     }))
 
-    expect(fetchMock).toHaveBeenCalledWith('blob:aruna/summary')
+    // The stored address is read in a bounded range, never whole.
+    expect(fetchMock).toHaveBeenCalledWith('blob:aruna/summary', { headers: { Range: `bytes=0-${ARTIFACT_TEXT_CAP - 1}` } })
     expect(content(root)).toContain('{"reads": 12}')
     expect(tag(root, 'img')).toBeUndefined()
   })

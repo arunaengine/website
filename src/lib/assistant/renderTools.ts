@@ -54,6 +54,8 @@ export interface LoadedArtifact {
   size?: number
   /** The text of a readable file, so the card needs no second fetch. */
   text?: string
+  /** True when the text is only the start of the file. */
+  truncated?: boolean
 }
 
 export interface RenderHost {
@@ -682,6 +684,7 @@ export function renderTools(host: RenderHost): ToolSet {
               versionId: versionId || undefined,
               jobId: jobId || undefined,
               text: loaded.text,
+              ...(loaded.truncated ? { truncated: true } : {}),
             },
           }
           host.keep(toolCallId, view)

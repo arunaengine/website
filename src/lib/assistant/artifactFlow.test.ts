@@ -18,6 +18,8 @@ vi.mock('@/composables/useS3', () => ({ useS3: () => s3, s3ErrorMessage: (err: u
 vi.stubGlobal('window', {
   localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {}, length: 0, key: () => null },
 })
+// The store answers the card's range request with the whole small chart.
+vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(2048), { status: 200, headers: { 'content-type': 'image/png' } })))
 URL.createObjectURL = vi.fn(() => 'blob:aruna/chart')
 URL.revokeObjectURL = vi.fn()
 
@@ -117,7 +119,7 @@ describe('a chart from a script run', () => {
     expect(called).toEqual(['list_objects', 'aggregate_objects', 'run_script', 'get_job', 'list_job_outputs'])
     // Only the script submission is a write, so only it is asked about.
     expect(ask).toHaveBeenCalledOnce()
-    expect(s3.getObjectBlob).toHaveBeenCalledWith('work', 'results/run-1/chart.png', 'node-2', 'v-9')
+    expect(s3.downloadUrl).toHaveBeenCalledWith('work', 'results/run-1/chart.png', 'node-2', 'v-9')
     expect(shown).toEqual({ shown: true, card: expect.any(String), content_type: 'image/png', kind: 'image' })
     expect(kept).toEqual([['call-art', {
       kind: 'artifact',
