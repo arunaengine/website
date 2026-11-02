@@ -43,7 +43,7 @@ const props = withDefaults(
 const route = useRoute()
 const { currentUser, profiles, myGroups, discoverableGroups, realmInfo, usageInfo } = useAruna()
 const realmBuckets = useRealmBucketCount(computed(() => usageInfo.value?.realm))
-const { realmId } = useRealm()
+const { realmId, realmDisplayName } = useRealm()
 const { bridge } = useAssistantEditor()
 const { bridge: runForm } = useAssistantRunForm()
 const { bridge: profileForm } = useAssistantProfileForm()
@@ -147,7 +147,9 @@ function identity() {
   const group = activeGroupId.value
   return {
     userId: user.id,
+    userName: user.name || undefined,
     realmId: realmId.value || undefined,
+    realmName: realmDisplayName.value || undefined,
     groupId: group || undefined,
     groupName: group ? myGroups.value.find((entry) => entry.id === group)?.name : undefined,
   }

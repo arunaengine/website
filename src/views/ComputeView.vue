@@ -18,6 +18,8 @@ import { useTes } from '@/composables/useTes'
 import { useJobs } from '@/composables/useJobs'
 import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
+import { providePageContext } from '@/composables/usePageContext'
+import type { PageContext } from '@/lib/assistant/prompt'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import { isDesktop } from '@/lib/desktop'
 import { NotebookPen, Settings, Star, Workflow } from '@lucide/vue'
@@ -60,6 +62,12 @@ const tab = computed(() => {
 const pageTitle = computed(() => {
   if (route.name === 'job') return `System job ${String(route.params.jobId ?? '')}`
   return 'Compute'
+})
+// The open run or system job, so "this run" needs no lookup.
+providePageContext((): PageContext => {
+  if (route.name === 'task') return { kind: 'run', title: '', details: { 'job id': String(route.params.taskId ?? '') } }
+  if (route.name === 'job') return { kind: 'system job', title: '', details: { 'job id': String(route.params.jobId ?? '') } }
+  return { kind: 'compute page', title: '', details: { tab: tab.value } }
 })
 // ?new=1 on the Notebooks tab starts a new notebook once.
 const startNew = computed(() => tab.value === 'notebooks' && route.query.new === '1')

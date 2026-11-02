@@ -98,6 +98,15 @@ describe('systemPrompt', () => {
     )
   })
 
+  it('names the user and the realm beside their ids', () => {
+    const prompt = systemPrompt({
+      route: '/app/buckets',
+      identity: { userId: 'u-1', userName: 'Ada Lovelace', realmId: 'r-1', realmName: 'NFDI realm' },
+    })
+
+    expect(prompt).toContain('the signed-in user is u-1 (Ada Lovelace), the active realm is r-1 (NFDI realm).')
+  })
+
   it('forbids restating what a shown card already says', () => {
     const prompt = systemPrompt({ route: '/app/assistant' })
 

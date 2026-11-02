@@ -53,7 +53,9 @@ export interface RealmContext {
 /** Who the caller is and where they are scoped, so ids never need a lookup. */
 export interface IdentityContext {
   userId: string
+  userName?: string
   realmId?: string
+  realmName?: string
   groupId?: string
   groupName?: string
 }
@@ -213,12 +215,10 @@ function realmLine(realm: RealmContext): string | null {
 }
 
 function identityLine(identity: IdentityContext): string {
-  const parts = [`the signed-in user is ${identity.userId}`]
-  if (identity.realmId) parts.push(`the active realm is ${identity.realmId}`)
-  if (identity.groupId) {
-    const name = identity.groupName ? ` (${identity.groupName})` : ''
-    parts.push(`the active group is ${identity.groupId}${name}`)
-  }
+  const named = (id: string, name?: string) => (name ? `${id} (${name})` : id)
+  const parts = [`the signed-in user is ${named(identity.userId, identity.userName)}`]
+  if (identity.realmId) parts.push(`the active realm is ${named(identity.realmId, identity.realmName)}`)
+  if (identity.groupId) parts.push(`the active group is ${named(identity.groupId, identity.groupName)}`)
   return `Use these ids directly instead of looking them up: ${parts.join(', ')}.`
 }
 

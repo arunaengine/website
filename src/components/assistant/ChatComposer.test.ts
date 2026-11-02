@@ -112,7 +112,7 @@ const ChatComposer = compileClientComponent(new URL('./ChatComposer.vue', import
     useRealmBucketCount: (totals: { value?: { distinct_buckets?: number } | null }) =>
       VueRuntime.computed(() => (totals.value?.distinct_buckets == null ? null : { count: totals.value.distinct_buckets, exact: true })),
   },
-  '@/composables/useRealm': { useRealm: () => ({ realmId: ref('r-1') }) },
+  '@/composables/useRealm': { useRealm: () => ({ realmId: ref('r-1'), realmDisplayName: ref('NFDI realm') }) },
   '@/composables/useGroupSelection': { activeGroupId: ref('') },
   '@/composables/useAssistantChat': { useAssistantChat: () => chat },
   '@/composables/useAssistantProviders': { useAssistantProviders: () => ({ central, centralUnavailable, refreshCentral }) },
@@ -273,7 +273,7 @@ describe('ChatComposer', () => {
   })
 
   it('attaches the realm totals once the user is signed in', async () => {
-    aruna.currentUser.value = { name: 'Ada Lovelace' }
+    aruna.currentUser.value = { id: 'u-1', name: 'Ada Lovelace' }
     // This node holds 2 buckets and no objects; the realm has 9 member buckets, 6 counted once.
     aruna.usageInfo.value = {
       metadata_documents: 12,
@@ -298,6 +298,12 @@ describe('ChatComposer', () => {
       buckets: 6,
       bucketsExact: true,
       storedBytes: 5_000,
+    })
+    expect(send.mock.calls[0][1].identity).toEqual({
+      userId: 'u-1',
+      userName: 'Ada Lovelace',
+      realmId: 'r-1',
+      realmName: 'NFDI realm',
     })
   })
 
