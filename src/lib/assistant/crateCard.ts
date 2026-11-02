@@ -39,8 +39,10 @@ const STATES: Record<string, string> = {
 function knownBytes(files: Array<{ contentSize?: string }>): number | undefined {
   let total = 0
   for (const file of files) {
-    const size = Number(file.contentSize)
-    if (file.contentSize === undefined || !Number.isFinite(size) || size < 0) return undefined
+    // Number('') is 0, so a blank size must be refused before it is converted.
+    const raw = file.contentSize?.trim()
+    const size = raw ? Number(raw) : NaN
+    if (!Number.isFinite(size) || size < 0) return undefined
     total += size
   }
   return files.length ? total : undefined

@@ -115,6 +115,12 @@ describe('datasetCard', () => {
     expect(sizeRow(card)).toEqual({ label: 'Files', value: '2\u00a0files' })
   })
 
+  it('treats a blank size as unknown, not as zero bytes', () => {
+    const card = datasetCard(dataset([{ '@id': 'a.csv', '@type': 'File', contentSize: '1024' }, { '@id': 'b.csv', '@type': 'File', contentSize: ' ' }]))
+
+    expect(card.bytes).toBeUndefined()
+  })
+
   it('names folders instead of a size it cannot know', () => {
     const card = datasetCard(dataset([{ '@id': 'raw/', '@type': 'Dataset' }, { '@id': 'a.csv', '@type': 'File', contentSize: '10' }]))
 
