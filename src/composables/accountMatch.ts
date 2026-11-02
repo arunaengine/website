@@ -74,7 +74,9 @@ export async function joinExistingAccount(): Promise<string | null> {
     })
     check()
     await adoptSession(token, tokens.id_token)
-    if (accountMatch.value === match) accountMatch.value = null
+    // A newer match that arrived meanwhile keeps the choice open, so nothing navigates away.
+    if (accountMatch.value !== match) return null
+    accountMatch.value = null
     return match.redirectTo
   } catch (error) {
     failed(error, mergeFailure)
@@ -97,7 +99,9 @@ export async function createNewAccount(): Promise<string | null> {
     const token = await issueToken(match.oidcToken, baseUrl)
     check()
     await adoptSession(token, match.idToken)
-    if (accountMatch.value === match) accountMatch.value = null
+    // A newer match that arrived meanwhile keeps the choice open, so nothing navigates away.
+    if (accountMatch.value !== match) return null
+    accountMatch.value = null
     return match.redirectTo
   } catch (error) {
     failed(error, apiErrorMessage)

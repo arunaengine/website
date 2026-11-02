@@ -225,6 +225,24 @@ describe('a first sign-in that matches an account', () => {
     expect(matchFailure.value).toBeNull()
   })
 
+  it('keeps a newer match and goes nowhere when it arrives while the session loads', async () => {
+    const newer = { oidcToken: 'newer', redirectTo: '/app/other' }
+    const arrives = async () => {
+      currentUser.value = { id: 'a1@R' }
+      accountMatch.value = newer
+    }
+    await matched()
+    refresh.mockImplementationOnce(arrives)
+    await expect(joinExistingAccount()).resolves.toBeNull()
+    expect(accountMatch.value).toEqual(newer)
+
+    storage.set('aruna.oidc.state', 's1').set('aruna.oidc.verifier', 'v1').set('aruna.oidc.redirect', '/app/data')
+    await matched()
+    refresh.mockImplementationOnce(arrives)
+    await expect(createNewAccount()).resolves.toBeNull()
+    expect(accountMatch.value).toEqual(newer)
+  })
+
   it('ends a new account session with the sign-in it was made for', async () => {
     await matched()
     await expect(createNewAccount()).resolves.toBe('/app/data')
