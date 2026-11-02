@@ -683,6 +683,8 @@ export function renderTools(host: RenderHost): ToolSet {
               key,
               versionId: versionId || undefined,
               jobId: jobId || undefined,
+              ...(text(input.node_id) ? { nodeId: text(input.node_id) } : {}),
+              ...(text(input.endpoint_url) ? { endpointUrl: text(input.endpoint_url) } : {}),
               text: loaded.text,
               ...(loaded.truncated ? { truncated: true } : {}),
             },

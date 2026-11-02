@@ -135,6 +135,8 @@ describe('a chart from a script run', () => {
         key: 'results/run-1/chart.png',
         versionId: 'v-9',
         jobId: 'job-1',
+        nodeId: 'node-2',
+        endpointUrl: 'https://s3.node.test',
       },
     }]])
   })

@@ -102,6 +102,8 @@ async function readObject() {
       bucket: props.artifact.bucket,
       key: props.artifact.key,
       versionId: props.artifact.versionId,
+      nodeId: props.artifact.nodeId,
+      endpointUrl: props.artifact.endpointUrl,
       contentType: props.artifact.contentType || undefined,
       filename: props.artifact.name || undefined,
       size: props.artifact.size,
@@ -129,6 +131,8 @@ async function toggleMore() {
       bucket: props.artifact.bucket,
       key: props.artifact.key,
       versionId: props.artifact.versionId,
+      nodeId: props.artifact.nodeId,
+      endpointUrl: props.artifact.endpointUrl,
       contentType: props.artifact.contentType || undefined,
       filename: props.artifact.name || undefined,
       size: props.artifact.size,
@@ -170,6 +174,7 @@ onBeforeUnmount(() => {
       <ObjectLink
         :bucket="artifact.bucket"
         :object-key="artifact.key"
+        :node-id="artifact.nodeId"
         :name="artifact.name"
         :size="artifact.size"
         class="min-w-0 flex-1 truncate font-medium text-foreground hover:text-primary hover:underline"
@@ -178,6 +183,7 @@ onBeforeUnmount(() => {
       <ObjectLink
         :bucket="artifact.bucket"
         :object-key="artifact.key"
+        :node-id="artifact.nodeId"
         :name="artifact.name"
         :size="artifact.size"
         class="chip shrink-0 text-primary hover:bg-muted"
@@ -230,6 +236,7 @@ onBeforeUnmount(() => {
             v-else
             :bucket="artifact.bucket"
             :object-key="artifact.key"
+            :node-id="artifact.nodeId"
             :name="artifact.name"
             :size="size"
             class="inline-flex items-center gap-1 font-medium text-primary hover:underline"
@@ -249,6 +256,7 @@ onBeforeUnmount(() => {
           >{{ artifact.bucket }}</BucketLink>/<ObjectLink
             :bucket="artifact.bucket"
             :object-key="artifact.key"
+            :node-id="artifact.nodeId"
             :name="artifact.name"
             :size="artifact.size"
             class="text-primary hover:underline"

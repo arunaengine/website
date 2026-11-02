@@ -28,6 +28,9 @@ export interface ArtifactView {
   key: string
   versionId?: string
   jobId?: string
+  /** The node the object lives on, so a later read goes there and not to the connected node. */
+  nodeId?: string
+  endpointUrl?: string
   /** The file's own text, read from the bytes the tab already holds. */
   text?: string
   /** True when `text` is only the start of the file. */

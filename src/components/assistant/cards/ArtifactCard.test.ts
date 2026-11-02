@@ -176,6 +176,26 @@ describe('ArtifactCard', () => {
     expect(content(root)).toContain('rest of the log')
   })
 
+  it('reads more of a remote file from the node it lives on', async () => {
+    loadArtifact.mockResolvedValue({ url: '', contentType: 'text/plain', kind: 'text', name: 'run.log', text: 'more', truncated: false })
+    const { root } = await card(artifact({
+      contentType: 'text/plain', previewKind: 'text', name: 'run.log', key: 'run.log', text: 'start', truncated: true,
+      nodeId: 'node-2', endpointUrl: 'https://s3.node-2.test',
+    }))
+
+    await click(element(root, (node) => node.tag === 'button' && content(node).trim() === 'Show more'))
+    await flush()
+
+    expect(loadArtifact).toHaveBeenCalledWith(expect.objectContaining({ nodeId: 'node-2', endpointUrl: 'https://s3.node-2.test' }), ARTIFACT_TEXT_CAP)
+  })
+
+  it('reads a restored remote image from the node it lives on', async () => {
+    loadArtifact.mockResolvedValue({ url: 'blob:aruna/again', contentType: 'image/png', kind: 'image', name: 'chart.png' })
+    await card(artifact({ url: '', nodeId: 'node-2' }))
+
+    expect(loadArtifact).toHaveBeenCalledWith(expect.objectContaining({ nodeId: 'node-2' }))
+  })
+
   it('offers no more for a short file read whole', async () => {
     const { root } = await card(artifact({ contentType: 'text/plain', previewKind: 'text', name: 'a.txt', key: 'a.txt', text: 'all' }))
 

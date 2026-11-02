@@ -297,6 +297,13 @@ describe('show_artifact', () => {
     }]])
   })
 
+  it('keeps the node a remote output lives on, so the card reads it there later', async () => {
+    const { tools, kept } = harness(null, { url: '', contentType: 'text/plain', kind: 'text', name: 'run.log', text: 'start', truncated: true })
+    await runTool(tools.show_artifact, { bucket: 'work', key: 'run.log', node_id: 'node-2', endpoint_url: 'https://s3.node-2.test' })
+
+    expect(kept[0][1]).toMatchObject({ artifact: { nodeId: 'node-2', endpointUrl: 'https://s3.node-2.test', truncated: true } })
+  })
+
   it('shows a json output as text', async () => {
     const { tools, kept } = harness(null, {
       url: 'blob:aruna/summary',
