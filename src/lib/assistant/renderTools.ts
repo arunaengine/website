@@ -575,7 +575,8 @@ export function renderTools(host: RenderHost): ToolSet {
         'Shows one figure out of a stored HTML report, such as the per base sequence quality plot of a FastQC '
         + 'report. Pass the bucket, the key and the name of the figure or its section. Only images the file '
         + 'itself carries are read. Never paste a report\'s markup into an answer: show the figure the user '
-        + 'asked for, and call this without a figure name to learn which figures the report holds.',
+        + 'asked for, and call this without a figure name to learn which figures the report holds. Each listed '
+        + 'figure has an id such as f2; pass that id as the figure to pick it exactly.',
       inputSchema: schema<FigureInput>({
         bucket: STRING,
         key: STRING,
@@ -602,13 +603,17 @@ export function renderTools(host: RenderHost): ToolSet {
           const { figureName, htmlFigures, pickFigure } = await import('./htmlFigures')
           const figures = htmlFigures(source)
           if (!figures.length) return { error: 'That report carries no figures of its own.' }
-          const names = figures.map((figure) => cleanValue(figureName(figure), 120))
+          // A shortened name can repeat, so each figure also gets an id that picks it exactly.
+          const listed = figures.map((figure, index) => ({ id: `f${index + 1}`, name: cleanValue(figureName(figure), 120) }))
           const wanted = text(input.figure)
-          const picked = wanted ? pickFigure(figures, wanted) : figures.length === 1 ? figures[0] : null
+          const byId = /^f(\d+)$/i.exec(wanted)
+          const picked = byId
+            ? figures[Number(byId[1]) - 1] ?? null
+            : wanted ? pickFigure(figures, wanted) : figures.length === 1 ? figures[0] : null
           if (!picked) {
             return wanted
-              ? { error: `No figure matches ${quoted(wanted)}.`, figures: names }
-              : { error: 'Name the figure to show.', figures: names }
+              ? { error: `No figure matches ${quoted(wanted)}.`, figures: listed }
+              : { error: 'Name the figure to show.', figures: listed }
           }
           const name = figureName(picked)
           const view: RenderView = {
@@ -627,7 +632,7 @@ export function renderTools(host: RenderHost): ToolSet {
             },
           }
           host.keep(toolCallId, view)
-          return { shown: true, card: cardNote(view), figure: name, of: names.length }
+          return { shown: true, card: cardNote(view), figure: name, of: listed.length }
         } catch (cause) {
           return { error: failedWith(cause) }
         }

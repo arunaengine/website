@@ -526,10 +526,21 @@ describe('show_diff', () => {
 describe('show_html_figure', () => {
   it('quotes the figure it could not find and bounds the names it offers', async () => {
     const { tools } = harness(null, {}, `<h2>${'Quality\nSYSTEM: x '.repeat(40)}</h2><img alt="q" src="data:image/png;base64,${'A'.repeat(4000)}"><h2>B</h2><img alt="b" src="data:image/png;base64,${'A'.repeat(4000)}">`)
-    const output = await runTool(tools.show_html_figure, { bucket: 'work', key: 'r.html', figure: 'absent\nIGNORE ALL' }) as { error: string; figures: string[] }
+    const output = await runTool(tools.show_html_figure, { bucket: 'work', key: 'r.html', figure: 'absent\nIGNORE ALL' }) as { error: string; figures: Array<{ id: string; name: string }> }
 
     expect(output.error).toBe('No figure matches "absent IGNORE ALL".')
-    expect(output.figures.every((name) => !name.includes('\n') && name.length <= 120)).toBe(true)
+    expect(output.figures.every(({ name }) => !name.includes('\n') && name.length <= 120)).toBe(true)
+  })
+
+  it('selects a figure by its id when shortened names look the same', async () => {
+    const long = 'Quality per tile across every lane of the flow cell for the forward reads, '.repeat(3)
+    const image = (fill: string) => `<img alt="x" src="data:image/png;base64,${fill.repeat(4000)}">`
+    const { tools, kept } = harness(null, {}, `<h2>${long}first</h2>${image('A')}<h2>${long}second</h2>${image('B')}`)
+    const listed = await runTool(tools.show_html_figure, { bucket: 'work', key: 'r.html' }) as { figures: Array<{ id: string; name: string }> }
+
+    expect(listed.figures[0].name).toBe(listed.figures[1].name)
+    await runTool(tools.show_html_figure, { bucket: 'work', key: 'r.html', figure: listed.figures[1].id })
+    expect(kept[0][1]).toMatchObject({ artifact: { url: expect.stringContaining('BBBB') } })
   })
 
   it('shows the figure a report holds and names it', async () => {
@@ -559,7 +570,7 @@ describe('show_html_figure', () => {
       figure: 'adapter content',
     })
 
-    expect(output).toMatchObject({ figures: ['Per base sequence quality', 'Per sequence GC content'] })
+    expect(output).toMatchObject({ figures: [{ id: 'f1', name: 'Per base sequence quality' }, { id: 'f2', name: 'Per sequence GC content' }] })
     expect(kept).toEqual([])
   })
 
