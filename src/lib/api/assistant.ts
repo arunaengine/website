@@ -2,7 +2,7 @@
 // Bring-your-own AI: every provider record belongs to one user and its secret
 // is encrypted on the node, never returned. The browser talks to a provider only
 // through the node proxy, which injects the real credentials.
-import { apiRequest, type ApiClientOptions } from './client'
+import { ApiError, apiRequest, type ApiClientOptions } from './client'
 
 export type AssistantProviderKind =
   | 'anthropic'
@@ -176,3 +176,95 @@ export const ADDABLE_PROVIDER_KINDS: readonly AssistantProviderKind[] = [
   'openrouter',
   'openai_compatible',
 ]
+
+// --- Central assistant (/system/assistant/central) ---
+// One provider a realm admin sets up for every member. Its key never leaves the
+// node that keeps it; members see only the label, the allowed models and usage.
+
+/** The reserved provider id of the central assistant; real ids are ULIDs. */
+export const CENTRAL_PROVIDER_ID = 'central'
+
+/** Inbound header naming the chat a central call belongs to. */
+export const SESSION_HEADER = 'x-session-id'
+
+export interface CentralAdminView {
+  base_url: string
+  holder_node: string
+  changed_by: string
+  changed_at: string
+  user_header: string
+  session_header: string
+}
+
+export interface CentralAssistant {
+  kind: AssistantProviderKind
+  label: string
+  models: AssistantModel[]
+  default_model?: string | null
+  /** Model calls per member per UTC day; unset means no limit. */
+  daily_limit?: number | null
+  used_today: number
+  resets_at: string
+  /** Present for realm admins only. */
+  admin?: CentralAdminView
+}
+
+export interface SetCentralRequest {
+  kind: AssistantProviderKind
+  label: string
+  /** Omitted to keep the stored key. */
+  api_key?: string
+  base_url?: string
+  models: { id: string }[]
+  default_model?: string
+  daily_limit?: number | null
+  user_header?: string
+  session_header?: string
+}
+
+export interface CentralTestResponse extends ProviderTestResponse {
+  models: AssistantModel[]
+}
+
+const CENTRAL = '/system/assistant/central'
+
+/** The realm's central assistant, or null when no admin set one up. */
+export async function getCentralAssistant(
+  client: ApiClientOptions = {},
+  signal?: AbortSignal,
+): Promise<CentralAssistant | null> {
+  try {
+    return await apiRequest<CentralAssistant>(CENTRAL, { signal }, client)
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.status === 404) return null
+    throw cause
+  }
+}
+
+export function putCentralAssistant(
+  request: SetCentralRequest,
+  client: ApiClientOptions = {},
+): Promise<CentralAssistant> {
+  return apiRequest<CentralAssistant>(CENTRAL, { method: 'PUT', body: JSON.stringify(request) }, client)
+}
+
+export function deleteCentralAssistant(client: ApiClientOptions = {}): Promise<void> {
+  return apiRequest<void>(CENTRAL, { method: 'DELETE' }, client)
+}
+
+export function testCentralAssistant(client: ApiClientOptions = {}): Promise<CentralTestResponse> {
+  return apiRequest<CentralTestResponse>(`${CENTRAL}/test`, { method: 'POST' }, client)
+}
+
+/** The central assistant as one more entry of the provider list. */
+export function centralProvider(central: CentralAssistant): AssistantProvider {
+  return {
+    provider_id: CENTRAL_PROVIDER_ID,
+    kind: central.kind,
+    label: central.label,
+    models: central.models,
+    default_model: central.default_model,
+    status: 'ready',
+    created_at: new Date(0).toISOString(),
+  }
+}

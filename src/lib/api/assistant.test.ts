@@ -4,7 +4,10 @@ import {
   createAssistantProvider,
   deleteAssistantProvider,
   fetchAssistantModels,
+  getCentralAssistant,
   listAssistantProviders,
+  putCentralAssistant,
+  testCentralAssistant,
   patchAssistantProvider,
   pollChatGptLogin,
   startChatGptLogin,
@@ -125,5 +128,32 @@ describe('assistantProxyBaseUrl', () => {
   it('does not double the slash on a trailing-slash base', () => {
     expect(assistantProxyBaseUrl('/api/v1/', 'p1'))
       .toBe('/api/v1/system/assistant/providers/p1/proxy')
+  })
+})
+
+describe('central assistant clients', () => {
+  it('reads an absent setup as null', async () => {
+    const calls = stubFetch({ error: 'Not found' }, 404)
+
+    expect(await getCentralAssistant(CLIENT)).toBeNull()
+    expect(calls[0].url).toBe('https://api.test/api/v1/system/assistant/central')
+  })
+
+  it('fails on other errors instead of hiding them', async () => {
+    stubFetch({ error: 'Forbidden' }, 403)
+
+    await expect(getCentralAssistant(CLIENT)).rejects.toMatchObject({ status: 403 })
+  })
+
+  it('saves the setup and tests it', async () => {
+    const calls = stubFetch({ ok: true, message: 'Provider is ready', models: [] })
+    const request = { kind: 'openai_compatible' as const, label: 'Realm assistant', models: [{ id: 'm' }] }
+
+    await putCentralAssistant(request, CLIENT)
+    await testCentralAssistant(CLIENT)
+
+    expect(calls[0]).toMatchObject({ method: 'PUT', body: request })
+    expect(calls[1].url).toBe('https://api.test/api/v1/system/assistant/central/test')
+    expect(calls[1].method).toBe('POST')
   })
 })
