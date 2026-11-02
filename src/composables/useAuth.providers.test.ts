@@ -9,6 +9,10 @@ const ARUNA_ISSUER = 'https://keycloak.v3.aruna-engine.org/realms/aruna'
 let assign: ReturnType<typeof vi.fn>
 let storage: Map<string, string>
 let fetchMock: ReturnType<typeof vi.fn>
+let tokenAnswer: unknown = {}
+
+// An unsigned ID token; the portal reads only its claims.
+const idToken = (sub: string) => `h.${btoa(JSON.stringify({ sub, iat: 1, exp: 2 }))}.s`
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -33,6 +37,7 @@ async function setup(issuer: string, stored: Record<string, string> = {}, served
     const url = String(input)
     if (url.endsWith('/system/realm')) return json({ oidc_providers: [{ audience: 'portal', issuer, discovery_url: discoveryUrl }] })
     if (url === discoveryUrl) return json({ issuer, authorization_endpoint: `${issuer}/auth`, token_endpoint: `${issuer}/token` })
+    if (url === `${issuer}/token`) return json(tokenAnswer)
     return json({ error: 'unexpected' }, 500)
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -126,11 +131,12 @@ describe('completeSignIn after linking', () => {
     'aruna.oidc.verifier': 'v1',
     'aruna.oidc.redirect': '/app/settings',
     'aruna.oidc.link': 'LifeScience RI',
-    'aruna.oidc.idToken': 'id-1',
+    'aruna.oidc.idToken': idToken('kc-a'),
   }
 
-  async function finish(query: Record<string, string>) {
-    await setup(ARUNA_ISSUER, LINKING)
+  async function finish(query: Record<string, string>, linkedSub = 'kc-a', stored: Record<string, string> = LINKING) {
+    tokenAnswer = { id_token: idToken(linkedSub), access_token: 'a' }
+    await setup(ARUNA_ISSUER, stored)
     const auth = useAuth()
     const target = await auth.completeSignIn(new URLSearchParams({ state: 's1', code: 'c1', ...query }))
     return { target, link: auth.providerLink.value }
@@ -140,10 +146,23 @@ describe('completeSignIn after linking', () => {
     const { target, link } = await finish({ kc_action_status: 'success' })
     expect(target).toBe('/app/settings')
     expect(link).toEqual({ name: 'LifeScience RI', linked: true })
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(storage.get('aruna.oidc.idToken')).toBe('id-1')
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).not.toContainEqual(expect.stringContaining('/access/'))
+    expect(storage.get('aruna.oidc.idToken')).toBe(idToken('kc-a'))
     expect(storage.has('aruna.oidc.link')).toBe(false)
     expect(storage.has('aruna.oidc.state')).toBe(false)
+  })
+
+  it('reports no success when the provider linked another Keycloak account', async () => {
+    const { link } = await finish({ kc_action_status: 'success' }, 'kc-b')
+    expect(link?.linked).toBe(false)
+    expect(link?.message).toContain('signed in as another account')
+  })
+
+  it('reports no success when the signed-in account is unknown', async () => {
+    const { 'aruna.oidc.idToken': _, ...withoutToken } = LINKING
+    const { link } = await finish({ kc_action_status: 'success' }, 'kc-a', withoutToken)
+    expect(link?.linked).toBe(false)
+    expect(link?.message).toContain('could not be confirmed')
   })
 
   it('says nothing when the person cancelled', async () => {
@@ -154,7 +173,7 @@ describe('completeSignIn after linking', () => {
   it('reports a refused link with the reason', async () => {
     const { link } = await finish({ kc_action_status: 'error', error_description: 'Already linked to another user' })
     expect(link).toEqual({ name: 'LifeScience RI', linked: false, message: 'Already linked to another user' })
-    expect(storage.get('aruna.oidc.idToken')).toBe('id-1')
+    expect(storage.get('aruna.oidc.idToken')).toBe(idToken('kc-a'))
   })
 
   it('still refuses a return with another state', async () => {

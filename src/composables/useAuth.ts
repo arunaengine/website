@@ -207,10 +207,10 @@ async function requestSignIn(options: SignInOptions = {}) {
   signInChoice.value = options
 }
 
-// Keycloak returns from an action with `kc_action_status`; the session is untouched.
-function finishLink(params: URLSearchParams, name: string): string {
+// Keycloak returns from an action with `kc_action_status` and a code; the session is untouched.
+async function finishLink(params: URLSearchParams, name: string): Promise<string> {
   const status = params.get('kc_action_status')
-  if (status === 'success') providerLink.value = { name, linked: true }
+  if (status === 'success') providerLink.value = await confirmLink(params, name)
   else if (status === 'cancelled') providerLink.value = null
   else {
     const reason = params.get('error_description') ?? params.get('error')
@@ -218,6 +218,33 @@ function finishLink(params: URLSearchParams, name: string): string {
   }
   stage.value = 'idle'
   return window.sessionStorage.getItem(REDIRECT_KEY) || '/app/settings'
+}
+
+// Keycloak links to the user of its own browser session, which may not be the signed-in one.
+async function confirmLink(params: URLSearchParams, name: string): Promise<ProviderLink> {
+  const own = tokenClaims(window.sessionStorage.getItem(ID_TOKEN_KEY) ?? '')?.sub
+  const code = params.get('code')
+  const verifier = window.sessionStorage.getItem(VERIFIER_KEY)
+  const tokens = own && code && verifier ? await redeemCode(code, verifier).catch(() => null) : null
+  const linked = tokens?.id_token ? tokenClaims(tokens.id_token)?.sub : undefined
+  if (own && linked === own) return { name, linked: true }
+  const message = linked
+    ? 'The identity provider is signed in as another account and linked it there. Sign out of the identity provider, then link again.'
+    : 'It could not be confirmed for this account. Check the linked logins in your account.'
+  return { name, linked: false, message }
+}
+
+async function redeemCode(code: string, verifier: string) {
+  const { clientId, discoveryUrl } = await resolveProvider()
+  const discovery = await discover(discoveryUrl)
+  return exchangeAuthorizationCode({
+    tokenEndpoint: discovery.token_endpoint,
+    clientId,
+    redirectUri: callbackUri(),
+    code,
+    codeVerifier: verifier,
+    send: (await nativeOidc())?.oidcToken,
+  })
 }
 
 /** Opens a session with a realm token, whose account must load; `idToken` ends it at the provider. */
@@ -253,7 +280,7 @@ async function completeSignIn(params: URLSearchParams): Promise<string | null> {
     if (state !== expectedState) throw new Error('State mismatch, please try signing in again.')
     consumeTransaction = true
     const linking = window.sessionStorage.getItem(LINK_KEY)
-    if (linking) return finishLink(params, linking)
+    if (linking) return await finishLink(params, linking)
 
     const oidcError = params.get('error')
     if (oidcError) {
@@ -267,16 +294,7 @@ async function completeSignIn(params: URLSearchParams): Promise<string | null> {
     }
 
     stage.value = 'exchanging'
-    const { clientId, discoveryUrl } = await resolveProvider()
-    const discovery = await discover(discoveryUrl)
-    const tokens = await exchangeAuthorizationCode({
-      tokenEndpoint: discovery.token_endpoint,
-      clientId,
-      redirectUri: callbackUri(),
-      code,
-      codeVerifier: verifier,
-      send: (await nativeOidc())?.oidcToken,
-    })
+    const tokens = await redeemCode(code, verifier)
     // Aruna validates the audience against the client id, which Keycloak only
     // sets on the ID token; the access token is for the account API.
     const oidcToken = tokens.id_token ?? tokens.access_token
