@@ -84,6 +84,13 @@ describe('show_stats', () => {
     expect(kept[0][1]).toEqual({ kind: 'stats', title: 'Totals', items: [{ label: 'Objects', value: '12', hint: 'in 2 buckets' }] })
   })
 
+  it('keeps the scope the numbers were counted in', async () => {
+    const { tools, kept } = harness()
+    await runTool(tools.show_stats, { title: 'Objects', scope: ' Whole realm ', items: [{ label: 'Objects', value: '44,018,207' }] })
+
+    expect(kept[0][1]).toMatchObject({ kind: 'stats', scope: 'Whole realm' })
+  })
+
   it('tells the model which numbers the card already shows', async () => {
     const { tools } = harness()
     const output = await runTool(tools.show_stats, { title: 'Realm', items: [{ label: 'Objects', value: '44,012,331' }] })
@@ -107,6 +114,17 @@ describe('show_crate', () => {
     expect(host.loadCrate).toHaveBeenCalledWith('doc-1')
     expect(output).toEqual({ shown: true, card: expect.any(String), name: 'Reads 2026', document_id: 'doc-1' })
     expect(kept[0][1]).toMatchObject({ kind: 'crate', title: 'Reads 2026', documentId: 'doc-1' })
+  })
+
+  it('adds the registry facts of a stored dataset, and shows the card without them on a failed read', async () => {
+    const { tools, kept, host } = harness(crate)
+    host.loadSummary = vi.fn(async () => ({ public: true, groupId: 'g-1', groupName: 'Lab' }))
+    await runTool(tools.show_crate, { document_id: 'doc-1' })
+    host.loadSummary = vi.fn(async () => { throw new Error('offline') })
+    await runTool(tools.show_crate, { document_id: 'doc-1' })
+
+    expect(kept[0][1]).toMatchObject({ summary: { public: true, groupId: 'g-1', groupName: 'Lab' } })
+    expect(kept[1][1]).not.toHaveProperty('summary')
   })
 
   it('shows a crate handed over inline', async () => {
@@ -145,8 +163,9 @@ describe('show_job', () => {
 
     expect(output).toEqual({
       shown: true,
-      card: 'Shown to the user as a card: job "gc analysis" in state succeeded, on node node-2, with when it ran, '
-        + 'and 1 output file.',
+      card: expect.stringMatching(
+        /^Shown to the user as a card: job "gc analysis" in state succeeded, finished 4 Sep 2026, \d\d:\d\d, on node node-2, outputs 1 file, 82 B\.$/,
+      ),
       updated: false,
       state: 'succeeded',
       outputs: 1,
@@ -211,6 +230,18 @@ describe('show_object', () => {
       versionId: '01M1NXGE23RMY4RFBRBYTQDWDS',
       size: 24,
     }]])
+  })
+
+  it('keeps the start of a text file as a preview the model only hears about', async () => {
+    const { tools, kept, host } = harness()
+    const preview = { kind: 'text' as const, language: 'json', text: '{\n  "reads": 12\n}', truncated: false }
+    host.loadPreview = vi.fn(async () => preview)
+    const output = await runTool(tools.show_object, { bucket: 'test', key: 'out/summary.json', version_id: 'v-1' })
+
+    expect(host.loadPreview).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'test', key: 'out/summary.json', versionId: 'v-1' }))
+    expect(kept[0][1]).toMatchObject({ preview })
+    expect(output).toEqual({ shown: true, card: expect.stringContaining('a preview of its whole content') })
+    expect(JSON.stringify(output)).not.toContain('reads')
   })
 
   it('refuses an object card without a key', async () => {
