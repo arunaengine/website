@@ -412,6 +412,44 @@ describe('logging in', () => {
     expect(chat.messages.value).toEqual([])
   })
 
+  it('keeps the empty chat Ask AI chose before the node chats arrive', async () => {
+    let release = () => {}
+    await login(() => {
+      seedNode('n-5', 'On the node', [payload('u1', 'node turn')])
+      node.listGate = new Promise<void>((resolve) => {
+        release = resolve
+      })
+    })
+    const placeholder: string = chat.activeChatId.value
+
+    chat.openWith('Explain this page.', 'the page')
+    node.listGate = null
+    release()
+    await settle()
+
+    expect(chat.activeChatId.value).toBe(placeholder)
+    expect(chat.draft.value).toBe('Explain this page.')
+  })
+
+  it('keeps the empty chat picked again before the node chats arrive', async () => {
+    let release = () => {}
+    await login((scope) => {
+      seedNode('n-6', 'On the node', [payload('u1', 'node turn')])
+      const empty = { ...newAssistantChat('Empty'), id: 'l-6' }
+      createAssistantChatStore(scope).save({ activeChatId: empty.id, chats: [empty] })
+      node.listGate = new Promise<void>((resolve) => {
+        release = resolve
+      })
+    })
+
+    chat.selectChat('l-6')
+    node.listGate = null
+    release()
+    await settle()
+
+    expect(chat.activeChatId.value).toBe('l-6')
+  })
+
   it('keeps every chat in this browser when the node has no routes', async () => {
     await login(() => {
       node.listStatus = 404

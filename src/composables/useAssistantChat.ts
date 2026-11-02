@@ -1638,8 +1638,8 @@ export function useAssistantChat() {
     syncEpoch()
     if (!chatStore || !historyReady.value || !chatState.chats.some((chat) => chat.id === id)) return
     markChatRead(id)
-    if (activeChatId.value === id) return
     chatPicked = true
+    if (activeChatId.value === id) return
     stopShownTurn('Opening another chat stopped this answer.')
     persistCurrentChat()
     chatState = { ...chatState, activeChatId: id }
@@ -1704,6 +1704,7 @@ export function useAssistantChat() {
     const current = activeChat()
     if (topic && current && current.messages.length && current.subject !== topic) newChat()
     const chat = activeChat()
+    chatPicked = true
     if (chat && topic && chat.subject !== topic) {
       chat.subject = topic
       markHead(chat.id)
