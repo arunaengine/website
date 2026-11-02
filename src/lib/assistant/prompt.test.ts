@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { systemPrompt } from './prompt'
+import { CARD_NOTE_PREFIX } from './cardNote'
 
 describe('systemPrompt', () => {
   it('names the page the user is looking at right after the route', () => {
@@ -97,6 +98,15 @@ describe('systemPrompt', () => {
     )
   })
 
+  it('forbids restating what a shown card already says', () => {
+    const prompt = systemPrompt({ route: '/app/assistant' })
+
+    // The rule quotes the exact note a render tool answers with.
+    expect(prompt).toContain(`reported back as "${CARD_NOTE_PREFIX}: ..."`)
+    expect(prompt).toContain('Never restate a fact a card shows')
+    expect(prompt).toContain('When a card fully answers the question, write one short line or nothing.')
+  })
+
   it('omits the identity line when no user is set', () => {
     const prompt = systemPrompt({ route: '/app/assistant' })
 
@@ -189,7 +199,7 @@ describe('systemPrompt', () => {
     )
     expect(prompt).toContain('One run has one card')
     expect(prompt).toContain('a job with show_job')
-    expect(prompt).toContain('A card carries the facts, so keep the words beside it short.')
+    expect(prompt).toContain('Never restate a fact a card shows')
   })
 
   it('names the tree, timeline, code and diff cards', () => {

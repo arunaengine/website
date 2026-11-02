@@ -118,7 +118,7 @@ describe('a chart from a script run', () => {
     // Only the script submission is a write, so only it is asked about.
     expect(ask).toHaveBeenCalledOnce()
     expect(s3.getObjectBlob).toHaveBeenCalledWith('work', 'results/run-1/chart.png', 'node-2', 'v-9')
-    expect(shown).toEqual({ shown: true, content_type: 'image/png', kind: 'image' })
+    expect(shown).toEqual({ shown: true, card: expect.any(String), content_type: 'image/png', kind: 'image' })
     expect(kept).toEqual([['call-art', {
       kind: 'artifact',
       title: 'chart.png',

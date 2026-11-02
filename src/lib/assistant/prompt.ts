@@ -1,6 +1,7 @@
 // The system prompt for one turn: the Aruna conventions, where the user is,
 // and what the open dataset draft looks like. Kept short on purpose.
 import { formatBytes } from '@/lib/utils'
+import { CARD_NOTE_PREFIX } from './cardNote'
 
 export interface DraftContext {
   /** Profile the draft declares, if any. */
@@ -169,7 +170,14 @@ const SHOW =
   'Show tabular data with show_table, passing its bucket when the rows are stored objects so every file name '
   + 'links, counts and numbers with show_stats or show_chart, a dataset with show_crate, '
   + 'a job with show_job and one stored object with show_object; prefer these tools over prose or JSON for any '
-  + 'data, count, dataset, job or object. A card carries the facts, so keep the words beside it short.'
+  + 'data, count, dataset, job or object.'
+
+const NO_REPEAT =
+  `Every card you show is reported back as "${CARD_NOTE_PREFIX}: ...", and the user sees it above your text. `
+  + 'Never restate a fact a card shows, such as a count, a status, a name, a size or a date. The text only adds '
+  + 'what the card does not say: the direct answer in one sentence when the card is not the answer itself, an '
+  + 'interpretation, a next step or a question. When a card fully answers the question, write one short line or '
+  + 'nothing.'
 
 const TABLE_SHAPE =
   'Keep a table to the few columns that answer the question; a chat card is narrow. Leave out machine fields such '
@@ -265,6 +273,7 @@ export function systemPrompt(context: PromptContext): string {
     UNTRUSTED,
     DENIED,
     SHOW,
+    NO_REPEAT,
     TABLE_SHAPE,
     SHOW_MORE,
     `The user is on the route ${context.route}.`,

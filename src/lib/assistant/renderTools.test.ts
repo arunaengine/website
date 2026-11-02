@@ -34,7 +34,7 @@ describe('show_table', () => {
       rows: [['raw', 12], ['derived', 3]],
     }, 'call-7')
 
-    expect(output).toEqual({ shown: true, rows: 2, truncated: false })
+    expect(output).toEqual({ shown: true, card: expect.any(String), rows: 2, truncated: false })
     expect(kept).toEqual([['call-7', { kind: 'table', title: 'Buckets', columns: ['Name', 'Objects'], rows: [['raw', 12], ['derived', 3]] }]])
   })
 
@@ -83,6 +83,13 @@ describe('show_stats', () => {
 
     expect(kept[0][1]).toEqual({ kind: 'stats', title: 'Totals', items: [{ label: 'Objects', value: '12', hint: 'in 2 buckets' }] })
   })
+
+  it('tells the model which numbers the card already shows', async () => {
+    const { tools } = harness()
+    const output = await runTool(tools.show_stats, { title: 'Realm', items: [{ label: 'Objects', value: '44,012,331' }] })
+
+    expect(output).toMatchObject({ card: 'Shown to the user as a card: "Realm" with Objects 44,012,331.' })
+  })
 })
 
 describe('show_crate', () => {
@@ -98,13 +105,13 @@ describe('show_crate', () => {
     const output = await runTool(tools.show_crate, { document_id: 'doc-1' })
 
     expect(host.loadCrate).toHaveBeenCalledWith('doc-1')
-    expect(output).toEqual({ shown: true, name: 'Reads 2026', document_id: 'doc-1' })
+    expect(output).toEqual({ shown: true, card: expect.any(String), name: 'Reads 2026', document_id: 'doc-1' })
     expect(kept[0][1]).toMatchObject({ kind: 'crate', title: 'Reads 2026', documentId: 'doc-1' })
   })
 
   it('shows a crate handed over inline', async () => {
     const { tools, kept } = harness()
-    expect(await runTool(tools.show_crate, { rocrate: crate })).toEqual({ shown: true, name: 'Reads 2026' })
+    expect(await runTool(tools.show_crate, { rocrate: crate })).toEqual({ shown: true, card: expect.any(String), name: 'Reads 2026' })
     expect(kept[0][1]).toMatchObject({ kind: 'crate', crate })
   })
 
@@ -136,7 +143,14 @@ describe('show_job', () => {
       outputs: [{ bucket: 'lorem', key: 'results/gc.json', size: 82 }, { bucket: 'lorem', key: '' }],
     }, 'call-3')
 
-    expect(output).toEqual({ shown: true, updated: false, state: 'succeeded', outputs: 1 })
+    expect(output).toEqual({
+      shown: true,
+      card: 'Shown to the user as a card: job "gc analysis" in state succeeded, on node node-2, with when it ran, '
+        + 'and 1 output file.',
+      updated: false,
+      state: 'succeeded',
+      outputs: 1,
+    })
     expect(kept[0]).toEqual(['call-3', {
       kind: 'job',
       title: 'gc analysis',
@@ -187,7 +201,7 @@ describe('show_object', () => {
       last_modified: ' ',
     }, 'call-3')
 
-    expect(output).toEqual({ shown: true })
+    expect(output).toEqual({ shown: true, card: expect.any(String) })
     expect(kept).toEqual([['call-3', {
       kind: 'object',
       bucket: 'test',
@@ -233,7 +247,7 @@ describe('show_artifact', () => {
       versionId: 'v-1',
       contentType: 'image/png',
     })
-    expect(output).toEqual({ shown: true, content_type: 'image/png', kind: 'image' })
+    expect(output).toEqual({ shown: true, card: expect.any(String), content_type: 'image/png', kind: 'image' })
     expect(kept).toEqual([['call-9', {
       kind: 'artifact',
       title: 'chart.png',
@@ -263,7 +277,7 @@ describe('show_artifact', () => {
 
     const output = await runTool(tools.show_artifact, { bucket: 'work', key: 'out/summary.json' })
 
-    expect(output).toEqual({ shown: true, content_type: 'application/json', kind: 'text' })
+    expect(output).toEqual({ shown: true, card: expect.any(String), content_type: 'application/json', kind: 'text' })
     expect(kept[0][1]).toMatchObject({ kind: 'artifact', artifact: { previewKind: 'text' } })
   })
 
@@ -278,7 +292,7 @@ describe('show_artifact', () => {
 
     const output = await runTool(tools.show_artifact, { bucket: 'work', key: 'big.tif' })
 
-    expect(output).toEqual({ shown: true, content_type: 'image/tiff', kind: 'download' })
+    expect(output).toEqual({ shown: true, card: expect.any(String), content_type: 'image/tiff', kind: 'download' })
     expect(kept[0][1]).toMatchObject({ artifact: { previewKind: 'download', size: 60 * 1024 * 1024 } })
   })
 
@@ -332,7 +346,7 @@ describe('show_tree', () => {
       ],
     }, 'call-9')
 
-    expect(output).toEqual({ shown: true, entries: 2, truncated: false })
+    expect(output).toEqual({ shown: true, card: expect.any(String), entries: 2, truncated: false })
     expect(kept).toEqual([['call-9', {
       kind: 'tree',
       title: 'Raw reads',
@@ -346,7 +360,7 @@ describe('show_tree', () => {
     const entries = Array.from({ length: 620 }, (_, index) => ({ path: `p/${index}.txt`, kind: 'file' }))
     const output = await runTool(tools.show_tree, { title: 'All', entries })
 
-    expect(output).toEqual({ shown: true, entries: 500, truncated: true })
+    expect(output).toEqual({ shown: true, card: expect.any(String), entries: 500, truncated: true })
     expect(kept[0][1]).toMatchObject({ dropped: 120 })
   })
 
@@ -370,7 +384,7 @@ describe('show_timeline', () => {
       ],
     }, 'call-4')
 
-    expect(output).toEqual({ shown: true, events: 2, truncated: false })
+    expect(output).toEqual({ shown: true, card: expect.any(String), events: 2, truncated: false })
     expect(kept[0][1]).toEqual({
       kind: 'timeline',
       title: 'Job history',
@@ -386,7 +400,7 @@ describe('show_timeline', () => {
     const events = Array.from({ length: 260 }, (_, index) => ({ at: 1_000 + index, label: `Step ${index}` }))
     const output = await runTool(tools.show_timeline, { title: 'Sync', events })
 
-    expect(output).toEqual({ shown: true, events: 200, truncated: true })
+    expect(output).toEqual({ shown: true, card: expect.any(String), events: 200, truncated: true })
     expect((kept[0][1] as { events: unknown[] }).events).toHaveLength(200)
   })
 
@@ -408,7 +422,7 @@ describe('show_code', () => {
       caption: 'Writes gc.json',
     }, 'call-5')
 
-    expect(output).toEqual({ shown: true, truncated: false })
+    expect(output).toEqual({ shown: true, card: expect.any(String), truncated: false })
     expect(kept).toEqual([['call-5', {
       kind: 'code',
       title: 'GC script',
@@ -422,7 +436,7 @@ describe('show_code', () => {
     const { tools, kept } = harness()
     const output = await runTool(tools.show_code, { title: 'x', language: 'text', code: 'a'.repeat(24_000) })
 
-    expect(output).toEqual({ shown: true, truncated: true })
+    expect(output).toEqual({ shown: true, card: expect.any(String), truncated: true })
     expect((kept[0][1] as { code: string }).code).toHaveLength(20_000)
   })
 
@@ -444,7 +458,7 @@ describe('show_diff', () => {
       after_label: 'Version 2',
     }, 'call-6')
 
-    expect(output).toEqual({ shown: true, changed: true })
+    expect(output).toEqual({ shown: true, card: expect.any(String), changed: true })
     expect(kept).toEqual([['call-6', {
       kind: 'diff',
       title: 'Config change',
@@ -481,7 +495,7 @@ describe('show_html_figure', () => {
       figure: 'per base sequence quality',
     })
 
-    expect(output).toEqual({ shown: true, figure: 'Per base sequence quality', of: 1 })
+    expect(output).toEqual({ shown: true, card: expect.any(String), figure: 'Per base sequence quality', of: 1 })
     expect(kept[0][1]).toMatchObject({
       kind: 'artifact',
       title: 'Per base sequence quality',

@@ -5,6 +5,7 @@ import { jsonSchema, tool, type JSONSchema7, type ToolSet } from 'ai'
 import type { PreviewKind } from '@/composables/useObjectPreview'
 import { crateGraph, crateRootId, stringProp } from '@/lib/dataEntities'
 import { errorMessage } from '@/lib/utils'
+import { cardNote } from './cardNote'
 import type {
   ChartKind,
   JobOutputRef,
@@ -229,8 +230,9 @@ export function renderTools(host: RenderHost): ToolSet {
         const columns = strings(input.columns ?? [])
         if (!columns.length) return { error: 'A table needs at least one column.' }
         const rows = (input.rows ?? []).slice(0, MAX_ROWS).map((row) => (Array.isArray(row) ? row : [row]))
-        host.keep(toolCallId, { kind: 'table', title: input.title, columns, rows, bucket: text(input.bucket) || undefined })
-        return { shown: true, rows: rows.length, truncated: (input.rows?.length ?? 0) > MAX_ROWS }
+        const view: RenderView = { kind: 'table', title: input.title, columns, rows, bucket: text(input.bucket) || undefined }
+        host.keep(toolCallId, view)
+        return { shown: true, card: cardNote(view), rows: rows.length, truncated: (input.rows?.length ?? 0) > MAX_ROWS }
       },
     }),
 
@@ -259,8 +261,9 @@ export function renderTools(host: RenderHost): ToolSet {
         if (series.some((entry) => entry.values.some((value) => !Number.isFinite(value)))) {
           return { error: 'Every value in a series must be a finite number.' }
         }
-        host.keep(toolCallId, { kind: 'chart', title: input.title, chart: input.kind, labels, series })
-        return { shown: true }
+        const view: RenderView = { kind: 'chart', title: input.title, chart: input.kind, labels, series }
+        host.keep(toolCallId, view)
+        return { shown: true, card: cardNote(view) }
       },
     }),
 
@@ -284,8 +287,9 @@ export function renderTools(host: RenderHost): ToolSet {
           ...(item.hint ? { hint: String(item.hint) } : {}),
         })).filter((item) => item.label)
         if (!items.length) return { error: 'Stats need at least one labelled value.' }
-        host.keep(toolCallId, { kind: 'stats', title: input.title, items })
-        return { shown: true }
+        const view: RenderView = { kind: 'stats', title: input.title, items }
+        host.keep(toolCallId, view)
+        return { shown: true, card: cardNote(view) }
       },
     }),
 
@@ -298,13 +302,19 @@ export function renderTools(host: RenderHost): ToolSet {
           const crate = input.document_id ? await host.loadCrate(input.document_id) : input.rocrate
           if (!crate || typeof crate !== 'object') return { error: 'Pass a document_id or an RO-Crate object.' }
           const title = crateTitle(crate)
-          host.keep(toolCallId, {
+          const view: RenderView = {
             kind: 'crate',
             title,
             ...(input.document_id ? { documentId: input.document_id } : {}),
             crate,
-          })
-          return { shown: true, name: title, ...(input.document_id ? { document_id: input.document_id } : {}) }
+          }
+          host.keep(toolCallId, view)
+          return {
+            shown: true,
+            card: cardNote(view),
+            name: title,
+            ...(input.document_id ? { document_id: input.document_id } : {}),
+          }
         } catch (cause) {
           return { error: errorMessage(cause) }
         }
@@ -364,7 +374,7 @@ export function renderTools(host: RenderHost): ToolSet {
           outputs,
         }
         const updated = host.keep(toolCallId, view) === true
-        return { shown: true, updated, state, outputs: outputs.length }
+        return { shown: true, card: cardNote(view), updated, state, outputs: outputs.length }
       },
     }),
 
@@ -399,7 +409,7 @@ export function renderTools(host: RenderHost): ToolSet {
           ...(count(input.size) !== undefined ? { size: count(input.size) } : {}),
         }
         host.keep(toolCallId, view)
-        return { shown: true }
+        return { shown: true, card: cardNote(view) }
       },
     }),
 
@@ -434,14 +444,15 @@ export function renderTools(host: RenderHost): ToolSet {
         const entries = all.slice(0, MAX_ENTRIES)
         const dropped = all.length - entries.length
         const bucket = text(input.bucket)
-        host.keep(toolCallId, {
+        const view: RenderView = {
           kind: 'tree',
           title: input.title,
           entries,
           ...(bucket ? { bucket } : {}),
           ...(dropped ? { dropped } : {}),
-        })
-        return { shown: true, entries: entries.length, truncated: dropped > 0 }
+        }
+        host.keep(toolCallId, view)
+        return { shown: true, card: cardNote(view), entries: entries.length, truncated: dropped > 0 }
       },
     }),
 
@@ -475,8 +486,9 @@ export function renderTools(host: RenderHost): ToolSet {
         }).sort((a, b) => a.at.localeCompare(b.at))
         if (!all.length) return { error: 'A timeline needs at least one event with a valid time and a label.' }
         const events = all.slice(0, MAX_EVENTS)
-        host.keep(toolCallId, { kind: 'timeline', title: input.title, events })
-        return { shown: true, events: events.length, truncated: all.length > MAX_EVENTS }
+        const view: RenderView = { kind: 'timeline', title: input.title, events }
+        host.keep(toolCallId, view)
+        return { shown: true, card: cardNote(view), events: events.length, truncated: all.length > MAX_EVENTS }
       },
     }),
 
@@ -494,14 +506,15 @@ export function renderTools(host: RenderHost): ToolSet {
         const code = typeof input.code === 'string' ? input.code : ''
         if (!code.trim()) return { error: 'A code card needs the code to show.' }
         const caption = text(input.caption)
-        host.keep(toolCallId, {
+        const view: RenderView = {
           kind: 'code',
           title: input.title,
           language: text(input.language).toLowerCase() || 'text',
           code: code.slice(0, MAX_TEXT_CHARS),
           ...(caption ? { caption } : {}),
-        })
-        return { shown: true, truncated: code.length > MAX_TEXT_CHARS }
+        }
+        host.keep(toolCallId, view)
+        return { shown: true, card: cardNote(view), truncated: code.length > MAX_TEXT_CHARS }
       },
     }),
 
@@ -520,15 +533,16 @@ export function renderTools(host: RenderHost): ToolSet {
         const before = firstLines(input.before, MAX_DIFF_LINES)
         const after = firstLines(input.after, MAX_DIFF_LINES)
         if (!before && !after) return { error: 'A comparison needs a before and an after text.' }
-        host.keep(toolCallId, {
+        const view: RenderView = {
           kind: 'diff',
           title: input.title,
           before,
           after,
           beforeLabel: text(input.before_label) || 'Before',
           afterLabel: text(input.after_label) || 'After',
-        })
-        return { shown: true, changed: before !== after }
+        }
+        host.keep(toolCallId, view)
+        return { shown: true, card: cardNote(view), changed: before !== after }
       },
     }),
 
@@ -573,7 +587,7 @@ export function renderTools(host: RenderHost): ToolSet {
               : { error: 'Name the figure to show.', figures: names }
           }
           const name = figureName(picked)
-          host.keep(toolCallId, {
+          const view: RenderView = {
             kind: 'artifact',
             title: name,
             caption: text(input.caption) || undefined,
@@ -587,8 +601,9 @@ export function renderTools(host: RenderHost): ToolSet {
               key,
               versionId: versionId || undefined,
             },
-          })
-          return { shown: true, figure: name, of: names.length }
+          }
+          host.keep(toolCallId, view)
+          return { shown: true, card: cardNote(view), figure: name, of: names.length }
         } catch (cause) {
           return { error: errorMessage(cause) }
         }
@@ -630,7 +645,7 @@ export function renderTools(host: RenderHost): ToolSet {
             filename: text(input.filename) || undefined,
             size: count(input.size),
           })
-          host.keep(toolCallId, {
+          const view: RenderView = {
             kind: 'artifact',
             title: loaded.name,
             caption: caption || undefined,
@@ -646,8 +661,9 @@ export function renderTools(host: RenderHost): ToolSet {
               jobId: jobId || undefined,
               text: loaded.text,
             },
-          })
-          return { shown: true, content_type: loaded.contentType, kind: loaded.kind }
+          }
+          host.keep(toolCallId, view)
+          return { shown: true, card: cardNote(view), content_type: loaded.contentType, kind: loaded.kind }
         } catch (cause) {
           return { error: errorMessage(cause) }
         }
