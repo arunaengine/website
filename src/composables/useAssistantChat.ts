@@ -1466,6 +1466,8 @@ function adoptStoredChats() {
     if (chat && !chats.some((entry) => entry.id === id)) chats.push(chat)
   }
   for (const chat of chatState.chats) if (!chats.some((entry) => entry.id === chat.id)) chatSyncs.delete(chat.id)
+  // A chat another tab synced carries its node cursor, so a rename or delete here reaches the node.
+  for (const chat of chats) if (chat.remote) restoreCursor(syncOf(chat.id), chatTurns(chat), chat.remote)
   chatState = { ...chatState, chats }
   updateChatList()
 }

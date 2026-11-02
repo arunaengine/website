@@ -151,7 +151,11 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 const stored = new Map<string, string>()
+const storageListeners: Array<(event: { key: string | null }) => void> = []
 vi.stubGlobal('window', {
+  addEventListener: (type: string, listener: (event: { key: string | null }) => void) => {
+    if (type === 'storage') storageListeners.push(listener)
+  },
   localStorage: {
     getItem: (key: string) => stored.get(key) ?? null,
     setItem: (key: string, value: string) => {
@@ -350,6 +354,32 @@ describe('pushing', () => {
     expect(node.log).toEqual([`PUT turn ${id}/1 rev 2`])
     expect(nodeTexts(id)).toEqual(['t1', 't1 answered', 'ta', 'ta answered'])
     expect(texts(id)).toEqual(['t1', 't1 answered', 'ta', 'ta answered'])
+  })
+
+  it('renames and deletes on the node a chat another tab synced', async () => {
+    const scope = await login()
+    seedNode('n-7', 'Theirs', [payload('u7', 'their turn')])
+    const head = node.chats.get('n-7')!.head
+    // Another tab of this browser synced n-7 and stored it with its node cursor.
+    const tab = createAssistantChatStore(scope)
+    const held = tab.load()
+    const theirs = {
+      ...newAssistantChat('Theirs'),
+      id: 'n-7',
+      ...decodeTurn(payload('u7', 'their turn'))!,
+      remote: { revision: head.revision, nextSeq: head.next_seq, tailKey: 'u7' },
+    }
+    tab.save({ ...held, chats: [...held.chats, theirs] }, ['n-7'])
+    for (const listener of storageListeners) listener({ key: `${tab.key}:index` })
+    node.log.length = 0
+
+    chat.renameChat('n-7', 'Renamed here')
+    await settle()
+    chat.deleteChat('n-7')
+    await settle()
+
+    expect(node.log).toEqual([`PUT chat n-7 rev ${head.revision} Renamed here`, 'DELETE chat n-7'])
+    expect(node.chats.get('n-7')?.deleted).toBe(true)
   })
 
   it('never creates an empty chat on the node', async () => {
