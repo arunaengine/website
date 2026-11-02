@@ -183,7 +183,7 @@ onUnmounted(() => {
         <div class="p-4">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">Tutorial</p>
+              <p class="text-[10px] font-semibold text-primary">Tutorial</p>
               <h2 class="mt-1 font-display text-sm font-semibold text-aruna-navy">{{ tutorialStep?.title }}</h2>
             </div>
             <div class="flex shrink-0 items-center gap-1">

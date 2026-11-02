@@ -397,14 +397,14 @@ async function submitToken() {
         <div class="space-y-2 text-sm">
           <div class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
             <div class="min-w-0">
-              <div class="text-[10px] uppercase tracking-wider text-muted-foreground">Access key ID</div>
+              <div class="text-[10px] text-muted-foreground">Access key ID</div>
               <div class="break-all font-mono text-xs">{{ created.access_key_id }}</div>
             </div>
             <CopyButton :value="created.access_key_id" label="Copy access key ID" />
           </div>
           <div class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
             <div class="min-w-0">
-              <div class="text-[10px] uppercase tracking-wider text-muted-foreground">Secret access key</div>
+              <div class="text-[10px] text-muted-foreground">Secret access key</div>
               <div class="break-all font-mono text-xs">{{ created.access_secret }}</div>
             </div>
             <CopyButton :value="created.access_secret" label="Copy secret access key" />
@@ -412,7 +412,7 @@ async function submitToken() {
           <template v-if="sessionToken">
             <div class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
               <div class="min-w-0">
-                <div class="text-[10px] uppercase tracking-wider text-muted-foreground">Session token</div>
+                <div class="text-[10px] text-muted-foreground">Session token</div>
                 <div class="break-all font-mono text-xs">{{ sessionToken }}</div>
               </div>
               <CopyButton :value="sessionToken" label="Copy session token" />
@@ -428,7 +428,7 @@ async function submitToken() {
             bucket is locked.
           </p>
           <div class="relative rounded-md border border-border bg-muted/40 px-3 py-2">
-            <div class="text-[10px] uppercase tracking-wider text-muted-foreground">CLI usage</div>
+            <div class="text-[10px] text-muted-foreground">CLI usage</div>
             <pre class="mt-1 whitespace-pre-wrap break-all font-mono text-[11px] leading-5">{{ cliSnippet }}</pre>
             <div class="absolute right-2 top-2"><CopyButton :value="cliSnippet" label="Copy CLI snippet" /></div>
           </div>

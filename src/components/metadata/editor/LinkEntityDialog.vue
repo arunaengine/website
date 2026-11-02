@@ -84,7 +84,7 @@ function pickUrl() {
     <p v-if="!listed.length" class="px-2.5 py-2 text-xs text-muted-foreground">Nothing in this dataset matches.</p>
 
     <template #footer>
-      <p class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">External URL</p>
+      <p class="text-[11px] font-medium text-muted-foreground">External URL</p>
       <div class="mt-1 flex items-start gap-2">
         <Input
           v-model="url"

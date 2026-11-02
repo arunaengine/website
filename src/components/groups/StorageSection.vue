@@ -403,8 +403,8 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
         <div class="flex items-center gap-2 px-3 py-2.5">
           <div class="min-w-0">
             <span class="text-sm font-semibold text-foreground">{{ backend.name }}</span>
-            <Badge size="sm" variant="secondary" class="ml-1.5 uppercase">{{ kindLabel(backend) }}</Badge>
-            <Badge v-if="backend.disabled" size="sm" variant="warn" class="ml-1 uppercase">removed</Badge>
+            <Badge size="sm" variant="secondary" class="ml-1.5">{{ kindLabel(backend) }}</Badge>
+            <Badge v-if="backend.disabled" size="sm" variant="warn" class="ml-1">removed</Badge>
             <p class="mt-0.5 truncate text-xs text-muted-foreground">{{ backend.public_config.endpoint ?? storeName(backend) }}</p>
           </div>
           <span class="flex-1" />
@@ -424,7 +424,7 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
         <div class="rounded-b-lg border-t border-border bg-muted/30 px-3 pb-2.5 pt-1.5 text-xs">
           <div
             v-if="rowsOf(backend.backend_id).length || defaultId === backend.backend_id"
-            :class="[GRID, 'border-b border-border py-1 text-[11px] uppercase tracking-wide text-muted-foreground']"
+            :class="[GRID, 'border-b border-border py-1 text-[11px] text-muted-foreground']"
           >
             <span>Aruna bucket</span><span /><span>S3 bucket</span><span>New uploads named</span><span>Synced</span><span />
           </div>
@@ -531,7 +531,7 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
         <div class="flex items-center gap-2 px-3 py-2.5">
           <div class="min-w-0">
             <span class="text-sm font-semibold text-foreground">Aruna storage</span>
-            <Badge size="sm" variant="secondary" class="ml-1.5 uppercase">built in</Badge>
+            <Badge size="sm" variant="secondary" class="ml-1.5">built in</Badge>
             <p class="mt-0.5 text-xs text-muted-foreground">
               {{ defaultId ? 'Managed by Aruna on this node.' : 'Gets new buckets.' }}
             </p>

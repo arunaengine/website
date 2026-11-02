@@ -148,7 +148,7 @@ const tooltipLeft = computed(() => (hoverPoint.value ? Math.min(85, Math.max(15,
         >
           <div class="font-medium text-foreground tabular-nums">{{ formatBytes(hoverPoint.v) }}</div>
           <div class="text-[10px] text-muted-foreground">{{ formatDateTime(hoverPoint.t) }}</div>
-          <div v-if="pointBadge(hoverPoint.point)" class="mt-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+          <div v-if="pointBadge(hoverPoint.point)" class="mt-0.5 text-[10px] font-medium text-muted-foreground">
             {{ pointBadge(hoverPoint.point)!.label }}
           </div>
         </div>
@@ -164,7 +164,7 @@ const tooltipLeft = computed(() => (hoverPoint.value ? Math.min(85, Math.max(15,
       <summary class="cursor-pointer text-[11px] text-muted-foreground">View as table</summary>
       <div class="mt-2 max-h-48 overflow-y-auto rounded-md border border-border">
         <table class="w-full text-xs">
-          <thead class="sticky top-0 bg-muted/50 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <thead class="sticky top-0 bg-muted/50 text-[10px] text-muted-foreground">
             <tr>
               <th class="px-2 py-1 text-left font-semibold">Timestamp</th>
               <th class="px-2 py-1 text-right font-semibold">Logical bytes</th>

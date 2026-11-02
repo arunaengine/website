@@ -189,7 +189,7 @@ function addKeyword() {
     </div>
 
     <div class="border-t border-border">
-      <p class="px-5 pb-1 pt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <p class="px-5 pb-1 pt-3 text-[11px] font-medium text-muted-foreground">
         More properties
       </p>
       <PropertyEditor

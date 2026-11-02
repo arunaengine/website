@@ -96,7 +96,7 @@ function transferVariant(item: UploadQueueItem): BadgeVariant {
             v-if="item.state !== 'uploading' && item.state !== 'queued'"
             :variant="transferVariant(item)"
             size="sm"
-            class="shrink-0 uppercase"
+            class="shrink-0"
           >
             {{ item.pausedForSession ? 'PAUSED' : item.state }}
           </Badge>

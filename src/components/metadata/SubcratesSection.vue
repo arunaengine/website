@@ -73,7 +73,7 @@ function displayName(link: SubcrateLink): string {
   <section>
     <SectionHeading title="Linked datasets" :icon="Layers" :count="links.length ? String(links.length) : undefined">
       <template #actions>
-        <Badge v-if="isProject" variant="outline" size="sm" class="uppercase">Project dataset</Badge>
+        <Badge v-if="isProject" variant="outline" size="sm">Project dataset</Badge>
         <Button v-if="canWrite" as-child variant="outline" size="sm">
           <RouterLink :to="{ name: 'dataset-edit', params: { id: documentId } }">
             <Pencil class="size-3.5" /> Edit
@@ -100,7 +100,7 @@ function displayName(link: SubcrateLink): string {
               <span class="block truncate font-mono text-[11px] text-muted-foreground" :title="link.identifier || link.iri">{{ link.identifier || link.iri }}</span>
             </div>
           </div>
-          <Badge variant="outline" size="sm" class="uppercase">{{ resolveDocumentId(link) ? 'linked' : 'external' }}</Badge>
+          <Badge variant="outline" size="sm">{{ resolveDocumentId(link) ? 'linked' : 'external' }}</Badge>
         </li>
       </ul>
       <EmptyState

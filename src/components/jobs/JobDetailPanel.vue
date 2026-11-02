@@ -133,7 +133,7 @@ async function confirmCancel() {
         <section v-if="job.error" class="space-y-2">
           <h3 class="font-display text-sm font-semibold text-aruna-navy">Last error</h3>
           <Notice tone="error" class="space-y-1.5">
-            <Badge :variant="errorKindVariant" size="sm" class="uppercase">{{ job.error.kind }}</Badge>
+            <Badge :variant="errorKindVariant" size="sm">{{ job.error.kind }}</Badge>
             <p class="whitespace-pre-wrap break-words">{{ job.error.message }}</p>
           </Notice>
         </section>

@@ -165,12 +165,12 @@ async function removeRole(role: ApiRole) {
           <tr v-for="role in sortedRoles" :key="role.role_id" class="border-t border-border">
             <td class="px-5 py-2.5 font-medium text-foreground">
               {{ role.name }}
-              <Badge v-if="role.public" size="sm" variant="success" class="ml-1 uppercase" title="Applies to everyone, including anonymous requests">
+              <Badge v-if="role.public" size="sm" variant="success" class="ml-1" title="Applies to everyone, including anonymous requests">
                 <Globe class="mr-0.5 h-3 w-3" aria-hidden="true" /> public
               </Badge>
             </td>
             <td v-for="scope in scopes" :key="scope.label" class="px-3 py-2.5">
-              <Badge v-if="cellLevel(role, scope.paths)" size="sm" :variant="levelVariant(cellLevel(role, scope.paths)!)" class="uppercase">
+              <Badge v-if="cellLevel(role, scope.paths)" size="sm" :variant="levelVariant(cellLevel(role, scope.paths)!)">
                 {{ cellLevel(role, scope.paths) }}
               </Badge>
               <span v-else class="text-muted-foreground">-</span>
@@ -183,7 +183,7 @@ async function removeRole(role: ApiRole) {
                 :aria-label="`Show the custom rules of ${role.name}`"
                 @click="rulesOf = role"
               >
-                <Badge size="sm" :variant="levelVariant(customSummary(role).level)" class="uppercase">{{ customSummary(role).level }}</Badge>
+                <Badge size="sm" :variant="levelVariant(customSummary(role).level)">{{ customSummary(role).level }}</Badge>
                 <span class="text-[11px] text-muted-foreground">{{ customSummary(role).count }} {{ customSummary(role).count === 1 ? 'rule' : 'rules' }}</span>
                 <Info class="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
               </button>
@@ -237,7 +237,7 @@ async function removeRole(role: ApiRole) {
         </DialogHeader>
         <ul class="divide-y divide-border/60 rounded-md border border-border/60 text-xs">
           <li v-for="rule in customRules(rulesOf)" :key="rule.path" class="flex items-start gap-2 px-3 py-2">
-            <Badge size="sm" :variant="levelVariant(rule.level)" class="mt-0.5 shrink-0 uppercase">{{ rule.level }}</Badge>
+            <Badge size="sm" :variant="levelVariant(rule.level)" class="mt-0.5 shrink-0">{{ rule.level }}</Badge>
             <span class="min-w-0">
               <span class="block">{{ rule.label }}</span>
               <span class="block break-all font-mono text-[10px] text-muted-foreground">{{ rule.path }}</span>

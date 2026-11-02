@@ -178,7 +178,7 @@ async function submit() {
 
     <div class="grid gap-6 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
       <div class="min-w-0">
-        <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Name</div>
+        <div class="text-[11px] font-semibold text-muted-foreground">Name</div>
         <div class="mt-1.5 max-w-sm">
           <label class="sr-only" for="role-name">Role name</label>
           <Input id="role-name" v-model="name" placeholder="e.g. curators" />
@@ -187,7 +187,7 @@ async function submit() {
           </p>
         </div>
 
-        <div class="mt-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Who holds this role</div>
+        <div class="mt-4 text-[11px] font-semibold text-muted-foreground">Who holds this role</div>
         <OptionToggle
           :model-value="isPublic ? 'everyone' : 'members'"
           :options="HOLDER_OPTIONS"
@@ -287,7 +287,7 @@ async function submit() {
               <ul v-if="grants.length" class="mt-1.5 space-y-0.5">
                 <li v-for="grant in grants" :key="grant.suffix" class="flex items-center gap-2 font-mono text-[11px]">
                   <span class="min-w-0 truncate text-foreground/80" :title="`${prefix}${grant.suffix}`">{{ grant.suffix }}</span>
-                  <span class="ml-auto shrink-0 uppercase text-muted-foreground">{{ grant.level }}</span>
+                  <span class="ml-auto shrink-0 text-muted-foreground">{{ grant.level }}</span>
                 </li>
               </ul>
               <p v-else class="mt-1.5 font-mono text-[11px] text-muted-foreground">(no paths yet)</p>

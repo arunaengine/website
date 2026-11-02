@@ -117,7 +117,7 @@ async function apply(action: 'grant' | 'revoke') {
           <li v-for="row in rows" :key="row.label" class="min-w-0 space-y-1 px-3 py-2">
             <div class="flex items-center justify-between gap-3">
               <span class="min-w-0 break-all">{{ row.label }}</span>
-              <Badge :variant="row.isPublic ? 'success' : 'secondary'" size="sm" class="shrink-0 uppercase">
+              <Badge :variant="row.isPublic ? 'success' : 'secondary'" size="sm" class="shrink-0">
                 <Globe v-if="row.isPublic" class="mr-0.5 size-3" aria-hidden="true" />
                 <Lock v-else class="mr-0.5 size-3" aria-hidden="true" />
                 {{ row.isPublic ? 'public' : 'private' }}

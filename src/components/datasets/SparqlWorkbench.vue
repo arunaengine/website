@@ -34,7 +34,7 @@ const sparqlModeOptions = Object.entries(SPARQL_MODE_LABELS).map(([value, label]
       <div class="flex items-center gap-2">
         <Code2 class="h-4 w-4 text-primary" />
         <h2 class="font-display text-sm font-semibold text-aruna-navy">SPARQL workbench</h2>
-        <Badge variant="secondary" size="sm" class="uppercase">real API</Badge>
+        <Badge variant="secondary" size="sm">real API</Badge>
       </div>
       <div class="flex items-center gap-3">
         <Select
@@ -48,7 +48,7 @@ const sparqlModeOptions = Object.entries(SPARQL_MODE_LABELS).map(([value, label]
     </div>
     <div v-if="documentScope" class="mt-3 rounded-md border border-primary/25 bg-primary/5 px-3 py-2.5 text-xs text-foreground/80">
       <div class="flex flex-wrap items-center gap-2">
-        <Badge variant="accent" size="sm" class="uppercase">Fixed dataset scope</Badge>
+        <Badge variant="accent" size="sm">Fixed dataset scope</Badge>
         <span class="break-all font-mono">{{ documentScope }}</span>
       </div>
       <p class="mt-2 leading-relaxed">
@@ -63,7 +63,7 @@ const sparqlModeOptions = Object.entries(SPARQL_MODE_LABELS).map(([value, label]
 
   <section v-if="sparqlFailure" class="surface overflow-hidden">
     <header class="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-4 py-2.5 text-[11px] text-muted-foreground">
-      <Badge variant="destructive" size="sm" class="uppercase">Unavailable</Badge>
+      <Badge variant="destructive" size="sm">Unavailable</Badge>
       <span v-if="sparqlFailureMode">Mode: {{ sparqlModeLabels[sparqlFailureMode] }}</span>
       <span v-if="documentScope" class="font-mono">Fixed dataset scope: {{ documentScope }}</span>
       <Button variant="outline" size="sm" class="ml-auto" :disabled="running" @click="runQuery">Retry</Button>
@@ -80,7 +80,7 @@ const sparqlModeOptions = Object.entries(SPARQL_MODE_LABELS).map(([value, label]
       <Badge
         :variant="sparqlCoverageStatus(sparqlResult) === 'Complete' ? 'success' : sparqlCoverageStatus(sparqlResult) === 'Partial' ? 'warn' : 'destructive'"
         size="sm"
-        class="uppercase"
+       
       >
         {{ sparqlCoverageStatus(sparqlResult) }}
       </Badge>
@@ -104,7 +104,7 @@ const sparqlModeOptions = Object.entries(SPARQL_MODE_LABELS).map(([value, label]
     </Notice>
     <div class="max-h-[480px] overflow-auto scrollbar-thin">
       <table class="w-full text-sm">
-        <thead class="sticky top-0 bg-background text-[11px] uppercase tracking-wider text-muted-foreground">
+        <thead class="sticky top-0 bg-background text-[11px] text-muted-foreground">
           <tr><th v-for="column in sparqlResult.columns" :key="column" class="px-3 py-2 text-left font-semibold">{{ column }}</th></tr>
         </thead>
         <tbody>

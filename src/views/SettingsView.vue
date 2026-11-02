@@ -313,7 +313,7 @@ const { mode: appearance, setTheme } = useTheme()
             </button>
             <div v-if="identityOpen" class="mt-2 flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
               <div class="min-w-0 flex-1">
-                <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Full user identity</div>
+                <div class="text-[10px] font-semibold text-muted-foreground">Full user identity</div>
                 <code class="mt-0.5 block break-all font-mono text-[11px] leading-relaxed text-foreground/80">{{ userInfo.user.user_id }}</code>
               </div>
               <CopyButton :value="userInfo.user.user_id" label="Copy user identity" />

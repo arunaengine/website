@@ -128,7 +128,7 @@ function rowTarget(row: TransferRow): string {
         <tbody>
           <tr v-for="row in visibleRows" :key="row.entry_key" class="border-b border-border last:border-0 align-top">
             <td class="px-2 py-1.5">
-              <Badge :variant="codeVariant(row.code)" size="sm" class="uppercase">{{ row.code }}</Badge>
+              <Badge :variant="codeVariant(row.code)" size="sm">{{ row.code }}</Badge>
             </td>
             <td class="px-2 py-1.5">
               <p class="break-all font-mono text-foreground">{{ rowSource(row) }}</p>

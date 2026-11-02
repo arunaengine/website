@@ -171,7 +171,7 @@ async function copyId() {
         <div class="flex flex-wrap gap-1.5">
           <template v-for="chip in typeChips" :key="chip.uri">
             <ExternalLink v-if="chip.href" :href="chip.href" :label="chip.label" class="chip text-primary" :title="chip.uri" />
-            <Badge v-else variant="outline" size="sm" class="uppercase">{{ chip.label }}</Badge>
+            <Badge v-else variant="outline" size="sm">{{ chip.label }}</Badge>
           </template>
           <Badge v-if="entity.profileLabel" variant="outline" size="sm">{{ entity.profileLabel }}</Badge>
         </div>

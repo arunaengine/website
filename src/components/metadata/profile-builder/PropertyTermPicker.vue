@@ -156,7 +156,7 @@ function addCustom() {
       </div>
 
       <div v-if="commonTerms.length">
-        <div class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        <div class="text-[10px] font-medium text-muted-foreground">
           Common for {{ typeLabel }}
         </div>
         <div class="mt-1 flex flex-wrap gap-1.5">

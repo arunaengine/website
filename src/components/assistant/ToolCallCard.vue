@@ -57,7 +57,7 @@ const hasBody = computed(() =>
         class="min-w-0 truncate font-medium text-foreground"
         :class="title === call.name ? 'font-mono' : ''"
       >{{ title }}</span>
-      <Badge size="sm" :variant="STATE_VARIANT[call.state]" class="ml-auto uppercase">{{ call.state }}</Badge>
+      <Badge size="sm" :variant="STATE_VARIANT[call.state]" class="ml-auto">{{ call.state }}</Badge>
     </button>
     <div v-if="open && hasBody" class="space-y-1.5 px-2.5 py-2">
       <p v-if="title !== call.name" class="font-mono text-[10px] text-muted-foreground">{{ call.name }}</p>

@@ -114,7 +114,7 @@ function pick(entityId: string) {
         :class="listOpen ? '' : 'hidden'"
       >
         <section v-for="group in groups" :key="group.key">
-          <p class="px-3 pb-1 pt-2.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <p class="px-3 pb-1 pt-2.5 text-[11px] font-medium text-muted-foreground">
             {{ group.title }}
           </p>
           <ul>

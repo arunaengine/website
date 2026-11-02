@@ -146,7 +146,7 @@ async function apply(): Promise<void> {
       <div class="space-y-4 py-1">
         <div v-if="entry" class="grid gap-3 sm:grid-cols-2">
           <section class="surface-inline border-primary/30 bg-primary/[0.06] px-3 py-2.5">
-            <h3 class="text-[11px] font-semibold uppercase tracking-wider text-foreground">On this computer</h3>
+            <h3 class="text-[11px] font-semibold text-foreground">On this computer</h3>
             <dl class="mt-2 space-y-1">
               <div v-for="detail in localDetails" :key="detail.label" class="flex items-baseline justify-between gap-3">
                 <dt class="text-[11px] text-muted-foreground">{{ detail.label }}</dt>
@@ -155,7 +155,7 @@ async function apply(): Promise<void> {
             </dl>
           </section>
           <section class="surface-inline px-3 py-2.5">
-            <h3 class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">In the realm</h3>
+            <h3 class="text-[11px] font-semibold text-muted-foreground">In the realm</h3>
             <p v-if="removing" class="mt-2 text-[11px] text-muted-foreground">
               Deleted. Earlier versions stay recoverable in the realm.
             </p>

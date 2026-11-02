@@ -98,7 +98,7 @@ const csv = computed(() => Papa.unparse([props.columns, ...props.rows.map((row) 
     </div>
     <div class="scrollbar-thin max-h-72 overflow-auto">
       <table class="w-full table-auto text-left">
-        <thead class="sticky top-0 bg-muted/60 text-[10px] uppercase tracking-wider text-muted-foreground backdrop-blur">
+        <thead class="sticky top-0 bg-muted/60 text-[10px] text-muted-foreground backdrop-blur">
           <tr>
             <th v-for="(column, index) in columns" :key="index" class="whitespace-nowrap px-2.5 py-1.5 font-semibold">
               <button type="button" class="inline-flex items-center gap-1 hover:text-foreground" @click="sort(index)">

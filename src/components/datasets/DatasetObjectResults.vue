@@ -117,7 +117,7 @@ function objectHitRoute(hit: ObjectSearchHit): RouteLocationRaw {
         class="surface flex min-w-0 flex-col gap-3 p-4 transition-shadow hover:shadow-md"
       >
         <div class="flex flex-wrap items-center gap-1.5">
-          <Badge variant="secondary" size="sm" class="uppercase">Object</Badge>
+          <Badge variant="secondary" size="sm">Object</Badge>
           <Badge variant="outline" size="sm">{{ OBJECT_SEARCH_MODE_LABELS[hit.mode] }}</Badge>
         </div>
         <p class="break-all font-mono text-xs font-medium text-foreground">{{ hit.key }}</p>

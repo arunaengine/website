@@ -77,7 +77,7 @@ function toggleLabel(field: CollapsibleField): string {
 <template>
   <div class="rounded-md border border-border bg-muted/40 px-3 py-2">
     <div class="flex flex-wrap items-center gap-2">
-      <div class="text-[10px] uppercase tracking-wider text-muted-foreground">{{ title }}</div>
+      <div class="text-[10px] text-muted-foreground">{{ title }}</div>
       <div class="ml-auto flex items-center gap-1.5">
         <button
           v-if="inputsCollapsible"

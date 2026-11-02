@@ -492,7 +492,7 @@ async function create() {
           Could not search saved datasets.
         </div>
         <div v-else-if="shownRecent.length">
-          <p class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <p class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-muted-foreground">
             From saved datasets
           </p>
           <button

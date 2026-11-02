@@ -486,7 +486,7 @@ const isEmpty = computed(
             <p v-if="listError" class="border-b border-border px-3 py-2 text-xs text-destructive">{{ listError }}</p>
             <div tabindex="0" role="region" aria-label="Objects" class="max-h-[260px] overflow-y-auto">
               <table class="w-full table-fixed text-sm">
-                <thead class="hidden bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground @xs:table-header-group">
+                <thead class="hidden bg-muted/50 text-[11px] text-muted-foreground @xs:table-header-group">
                   <tr>
                     <th v-if="selectable" class="w-10 px-3 py-1.5"></th>
                     <th scope="col" class="px-3 py-1.5 text-left font-semibold">Name</th>

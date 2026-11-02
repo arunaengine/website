@@ -197,7 +197,7 @@ function pickRemote(hit: TermHit) {
     <!-- Section 2: streamed remote hits. Only ever additive on top of the
          bundled results; a degraded provider shows a hint + status dot. -->
     <div v-if="showRemoteSection" :class="matches.length ? 'mt-1.5 border-t border-border/60 pt-1.5' : ''">
-      <p class="mb-0.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+      <p class="mb-0.5 flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
         More from terminology services
         <Spinner v-if="remotePending" label="Searching terminology services…" class="[&>svg]:size-3" />
         <StatusDot v-if="degraded.length" tone="attention" :label="degradedTooltip" class="size-1.5" />

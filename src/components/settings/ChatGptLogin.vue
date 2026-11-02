@@ -146,7 +146,7 @@ onBeforeUnmount(stopPolling)
 
     <div v-if="waiting" class="space-y-2">
       <div class="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
-        <span class="text-[11px] uppercase tracking-wider text-muted-foreground">Code</span>
+        <span class="text-[11px] text-muted-foreground">Code</span>
         <code class="font-mono text-sm tracking-widest text-foreground">{{ userCode }}</code>
         <CopyButton :value="userCode" label="Copy the sign-in code" />
       </div>

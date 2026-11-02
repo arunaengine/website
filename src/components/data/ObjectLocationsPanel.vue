@@ -231,8 +231,8 @@ Only the node that holds a file can say where its copies are; open the bucket on
               >
                 {{ otherPath(copy) }}
               </span>
-              <Badge v-if="copy.local" variant="outline" size="sm" class="uppercase">this node</Badge>
-              <Badge :variant="copyVariant(copy.state)" size="sm" class="uppercase" :title="copyState(copy.state).description">
+              <Badge v-if="copy.local" variant="outline" size="sm">this node</Badge>
+              <Badge :variant="copyVariant(copy.state)" size="sm" :title="copyState(copy.state).description">
                 {{ copyState(copy.state).label }}
               </Badge>
               <span class="min-w-0 flex-1 truncate text-right text-[11px] text-muted-foreground">

@@ -104,7 +104,7 @@ function pickVocab(term: VocabTerm) {
       </div>
 
       <div v-if="profileShapes.length">
-        <div class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Shapes in this profile</div>
+        <div class="text-[10px] font-medium text-muted-foreground">Shapes in this profile</div>
         <div class="mt-1 flex flex-wrap gap-1.5">
           <button
             v-for="option in profileShapes"
@@ -120,7 +120,7 @@ function pickVocab(term: VocabTerm) {
       </div>
 
       <div v-if="curatedTypes.length">
-        <div class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Common types</div>
+        <div class="text-[10px] font-medium text-muted-foreground">Common types</div>
         <div class="mt-1 flex flex-wrap gap-1.5">
           <button
             v-for="option in curatedTypes"

@@ -473,7 +473,7 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
             :key="i"
             :variant="MARKER_VARIANT[marker.kind]"
             size="sm"
-            class="shrink-0 gap-0.5 px-1.5 uppercase"
+            class="shrink-0 gap-0.5 px-1.5"
           >
             <ArrowDownToLine v-if="marker.kind === 'in'" class="h-2.5 w-2.5" />
             <ArrowUpFromLine v-else-if="marker.kind === 'out'" class="h-2.5 w-2.5" />
@@ -658,7 +658,7 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
       class="mt-2 space-y-1"
     >
       <div v-for="(marker, i) in model.unplaced" :key="i" class="flex items-center gap-1.5">
-        <Badge :variant="MARKER_VARIANT[marker.kind]" size="sm" class="shrink-0 px-1.5 uppercase">{{ MARKER_LABEL[marker.kind] }}</Badge>
+        <Badge :variant="MARKER_VARIANT[marker.kind]" size="sm" class="shrink-0 px-1.5">{{ MARKER_LABEL[marker.kind] }}</Badge>
         <template v-if="editing && sameMarker(marker, editing.marker)">
           <Input
             v-model="editing.value"

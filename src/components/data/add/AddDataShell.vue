@@ -153,7 +153,7 @@ function rowEditable(row: BuilderRow): boolean {
           description="Add files or connector sources from the tabs above."
         />
         <table v-else class="w-full text-sm">
-          <thead class="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
+          <thead class="bg-muted/50 text-[11px] text-muted-foreground">
             <tr>
               <th class="px-3 py-1.5 text-left font-semibold">Source</th>
               <th class="px-3 py-1.5 text-left font-semibold">Target key</th>
@@ -165,8 +165,8 @@ function rowEditable(row: BuilderRow): boolean {
             <tr v-for="row in basket.rows.value" :key="row.id" class="border-t border-border align-top">
               <td class="px-3 py-2">
                 <div class="flex items-center gap-2">
-                  <Badge variant="secondary" size="sm" class="uppercase">{{ kindLabel[row.sourceKind] }}</Badge>
-                  <Badge v-if="row.isPrefix" variant="outline" size="sm" class="uppercase">folder</Badge>
+                  <Badge variant="secondary" size="sm">{{ kindLabel[row.sourceKind] }}</Badge>
+                  <Badge v-if="row.isPrefix" variant="outline" size="sm">folder</Badge>
                   <span class="min-w-0 truncate font-mono text-xs" :title="row.source">{{ row.source }}</span>
                 </div>
                 <Select
@@ -194,7 +194,7 @@ function rowEditable(row: BuilderRow): boolean {
               <td class="px-3 py-2">
                 <div class="flex items-center gap-2">
                   <Spinner v-if="row.state === 'submitting'" label="Adding" class="text-primary" />
-                  <Badge :variant="rowVariant(row.state)" size="sm" class="uppercase">{{ row.state === 'submitting' ? 'adding' : row.state }}</Badge>
+                  <Badge :variant="rowVariant(row.state)" size="sm">{{ row.state === 'submitting' ? 'adding' : row.state }}</Badge>
                   <Progress
                     v-if="row.state === 'submitting'"
                     :value="row.progress"

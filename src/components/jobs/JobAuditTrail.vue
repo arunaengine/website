@@ -222,7 +222,7 @@ watch(
                   {{ formatAuditTime(record.at_ms) }}
                 </td>
                 <td class="px-3 py-2">
-                  <Badge variant="secondary" size="sm" class="uppercase">{{ KIND_LABEL[record.kind] ?? record.kind }}</Badge>
+                  <Badge variant="secondary" size="sm">{{ KIND_LABEL[record.kind] ?? record.kind }}</Badge>
                   <Badge
                     v-if="record.conflicting_family"
                     variant="outline"
@@ -257,7 +257,7 @@ watch(
           </div>
           <ul class="divide-y divide-border" aria-label="Audit record conflicts">
             <li v-for="conflict in conflicts" :key="conflict.digest" class="grid gap-1 py-2 text-[11px] sm:grid-cols-[6rem_1fr]">
-              <Badge variant="outline" size="sm" class="w-fit uppercase">{{ conflict.kind }}</Badge>
+              <Badge variant="outline" size="sm" class="w-fit">{{ conflict.kind }}</Badge>
               <div class="space-y-0.5 text-muted-foreground">
                 <p :title="conflict.digest">Refused digest <span class="font-mono">{{ truncateMiddle(conflict.digest) }}</span></p>
                 <p :title="conflict.retained">Retained digest <span class="font-mono">{{ truncateMiddle(conflict.retained) }}</span></p>

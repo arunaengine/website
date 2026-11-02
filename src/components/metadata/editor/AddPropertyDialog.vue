@@ -172,7 +172,7 @@ function add() {
 
     <template v-else>
       <template v-if="fromProfile.length">
-        <p class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <p class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-muted-foreground">
           Optional in {{ profileName }}
         </p>
         <button
@@ -188,7 +188,7 @@ function add() {
           <span v-if="rule.description" class="line-clamp-1 text-[11px] text-muted-foreground">{{ rule.description }}</span>
         </button>
       </template>
-      <p class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <p class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-muted-foreground">
         Suggested
       </p>
       <button
@@ -206,7 +206,7 @@ function add() {
       <p v-if="!suggested.length" class="px-2.5 py-2 text-xs text-muted-foreground">No suggestion left for this type.</p>
 
       <template v-if="all.length">
-        <p class="px-2.5 pb-1 pt-2.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <p class="px-2.5 pb-1 pt-2.5 text-[11px] font-medium text-muted-foreground">
           Everything else
         </p>
         <button

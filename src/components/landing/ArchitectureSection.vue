@@ -8,7 +8,7 @@ import { Hash, FileJson2, Database, Layers } from '@lucide/vue'
   <section id="architecture" class="section">
     <div class="container max-w-5xl">
       <div class="mx-auto max-w-2xl text-center">
-        <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Architecture</div>
+        <div class="text-[11px] font-semibold text-primary">Architecture</div>
         <h2 class="mt-3 text-balance font-display text-3xl font-semibold tracking-tight text-aruna-navy sm:text-4xl">
           How a realm is put together.
         </h2>

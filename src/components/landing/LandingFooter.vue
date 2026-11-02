@@ -17,7 +17,7 @@ import { RouterLink } from 'vue-router'
       </div>
       <div>
         <h4
-          class="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+          class="text-xs font-semibold text-muted-foreground"
         >
           Portal
         </h4>
@@ -31,7 +31,7 @@ import { RouterLink } from 'vue-router'
       </div>
       <div>
         <h4
-          class="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+          class="text-xs font-semibold text-muted-foreground"
         >
           Engine &amp; spec
         </h4>

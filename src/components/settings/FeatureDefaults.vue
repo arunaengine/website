@@ -51,7 +51,7 @@ async function save() {
     <div class="surface">
     <div class="grid gap-x-8 gap-y-5 p-5 lg:grid-cols-2">
       <div v-for="group in FEATURE_GROUPS" :key="group.label">
-        <h4 class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{{ group.label }}</h4>
+        <h4 class="text-[11px] font-semibold text-muted-foreground">{{ group.label }}</h4>
         <ul class="mt-1 divide-y divide-border">
           <li v-for="info in group.features" :key="info.key" class="flex items-center gap-4 py-2.5">
             <div class="min-w-0 flex-1">

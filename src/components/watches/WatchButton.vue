@@ -356,7 +356,7 @@ const onDelete = () => exclusive(async () => {
       <div class="space-y-3">
         <!-- Human identity first; the canonical path is a technical detail. -->
         <div class="surface-muted px-3 py-2.5">
-          <div class="text-[11px] uppercase tracking-wider text-muted-foreground">
+          <div class="text-[11px] text-muted-foreground">
             {{ isData ? 'Watched folder' : 'Watched path' }}
           </div>
           <div class="mt-1 truncate text-sm font-medium text-foreground" :title="resourceLabel">{{ resourceLabel }}</div>

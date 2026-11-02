@@ -92,7 +92,7 @@ async function createOtherRelationships() {
     <ul class="divide-y divide-border">
       <li v-for="row in otherRows" :key="row.id" class="space-y-1 px-3 py-2">
         <div class="flex items-center gap-2 text-xs">
-          <Badge v-if="row.isPrefix" variant="outline" size="sm" class="shrink-0 uppercase">folder</Badge>
+          <Badge v-if="row.isPrefix" variant="outline" size="sm" class="shrink-0">folder</Badge>
           <span class="min-w-0 truncate font-mono" :title="`${row.bucket}/${row.sourcePrefix}`">
             {{ row.bucket }}/{{ row.sourcePrefix }}
           </span>
@@ -110,8 +110,8 @@ async function createOtherRelationships() {
             />
             <Badge v-else variant="outline" size="sm">{{ row.mode === 'once' ? 'Copy (once)' : 'Reference' }}</Badge>
             <Spinner v-if="row.state === 'creating'" label="Creating the import" class="text-primary" />
-            <Badge v-else-if="row.state === 'done'" :variant="stateVariant('done')" size="sm" class="uppercase">done</Badge>
-            <Badge v-else-if="row.state === 'error'" :variant="stateVariant('failed')" size="sm" class="uppercase">failed</Badge>
+            <Badge v-else-if="row.state === 'done'" :variant="stateVariant('done')" size="sm">done</Badge>
+            <Badge v-else-if="row.state === 'error'" :variant="stateVariant('failed')" size="sm">failed</Badge>
             <Button
               v-if="row.state !== 'creating'"
               variant="ghost"

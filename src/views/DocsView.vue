@@ -333,7 +333,7 @@ function glossaryLink(anchor: string) {
                 </ol>
                 <div v-if="section.table" class="mt-3 min-w-0 overflow-x-auto rounded-md border border-border">
                   <table class="w-full min-w-max text-sm">
-                    <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <thead class="bg-muted/20 text-[11px] text-muted-foreground">
                       <tr>
                         <th v-for="column in section.table.columns" :key="column" class="px-3 py-2 text-left font-semibold">
                           {{ column }}

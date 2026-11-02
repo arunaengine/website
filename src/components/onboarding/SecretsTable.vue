@@ -112,7 +112,7 @@ onUnmounted(() => window.clearTimeout(confirmTimer))
   <div class="overflow-x-auto">
     <table class="w-full text-left text-sm">
       <thead>
-        <tr class="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+        <tr class="border-b border-border text-[11px] text-muted-foreground">
           <th class="px-3 py-2 font-medium">{{ props.kindHeader }}</th>
           <th v-if="props.showOwner" class="px-3 py-2 font-medium">Owner</th>
           <th class="px-3 py-2 font-medium">Enrollment id</th>
@@ -124,7 +124,7 @@ onUnmounted(() => window.clearTimeout(confirmTimer))
       <tbody class="divide-y divide-border">
         <tr v-for="row in rows" :key="row.id" class="align-middle">
           <td class="px-3 py-2.5">
-            <Badge size="sm" :variant="row.kindVariant" class="uppercase">{{ row.kindLabel }}</Badge>
+            <Badge size="sm" :variant="row.kindVariant">{{ row.kindLabel }}</Badge>
           </td>
           <td v-if="props.showOwner" class="px-3 py-2.5">
             <span v-if="row.owner" class="text-xs text-foreground/90" :title="row.owner">
@@ -144,7 +144,7 @@ onUnmounted(() => window.clearTimeout(confirmTimer))
           </td>
           <td class="px-3 py-2.5">
             <div class="flex flex-col items-start gap-0.5">
-              <Badge size="sm" :variant="row.statusVariant ?? STATUS_VARIANT[row.status]" class="uppercase">{{ row.statusLabel ?? row.status }}</Badge>
+              <Badge size="sm" :variant="row.statusVariant ?? STATUS_VARIANT[row.status]">{{ row.statusLabel ?? row.status }}</Badge>
               <RouterLink
                 v-if="row.status === 'claimed' && row.claimedBy && row.claimedLink"
                 :to="row.claimedLink"

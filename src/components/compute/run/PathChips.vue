@@ -33,7 +33,7 @@ const KIND_CLASS: Record<string, string> = {
       ]"
     >
       <span class="max-w-56 truncate" :title="check.path">{{ check.path }}</span>
-      <span :class="['rounded-full px-1.5 py-px font-sans text-[10px] font-semibold uppercase tracking-wide', KIND_CLASS[check.kind]]">
+      <span :class="['rounded-full px-1.5 py-px font-sans text-[10px] font-semibold', KIND_CLASS[check.kind]]">
         {{ check.label }}
       </span>
       <button

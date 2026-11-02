@@ -164,7 +164,7 @@ watch(
               </span>
             </Notice>
             <div class="space-y-1.5">
-              <p class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Graph</p>
+              <p class="text-[11px] font-medium text-muted-foreground">Graph</p>
               <CrateGraph :source="importPreview.crate" mode="view" height="18rem" />
             </div>
           </template>

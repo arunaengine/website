@@ -162,7 +162,7 @@ describe('ContextSwitcher', () => {
       && String(node.props.class ?? '').includes('flex-col'))
     expect(String(label.props.class)).not.toContain('hidden')
     const line = element(label, (node) => node.props.title === 'AbCdEfGh-full-realm-id')
-    expect(String(line.props.class)).toContain('uppercase')
+    expect(String(line.props.class)).not.toContain('uppercase')
     expect(content(line)).toContain('Demo realm')
     expect(content(line)).toContain('· AbCdEfGh')
     expect(content(line)).not.toContain('full-realm-id')

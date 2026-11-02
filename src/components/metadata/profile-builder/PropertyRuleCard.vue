@@ -472,7 +472,7 @@ watch(advancedNeedsAttention, (needsAttention) => {
         <!-- Technical identifiers: the machine identifiers behind this rule
              (RO-Crate property name and ontology term URI). -->
         <div>
-          <div class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Technical identifiers</div>
+          <div class="text-[10px] font-medium text-muted-foreground">Technical identifiers</div>
           <div class="mt-1 grid gap-2 rounded-md border border-border p-3 sm:grid-cols-2">
             <div>
               <label class="text-[11px] font-medium text-muted-foreground">Property name</label>

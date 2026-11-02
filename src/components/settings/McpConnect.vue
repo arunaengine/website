@@ -57,7 +57,7 @@ async function mint() {
     <div class="surface overflow-hidden">
 
     <div class="border-b border-border px-5 py-3">
-      <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">MCP endpoint</div>
+      <div class="text-[10px] font-semibold text-muted-foreground">MCP endpoint</div>
       <div v-if="mcpUrl" class="mt-1 flex flex-wrap items-center gap-1.5 rounded-md border border-border bg-muted/30 px-3 py-2">
         <code class="min-w-0 break-all font-mono text-[11px] text-foreground">{{ mcpUrl }}</code>
         <CopyButton :value="mcpUrl" label="Copy the MCP endpoint" />

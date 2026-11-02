@@ -115,7 +115,7 @@ function isSelected(type: string): boolean {
     </div>
 
     <div v-for="group in [{ title: 'From the profile', options: results.profile }, { title: 'Common', options: results.shortlist }, { title: 'Everything else', options: results.all }]" :key="group.title">
-      <p v-if="group.options.length" class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <p v-if="group.options.length" class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-muted-foreground">
         {{ group.title }}
       </p>
       <button

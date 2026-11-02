@@ -178,7 +178,7 @@ onMounted(() => void list.load())
       />
 
       <table v-else class="w-full text-sm">
-        <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground">
+        <thead class="bg-muted/20 text-[11px] text-muted-foreground">
           <tr>
             <th class="px-5 py-2 text-left font-semibold">Kind</th>
             <th class="px-5 py-2 text-left font-semibold">State</th>

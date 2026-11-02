@@ -87,7 +87,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         <div class="p-4">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">Guided tour</p>
+              <p class="text-[10px] font-semibold text-primary">Guided tour</p>
               <h2 class="mt-1 font-display text-sm font-semibold text-aruna-navy">{{ currentStep?.title }}</h2>
             </div>
             <Button variant="ghost" size="icon-sm" aria-label="End the tour" @click="stopTour">

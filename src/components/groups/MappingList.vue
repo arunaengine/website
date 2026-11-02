@@ -172,7 +172,7 @@ const COLUMNS = 'grid grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)_11rem] items
       <Button variant="ghost" size="sm" class="h-7 px-2 text-aruna-navy dark:text-foreground" @click="add">+ Add mapping</Button>
     </div>
     <div class="mt-1 rounded-md border border-border text-xs">
-      <div :class="[COLUMNS, 'border-b border-border px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground']">
+      <div :class="[COLUMNS, 'border-b border-border px-3 py-1.5 text-[11px] text-muted-foreground']">
         <span>Aruna path</span><span /><span>Storage path</span><span />
       </div>
       <div v-for="(mapping, index) in modelValue" :key="index" class="border-b border-border px-3 py-1.5" data-testid="mapping">
@@ -237,7 +237,7 @@ const COLUMNS = 'grid grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)_11rem] items
             @prev="examples.prev()"
           >
             <template #head>
-              <div :class="['grid grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)] gap-2 text-[11px] uppercase tracking-wide text-muted-foreground']">
+              <div :class="['grid grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)] gap-2 text-[11px] text-muted-foreground']">
                 <span>Aruna path</span><span /><span>Storage path</span>
               </div>
             </template>

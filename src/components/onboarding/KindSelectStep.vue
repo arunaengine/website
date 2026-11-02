@@ -95,7 +95,7 @@ function tabindexFor(index: number): number {
             <Badge size="sm"
               v-if="option.badgeLabel"
               :variant="option.badgeVariant ?? 'outline'"
-              class="uppercase"
+             
             >
               {{ option.badgeLabel }}
             </Badge>

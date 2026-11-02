@@ -311,10 +311,10 @@ const filesText = computed(() => {
       :docs="{ topic: 'where-data-lives', section: 'Syncs' }"
     >
       <template #breadcrumbs>
-        <Badge v-if="folder" variant="outline" size="sm" class="uppercase">{{ modeLabel(folder.mode) }}</Badge>
-        <Badge v-if="folder?.state === 'paused'" variant="secondary" size="sm" class="uppercase">paused</Badge>
-        <Badge v-if="folder?.state === 'deleting'" variant="sky" size="sm" class="uppercase">deleting</Badge>
-        <Badge v-if="folder?.state === 'binding'" variant="sky" size="sm" class="uppercase">linking</Badge>
+        <Badge v-if="folder" variant="outline" size="sm">{{ modeLabel(folder.mode) }}</Badge>
+        <Badge v-if="folder?.state === 'paused'" variant="secondary" size="sm">paused</Badge>
+        <Badge v-if="folder?.state === 'deleting'" variant="sky" size="sm">deleting</Badge>
+        <Badge v-if="folder?.state === 'binding'" variant="sky" size="sm">linking</Badge>
       </template>
       <template #actions>
         <Button variant="ghost" size="sm" as-child>
@@ -359,11 +359,11 @@ const filesText = computed(() => {
 
       <dl v-if="folder" class="grid gap-3 md:grid-cols-3">
         <div class="surface px-4 py-3">
-          <dt class="text-[10px] uppercase tracking-wide text-muted-foreground">On this computer</dt>
+          <dt class="text-[10px] text-muted-foreground">On this computer</dt>
           <dd class="mt-0.5 truncate font-mono text-xs text-foreground" :title="folder.root">{{ folder.root }}</dd>
         </div>
         <div class="surface px-4 py-3">
-          <dt class="text-[10px] uppercase tracking-wide text-muted-foreground">In Aruna</dt>
+          <dt class="text-[10px] text-muted-foreground">In Aruna</dt>
           <dd class="mt-0.5 truncate text-sm text-foreground">
             <RouterLink v-if="bucketLink" :to="bucketLink" class="inline-flex items-center gap-1 font-medium text-primary hover:underline">
               {{ folder.remote.bucket }}<template v-if="folder.remote.prefix">/{{ folder.remote.prefix }}</template>
@@ -373,7 +373,7 @@ const filesText = computed(() => {
           </dd>
         </div>
         <div class="surface px-4 py-3">
-          <dt class="text-[10px] uppercase tracking-wide text-muted-foreground">Files</dt>
+          <dt class="text-[10px] text-muted-foreground">Files</dt>
           <dd class="mt-0.5 text-sm text-foreground">{{ filesText }}</dd>
         </div>
       </dl>

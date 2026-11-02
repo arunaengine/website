@@ -980,7 +980,7 @@ async function confirmDelete() {
             Attempt {{ nativeJob?.attempts }} failed, retrying: <span class="font-mono">{{ retryError }}</span>
           </p>
           <div v-if="failed || nodeConstraint" class="flex flex-wrap items-center gap-1.5 text-[11px]">
-            <Badge v-if="failed && nativeJob?.error?.kind" variant="destructive" size="sm" class="uppercase">{{ nativeJob.error.kind }}</Badge>
+            <Badge v-if="failed && nativeJob?.error?.kind" variant="destructive" size="sm">{{ nativeJob.error.kind }}</Badge>
             <Badge v-if="failed && exitCode !== undefined" variant="outline" size="sm">exit {{ exitCode }}</Badge>
             <Badge v-if="failed && nativeJob?.attempts" variant="outline" size="sm">
               {{ nativeJob.attempts }} attempt{{ nativeJob.attempts === 1 ? '' : 's' }}

@@ -117,7 +117,7 @@ defineProps<{
         <div class="mb-2 flex items-center gap-2">
           <span class="type-label text-primary">{{ isLocal ? 'This node' : 'Node details' }}</span>
           <!-- A fine status says nothing; only a problem is named. -->
-          <Badge v-if="statusProblem(probe.info.node.status)" size="sm" :variant="statusVariant(probe.info.node.status)" class="uppercase">{{ statusProblem(probe.info.node.status)!.word }}</Badge>
+          <Badge v-if="statusProblem(probe.info.node.status)" size="sm" :variant="statusVariant(probe.info.node.status)">{{ statusProblem(probe.info.node.status)!.word }}</Badge>
         </div>
         <LocalNodeDetails
           :info="probe.info"

@@ -221,7 +221,7 @@
     @apply font-display text-2xl font-semibold tracking-tight text-aruna-navy md:text-3xl;
   }
   .eyebrow {
-    @apply font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-primary/80;
+    @apply font-mono text-xs font-medium text-primary/80;
   }
   /* Long-form text on the public pages: news posts and legal pages. */
   .article-body {

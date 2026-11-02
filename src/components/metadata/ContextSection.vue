@@ -67,7 +67,7 @@ function timeLabel(iso: string): string {
           <Badge v-if="entity.profileLabel" variant="royal" size="sm">{{ entity.profileLabel }}</Badge>
           <span v-if="entity.types.length" class="font-mono text-[10px] text-muted-foreground/70">{{ entity.types.join(' · ') }}</span>
           <span v-if="entity.relations.length" class="ml-auto flex shrink-0 flex-wrap gap-1">
-            <Badge v-for="relation in entity.relations" :key="relation" variant="outline" size="sm" class="uppercase">{{ relation }}</Badge>
+            <Badge v-for="relation in entity.relations" :key="relation" variant="outline" size="sm">{{ relation }}</Badge>
           </span>
         </div>
 

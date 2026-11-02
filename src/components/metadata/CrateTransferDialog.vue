@@ -161,7 +161,7 @@ watch(() => props.documentId, reset)
           Not every linked dataset could be checked. Their references remain in the metadata.
         </p>
         <div v-if="!activeJobId && exportCrate" class="space-y-1.5">
-          <p class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Graph</p>
+          <p class="text-[11px] font-medium text-muted-foreground">Graph</p>
           <CrateGraph :source="exportCrate" mode="view" height="18rem" />
         </div>
 

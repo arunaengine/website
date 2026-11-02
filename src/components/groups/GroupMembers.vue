@@ -201,7 +201,7 @@ async function removeMember(member: GroupMember, roleId?: string) {
                         </a>
                       </div>
                       <div class="rounded-md border border-border bg-muted/40 px-2 py-1.5">
-                        <div class="text-[10px] uppercase tracking-wider text-muted-foreground">User ID</div>
+                        <div class="text-[10px] text-muted-foreground">User ID</div>
                         <div class="flex items-center justify-between gap-2">
                           <span class="break-all font-mono text-[10px] text-foreground">{{ member.user_id }}</span>
                           <CopyButton :value="member.user_id" label="Copy user ID" />

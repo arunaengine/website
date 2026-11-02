@@ -220,7 +220,7 @@ const blocked = computed(() => busy.value !== null || Boolean(props.job) || writ
           @filter="(value: string) => copies.load(value)"
         >
           <template #head>
-            <div class="grid grid-cols-2 gap-3 text-[11px] uppercase tracking-wide text-muted-foreground">
+            <div class="grid grid-cols-2 gap-3 text-[11px] text-muted-foreground">
               <span>Kept</span><span>Deleted</span>
             </div>
           </template>
@@ -296,7 +296,7 @@ const blocked = computed(() => busy.value !== null || Boolean(props.job) || writ
           @filter="(value: string) => oldNames.load(value)"
         >
           <template #head>
-            <div class="grid grid-cols-2 gap-3 text-[11px] uppercase tracking-wide text-muted-foreground">
+            <div class="grid grid-cols-2 gap-3 text-[11px] text-muted-foreground">
               <span>Old name</span><span>New name</span>
             </div>
           </template>

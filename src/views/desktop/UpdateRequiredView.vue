@@ -186,11 +186,11 @@ async function quit(): Promise<void> {
 
       <dl class="grid gap-3 sm:grid-cols-2">
         <div class="surface-inline px-3 py-2">
-          <dt class="text-[10px] uppercase tracking-wide text-muted-foreground">This app</dt>
+          <dt class="text-[10px] text-muted-foreground">This app</dt>
           <dd class="mt-0.5 font-mono text-xs text-foreground">{{ local }}</dd>
         </div>
         <div class="surface-inline px-3 py-2">
-          <dt class="truncate text-[10px] uppercase tracking-wide text-muted-foreground">{{ name }}</dt>
+          <dt class="truncate text-[10px] text-muted-foreground">{{ name }}</dt>
           <dd class="mt-0.5 font-mono text-xs text-foreground">{{ realm }}</dd>
         </div>
       </dl>

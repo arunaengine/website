@@ -83,7 +83,7 @@ const { realm } = useAruna()
           :to="{ name: 'dataset', params: { id: line.hit.document_id } }"
           class="surface group flex h-full flex-col gap-3 p-4 transition-shadow hover:shadow-md"
         >
-          <span class="w-fit text-[10px] uppercase text-muted-foreground">Purpose unknown</span>
+          <span class="w-fit text-[10px] text-muted-foreground">Purpose unknown</span>
           <div>
             <h3 v-if="line.title" class="font-display text-sm font-semibold text-aruna-navy">{{ line.title }}</h3>
             <h3 v-else class="break-all font-mono text-xs font-semibold text-aruna-navy">{{ line.hit.document_path }}</h3>
