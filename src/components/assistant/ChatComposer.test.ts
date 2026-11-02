@@ -35,7 +35,7 @@ const aruna = {
   myGroups: ref<unknown[]>([]),
   discoverableGroups: ref<unknown[]>([]),
   realmInfo: ref<{ nodes: Array<{ kind: string; present: boolean }> } | null>(null),
-  usageInfo: ref<{ metadata_documents?: number; objects?: number; buckets?: number; stored_bytes?: number; realm?: { buckets: number; distinct_buckets?: number } } | null>(null),
+  usageInfo: ref<{ metadata_documents?: number; objects?: number; buckets?: number; stored_bytes?: number; realm?: { buckets: number; distinct_buckets?: number; objects?: number; stored_bytes?: number } } | null>(null),
 }
 
 const central = ref<{ daily_limit?: number | null; used_today: number; resets_at: string } | null>(null)
@@ -274,8 +274,14 @@ describe('ChatComposer', () => {
 
   it('attaches the realm totals once the user is signed in', async () => {
     aruna.currentUser.value = { name: 'Ada Lovelace' }
-    // This node holds 2 buckets; the realm has 9 member buckets, 6 buckets counted once.
-    aruna.usageInfo.value = { metadata_documents: 12, objects: 40, buckets: 2, realm: { buckets: 9, distinct_buckets: 6 } }
+    // This node holds 2 buckets and no objects; the realm has 9 member buckets, 6 counted once.
+    aruna.usageInfo.value = {
+      metadata_documents: 12,
+      objects: 0,
+      buckets: 2,
+      stored_bytes: 0,
+      realm: { buckets: 9, distinct_buckets: 6, objects: 44_000_000, stored_bytes: 5_000 },
+    }
     aruna.myGroups.value = [{}, {}]
     aruna.realmInfo.value = { nodes: [{ kind: 'server', present: true }, { kind: 'user', present: false }] }
     const { root } = await mountApp(ChatComposer, { props: { size: 'full' } })
@@ -288,9 +294,10 @@ describe('ChatComposer', () => {
       profiles: 0,
       groups: 2,
       nodesOnline: '1 / 1',
-      objects: 40,
+      objects: 44_000_000,
       buckets: 6,
       bucketsExact: true,
+      storedBytes: 5_000,
     })
   })
 

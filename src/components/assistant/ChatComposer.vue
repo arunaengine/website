@@ -132,10 +132,11 @@ function realmSummary() {
     profiles: profiles.value.length,
     groups: myGroups.value.length + discoverableGroups.value.length,
     nodesOnline: infra.length ? `${online} / ${infra.length}` : undefined,
-    objects: usage?.objects,
+    // The flat usage fields are this node's own; the realm figures are summed over all nodes.
+    objects: usage?.realm?.objects,
     buckets: realmBuckets.value?.count,
     bucketsExact: realmBuckets.value?.exact,
-    storedBytes: usage?.stored_bytes ?? undefined,
+    storedBytes: usage?.realm?.stored_bytes ?? undefined,
   }
 }
 
