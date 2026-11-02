@@ -2,7 +2,7 @@ import { computed, ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { restoring } from '@/composables/aruna/state'
 import { tokenClaims } from '@/composables/aruna/renewal'
-import { ApiError, apiRequest } from '@/lib/api'
+import { ApiError, apiRequest, issueToken, signInHasNoAccount } from '@/lib/api'
 import type { RealmInfoResponse } from '@/lib/api'
 import { featureEnabled, portalConfig, type LoginOption } from '@/lib/config'
 import { desktopBridge } from '@/lib/desktop'
@@ -220,18 +220,33 @@ async function finishLink(params: URLSearchParams, name: string): Promise<string
   return window.sessionStorage.getItem(REDIRECT_KEY) || '/app/settings'
 }
 
-// Keycloak links to the user of its own browser session, which may not be the signed-in one.
+// Keycloak links to the user of its own browser session, which may not be the signed-in one, so
+// the linked identity's Aruna account must be the account of the active token.
 async function confirmLink(params: URLSearchParams, name: string): Promise<ProviderLink> {
-  const own = tokenClaims(window.sessionStorage.getItem(ID_TOKEN_KEY) ?? '')?.sub
+  const { authToken, apiBaseUrl } = useAruna()
+  const own = tokenClaims(authToken.value ?? '')?.sub
+  const baseUrl = apiBaseUrl.value
   const code = params.get('code')
   const verifier = window.sessionStorage.getItem(VERIFIER_KEY)
   const tokens = own && code && verifier ? await redeemCode(code, verifier).catch(() => null) : null
-  const linked = tokens?.id_token ? tokenClaims(tokens.id_token)?.sub : undefined
-  if (own && linked === own) return { name, linked: true }
-  const message = linked
+  const account = tokens?.id_token ? await accountOf(tokens.id_token, baseUrl) : undefined
+  if (own && account === own) return { name, linked: true }
+  const message = account !== undefined
     ? 'The identity provider is signed in as another account and linked it there. Sign out of the identity provider, then link again.'
     : 'It could not be confirmed for this account. Check the linked logins in your account.'
   return { name, linked: false, message }
+}
+
+// The Aruna account of an identity: its user id, null when it has none, undefined when unknown.
+// The node names it in a token that is revoked at once and never adopted.
+async function accountOf(idToken: string, baseUrl: string): Promise<string | null | undefined> {
+  try {
+    const token = await issueToken(idToken, baseUrl)
+    revokeCurrent(token, baseUrl)
+    return tokenClaims(token)?.sub
+  } catch (error) {
+    return signInHasNoAccount(error) ? null : undefined
+  }
 }
 
 async function redeemCode(code: string, verifier: string) {

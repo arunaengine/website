@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setAuthOpener, useAuth } from './useAuth'
 import { signInChoice } from './signInChoice'
 import { loadPortalConfig } from '@/lib/config'
+import { authToken } from './aruna/state'
 
 const PAGE_ORIGIN = 'https://portal.test'
 const ARUNA_ISSUER = 'https://keycloak.v3.aruna-engine.org/realms/aruna'
@@ -10,9 +11,12 @@ let assign: ReturnType<typeof vi.fn>
 let storage: Map<string, string>
 let fetchMock: ReturnType<typeof vi.fn>
 let tokenAnswer: unknown = {}
+// The Aruna account of each Keycloak user; null when it has none.
+let accounts: Record<string, string | null> = {}
 
 // An unsigned ID token; the portal reads only its claims.
 const idToken = (sub: string) => `h.${btoa(JSON.stringify({ sub, iat: 1, exp: 2 }))}.s`
+const realmToken = (sub: string) => `h.${btoa(JSON.stringify({ sub, iat: 1, exp: 2, sid: `sid-${sub}` }))}.s`
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -33,8 +37,15 @@ async function setup(issuer: string, stored: Record<string, string> = {}, served
     },
   })
   const discoveryUrl = `${issuer}/${Math.random()}/.well-known/openid-configuration`
-  fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    const bearer = new Headers(init?.headers).get('Authorization')?.replace('Bearer ', '') ?? ''
+    if (url.includes('/access/token')) {
+      const account = accounts[JSON.parse(atob(bearer.split('.')[1] ?? '')).sub]
+      if (account === null) return json({ error: 'no account', code: 'account_missing' }, 401)
+      return account ? json({ token: realmToken(account) }) : json({ error: 'unexpected' }, 500)
+    }
+    if (url.includes('/access/sessions/') && init?.method === 'DELETE') return new Response(null, { status: 204 })
     if (url.endsWith('/system/realm')) return json({ oidc_providers: [{ audience: 'portal', issuer, discovery_url: discoveryUrl }] })
     if (url === discoveryUrl) return json({ issuer, authorization_endpoint: `${issuer}/auth`, token_endpoint: `${issuer}/token` })
     if (url === `${issuer}/token`) return json(tokenAnswer)
@@ -55,6 +66,7 @@ beforeEach(() => {
 
 afterEach(() => {
   setAuthOpener(null)
+  authToken.value = ''
   vi.unstubAllGlobals()
 })
 
@@ -134,9 +146,11 @@ describe('completeSignIn after linking', () => {
     'aruna.oidc.idToken': idToken('kc-a'),
   }
 
-  async function finish(query: Record<string, string>, linkedSub = 'kc-a', stored: Record<string, string> = LINKING) {
+  async function finish(query: Record<string, string>, linkedSub = 'kc-a', active = 'aruna-a') {
     tokenAnswer = { id_token: idToken(linkedSub), access_token: 'a' }
-    await setup(ARUNA_ISSUER, stored)
+    accounts = { 'kc-a': 'aruna-a', 'kc-b': 'aruna-b', 'kc-new': null }
+    authToken.value = active ? realmToken(active) : ''
+    await setup(ARUNA_ISSUER, LINKING)
     const auth = useAuth()
     const target = await auth.completeSignIn(new URLSearchParams({ state: 's1', code: 'c1', ...query }))
     return { target, link: auth.providerLink.value }
@@ -146,7 +160,9 @@ describe('completeSignIn after linking', () => {
     const { target, link } = await finish({ kc_action_status: 'success' })
     expect(target).toBe('/app/settings')
     expect(link).toEqual({ name: 'LifeScience RI', linked: true })
-    expect(fetchMock.mock.calls.map(([url]) => String(url))).not.toContainEqual(expect.stringContaining('/access/'))
+    // The token that named the account is revoked and never adopted.
+    expect(fetchMock.mock.calls.some(([url, init]) => String(url).includes('/access/sessions/sid-aruna-a') && init?.method === 'DELETE')).toBe(true)
+    expect(authToken.value).toBe(realmToken('aruna-a'))
     expect(storage.get('aruna.oidc.idToken')).toBe(idToken('kc-a'))
     expect(storage.has('aruna.oidc.link')).toBe(false)
     expect(storage.has('aruna.oidc.state')).toBe(false)
@@ -158,9 +174,20 @@ describe('completeSignIn after linking', () => {
     expect(link?.message).toContain('signed in as another account')
   })
 
+  it('reports no success when the active token is another account than the stored sign-in', async () => {
+    const { link } = await finish({ kc_action_status: 'success' }, 'kc-a', 'aruna-b')
+    expect(link?.linked).toBe(false)
+    expect(link?.message).toContain('signed in as another account')
+  })
+
+  it('reports no success when the linked identity has no account', async () => {
+    const { link } = await finish({ kc_action_status: 'success' }, 'kc-new')
+    expect(link?.linked).toBe(false)
+    expect(link?.message).toContain('signed in as another account')
+  })
+
   it('reports no success when the signed-in account is unknown', async () => {
-    const { 'aruna.oidc.idToken': _, ...withoutToken } = LINKING
-    const { link } = await finish({ kc_action_status: 'success' }, 'kc-a', withoutToken)
+    const { link } = await finish({ kc_action_status: 'success' }, 'kc-a', '')
     expect(link?.linked).toBe(false)
     expect(link?.message).toContain('could not be confirmed')
   })
