@@ -15,6 +15,8 @@ let tokenAnswer: unknown = {}
 let accounts: Record<string, string | null> = {}
 // Runs when the node is asked for the linked identity's account.
 let onIssue: (() => void) | null = null
+// The node's answers to the helper session's revocation, in order; then 204.
+let revokeAnswers: Array<() => Promise<Response>> = []
 
 // An unsigned ID token; the portal reads only its claims.
 const idToken = (sub: string) => `h.${btoa(JSON.stringify({ sub, iat: 1, exp: 2 }))}.s`
@@ -48,7 +50,7 @@ async function setup(issuer: string, stored: Record<string, string> = {}, served
       if (account === null) return json({ error: 'no account', code: 'account_missing' }, 401)
       return account ? json({ token: realmToken(account) }) : json({ error: 'unexpected' }, 500)
     }
-    if (url.includes('/access/sessions/') && init?.method === 'DELETE') return new Response(null, { status: 204 })
+    if (url.includes('/access/sessions/') && init?.method === 'DELETE') return (revokeAnswers.shift() ?? (async () => new Response(null, { status: 204 })))()
     if (url.endsWith('/system/realm')) return json({ oidc_providers: [{ audience: 'portal', issuer, discovery_url: discoveryUrl }] })
     if (url === discoveryUrl) return json({ issuer, authorization_endpoint: `${issuer}/auth`, token_endpoint: `${issuer}/token` })
     if (url === `${issuer}/token`) return json(tokenAnswer)
@@ -71,6 +73,7 @@ afterEach(() => {
   setAuthOpener(null)
   authToken.value = ''
   onIssue = null
+  revokeAnswers = []
   vi.unstubAllGlobals()
 })
 
@@ -182,6 +185,37 @@ describe('completeSignIn after linking', () => {
     const { link } = await finish({ kc_action_status: 'success' }, 'kc-a', 'aruna-b')
     expect(link?.linked).toBe(false)
     expect(link?.message).toContain('signed in as another account')
+  })
+
+  it('ends the helper session before the confirmation finishes', async () => {
+    let release!: () => void
+    revokeAnswers = [() => new Promise((resolve) => (release = () => resolve(new Response(null, { status: 204 }))))]
+    let finished = false
+    const done = finish({ kc_action_status: 'success' }).then((result) => {
+      finished = true
+      return result
+    })
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    expect(finished).toBe(false)
+    release()
+    expect((await done).link).toEqual({ name: 'LifeScience RI', linked: true })
+  })
+
+  it('tries the revocation once more, then logs a session left open without its token', async () => {
+    const refused = async () => json({ error: 'busy' }, 503)
+    revokeAnswers = [refused, async () => new Response(null, { status: 204 })]
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    await finish({ kc_action_status: 'success' })
+    expect(warn).not.toHaveBeenCalled()
+
+    revokeAnswers = [refused, refused]
+    await finish({ kc_action_status: 'success' })
+    const deletes = fetchMock.mock.calls.filter(([, init]) => init?.method === 'DELETE')
+    expect(deletes).toHaveLength(2)
+    expect(warn).toHaveBeenCalledOnce()
+    expect(JSON.stringify(warn.mock.calls[0])).not.toContain(realmToken('aruna-a'))
+    expect(warn.mock.calls[0][1]).toMatchObject({ session: 'sid-aruna-a' })
+    warn.mockRestore()
   })
 
   it('reports nothing when another session starts while the link is confirmed', async () => {

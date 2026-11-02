@@ -243,14 +243,28 @@ async function confirmLink(params: URLSearchParams, name: string): Promise<Provi
 }
 
 // The Aruna account of an identity: its user id, null when it has none, undefined when unknown.
-// The node names it in a token that is revoked at once and never adopted.
+// The node names it in a helper token that is never adopted and ends before the answer returns.
 async function accountOf(idToken: string, baseUrl: string): Promise<string | null | undefined> {
+  let token: string | undefined
   try {
-    const token = await issueToken(idToken, baseUrl)
-    revokeCurrent(token, baseUrl)
+    token = await issueToken(idToken, baseUrl)
     return tokenClaims(token)?.sub
   } catch (error) {
     return signInHasNoAccount(error) ? null : undefined
+  } finally {
+    if (token) await revokeHelper(token, baseUrl)
+  }
+}
+
+// Ends the helper session, trying once more on failure; a session left open is logged without its token.
+async function revokeHelper(token: string, baseUrl: string) {
+  const sid = tokenClaims(token)?.sid
+  const revoke = () => apiRequest<void>(`/access/sessions/${encodeURIComponent(sid ?? '')}`, { method: 'DELETE' }, { baseUrl, token })
+  try {
+    if (!sid) throw new Error('The helper token names no session.')
+    await revoke().catch(revoke)
+  } catch (error) {
+    console.warn('aruna-auth: helper session not revoked', { baseUrl, session: sid ?? null, error: errorMessage(error) })
   }
 }
 
