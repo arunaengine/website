@@ -69,7 +69,12 @@ const deleteError = ref<string | null>(null)
 
 const visibleProfiles = computed(() => profiles.value)
 
-const selectedId = computed(() => (route.params.profileId as string) || visibleProfiles.value[0]?.id || '')
+// A persistent profile link names the document id; the list names profiles by their slug.
+const selectedId = computed(() => {
+  const asked = route.params.profileId as string
+  const byDocument = asked ? visibleProfiles.value.find((profile) => profile.documentId === asked)?.id : undefined
+  return byDocument || asked || visibleProfiles.value[0]?.id || ''
+})
 const selected = computed(() => visibleProfiles.value.find((profile) => profile.id === selectedId.value))
 const preferredId = computed(() => currentUser.value?.preferredProfileId ?? '')
 

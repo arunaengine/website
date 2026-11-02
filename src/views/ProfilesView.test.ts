@@ -131,6 +131,18 @@ describe('ProfilesView', () => {
     mounted.app.unmount()
   })
 
+  it('opens a profile named by its document id, as persistent links do', async () => {
+    route.name = 'profile'
+    route.params = { profileId: 'doc-1' }
+    const mounted = await mountApp(ProfilesView)
+
+    expect(content(mounted.root)).toContain('Example profile')
+    expect(content(mounted.root)).not.toContain('Select a visible profile.')
+    mounted.app.unmount()
+    route.name = 'profiles'
+    route.params = {}
+  })
+
   it('marks a public profile as public', async () => {
     profiles.value = [{ ...profile, managed: true }]
     const mounted = await mountApp(ProfilesView)
