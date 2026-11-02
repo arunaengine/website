@@ -198,6 +198,8 @@ let history: ModelMessage[] = []
 let chatState: AssistantChatState = { activeChatId: '', chats: [] }
 let chatStore: ReturnType<typeof createAssistantChatStore> | null = null
 let chatScopeKey = ''
+// Set once the user starts or opens a chat, so the first sync leaves it on screen.
+let chatPicked = false
 // Set once the node answered for this scope; empty while chats stay in this browser.
 let remoteScopeKey = ''
 let remoteSaveTimer: ReturnType<typeof setTimeout> | null = null
@@ -1264,7 +1266,7 @@ async function syncChats(scopeKey: string) {
   // A fresh browser opens on an empty chat; once the node's chats are in, the
   // one written to last is the one to show, not the empty placeholder.
   const current = activeChat()
-  if (!current || (!current.messages.length && !current.history.length)) {
+  if (!chatPicked && (!current || (!current.messages.length && !current.history.length))) {
     const shown = [...chatState.chats].filter((chat) => chat.messages.length).sort((a, b) => b.updatedAt - a.updatedAt)[0]
     if (shown) chatState = { ...chatState, activeChatId: shown.id }
   }
@@ -1415,6 +1417,7 @@ function syncChatScope() {
   if (chatScopeKey && nextKey !== chatScopeKey) discardTurn(abortTurn())
   chatScopeKey = ''
   chatStore = null
+  chatPicked = false
   historyReady.value = false
   stopRemoteSync()
   stopWatchers()
@@ -1621,6 +1624,7 @@ export function useAssistantChat() {
     syncEpoch()
     if (activeTurn?.resumeText !== undefined) discardTurn(abortTurn())
     else stopShownTurn('Starting a new chat stopped this answer.')
+    chatPicked = true
     persistCurrentChat()
     if (!chatStore || !historyReady.value) {
       resetConversation()
@@ -1634,6 +1638,7 @@ export function useAssistantChat() {
     if (!chatStore || !historyReady.value || !chatState.chats.some((chat) => chat.id === id)) return
     markChatRead(id)
     if (activeChatId.value === id) return
+    chatPicked = true
     stopShownTurn('Opening another chat stopped this answer.')
     persistCurrentChat()
     chatState = { ...chatState, activeChatId: id }

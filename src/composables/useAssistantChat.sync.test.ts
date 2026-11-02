@@ -59,6 +59,7 @@ const node = vi.hoisted(() => ({
   log: [] as string[],
   clients: [] as Array<{ baseUrl?: string; token?: string }>,
   listStatus: 200,
+  listGate: null as Promise<void> | null,
   maxTurnChars: Infinity,
   fail: (status: number, message: string): Error => new Error(`${status} ${message}`),
   now: () => new Date().toISOString(),
@@ -99,6 +100,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     listChats: async (client?: { baseUrl?: string; token?: string }) => {
       node.log.push('GET chats')
       node.clients.push({ baseUrl: client?.baseUrl, token: client?.token })
+      if (node.listGate) await node.listGate
       if (node.listStatus !== 200) throw node.fail(node.listStatus, 'no such route')
       return { chats: [...node.chats.values()].filter((chat) => !chat.deleted).map((chat) => chat.head) }
     },
@@ -362,6 +364,29 @@ describe('logging in', () => {
 
     expect(chat.activeChatId.value).toBe('n-2')
     expect(chat.messages.value.map((message) => message.text)).toEqual(['restored', 'restored answered'])
+  })
+
+  it('keeps a new chat started before the node chats arrive', async () => {
+    let release = () => {}
+    await login((scope) => {
+      seedNode('n-3', 'On the node', [payload('u1', 'node turn')])
+      const here = decodeTurn(payload('u3', 'here'))!
+      const local = { ...newAssistantChat('Here'), id: 'l-3', updatedAt: 5, ...here }
+      createAssistantChatStore(scope).save({ activeChatId: local.id, chats: [local] })
+      node.listGate = new Promise<void>((resolve) => {
+        release = resolve
+      })
+    })
+
+    chat.newChat()
+    const fresh = chat.activeChatId.value
+    node.listGate = null
+    release()
+    await settle()
+
+    expect(fresh).not.toBe('l-3')
+    expect(chat.activeChatId.value).toBe(fresh)
+    expect(chat.messages.value).toEqual([])
   })
 
   it('keeps every chat in this browser when the node has no routes', async () => {
