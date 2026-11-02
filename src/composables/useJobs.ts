@@ -114,8 +114,11 @@ export function useJobsList(options: JobsListOptions = {}) {
   const moreError = ref<string | null>(null)
   const lastPollError = ref<string | null>(null)
   const stateFilter = ref<'' | JobState>('')
-  // Other nodes that did not answer, and those with more pages, read again by loadMore.
-  const remoteFailed = ref(0)
+  // Other nodes that missed page one stay missing until a full reload; a continuation that failed
+  // keeps its cursor and is asked again by loadMore.
+  const firstFailed = ref(0)
+  const moreFailed = ref(0)
+  const remoteFailed = computed(() => firstFailed.value + moreFailed.value)
   const remoteCursors = ref<{ client: ApiClientOptions; cursor: string }[]>([])
   const hasMore = computed(() => Boolean(nextCursor.value) || remoteCursors.value.length > 0)
   // Stale responses are dropped via a request id (ObjectBrowserPanel pattern).
@@ -129,7 +132,8 @@ export function useJobsList(options: JobsListOptions = {}) {
     requestId++
     jobs.value = []
     nextCursor.value = null
-    remoteFailed.value = 0
+    firstFailed.value = 0
+    moreFailed.value = 0
     remoteCursors.value = []
     pagesLoaded.value = 0
     listError.value = null
@@ -160,7 +164,8 @@ export function useJobsList(options: JobsListOptions = {}) {
       const added = remote.flatMap((other) => other?.jobs ?? []).filter((job) => !known.has(job.job_id) && known.add(job.job_id))
       jobs.value = added.length ? [...page.jobs, ...added].sort((a, b) => b.created_at.localeCompare(a.created_at)) : page.jobs
       nextCursor.value = page.next_cursor ?? null
-      remoteFailed.value = remote.filter((other) => !other).length
+      firstFailed.value = remote.filter((other) => !other).length
+      moreFailed.value = 0
       remoteCursors.value = others.flatMap((other, index) => {
         const cursor = remote[index]?.next_cursor
         return cursor ? [{ client: other, cursor }] : []
@@ -207,7 +212,7 @@ export function useJobsList(options: JobsListOptions = {}) {
       jobs.value = pending.length ? [...jobs.value, ...added].sort((a, b) => b.created_at.localeCompare(a.created_at)) : [...jobs.value, ...added]
       if (page) nextCursor.value = page.next_cursor ?? null
       // A node that did not answer keeps its cursor, so the next load asks it again.
-      remoteFailed.value = remote.filter((other) => !other).length
+      moreFailed.value = remote.filter((other) => !other).length
       remoteCursors.value = pending.flatMap((other, index) => {
         const answer = remote[index]
         if (!answer) return [other]

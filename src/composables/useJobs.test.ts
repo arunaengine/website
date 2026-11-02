@@ -48,4 +48,21 @@ describe('system jobs list', () => {
     expect(list.jobs.value.map((entry) => entry.job_id)).toEqual(['own', 'new', 'old'])
     expect(list.hasMore.value).toBe(false)
   })
+
+  it('keeps a node that missed page one missing when another node pages on', async () => {
+    listJobs.mockImplementation(async (params: { cursor?: string }, client: { baseUrl: string }) => {
+      if (client.baseUrl.includes('n3')) throw new Error('unreachable')
+      if (!client.baseUrl.includes('n2')) return { jobs: [job('own', '2026-11-01T03:00:00Z')] }
+      return params.cursor ? { jobs: [job('old', '2026-10-30T00:00:00Z')] } : { jobs: [job('new', '2026-11-01T02:00:00Z')], next_cursor: 'r2' }
+    })
+    const list = useJobsList({
+      others: () => [{ baseUrl: 'https://n2.test/api/v1', token: 't' }, { baseUrl: 'https://n3.test/api/v1', token: 't' }],
+    })
+    await list.load()
+    expect(list.remoteFailed.value).toBe(1)
+    await list.loadMore()
+
+    expect(list.jobs.value.map((entry) => entry.job_id)).toContain('old')
+    expect(list.remoteFailed.value).toBe(1)
+  })
 })
