@@ -3,7 +3,7 @@
 import { ref, watch } from 'vue'
 import { ApiError, apiErrorMessage, apiRequest, attachSignIn, issueToken, signInHasNoAccount } from '@/lib/api'
 import { useAruna } from './useAruna'
-import { accountMatch, adoptSession } from './useAuth'
+import { accountMatch, adoptSession, type AccountMatch } from './useAuth'
 import { loginFresh, mergeFailure } from './useAccountMerge'
 import { SignInCancelled, popupSignIn } from './popupSignIn'
 
@@ -27,6 +27,17 @@ function failed(error: unknown, describe: (error: unknown) => string) {
   matchFailure.value = stale ? STALE : describe(error)
 }
 
+// The realm, session and match an action started with; once any changes, the action stops.
+function fence(match: AccountMatch) {
+  const { apiBaseUrl, sessionEpoch } = useAruna()
+  const baseUrl = apiBaseUrl.value
+  const epoch = sessionEpoch.value
+  const check = () => {
+    if (apiBaseUrl.value !== baseUrl || sessionEpoch.value !== epoch || accountMatch.value !== match) throw new SignInCancelled()
+  }
+  return { baseUrl, check }
+}
+
 function begin() {
   matchBusy.value = true
   matchFailure.value = null
@@ -46,18 +57,21 @@ export async function joinExistingAccount(): Promise<string | null> {
     return null
   }
   begin()
+  const { baseUrl, check } = fence(match)
   try {
     const tokens = await popupSignIn()
-    const baseUrl = useAruna().apiBaseUrl.value
+    check()
     const token = await issueToken(tokens.id_token ?? tokens.access_token, baseUrl).catch((error: unknown) => {
       if (signInHasNoAccount(error)) throw new Error('That sign-in has no account either. Choose the one you used before.')
       if (error instanceof ApiError && error.status === 401) throw new Error('That sign-in was refused. Try again.')
       throw error
     })
+    check()
     await attachSignIn(match.oidcToken, { baseUrl, token }).catch((error: unknown) => {
       if (!(error instanceof ApiError && error.code === 'subject_taken')) throw error
       throw new Error('Your new sign-in already has an account. Sign in with it instead.')
     })
+    check()
     await adoptSession(token, tokens.id_token)
     accountMatch.value = null
     return match.redirectTo
@@ -74,11 +88,14 @@ export async function createNewAccount(): Promise<string | null> {
   const match = accountMatch.value
   if (!match || matchBusy.value) return null
   begin()
+  const { baseUrl, check } = fence(match)
   try {
-    const client = { baseUrl: useAruna().apiBaseUrl.value, token: match.oidcToken }
+    const client = { baseUrl, token: match.oidcToken }
     const body = JSON.stringify({ create_new: true })
     await apiRequest('/access/users/register', { method: 'POST', body }, client)
-    await adoptSession(await issueToken(match.oidcToken, client.baseUrl))
+    const token = await issueToken(match.oidcToken, baseUrl)
+    check()
+    await adoptSession(token)
     accountMatch.value = null
     return match.redirectTo
   } catch (error) {

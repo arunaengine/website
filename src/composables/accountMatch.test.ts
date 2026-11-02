@@ -3,6 +3,8 @@ import { ref } from 'vue'
 
 const popupSignIn = vi.fn()
 const authToken = ref('')
+const apiBaseUrl = ref('https://api.test')
+const sessionEpoch = ref(0)
 const currentUser = ref<{ id: string } | null>(null)
 const setAuthToken = vi.fn((token: string) => {
   authToken.value = token
@@ -14,7 +16,8 @@ const refresh = vi.fn(async () => {
 vi.mock('./popupSignIn', () => ({ popupSignIn: () => popupSignIn(), SignInCancelled: class extends Error {} }))
 vi.mock('./useAruna', () => ({
   useAruna: () => ({
-    apiBaseUrl: ref('https://api.test'),
+    apiBaseUrl,
+    sessionEpoch,
     realmInfo: ref(null),
     authToken,
     authError: ref(null),
@@ -69,6 +72,7 @@ beforeEach(async () => {
   })
   calls = []
   authToken.value = ''
+  apiBaseUrl.value = 'https://api.test'
   currentUser.value = null
   setAuthToken.mockClear()
   popupSignIn.mockReset()
@@ -178,6 +182,32 @@ describe('a first sign-in that matches an account', () => {
     expect(registered[1].bearer).toBe(NEW_SIGN_IN)
     expect(authToken.value).toBe('realm-of-new')
     expect(popupSignIn).not.toHaveBeenCalled()
+  })
+
+  it('stops when the realm changes while the popup is open', async () => {
+    await matched()
+    popupSignIn.mockImplementation(async () => {
+      apiBaseUrl.value = 'https://other-realm.test'
+      return { access_token: 'x', id_token: EXISTING_SIGN_IN, token_type: 'Bearer' }
+    })
+
+    await expect(joinExistingAccount()).resolves.toBeNull()
+
+    expect(calls.map((call) => call.path)).toEqual(['/access/users/register'])
+    expect(setAuthToken).not.toHaveBeenCalled()
+    expect(matchFailure.value).toBeNull()
+  })
+
+  it('keeps a newer session that started while a new account was made', async () => {
+    await matched()
+    register = () => {
+      sessionEpoch.value++
+      return json({ id: 'n1@R', name: 'New' }, 201)
+    }
+
+    await expect(createNewAccount()).resolves.toBeNull()
+
+    expect(setAuthToken).not.toHaveBeenCalled()
   })
 
   it('registers directly when nothing matches', async () => {
