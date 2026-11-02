@@ -1,6 +1,7 @@
 // What the chat panel renders and what the tool layer hands back to the model.
 import type { PreviewKind } from '@/composables/useObjectPreview'
 import type { MessageSource } from '@/lib/assistant/citations'
+import type { ContentPreview } from '@/lib/assistant/contentPreview'
 
 export type { MessageSource }
 
@@ -118,14 +119,24 @@ export interface ObjectView {
   versionId?: string
   lastModified?: string
   nodeId?: string
+  /** The first lines of a text file, read for the card; never sent to the model. */
+  preview?: ContentPreview
+}
+
+/** The registry facts a dataset card shows beside its crate; each is left out when unknown. */
+export interface DatasetSummary {
+  public?: boolean
+  groupId?: string
+  groupName?: string
+  updatedAt?: string
 }
 
 /** What a render tool asked the conversation to show; kept beside the call. */
 export type RenderView =
   | { kind: 'table'; title: string; columns: string[]; rows: unknown[][]; bucket?: string }
   | { kind: 'chart'; title: string; chart: ChartKind; labels: string[]; series: Array<{ name: string; values: number[] }> }
-  | { kind: 'stats'; title: string; items: Array<{ label: string; value: string; hint?: string }> }
-  | { kind: 'crate'; title: string; documentId?: string; crate: unknown }
+  | { kind: 'stats'; title: string; scope?: string; items: Array<{ label: string; value: string; hint?: string }> }
+  | { kind: 'crate'; title: string; documentId?: string; crate: unknown; summary?: DatasetSummary }
   | { kind: 'artifact'; title: string; caption?: string; artifact: ArtifactView }
   | JobView
   | ObjectView

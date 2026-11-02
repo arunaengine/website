@@ -14,6 +14,8 @@ import {
   userInfo,
 } from './aruna/state'
 import { loadRoCrate } from './aruna/crates'
+import { getMetadataDocument } from './aruna/documents'
+import { discoverableGroups, myGroups } from './aruna/groups'
 import { useAssistantProviders } from './useAssistantProviders'
 import { useNotifications } from './useNotifications'
 import { useAssistantEditor } from './useAssistantEditor'
@@ -23,8 +25,9 @@ import { useAssistantNotebook } from './useAssistantNotebook'
 import type { McpConnection } from '@/lib/assistant/mcpClient'
 import type { PromptContext } from '@/lib/assistant/prompt'
 import type { ArtifactRef, LoadedArtifact } from '@/lib/assistant/renderTools'
+import type { ContentPreview } from '@/lib/assistant/contentPreview'
 import { ARTIFACT_TEXT_CAP } from '@/lib/assistant/types'
-import type { ApprovalGate, ApprovalRequest, ChatMessage, JobView, ToolCallView } from '@/lib/assistant/types'
+import type { ApprovalGate, ApprovalRequest, ChatMessage, DatasetSummary, JobView, ToolCallView } from '@/lib/assistant/types'
 import { clampEffort, modelSuggestions, reasoningEffortOptions } from '@/lib/assistant/modelOptions'
 import type { StreamProviderOptions, TurnHandlers } from '@/lib/assistant/chat'
 import {
@@ -655,6 +658,49 @@ export async function loadArtifact(ref: ArtifactRef): Promise<LoadedArtifact> {
   }
 }
 
+// The bytes of a response up to `limit`; the rest of the body is never downloaded.
+async function readStart(response: Response, limit: number): Promise<Uint8Array> {
+  const reader = response.body?.getReader()
+  if (!reader) return new Uint8Array(await response.arrayBuffer()).slice(0, limit)
+  const bytes = new Uint8Array(limit)
+  let length = 0
+  while (length < limit) {
+    const { done, value } = await reader.read()
+    if (done) break
+    const part = value.subarray(0, limit - length)
+    bytes.set(part, length)
+    length += part.length
+  }
+  void reader.cancel().catch(() => undefined)
+  return bytes.slice(0, length)
+}
+
+/**
+ * Reads the start of one stored text file for its card's preview. Other
+ * formats are not read at all; a failed read leaves the card without one.
+ */
+export async function loadPreview(ref: ArtifactRef): Promise<ContentPreview | null> {
+  const [{ useS3 }, { PREVIEW_BYTES, contentPreview, previewFormat }] = await Promise.all([
+    import('./useS3'),
+    import('@/lib/assistant/contentPreview'),
+  ])
+  const name = ref.filename || ref.key.split('/').pop() || ref.key
+  if (!previewFormat(name, ref.contentType)) return null
+  const s3 = useS3()
+  if (!s3.hasActiveKey.value) {
+    const { activeGroupId } = await import('./useGroupSelection')
+    if (activeGroupId.value) await s3.ensureSession(activeGroupId.value)
+  }
+  const url = await s3.downloadUrl(ref.bucket, ref.key, artifactNode(s3.resolveObjectUrl, ref), ref.versionId)
+  const response = await fetch(url, { headers: { Range: `bytes=0-${PREVIEW_BYTES - 1}` } })
+  if (!response.ok) return null
+  const bytes = await readStart(response, PREVIEW_BYTES)
+  const ranged = /\/(\d+)$/.exec(response.headers.get('content-range') ?? '')?.[1]
+  const length = response.status === 200 ? response.headers.get('content-length') : null
+  const total = ranged ? Number(ranged) : length ? Number(length) : ref.size
+  return contentPreview(bytes, total !== undefined && total <= bytes.length, name, ref.contentType)
+}
+
 /**
  * Reads one stored HTML file as text, for the figures it carries inline. It is
  * read whole rather than capped like an artifact card's text, because a report
@@ -676,6 +722,18 @@ export async function loadHtml(ref: ArtifactRef): Promise<string> {
   return (await blob.text()).slice(0, MAX_PREVIEW_HTML)
 }
 
+// The registry facts a dataset card shows; a group is named only when the caller knows it.
+async function loadSummary(documentId: string): Promise<DatasetSummary> {
+  const summary = await getMetadataDocument(documentId)
+  const group = [...myGroups.value, ...discoverableGroups.value].find((entry) => entry.id === summary.group_id)
+  return {
+    public: summary.public,
+    groupId: summary.group_id,
+    ...(group?.name ? { groupName: group.name } : {}),
+    ...(summary.updated_at ? { updatedAt: summary.updated_at } : {}),
+  }
+}
+
 // The cards a render tool asks for stay on the call; the model only hears "shown".
 async function renderToolSet(turn: TurnContext): Promise<ToolSet> {
   const { renderTools } = await import('@/lib/assistant/renderTools')
@@ -687,7 +745,9 @@ async function renderToolSet(turn: TurnContext): Promise<ToolSet> {
       return false
     },
     loadCrate: loadRoCrate,
+    loadSummary,
     loadArtifact,
+    loadPreview,
     loadHtml,
   })
 }

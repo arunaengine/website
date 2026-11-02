@@ -6,8 +6,10 @@ import type { PreviewKind } from '@/composables/useObjectPreview'
 import { crateGraph, crateRootId, stringProp } from '@/lib/dataEntities'
 import { errorMessage } from '@/lib/utils'
 import { cardNote } from './cardNote'
+import type { ContentPreview } from './contentPreview'
 import type {
   ChartKind,
+  DatasetSummary,
   JobOutputRef,
   JobView,
   ObjectView,
@@ -60,8 +62,12 @@ export interface RenderHost {
   keep: (toolCallId: string, view: RenderView) => boolean | void
   /** Fetches a stored dataset's RO-Crate by document id. */
   loadCrate: (documentId: string) => Promise<unknown>
+  /** Reads the registry facts of a stored dataset; null when they cannot be read. */
+  loadSummary?: (documentId: string) => Promise<DatasetSummary | null>
   /** Fetches one stored object for a card; bytes never reach the model. */
   loadArtifact: (ref: ArtifactRef) => Promise<LoadedArtifact>
+  /** Reads the first lines of a stored text file for its card; null for other files. */
+  loadPreview?: (ref: ArtifactRef) => Promise<ContentPreview | null>
   /** Reads one stored HTML file as text, so a figure inside it can be shown. */
   loadHtml: (ref: ArtifactRef) => Promise<string>
 }
@@ -82,6 +88,7 @@ interface ChartInput {
 
 interface StatsInput {
   title: string
+  scope?: string
   items: Array<{ label: string; value: string | number; hint?: string }>
 }
 
@@ -268,9 +275,12 @@ export function renderTools(host: RenderHost): ToolSet {
     }),
 
     show_stats: tool({
-      description: 'Shows a row of labelled numbers (stat tiles) in the conversation.',
+      description:
+        'Shows one number, or a row of labelled numbers, in the conversation. Pass the scope the numbers '
+        + 'cover, such as "Whole realm" or "Group Marine Genomics Lab", so the reader knows what was counted.',
       inputSchema: schema<StatsInput>({
         title: STRING,
+        scope: STRING,
         items: {
           type: 'array',
           items: {
@@ -287,7 +297,8 @@ export function renderTools(host: RenderHost): ToolSet {
           ...(item.hint ? { hint: String(item.hint) } : {}),
         })).filter((item) => item.label)
         if (!items.length) return { error: 'Stats need at least one labelled value.' }
-        const view: RenderView = { kind: 'stats', title: input.title, items }
+        const scope = text(input.scope)
+        const view: RenderView = { kind: 'stats', title: input.title, ...(scope ? { scope } : {}), items }
         host.keep(toolCallId, view)
         return { shown: true, card: cardNote(view) }
       },
@@ -302,11 +313,13 @@ export function renderTools(host: RenderHost): ToolSet {
           const crate = input.document_id ? await host.loadCrate(input.document_id) : input.rocrate
           if (!crate || typeof crate !== 'object') return { error: 'Pass a document_id or an RO-Crate object.' }
           const title = crateTitle(crate)
+          const summary = input.document_id ? await host.loadSummary?.(input.document_id).catch(() => null) : null
           const view: RenderView = {
             kind: 'crate',
             title,
             ...(input.document_id ? { documentId: input.document_id } : {}),
             crate,
+            ...(summary ? { summary } : {}),
           }
           host.keep(toolCallId, view)
           return {
@@ -393,10 +406,18 @@ export function renderTools(host: RenderHost): ToolSet {
         node_id: STRING,
         size: { type: 'number' },
       }, ['bucket', 'key']),
-      execute: (input, { toolCallId }) => {
+      execute: async (input, { toolCallId }) => {
         const bucket = text(input.bucket)
         const key = text(input.key)
         if (!bucket || !key) return { error: 'An object card needs a bucket and a key.' }
+        const preview = await host.loadPreview?.({
+          bucket,
+          key,
+          versionId: text(input.version_id) || undefined,
+          nodeId: text(input.node_id) || undefined,
+          contentType: text(input.content_type) || undefined,
+          size: count(input.size),
+        }).catch(() => null)
         const view: ObjectView = {
           kind: 'object',
           bucket,
@@ -407,6 +428,7 @@ export function renderTools(host: RenderHost): ToolSet {
           ...(text(input.last_modified) ? { lastModified: text(input.last_modified) } : {}),
           ...(text(input.node_id) ? { nodeId: text(input.node_id) } : {}),
           ...(count(input.size) !== undefined ? { size: count(input.size) } : {}),
+          ...(preview ? { preview } : {}),
         }
         host.keep(toolCallId, view)
         return { shown: true, card: cardNote(view) }
