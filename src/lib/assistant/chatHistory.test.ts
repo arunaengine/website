@@ -659,6 +659,17 @@ describe('the final store rules', () => {
     expect(stored?.updatedAt).toBe(10)
   })
 
+  it('trims no other chat for a change that cannot fit beside the chats kept', () => {
+    const store = createAssistantChatStore(user, backing)
+    store.save({ activeChatId: 'a-1', chats: [sized('a-1', 20, 600_000), sized('o-1', 5, 1_000)] })
+
+    store.save({ activeChatId: 'a-1', chats: [sized('a-1', 20, 600_000), sized('o-1', 5, 1_000), sized('b-1', 30, 500_000)] }, ['b-1'])
+
+    expect(store.unsavedChats().has('b-1')).toBe(true)
+    const ids = createAssistantChatStore(user, backing).load().chats.map((entry) => entry.id)
+    expect(ids).toContain('o-1')
+  })
+
   it('does not bring back a moved chat that was deleted while the move was unfinished', () => {
     const store = createAssistantChatStore(user, backing)
     backing.setItem(store.key, JSON.stringify({

@@ -376,7 +376,12 @@ export function createAssistantChatStore(
       if (!fitted) continue
       const previous = values.get(name)
       values.set(name, fitted.raw)
-      while (over()) if (!trimOldest()) break
+      // What trimming can never free: the old key, the chat on screen and this write's chats.
+      const floor = [...values].reduce(
+        (sum, [entry, value]) => sum + (kept.has(entry) || !entry.startsWith(chatPrefix) ? value.length : 0),
+        0,
+      )
+      if (floor <= MAX_ASSISTANT_STORAGE_CHARS) while (over()) if (!trimOldest()) break
       if (used() > MAX_ASSISTANT_STORAGE_CHARS) {
         // It does not fit beside the chats kept; the stored copy stays and the change waits.
         if (previous === undefined) values.delete(name)
