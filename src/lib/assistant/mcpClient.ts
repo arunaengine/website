@@ -1,7 +1,7 @@
 // Streamable HTTP MCP client against this node's /mcp endpoint, authenticated
 // with a child session of kind `assistant`. Only the two calls the tool layer
 // needs are exposed, so the rest of the portal never sees the SDK types.
-import { quoted } from './untrusted'
+import { quoted, textEnvelope } from './untrusted'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type {
@@ -66,6 +66,20 @@ function blockSummary(block: Record<string, unknown>): Record<string, unknown> {
   return { type, mimeType: block.mimeType, bytes: base64Bytes(block.data) }
 }
 
+// JSON text is data the model can read as it is; any other text keeps its line
+// breaks inside an envelope that marks it as data.
+function textResult(text: string): unknown {
+  const trimmed = text.trim()
+  if (/^[[{]/.test(trimmed)) {
+    try {
+      return JSON.parse(trimmed)
+    } catch {
+      // Not JSON after all; it is handed over as text.
+    }
+  }
+  return textEnvelope(text)
+}
+
 /**
  * What the model receives from a call: the structured content when the server
  * sent one, else the text blocks, and a plain error result for `isError`. A
@@ -83,7 +97,7 @@ export function toolOutput(result: unknown): unknown {
   // The server's own words are data, so they come back quoted on one bounded line.
   if (call.isError) return { error: text ? `The tool reported an error: ${quoted(text, 1000)}` : 'The tool call failed.' }
   if (call.structuredContent !== undefined && call.structuredContent !== null) return call.structuredContent
-  if (text) return text
+  if (text) return textResult(text)
   return { content: blocks.filter((block) => block?.type !== 'text').map(blockSummary) }
 }
 

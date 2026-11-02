@@ -82,7 +82,7 @@ describe('profile form tools', () => {
   it('hands a bridge refusal back as the error', async () => {
     const form = bridge({ addEntity: vi.fn(() => 'An entity rule needs a type.') })
     expect(await call(profileFormTools(form, gate()), 'add_profile_entity', { type: ' ' }))
-      .toEqual({ error: 'An entity rule needs a type.' })
+      .toEqual({ error: 'The request was refused: "An entity rule needs a type."' })
   })
 
   it('finds a known term for a rule and names its value kind', async () => {

@@ -1,7 +1,8 @@
 // The node's MCP tools, mapped to AI SDK tools. Nothing about the tool surface
 // is duplicated here: names, descriptions and schemas all come from the server.
-import { dynamicTool, jsonSchema, type JSONSchema7, type ToolSet } from 'ai'
+import { dynamicTool, jsonSchema, type JSONSchema7, type Tool, type ToolSet } from 'ai'
 import { denied, type ApprovalGate } from './types'
+import { failedWith } from './untrusted'
 
 export interface McpToolAnnotations {
   title?: string
@@ -56,14 +57,41 @@ export function nodeTools(
           const approved = await gate.ask({ id: toolCallId, name: descriptor.name, input: args }, false)
           if (!approved) return denied()
         }
-        return source.callTool(descriptor.name, args)
+        try {
+          return await source.callTool(descriptor.name, args)
+        } catch (cause) {
+          return thrownResult(cause)
+        }
       },
     })
   }
   return tools
 }
 
+// A thrown message would reach the model raw, so it becomes a fixed sentence and quoted data.
+// A stopped turn still stops: its abort is passed on.
+function thrownResult(cause: unknown): { error: string } {
+  if (cause instanceof Error && cause.name === 'AbortError') throw cause
+  return { error: failedWith(cause) }
+}
+
+function guarded(entry: Tool): Tool {
+  const execute = entry.execute
+  if (!execute) return entry
+  return {
+    ...entry,
+    execute: async (input: unknown, options: Parameters<NonNullable<Tool['execute']>>[1]) => {
+      try {
+        return await execute(input, options)
+      } catch (cause) {
+        return thrownResult(cause)
+      }
+    },
+  } as Tool
+}
+
 /** One tool set for the model: node tools first, editor tools override by name. */
 export function mergeTools(...sets: ToolSet[]): ToolSet {
-  return Object.assign({}, ...sets) as ToolSet
+  const merged = Object.assign({}, ...sets) as ToolSet
+  return Object.fromEntries(Object.entries(merged).map(([name, entry]) => [name, guarded(entry)]))
 }

@@ -1,6 +1,6 @@
 // Tools that act on the notebook that is open. They are offered only while the
 // notebook page is open, and every write asks the approval gate while it is on.
-import { cleanValue } from './untrusted'
+import { refused } from './untrusted'
 import { jsonSchema, tool, type JSONSchema7, type ToolSet } from 'ai'
 import type { NotebookCellType } from '@/lib/notebook/nbformat'
 import { denied, type ApprovalGate } from './types'
@@ -77,7 +77,7 @@ export function notebookTools(bridge: NotebookBridge, gate: ApprovalGate): ToolS
     }
     if (scope !== bridge.scope()) return { error: 'The notebook or kernel changed while waiting for approval. Read the notebook and request the action again.' }
     const refusal = await apply()
-    if (refusal) return { error: cleanValue(refusal, 600) }
+    if (refusal) return { error: refused(refusal) }
     return bridge.summary()
   }
 
@@ -178,7 +178,7 @@ export function notebookTools(bridge: NotebookBridge, gate: ApprovalGate): ToolS
       inputSchema: schema<{ cell_id: string }>({ cell_id: STRING }, ['cell_id']),
       execute: (input) => {
         const outputs = bridge.readOutputs(input.cell_id)
-        return typeof outputs === 'string' ? { error: cleanValue(outputs, 600) } : outputs
+        return typeof outputs === 'string' ? { error: refused(outputs) } : outputs
       },
     }),
   }
