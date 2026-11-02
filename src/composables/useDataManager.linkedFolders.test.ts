@@ -44,6 +44,8 @@ vi.mock('./useAruna', () => ({
     listSyncRelationships: vi.fn(async () => ({ outgoing: [], incoming: [] })),
     nodeInfo: ref(null),
     realmInfo: ref(null),
+    sessionEpoch: ref(1),
+    searchBuckets: vi.fn(async () => ({ hits: [], next_cursor: null })),
   }),
 }))
 vi.mock('./useBuckets', () => ({

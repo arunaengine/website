@@ -19,6 +19,7 @@ const provider = {
 
 vi.mock('./useAssistantProviders', () => ({
   useAssistantProviders: () => ({
+    centralUnavailable: ref(false),
     ready: ref([provider]),
     providers: ref([provider]),
     listedModels: ref({}),
@@ -318,7 +319,9 @@ describe('another tab', () => {
 
     for (const listener of storageListeners) listener({ key: `${tab.key}:chat:c-tab` })
 
-    expect(chat.chats.value.map((entry) => entry.id).sort()).toEqual(['c-old', 'c-tab'])
+    // The reactive chat type is too deep for the checker in a matcher; only ids and titles matter.
+    const ids = (chat.chats.value as unknown as Array<{ id: string }>).map((entry) => entry.id).sort()
+    expect(ids).toEqual(['c-old', 'c-tab'])
     expect(chat.activeChatId.value).toBe('c-old')
   })
 })
@@ -336,8 +339,9 @@ describe('a storage event', () => {
 
       for (const listener of storageListeners) listener({ key: `${tab.key}:chat:c-tab` })
 
-      expect(chat.chats.value.map((entry) => entry.id)).toContain('c-tab')
-      expect(chat.chats.value.find((entry) => entry.id === 'c-new')?.title).toBe('Renamed here')
+      const chats = chat.chats.value as unknown as Array<{ id: string; title: string }>
+      expect(chats.map((entry) => entry.id)).toContain('c-tab')
+      expect(chats.find((entry) => entry.id === 'c-new')?.title).toBe('Renamed here')
     } finally {
       refused.clear()
     }
