@@ -65,7 +65,7 @@ function seed() {
   apiBaseUrl.value = scope.apiBaseUrl
   authToken.value = 'token'
   userInfo.value = {
-    user: { user_id: scope.userId },
+    user: { user_id: scope.userId, name: 'Tester', attributes: {} },
     realm: { realm_id: scope.realmId, roles: [] },
     groups: [],
   } as unknown as UserInfoResponse
