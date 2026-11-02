@@ -200,6 +200,8 @@ let chatStore: ReturnType<typeof createAssistantChatStore> | null = null
 let chatScopeKey = ''
 // Set once the user starts or opens a chat, so the first sync leaves it on screen.
 let chatPicked = false
+// The chats changed or deleted since the last save; only these are written.
+const changedChats = new Set<string>()
 // Set once the node answered for this scope; empty while chats stay in this browser.
 let remoteScopeKey = ''
 let remoteSaveTimer: ReturnType<typeof setTimeout> | null = null
@@ -357,10 +359,16 @@ function clearChatState() {
 function saveChatState() {
   if (!chatStore) return
   const before = chatState.chats.map((chat) => chat.id)
-  chatState = chatStore.save(chatState)
+  const shown = activeChatId.value
+  chatState = chatStore.save(chatState, changedChats)
+  changedChats.clear()
   // The node keeps a chat this browser has no room for; only deleteChat removes it there.
   for (const id of before) if (!chatById(id)) chatSyncs.delete(id)
   activeChatId.value = chatState.activeChatId
+  if (activeChatId.value !== shown) {
+    messages.value = activeChat()?.messages ?? []
+    history = activeChat()?.history ?? []
+  }
 }
 
 function persistChatState() {
@@ -376,6 +384,7 @@ function persistCurrentChat() {
   current.messages = messages.value
   current.history = history
   current.updatedAt = Date.now()
+  changedChats.add(current.id)
   persistChatState()
 }
 
@@ -389,6 +398,7 @@ function persistChat(chatId: string) {
   }
   chat.updatedAt = Date.now()
   markTurns(syncOf(chat.id), chatTurns(chat))
+  changedChats.add(chat.id)
   persistChatState()
 }
 
@@ -734,6 +744,7 @@ function abortTurn(): TurnContext | null {
 
 function discardTurn(turn: TurnContext | null) {
   if (!turn) return
+  changedChats.add(turn.chatId)
   setMessagesOf(turn.chatId, messagesOf(turn.chatId).filter((message) =>
     message.id !== turn.userMessageId && message.id !== turn.messageId))
 }
@@ -1132,7 +1143,9 @@ function markHead(chatId: string) {
 /** Puts what the node confirmed into the live record; the next save keeps it. */
 function recordCursor(chatId: string, sync: ChatSync) {
   const chat = chatById(chatId)
-  if (chat) chat.remote = cursorOf(sync)
+  if (!chat) return
+  chat.remote = cursorOf(sync)
+  changedChats.add(chatId)
 }
 
 /** Starts a chat over as one the node does not hold. */
@@ -1160,6 +1173,7 @@ function removeChat(id: string) {
   watchRegistry?.dropChat(id)
   markChatRead(id)
   chatSyncs.delete(id)
+  changedChats.add(id)
   // The record of the chat on screen may predate text streamed since the last save.
   const current = activeChat()
   if (current && !wasActive) {
@@ -1251,6 +1265,7 @@ async function pullChat(head: AssistantChatHead): Promise<void> {
   trackHead(sync, head)
   if (pulled.length) sync.tailKey = turnKey(pulled[pulled.length - 1])
   chat.remote = cursorOf(sync)
+  changedChats.add(chat.id)
   sync.dirtyTurns = new Set(merged.unsent.map((_, index) => head.next_seq + index))
   if (!local) chatState = { ...chatState, chats: [...chatState.chats, chat] }
 }
@@ -1425,6 +1440,7 @@ function syncChatScope() {
   chatScopeKey = ''
   chatStore = null
   chatPicked = false
+  changedChats.clear()
   historyReady.value = false
   stopRemoteSync()
   stopWatchers()
@@ -1695,6 +1711,7 @@ export function useAssistantChat() {
     chat.title = title.trim().slice(0, 80) || 'New chat'
     chat.updatedAt = Date.now()
     markHead(id)
+    changedChats.add(id)
     persistChatState()
   }
 
@@ -1734,6 +1751,7 @@ export function useAssistantChat() {
     if (chat && topic && chat.subject !== topic) {
       chat.subject = topic
       markHead(chat.id)
+      changedChats.add(chat.id)
       persistChatState()
     }
     draft.value = prompt.trim()

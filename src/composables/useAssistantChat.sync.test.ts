@@ -393,7 +393,7 @@ describe('logging in', () => {
   it('keeps the node chats this browser has no room for', async () => {
     // The node allows far more than the local budget; running out of room here must not delete there.
     const long = 'x'.repeat(7_500)
-    await login(() => {
+    const scope = await login(() => {
       for (let index = 0; index < 8; index += 1) {
         seedNode(`big-${index}`, `Big ${index}`, [0, 1, 2, 3, 4, 5].map((turn) => payload(`u${index}-${turn}`, `${long} ${turn}`)))
       }
@@ -401,7 +401,7 @@ describe('logging in', () => {
     await settle()
     await settle()
 
-    expect(chatList().length).toBeLessThan(8)
+    expect(createAssistantChatStore(scope).load().chats.length).toBeLessThan(8)
     expect(node.log.filter((line) => line.startsWith('DELETE'))).toEqual([])
     expect([...node.chats.values()].every((held) => !held.deleted)).toBe(true)
   })

@@ -307,7 +307,7 @@ describe('another tab', () => {
     const tab = createAssistantChatStore(scope)
     const held = tab.load()
     const added = { ...newAssistantChat('From the other tab'), id: 'c-tab', updatedAt: 20_000 }
-    tab.save({ ...held, chats: [added, ...held.chats.filter((entry) => entry.id !== 'c-new')] })
+    tab.save({ ...held, chats: [added, ...held.chats.filter((entry) => entry.id !== 'c-new')] }, ['c-tab', 'c-new'])
 
     for (const listener of storageListeners) listener({ key: `${tab.key}:index` })
 

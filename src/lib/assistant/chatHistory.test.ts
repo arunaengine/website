@@ -33,6 +33,18 @@ function storage(): AssistantChatStorage & { value: string | null; values: Map<s
   }
 }
 
+/** An in-memory stand-in for navigator.locks: one holder per name, in request order. */
+function memoryLocks() {
+  const tails = new Map<string, Promise<unknown>>()
+  return {
+    request(name: string, callback: () => unknown): Promise<unknown> {
+      const run = (tails.get(name) ?? Promise.resolve()).then(() => callback())
+      tails.set(name, run.catch(() => {}))
+      return run
+    },
+  }
+}
+
 /** Characters the chat history of a scope holds across all its keys. */
 function usedChars(backing: ReturnType<typeof storage>, base: string): number {
   let total = 0
@@ -102,7 +114,7 @@ describe('assistant chat history', () => {
     const restored = createAssistantChatStore(scope('user-a'), backing).load()
     expect(restored.chats.length).toBeLessThanOrEqual(MAX_ASSISTANT_CHATS)
     expect(restored.chats[0]?.title).toBe(`Chat ${MAX_ASSISTANT_CHATS + 7}`)
-    expect(restored.activeChatId).toBe(restored.chats[0]?.id)
+    expect(restored.activeChatId).toBe(chatState[0].id)
   })
 
   it('keeps a restored artifact card without its dead blob URL', () => {
@@ -326,8 +338,8 @@ describe('two tabs', () => {
   it('keeps the chats two tabs create at the same time', () => {
     const { tabA, tabB } = tabs()
 
-    tabA.save({ activeChatId: 'a-1', chats: [chat('a-1', ['ta'], 20), chat('c-1', ['t1']), chat('c-2', ['t2'])] })
-    tabB.save({ activeChatId: 'b-1', chats: [chat('b-1', ['tb'], 30), chat('c-1', ['t1']), chat('c-2', ['t2'])] })
+    tabA.save({ activeChatId: 'a-1', chats: [chat('a-1', ['ta'], 20), chat('c-1', ['t1']), chat('c-2', ['t2'])] }, ['a-1'])
+    tabB.save({ activeChatId: 'b-1', chats: [chat('b-1', ['tb'], 30), chat('c-1', ['t1']), chat('c-2', ['t2'])] }, ['b-1'])
 
     expect(saved().map((entry) => entry.id).sort()).toEqual(['a-1', 'b-1', 'c-1', 'c-2'])
   })
@@ -335,8 +347,8 @@ describe('two tabs', () => {
   it('keeps a deletion while another tab saves a different chat', () => {
     const { tabA, tabB } = tabs()
 
-    tabA.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1'])] })
-    tabB.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1', 't3'], 30), chat('c-2', ['t2'])] })
+    tabA.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1'])] }, ['c-2'])
+    tabB.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1', 't3'], 30), chat('c-2', ['t2'])] }, ['c-1'])
 
     expect(saved().map((entry) => entry.id)).toEqual(['c-1'])
   })
@@ -344,8 +356,8 @@ describe('two tabs', () => {
   it('keeps an answer another tab completed when this tab renames a different chat', () => {
     const { tabA, tabB } = tabs()
 
-    tabA.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1', 't4'], 20), chat('c-2', ['t2'])] })
-    tabB.save({ activeChatId: 'c-2', chats: [chat('c-1', ['t1']), chat('c-2', ['t2'], 30, 'Renamed')] })
+    tabA.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1', 't4'], 20), chat('c-2', ['t2'])] }, ['c-1'])
+    tabB.save({ activeChatId: 'c-2', chats: [chat('c-1', ['t1']), chat('c-2', ['t2'], 30, 'Renamed')] }, ['c-2'])
 
     const stored = saved()
     expect(stored.find((entry) => entry.id === 'c-1')?.messages.map((message) => message.id)).toEqual(['t1', 't1-a', 't4', 't4-a'])
@@ -356,8 +368,8 @@ describe('two tabs', () => {
     // Two tabs writing the same chat: the last one wins, in its own order.
     const { tabA, tabB } = tabs()
 
-    tabA.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1', 'tb'], 20), chat('c-2', ['t2'])] })
-    const kept = tabB.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1', 'ta'], 30), chat('c-2', ['t2'])] })
+    tabA.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1', 'tb'], 20), chat('c-2', ['t2'])] }, ['c-1'])
+    const kept = tabB.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1', 'ta'], 30), chat('c-2', ['t2'])] }, ['c-1'])
 
     const order = ['t1', 't1-a', 'ta', 'ta-a']
     expect(kept.chats.find((entry) => entry.id === 'c-1')?.messages.map((message) => message.id)).toEqual(order)
@@ -403,11 +415,130 @@ describe('two tabs', () => {
     const { tabA, tabB } = tabs()
     tabA.save({ activeChatId: 'a-1', chats: [big('a-1', 20), big('a-2', 21)] })
 
-    tabB.save({ activeChatId: 'b-1', chats: [big('b-1', 30), big('b-2', 31)] })
+    tabB.save({ activeChatId: 'b-1', chats: [big('b-1', 30), big('b-2', 31)] }, ['b-1', 'b-2'])
 
     const kept = saved().map((entry) => entry.id)
     expect(kept).toEqual(['b-2', 'b-1', 'a-2'])
     expect(usedChars(backing, createAssistantChatStore(user, backing).key)).toBeLessThanOrEqual(MAX_ASSISTANT_STORAGE_CHARS)
     expect(backing.largest).toBeLessThanOrEqual(MAX_ASSISTANT_STORAGE_CHARS)
+  })
+})
+
+describe('writing under a lock', () => {
+  const user = scope('user-locks')
+  let backing: ReturnType<typeof storage>
+
+  beforeEach(() => {
+    backing = storage()
+  })
+
+  function chat(id: string, turns: string[], updatedAt = 10, title = id) {
+    return {
+      ...newAssistantChat(title, 1),
+      id,
+      updatedAt,
+      messages: turns.flatMap((turn, index) => [
+        { id: turn, role: 'user' as const, text: `${turn} asked`, calls: [], at: index * 10 + 1 },
+        { id: `${turn}-a`, role: 'assistant' as const, text: `${turn} answered`, calls: [], at: index * 10 + 2 },
+      ]),
+      history: [],
+    }
+  }
+
+  function big(id: string, updatedAt: number) {
+    return {
+      ...chat(id, [], updatedAt),
+      messages: [{ id: `${id}-m`, role: 'assistant' as const, text: 'x'.repeat(7_000), calls: [], at: 1 }],
+      history: [{ role: 'user' as const, content: 'x'.repeat(250_000) }],
+    }
+  }
+
+  function saved() {
+    return createAssistantChatStore(user, backing).load().chats
+  }
+
+  function legacy(chats: ReturnType<typeof chat>[]) {
+    const store = createAssistantChatStore(user, backing)
+    backing.setItem(store.key, JSON.stringify({ version: 1, state: { activeChatId: chats[0].id, chats } }))
+    return store.key
+  }
+
+  it('writes only the chats a tab says it changed', async () => {
+    const locks = memoryLocks()
+    const tabA = createAssistantChatStore(user, backing, locks)
+    const tabB = createAssistantChatStore(user, backing, locks)
+    tabA.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1']), chat('c-2', ['t2'])] })
+    await tabA.whenWritten()
+    tabA.load()
+    tabB.load()
+
+    tabB.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1', 't4'], 20), chat('c-2', ['t2'])] }, ['c-1'])
+    // Tab A still shows the old copy of c-1, touched in memory but not changed by it.
+    tabA.save({ activeChatId: 'c-2', chats: [chat('c-1', ['t1'], 25), chat('c-2', ['t2'], 30, 'Renamed')] }, ['c-2'])
+    await Promise.all([tabA.whenWritten(), tabB.whenWritten()])
+
+    const stored = saved()
+    expect(stored.find((entry) => entry.id === 'c-1')?.messages.map((message) => message.id)).toEqual(['t1', 't1-a', 't4', 't4-a'])
+    expect(stored.find((entry) => entry.id === 'c-2')?.title).toBe('Renamed')
+  })
+
+  it('keeps the old history when moving it runs out of room', () => {
+    const key = legacy([chat('c-1', ['t1']), chat('c-2', ['t2'])])
+    const setItem = backing.setItem.bind(backing)
+    let chatWrites = 0
+    backing.setItem = (name, value) => {
+      if (name.includes(':chat:') && ++chatWrites > 1) throw new Error('QuotaExceededError')
+      setItem(name, value)
+    }
+
+    const first = createAssistantChatStore(user, backing).load()
+    backing.setItem = setItem
+
+    expect(first.chats.map((entry) => entry.id).sort()).toEqual(['c-1', 'c-2'])
+    expect(backing.values.has(key)).toBe(true)
+    expect(saved().map((entry) => entry.id).sort()).toEqual(['c-1', 'c-2'])
+  })
+
+  it('moves the old history once when two tabs load it at the same time', async () => {
+    const locks = memoryLocks()
+    const key = legacy([chat('c-1', ['t1']), chat('c-2', ['t2'])])
+    const tabA = createAssistantChatStore(user, backing, locks)
+    const tabB = createAssistantChatStore(user, backing, locks)
+    const held = tabA.load()
+    tabB.load()
+
+    tabA.save({ ...held, chats: [chat('a-1', ['ta'], 40), ...held.chats] }, ['a-1'])
+    await Promise.all([tabA.whenWritten(), tabB.whenWritten()])
+
+    expect(backing.values.has(key)).toBe(false)
+    expect(saved().map((entry) => entry.id).sort()).toEqual(['a-1', 'c-1', 'c-2'])
+  })
+
+  it('stays under the size cap when the index lost a chat size', async () => {
+    const store = createAssistantChatStore(user, backing, memoryLocks())
+    store.save({ activeChatId: 'a-1', chats: [big('a-1', 10)] })
+    await store.whenWritten()
+    const index = [...backing.values.keys()].find((name) => name.endsWith(':index')) ?? ''
+    const entries = JSON.parse(backing.values.get(index) ?? '{}') as { chats: Record<string, { size?: number }> }
+    for (const entry of Object.values(entries.chats)) entry.size = 10
+    backing.values.set(index, JSON.stringify(entries))
+
+    store.save({ activeChatId: 'b-3', chats: [big('b-1', 20), big('b-2', 21), big('b-3', 22), big('a-1', 10)] }, ['b-1', 'b-2', 'b-3'])
+    await store.whenWritten()
+
+    expect(usedChars(backing, store.key)).toBeLessThanOrEqual(MAX_ASSISTANT_STORAGE_CHARS)
+    expect(saved().map((entry) => entry.id)).toContain('b-3')
+  })
+
+  it('keeps the active chat when the count limit drops older ones', () => {
+    const chats = Array.from({ length: MAX_ASSISTANT_CHATS + 1 }, (_, index) => chat(`c-${index}`, [`t${index}`], 100 + index))
+    const store = createAssistantChatStore(user, backing)
+
+    const kept = store.save({ activeChatId: 'c-0', chats })
+
+    expect(kept.activeChatId).toBe('c-0')
+    expect(kept.chats.map((entry) => entry.id)).toContain('c-0')
+    expect(kept.chats).toHaveLength(MAX_ASSISTANT_CHATS)
+    expect(saved().map((entry) => entry.id)).toContain('c-0')
   })
 })
