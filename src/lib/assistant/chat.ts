@@ -34,12 +34,16 @@ export interface TurnOptions extends TurnHandlers {
   abortSignal?: AbortSignal
   providerOptions?: StreamProviderOptions
   maxOutputTokens?: number
+  /** Retries the SDK makes on a failed call; unset keeps its default. */
+  maxRetries?: number
 }
 
 export interface TurnResult {
   /** Everything the model produced, to append to the conversation. */
   messages: ModelMessage[]
   error?: string
+  /** Set when the realm assistant's daily limit refused the turn. */
+  limited?: true
 }
 
 /** How much of a provider's reason is kept; the message is stored with the turn on the node. */
@@ -57,6 +61,25 @@ function providerReason(body: string | undefined): string {
   } catch {
     return ''
   }
+}
+
+/** The realm assistant's refusal at its daily limit, with when it resets; null for any other error. */
+export function limitMessage(error: unknown, now = Date.now()): string | null {
+  if (!APICallError.isInstance(error) || error.statusCode !== 429 || !error.responseBody) return null
+  let body: { code?: unknown; quota?: { limit?: unknown } }
+  try {
+    body = JSON.parse(error.responseBody)
+  } catch {
+    return null
+  }
+  if (body.code !== 'assistant_quota_exhausted') return null
+  const limit = typeof body.quota?.limit === 'number' ? body.quota.limit : null
+  const wait = Number(error.responseHeaders?.['retry-after'])
+  const reset = Number.isFinite(wait)
+    ? ` It resets at ${new Date(now + wait * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`
+    : ''
+  const used = limit === null ? 'all calls' : `all ${limit} calls`
+  return `You used ${used} of the realm assistant for today.${reset} You can still use your own provider.`
 }
 
 /** A provider failure the way the panel shows it: the HTTP code, then why. */
@@ -79,9 +102,16 @@ export async function runTurn(options: TurnOptions): Promise<TurnResult> {
     abortSignal: options.abortSignal,
     providerOptions: options.providerOptions,
     maxOutputTokens: options.maxOutputTokens,
+    ...(options.maxRetries === undefined ? {} : { maxRetries: options.maxRetries }),
   })
 
   let failure: string | undefined
+  let limited: true | undefined
+  const fail = (error: unknown) => {
+    const limit = limitMessage(error)
+    if (limit) limited = true
+    return limit ?? providerErrorMessage(error)
+  }
   // Text the model writes after a tool step is its own block; a blank line keeps
   // it from running into the sentence before the call.
   let written = false
@@ -102,11 +132,12 @@ export async function runTurn(options: TurnOptions): Promise<TurnResult> {
       } else if (part.type === 'source') {
         if (part.sourceType === 'url') options.onSource?.({ url: part.url, ...(part.title ? { title: part.title } : {}) })
       } else if (part.type === 'error') {
-        failure ??= providerErrorMessage(part.error)
+        failure ??= fail(part.error)
       }
     }
-    return { messages: await result.responseMessages, error: failure }
+    return { messages: await result.responseMessages, error: failure, ...(limited ? { limited } : {}) }
   } catch (cause) {
-    return { messages: [], error: providerErrorMessage(cause) }
+    const error = fail(cause)
+    return { messages: [], error, ...(limited ? { limited } : {}) }
   }
 }

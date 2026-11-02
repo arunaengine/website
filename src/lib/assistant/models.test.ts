@@ -47,3 +47,19 @@ describe('assistant proxy fetch', () => {
     await expect(canceled('http://127.0.0.1:43001/proxy/responses')).rejects.toMatchObject({ name: 'AbortError' })
   })
 })
+
+describe('realm assistant session', () => {
+  it('names the chat only when a session is given', async () => {
+    const seen: (string | null)[] = []
+    const fetcher: typeof globalThis.fetch = vi.fn(async (_input, init) => {
+      seen.push(new Headers(init?.headers).get('x-session-id'))
+      return new Response(null, { status: 204 })
+    })
+    const chatId = '3f0c8a52-6c1e-4c39-9f1b-1d2a4b5c6d7e'
+
+    await proxyFetch({ apiBaseUrl: '/api/v1', token: 't', sessionId: chatId, fetch: fetcher })('http://n/proxy')
+    await proxyFetch({ apiBaseUrl: '/api/v1', token: 't', fetch: fetcher })('http://n/proxy')
+
+    expect(seen).toEqual([chatId, null])
+  })
+})

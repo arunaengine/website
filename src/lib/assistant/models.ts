@@ -5,7 +5,7 @@ import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import type { LanguageModel } from 'ai'
-import { assistantProxyBaseUrl, type AssistantProvider } from '@/lib/api'
+import { SESSION_HEADER, assistantProxyBaseUrl, type AssistantProvider } from '@/lib/api'
 
 /** The proxy never reads a provider key from the browser; this is a marker. */
 const PROXIED = 'proxied'
@@ -14,6 +14,8 @@ export interface ModelContext {
   apiBaseUrl: string
   /** The Aruna session bearer the proxy authenticates. */
   token: string
+  /** The chat a realm assistant call belongs to; sent only for that provider. */
+  sessionId?: string
   fetch?: typeof globalThis.fetch
 }
 
@@ -30,6 +32,7 @@ export function proxyFetch(context: ModelContext): typeof globalThis.fetch {
     headers.delete('x-api-key')
     headers.delete('anthropic-version')
     headers.set('Authorization', `Bearer ${context.token}`)
+    if (context.sessionId) headers.set(SESSION_HEADER, context.sessionId)
     try {
       return await base(input, { ...init, headers })
     } catch (cause) {

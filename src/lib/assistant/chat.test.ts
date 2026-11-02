@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { APICallError, dynamicTool, jsonSchema, type ToolSet } from 'ai'
 import { MockLanguageModelV4, simulateReadableStream } from 'ai/test'
-import { providerErrorMessage, runTurn } from './chat'
+import { limitMessage, providerErrorMessage, runTurn } from './chat'
 import { DENIAL_MESSAGE } from './types'
 
 const USAGE = {
@@ -244,5 +244,56 @@ describe('providerErrorMessage', () => {
     expect(providerErrorMessage(failed(JSON.stringify({ error: { message: 'no key\nAuthorization: Bearer sk-1' } }))))
       .toBe('400: Bad Request: no key')
     expect(providerErrorMessage(failed('<html>Bad Gateway</html>'))).toBe('400: Bad Request')
+  })
+})
+
+describe('realm assistant daily limit', () => {
+  function refusal(body: unknown, headers: Record<string, string> = { 'retry-after': '3600' }) {
+    return new APICallError({
+      message: 'Too Many Requests',
+      url: 'https://node.test/proxy/v1/chat/completions',
+      requestBodyValues: {},
+      statusCode: 429,
+      responseHeaders: headers,
+      responseBody: JSON.stringify(body),
+    })
+  }
+  const exhausted = {
+    error: 'daily assistant limit reached',
+    code: 'assistant_quota_exhausted',
+    quota: { scope: 'user', dimension: 'assistant_requests', observed: 50, requested: 1, limit: 50 },
+  }
+
+  it('names the limit, the reset time and the way out', () => {
+    const now = new Date(2026, 10, 2, 23, 0).getTime()
+    const reset = new Date(now + 3_600_000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+    expect(limitMessage(refusal(exhausted), now)).toBe(
+      `You used all 50 calls of the realm assistant for today. It resets at ${reset}. You can still use your own provider.`,
+    )
+  })
+
+  it('leaves other refusals to the normal message', () => {
+    expect(limitMessage(refusal({ error: 'too many requests', code: 'rate_limited' }))).toBeNull()
+    expect(limitMessage(new Error('429'))).toBeNull()
+  })
+
+  it('marks the turn as limited', async () => {
+    const model = new MockLanguageModelV4({ doStream: async () => { throw refusal(exhausted) } })
+
+    const result = await runTurn({
+      model,
+      system: 'test',
+      messages: [{ role: 'user', content: 'hi' }],
+      tools: {},
+      maxRetries: 0,
+      onText: () => {},
+      onToolCall: () => {},
+      onToolResult: () => {},
+      onToolError: () => {},
+    })
+
+    expect(result.limited).toBe(true)
+    expect(result.error).toContain('You used all 50 calls')
   })
 })

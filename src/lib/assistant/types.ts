@@ -167,6 +167,8 @@ export interface ChatMessage {
   marker?: true
   /** Set when the provider or the loop itself failed, e.g. "429 rate limited". */
   error?: string
+  /** Set when the error is the realm assistant's daily limit. */
+  limited?: true
   /** The web pages a search-backed answer drew on, with their titles. */
   sources?: MessageSource[]
 }

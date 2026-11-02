@@ -3,7 +3,7 @@
 // are only imported once a message is actually sent.
 import { computed, ref, watch } from 'vue'
 import type { ModelMessage, ToolSet } from 'ai'
-import { createSession, providerModelId, type AssistantModel, type AssistantProvider } from '@/lib/api'
+import { CENTRAL_PROVIDER_ID, createSession, providerModelId, type AssistantModel, type AssistantProvider } from '@/lib/api'
 import {
   apiBaseUrl,
   authToken,
@@ -965,7 +965,8 @@ async function runChatTurn(chatId: string, prompt: string, context: PromptContex
     ...historyOf(chatId),
     { role: 'user', content: resumeText === undefined ? prompt : `${prompt} ${RESUME_NOTE}` },
   ]
-  const modelContext = { apiBaseUrl: apiBaseUrl.value, token: authToken.value }
+  const central = selectedProvider.provider_id === CENTRAL_PROVIDER_ID
+  const modelContext = { apiBaseUrl: apiBaseUrl.value, token: authToken.value, ...(central ? { sessionId: chatId } : {}) }
   const answer = () => messagesOf(chatId).find((entry) => entry.id === assistantMessageId)
   try {
     const [{ runTurn }, { buildModel }, { buildBrowserModel }, { systemPrompt }] = await Promise.all([
@@ -1006,6 +1007,8 @@ async function runChatTurn(chatId: string, prompt: string, context: PromptContex
         abortSignal: turn.controller.signal,
         providerOptions: req.providerOptions,
         maxOutputTokens: req.maxOutputTokens,
+        // A refusal at the daily limit shows at once instead of after retries.
+        ...(central ? { maxRetries: 0 } : {}),
         ...handlers,
       })
     }
@@ -1065,6 +1068,7 @@ async function runChatTurn(chatId: string, prompt: string, context: PromptContex
       if (isShownTurn(turn)) error.value = result.error
       const message = answer()
       if (message) message.error = result.error
+      if (message && result.limited) message.limited = true
     } else if (!result.error) {
       setHistoryOf(chatId, [...turnMessages, ...result.messages])
     }
@@ -1083,6 +1087,7 @@ async function runChatTurn(chatId: string, prompt: string, context: PromptContex
       persistChat(chatId)
       pumpResumes()
     }
+    if (central) void providers.refreshCentral()
   }
 }
 
