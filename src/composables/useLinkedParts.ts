@@ -37,6 +37,8 @@ export interface LinkedPartFacts {
   usage: BucketUsageResponse | null
   /** The first entries below the part, when asked for; `more` when the bucket holds further ones. */
   entries: { list: PartEntry[]; more: boolean } | null
+  /** Why the entries below the part could not be listed, or null. */
+  listError?: string | null
   others: DataLinkDocument[]
   /** Signed out, how a visitor downloads the files below the part. */
   download?: PartDownload | null
@@ -143,10 +145,14 @@ export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wants
     if (!facts.value.has(id)) put(id, base)
     const node = target.node_id && !isLocalNode(target.node_id) ? target.node_id : null
     const bucket = target.bucket ?? ''
+    let listError: string | null = null
     const [usage, page, links, distribution] = await Promise.all([
       bucket && !target.prefix ? getBucketUsage(bucket, node).catch(() => null) : null,
       bucket && !problem && wantsEntries(id)
-        ? listBucketObjects(bucket, { prefix: target.prefix || undefined, delimiter: '/', limit: SHOWN + 1 }, node).catch(() => null)
+        ? listBucketObjects(bucket, { prefix: target.prefix || undefined, delimiter: '/', limit: SHOWN + 1 }, node).catch((cause: unknown) => {
+          listError = apiErrorMessage(cause)
+          return null
+        })
         : null,
       getDataLinks(id, { parts_only: true }).catch(() => null),
       bucket && target.set_id ? getBucketDistribution(bucket, undefined, node).catch(() => null) : null,
@@ -160,6 +166,7 @@ export function useLinkedParts(ids: Ref<string[]>, datasetId: Ref<string>, wants
       nodes: distribution ? [...new Set(distribution.members.map((member) => member.node_id))] : nodes,
       usage,
       entries: page ? { list: list.slice(0, SHOWN), more: list.length > SHOWN || Boolean(page.next_cursor) } : null,
+      listError,
       others: (links?.documents ?? []).filter((document) => document.document_id !== datasetId.value),
     })
   }
@@ -201,7 +208,7 @@ const MORE = 50
 export function usePartFolders(datasetId: Ref<string>) {
   const { listBucketObjects, sessionEpoch } = useAruna()
   const { isLocalNode } = useRealmNodes()
-  const folders = ref(new Map<string, { list: PartEntry[]; more: boolean; loading: boolean }>())
+  const folders = ref(new Map<string, { list: PartEntry[]; more: boolean; loading: boolean; error?: string | null }>())
   let generation = 0
   watch([datasetId, sessionEpoch], () => {
     generation++
@@ -218,13 +225,18 @@ export function usePartFolders(datasetId: Ref<string>) {
     const known = folders.value.get(key)
     folders.value = new Map(folders.value).set(key, { list: known?.list ?? [], more: false, loading: true })
     const node = target.node_id && !isLocalNode(target.node_id) ? target.node_id : null
-    const page = await listBucketObjects(target.bucket, { prefix: prefix || undefined, delimiter: '/', limit: limit + 1 }, node).catch(() => null)
+    let error: string | null = null
+    const page = await listBucketObjects(target.bucket, { prefix: prefix || undefined, delimiter: '/', limit: limit + 1 }, node).catch((cause: unknown) => {
+      error = apiErrorMessage(cause)
+      return null
+    })
     if (round !== generation || !folders.value.has(key)) return
-    const entries = page ? entryList(target, prefix, page, isLocalNode, part.download) : []
+    const entries = page ? entryList(target, prefix, page, isLocalNode, part.download) : (known?.list ?? [])
     folders.value = new Map(folders.value).set(key, {
-      list: entries.slice(0, limit),
-      more: entries.length > limit || Boolean(page?.next_cursor),
+      list: entries.slice(0, page ? limit : undefined),
+      more: page ? entries.length > limit || Boolean(page.next_cursor) : false,
       loading: false,
+      error,
     })
   }
 

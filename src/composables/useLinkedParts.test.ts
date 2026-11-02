@@ -51,6 +51,23 @@ describe('useLinkedParts', () => {
     scope.stop()
   })
 
+  it('says why a visitor sees no files when the listing is refused', async () => {
+    aruna.authToken.value = ''
+    aruna.listBucketObjects.mockRejectedValue(new Error('Not authorized'))
+    const scope = effectScope()
+    const facts = scope.run(() => useLinkedParts(ref([PART]), ref('d1'), () => true))!
+    await settle()
+
+    expect(facts.value.get(PART)?.entries).toBeNull()
+    expect(facts.value.get(PART)?.listError).toBe('Not authorized')
+
+    const { folders, keyOf, toggle } = scope.run(() => usePartFolders(ref('d1')))!
+    toggle(facts.value.get(PART)!, 'genomes/')
+    await settle()
+    expect(folders.value.get(keyOf(facts.value.get(PART)!, 'genomes/'))?.error).toBe('Not authorized')
+    scope.stop()
+  })
+
   it('lists a node ARN part signed out without the refused lookup and downloads its files there', async () => {
     aruna.authToken.value = ''
     const scope = effectScope()

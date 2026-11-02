@@ -136,20 +136,22 @@ const { folders, keyOf, toggle: toggleFolder, more: moreFolder } = usePartFolder
 type EntryRow =
   | { kind: 'entry'; key: string; entry: PartEntry; depth: number; open: boolean; loading: boolean }
   | { kind: 'more'; key: string; prefix: string; depth: number; shown: number; loading: boolean }
+  | { kind: 'error'; key: string; message: string; depth: number }
 function entryRows(row: DataEntityNode): EntryRow[] {
   const part = partOf(row)
   if (!part?.target) return []
   const rows: EntryRow[] = []
-  const walk = (prefix: string, list: PartEntry[], more: boolean, depth: number, loading = false) => {
+  const walk = (prefix: string, list: PartEntry[], more: boolean, depth: number, loading = false, error?: string | null) => {
     for (const entry of list) {
       const opened = entry.prefix ? folders.value.get(keyOf(part, entry.prefix)) : undefined
       rows.push({ kind: 'entry', key: `${prefix}${entry.name}`, entry, depth, open: Boolean(opened), loading: Boolean(opened?.loading) })
-      if (opened && entry.prefix) walk(entry.prefix, opened.list, opened.more, depth + 1, opened.loading)
+      if (opened && entry.prefix) walk(entry.prefix, opened.list, opened.more, depth + 1, opened.loading, opened.error)
     }
+    if (error) rows.push({ kind: 'error', key: `${prefix}\nerror`, message: error, depth })
     if (more && !currentUser.value) rows.push({ kind: 'more', key: `${prefix}\n`, prefix, depth, shown: list.length, loading })
   }
   const root = folders.value.get(keyOf(part, part.target.prefix))
-  walk(part.target.prefix, root?.list ?? entriesOf(row), root ? root.more : Boolean(part.entries?.more), row.depth + 1, root?.loading)
+  walk(part.target.prefix, root?.list ?? entriesOf(row), root ? root.more : Boolean(part.entries?.more), row.depth + 1, root?.loading, root?.error)
   return rows
 }
 
@@ -395,6 +397,11 @@ function openPreview(row: DataEntity) {
                     <td class="whitespace-nowrap px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground">{{ item.entry.size !== null ? formatBinary(item.entry.size) : '' }}</td>
                     <td :colspan="columns - 4"></td>
                   </tr>
+                  <tr v-else-if="item.kind === 'error'" class="border-t border-border-subtle">
+                    <td :colspan="columns" class="py-1.5 pr-3 text-xs text-destructive" :style="{ paddingLeft: `${2.5 + item.depth * 1.5}rem` }">
+                      The files could not be listed: {{ item.message }}
+                    </td>
+                  </tr>
                   <tr v-else class="border-t border-border-subtle">
                     <td :colspan="columns" class="py-1.5 pr-3" :style="{ paddingLeft: `${2.5 + item.depth * 1.5}rem` }">
                       <button type="button" class="text-xs text-primary hover:underline disabled:opacity-60" :disabled="item.loading" @click="moreFolder(partOf(row)!, item.prefix, item.shown)">Show more</button>
@@ -407,6 +414,11 @@ function openPreview(row: DataEntity) {
                   </td>
                 </tr>
               </template>
+              <tr v-if="partOf(row)?.listError" class="border-t border-border-subtle">
+                <td :colspan="columns" class="py-1.5 pr-3 text-xs text-destructive" :style="{ paddingLeft: `${3.75 + row.depth * 1.5}rem` }">
+                  The files could not be listed: {{ partOf(row)!.listError }}
+                </td>
+              </tr>
               <tr v-if="notListed(row) && !entriesOf(row).length && (isOpen(row) || !row.childIds.length)" class="border-t border-border-subtle">
                 <td :colspan="columns" class="py-1.5 pr-3">
                   <span class="flex min-w-0 items-center gap-2" :style="{ paddingLeft: `${2 + row.depth * 1.5}rem` }">

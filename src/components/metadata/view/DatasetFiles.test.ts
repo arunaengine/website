@@ -244,6 +244,32 @@ describe('DatasetFiles', () => {
     mounted.app.unmount()
   })
 
+  it('shows why the files of a linked bucket or an opened folder could not be listed', async () => {
+    const part = 'arn:aruna:r:n2:s3/raw/'
+    const genomes = { name: 'genomes', folder: true, size: null, route: { name: 'bucket' }, prefix: 'genomes/' }
+    partFacts.value = new Map([[part, {
+      target: { id: part, bucket: 'raw', prefix: '', node_id: 'n2', held_here: false },
+      problem: null,
+      route: null,
+      nodes: ['n2'],
+      usage: null,
+      entries: { list: [genomes], more: false },
+      listError: 'Not authorized',
+      others: [],
+    }]])
+    openedFolders.value = new Map([[`${part}\ngenomes/`, { list: [], more: false, loading: false, error: 'Node did not answer' }]])
+    user.value = null
+    const mounted = await render({ '@id': part, '@type': 'Dataset', name: 'raw' })
+    const text = content(mounted.root)
+    partFacts.value = new Map()
+    openedFolders.value = new Map()
+    user.value = { id: 'u1' }
+
+    expect(text).toContain('The files could not be listed: Not authorized')
+    expect(text).toContain('The files could not be listed: Node did not answer')
+    mounted.app.unmount()
+  })
+
   it('opens a folder of a linked bucket in place for a visitor and downloads its files', async () => {
     const part = 'arn:aruna:r:n2:s3/raw/'
     const download = 'https://n2.test/api/v1/ga4gh/drs/v1/download?object_id=y'
