@@ -97,9 +97,8 @@ describe('node cards', () => {
     expect(await renderToString(createSSRApp({ render: () => h(NodeCards, { nodes: [node()], devices: [] }) }))).not.toContain('Rename')
     const html = await renderToString(createSSRApp({ render: () => h(NodeCards, { nodes: [node()], devices: [], rename: async () => {} }) }))
     expect(html).toContain('aria-label="Rename node-2"')
-    // The Pencil waits for hover or keyboard focus on the card.
-    expect(html).toMatch(/class="group [^"]*"/)
-    expect(html).toMatch(/aria-label="Rename node-2"[^>]*class="[^"]*opacity-0[^"]*group-focus-within:opacity-100|class="[^"]*opacity-0[^"]*group-focus-within:opacity-100[^"]*"[^>]*aria-label="Rename node-2"/)
+    // The Pencil stays visible; it never waits for hover.
+    expect(html).not.toContain('opacity-0')
   })
 
   it('links each name to its node page', async () => {
