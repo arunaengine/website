@@ -167,7 +167,7 @@ onMounted(() => void list.load())
         <FilterChips v-model="stateGroup" :options="chipOptions" aria-label="Filter system jobs by state" />
       </template>
       <template #tools>
-        <span v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</span>
+        <span v-if="lastPollError" class="text-xs text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</span>
       </template>
 
       <EmptyState
@@ -178,7 +178,7 @@ onMounted(() => void list.load())
       />
 
       <table v-else class="w-full text-sm">
-        <thead class="bg-muted/20 text-[11px] text-muted-foreground">
+        <thead class="bg-muted/20 text-xs text-muted-foreground">
           <tr>
             <th class="px-5 py-2 text-left font-semibold">Kind</th>
             <th class="px-5 py-2 text-left font-semibold">State</th>
@@ -199,7 +199,7 @@ onMounted(() => void list.load())
                 @click="openJob(job)"
               >
                 <span class="font-medium text-foreground">{{ jobLabel(job) }}</span>
-                <span class="block font-mono text-[11px] text-muted-foreground" :title="job.job_id">{{ truncateMiddle(job.job_id) }}</span>
+                <span class="block font-mono text-xs text-muted-foreground" :title="job.job_id">{{ truncateMiddle(job.job_id) }}</span>
               </button>
             </td>
             <td class="px-5 py-2.5">
@@ -216,14 +216,14 @@ onMounted(() => void list.load())
                   :label="`Progress: ${formatJobProgress(job.progress)}`"
                   class="h-1.5"
                 />
-                <span class="block text-[11px] text-muted-foreground">{{ formatJobProgress(job.progress) }}</span>
+                <span class="block text-xs text-muted-foreground">{{ formatJobProgress(job.progress) }}</span>
               </div>
             </td>
-            <td class="hidden px-5 py-2.5 text-[11px] text-muted-foreground sm:table-cell">{{ job.attempts }}</td>
-            <td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="job.created_at">
+            <td class="hidden px-5 py-2.5 text-xs text-muted-foreground sm:table-cell">{{ job.attempts }}</td>
+            <td class="px-5 py-2.5 text-xs text-muted-foreground" :title="job.created_at">
               {{ relativeTime(job.created_at) }}
             </td>
-            <td class="hidden px-5 py-2.5 text-[11px] text-muted-foreground md:table-cell" :title="job.updated_at">
+            <td class="hidden px-5 py-2.5 text-xs text-muted-foreground md:table-cell" :title="job.updated_at">
               {{ relativeTime(job.updated_at) }}
             </td>
             <td class="px-5 py-2.5 text-right">

@@ -134,7 +134,7 @@ const checkLabel = computed(() => {
           aria-label="Language"
         />
         <Input v-else :model-value="language.label" class="mt-1 h-8 text-xs" :disabled="true" aria-label="Language" />
-        <p class="mt-1 text-[11px] text-muted-foreground">
+        <p class="mt-1 text-xs text-muted-foreground">
           {{ underRuntime ? 'Set by the runtime.' : 'Highlighting and file name only.' }}
         </p>
       </div>
@@ -148,7 +148,7 @@ const checkLabel = computed(() => {
           aria-label="Mounted at"
           @update:model-value="(value) => setScriptPath(String(value))"
         />
-        <p class="mt-1 text-[11px] text-muted-foreground">
+        <p class="mt-1 text-xs text-muted-foreground">
           <template v-if="underRuntime">Set by the runtime.</template>
           <template v-else>Call it, for example <code class="font-mono">{{ language.call }} {{ scriptPath }}</code></template>
         </p>
@@ -173,10 +173,10 @@ const checkLabel = computed(() => {
           aria-label="Script bucket"
           :invalid="stagingBucketValid ? undefined : 'error'"
         />
-        <p v-if="bucketsLoaded && !buckets.length" class="mt-1 text-[11px] text-destructive">
+        <p v-if="bucketsLoaded && !buckets.length" class="mt-1 text-xs text-destructive">
           You have no buckets yet.
         </p>
-        <p v-else-if="!stagingBucketValid" class="mt-1 text-[11px] text-destructive">Pick one of your buckets.</p>
+        <p v-else-if="!stagingBucketValid" class="mt-1 text-xs text-destructive">Pick one of your buckets.</p>
       </div>
       <div class="min-w-0">
         <label for="run-script-key" class="flex items-center gap-1.5 text-xs font-medium text-foreground">
@@ -190,7 +190,7 @@ const checkLabel = computed(() => {
           :invalid="scriptKeyProblem ? 'error' : undefined"
           @update:model-value="(value) => { setScriptKey(String(value)); clearAi('scriptKey') }"
         />
-        <p v-if="scriptKeyProblem" class="mt-1 text-[11px] text-destructive">{{ scriptKeyProblem }}</p>
+        <p v-if="scriptKeyProblem" class="mt-1 text-xs text-destructive">{{ scriptKeyProblem }}</p>
       </div>
     </div>
 
@@ -211,20 +211,20 @@ const checkLabel = computed(() => {
       >
         <FolderPlus class="size-3.5" /> Create bucket
       </Button>
-      <p v-if="createBucketError" class="text-[11px] text-destructive">{{ createBucketError }}</p>
-      <p v-else-if="newBucketProblem" class="text-[11px] text-destructive">{{ newBucketProblem }}</p>
+      <p v-if="createBucketError" class="text-xs text-destructive">{{ createBucketError }}</p>
+      <p v-else-if="newBucketProblem" class="text-xs text-destructive">{{ newBucketProblem }}</p>
     </div>
 
-    <p v-if="reuseSelectedScript && !needsStagingLocation" class="mb-2 truncate font-mono text-[11px] text-muted-foreground" :title="scriptUrl">
+    <p v-if="reuseSelectedScript && !needsStagingLocation" class="mb-2 truncate font-mono text-xs text-muted-foreground" :title="scriptUrl">
       Reused directly: {{ scriptUrl }}
     </p>
-    <p v-else class="mb-2 truncate font-mono text-[11px] text-muted-foreground" :title="stagedFileUrl">{{ stagedFileUrl }}</p>
+    <p v-else class="mb-2 truncate font-mono text-xs text-muted-foreground" :title="stagedFileUrl">{{ stagedFileUrl }}</p>
 
     <div class="overflow-hidden rounded-md border border-border">
       <div class="flex items-center gap-2 border-b border-border bg-muted px-2.5 py-1.5">
         <OptionToggle v-model="editorTab" :options="tabs" aria-label="Script editor tabs" />
         <span class="flex-1" />
-        <span v-if="dependencies.length" class="text-[11px] text-muted-foreground">
+        <span v-if="dependencies.length" class="text-xs text-muted-foreground">
           Dependencies need network access. <DocsLink topic="compute-run" label="Docs" />
         </span>
       </div>
@@ -240,7 +240,7 @@ const checkLabel = computed(() => {
         <DependenciesTab />
       </div>
     </div>
-    <p v-if="!script.trim()" class="mt-1.5 text-[11px] text-destructive">The script cannot be empty.</p>
+    <p v-if="!script.trim()" class="mt-1.5 text-xs text-destructive">The script cannot be empty.</p>
 
     <PathChips
       class="mt-2.5"

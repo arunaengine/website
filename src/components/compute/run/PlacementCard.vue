@@ -250,7 +250,7 @@ function isCustom(rowId: number): boolean {
           >
             <Plus class="size-3.5" /> Add constraint
           </Button>
-          <p class="text-[11px] text-muted-foreground">
+          <p class="text-xs text-muted-foreground">
             Keys and values come from what the nodes advertise.
             <DocsLink topic="compute-run" label="Docs" />
           </p>
@@ -263,7 +263,7 @@ function isCustom(rowId: number): boolean {
             {{ matchCount ? `${eligible.length} of ${nodeMatches.total} nodes match` : 'No node matches' }}
           </b>
           <span class="flex-1" />
-          <Button variant="link" size="sm" class="h-auto p-0 text-[11px]" :aria-expanded="listOpen" @click="listOpen = !listOpen">
+          <Button variant="link" size="sm" class="h-auto p-0 text-xs" :aria-expanded="listOpen" @click="listOpen = !listOpen">
             {{ listOpen ? 'Hide nodes' : 'Show nodes' }}
           </Button>
         </div>
@@ -278,23 +278,23 @@ function isCustom(rowId: number): boolean {
               class="grid grid-cols-[1.2fr_1fr_2fr] items-center gap-2.5 border-b border-border/70 px-3 py-1.5 text-xs last:border-b-0"
             >
               <span class="truncate font-medium">{{ node.label }}</span>
-              <span class="truncate text-[11px] text-muted-foreground">{{ node.executorKinds.join(', ') }}</span>
-              <span class="truncate text-[11px] text-muted-foreground">
+              <span class="truncate text-xs text-muted-foreground">{{ node.executorKinds.join(', ') }}</span>
+              <span class="truncate text-xs text-muted-foreground">
                 {{ Object.entries(node.info?.labels ?? {}).filter(([key]) => !key.startsWith('aruna-engine.org/')).map(([key, value]) => `${key}=${value}`).join(', ') }}
               </span>
             </li>
-            <li v-if="!filtered.length" class="px-3 py-1.5 text-[11px] text-muted-foreground">
+            <li v-if="!filtered.length" class="px-3 py-1.5 text-xs text-muted-foreground">
               Loosen a constraint or pick another node.
             </li>
           </ul>
-          <div v-if="!showAll && matching > 5" class="flex items-center gap-2 border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground">
+          <div v-if="!showAll && matching > 5" class="flex items-center gap-2 border-t border-border px-3 py-1.5 text-xs text-muted-foreground">
             <span>and {{ matching - 5 }} more</span>
-            <Button variant="link" size="sm" class="h-auto p-0 text-[11px]" @click="showAll = true">Show all</Button>
+            <Button variant="link" size="sm" class="h-auto p-0 text-xs" @click="showAll = true">Show all</Button>
           </div>
         </template>
       </div>
 
-      <div v-if="leftOutReasons.length" class="text-[11px] text-muted-foreground">
+      <div v-if="leftOutReasons.length" class="text-xs text-muted-foreground">
         <button
           type="button"
           class="underline-offset-2 hover:underline"

@@ -485,7 +485,7 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
               class="flex min-w-0 flex-1 items-center gap-1"
               @focusout="(e: FocusEvent) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) commitDest() }"
             >
-              <span class="shrink-0 text-[10px] text-muted-foreground">s3://</span>
+              <span class="shrink-0 text-xs text-muted-foreground">s3://</span>
               <Select
                 v-if="bucketOptions?.length"
                 v-model="destDraft.bucket"
@@ -515,7 +515,7 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
             <button
               v-else
               type="button"
-              class="min-w-0 flex-1 truncate text-left font-mono text-[10px] text-muted-foreground hover:underline"
+              class="min-w-0 flex-1 truncate text-left font-mono text-xs text-muted-foreground hover:underline"
               :title="`Change the destination of ${row.name}`"
               @click="startDest(outMarkerOf(row)!.index!)"
             >
@@ -525,7 +525,7 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
           <span
             v-for="marker in outMarkerOf(row) ? [] : [secondaryOf(row)].filter((m): m is Marker => m !== null)"
             :key="marker.kind"
-            class="hidden min-w-0 flex-1 truncate text-[10px] text-muted-foreground sm:inline"
+            class="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:inline"
             :class="marker.kind === 'ws' ? 'italic' : 'font-mono'"
             :title="marker.secondary"
           >
@@ -642,9 +642,9 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
         >
           <span class="w-4 shrink-0" />
           <FileText class="h-3 w-3 shrink-0" />
-          <span class="truncate font-mono text-[11px]">{{ file }}</span>
+          <span class="truncate font-mono text-xs">{{ file }}</span>
         </div>
-        <div v-if="folderFilesFor(row).length > FOLDER_FILE_PREVIEW" class="py-0.5 text-[10px] text-muted-foreground" :style="indent(row.depth + 2)">
+        <div v-if="folderFilesFor(row).length > FOLDER_FILE_PREVIEW" class="py-0.5 text-xs text-muted-foreground" :style="indent(row.depth + 2)">
           +{{ folderFilesFor(row).length - FOLDER_FILE_PREVIEW }} more file{{ folderFilesFor(row).length - FOLDER_FILE_PREVIEW === 1 ? '' : 's' }}
         </div>
       </template>
@@ -671,7 +671,7 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
           />
         </template>
         <template v-else>
-          <span class="min-w-0 flex-1 truncate font-mono text-[11px]">{{ marker.raw || '(empty)' }}</span>
+          <span class="min-w-0 flex-1 truncate font-mono text-xs">{{ marker.raw || '(empty)' }}</span>
           <Button v-if="!disabled && marker.index !== undefined" variant="ghost" size="icon-sm" class="h-5 w-5" aria-label="Edit path" @click="startEditMarker(marker)">
             <Pencil class="size-3" />
           </Button>

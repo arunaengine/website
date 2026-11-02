@@ -17,7 +17,7 @@ defineProps<{ view: CodeView }>()
     <div class="flex items-center gap-2 border-b border-border/60 px-2.5 py-1.5">
       <Code class="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
       <span class="min-w-0 flex-1 truncate font-medium text-foreground">{{ view.title }}</span>
-      <span class="shrink-0 font-mono text-[10px] text-muted-foreground">{{ view.language }}</span>
+      <span class="shrink-0 font-mono text-xs text-muted-foreground">{{ view.language }}</span>
       <CopyButton :value="view.code" label="Copy the code" />
     </div>
     <div class="space-y-2 px-3 py-2.5">

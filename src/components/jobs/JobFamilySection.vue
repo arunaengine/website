@@ -36,7 +36,7 @@ function outputUrl(output: JobOutputResponse): string {
         <dt class="text-muted-foreground">Known family conflicts</dt>
         <dd class="text-foreground">{{ family.conflict_count }}</dd>
       </dl>
-      <p class="text-[11px] text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         Projection revision {{ family.revision }} · digest
         <span class="font-mono" :title="family.projection_digest">{{ truncateMiddle(family.projection_digest) }}</span>
       </p>
@@ -55,12 +55,12 @@ function outputUrl(output: JobOutputResponse): string {
     <div data-tutorial="job-outputs" class="space-y-2">
       <div>
         <h4 class="text-xs font-medium text-foreground">Result outputs</h4>
-        <p class="text-[11px] text-muted-foreground">
+        <p class="text-xs text-muted-foreground">
           Outputs of the execution that supplied the result, each named by its exact version.
         </p>
       </div>
       <div v-if="family.outputs.length" class="overflow-x-auto rounded-md border border-border">
-        <table class="w-full min-w-[52rem] text-left text-[11px]">
+        <table class="w-full min-w-[52rem] text-left text-xs">
           <thead class="bg-muted/50 text-muted-foreground">
             <tr>
               <th scope="col" class="px-3 py-2 font-medium">Bucket</th>

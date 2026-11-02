@@ -135,11 +135,11 @@ function add() {
       </li>
       <li v-if="!loading && !objects.length && !prefixes.length && !failure" class="px-3 py-3 text-muted-foreground">{{ asked ? 'No name here starts with that.' : 'This folder is empty.' }}</li>
     </ul>
-    <p v-if="stale" class="text-[11px] text-muted-foreground">Part of this list comes from a copy and may miss recent changes.</p>
+    <p v-if="stale" class="text-xs text-muted-foreground">Part of this list comes from a copy and may miss recent changes.</p>
     <div class="flex items-center gap-2">
       <Button v-if="cursor" size="sm" variant="ghost" :disabled="loading" @click="load(true)">Show more</Button>
       <Spinner v-if="loading" />
-      <span v-if="!count" class="ml-auto text-[11px] text-muted-foreground">Select files or folders to add them</span>
+      <span v-if="!count" class="ml-auto text-xs text-muted-foreground">Select files or folders to add them</span>
       <Button size="sm" :class="count ? 'ml-auto' : ''" :disabled="!count || busy" @click="add">Add {{ count || '' }} selected</Button>
     </div>
   </div>

@@ -52,7 +52,7 @@ const anything = computed(
 <template>
   <!-- Compact list line: one colored verdict with an icon, then the logical
        state as muted text, so the State column stays a tidy two lines. -->
-  <div v-if="compact && anything" class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-tight">
+  <div v-if="compact && anything" class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs leading-tight">
     <span
       v-if="verdict"
       class="inline-flex items-center gap-1 font-medium"
@@ -67,7 +67,7 @@ const anything = computed(
     </span>
   </div>
 
-  <div v-else-if="anything" class="flex flex-wrap items-center gap-1.5 text-[11px]">
+  <div v-else-if="anything" class="flex flex-wrap items-center gap-1.5 text-xs">
     <Badge v-if="verdict" :variant="verdictVariant" size="sm" :title="verdict.explanation">
       {{ verdict.label }}
     </Badge>

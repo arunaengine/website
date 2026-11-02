@@ -154,7 +154,7 @@ function candidateVerdict(verdictName: string, rank?: number): string {
           </span>
         </p>
 
-        <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+        <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span v-if="placement.target_node_id" class="inline-flex items-center gap-1">
             Runs on <NodeLabel :node-id="placement.target_node_id" size="sm" />
           </span>
@@ -198,7 +198,7 @@ function candidateVerdict(verdictName: string, rank?: number): string {
 
         <div v-if="movementsOpen && inputs.length" class="space-y-1.5">
           <div class="overflow-x-auto rounded-md border border-border">
-            <table class="w-full min-w-[34rem] text-left text-[11px]">
+            <table class="w-full min-w-[34rem] text-left text-xs">
               <thead class="bg-muted/50 text-muted-foreground">
                 <tr>
                   <th scope="col" class="px-3 py-2 font-medium">Input</th>
@@ -228,7 +228,7 @@ function candidateVerdict(verdictName: string, rank?: number): string {
             </table>
           </div>
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <span class="text-[11px] text-muted-foreground">{{ rangeOf(inputs, movementsPage) }}</span>
+            <span class="text-xs text-muted-foreground">{{ rangeOf(inputs, movementsPage) }}</span>
             <Pagination
               :page="movementsPage"
               :page-count="pageCount(inputs)"
@@ -240,7 +240,7 @@ function candidateVerdict(verdictName: string, rank?: number): string {
 
         <div v-if="candidatesOpen && candidates.length" class="space-y-1.5">
           <div class="overflow-x-auto rounded-md border border-border">
-            <table class="w-full min-w-[34rem] text-left text-[11px]">
+            <table class="w-full min-w-[34rem] text-left text-xs">
               <thead class="bg-muted/50 text-muted-foreground">
                 <tr>
                   <th scope="col" class="px-3 py-2 font-medium">Candidate</th>
@@ -265,7 +265,7 @@ function candidateVerdict(verdictName: string, rank?: number): string {
             </table>
           </div>
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <span class="text-[11px] text-muted-foreground">{{ rangeOf(candidates, candidatesPage) }}</span>
+            <span class="text-xs text-muted-foreground">{{ rangeOf(candidates, candidatesPage) }}</span>
             <Pagination
               :page="candidatesPage"
               :page-count="pageCount(candidates)"
@@ -278,7 +278,7 @@ function candidateVerdict(verdictName: string, rank?: number): string {
       <p v-else class="p-3 text-xs text-muted-foreground">{{ verdict.explanation }}</p>
     </div>
 
-    <p class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+    <p class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
       Estimated at planning time, not measured.
       <DocsLink topic="data-to-compute" section="How placement is decided" />
     </p>

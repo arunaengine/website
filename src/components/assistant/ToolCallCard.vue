@@ -42,7 +42,7 @@ const hasBody = computed(() =>
 </script>
 
 <template>
-  <div class="rounded-md border border-border bg-muted/20 text-[11px]">
+  <div class="rounded-md border border-border bg-muted/20 text-xs">
     <button
       type="button"
       class="flex w-full items-center gap-2 px-2.5 py-1.5 text-left"
@@ -60,8 +60,8 @@ const hasBody = computed(() =>
       <Badge size="sm" :variant="STATE_VARIANT[call.state]" class="ml-auto">{{ call.state }}</Badge>
     </button>
     <div v-if="open && hasBody" class="space-y-1.5 px-2.5 py-2">
-      <p v-if="title !== call.name" class="font-mono text-[10px] text-muted-foreground">{{ call.name }}</p>
-      <pre v-if="input && input !== '{}'" class="scrollbar-thin max-h-32 overflow-auto font-mono text-[10px] text-muted-foreground">{{ input }}</pre>
+      <p v-if="title !== call.name" class="font-mono text-xs text-muted-foreground">{{ call.name }}</p>
+      <pre v-if="input && input !== '{}'" class="scrollbar-thin max-h-32 overflow-auto font-mono text-xs text-muted-foreground">{{ input }}</pre>
       <!-- The question and its two answers stay one block, so the choice never
            wraps apart in the narrow panel. -->
       <div v-if="call.state === 'approval'" class="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2">
@@ -79,7 +79,7 @@ const hasBody = computed(() =>
       </div>
       <p v-else-if="call.state === 'denied'" class="text-muted-foreground">Aborted, nothing ran.</p>
       <p v-else-if="call.error" class="break-words text-destructive">{{ call.error }}</p>
-      <pre v-else-if="output" class="scrollbar-thin max-h-40 overflow-auto font-mono text-[10px] text-foreground/80">{{ output }}</pre>
+      <pre v-else-if="output" class="scrollbar-thin max-h-40 overflow-auto font-mono text-xs text-foreground/80">{{ output }}</pre>
     </div>
   </div>
 </template>

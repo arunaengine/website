@@ -123,7 +123,7 @@ watch(() => props.view.jobId, readJob)
               :bucket="output.bucket"
               :object-key="output.key"
               :size="output.size"
-              class="block truncate font-mono text-[11px] text-primary hover:underline"
+              class="block truncate font-mono text-xs text-primary hover:underline"
               :title="`${output.bucket}/${output.key}`"
             >{{ output.key }}</ObjectLink>
           </dd>

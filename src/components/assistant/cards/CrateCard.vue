@@ -111,7 +111,7 @@ const graphShown = ref(false)
               <RouterLink
                 v-if="folder"
                 :to="folder.to"
-                class="ml-1 font-mono text-[11px] text-primary hover:underline"
+                class="ml-1 font-mono text-xs text-primary hover:underline"
               >{{ folder.path }}</RouterLink>
             </dd>
           </div>
@@ -146,7 +146,7 @@ const graphShown = ref(false)
           v-if="hasGraph"
           variant="outline"
           size="sm"
-          class="h-7 text-[11px]"
+          class="h-7 text-xs"
           :aria-pressed="graphShown"
           @click="graphShown = !graphShown"
         >

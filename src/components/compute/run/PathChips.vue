@@ -22,24 +22,24 @@ const KIND_CLASS: Record<string, string> = {
 </script>
 
 <template>
-  <div v-if="checks.length" class="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+  <div v-if="checks.length" class="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
     <span>{{ label }}</span>
     <span
       v-for="check in checks"
       :key="check.path"
       :class="[
-        'inline-flex items-center gap-1.5 rounded-full border py-0.5 pl-2 pr-1 font-mono text-[11px] text-foreground',
+        'inline-flex items-center gap-1.5 rounded-full border py-0.5 pl-2 pr-1 font-mono text-xs text-foreground',
         check.fix ? 'border-destructive bg-destructive/5' : 'border-border bg-card',
       ]"
     >
       <span class="max-w-56 truncate" :title="check.path">{{ check.path }}</span>
-      <span :class="['rounded-full px-1.5 py-px font-sans text-[10px] font-semibold', KIND_CLASS[check.kind]]">
+      <span :class="['rounded-full px-1.5 py-px font-sans text-xs font-semibold', KIND_CLASS[check.kind]]">
         {{ check.label }}
       </span>
       <button
         v-if="check.fix === 'capture'"
         type="button"
-        class="rounded-full bg-accent px-2 py-px font-sans text-[10px] font-semibold text-accent-foreground hover:bg-accent/80"
+        class="rounded-full bg-accent px-2 py-px font-sans text-xs font-semibold text-accent-foreground hover:bg-accent/80"
         @click="emit('capture', check.path)"
       >
         Capture
@@ -47,7 +47,7 @@ const KIND_CLASS: Record<string, string> = {
       <button
         v-else-if="check.fix === 'input'"
         type="button"
-        class="rounded-full bg-accent px-2 py-px font-sans text-[10px] font-semibold text-accent-foreground hover:bg-accent/80"
+        class="rounded-full bg-accent px-2 py-px font-sans text-xs font-semibold text-accent-foreground hover:bg-accent/80"
         @click="emit('add-input', check.path)"
       >
         Add input
@@ -55,7 +55,7 @@ const KIND_CLASS: Record<string, string> = {
       <button
         v-if="check.fix && canMountScript && !check.path.endsWith('/')"
         type="button"
-        class="rounded-full bg-accent px-2 py-px font-sans text-[10px] font-semibold text-accent-foreground hover:bg-accent/80"
+        class="rounded-full bg-accent px-2 py-px font-sans text-xs font-semibold text-accent-foreground hover:bg-accent/80"
         @click="emit('mount-script', check.path)"
       >
         Mount script here

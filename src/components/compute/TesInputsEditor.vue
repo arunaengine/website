@@ -79,16 +79,16 @@ function removeGroup(group: InputGroup<Picked>) {
       <div v-if="row.kind === 'group'" class="surface-inline grid grid-cols-[minmax(0,1fr)_1.75rem] gap-x-2 p-3">
         <div class="flex min-w-0 flex-wrap items-center gap-3">
           <div class="min-w-0 flex-1">
-            <button type="button" class="flex max-w-full items-center gap-1.5 text-left text-[11px] text-foreground hover:text-primary" :aria-expanded="opened.has(row.key)" :title="row.files.mount" @click="toggle(row.key)">
+            <button type="button" class="flex max-w-full items-center gap-1.5 text-left text-xs text-foreground hover:text-primary" :aria-expanded="opened.has(row.key)" :title="row.files.mount" @click="toggle(row.key)">
               <ChevronRight class="h-3.5 w-3.5 shrink-0 transition-transform" :class="opened.has(row.key) ? 'rotate-90' : ''" aria-hidden="true" />
               <Folder class="h-3.5 w-3.5 shrink-0 text-primary" />
               <span class="truncate font-mono">{{ row.files.group.bucket }}/{{ row.files.group.folder }}</span>
               <span class="shrink-0 text-muted-foreground">{{ row.files.inputs.length }} files</span>
             </button>
-            <div v-if="row.files.group.nodeId && !isLocalNode(row.files.group.nodeId)" class="truncate pl-5 text-[11px] text-muted-foreground">on {{ displayName(row.files.group.nodeId) }}</div>
+            <div v-if="row.files.group.nodeId && !isLocalNode(row.files.group.nodeId)" class="truncate pl-5 text-xs text-muted-foreground">on {{ displayName(row.files.group.nodeId) }}</div>
           </div>
           <Badge variant="outline">FOLDER</Badge>
-          <div class="w-full truncate font-mono text-[11px] text-muted-foreground sm:w-64">{{ row.files.mount }}</div>
+          <div class="w-full truncate font-mono text-xs text-muted-foreground sm:w-64">{{ row.files.mount }}</div>
         </div>
         <Button variant="ghost" size="icon-sm" class="self-center" :disabled="disabled" aria-label="Remove these inputs" @click="removeGroup(row.files)"><X class="h-4 w-4" /></Button>
       </div>
@@ -96,7 +96,7 @@ function removeGroup(group: InputGroup<Picked>) {
         <div class="flex min-w-0 flex-wrap items-center gap-3">
           <template v-if="row.entry.kind === 'folder'">
             <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-1.5 truncate text-[11px] text-foreground" :title="`s3://${row.entry.bucket}/${row.entry.prefix}`">
+              <div class="flex items-center gap-1.5 truncate text-xs text-foreground" :title="`s3://${row.entry.bucket}/${row.entry.prefix}`">
                 <Folder class="h-3.5 w-3.5 shrink-0 text-primary" />
                 <span class="truncate font-mono">{{ row.entry.name }}/</span>
                 <span v-if="row.entry.directory" class="shrink-0 text-muted-foreground">all files</span>
@@ -116,8 +116,8 @@ function removeGroup(group: InputGroup<Picked>) {
           </template>
           <template v-else>
             <div class="min-w-0 flex-1">
-              <div class="truncate font-mono text-[11px] text-foreground" :title="row.entry.url">{{ inputPlace(row.entry.url || '').text }}</div>
-              <div v-if="nodeOf(row.entry.url || '')" class="truncate text-[11px] text-muted-foreground">on {{ nodeOf(row.entry.url || '') }}</div>
+              <div class="truncate font-mono text-xs text-foreground" :title="row.entry.url">{{ inputPlace(row.entry.url || '').text }}</div>
+              <div v-if="nodeOf(row.entry.url || '')" class="truncate text-xs text-muted-foreground">on {{ nodeOf(row.entry.url || '') }}</div>
             </div>
             <Badge variant="outline">FILE</Badge>
             <div class="w-full sm:w-64">
@@ -138,7 +138,7 @@ function removeGroup(group: InputGroup<Picked>) {
       </div>
       </template>
     </div>
-    <p v-if="modelValue.some((entry) => entry.kind === 'file')" class="text-[11px] text-muted-foreground">
+    <p v-if="modelValue.some((entry) => entry.kind === 'file')" class="text-xs text-muted-foreground">
       Locality is a hint about where these files already are. The node plans the run itself and can
       still place it elsewhere.
     </p>

@@ -133,7 +133,7 @@ const summary = computed(() => {
   <section class="space-y-2">
     <div class="flex flex-wrap items-baseline justify-between gap-2">
       <h3 class="font-display text-sm font-semibold text-aruna-navy">Report</h3>
-      <span v-if="panelState === 'ready' && digest" class="font-mono text-[10px] text-muted-foreground" :title="digest">
+      <span v-if="panelState === 'ready' && digest" class="font-mono text-xs text-muted-foreground" :title="digest">
         snapshot {{ truncateMiddle(digest) }}
       </span>
     </div>
@@ -168,7 +168,7 @@ const summary = computed(() => {
       </div>
 
       <div v-if="rows.length" class="overflow-x-auto rounded-md border border-border">
-        <table class="w-full min-w-[32rem] text-left text-[11px]">
+        <table class="w-full min-w-[32rem] text-left text-xs">
           <thead class="bg-muted/50 text-muted-foreground">
             <tr>
               <th scope="col" class="px-3 py-2 font-medium">Entry</th>
@@ -193,9 +193,9 @@ const summary = computed(() => {
         <Button variant="ghost" size="sm" :disabled="loadingMore" :aria-busy="loadingMore" @click="loadMore">
           <Spinner v-if="loadingMore" label="Loading more report rows" class="text-current" /> Load more
         </Button>
-        <span class="text-[11px] text-muted-foreground">{{ rows.length }} rows loaded</span>
+        <span class="text-xs text-muted-foreground">{{ rows.length }} rows loaded</span>
       </div>
-      <p v-if="moreError" class="text-[11px] text-destructive">{{ moreError }}</p>
+      <p v-if="moreError" class="text-xs text-destructive">{{ moreError }}</p>
     </template>
   </section>
 </template>

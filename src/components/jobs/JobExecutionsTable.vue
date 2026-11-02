@@ -53,7 +53,7 @@ function isoOf(ms: number | null | undefined): string | undefined {
 
 <template>
   <div class="space-y-2">
-    <p class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+    <p class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
       A run may execute more than once; one execution supplies the result.
       <DocsLink topic="compute-run" section="Follow the run" />
     </p>
@@ -64,7 +64,7 @@ function isoOf(ms: number | null | undefined): string | undefined {
     </Notice>
 
     <div v-if="executions.length" class="overflow-x-auto rounded-md border border-border">
-      <table class="w-full min-w-[40rem] text-left text-[11px]">
+      <table class="w-full min-w-[40rem] text-left text-xs">
         <thead class="bg-muted/50 text-muted-foreground">
           <tr>
             <th scope="col" class="px-3 py-2 font-medium">Node</th>
@@ -103,13 +103,13 @@ function isoOf(ms: number | null | undefined): string | undefined {
     <!-- An older node serves the count only. -->
     <div v-else class="space-y-1 text-xs">
       <p class="text-foreground">{{ count }} execution{{ count === 1 ? '' : 's' }} recorded.</p>
-      <p v-if="family.canonical_execution_id" class="break-all text-[11px] text-muted-foreground">
+      <p v-if="family.canonical_execution_id" class="break-all text-xs text-muted-foreground">
         Result execution <span class="font-mono">{{ family.canonical_execution_id }}</span>
       </p>
       <p v-else class="text-muted-foreground">No execution has supplied the result yet.</p>
     </div>
 
-    <p v-if="family.duplicate_successes" class="text-[11px] text-muted-foreground">
+    <p v-if="family.duplicate_successes" class="text-xs text-muted-foreground">
       {{ family.duplicate_successes }} duplicate success{{ family.duplicate_successes === 1 ? '' : 'es' }}.
     </p>
 
@@ -132,7 +132,7 @@ function isoOf(ms: number | null | undefined): string | undefined {
       >
         Locally exhausted
       </Badge>
-      <span v-if="family.responder_node_id" class="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+      <span v-if="family.responder_node_id" class="inline-flex items-center gap-1 text-xs text-muted-foreground">
         answered by node <NodeLabel :node-id="family.responder_node_id" size="sm" />
       </span>
     </div>

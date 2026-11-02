@@ -41,25 +41,25 @@ watch(
 </script>
 
 <template>
-  <span v-if="!ref_" class="text-[10px] text-muted-foreground">Locality needs an s3:// input.</span>
-  <span v-else-if="!entry || entry.state === 'loading'" class="text-[10px] text-muted-foreground">
+  <span v-if="!ref_" class="text-xs text-muted-foreground">Locality needs an s3:// input.</span>
+  <span v-else-if="!entry || entry.state === 'loading'" class="text-xs text-muted-foreground">
     Checking where this file is…
   </span>
-  <span v-else-if="entry.state === 'unavailable'" class="text-[10px] text-muted-foreground">
+  <span v-else-if="entry.state === 'unavailable'" class="text-xs text-muted-foreground">
     This node cannot say where files are stored.
   </span>
-  <span v-else-if="entry.state === 'forbidden'" class="text-[10px] text-muted-foreground">
+  <span v-else-if="entry.state === 'forbidden'" class="text-xs text-muted-foreground">
     This token may not read where this file is stored.
   </span>
-  <span v-else-if="entry.state === 'error'" class="text-[10px] text-muted-foreground">
+  <span v-else-if="entry.state === 'error'" class="text-xs text-muted-foreground">
     Storage locations could not be read.
   </span>
   <span v-else-if="entry.hint" class="inline-flex items-center gap-1.5" :title="entry.hint.summary">
     <MapPin class="h-3 w-3 shrink-0 text-muted-foreground" />
     <Badge :variant="variant" size="sm">{{ label }}</Badge>
-    <span v-if="entry.hint.pendingNodeIds.length" class="text-[10px] text-muted-foreground">
+    <span v-if="entry.hint.pendingNodeIds.length" class="text-xs text-muted-foreground">
       {{ entry.hint.pendingNodeIds.length }} copy on its way
     </span>
-    <span v-if="!entry.hint.complete" class="text-[10px] text-muted-foreground">incomplete view</span>
+    <span v-if="!entry.hint.complete" class="text-xs text-muted-foreground">incomplete view</span>
   </span>
 </template>

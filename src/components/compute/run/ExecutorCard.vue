@@ -118,7 +118,7 @@ function removeEnv(index: number) {
           </span>
           <span class="min-w-0">
             <span class="block text-[13px] font-semibold text-foreground">{{ entry.label }}</span>
-            <span class="block text-[11px] text-muted-foreground">{{ entry.hint }}</span>
+            <span class="block text-xs text-muted-foreground">{{ entry.hint }}</span>
           </span>
         </label>
       </div>
@@ -141,7 +141,7 @@ function removeEnv(index: number) {
           :invalid="imageValid ? undefined : 'error'"
           @update:model-value="onImage"
         />
-        <p id="run-image-message" class="mt-1 text-[11px]" :class="imageValid ? 'text-muted-foreground' : 'text-destructive'">
+        <p id="run-image-message" class="mt-1 text-xs" :class="imageValid ? 'text-muted-foreground' : 'text-destructive'">
           <template v-if="imageValid">Any registry the node can reach. <DocsLink topic="compute-run" label="Docs" /></template>
           <template v-else>An image is required.</template>
         </p>
@@ -164,7 +164,7 @@ function removeEnv(index: number) {
           :invalid="commandValid ? undefined : 'error'"
           @update:model-value="onCommand"
         />
-        <p id="run-command-message" class="mt-1 text-[11px]" :class="commandValid ? 'text-muted-foreground' : 'text-destructive'">
+        <p id="run-command-message" class="mt-1 text-xs" :class="commandValid ? 'text-muted-foreground' : 'text-destructive'">
           <template v-if="commandTokens.error">{{ commandTokens.error }}</template>
           <template v-else-if="!commandValid">A command is required.</template>
           <template v-else>Split like a shell, run without one. <DocsLink topic="compute-run" label="Docs" /></template>
@@ -190,7 +190,7 @@ function removeEnv(index: number) {
           :invalid="workdirValid ? undefined : 'error'"
           @update:model-value="(value) => setWorkdir(String(value))"
         />
-        <p class="mt-1 text-[11px]" :class="workdirValid ? 'text-muted-foreground' : 'text-destructive'">
+        <p class="mt-1 text-xs" :class="workdirValid ? 'text-muted-foreground' : 'text-destructive'">
           {{ workdirValid ? workdirNotice ?? 'Inputs and outputs are placed under it.' : 'Needs an absolute directory other than /.' }}
         </p>
       </div>
@@ -223,13 +223,13 @@ function removeEnv(index: number) {
           </div>
           <Button variant="ghost" size="sm" @click="addEnv"><Plus class="size-3.5" /> Add variable</Button>
         </div>
-        <p class="mt-1 text-[11px] text-muted-foreground">Added to the container environment.</p>
+        <p class="mt-1 text-xs text-muted-foreground">Added to the container environment.</p>
       </div>
     </div>
 
-    <div v-if="executorMode === 'runtime'" class="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
+    <div v-if="executorMode === 'runtime'" class="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
       <span>{{ runtimeEdited ? `Edited from the ${runtime.label} defaults.` : `Prefilled from the ${runtime.label} runtime; edit freely.` }}</span>
-      <Button variant="link" size="sm" class="h-auto p-0 text-[11px]" @click="applyRuntimeDefaults(true)">
+      <Button variant="link" size="sm" class="h-auto p-0 text-xs" @click="applyRuntimeDefaults(true)">
         Reset to runtime defaults
       </Button>
     </div>
