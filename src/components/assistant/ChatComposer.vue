@@ -2,7 +2,7 @@
 // The message box: one rounded card holding the text area, the cogwheel and
 // Send. Enter sends, Shift+Enter breaks the line, and the turn's context
 // (route, open draft, realm profiles) is gathered here.
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useRealmBucketCount } from '@/composables/useBucketCount'
 import Button from '@/components/ui/Button.vue'
@@ -72,7 +72,7 @@ const unlockOpen = ref(false)
 const keysLocked = computed(() =>
   vaultState.value === 'locked'
   && (!provider.value || (providerId.value !== '' && providerId.value !== provider.value.provider_id)))
-const { central, centralUnavailable } = useAssistantProviders()
+const { central, centralUnavailable, refreshCentral } = useAssistantProviders()
 // Today's realm assistant calls, while it is the chosen provider and has a limit.
 const quota = computed(() => {
   const setup = central.value
@@ -80,6 +80,33 @@ const quota = computed(() => {
   const reset = new Date(setup.resets_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   return { left: Math.max(setup.daily_limit - setup.used_today, 0), limit: setup.daily_limit, reset }
 })
+// A used-up day ends at the reset; a server clock still before it is asked again a minute later.
+let resetTimer: ReturnType<typeof setTimeout> | undefined
+watch(quota, (next) => {
+  clearTimeout(resetTimer)
+  resetTimer = undefined
+  if (next?.left !== 0 || !central.value) return
+  const wait = Date.parse(central.value.resets_at) - Date.now()
+  resetTimer = setTimeout(() => void refreshCentral(), wait > 0 ? wait + 1_000 : 60_000)
+}, { immediate: true })
+
+// A window coming back may have missed the reset or the end of an outage.
+function onActive() {
+  if (document.visibilityState === 'hidden') return
+  if (quota.value || centralUnavailable.value) void refreshCentral()
+}
+onMounted(() => {
+  if (typeof window === 'undefined') return
+  window.addEventListener('focus', onActive)
+  document.addEventListener('visibilitychange', onActive)
+})
+onUnmounted(() => {
+  clearTimeout(resetTimer)
+  if (typeof window === 'undefined') return
+  window.removeEventListener('focus', onActive)
+  document.removeEventListener('visibilitychange', onActive)
+})
+
 const canSend = computed(() =>
   historyReady.value && !busy.value && Boolean(provider.value) && Boolean(model.value) && Boolean(draft.value.trim())
   && quota.value?.left !== 0)

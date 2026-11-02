@@ -40,6 +40,7 @@ const aruna = {
 
 const central = ref<{ daily_limit?: number | null; used_today: number; resets_at: string } | null>(null)
 const centralUnavailable = ref(false)
+const refreshCentral = vi.fn(async () => {})
 const realmAssistant: AssistantProvider = { ...openai, provider_id: 'central', label: 'Realm assistant' }
 
 const vaultState = ref<'absent' | 'locked' | 'unlocked' | 'unsupported'>('absent')
@@ -114,7 +115,7 @@ const ChatComposer = compileClientComponent(new URL('./ChatComposer.vue', import
   '@/composables/useRealm': { useRealm: () => ({ realmId: ref('r-1') }) },
   '@/composables/useGroupSelection': { activeGroupId: ref('') },
   '@/composables/useAssistantChat': { useAssistantChat: () => chat },
-  '@/composables/useAssistantProviders': { useAssistantProviders: () => ({ central, centralUnavailable }) },
+  '@/composables/useAssistantProviders': { useAssistantProviders: () => ({ central, centralUnavailable, refreshCentral }) },
   '@/lib/api': { CENTRAL_PROVIDER_ID: 'central' },
   '@/composables/useAssistantRunForm': { useAssistantRunForm: () => ({ bridge: { value: null } }) },
   '@/composables/useAssistantProfileForm': { useAssistantProfileForm: () => ({ bridge: { value: null } }) },
@@ -141,6 +142,7 @@ beforeEach(() => {
   vaultState.value = 'absent'
   central.value = null
   centralUnavailable.value = false
+  refreshCentral.mockClear()
   aruna.currentUser.value = null
   aruna.profiles.value = []
   aruna.myGroups.value = []
@@ -181,6 +183,48 @@ describe('ChatComposer', () => {
 
     expect(content(root)).toContain('The realm assistant cannot be reached right now.')
     expect(control(root, 'Send').props.disabled).toBe(true)
+  })
+
+  it('reads the count again at the reset time', async () => {
+    vi.useFakeTimers()
+    try {
+      chat.provider.value = realmAssistant
+      central.value = { daily_limit: 50, used_today: 50, resets_at: new Date(Date.now() + 5_000).toISOString() }
+      await mountApp(ChatComposer)
+      expect(refreshCentral).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(4_000)
+      expect(refreshCentral).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(2_500)
+
+      // Composers mounted by earlier cases watch the same setup, so count no exact number.
+      expect(refreshCentral).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('reads the count again when the window is back', async () => {
+    const listeners = new Map<string, () => void>()
+    const target = {
+      visibilityState: 'visible',
+      addEventListener: (type: string, listener: () => void) => listeners.set(type, listener),
+      removeEventListener: (type: string) => listeners.delete(type),
+    }
+    vi.stubGlobal('window', target)
+    vi.stubGlobal('document', target)
+    try {
+      chat.provider.value = realmAssistant
+      central.value = { daily_limit: 50, used_today: 3, resets_at: '2026-11-03T00:00:00Z' }
+      await mountApp(ChatComposer)
+
+      listeners.get('focus')?.()
+      listeners.get('visibilitychange')?.()
+
+      expect(refreshCentral).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('shows no count without a daily limit', async () => {
