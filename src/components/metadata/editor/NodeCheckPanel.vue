@@ -130,7 +130,7 @@ function groupName(entityId: string): string {
           <Check class="h-3.5 w-3.5 shrink-0" />
           {{ profileUnchecked ? 'The node checked only the structure of this dataset.' : 'The node would accept this dataset.' }}
         </p>
-        <p class="mt-0.5 pl-5 text-[11px] text-muted-foreground">{{ profileLine }}</p>
+        <p class="mt-0.5 pl-5 text-xs text-muted-foreground">{{ profileLine }}</p>
       </Notice>
       <section v-for="group in advisoryGroups" :key="group.entityId" class="rounded-lg border border-border">
         <header class="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
@@ -143,7 +143,7 @@ function groupName(entityId: string): string {
         <ul class="divide-y divide-border">
           <li v-for="issue in group.advisory" :key="issue.key" class="px-3 py-2 text-xs">
             <p class="text-muted-foreground">{{ issue.message }}</p>
-            <p v-if="issue.path" class="mt-0.5 font-mono text-[10px] text-muted-foreground">{{ issue.path }}</p>
+            <p v-if="issue.path" class="mt-0.5 font-mono text-xs text-muted-foreground">{{ issue.path }}</p>
           </li>
         </ul>
       </section>
@@ -171,13 +171,13 @@ function groupName(entityId: string): string {
         <ul class="divide-y divide-border">
           <li v-for="issue in group.violations" :key="issue.key" class="px-3 py-2 text-xs">
             <p class="text-foreground">{{ issue.message }}</p>
-            <p v-if="issue.path" class="mt-0.5 font-mono text-[10px] text-muted-foreground">{{ issue.path }}</p>
+            <p v-if="issue.path" class="mt-0.5 font-mono text-xs text-muted-foreground">{{ issue.path }}</p>
           </li>
           <li v-if="group.advisory.length" class="px-3 py-2">
             <Badge variant="secondary">Advisory</Badge>
             <div v-for="issue in group.advisory" :key="issue.key" class="mt-1.5 text-xs">
               <p class="text-muted-foreground">{{ issue.message }}</p>
-              <p v-if="issue.path" class="mt-0.5 font-mono text-[10px] text-muted-foreground">{{ issue.path }}</p>
+              <p v-if="issue.path" class="mt-0.5 font-mono text-xs text-muted-foreground">{{ issue.path }}</p>
             </div>
           </li>
         </ul>

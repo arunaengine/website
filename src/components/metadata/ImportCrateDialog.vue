@@ -128,7 +128,7 @@ watch(
             <Button type="button" variant="outline" size="sm" @click="importFileInput?.click()">
               <Upload class="size-3.5" /> Upload file
             </Button>
-            <span class="text-[11px] text-muted-foreground">or paste the JSON-LD below</span>
+            <span class="text-xs text-muted-foreground">or paste the JSON-LD below</span>
           </div>
           <div class="space-y-2">
             <Textarea v-model="importPaste" rows="6" class="font-mono text-xs" spellcheck="false" placeholder='{ "@context": "https://w3id.org/ro/crate/1.1/context", "@graph": [ … ] }' />
@@ -143,7 +143,7 @@ watch(
               <div class="flex items-center gap-2 font-medium text-foreground">
                 <FileJson class="h-3.5 w-3.5 shrink-0 text-primary" />
                 {{ importPreview.source }}: {{ importPreview.rootName }}
-                <span v-if="importPreview.specVersion" class="ml-auto shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/5 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                <span v-if="importPreview.specVersion" class="ml-auto shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/5 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
                   RO-Crate {{ importPreview.specVersion }}
                 </span>
               </div>
@@ -164,7 +164,7 @@ watch(
               </span>
             </Notice>
             <div class="space-y-1.5">
-              <p class="text-[11px] font-medium text-muted-foreground">Graph</p>
+              <p class="text-xs font-medium text-muted-foreground">Graph</p>
               <CrateGraph :source="importPreview.crate" mode="view" height="18rem" />
             </div>
           </template>

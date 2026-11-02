@@ -172,7 +172,7 @@ function add() {
 
     <template v-else>
       <template v-if="fromProfile.length">
-        <p class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-muted-foreground">
+        <p class="px-2.5 pb-1 pt-1.5 text-xs font-medium text-muted-foreground">
           Optional in {{ profileName }}
         </p>
         <button
@@ -185,10 +185,10 @@ function add() {
         >
           <span class="text-xs font-medium text-foreground">{{ rule.label }}</span>
           <Badge class="ml-1.5" variant="accent" size="sm">Profile</Badge>
-          <span v-if="rule.description" class="line-clamp-1 text-[11px] text-muted-foreground">{{ rule.description }}</span>
+          <span v-if="rule.description" class="line-clamp-1 text-xs text-muted-foreground">{{ rule.description }}</span>
         </button>
       </template>
-      <p class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-muted-foreground">
+      <p class="px-2.5 pb-1 pt-1.5 text-xs font-medium text-muted-foreground">
         Suggested
       </p>
       <button
@@ -200,13 +200,13 @@ function add() {
         @click="choose(propertyKey(term))"
       >
         <span class="text-xs font-medium text-foreground">{{ term.label }}</span>
-        <span class="ml-1.5 text-[11px] text-muted-foreground">{{ (term.targets ?? []).map(typeLabel).join(', ') }}</span>
-        <span v-if="term.description" class="line-clamp-1 text-[11px] text-muted-foreground">{{ term.description }}</span>
+        <span class="ml-1.5 text-xs text-muted-foreground">{{ (term.targets ?? []).map(typeLabel).join(', ') }}</span>
+        <span v-if="term.description" class="line-clamp-1 text-xs text-muted-foreground">{{ term.description }}</span>
       </button>
       <p v-if="!suggested.length" class="px-2.5 py-2 text-xs text-muted-foreground">No suggestion left for this type.</p>
 
       <template v-if="all.length">
-        <p class="px-2.5 pb-1 pt-2.5 text-[11px] font-medium text-muted-foreground">
+        <p class="px-2.5 pb-1 pt-2.5 text-xs font-medium text-muted-foreground">
           Everything else
         </p>
         <button
@@ -218,8 +218,8 @@ function add() {
           @click="choose(propertyKey(term))"
         >
           <span class="text-xs font-medium text-foreground">{{ term.label }}</span>
-          <span class="ml-1.5 text-[11px] text-muted-foreground">{{ (term.targets ?? []).map(typeLabel).join(', ') }}</span>
-          <span v-if="term.description" class="line-clamp-1 text-[11px] text-muted-foreground">{{ term.description }}</span>
+          <span class="ml-1.5 text-xs text-muted-foreground">{{ (term.targets ?? []).map(typeLabel).join(', ') }}</span>
+          <span v-if="term.description" class="line-clamp-1 text-xs text-muted-foreground">{{ term.description }}</span>
         </button>
       </template>
 

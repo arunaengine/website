@@ -157,11 +157,11 @@ watch(() => props.documentId, reset)
         >
           The archive keeps these dataset references. Linked datasets and their files are not bundled recursively.
         </Notice>
-        <p v-if="!activeJobId && preflight?.failed" class="text-[11px] text-muted-foreground">
+        <p v-if="!activeJobId && preflight?.failed" class="text-xs text-muted-foreground">
           Not every linked dataset could be checked. Their references remain in the metadata.
         </p>
         <div v-if="!activeJobId && exportCrate" class="space-y-1.5">
-          <p class="text-[11px] font-medium text-muted-foreground">Graph</p>
+          <p class="text-xs font-medium text-muted-foreground">Graph</p>
           <CrateGraph :source="exportCrate" mode="view" height="18rem" />
         </div>
 
@@ -173,7 +173,7 @@ watch(() => props.documentId, reset)
             {{ exportResult.omitted.denied === 1 ? '1 entry was' : `${exportResult.omitted.denied} entries were` }}
             left out because you may not read them; the report marks them as denied.
           </Notice>
-          <p v-if="exportResult?.artifact" class="text-[11px] text-muted-foreground">
+          <p v-if="exportResult?.artifact" class="text-xs text-muted-foreground">
             Archive {{ formatBytes(exportResult.artifact.size) }}
             <template v-if="downloadedName"> · saved as {{ downloadedName }}</template>
           </p>

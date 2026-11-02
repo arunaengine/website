@@ -114,7 +114,7 @@ function rowTarget(row: TransferRow): string {
   <div v-if="settled" class="space-y-2">
     <div class="flex items-center gap-2">
       <h3 class="font-display text-sm font-semibold text-aruna-navy">Report</h3>
-      <span v-if="visibleRows.length" class="text-[11px] text-muted-foreground">{{ visibleRows.length }} rows</span>
+      <span v-if="visibleRows.length" class="text-xs text-muted-foreground">{{ visibleRows.length }} rows</span>
     </div>
     <div v-if="reportPending || reportError" class="flex items-center gap-2">
       <p class="text-xs" :class="reportError ? 'text-destructive' : 'text-muted-foreground'">
@@ -124,7 +124,7 @@ function rowTarget(row: TransferRow): string {
     </div>
     <EmptyState v-else-if="!visibleRows.length && !reportLoading" compact title="No further report details." />
     <div v-else-if="visibleRows.length" class="max-h-64 overflow-y-auto rounded-md border border-border">
-      <table class="w-full text-[11px]">
+      <table class="w-full text-xs">
         <tbody>
           <tr v-for="row in visibleRows" :key="row.entry_key" class="border-b border-border last:border-0 align-top">
             <td class="px-2 py-1.5">

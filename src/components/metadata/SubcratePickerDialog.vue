@@ -149,7 +149,7 @@ async function confirm() {
         >
           <span class="min-w-0">
             <span class="block truncate font-medium text-foreground">{{ item.title }}</span>
-            <span class="block truncate font-mono text-[11px] text-muted-foreground">{{ item.path }}</span>
+            <span class="block truncate font-mono text-xs text-muted-foreground">{{ item.path }}</span>
           </span>
           <Check v-if="selected.has(item.documentId)" class="h-4 w-4 shrink-0 text-primary" />
         </button>
@@ -165,7 +165,7 @@ async function confirm() {
           :title="searchable ? 'No datasets match the search.' : 'Type at least two characters to search the realm.'"
         />
       </div>
-      <p v-if="!searchable" class="text-[11px] text-muted-foreground">
+      <p v-if="!searchable" class="text-xs text-muted-foreground">
         Showing the pages loaded so far. Search to reach every dataset in the realm.
       </p>
 

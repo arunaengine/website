@@ -161,7 +161,7 @@ async function copyId() {
             class="chip shrink-0 text-primary hover:border-primary/40"
             @click="back"
           ><ArrowLeft class="h-3 w-3" /> Back</button>
-          <span class="min-w-0 truncate font-mono text-[11px] text-muted-foreground" :title="currentId">{{ currentId }}</span>
+          <span class="min-w-0 truncate font-mono text-xs text-muted-foreground" :title="currentId">{{ currentId }}</span>
           <Button variant="ghost" size="icon-sm" class="shrink-0 text-muted-foreground" :aria-label="copied ? 'Copied' : 'Copy id'" @click="copyId">
             <Check v-if="copied" class="size-3.5 text-primary" />
             <Copy v-else class="size-3.5" />

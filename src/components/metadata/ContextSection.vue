@@ -65,7 +65,7 @@ function timeLabel(iso: string): string {
           <component :is="iconOf(entity.kind)" class="h-4 w-4 shrink-0 text-primary/70" />
           <h3 class="min-w-0 truncate text-sm font-semibold text-foreground" :title="entity.id">{{ entity.name }}</h3>
           <Badge v-if="entity.profileLabel" variant="royal" size="sm">{{ entity.profileLabel }}</Badge>
-          <span v-if="entity.types.length" class="font-mono text-[10px] text-muted-foreground/70">{{ entity.types.join(' · ') }}</span>
+          <span v-if="entity.types.length" class="font-mono text-xs text-muted-foreground/70">{{ entity.types.join(' · ') }}</span>
           <span v-if="entity.relations.length" class="ml-auto flex shrink-0 flex-wrap gap-1">
             <Badge v-for="relation in entity.relations" :key="relation" variant="outline" size="sm">{{ relation }}</Badge>
           </span>

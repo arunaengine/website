@@ -159,7 +159,7 @@ function indent(depth: number) {
           >
             <Folder class="h-3.5 w-3.5 shrink-0 text-primary/70" />
             <span class="truncate font-mono">{{ row.name }}</span>
-            <span v-if="row.isNew" class="shrink-0 text-[10px] text-muted-foreground">(new)</span>
+            <span v-if="row.isNew" class="shrink-0 text-xs text-muted-foreground">(new)</span>
           </button>
         </div>
         <p
@@ -173,7 +173,7 @@ function indent(depth: number) {
         </p>
       </li>
     </ul>
-    <p v-if="!loading && !tree.folders.length" class="px-1.5 pb-1 text-[11px] text-muted-foreground">
+    <p v-if="!loading && !tree.folders.length" class="px-1.5 pb-1 text-xs text-muted-foreground">
       No folders yet. Datasets land in the group root, or create a folder below.
     </p>
   </div>

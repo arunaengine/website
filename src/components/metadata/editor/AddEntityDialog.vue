@@ -492,7 +492,7 @@ async function create() {
           Could not search saved datasets.
         </div>
         <div v-else-if="shownRecent.length">
-          <p class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-muted-foreground">
+          <p class="px-2.5 pb-1 pt-1.5 text-xs font-medium text-muted-foreground">
             From saved datasets
           </p>
           <button
@@ -504,12 +504,12 @@ async function create() {
             @click="pick(candidate)"
           >
             <span class="w-full truncate text-sm font-medium text-foreground">{{ displayName(candidate.entity) }}</span>
-            <span class="w-full truncate text-[11px] text-muted-foreground">
+            <span class="w-full truncate text-xs text-muted-foreground">
               {{ typeLabel(candidateType(candidate)) }} · {{ candidate.source.groupId === draft.groupId ? 'This group' : 'Public dataset' }} · {{ candidate.source.title }}
             </span>
           </button>
         </div>
-        <p v-if="recentPartial" class="px-2.5 py-1 text-[11px] text-muted-foreground">
+        <p v-if="recentPartial" class="px-2.5 py-1 text-xs text-muted-foreground">
           Some datasets could not be searched.
         </p>
         <Button v-if="recentMore" variant="ghost" size="sm" :disabled="moreBusy || recentState === 'loading'" @click="loadMore(false)">{{ moreBusy ? 'Loading…' : 'Load more entities' }}</Button>
@@ -538,7 +538,7 @@ async function create() {
         <div v-if="candidateState !== 'idle'" class="min-w-0">
           <p class="text-xs font-medium text-foreground">Reuse an existing {{ typeLabel(type) }}</p>
           <Spinner v-if="candidateState === 'loading'" label="Searching existing datasets" show-label class="mt-1" />
-          <p v-else-if="candidateState === 'failed'" class="mt-1 text-[11px] text-muted-foreground">
+          <p v-else-if="candidateState === 'failed'" class="mt-1 text-xs text-muted-foreground">
             Could not search existing datasets.
           </p>
           <template v-if="candidateState !== 'failed'">
@@ -555,16 +555,16 @@ async function create() {
                   @click="pick(candidate)"
                 >
                   <span class="block truncate font-medium text-foreground">{{ displayName(candidate.entity) }}</span>
-                  <span class="block truncate text-[11px] text-muted-foreground">
+                  <span class="block truncate text-xs text-muted-foreground">
                     {{ candidate.source.groupId === draft.groupId ? 'This group' : 'Public dataset' }} · {{ candidate.source.title }}
                   </span>
                 </button>
               </li>
             </ul>
-            <p v-else-if="candidateState === 'ready'" class="mt-1 text-[11px] text-muted-foreground">
+            <p v-else-if="candidateState === 'ready'" class="mt-1 text-xs text-muted-foreground">
               {{ candidatesPartial ? 'Nothing found in the datasets that could be searched.' : `No existing ${typeLabel(type)} found.` }}
             </p>
-            <p v-if="shownCandidates.length && candidatesPartial" class="mt-1 text-[11px] text-muted-foreground">
+            <p v-if="shownCandidates.length && candidatesPartial" class="mt-1 text-xs text-muted-foreground">
               Not every dataset could be searched.
             </p>
           </template>
@@ -588,7 +588,7 @@ async function create() {
               @select="useHit"
               @clear="forgetHit"
             />
-            <p class="break-words text-[11px] text-muted-foreground">
+            <p class="break-words text-xs text-muted-foreground">
               Search {{ registry.label }} by name or id, or simply type the name yourself.
             </p>
             <div v-if="typedId" class="flex min-w-0 items-center gap-2">
@@ -622,8 +622,8 @@ async function create() {
             aria-label="Identifier"
             @update:model-value="(value: string | number) => { identifier = String(value); idTouched = true }"
           />
-          <p class="mt-1 break-words text-[11px] text-muted-foreground">{{ idHint(type) }}</p>
-          <p v-if="startsWith.length" class="mt-1 break-words text-[11px] text-muted-foreground">
+          <p class="mt-1 break-words text-xs text-muted-foreground">{{ idHint(type) }}</p>
+          <p v-if="startsWith.length" class="mt-1 break-words text-xs text-muted-foreground">
             Starts with: {{ startsWith.join(', ') }}
           </p>
         </div>
@@ -642,7 +642,7 @@ async function create() {
             aria-label="Link from the dataset as"
             @update:model-value="(value: string) => (linkAs = value)"
           />
-          <p class="mt-1 break-words text-[11px] text-muted-foreground">
+          <p class="mt-1 break-words text-xs text-muted-foreground">
             {{ linkAs ? 'The dataset will point at this entity.' : 'Nothing points at this entity until you pick a property.' }}
           </p>
         </div>

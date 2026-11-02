@@ -97,7 +97,7 @@ function displayName(link: SubcrateLink): string {
               </RouterLink>
               <ExternalLink v-else-if="isHttpUrl(link.iri)" :href="link.iri" :label="link.name" class="block truncate font-medium" :title="link.iri" />
               <span v-else class="block truncate font-medium text-foreground" :title="link.iri">{{ link.name }}</span>
-              <span class="block truncate font-mono text-[11px] text-muted-foreground" :title="link.identifier || link.iri">{{ link.identifier || link.iri }}</span>
+              <span class="block truncate font-mono text-xs text-muted-foreground" :title="link.identifier || link.iri">{{ link.identifier || link.iri }}</span>
             </div>
           </div>
           <Badge variant="outline" size="sm">{{ resolveDocumentId(link) ? 'linked' : 'external' }}</Badge>

@@ -507,9 +507,9 @@ function addUrl() {
               v-if="item.state === 'uploading' && item.finishing"
               :label="UPLOAD_FINISHING_MESSAGE"
               show-label
-              class="text-[11px]"
+              class="text-xs"
             />
-            <p v-if="item.error" class="text-[11px] text-destructive">{{ item.error }}</p>
+            <p v-if="item.error" class="text-xs text-destructive">{{ item.error }}</p>
           </li>
         </ul>
       </div>
@@ -563,7 +563,7 @@ function addUrl() {
             <Input v-model="urlName" class="mt-1" aria-label="External file name" placeholder="Optional" />
           </div>
         </div>
-        <p v-if="urlInvalid" class="text-[11px] text-destructive">That is not an absolute URL.</p>
+        <p v-if="urlInvalid" class="text-xs text-destructive">That is not an absolute URL.</p>
         <Button size="sm" :disabled="!url.trim() || urlInvalid" @click="addUrl">Add file</Button>
       </div>
 

@@ -334,15 +334,15 @@ watch(sessionEpoch, () => {
                 aria-label="Repository"
                 class="mt-1"
               />
-              <p v-else-if="!groupId" class="mt-2 text-[11px] text-muted-foreground">Choose a group first.</p>
-              <p v-else-if="kindsError" class="mt-2 text-[11px] text-destructive">{{ kindsError }}</p>
-              <p v-else-if="connectorsError" class="mt-2 text-[11px] text-destructive">{{ connectorsError }}</p>
-              <Spinner v-else-if="connectorsLoading || !repositoryConnectors" show-label label="Loading repositories…" class="mt-2 flex text-[11px]" />
+              <p v-else-if="!groupId" class="mt-2 text-xs text-muted-foreground">Choose a group first.</p>
+              <p v-else-if="kindsError" class="mt-2 text-xs text-destructive">{{ kindsError }}</p>
+              <p v-else-if="connectorsError" class="mt-2 text-xs text-destructive">{{ connectorsError }}</p>
+              <Spinner v-else-if="connectorsLoading || !repositoryConnectors" show-label label="Loading repositories…" class="mt-2 flex text-xs" />
               <div v-else-if="repositoryConnectors && canWriteMeta" class="mt-2 space-y-1">
                 <Button size="sm" variant="outline" :disabled="addingPreset" @click="addPreset">Add Zenodo</Button>
-                <p v-if="presetError" role="alert" class="text-[11px] text-destructive">{{ presetError }}</p>
+                <p v-if="presetError" role="alert" class="text-xs text-destructive">{{ presetError }}</p>
               </div>
-              <p v-else-if="repositoryConnectors" class="mt-2 text-[11px] text-muted-foreground">
+              <p v-else-if="repositoryConnectors" class="mt-2 text-xs text-muted-foreground">
                 This group has no repository yet. Ask someone who manages the group's metadata to add Zenodo.
                 <RouterLink
                   :to="{ name: 'group', params: { id: groupId }, query: { tab: 'sources' } }"
@@ -371,7 +371,7 @@ watch(sessionEpoch, () => {
               placeholder="10.5281/zenodo.1234567"
               class="mt-1 font-mono text-xs"
             />
-            <p class="mt-1 text-[11px]" :class="recordInput.trim() && !source ? 'text-destructive' : 'text-muted-foreground'">
+            <p class="mt-1 text-xs" :class="recordInput.trim() && !source ? 'text-destructive' : 'text-muted-foreground'">
               {{ capabilities?.search === false ? 'A record id. This repository cannot be searched, so DOIs and record links do not work here.' : 'A DOI, a record link or a record id.' }}
             </p>
           </div>
@@ -380,7 +380,7 @@ watch(sessionEpoch, () => {
             <Input :id="`${uid}-path`" v-model="documentPath" placeholder="datasets/my-dataset" class="mt-1" />
           </div>
         </div>
-        <p v-if="lookupOpen" class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+        <p v-if="lookupOpen" class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           Not every node answered, so Aruna could not check whether a dataset already holds this DOI.
           <Button variant="ghost" size="sm" class="h-6 px-1 text-xs" @click="checkExisting(lookupDoi)">Retry</Button>
         </p>
@@ -396,7 +396,7 @@ watch(sessionEpoch, () => {
 
         <div class="space-y-1.5">
           <OptionToggle v-model="mode" :options="MODE_OPTIONS" aria-label="What to import" />
-          <p class="text-[11px] text-muted-foreground">{{ MODE_HINT[mode] }}</p>
+          <p class="text-xs text-muted-foreground">{{ MODE_HINT[mode] }}</p>
         </div>
         <label v-if="canPull" class="flex items-start gap-2 text-xs text-foreground">
           <Switch
@@ -407,7 +407,7 @@ watch(sessionEpoch, () => {
           />
           <span>
             Keep updated
-            <span class="block text-[11px] text-muted-foreground">
+            <span class="block text-xs text-muted-foreground">
               {{ canWriteMeta
                 ? 'Aruna checks the record once a day and offers new versions.'
                 : "Needs write access to the group's metadata." }}
@@ -438,7 +438,7 @@ watch(sessionEpoch, () => {
             <CopyButton :value="doi.value" label="Copy DOI" />
           </p>
         </div>
-        <p v-else-if="importedDois" class="text-[11px] text-muted-foreground">
+        <p v-else-if="importedDois" class="text-xs text-muted-foreground">
           The record DOIs appear on the dataset page once they are registered.
         </p>
         <div class="flex flex-wrap gap-2">

@@ -63,7 +63,7 @@ function pickBucket(value: string) {
 <template>
   <div class="grid gap-2 sm:grid-cols-2">
     <div>
-      <label class="text-[11px] font-medium text-muted-foreground">Bucket</label>
+      <label class="text-xs font-medium text-muted-foreground">Bucket</label>
       <Select
         class="mt-1"
         :options="options"
@@ -73,7 +73,7 @@ function pickBucket(value: string) {
       />
     </div>
     <div>
-      <label class="text-[11px] font-medium text-muted-foreground">Prefix</label>
+      <label class="text-xs font-medium text-muted-foreground">Prefix</label>
       <Input
         class="mt-1 font-mono text-xs"
         :model-value="modelValue.prefix"
@@ -82,8 +82,8 @@ function pickBucket(value: string) {
         @update:model-value="(value: string | number) => emit('update:modelValue', { bucket: shownBucket, prefix: String(value) })"
       />
     </div>
-    <p v-if="listing === 'loading'" class="text-[11px] text-muted-foreground sm:col-span-2">Loading the group's buckets.</p>
-    <p v-else-if="listing === 'unavailable'" class="text-[11px] text-muted-foreground sm:col-span-2">
+    <p v-if="listing === 'loading'" class="text-xs text-muted-foreground sm:col-span-2">Loading the group's buckets.</p>
+    <p v-else-if="listing === 'unavailable'" class="text-xs text-muted-foreground sm:col-span-2">
       The group's other buckets could not be listed.
     </p>
   </div>

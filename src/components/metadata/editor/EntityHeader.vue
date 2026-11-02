@@ -204,14 +204,14 @@ function applyRor() {
           <X class="h-3 w-3" />
         </button>
       </span>
-      <Button variant="ghost" size="sm" class="h-6 px-2 text-[11px]" @click="typeOpen = true">
+      <Button variant="ghost" size="sm" class="h-6 px-2 text-xs" @click="typeOpen = true">
         <Plus class="h-3 w-3" /> Add type
       </Button>
       <Button
         v-if="needsRor"
         variant="ghost"
         size="sm"
-        class="h-6 px-2 text-[11px] text-muted-foreground"
+        class="h-6 px-2 text-xs text-muted-foreground"
         :disabled="rorBusy"
         @click="findRor"
       >
