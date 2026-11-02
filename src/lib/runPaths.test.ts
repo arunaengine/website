@@ -41,8 +41,9 @@ describe('scanPaths', () => {
     expect(scanPaths('cd /work/results && ls', '/work')).toEqual(['/work/results/'])
   })
 
-  it('marks an option value without a file extension as a folder', () => {
-    expect(scanPaths('/bakta --db /work/in/db --output /work/out -o /work/out/genome.gff3 /work/in/a', '/work')).toEqual([
+  it('keeps an option value without a trailing slash a file, and a slash marks a folder', () => {
+    expect(scanPaths('tool -o /work/out/result', '/work')).toEqual(['/work/out/result'])
+    expect(scanPaths('/bakta --db /work/in/db/ --output /work/out/ -o /work/out/genome.gff3 /work/in/a', '/work')).toEqual([
       '/work/in/db/',
       '/work/out/',
       '/work/out/genome.gff3',

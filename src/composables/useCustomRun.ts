@@ -104,7 +104,7 @@ export const DEFAULT_RESOURCES = { cpuCores: '1', ramGb: '2', diskGb: '10' }
 export const NODE_LABEL_KEY = 'aruna-engine.org/node'
 // The Bakta template reads the database folder at /work/in/db; the genome path is edited to match.
 const BAKTA_IMAGE = 'harbor.computational.bio.uni-giessen.de/aruna/bakta-rs@sha256:2bf286e66203f8cd5dac0e5b08a7f75156f986330d437d6eef937a3b900f32cc'
-const BAKTA_COMMAND = '/bakta --db /work/in/db --output /work/out --force --prefix genome --threads 4 --skip-plot /work/in/genome.fna.gz'
+const BAKTA_COMMAND = '/bakta --db /work/in/db/ --output /work/out/ --force --prefix genome --threads 4 --skip-plot /work/in/genome.fna.gz'
 const SYSTEM_LABEL_PREFIX = 'aruna-engine.org/'
 export const MAX_LABEL_CONSTRAINTS = 8
 
