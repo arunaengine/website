@@ -615,6 +615,9 @@ export function renderTools(host: RenderHost): ToolSet {
               ? { error: `No figure matches ${quoted(wanted)}.`, figures: listed }
               : { error: 'Name the figure to show.', figures: listed }
           }
+          // A name several figures share picks none of them; their ids tell them apart.
+          const shared = byId ? [] : listed.filter((entry) => entry.name === listed[figures.indexOf(picked)]?.name)
+          if (shared.length > 1) return { error: 'Several figures have that name. Pick one by its id.', figures: shared }
           const name = figureName(picked)
           const view: RenderView = {
             kind: 'artifact',

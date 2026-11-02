@@ -543,6 +543,17 @@ describe('show_html_figure', () => {
     expect(kept[0][1]).toMatchObject({ artifact: { url: expect.stringContaining('BBBB') } })
   })
 
+  it('refuses a name that several figures share and offers their ids', async () => {
+    const long = 'Quality per tile across every lane of the flow cell for the forward reads, '.repeat(3)
+    const image = (fill: string) => `<img alt="x" src="data:image/png;base64,${fill.repeat(4000)}">`
+    const { tools, kept } = harness(null, {}, `<h2>${long}first</h2>${image('A')}<h2>${long}second</h2>${image('B')}`)
+    const listed = await runTool(tools.show_html_figure, { bucket: 'work', key: 'r.html' }) as { figures: Array<{ id: string; name: string }> }
+
+    const output = await runTool(tools.show_html_figure, { bucket: 'work', key: 'r.html', figure: listed.figures[1].name })
+    expect(output).toMatchObject({ error: expect.stringContaining('id'), figures: [{ id: 'f1' }, { id: 'f2' }] })
+    expect(kept).toEqual([])
+  })
+
   it('shows the figure a report holds and names it', async () => {
     const { tools, kept } = harness()
 
