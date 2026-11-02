@@ -3,13 +3,14 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 type Profile = { user: { attributes: Record<string, string> } }
 const userInfo = ref<Profile | null>(null)
+const sessionEpoch = ref(0)
 const updateUserProfile = vi.fn()
 const reportGlobalError = vi.fn()
 
 let useBucketOrder: typeof import('./useBucketOrder').useBucketOrder
 
 beforeAll(async () => {
-  vi.doMock('@/composables/useAruna', () => ({ useAruna: () => ({ userInfo, updateUserProfile }) }))
+  vi.doMock('@/composables/useAruna', () => ({ useAruna: () => ({ userInfo, updateUserProfile, sessionEpoch }) }))
   vi.doMock('@/composables/useGlobalErrors', () => ({ reportGlobalError }))
   ;({ useBucketOrder } = await import('./useBucketOrder'))
 })
@@ -31,6 +32,22 @@ function heldWrites() {
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 describe('own bucket order', () => {
+  it('drops a queued write and its pending order when the session changes', async () => {
+    const held = heldWrites()
+    const order = useBucketOrder(ref('g1'))
+    void order.save(['genes', 'reef'])
+    const queued = order.save(['reef', 'genes', 'new'])
+    await settle()
+    sessionEpoch.value++
+    const shown = order.names.value
+    held[0].finish()
+    await settle()
+    held[1]?.finish()
+    await queued
+    expect(shown).toEqual(['reef', 'genes'])
+    expect(updateUserProfile).toHaveBeenCalledTimes(1)
+  })
+
   it('reads the order of the open group only', () => {
     const group = ref<string | null>('g1')
     const order = useBucketOrder(group)
