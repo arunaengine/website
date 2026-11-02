@@ -69,6 +69,8 @@ purgeLegacyS3KeyStorage()
 
 export const sessions = shallowRef(new Map<string, PortalS3Session>())
 export const sessionRevision = ref(0)
+/** Context activations under way; a missing session is worth waiting for only while one runs. */
+export const activations = ref(0)
 const activeSessionKey = ref<string | null>(null)
 const pendingMints = new Map<string, Promise<PortalS3Session>>()
 let boundaryGeneration = 0
@@ -334,16 +336,21 @@ export async function activateContext(nodeId: string | null, groupId: string): P
   const activation = ++activationGeneration
   const key = storeKey(issuerNodeId, explicitGroupId)
   const existing = sessions.value.get(key)
-  const session = sessionUsable(existing)
-    ? existing
-    : await mintSession(issuerNodeId, explicitGroupId, user.id)
-  if (activation !== activationGeneration) return session
-  if (currentUser.value?.id !== session.userId || apiBaseUrl.value !== sessionsBoundaryApiBase) {
-    throw new DOMException('The authenticated API context changed.', 'AbortError')
+  activations.value++
+  try {
+    const session = sessionUsable(existing)
+      ? existing
+      : await mintSession(issuerNodeId, explicitGroupId, user.id)
+    if (activation !== activationGeneration) return session
+    if (currentUser.value?.id !== session.userId || apiBaseUrl.value !== sessionsBoundaryApiBase) {
+      throw new DOMException('The authenticated API context changed.', 'AbortError')
+    }
+    activeSessionKey.value = key
+    scheduleActiveSession()
+    return session
+  } finally {
+    activations.value--
   }
-  activeSessionKey.value = key
-  scheduleActiveSession()
-  return session
 }
 
 /** Reuses the active session when it already serves the group. */

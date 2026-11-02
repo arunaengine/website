@@ -29,6 +29,7 @@ import {
 } from './s3/objects'
 import {
   activateContext,
+  activations,
   activeContext,
   activeKey,
   activeSession,
@@ -117,6 +118,7 @@ function nodeS3() {
     nodeIdFor: normalizeNodeId,
     resolveObjectUrl,
     activateContext,
+    activations,
     ensureSession,
     replaceSession,
     clearSessions,

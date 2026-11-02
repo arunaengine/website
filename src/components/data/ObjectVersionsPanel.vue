@@ -41,10 +41,10 @@ const loadError = ref<string | null>(null)
 const actionError = ref<string | null>(null)
 const restoringId = ref<string | null>(null)
 let loadSeq = 0
-// A deep link asks before the session of the bucket's node is open; that session asks again.
+// A deep link may ask before the session of the bucket's node is open: it spins while an
+// activation runs, shows the error otherwise, and asks again once a context opens.
+let sessionMissing = false
 let waitingSession = false
-// A missing session is waited for once; a second miss is an error to show.
-let sessionWaited = false
 
 // Versions list through the bucket's node; only purging needs the owner node itself.
 const remote = computed(() => Boolean(props.nodeId))
@@ -56,6 +56,7 @@ async function load() {
   const seq = ++loadSeq
   loading.value = true
   loadError.value = null
+  sessionMissing = false
   waitingSession = false
   try {
     const page = await s3.listObjectVersions(props.bucket, props.objectKey, props.nodeId ?? null)
@@ -65,22 +66,24 @@ async function load() {
   } catch (err) {
     if (seq !== loadSeq) return
     versions.value = []
-    waitingSession = err instanceof S3ContextMismatchError || (err instanceof S3SessionUnavailableError && !sessionWaited)
+    sessionMissing = err instanceof S3ContextMismatchError || err instanceof S3SessionUnavailableError
+    waitingSession = sessionMissing && s3.activations.value > 0
     if (!waitingSession) loadError.value = s3ErrorMessage(err)
   } finally {
     if (seq === loadSeq && !waitingSession) loading.value = false
   }
 }
 watch(() => s3.activeContext.value, () => {
-  if (!waitingSession || !props.active) return
-  sessionWaited = true
-  void load()
+  if (sessionMissing && props.active) void load()
+})
+// An activation that ended without a new context leaves the error to show.
+watch(() => s3.activations.value, (count) => {
+  if (!count && waitingSession && props.active) void load()
 })
 
 watch(
   () => [props.active, props.bucket, props.objectKey, props.nodeId, props.revision],
   () => {
-    sessionWaited = false
     if (props.active) void load()
   },
   { immediate: true },

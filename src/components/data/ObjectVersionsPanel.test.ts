@@ -21,6 +21,7 @@ const listObjectVersions = vi.fn()
 const deleteObjectVersion = vi.fn(async () => undefined)
 const canWrite = vi.fn(() => true)
 const activeContext = ref<{ nodeId: string } | null>({ nodeId: 'node-a' })
+const activations = ref(0)
 class S3ContextMismatchError extends Error {}
 class S3SessionUnavailableError extends Error {}
 
@@ -58,7 +59,7 @@ const panel = compileClientComponent(new URL('./ObjectVersionsPanel.vue', import
     S3ContextMismatchError,
     S3SessionUnavailableError,
     s3ErrorMessage: (error: unknown) => String(error),
-    useS3: () => ({ listObjectVersions, deleteObjectVersion, canWrite, activeContext, downloadUrl: async () => 'url' }),
+    useS3: () => ({ listObjectVersions, deleteObjectVersion, canWrite, activeContext, activations, downloadUrl: async () => 'url' }),
   },
   '@/components/ui/Badge.vue': moduleDefault(slotted('span')),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
@@ -199,37 +200,45 @@ describe('object versions panel', () => {
     expect(content(root)).toContain('Current')
   })
 
-  it('waits for the session of the bucket node instead of showing the mismatch', async () => {
+  it('waits for the session of the bucket node while it opens instead of showing the mismatch', async () => {
     listObjectVersions.mockClear()
     listObjectVersions.mockRejectedValueOnce(new S3ContextMismatchError('Session issuer node-a cannot access node node-b'))
+    activations.value = 1
     const { root } = await render([current], 'node-b')
     expect(content(root)).not.toContain('cannot access')
     expect(content(root)).not.toContain('Current')
 
     activeContext.value = { nodeId: 'node-b' }
+    activations.value = 0
     await flush()
     expect(listObjectVersions).toHaveBeenCalledTimes(2)
     expect(content(root)).toContain('Current')
   })
 
-  it('waits once for a session that is not open yet, then shows a second miss', async () => {
+  it('shows a missing session when no activation runs, and loads once a context opens', async () => {
     const missing = () => new S3SessionUnavailableError('No valid S3 session is available for this node and group.')
     listObjectVersions.mockClear()
     listObjectVersions.mockRejectedValueOnce(missing())
     const { root } = await render([current], 'node-c')
-    expect(content(root)).not.toContain('No valid S3 session')
+    expect(content(root)).toContain('No valid S3 session')
 
     activeContext.value = { nodeId: 'node-c' }
     await flush()
     expect(listObjectVersions).toHaveBeenCalledTimes(2)
     expect(content(root)).toContain('Current')
+  })
 
+  it('shows the miss once an activation ends without opening the context', async () => {
+    const missing = () => new S3SessionUnavailableError('No valid S3 session is available for this node and group.')
     listObjectVersions.mockClear()
     listObjectVersions.mockRejectedValueOnce(missing()).mockRejectedValueOnce(missing())
-    const again = await render([current], 'node-d')
-    activeContext.value = { nodeId: 'node-d' }
+    activations.value = 1
+    const { root } = await render([current], 'node-d')
+    expect(content(root)).not.toContain('No valid S3 session')
+
+    activations.value = 0
     await flush()
     expect(listObjectVersions).toHaveBeenCalledTimes(2)
-    expect(content(again.root)).toContain('No valid S3 session')
+    expect(content(root)).toContain('No valid S3 session')
   })
 })
