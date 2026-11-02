@@ -621,7 +621,7 @@ async function onDrop(event: DragEvent) {
 
 <template>
   <div class="min-w-0 space-y-4">
-    <EmptyState v-if="!bucket" title="Select a bucket to browse its objects." />
+    <EmptyState v-if="!bucket" title="Select a bucket to browse its objects" />
 
     <template v-else>
       <SectionHeading title="Files" :icon="FolderOpen">

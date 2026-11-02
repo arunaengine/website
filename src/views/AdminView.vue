@@ -343,7 +343,7 @@ async function save() {
               <span v-if="realmNodeCount"><Server />Across <b>{{ formatNumber(realmNodeCount) }}</b> {{ realmNodeCount === 1 ? 'node' : 'nodes' }}</span>
             </OverviewCell>
           </div>
-          <EmptyState v-else title="Realm totals need a signed-in session on a quota-aware node." />
+          <EmptyState v-else title="Realm totals need a signed-in session on a quota-aware node" />
         </section>
 
         <section id="policy" class="scroll-mt-24" aria-labelledby="admin-policy-heading">

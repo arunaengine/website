@@ -42,12 +42,12 @@ describe('transfers tab', () => {
     const bucket = ref('reef')
     const host = defineComponent({ setup: () => () => h(tab, { bucket: bucket.value, nodeId: null, groupId: 'g-1' }) })
     const { root } = await mountApp(host)
-    expect(content(root)).toContain('Nothing is copied into or out of this bucket.')
+    expect(content(root)).toContain('Nothing is copied into or out of this bucket')
 
     bucket.value = 'archive'
     await flush()
 
-    expect(content(root)).not.toContain('Nothing is copied into or out of this bucket.')
+    expect(content(root)).not.toContain('Nothing is copied into or out of this bucket')
   })
 
   it('keeps linked storage out of the transfers and filters only between syncs and staging', async () => {

@@ -687,7 +687,7 @@ async function leave() {
           </section>
           <section aria-labelledby="group-members-heading">
             <SectionHeading id="group-members-heading" title="Members" :icon="Users" />
-            <EmptyState v-if="membersHidden" title="Only group members see the member list." />
+            <EmptyState v-if="membersHidden" title="Only group members see the member list" />
             <div v-else class="surface overflow-x-auto">
               <GroupMembers
                 :group-id="group.group_id"

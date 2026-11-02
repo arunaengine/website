@@ -113,7 +113,7 @@ const askPrompt = computed(() =>
         <Skeleton class="h-32" />
       </div>
 
-      <EmptyState v-else-if="failed" title="This user is not in your realm, or you may not look them up.">
+      <EmptyState v-else-if="failed" title="This user is not in your realm, or you may not look them up">
         <template #icon><UserRound class="size-6" /></template>
         <Button variant="outline" size="sm" @click="load(userId, true)"><RefreshCw class="h-3.5 w-3.5" /> Try again</Button>
       </EmptyState>

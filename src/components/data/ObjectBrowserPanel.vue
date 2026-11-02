@@ -474,7 +474,7 @@ const isEmpty = computed(
       </aside>
 
       <div class="min-w-0">
-        <EmptyState v-if="!activeBucket" class="h-full" title="Select a bucket to browse its objects." />
+        <EmptyState v-if="!activeBucket" class="h-full" title="Select a bucket to browse its objects" />
         <template v-else>
           <div class="flex min-w-0 items-center gap-2 pb-2">
             <Breadcrumbs :bucket="activeBucket" :path="prefix" @navigate="navigateTo" />

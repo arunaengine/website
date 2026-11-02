@@ -553,13 +553,13 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
 
         <EmptyState
           v-else-if="selectedRuleState === 'ready' && (selected.shapesText || selected.customShapesText)"
-          title="No editable controls could be generated."
+          title="No editable controls could be generated"
           description="The retained SHACL requirements still apply during validation."
         />
-        <EmptyState v-else-if="selectedRuleState === 'empty'" title="No rules are defined for this profile." />
+        <EmptyState v-else-if="selectedRuleState === 'empty'" title="No rules are defined for this profile" />
       </section>
 
-      <EmptyState v-else title="Select a visible profile." />
+      <EmptyState v-else title="Select a visible profile" />
     </div>
 
     <Dialog :open="showDelete" @update:open="(value: boolean) => (showDelete = value)">

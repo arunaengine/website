@@ -149,5 +149,5 @@ function addOptional() {
 
   </section>
 
-  <EmptyState v-else title="Pick something on the left to edit it." />
+  <EmptyState v-else title="Pick something on the left to edit it" />
 </template>

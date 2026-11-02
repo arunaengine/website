@@ -209,7 +209,7 @@ const bucketLink = (hit: BucketSearchHit) => ({
     </template>
 
     <div class="space-y-8">
-      <EmptyState v-if="!node" title="This node is not in the realm's node list." />
+      <EmptyState v-if="!node" title="This node is not in the realm's node list" />
       <template v-else>
         <div class="grid gap-3 sm:gap-4" :class="recentRuns.state.value === 'off' ? 'md:grid-cols-2' : 'md:grid-cols-3'">
           <OverviewCell label="Stored" :icon="HardDrive">

@@ -287,7 +287,7 @@ function continueInPanel() {
 
       <div v-if="!available" class="flex min-h-0 flex-1 items-center justify-center p-6">
         <EmptyState
-          title="No AI provider is ready yet."
+          title="No AI provider is ready yet"
           description="Add a provider under Settings, test it, and the assistant appears here and in the top bar."
         >
           <template #icon><MessageSquare class="h-6 w-6" /></template>

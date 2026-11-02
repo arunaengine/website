@@ -137,7 +137,7 @@ describe('ProfilesView', () => {
     const mounted = await mountApp(ProfilesView)
 
     expect(content(mounted.root)).toContain('Example profile')
-    expect(content(mounted.root)).not.toContain('Select a visible profile.')
+    expect(content(mounted.root)).not.toContain('Select a visible profile')
     mounted.app.unmount()
     route.name = 'profiles'
     route.params = {}

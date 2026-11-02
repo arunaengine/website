@@ -226,7 +226,7 @@ describe('node dialog', () => {
     params.value = { nodeId: 'gone' }
     const mounted = await mountApp(NodeView)
     await flush()
-    expect(content(mounted.root)).toContain("This node is not in the realm's node list.")
+    expect(content(mounted.root)).toContain("This node is not in the realm's node list")
     mounted.app.unmount()
   })
 
