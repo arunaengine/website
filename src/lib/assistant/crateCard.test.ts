@@ -78,6 +78,24 @@ describe('runCard', () => {
     expect(runCard(crate)?.inputDatasets).toHaveLength(2)
   })
 
+  it('links an input dataset only through a web address or a DOI', () => {
+    const part = (id: string, identifier: string) => ({ '@id': id, '@type': 'Dataset', name: id, identifier: [identifier] })
+    const crate = runCrate({ object: ['a', 'b', 'c', 'd'].map((id) => ({ '@id': id })) }, [
+      ...['a', 'b', 'c', 'd'].map((id) => ({ '@id': id, '@type': 'File', isPartOf: [{ '@id': `#bucket-metadata-${id}` }] })),
+      part('#bucket-metadata-a', 'javascript:alert(1)'),
+      part('#bucket-metadata-b', 'data:text/html,<script>alert(1)</script>'),
+      part('#bucket-metadata-c', '10.5281/zenodo.14916843'),
+      part('#bucket-metadata-d', 'https://example.org/genomes'),
+    ])
+
+    expect(runCard(crate)?.inputDatasets.map((source) => source.link)).toEqual([
+      undefined,
+      undefined,
+      'https://doi.org/10.5281/zenodo.14916843',
+      'https://example.org/genomes',
+    ])
+  })
+
   it('names a run that is still going as running', () => {
     expect(runCard(runCrate({ actionStatus: 'ActiveActionStatus' }))?.state).toBe('running')
   })

@@ -3,7 +3,8 @@
 import { crateGraph, crateRootId, dataEntitiesOf, stringProp, typeShortName } from '@/lib/dataEntities'
 import { formatCount } from '@/lib/formatCount'
 import { parseRunCrate, resultsFolder, runDuration, runState, type RunCrateFileRef } from '@/lib/runCrate'
-import { formatBytes } from '@/lib/utils'
+import { doiUrl } from '@/lib/repository'
+import { formatBytes, isHttpUrl } from '@/lib/utils'
 
 export interface RunCard {
   /** succeeded, failed, running or queued; null when the crate gives none. */
@@ -31,6 +32,18 @@ export interface DatasetCard {
   bytes?: number
 }
 
+const BARE_DOI = /^10\.\d{4,9}\/\S+$/
+
+// Only a web address or a DOI becomes a link; any other value stays plain text.
+function safeLink(links: string[]): string | undefined {
+  for (const link of links) {
+    const value = link.trim()
+    if (isHttpUrl(value)) return value
+    if (BARE_DOI.test(value)) return doiUrl(value)
+  }
+  return undefined
+}
+
 const STATES: Record<string, string> = {
   ActiveActionStatus: 'running',
   PotentialActionStatus: 'queued',
@@ -55,7 +68,8 @@ function inputDatasets(inputs: RunCrateFileRef[]): RunCard['inputDatasets'] {
     const parts = file.partOf ?? []
     const database = parts.filter((part) => part.kind === 'database')
     for (const part of database.length ? database : parts) {
-      if (!found.has(part.id)) found.set(part.id, { id: part.id, name: part.name || part.id, ...(part.links[0] ? { link: part.links[0] } : {}) })
+      const link = safeLink(part.links)
+      if (!found.has(part.id)) found.set(part.id, { id: part.id, name: part.name || part.id, ...(link ? { link } : {}) })
     }
   }
   return [...found.values()]

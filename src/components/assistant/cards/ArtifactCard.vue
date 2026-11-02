@@ -9,7 +9,7 @@ import ObjectLink from '@/components/assistant/ObjectLink.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { classifyObject } from '@/composables/useObjectPreview'
-import { errorMessage, formatBytes } from '@/lib/utils'
+import { errorMessage, formatBytes, isHttpUrl } from '@/lib/utils'
 import { firstLines } from '@/lib/assistant/textLines'
 import { ARTIFACT_TEXT_CAP } from '@/lib/assistant/types'
 import type { ArtifactView } from '@/lib/assistant/types'
@@ -47,6 +47,8 @@ const isHtml = computed(() =>
     || props.artifact.contentType.toLowerCase().startsWith('text/html')))
 const delimiter = computed(() => (props.artifact.key.toLowerCase().endsWith('.tsv') ? '\t' : ','))
 const url = computed(() => loaded.value?.url ?? props.artifact.url)
+// A stored card's address is data; only the tab's own bytes or a web address may be a link.
+const downloadHref = computed(() => (url.value.startsWith('blob:') || isHttpUrl(url.value) ? url.value : ''))
 const size = computed(() => loaded.value?.size ?? props.artifact.size)
 const isDownload = computed(() => kind.value !== 'image' && !isText.value)
 
@@ -187,8 +189,8 @@ onBeforeUnmount(() => {
             {{ formatBytes(size) }}
           </span>
           <a
-            v-if="url && isDownload"
-            :href="url"
+            v-if="downloadHref && isDownload"
+            :href="downloadHref"
             :download="artifact.name"
             class="inline-flex items-center gap-1 font-medium text-primary hover:underline"
           >

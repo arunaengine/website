@@ -256,6 +256,12 @@ describe('ArtifactCard', () => {
     expect(content(root)).toContain('60\u00a0MiB')
   })
 
+  it('never turns a stored address with another scheme into a download link', async () => {
+    const { root } = await card(artifact({ url: 'javascript:alert(1)', previewKind: 'download', contentType: 'application/octet-stream', name: 'x.bin', key: 'x.bin' }))
+
+    expect(nodes(root).some((node) => String(node.props.href ?? '').startsWith('javascript:'))).toBe(false)
+  })
+
   it('keeps an image above the cap as a download row', async () => {
     // The bytes were never fetched, so the classifier must not win here.
     const { root } = await card(artifact({
