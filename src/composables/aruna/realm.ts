@@ -66,6 +66,8 @@ async function readRealmUsage(context: ReturnType<typeof refreshContext>, key: s
 }
 
 export async function loadInfo(context = refreshContext()) {
+  watchRealmName()
+  nameReadAt = Date.now()
   // Partial tolerance: one endpoint failing or degrading (e.g. realm
   // discovery with offline nodes) must not blank the others' data; keep the
   // last-known values and only fail when both core calls are down.
@@ -95,6 +97,33 @@ export async function loadInfo(context = refreshContext()) {
   if (own) federationName.value = signed.name?.trim() ?? ''
   else if (absent || realmInfo.value?.realm_id !== known) federationName.value = ''
   if (info.status === 'rejected' && realm.status === 'rejected') throw info.reason
+}
+
+/** Reads only the realm's signed name, so an open page picks up a rename. */
+export async function refreshRealmName(context = refreshContext()) {
+  try {
+    const signed = await apiRequest<Signed<RealmDescriptor>>('/system/realm/descriptor', {}, context.client)
+    if (context.epoch !== sessionEpoch.value) return
+    if (realmIdText(signed.payload.realm_id) === realmInfo.value?.realm_id) federationName.value = signed.payload.name?.trim() ?? ''
+  } catch (error) {
+    // Only a 404 says the realm has no name; other failures keep the shown one.
+    if (context.epoch === sessionEpoch.value && error instanceof ApiError && error.status === 404) federationName.value = ''
+  }
+}
+
+const NAME_REFRESH_MS = 60_000
+let nameReadAt = 0
+let nameWatched = false
+
+/** Reads the realm name again when the page becomes visible, at most once a minute. */
+function watchRealmName() {
+  if (nameWatched || typeof document === 'undefined') return
+  nameWatched = true
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || Date.now() - nameReadAt < NAME_REFRESH_MS) return
+    nameReadAt = Date.now()
+    void refreshRealmName()
+  })
 }
 
 export interface RealmView {

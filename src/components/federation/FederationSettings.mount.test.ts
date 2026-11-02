@@ -7,6 +7,7 @@ import { ApiError } from '@/lib/api/client'
 const getRealmFederation = vi.fn()
 const setRealmFederation = vi.fn()
 const sessionEpoch = ref(1)
+const federationName = ref('Old name')
 const Empty = defineComponent(() => () => null)
 const Button = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const Passthrough = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
@@ -29,6 +30,7 @@ const Settings = compileClientComponent(new URL('./FederationSettings.vue', impo
     assertCurrentSession: () => undefined,
     refreshContext: () => ({ epoch: sessionEpoch.value, client: { baseUrl: '/api/v1', token: 'T' } }),
     sessionEpoch,
+    federationName,
   },
   '@/lib/api': {
     ApiError,
@@ -73,6 +75,18 @@ describe('FederationSettings', () => {
     )
     await click(button(mounted.root, 'Save'))
     expect(setRealmFederation.mock.calls[1][1]).toBe('"next"')
+    mounted.app.unmount()
+  })
+
+  it('shows a saved name in the top bar at once', async () => {
+    getRealmFederation.mockResolvedValue({ settings: stored, etag: '"v1"' })
+    federationName.value = 'Old name'
+    const mounted = await mountApp(Settings)
+    await flush()
+    await click(button(mounted.root, 'Save'))
+    const saved = setRealmFederation.mock.calls.at(-1)?.[0].name
+    expect(saved).toBeTruthy()
+    expect(federationName.value).toBe(saved)
     mounted.app.unmount()
   })
 

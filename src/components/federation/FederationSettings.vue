@@ -19,7 +19,7 @@ import {
   type StoredFederation,
 } from '@/lib/api'
 import { checkRealm, knownRealm } from '@/lib/federation/realms'
-import { assertCurrentSession, refreshContext, sessionEpoch } from '@/composables/aruna/state'
+import { assertCurrentSession, federationName, refreshContext, sessionEpoch } from '@/composables/aruna/state'
 import { Globe, Plus, Save, X } from '@lucide/vue'
 
 const { realm } = useAruna()
@@ -113,6 +113,8 @@ async function save() {
     )
     assertCurrentSession(context.epoch)
     apply(stored)
+    // The top bar shows the new name at once; others see it when their page reads it again.
+    federationName.value = stored.settings.name.trim()
     saved.value = true
   } catch (error) {
     if (context.epoch !== sessionEpoch.value) return
@@ -139,8 +141,9 @@ async function save() {
     <fieldset v-else :disabled="!editable" class="min-w-0 space-y-5 p-5">
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
-          <label for="federation-name" class="text-xs font-medium text-foreground">Name</label>
+          <label for="federation-name" class="text-xs font-medium text-foreground">Realm name</label>
           <Input id="federation-name" v-model="name" class="mt-1" />
+          <p class="mt-1 text-xs text-muted-foreground">Everyone sees this name in the top bar.</p>
         </div>
         <div>
           <label for="federation-portal" class="text-xs font-medium text-foreground">Portal address</label>

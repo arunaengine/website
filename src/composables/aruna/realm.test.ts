@@ -14,7 +14,7 @@ const BYTES = Array.from({ length: 32 }, (_, index) => index)
 const REALM_ID = toBase64Url(Uint8Array.from(BYTES))
 
 const state = await import('./state')
-const { loadInfo, loadRealmView, realm } = await import('./realm')
+const { loadInfo, loadRealmView, realm, refreshRealmName } = await import('./realm')
 
 function serve(descriptor: unknown, description = 'Test_Deploy_Realm', realmId = REALM_ID) {
   vi.mocked(apiRequest).mockImplementation(async (path) => {
@@ -63,6 +63,26 @@ describe('visitor node addresses', () => {
     state.nodeInfo.value = null
     expect(state.realmInfo.value?.nodes[0]?.rest_url).toBe('https://api.node-2.example.org')
     expect(state.nodeClient('n2').baseUrl).toBe('https://api.node-2.example.org/api/v1')
+  })
+})
+
+describe('realm name refresh', () => {
+  it('picks up a rename on an open page, keeps the name on errors and drops it on 404', async () => {
+    serve(signed('Realm A'))
+    await loadInfo()
+    expect(realm.value.name).toBe('Realm A')
+
+    serve(signed('Realm B'))
+    await refreshRealmName()
+    expect(realm.value.name).toBe('Realm B')
+
+    serve(new ApiError(503, 'Unavailable'))
+    await refreshRealmName()
+    expect(realm.value.name).toBe('Realm B')
+
+    serve(new ApiError(404, 'No federation settings'))
+    await refreshRealmName()
+    expect(realm.value.name).toBe('Test_Deploy_Realm'.replace(/_+/g, ' '))
   })
 })
 
