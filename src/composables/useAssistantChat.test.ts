@@ -139,6 +139,8 @@ describe('loadArtifact', () => {
     expect(fetchMock).toHaveBeenCalledWith('https://s3.node.test/work/object?signature', { headers: { Range: 'bytes=0-16383' } })
     expect(loaded.truncated).toBe(true)
     expect(loaded.text?.length).toBeLessThanOrEqual(16_384)
+    // The store states the whole size even though only the start was read.
+    expect(loaded.size).toBe(50_000)
   })
 
   it('reads an empty file as empty text instead of failing', async () => {
@@ -188,6 +190,18 @@ describe('loadArtifact', () => {
 
     expect(s3.getObjectBlob).not.toHaveBeenCalled()
     expect(loaded).toMatchObject({ kind: 'download', url: 'https://s3.node.test/work/object?signature' })
+  })
+
+  it('names the size of an oversized image only when the store states it', async () => {
+    const big = new Uint8Array(25 * 1024 * 1024 + 4096)
+    vi.stubGlobal('fetch', serve(big, false))
+    const unknown = await loadArtifact({ bucket: 'work', key: 'results/a.png', contentType: 'image/png' })
+    vi.stubGlobal('fetch', serve(big))
+    const ranged = await loadArtifact({ bucket: 'work', key: 'results/b.png', contentType: 'image/png' })
+
+    expect(unknown).toMatchObject({ kind: 'download' })
+    expect(unknown.size).toBeUndefined()
+    expect(ranged).toMatchObject({ kind: 'download', size: big.length })
   })
 
   it('holds a small image in the tab as a blob url', async () => {

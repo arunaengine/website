@@ -629,20 +629,23 @@ function objectTotal(response: Response): number | undefined {
  * The first `limit` bytes of one stored object, asked for as a range so a large
  * or misreported object is never downloaded whole, even by a store that ignores ranges.
  */
-async function readObjectStart(ref: ArtifactRef, limit: number): Promise<{ bytes: Uint8Array<ArrayBuffer>; complete: boolean; type: string }> {
+async function readObjectStart(
+  ref: ArtifactRef,
+  limit: number,
+): Promise<{ bytes: Uint8Array<ArrayBuffer>; complete: boolean; total?: number; type: string }> {
   const [s3, { readStart }] = await Promise.all([readyS3(), import('@/lib/assistant/contentPreview')])
   const url = await s3.downloadUrl(ref.bucket, ref.key, artifactNode(s3.resolveObjectUrl, ref), ref.versionId)
   const response = await fetch(url, { headers: { Range: `bytes=0-${limit - 1}` } })
   // A store answers a range on an empty object with 416 and a total of zero; that is a complete read.
   if (response.status === 416 && /^bytes \*\/0$/.test(response.headers.get('content-range')?.trim() ?? '')) {
-    return { bytes: new Uint8Array(0), complete: true, type: response.headers.get('content-type') ?? '' }
+    return { bytes: new Uint8Array(0), complete: true, total: 0, type: response.headers.get('content-type') ?? '' }
   }
   if (!response.ok) throw new Error(`The object could not be fetched (HTTP ${response.status}).`)
   const bytes = await readStart(response, limit)
   const total = objectTotal(response)
   // A body that ended before the limit is the whole object; at the limit only the stated total can tell.
   const complete = bytes.length < limit || (total !== undefined && total <= bytes.length)
-  return { bytes, complete, type: response.headers.get('content-type') ?? '' }
+  return { bytes, complete, ...(total !== undefined ? { total } : {}), type: response.headers.get('content-type') ?? '' }
 }
 
 /**
@@ -661,19 +664,20 @@ export async function loadArtifact(ref: ArtifactRef, textLimit?: number): Promis
   const contentType = ref.contentType || 'application/octet-stream'
   const classified = classifyObject({ key: name, contentType: ref.contentType })
   const oversize = typeof ref.size === 'number' && ref.size > ARTIFACT_CAP
-  const download = async (size?: number): Promise<LoadedArtifact> => ({
+  // A size is named only when the caller or the store stated it, never as the bytes read so far.
+  const download = async (tooLarge: boolean, size = ref.size): Promise<LoadedArtifact> => ({
     url: await s3.downloadUrl(ref.bucket, ref.key, nodeId, ref.versionId),
     contentType,
-    kind: oversize || size !== undefined ? 'download' : classified.kind,
+    kind: tooLarge ? 'download' : classified.kind,
     name,
-    size: size ?? ref.size,
+    size,
   })
 
-  if (oversize || !INLINE_KINDS.has(classified.kind)) return download()
+  if (oversize || !INLINE_KINDS.has(classified.kind)) return download(oversize)
 
   if (!TEXT_KINDS.has(classified.kind)) {
     const read = await readObjectStart(ref, ARTIFACT_CAP + 1)
-    if (read.bytes.length > ARTIFACT_CAP) return download(ref.size ?? read.bytes.length)
+    if (read.bytes.length > ARTIFACT_CAP) return download(true, ref.size ?? read.total)
     const blob = new Blob([read.bytes], { type: ref.contentType || read.type || contentType })
     const url = URL.createObjectURL(blob)
     trackArtifact(url)
@@ -691,7 +695,7 @@ export async function loadArtifact(ref: ArtifactRef, textLimit?: number): Promis
     contentType: ref.contentType || read.type || contentType,
     kind: classified.kind,
     name,
-    size: ref.size ?? (read.complete ? read.bytes.length : undefined),
+    size: ref.size ?? read.total ?? (read.complete ? read.bytes.length : undefined),
     text: (read.complete && classified.language === 'json' ? prettyJson(raw) : raw).slice(0, ARTIFACT_TEXT_CAP),
     truncated: !read.complete,
   }
