@@ -1,6 +1,7 @@
 // Tools that act on the dataset editor's live draft. They are offered only
 // while the editor is open, they never persist anything, and the user still
 // presses Save. A delete always asks first, whatever the approval toggle says.
+import { failedWith, quoted } from './untrusted'
 import { jsonSchema, tool, type JSONSchema7, type ToolSet } from 'ai'
 import {
   addEntity,
@@ -24,7 +25,7 @@ import type { ProfileObligation, ProfilePropertyRule, ProfileValueKind } from '@
 import type { DraftContext } from './prompt'
 import { fetchOrcidRecord } from '@/lib/lookup/orcid'
 import { fetchRorRecord } from '@/lib/lookup/ror'
-import { errorMessage, stableJson } from '@/lib/utils'
+import { stableJson } from '@/lib/utils'
 import { denied, type ApprovalGate } from './types'
 
 /** What the editor view lends the assistant; nothing reaches into the view. */
@@ -44,7 +45,7 @@ interface Failure {
   error: string
 }
 
-const NO_ENTITY = (id: string): Failure => ({ error: `No entity ${id} in this draft.` })
+const NO_ENTITY = (id: string): Failure => ({ error: `No entity ${quoted(id)} in this draft.` })
 
 const STALE_READ =
   'Read the entity again before editing it: it was never read in this chat, or it changed since.'
@@ -132,7 +133,8 @@ function chosenValues(rules: ProfilePropertyRule[], property: string, list: Draf
     if (options.length && value.value.trim()) {
       const option = options.find((candidate) => sameText(candidate, value.value))
       if (!option) {
-        return { error: `${property} takes one of these options: ${options.join(', ')}. Nothing was written.` }
+        const choices = options.map((option) => quoted(option, 80)).join(', ')
+        return { error: `${quoted(property)} takes one of these options: ${choices}. Nothing was written.` }
       }
       chosen.push({ ...value, value: option })
       continue
@@ -284,7 +286,7 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
       execute: (input) => {
         const draft = bridge.draft()
         if (!findEntity(draft, input.id)) return NO_ENTITY(input.id)
-        if (findEntity(draft, input.new_id)) return { error: `${input.new_id} is already taken.` }
+        if (findEntity(draft, input.new_id)) return { error: `${quoted(input.new_id)} is already taken.` }
         const next = renameEntity(draft, input.id, input.new_id)
         bridge.update(next)
         seen.delete(input.id)
@@ -359,7 +361,7 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
         try {
           return { node: await bridge.validate(), advisory }
         } catch (cause) {
-          return { node: null, advisory, error: errorMessage(cause) }
+          return { node: null, advisory, error: failedWith(cause) }
         }
       },
     }),
@@ -377,12 +379,12 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
         const named = profiles.filter((profile) => sameText(profile.name, wanted))
         const match = profiles.find((profile) => sameText(profile.id, wanted)) ?? (named.length === 1 ? named[0] : undefined)
         if (!match && named.length > 1) {
-          const ids = named.map((profile) => profile.id).join(', ')
-          return { error: `More than one profile is named ${profileId}: ${ids}. Name the one you mean by its id.` }
+          const ids = named.map((profile) => quoted(profile.id, 80)).join(', ')
+          return { error: `More than one profile is named ${quoted(profileId)}: ${ids}. Name the one you mean by its id.` }
         }
         if (!match) {
-          const known = profiles.map((profile) => `${profile.id} (${profile.name})`).join(', ')
-          return { error: `No profile ${profileId} in this realm.${known ? ` Available: ${known}.` : ''}` }
+          const known = profiles.map((profile) => `${quoted(profile.id, 80)} (${quoted(profile.name, 80)})`).join(', ')
+          return { error: `No profile ${quoted(profileId)} in this realm.${known ? ` Available: ${known}.` : ''}` }
         }
         bridge.applyProfile(match.id)
         return { profile_id: match.id }
@@ -408,7 +410,7 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
           remember(created.entity)
           return entityJson(created.entity)
         } catch (cause) {
-          return { error: errorMessage(cause) }
+          return { error: failedWith(cause) }
         }
       },
     }),
@@ -431,7 +433,7 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
           remember(created.entity)
           return entityJson(created.entity)
         } catch (cause) {
-          return { error: errorMessage(cause) }
+          return { error: failedWith(cause) }
         }
       },
     }),

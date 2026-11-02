@@ -1,6 +1,7 @@
 // Streamable HTTP MCP client against this node's /mcp endpoint, authenticated
 // with a child session of kind `assistant`. Only the two calls the tool layer
 // needs are exposed, so the rest of the portal never sees the SDK types.
+import { quoted } from './untrusted'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type {
@@ -79,7 +80,8 @@ export function toolOutput(result: unknown): unknown {
     .filter((block) => block?.type === 'text' && typeof block.text === 'string')
     .map((block) => block.text as string)
     .join('\n')
-  if (call.isError) return { error: text || 'The tool call failed.' }
+  // The server's own words are data, so they come back quoted on one bounded line.
+  if (call.isError) return { error: text ? `The tool reported an error: ${quoted(text, 1000)}` : 'The tool call failed.' }
   if (call.structuredContent !== undefined && call.structuredContent !== null) return call.structuredContent
   if (text) return text
   return { content: blocks.filter((block) => block?.type !== 'text').map(blockSummary) }

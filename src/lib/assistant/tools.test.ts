@@ -119,6 +119,6 @@ describe('toolOutput', () => {
     const { toolOutput } = await import('./mcpClient')
     expect(toolOutput({ content: [{ type: 'text', text: 'x' }], structuredContent: { a: 1 } })).toEqual({ a: 1 })
     expect(toolOutput({ content: [{ type: 'text', text: 'a' }, { type: 'text', text: 'b' }] })).toBe('a\nb')
-    expect(toolOutput({ content: [{ type: 'text', text: 'boom' }], isError: true })).toEqual({ error: 'boom' })
+    expect(toolOutput({ content: [{ type: 'text', text: 'boom' }], isError: true })).toEqual({ error: 'The tool reported an error: "boom"' })
   })
 })

@@ -2,6 +2,7 @@
 // is open, they never send a run, and every write asks through the approval
 // gate. What a tool changed carries an AI mark until the user edits it, and one
 // Undo restores the form as it was before the last applied change.
+import { cleanValue } from './untrusted'
 import { jsonSchema, tool, type JSONSchema7, type ToolSet } from 'ai'
 import { denied, type ApprovalGate } from './types'
 
@@ -73,7 +74,7 @@ export function runFormTools(bridge: RunFormBridge, gate: ApprovalGate): ToolSet
     }
     bridge.snapshot()
     const refusal = apply()
-    if (refusal) return { error: refusal }
+    if (refusal) return { error: cleanValue(refusal, 600) }
     return bridge.summary()
   }
 

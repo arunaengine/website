@@ -1,6 +1,7 @@
 // Background watchers: the portal polls a job or a bucket sync for the
 // assistant and continues that chat once the work settles. They are stored
 // beside the chat history, so they survive a reload but never leave the browser.
+import { quoted } from './untrusted'
 import { assistantChatScopeKey, type AssistantChatScope, type AssistantChatStorage } from './chatHistory'
 
 export const ASSISTANT_WATCH_STORAGE_KEY = 'aruna.assistant.watchers.v1'
@@ -63,7 +64,7 @@ export function jobOutcome(watch: AssistantWatch, state: string): WatchPoll {
   if (!JOB_TERMINAL.has(state)) return state === watch.seen ? { state: 'pending' } : { state: 'pending', seen: state }
   return {
     state: 'final',
-    text: `Background update: the job ${watch.target} (${watch.label}) reached the state ${state}.`,
+    text: `Background update: the job ${quoted(watch.target)} (${quoted(watch.label)}) reached the state ${quoted(state)}.`,
   }
 }
 
@@ -94,26 +95,26 @@ export function syncOutcome(watch: AssistantWatch, snapshot: SyncSnapshot): Watc
   if (snapshot.state === 'failed' || (!first && Boolean(snapshot.lastError))) {
     return {
       state: 'final',
-      text: `Background update: the bucket sync ${watch.target} (${watch.label}) is failing.`,
+      text: `Background update: the bucket sync ${quoted(watch.target)} (${quoted(watch.label)}) is failing.`,
     }
   }
   if (snapshot.pendingJobs === 0 && syncedAfter(watch, snapshot)) {
     return {
       state: 'final',
-      text: `Background update: the bucket sync ${watch.target} (${watch.label}) finished. `
-        + `Nothing is queued and it last synced at ${snapshot.lastSyncedAt}.`,
+      text: `Background update: the bucket sync ${quoted(watch.target)} (${quoted(watch.label)}) finished. `
+        + `Nothing is queued and it last synced at ${quoted(snapshot.lastSyncedAt ?? '')}.`,
     }
   }
   return { state: 'pending', seen: signature }
 }
 
 function deadlineText(watch: AssistantWatch): string {
-  return `Background update: the ${watch.kind} ${watch.target} (${watch.label}) has still not settled, `
+  return `Background update: the ${watch.kind} ${quoted(watch.target)} (${quoted(watch.label)}) has still not settled, `
     + 'so the portal stopped watching it.'
 }
 
 function errorText(watch: AssistantWatch): string {
-  return `Background update: the ${watch.kind} ${watch.target} (${watch.label}) could not be read, `
+  return `Background update: the ${watch.kind} ${quoted(watch.target)} (${quoted(watch.label)}) could not be read, `
     + 'so the portal stopped watching it.'
 }
 
@@ -288,7 +289,7 @@ export function createWatchRegistry(options: WatchRegistryOptions): WatchRegistr
     add({ chatId, kind, target, label }) {
       const id = watchId(chatId, kind, target)
       if (watches.some((watch) => watch.id === id)) {
-        return { ok: true, message: `Already watching the ${kind} ${target}; this chat continues on its own.` }
+        return { ok: true, message: `Already watching the ${kind} ${quoted(target)}; this chat continues on its own.` }
       }
       if (watches.length >= MAX_ASSISTANT_WATCHES) {
         return {
@@ -312,7 +313,7 @@ export function createWatchRegistry(options: WatchRegistryOptions): WatchRegistr
       options.save(watches)
       return {
         ok: true,
-        message: `Watching the ${kind} ${target}. This chat continues on its own when it settles, `
+        message: `Watching the ${kind} ${quoted(target)}. This chat continues on its own when it settles, `
           + 'and the watch stops after two hours. Answer the user now instead of polling.',
       }
     },

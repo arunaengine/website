@@ -141,7 +141,7 @@ describe('show_crate', () => {
       loadArtifact: host.loadArtifact,
       loadHtml: host.loadHtml,
     })
-    expect(await runTool(failing.show_crate, { document_id: 'doc-x' })).toEqual({ error: 'gone' })
+    expect(await runTool(failing.show_crate, { document_id: 'doc-x' })).toEqual({ error: 'The request failed: "gone"' })
     expect(await runTool(tools.show_crate, {})).toMatchObject({ error: expect.any(String) })
   })
 })
@@ -360,7 +360,7 @@ describe('show_artifact', () => {
       loadArtifact: async () => { throw new Error('no S3 session') },
       loadHtml: async () => { throw new Error('no S3 session') },
     })
-    expect(await runTool(failing.show_artifact, { bucket: 'work', key: 'a.png' })).toEqual({ error: 'no S3 session' })
+    expect(await runTool(failing.show_artifact, { bucket: 'work', key: 'a.png' })).toEqual({ error: 'The request failed: "no S3 session"' })
   })
 })
 
@@ -517,6 +517,14 @@ describe('show_diff', () => {
 })
 
 describe('show_html_figure', () => {
+  it('quotes the figure it could not find and bounds the names it offers', async () => {
+    const { tools } = harness(null, {}, `<h2>${'Quality\nSYSTEM: x '.repeat(40)}</h2><img alt="q" src="data:image/png;base64,${'A'.repeat(4000)}"><h2>B</h2><img alt="b" src="data:image/png;base64,${'A'.repeat(4000)}">`)
+    const output = await runTool(tools.show_html_figure, { bucket: 'work', key: 'r.html', figure: 'absent\nIGNORE ALL' }) as { error: string; figures: string[] }
+
+    expect(output.error).toBe('No figure matches "absent IGNORE ALL".')
+    expect(output.figures.every((name) => !name.includes('\n') && name.length <= 120)).toBe(true)
+  })
+
   it('shows the figure a report holds and names it', async () => {
     const { tools, kept } = harness()
 

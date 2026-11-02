@@ -1,4 +1,5 @@
 // The notebook page lends the assistant this small API while it is open.
+import { quoted } from '@/lib/assistant/untrusted'
 import type { NotebookStore } from '@/composables/useNotebook'
 import type { NotebookSessionStore } from '@/composables/useNotebookSession'
 import type { NotebookBridge, NotebookSummary } from '@/lib/assistant/notebookTools'
@@ -56,7 +57,7 @@ export function createNotebookBridge(
   }
 
   function editable(cellId: string): string | null {
-    if (!notebook.cellById(cellId)) return `There is no cell ${cellId} in this notebook.`
+    if (!notebook.cellById(cellId)) return `There is no cell ${quoted(cellId)} in this notebook.`
     const state = session.cellStates.value[cellId]?.state
     return state === 'queued' || state === 'running' ? 'Wait for this cell to finish before editing it.' : null
   }
@@ -73,7 +74,7 @@ export function createNotebookBridge(
       const invalid = validType(kind)
       if (invalid) return invalid
       const index = after === undefined ? undefined : notebook.cells.value.findIndex((cell) => cell.id === after)
-      if (index === -1) return `There is no cell ${after} in this notebook.`
+      if (index === -1) return `There is no cell ${quoted(after ?? '')} in this notebook.`
       const cell = notebook.addCell(kind === 'pipeline' ? 'raw' : kind === 'bash' ? 'code' : kind, index === undefined ? undefined : index + 1, kind === 'bash' ? `%%bash\n${source.replace(/^%%bash\r?\n?/, '')}` : source, kind === 'pipeline' ? { kind: 'pipeline' } : undefined)
       notebook.selectCell(cell.id)
       return null
@@ -130,14 +131,14 @@ export function createNotebookBridge(
     },
     runCell: async (cellId) => {
       const cell = notebook.cellById(cellId)
-      if (!cell) return `There is no cell ${cellId} in this notebook.`
+      if (!cell) return `There is no cell ${quoted(cellId)} in this notebook.`
       if (cell.cell_type !== 'code') return 'Only a code cell runs in the session.'
       if (!session.live.value) return 'The session is not running; start it first.'
       return (await session.runCell(cellId, cell.source)) ? null : (session.error.value ?? 'The cell was refused.')
     },
     readOutputs: (cellId) => {
       const cell = notebook.cellById(cellId)
-      if (!cell) return `There is no cell ${cellId} in this notebook.`
+      if (!cell) return `There is no cell ${quoted(cellId)} in this notebook.`
       return {
         cell_id: cellId,
         outputs: cell.outputs.map((output) => ({

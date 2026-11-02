@@ -2,6 +2,7 @@
 // profile page is open, they never create the profile, and every write asks
 // through the approval gate. One Undo restores the form as it was before the
 // last applied change.
+import { cleanValue } from './untrusted'
 import { jsonSchema, tool, type JSONSchema7, type ToolSet } from 'ai'
 import { denied, type ApprovalGate } from './types'
 
@@ -120,7 +121,7 @@ async function guarded(
   }
   bridge.snapshot()
   const error = run()
-  if (error) return { error }
+  if (error) return { error: cleanValue(error, 600) }
   const summary = bridge.summary()
   return { applied: true, problems: summary.problems }
 }

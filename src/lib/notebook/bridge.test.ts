@@ -123,7 +123,7 @@ describe('createNotebookBridge', () => {
     const { bridge, code, setSource } = doubles()
     expect(bridge.editCell(code.id, 'print(2)')).toBeNull()
     expect(setSource).toHaveBeenCalledWith(code.id, 'print(2)')
-    expect(bridge.editCell('nope', 'x')).toContain('no cell nope')
+    expect(bridge.editCell('nope', 'x')).toContain('no cell "nope"')
   })
 
   it('runs a code cell only while the session is live', async () => {
@@ -142,6 +142,6 @@ describe('createNotebookBridge', () => {
       cell_id: code.id,
       outputs: [{ type: 'stream', text: '1\n' }],
     })
-    expect(bridge.readOutputs('nope')).toContain('no cell nope')
+    expect(bridge.readOutputs('nope')).toContain('no cell "nope"')
   })
 })

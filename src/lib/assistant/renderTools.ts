@@ -4,8 +4,8 @@
 import { jsonSchema, tool, type JSONSchema7, type ToolSet } from 'ai'
 import type { PreviewKind } from '@/composables/useObjectPreview'
 import { crateGraph, crateRootId, stringProp } from '@/lib/dataEntities'
-import { errorMessage } from '@/lib/utils'
 import { cardNote } from './cardNote'
+import { cleanValue, failedWith, quoted } from './untrusted'
 import type { ContentPreview } from './contentPreview'
 import type {
   ChartKind,
@@ -331,7 +331,7 @@ export function renderTools(host: RenderHost): ToolSet {
             ...(input.document_id ? { document_id: input.document_id } : {}),
           }
         } catch (cause) {
-          return { error: errorMessage(cause) }
+          return { error: failedWith(cause) }
         }
       },
     }),
@@ -602,12 +602,12 @@ export function renderTools(host: RenderHost): ToolSet {
           const { figureName, htmlFigures, pickFigure } = await import('./htmlFigures')
           const figures = htmlFigures(source)
           if (!figures.length) return { error: 'That report carries no figures of its own.' }
-          const names = figures.map(figureName)
+          const names = figures.map((figure) => cleanValue(figureName(figure), 120))
           const wanted = text(input.figure)
           const picked = wanted ? pickFigure(figures, wanted) : figures.length === 1 ? figures[0] : null
           if (!picked) {
             return wanted
-              ? { error: `No figure matches "${wanted}".`, figures: names }
+              ? { error: `No figure matches ${quoted(wanted)}.`, figures: names }
               : { error: 'Name the figure to show.', figures: names }
           }
           const name = figureName(picked)
@@ -629,7 +629,7 @@ export function renderTools(host: RenderHost): ToolSet {
           host.keep(toolCallId, view)
           return { shown: true, card: cardNote(view), figure: name, of: names.length }
         } catch (cause) {
-          return { error: errorMessage(cause) }
+          return { error: failedWith(cause) }
         }
       },
     }),
@@ -690,7 +690,7 @@ export function renderTools(host: RenderHost): ToolSet {
           host.keep(toolCallId, view)
           return { shown: true, card: cardNote(view), content_type: loaded.contentType, kind: loaded.kind }
         } catch (cause) {
-          return { error: errorMessage(cause) }
+          return { error: failedWith(cause) }
         }
       },
     }),
