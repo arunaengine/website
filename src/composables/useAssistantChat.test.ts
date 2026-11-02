@@ -141,6 +141,19 @@ describe('loadArtifact', () => {
     expect(loaded.text?.length).toBeLessThanOrEqual(16_384)
   })
 
+  it('reads an empty file as empty text instead of failing', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 416, headers: { 'content-range': 'bytes */0' } })))
+    const loaded = await loadArtifact({ bucket: 'work', key: 'logs/empty.log', contentType: 'text/plain' })
+
+    expect(loaded).toMatchObject({ kind: 'text', text: '', truncated: false, size: 0 })
+  })
+
+  it('still fails on a range the store refuses for a file that is not empty', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 416, headers: { 'content-range': 'bytes */12' } })))
+
+    await expect(loadArtifact({ bucket: 'work', key: 'logs/odd.log', contentType: 'text/plain' })).rejects.toThrow('416')
+  })
+
   it('reads more of a text file only when asked to', async () => {
     const fetchMock = serve(new TextEncoder().encode('line\n'.repeat(10_000)))
     vi.stubGlobal('fetch', fetchMock)

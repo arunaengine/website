@@ -625,6 +625,10 @@ async function readObjectStart(ref: ArtifactRef, limit: number): Promise<{ bytes
   const [s3, { readStart }] = await Promise.all([readyS3(), import('@/lib/assistant/contentPreview')])
   const url = await s3.downloadUrl(ref.bucket, ref.key, artifactNode(s3.resolveObjectUrl, ref), ref.versionId)
   const response = await fetch(url, { headers: { Range: `bytes=0-${limit - 1}` } })
+  // A store answers a range on an empty object with 416 and a total of zero; that is a complete read.
+  if (response.status === 416 && /^bytes \*\/0$/.test(response.headers.get('content-range')?.trim() ?? '')) {
+    return { bytes: new Uint8Array(0), complete: true, type: response.headers.get('content-type') ?? '' }
+  }
   if (!response.ok) throw new Error(`The object could not be fetched (HTTP ${response.status}).`)
   const bytes = await readStart(response, limit)
   const total = Number(/\/(\d+)$/.exec(response.headers.get('content-range') ?? '')?.[1] ?? NaN)
