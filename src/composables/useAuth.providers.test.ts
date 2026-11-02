@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setAuthOpener, useAuth } from './useAuth'
 import { signInChoice } from './signInChoice'
 import { loadPortalConfig } from '@/lib/config'
-import { authToken } from './aruna/state'
+import { authToken, sessionEpoch } from './aruna/state'
 
 const PAGE_ORIGIN = 'https://portal.test'
 const ARUNA_ISSUER = 'https://keycloak.v3.aruna-engine.org/realms/aruna'
@@ -13,6 +13,8 @@ let fetchMock: ReturnType<typeof vi.fn>
 let tokenAnswer: unknown = {}
 // The Aruna account of each Keycloak user; null when it has none.
 let accounts: Record<string, string | null> = {}
+// Runs when the node is asked for the linked identity's account.
+let onIssue: (() => void) | null = null
 
 // An unsigned ID token; the portal reads only its claims.
 const idToken = (sub: string) => `h.${btoa(JSON.stringify({ sub, iat: 1, exp: 2 }))}.s`
@@ -41,6 +43,7 @@ async function setup(issuer: string, stored: Record<string, string> = {}, served
     const url = String(input)
     const bearer = new Headers(init?.headers).get('Authorization')?.replace('Bearer ', '') ?? ''
     if (url.includes('/access/token')) {
+      onIssue?.()
       const account = accounts[JSON.parse(atob(bearer.split('.')[1] ?? '')).sub]
       if (account === null) return json({ error: 'no account', code: 'account_missing' }, 401)
       return account ? json({ token: realmToken(account) }) : json({ error: 'unexpected' }, 500)
@@ -67,6 +70,7 @@ beforeEach(() => {
 afterEach(() => {
   setAuthOpener(null)
   authToken.value = ''
+  onIssue = null
   vi.unstubAllGlobals()
 })
 
@@ -178,6 +182,16 @@ describe('completeSignIn after linking', () => {
     const { link } = await finish({ kc_action_status: 'success' }, 'kc-a', 'aruna-b')
     expect(link?.linked).toBe(false)
     expect(link?.message).toContain('signed in as another account')
+  })
+
+  it('reports nothing when another session starts while the link is confirmed', async () => {
+    onIssue = () => {
+      sessionEpoch.value++
+      authToken.value = realmToken('aruna-b')
+    }
+    const { target, link } = await finish({ kc_action_status: 'success' })
+    expect(target).toBe('/app/settings')
+    expect(link).toBeNull()
   })
 
   it('reports no success when the linked identity has no account', async () => {

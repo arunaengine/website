@@ -223,15 +223,18 @@ async function finishLink(params: URLSearchParams, name: string): Promise<string
 }
 
 // Keycloak links to the user of its own browser session, which may not be the signed-in one, so
-// the linked identity's Aruna account must be the account of the active token.
-async function confirmLink(params: URLSearchParams, name: string): Promise<ProviderLink> {
-  const { authToken, apiBaseUrl } = useAruna()
+// the linked identity's Aruna account must be the account of the active token. Another session or
+// realm meanwhile ends the confirmation quietly with null.
+async function confirmLink(params: URLSearchParams, name: string): Promise<ProviderLink | null> {
+  const { authToken, apiBaseUrl, sessionEpoch } = useAruna()
   const own = tokenClaims(authToken.value ?? '')?.sub
   const baseUrl = apiBaseUrl.value
+  const epoch = sessionEpoch.value
   const code = params.get('code')
   const verifier = window.sessionStorage.getItem(VERIFIER_KEY)
   const tokens = own && code && verifier ? await redeemCode(code, verifier).catch(() => null) : null
   const account = tokens?.id_token ? await accountOf(tokens.id_token, baseUrl) : undefined
+  if (epoch !== sessionEpoch.value || baseUrl !== apiBaseUrl.value) return null
   if (own && account === own) return { name, linked: true }
   const message = account !== undefined
     ? 'The identity provider is signed in as another account and linked it there. Sign out of the identity provider, then link again.'
