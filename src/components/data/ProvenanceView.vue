@@ -58,7 +58,10 @@ const readers: Readers = {
   origin: (version) => getVersionOrigin(version),
   run: (runId) => getRun(runId),
   crate: (documentId) => fetchRoCrateRaw(documentId),
-  writers: async (bucket, prefix, nodeId) => (await getBucketRuns(bucket, prefix, nodeId)).runs.map((run) => run.run_id),
+  writers: async (bucket, prefix, nodeId) => {
+    const answer = await getBucketRuns(bucket, prefix, nodeId)
+    return { runs: answer.runs.map((run) => run.run_id), complete: answer.complete }
+  },
 }
 
 const graph = reactive<Graph>(emptyGraph())
@@ -565,8 +568,11 @@ const legend = computed(() => {
     </div>
     <Notice v-if="exportError" tone="error">{{ exportError }}</Notice>
     <p v-else-if="exported" role="status" class="text-xs text-muted-foreground">Saved as provenance.zip.</p>
-    <Notice v-if="writersRead === 'failed'" tone="warning">The runs that wrote into this dataset’s buckets could not be read.</Notice>
-    <Notice v-else-if="writersRead === 'partial'" tone="warning">Some runs that wrote into this dataset’s buckets may be missing.</Notice>
+    <Notice v-if="writersRead === 'failed' && start.kind === 'dataset'" tone="warning">
+      The runs that wrote into this dataset’s buckets could not be read.
+      <button type="button" class="text-primary hover:underline" @click="readWriters(start.documentId, start.crate)">Try again</button>
+    </Notice>
+    <Notice v-else-if="writersRead === 'partial' || graph.incomplete" tone="warning">Some runs that wrote into these datasets may be missing.</Notice>
 
     <div :class="start.kind === 'dataset' ? 'surface overflow-hidden' : ''">
       <div v-if="walking" role="status" class="flex flex-wrap items-center gap-2 px-4 pt-3 text-xs text-muted-foreground">

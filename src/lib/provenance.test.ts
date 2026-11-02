@@ -385,7 +385,7 @@ describe('provenance graph', () => {
     }
     const read = readers({ [arn('a.faa', V1)]: origin({ origin: { kind: 'upload', node_id: 'n1' } }) })
     read.crate = vi.fn(async (doc: string) => (doc === DOC ? based : { '@graph': [{ '@id': './', '@type': 'Dataset', isBasedOn: { '@id': `https://w3id.org/aruna/${DOC}` } }] }))
-    read.writers = vi.fn(async () => ['prep'])
+    read.writers = vi.fn(async () => ({ runs: ['prep'], complete: true }))
     await expandAll(graph, read, () => false)
 
     const database = graph.boxes[`dataset:${DOC}`]!
@@ -396,6 +396,26 @@ describe('provenance graph', () => {
     expect(graph.boxes[`dataset:${PART}`]!.from).toEqual([`dataset:${DOC}`])
     expect(read.crate).toHaveBeenCalledTimes(3)
     expect(hasPending(graph)).toBe(false)
+  })
+
+  it('asks a nested dataset again when its runs could not be read, and marks partial runs', async () => {
+    const DOC = '01K8W1B3D5F7H9KMQ1S3V5X7ZF'
+    const root = { '@graph': [{ '@id': './', '@type': 'Dataset', isBasedOn: { '@id': `https://w3id.org/aruna/${DOC}` } }] }
+    const part = 'arn:aruna:realm:n2:s3/bakta-db/'
+    const nested = { '@graph': [{ '@id': './', '@type': 'Dataset', name: 'Bakta database', hasPart: { '@id': part } }, { '@id': part, '@type': 'Dataset' }] }
+    const graph = emptyGraph()
+    startDataset(graph, 'Annotations', 'd0', root)
+    const read = readers({})
+    read.crate = vi.fn(async () => nested)
+    read.writers = vi.fn().mockRejectedValueOnce(new ApiError(404, 'not found')).mockResolvedValueOnce({ runs: [], complete: false })
+    await expandAll(graph, read, () => false)
+
+    const silent = graph.boxes[`silent:dataset:${DOC}`]!
+    expect(silent).toMatchObject({ kind: 'silent', title: 'Node did not answer' })
+    expect(graph.incomplete).toBe(false)
+    await expand(graph, silent.id, read)
+    expect(graph.boxes[`dataset:${DOC}`]).toMatchObject({ title: 'Bakta database' })
+    expect(graph.incomplete).toBe(true)
   })
 
   it('reads only the links a closed card asks for', async () => {

@@ -52,8 +52,8 @@ export interface Readers {
   origin: (version: string) => Promise<OriginResponse>
   run: (runId: string) => Promise<RunResponse>
   crate: (documentId: string) => Promise<unknown>
-  /** The runs that wrote into a bucket folder a nested dataset links; none when absent. */
-  writers?: (bucket: string, prefix: string, nodeId: string) => Promise<string[]>
+  /** The runs that wrote into a bucket folder a nested dataset links, and whether that is all. */
+  writers?: (bucket: string, prefix: string, nodeId: string) => Promise<{ runs: string[]; complete: boolean }>
 }
 
 export type ProvenanceStart =
@@ -66,6 +66,8 @@ export interface Graph {
   seen: Record<string, string>
   roots: string[]
   steps: number
+  /** A nested dataset's bucket named only some of the runs that wrote into it. */
+  incomplete: boolean
 }
 
 function box(id: string, kind: BoxKind, role: string, title: string, extra: Partial<Box> = {}): Box {
@@ -202,7 +204,7 @@ function addOrigin(graph: Graph, id: string, asked: string, response: OriginResp
 }
 
 export function emptyGraph(): Graph {
-  return { boxes: {}, seen: {}, roots: [], steps: 0 }
+  return { boxes: {}, seen: {}, roots: [], steps: 0, incomplete: false }
 }
 
 /** Starts at a file whose origin is already read; `id` is its exact version id. */
@@ -395,10 +397,13 @@ async function follow(graph: Graph, boxId: string, hop: Hop, readers: Readers, c
 
 async function followDataset(graph: Graph, boxId: string, hop: Hop & { kind: 'dataset' }, readers: Readers, current: Current) {
   const crate = await readers.crate(hop.documentId)
-  // A nested dataset's linked buckets name the runs that wrote into them; a failed ask adds none.
+  // A nested dataset's linked buckets name the runs that wrote into them; a failed ask reads it again.
   const buckets = readers.writers ? linkedBuckets(crate) : []
-  const writers = await Promise.all(buckets.map((part) => readers.writers!(part.bucket, part.prefix, part.nodeId).catch(() => [])))
+  const writers = await Promise.all(buckets.map((part) => readers.writers!(part.bucket, part.prefix, part.nodeId).catch((cause: unknown) => {
+    throw new Error(`The runs that wrote into ${part.bucket} could not be read.`, { cause })
+  })))
   if (!current()) return
+  if (writers.some((answer) => !answer.complete)) graph.incomplete = true
   const id = `dataset:${hop.documentId}`
   graph.seen[id] = id
   const name = rootEntity(crate)?.name
@@ -407,7 +412,7 @@ async function followDataset(graph: Graph, boxId: string, hop: Hop & { kind: 'da
   })
   add(graph, boxId, created)
   fillDataset(graph, created, crate)
-  for (const runId of new Set(writers.flat())) {
+  for (const runId of new Set(writers.flatMap((answer) => answer.runs))) {
     if (!created.pending.some((each) => each.kind === 'run' && each.runId === runId)) created.pending.push({ kind: 'run', runId })
   }
 }

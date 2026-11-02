@@ -150,6 +150,8 @@ describe('provenance view', () => {
     aruna.getBucketRuns.mockRejectedValueOnce(new Error('down'))
     const failed = await mountApp(component, { props: { start } })
     await vi.waitFor(() => expect(content(failed.root)).toContain('could not be read'))
+    await click(button(failed.root, 'Try again'))
+    await vi.waitFor(() => expect(content(failed.root)).not.toContain('could not be read'))
 
     aruna.getBucketRuns.mockResolvedValueOnce({ runs: [], complete: false })
     const partial = await mountApp(component, { props: { start } })
