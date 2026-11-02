@@ -344,6 +344,17 @@ describe('a storage event', () => {
   })
 })
 
+describe('choosing a chat', () => {
+  it('opens that chat again after a reload', () => {
+    login()
+    const scope = { apiBaseUrl: 'https://node.test', realmId: 'r-1', userId: `u-${users}` }
+
+    chat.selectChat('c-new')
+
+    expect(createAssistantChatStore(scope).load().activeChatId).toBe('c-new')
+  })
+})
+
 describe('reopening the panel', () => {
   it('keeps the new chat it was closed on', async () => {
     const panel = await panelOnOldChat()

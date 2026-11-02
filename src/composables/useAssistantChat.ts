@@ -1689,6 +1689,7 @@ export function useAssistantChat() {
     persistCurrentChat()
     chatState = { ...chatState, activeChatId: id }
     applyChatState(chatState)
+    chatStore.keepActive(id)
   }
 
   function selectLatestChat() {

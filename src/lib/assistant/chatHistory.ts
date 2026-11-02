@@ -440,15 +440,20 @@ export function createAssistantChatStore(
     }
   }
 
+  /** Remembers the chat on screen for this tab, so a reload opens it again. */
+  function keepActive(id: string) {
+    try {
+      active?.setItem(activeKey, id)
+    } catch {
+      // The newest chat shows after a reload instead.
+    }
+  }
+
   /** The state as this tab holds it; the changed chats are in storage when this returns. */
   function save(state: AssistantChatState, changed: Iterable<string> = state.chats.map((chat) => chat.id)) {
     const next = normalizeState(state)
     if (!storage) return next
-    try {
-      active?.setItem(activeKey, next.activeChatId)
-    } catch {
-      // The newest chat shows after a reload instead.
-    }
+    keepActive(next.activeChatId)
     for (const id of changed) unsaved.add(id)
     const failed = write(next, [...unsaved])
     unsaved.clear()
@@ -483,6 +488,7 @@ export function createAssistantChatStore(
     key,
     load,
     save,
+    keepActive,
     /** True for a storage event that changed a chat of this scope. */
     listChanged: (changed: string | null) => changed === null || changed.startsWith(chatPrefix),
     /** The chats changed here that storage refused so far. */
