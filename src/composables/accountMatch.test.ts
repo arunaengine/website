@@ -121,7 +121,7 @@ async function matched() {
 describe('a first sign-in that matches an account', () => {
   it('stops before any session and keeps the new sign-in in memory', async () => {
     await matched()
-    expect(accountMatch.value).toEqual({ oidcToken: NEW_SIGN_IN, redirectTo: '/app/data' })
+    expect(accountMatch.value).toEqual({ oidcToken: NEW_SIGN_IN, idToken: NEW_SIGN_IN, redirectTo: '/app/data' })
     expect(setAuthToken).not.toHaveBeenCalled()
     expect(calls.map((call) => call.path)).toEqual(['/access/users/register'])
     expect(storage.has('aruna.oidc.verifier')).toBe(false)
@@ -208,6 +208,27 @@ describe('a first sign-in that matches an account', () => {
     await expect(createNewAccount()).resolves.toBeNull()
 
     expect(setAuthToken).not.toHaveBeenCalled()
+  })
+
+  it('leaves a session that started while the joined account loaded', async () => {
+    await matched()
+    const match = accountMatch.value
+    refresh.mockImplementationOnce(async () => {
+      sessionEpoch.value++
+    })
+
+    await expect(joinExistingAccount()).resolves.toBeNull()
+
+    expect(setAuthToken.mock.calls.map(([token]) => token)).toEqual(['realm-of-existing'])
+    expect(storage.has('aruna.oidc.idToken')).toBe(false)
+    expect(accountMatch.value).toBe(match)
+    expect(matchFailure.value).toBeNull()
+  })
+
+  it('ends a new account session with the sign-in it was made for', async () => {
+    await matched()
+    await expect(createNewAccount()).resolves.toBe('/app/data')
+    expect(storage.get('aruna.oidc.idToken')).toBe(NEW_SIGN_IN)
   })
 
   it('registers directly when nothing matches', async () => {

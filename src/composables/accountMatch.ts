@@ -21,7 +21,8 @@ watch(accountMatch, () => {
 })
 
 function failed(error: unknown, describe: (error: unknown) => string) {
-  if (error instanceof SignInCancelled) return
+  // A switch of realm or session ends the action quietly.
+  if (error instanceof SignInCancelled || (error instanceof DOMException && error.name === 'AbortError')) return
   const stale = error instanceof ApiError && (error.status === 401 || error.code === 'merge_refused')
   matchStale.value = stale
   matchFailure.value = stale ? STALE : describe(error)
@@ -73,7 +74,7 @@ export async function joinExistingAccount(): Promise<string | null> {
     })
     check()
     await adoptSession(token, tokens.id_token)
-    accountMatch.value = null
+    if (accountMatch.value === match) accountMatch.value = null
     return match.redirectTo
   } catch (error) {
     failed(error, mergeFailure)
@@ -95,8 +96,8 @@ export async function createNewAccount(): Promise<string | null> {
     await apiRequest('/access/users/register', { method: 'POST', body }, client)
     const token = await issueToken(match.oidcToken, baseUrl)
     check()
-    await adoptSession(token)
-    accountMatch.value = null
+    await adoptSession(token, match.idToken)
+    if (accountMatch.value === match) accountMatch.value = null
     return match.redirectTo
   } catch (error) {
     failed(error, apiErrorMessage)

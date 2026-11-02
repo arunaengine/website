@@ -51,6 +51,8 @@ const providerLink = ref<ProviderLink | null>(null)
 /** A new sign-in whose email or name matches an account; its token stays in memory. */
 export interface AccountMatch {
   oidcToken: string
+  /** Stored once a session for the new sign-in is adopted, to end it at the provider. */
+  idToken?: string
   redirectTo: string
 }
 
@@ -262,17 +264,23 @@ async function redeemCode(code: string, verifier: string) {
   })
 }
 
-/** Opens a session with a realm token, whose account must load; `idToken` ends it at the provider. */
+/**
+ * Opens a session with a realm token, whose account must load; `idToken` ends it at the provider.
+ * A session that starts meanwhile is left alone, and this one ends with an AbortError.
+ */
 export async function adoptSession(token: string, idToken?: string): Promise<void> {
   const aruna = useAruna()
   aruna.setAuthToken(token)
+  const epoch = aruna.sessionEpoch.value
+  const ours = () => epoch === aruna.sessionEpoch.value
   try {
     await aruna.refresh()
+    if (!ours()) throw new DOMException('Another session started meanwhile.', 'AbortError')
     if (!aruna.currentUser.value) {
       throw new Error(aruna.authError.value || 'The issued session could not be validated by this Aruna node.')
     }
   } catch (err) {
-    aruna.setAuthToken('')
+    if (ours()) aruna.setAuthToken('')
     throw err
   }
   if (idToken) window.sessionStorage.setItem(ID_TOKEN_KEY, idToken)
@@ -313,7 +321,6 @@ async function completeSignIn(params: URLSearchParams): Promise<string | null> {
     // Aruna validates the audience against the client id, which Keycloak only
     // sets on the ID token; the access token is for the account API.
     const oidcToken = tokens.id_token ?? tokens.access_token
-    if (tokens.id_token) window.sessionStorage.setItem(ID_TOKEN_KEY, tokens.id_token)
 
     stage.value = 'registering'
     const client = { baseUrl: aruna.apiBaseUrl.value, token: oidcToken }
@@ -329,18 +336,17 @@ async function completeSignIn(params: URLSearchParams): Promise<string | null> {
       )
     } catch (err) {
       if (!(err instanceof ApiError && err.code === 'account_match')) throw err
-      accountMatch.value = { oidcToken, redirectTo: window.sessionStorage.getItem(REDIRECT_KEY) || '/app' }
+      accountMatch.value = { oidcToken, idToken: tokens.id_token, redirectTo: window.sessionStorage.getItem(REDIRECT_KEY) || '/app' }
       stage.value = 'match'
       return null
     }
     const issued = await apiRequest<GetTokenResponse>('/access/token', {}, client)
-    await adoptSession(issued.token)
+    await adoptSession(issued.token, tokens.id_token)
 
     stage.value = 'done'
     const redirectTo = window.sessionStorage.getItem(REDIRECT_KEY) || '/app'
     return redirectTo
   } catch (err) {
-    window.sessionStorage.removeItem(ID_TOKEN_KEY)
     stage.value = 'error'
     stageError.value = errorMessage(err)
     throw err
