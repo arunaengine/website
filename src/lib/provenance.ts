@@ -397,10 +397,14 @@ async function follow(graph: Graph, boxId: string, hop: Hop, readers: Readers, c
 
 async function followDataset(graph: Graph, boxId: string, hop: Hop & { kind: 'dataset' }, readers: Readers, current: Current) {
   const crate = await readers.crate(hop.documentId)
-  // A nested dataset's linked buckets name the runs that wrote into them; a failed ask reads it again.
+  // A nested dataset's linked buckets name the runs that wrote into them. A refusal is final and
+  // shows on the card; a node that did not answer is asked again.
   const buckets = readers.writers ? linkedBuckets(crate) : []
+  let hiddenRuns: string | undefined
   const writers = await Promise.all(buckets.map((part) => readers.writers!(part.bucket, part.prefix, part.nodeId).catch((cause: unknown) => {
-    throw new Error(`The runs that wrote into ${part.bucket} could not be read.`, { cause })
+    if (!refused(cause)) throw new Error(`The runs that wrote into ${part.bucket} could not be read.`, { cause })
+    hiddenRuns = (cause as ApiError).status === 404 ? 'Its runs were not found' : 'Its runs are not visible to you'
+    return { runs: [], complete: true }
   })))
   if (!current()) return
   if (writers.some((answer) => !answer.complete)) graph.incomplete = true
@@ -409,6 +413,7 @@ async function followDataset(graph: Graph, boxId: string, hop: Hop & { kind: 'da
   const name = rootEntity(crate)?.name
   const created = box(id, 'dataset', hop.role, typeof name === 'string' ? name : `Dataset ${shortName(hop.documentId)}`, {
     link: { label: 'Open the dataset', document: hop.documentId },
+    ...(hiddenRuns ? { detail: hiddenRuns } : {}),
   })
   add(graph, boxId, created)
   fillDataset(graph, created, crate)

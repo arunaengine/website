@@ -398,6 +398,24 @@ describe('provenance graph', () => {
     expect(hasPending(graph)).toBe(false)
   })
 
+  it('says plainly when the runs of a nested dataset are refused or not found, without a retry', async () => {
+    const DOC = '01K8W1B3D5F7H9KMQ1S3V5X7ZG'
+    const part = 'arn:aruna:realm:n2:s3/bakta-db/'
+    const root = { '@graph': [{ '@id': './', '@type': 'Dataset', isBasedOn: { '@id': `https://w3id.org/aruna/${DOC}` } }] }
+    const nested = { '@graph': [{ '@id': './', '@type': 'Dataset', name: 'Bakta database', hasPart: { '@id': part } }, { '@id': part, '@type': 'Dataset' }] }
+    for (const [status, detail] of [[403, 'Its runs are not visible to you'], [401, 'Its runs are not visible to you'], [404, 'Its runs were not found']] as const) {
+      const graph = emptyGraph()
+      startDataset(graph, 'Annotations', 'd0', root)
+      const read = readers({})
+      read.crate = vi.fn(async () => nested)
+      read.writers = vi.fn().mockRejectedValueOnce(new ApiError(status, 'refused'))
+      await expandAll(graph, read, () => false)
+
+      expect(graph.boxes[`silent:dataset:${DOC}`]).toBeUndefined()
+      expect(graph.boxes[`dataset:${DOC}`]).toMatchObject({ title: 'Bakta database', detail, pending: [] })
+    }
+  })
+
   it('asks a nested dataset again when its runs could not be read, and marks partial runs', async () => {
     const DOC = '01K8W1B3D5F7H9KMQ1S3V5X7ZF'
     const root = { '@graph': [{ '@id': './', '@type': 'Dataset', isBasedOn: { '@id': `https://w3id.org/aruna/${DOC}` } }] }
@@ -407,7 +425,7 @@ describe('provenance graph', () => {
     startDataset(graph, 'Annotations', 'd0', root)
     const read = readers({})
     read.crate = vi.fn(async () => nested)
-    read.writers = vi.fn().mockRejectedValueOnce(new ApiError(404, 'not found')).mockResolvedValueOnce({ runs: [], complete: false })
+    read.writers = vi.fn().mockRejectedValueOnce(new ApiError(503, 'busy')).mockResolvedValueOnce({ runs: [], complete: false })
     await expandAll(graph, read, () => false)
 
     const silent = graph.boxes[`silent:dataset:${DOC}`]!
