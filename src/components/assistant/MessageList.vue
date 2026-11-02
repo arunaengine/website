@@ -172,7 +172,7 @@ onUnmounted(() => listening?.removeEventListener('scroll', measure))
 
           <div v-else class="min-w-0" :class="props.size === 'full' ? 'space-y-2.5' : 'space-y-1.5'">
             <p class="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-              <Sparkles class="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+              <Sparkles class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
               Assistant
               <time v-if="message.at" class="font-normal text-muted-foreground/70" :title="exact(message.at)">
                 {{ ago(message.at) }}
