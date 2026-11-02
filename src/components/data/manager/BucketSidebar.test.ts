@@ -1124,14 +1124,20 @@ describe('bucket filters', () => {
     referencedBuckets.clear()
   })
 
-  it('keeps the rows of one node and names the filter in a chip that removes it', async () => {
+  it('keeps the rows of the chosen nodes and names each in a chip that removes it', async () => {
     const root = await mounted()
-    expect(opened(root)).toEqual(['reads', 'bakta-database', 'images', 'refseq'])
+    allBuckets.hits.value = [...allBuckets.hits.value, { bucket: 'archive', node_id: 'node-3', group_id: 'g1', nodes: ['node-3'] }]
+    await flush()
+    expect([...opened(root)].sort()).toEqual(['archive', 'bakta-database', 'images', 'reads', 'refseq'])
 
-    await pick(root, 'menuitemradio', 'name-node-2')
-    expect(opened(root)).toEqual(['reads', 'bakta-database'])
+    await pick(root, 'menuitemcheckbox', 'name-node-2')
+    expect([...opened(root)].sort()).toEqual(['bakta-database', 'reads'])
+    await pick(root, 'menuitemcheckbox', 'name-node-3')
+    expect([...opened(root)].sort()).toEqual(['archive', 'bakta-database', 'reads'])
     await click(element(root, (node) => node.props['aria-label'] === 'Remove filter name-node-2'))
-    expect(opened(root)).toHaveLength(4)
+    expect(opened(root)).toEqual(['archive'])
+    await pick(root, 'menuitemcheckbox', 'All nodes')
+    expect(opened(root)).toHaveLength(5)
   })
 
   it('keeps only rows with every chosen fact, each from what the nodes report', async () => {

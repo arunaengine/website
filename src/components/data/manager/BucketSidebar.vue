@@ -94,7 +94,13 @@ const KINDS: { value: KindFilter; label: string }[] = [
 ]
 const kindFilter = ref<KindFilter>('all')
 // One node, and facts a row must have; each fact is read from what its node reports.
-const nodeFilter = ref<string | null>(null)
+// The nodes to show; empty shows every node.
+const nodeFilter = ref<string[]>([])
+function toggleNode(node: string | null) {
+  if (node === null) nodeFilter.value = []
+  else if (nodeFilter.value.includes(node)) nodeFilter.value = nodeFilter.value.filter((entry) => entry !== node)
+  else nodeFilter.value = [...nodeFilter.value, node]
+}
 type Fact = 'pinned' | 'public' | 'dataset' | 'inPlace'
 const FACTS: { value: Fact; label: string }[] = [
   { value: 'pinned', label: 'Pinned' },
@@ -107,12 +113,12 @@ const toggleFact = (fact: Fact) =>
   (onlyFacts.value = onlyFacts.value.includes(fact) ? onlyFacts.value.filter((entry) => entry !== fact) : [...onlyFacts.value, fact])
 const activeFilters = computed(() => [
   ...(kindFilter.value === 'all' ? [] : [{ key: 'kind', label: KINDS.find((kind) => kind.value === kindFilter.value)!.label, clear: () => (kindFilter.value = 'all') }]),
-  ...(nodeFilter.value ? [{ key: 'node', label: realmNodes.displayName(nodeFilter.value), clear: () => (nodeFilter.value = null) }] : []),
+  ...nodeFilter.value.map((node) => ({ key: `node:${node}`, label: realmNodes.displayName(node), clear: () => toggleNode(node) })),
   ...FACTS.filter((fact) => onlyFacts.value.includes(fact.value)).map((fact) => ({ key: fact.value, label: fact.label, clear: () => toggleFact(fact.value) })),
 ])
 function clearFilters() {
   kindFilter.value = 'all'
-  nodeFilter.value = null
+  nodeFilter.value = []
   onlyFacts.value = []
 }
 const filterLabel = computed(() => (activeFilters.value.length ? `Filter buckets, ${activeFilters.value.length} on` : 'Filter buckets'))
@@ -179,7 +185,7 @@ const rowPublic = (name: string, node: string | null) =>
 // A row passes the node and fact filters; a fact its node has not reported yet does not pass.
 // `nodeId` is null for this node; `nodeIds` are every node of the row by id.
 function passesFilters(name: string, node: string | null, nodeIds: string[], pinned: boolean): boolean {
-  if (nodeFilter.value && !nodeIds.includes(nodeFilter.value)) return false
+  if (nodeFilter.value.length && !nodeIds.some((id) => nodeFilter.value.includes(id))) return false
   const database = databaseOf(name, node)
   const checks: Record<Fact, () => boolean> = {
     pinned: () => pinned,
@@ -484,13 +490,14 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               <DropdownMenuItem
                 v-for="node in [null, ...filterNodes]"
                 :key="node ?? 'all'"
-                role="menuitemradio"
-                :aria-checked="nodeFilter === node"
+                role="menuitemcheckbox"
+                :aria-checked="node ? nodeFilter.includes(node) : !nodeFilter.length"
                 class="pl-8"
-                @click="nodeFilter = node"
+                @select.prevent
+                @click="toggleNode(node)"
               >
                 <span class="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-                  <Check v-if="nodeFilter === node" class="h-3.5 w-3.5 text-primary" />
+                  <Check v-if="node ? nodeFilter.includes(node) : !nodeFilter.length" class="h-3.5 w-3.5 text-primary" />
                 </span>
                 {{ node ? realmNodes.displayName(node) : 'All nodes' }}
               </DropdownMenuItem>
