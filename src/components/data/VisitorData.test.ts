@@ -1,6 +1,8 @@
-import { createSSRApp, defineComponent, h, ref } from 'vue'
+import { createSSRApp, defineComponent, h, reactive, ref } from 'vue'
+import * as VueRuntime from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { click, compileClientComponent, content, flush, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 
 const route = { params: { bucketId: 'refseq' } as Record<string, string>, query: { node: 'n2' } as Record<string, string>, fullPath: '/app/buckets/refseq?node=n2' }
 const buckets = ref([{ bucket: 'refseq', node_id: 'n2', set_id: 's1', nodes: ['n2', 'n3'], group_id: 'g', arn: '', created_at: '' }])
@@ -101,3 +103,40 @@ describe('VisitorData', () => {
   })
 })
 
+
+describe('VisitorData file details', () => {
+  it('closes the open file when the address names another node', async () => {
+    const live = reactive({ params: { bucketId: 'refseq' }, query: { node: 'n2' } as Record<string, string> })
+    const Dialog = defineComponent({ props: { file: Object }, setup: (props) => () => h('dialog', props.file ? 'open' : 'closed') })
+    const Stub = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
+    const known: Record<string, unknown> = {
+      vue: VueRuntime,
+      'vue-router': { useRoute: () => live, useRouter: () => ({ push: vi.fn() }) },
+      '@lucide/vue': new Proxy({}, { get: () => Stub }),
+      '@/components/data/VisitorFileDialog.vue': moduleDefault(Dialog),
+      '@/composables/useAruna': { useAruna: () => ({ getNodeInfo: async () => ({ services: { interfaces: { s3: { url: s3Url } } } }), nodeInfo: ref(null) }) },
+      '@/composables/useAuth': { useAuth: () => ({ requestSignIn: vi.fn() }) },
+      '@/composables/useRealmNodes': { useRealmNodes: () => ({ isLocalNode: () => false, displayName: (id: string) => id }) },
+      '@/composables/useBucketUsage': { useListedUsage: () => ({ ensure: vi.fn(), partsOf: () => null, textOf: () => null }), usageText: () => '' },
+      '@/composables/useListPages': { PAGE_SIZES: [25] },
+      '@/composables/usePublicData': {
+        publicDownload: () => null,
+        usePublicBuckets: () => ({ buckets, loading: ref(false), error: ref(null), failedNodes: ref(0), reload: vi.fn() }),
+        usePublicFolder: () => folder,
+      },
+      '@/lib/formatCount': { formatCount: String },
+      '@/lib/objectListing': { pageRange: () => '' },
+      '@/lib/utils': { formatBytes: String, relativeTime: String },
+    }
+    const modules = new Proxy(known, { has: () => true, get: (map, id: string) => map[id] ?? moduleDefault(Stub) })
+    const component = compileClientComponent(new URL('./VisitorData.vue', import.meta.url), modules)
+    const { root } = await mountApp(component)
+    const dialog = () => content(nodes(root).find((node) => node.tag === 'dialog')!)
+
+    await click(nodes(root).find((node) => node.tag === 'tr' && node.props.onClick && content(node).includes('README.md'))!)
+    expect(dialog()).toBe('open')
+    live.query.node = 'n3'
+    await flush()
+    expect(dialog()).toBe('closed')
+  })
+})

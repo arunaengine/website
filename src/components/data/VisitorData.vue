@@ -90,7 +90,7 @@ function openFolder(path: string) {
 }
 
 const details = ref<PublicFile | null>(null)
-watch([bucket, s3Prefix], () => (details.value = null))
+watch([bucket, s3Prefix, listNode], () => (details.value = null))
 </script>
 
 <template>
