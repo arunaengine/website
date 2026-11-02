@@ -31,7 +31,7 @@ import { useAruna } from '../useAruna'
 import { client } from './client'
 import { resolveObjectUrl } from './endpoints'
 import { BUCKET_LOCKED_HEADER, isS3AuthError, isS3NetworkError, PURGE_IN_PROGRESS_MESSAGE } from './errors'
-import { hasActiveKey, type S3SessionReference } from './session'
+import { contextMismatch, hasActiveKey, type S3SessionReference } from './session'
 
 export interface ObjectEntry {
   key: string
@@ -979,7 +979,8 @@ export async function getObjectBlob(
 // loadRoCrate when resolving externalized profile artifacts.
 export async function fetchUrlText(target: string): Promise<string> {
   const object = hasActiveKey.value ? resolveObjectUrl(target) : null
-  if (object) return getObjectText(object.bucket, object.key, object.nodeId)
+  // The session signs only for its own node; a file on another node is read as a visitor reads it.
+  if (object && !contextMismatch(object.nodeId)) return getObjectText(object.bucket, object.key, object.nodeId)
   if (isDrsReference(target) && !/^drs:\/\//i.test(target)) return fetchDrsText(target)
   // Published profile artifacts keep their URL across updates, so revalidate
   // instead of trusting the HTTP cache's heuristic freshness.

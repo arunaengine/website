@@ -381,6 +381,21 @@ describe('portal S3 session boundaries and node scope', () => {
     })
   })
 
+  it('reads a public file on another node without the session', async () => {
+    await s3.activateContext(null, 'group-a')
+    const fetchMock = vi.fn(async () => new Response('shapes'))
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      const url = 'https://s3.node-b.test/profiles-x/profiles/p/shapes.ttl'
+      await expect(s3.fetchUrlText(url)).resolves.toBe('shapes')
+      expect(fetchMock).toHaveBeenCalledWith(url, { cache: 'no-cache' })
+      expect(s3.activeContext.value).toMatchObject({ nodeId: 'node-a', groupId: 'group-a' })
+      expect(apiRequest).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('keeps independent node and group sessions in memory', async () => {
     apiRequest
       .mockResolvedValueOnce(sessionResponse())
