@@ -1645,7 +1645,6 @@ export function useAssistantChat() {
     applyChatState(chatState)
   }
 
-  // Reopening the assistant lands on the conversation last written to.
   function selectLatestChat() {
     syncEpoch()
     if (busy.value || !chatStore || !historyReady.value) return
@@ -1675,7 +1674,8 @@ export function useAssistantChat() {
   function openPanel() {
     syncEpoch()
     open.value = true
-    selectLatestChat()
+    // Reopens on the chat it was closed on; only a chat that is gone falls back to the newest.
+    if (!activeChat()) selectLatestChat()
     void providers.load()
     ensureKnownBuckets()
     if (realmInfo.value?.interfaces.mcp?.url) {

@@ -114,12 +114,12 @@ const AssistantView = compileClientComponent(new URL('../views/AssistantView.vue
 let users = 0
 
 /** A fresh user with an older chat on screen and a newer one beside it. */
-function login() {
+function login(active = 'c-old') {
   users += 1
   const scope = { apiBaseUrl: 'https://node.test', realmId: 'r-1', userId: `u-${users}` }
   const said = (text: string): ChatMessage => ({ id: `m-${text}`, role: 'user', text, calls: [], at: 1 })
   createAssistantChatStore(scope).save({
-    activeChatId: 'c-old',
+    activeChatId: active,
     chats: [
       { ...newAssistantChat('Buckets'), id: 'c-old', updatedAt: 1_000, messages: [said('old question')] },
       { ...newAssistantChat('Profiles'), id: 'c-new', updatedAt: 9_000, messages: [said('new question')] },
@@ -268,5 +268,29 @@ describe('a stopped answer', () => {
     expect(chat.messages.value.map((message) => message.text)).toEqual(['old question', 'a question', 'first half '])
     expect(chat.messages.value.at(-1)?.error).toBeTruthy()
     panel.app.unmount()
+  })
+})
+
+describe('reopening the panel', () => {
+  it('keeps the new chat it was closed on', async () => {
+    const panel = await panelOnOldChat()
+    await click(control(panel.root, 'Start a new chat'))
+    const fresh = chat.activeChatId.value
+    await click(control(panel.root, 'Close the assistant'))
+    for (const entry of chat.chats.value) if (entry.id !== fresh) entry.updatedAt = Date.now() + 60_000
+
+    chat.openPanel()
+
+    expect(chat.activeChatId.value).toBe(fresh)
+    expect(chat.messages.value).toEqual([])
+    panel.app.unmount()
+  })
+
+  it('opens the newest chat when the one it was closed on is gone', async () => {
+    login('gone')
+
+    chat.openPanel()
+
+    expect(chat.activeChatId.value).toBe('c-new')
   })
 })
