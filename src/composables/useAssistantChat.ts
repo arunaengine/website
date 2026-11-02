@@ -617,6 +617,14 @@ async function readyS3() {
   return s3
 }
 
+/** The object's full size as the store states it: a range's total, or the length of a whole answer. */
+function objectTotal(response: Response): number | undefined {
+  const ranged = /\/(\d+)$/.exec(response.headers.get('content-range') ?? '')?.[1]
+  const whole = response.status === 200 ? response.headers.get('content-length') : null
+  const value = ranged ?? whole
+  return value && /^\d+$/.test(value.trim()) ? Number(value) : undefined
+}
+
 /**
  * The first `limit` bytes of one stored object, asked for as a range so a large
  * or misreported object is never downloaded whole, even by a store that ignores ranges.
@@ -631,9 +639,9 @@ async function readObjectStart(ref: ArtifactRef, limit: number): Promise<{ bytes
   }
   if (!response.ok) throw new Error(`The object could not be fetched (HTTP ${response.status}).`)
   const bytes = await readStart(response, limit)
-  const total = Number(/\/(\d+)$/.exec(response.headers.get('content-range') ?? '')?.[1] ?? NaN)
-  // A body that ended before the limit is the whole object.
-  const complete = bytes.length < limit || (Number.isFinite(total) && total <= bytes.length)
+  const total = objectTotal(response)
+  // A body that ended before the limit is the whole object; at the limit only the stated total can tell.
+  const complete = bytes.length < limit || (total !== undefined && total <= bytes.length)
   return { bytes, complete, type: response.headers.get('content-type') ?? '' }
 }
 

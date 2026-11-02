@@ -154,6 +154,24 @@ describe('loadArtifact', () => {
     await expect(loadArtifact({ bucket: 'work', key: 'logs/odd.log', contentType: 'text/plain' })).rejects.toThrow('416')
   })
 
+  it('keeps a file exactly at the read limit whole when the store says it is complete', async () => {
+    const body = new TextEncoder().encode(`heading\n${'x'.repeat(16_384 - 'heading\n\nlast line'.length)}\nlast line`)
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status: 200, headers: { 'content-length': String(body.length) } })))
+    const loaded = await loadArtifact({ bucket: 'work', key: 'notes/exact.txt', contentType: 'text/plain' })
+
+    expect(body.length).toBe(16_384)
+    expect(loaded.truncated).toBe(false)
+    expect(loaded.text?.endsWith('last line')).toBe(true)
+  })
+
+  it('keeps a ranged read whole when its total matches the limit', async () => {
+    vi.stubGlobal('fetch', serve(new TextEncoder().encode('a\n'.repeat(8_192))))
+    const loaded = await loadArtifact({ bucket: 'work', key: 'notes/exact.txt', contentType: 'text/plain' })
+
+    expect(loaded.truncated).toBe(false)
+    expect(loaded.text).toBe('a\n'.repeat(8_192))
+  })
+
   it('reads more of a text file only when asked to', async () => {
     const fetchMock = serve(new TextEncoder().encode('line\n'.repeat(10_000)))
     vi.stubGlobal('fetch', fetchMock)
