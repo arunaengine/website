@@ -59,6 +59,10 @@ async function startNode(): Promise<void> {
 <template>
   <div class="w-full px-4 sm:px-6 flex justify-center py-16">
     <section class="surface relative w-full max-w-lg overflow-hidden p-6" aria-live="polite">
+      <div
+        aria-hidden="true"
+        class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_50%_0%,black_30%,transparent_80%)]"
+      />
       <div class="relative">
         <ServerOff class="h-5 w-5 text-destructive" aria-hidden="true" />
         <h1 class="mt-3 font-display text-lg font-semibold tracking-tight text-aruna-navy">{{ headline }}</h1>

@@ -83,6 +83,11 @@ import { Hash, FileJson2, Database, Layers } from '@lucide/vue'
 
         <div class="relative">
           <Card class="relative overflow-hidden p-4 sm:p-6">
+            <div
+              aria-hidden="true"
+              class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_50%_50%,black_30%,transparent_72%)]"
+            />
+            <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0" />
             <FederationGraph />
           </Card>
           <p class="mt-3 text-xs text-muted-foreground">

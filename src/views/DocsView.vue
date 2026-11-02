@@ -230,7 +230,7 @@ function glossaryLink(anchor: string) {
     <!-- A guide either narrates the real controls or offers the tutorial. -->
     <div v-if="tour.length || tutorial" class="w-full px-4 sm:px-6 pt-6">
       <div
-        class="flex flex-wrap items-center gap-4 rounded-lg border border-primary/25 bg-primary/5 px-4 py-3.5"
+        class="flex flex-wrap items-center gap-4 rounded-lg border border-primary/25 bg-gradient-to-r from-primary/10 via-primary/[0.04] to-transparent px-4 py-3.5"
       >
         <span class="grid size-9 shrink-0 place-items-center rounded-md bg-primary/15 text-primary">
           <Play class="h-4 w-4" />
@@ -391,7 +391,7 @@ function glossaryLink(anchor: string) {
 
             <RouterLink
               :to="{ name: 'docs', params: { topic: 'portal-tour' } }"
-              class="mt-5 flex flex-wrap items-center gap-4 rounded-lg border border-primary/25 bg-primary/5 px-4 py-4 transition-colors hover:border-primary/40"
+              class="mt-5 flex flex-wrap items-center gap-4 rounded-lg border border-primary/25 bg-gradient-to-r from-primary/10 via-primary/[0.04] to-transparent px-4 py-4 transition-colors hover:border-primary/40"
             >
               <span class="grid size-10 shrink-0 place-items-center rounded-md bg-primary/15 text-primary">
                 <Compass class="h-5 w-5" />

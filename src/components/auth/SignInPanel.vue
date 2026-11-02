@@ -37,9 +37,18 @@ function startSignIn() {
 
 <template>
   <section :aria-labelledby="props.compact ? undefined : 'signin-realm-name'" :aria-label="props.compact ? 'Sign in' : undefined" class="surface relative overflow-hidden">
+    <div
+      aria-hidden="true"
+      class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-aruna-aqua/60 to-transparent"
+    />
     <div :class="props.compact ? '' : 'grid md:grid-cols-[1.1fr_1fr]'">
       <!-- The realm the visitor is about to enter. -->
       <div v-if="!props.compact" class="relative overflow-hidden border-b border-border/70 p-6 md:border-b-0 md:border-r md:p-7">
+        <div
+          aria-hidden="true"
+          class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_0%_0%,black_35%,transparent_80%)]"
+        />
+        <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0" />
         <!-- The padded icon is oversized and cropped out of the panel's corner. -->
         <img
           :src="iconMark"

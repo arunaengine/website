@@ -95,6 +95,10 @@ export default {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      backgroundImage: {
+        'aruna-hero':
+          'linear-gradient(140deg, #08216C 0%, #335DC6 55%, #24A9E6 100%)',
+      },
       keyframes: {
         'accordion-down': {
           from: { height: '0' },
@@ -109,12 +113,22 @@ export default {
           from: { opacity: 0, transform: 'translateY(12px)' },
           to: { opacity: 1, transform: 'translateY(0)' },
         },
+        shimmer: {
+          '0%': { backgroundPosition: '-1000px 0' },
+          '100%': { backgroundPosition: '1000px 0' },
+        },
+        pulseglow: {
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(87, 197, 222, 0.45)' },
+          '50%': { boxShadow: '0 0 0 10px rgba(87, 197, 222, 0)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'fade-in': 'fade-in 0.4s ease-out',
         'slide-up': 'slide-up 0.4s ease-out',
+        shimmer: 'shimmer 2.5s linear infinite',
+        pulseglow: 'pulseglow 2s ease-out infinite',
       },
     },
   },

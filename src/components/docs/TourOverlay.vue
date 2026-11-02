@@ -84,6 +84,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         aria-live="polite"
         :aria-label="currentStep?.title"
       >
+        <div class="h-0.5 w-full bg-gradient-to-r from-primary via-primary/40 to-transparent" aria-hidden="true" />
         <div class="p-4">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">

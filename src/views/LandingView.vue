@@ -16,6 +16,7 @@ import LandingFooter from '@/components/landing/LandingFooter.vue'
     <main>
       <Hero />
       <div class="relative isolate">
+        <div aria-hidden="true" class="wash-landing pointer-events-none absolute inset-0 -z-10" />
         <FeatureGrid />
         <RunAnywhereSection />
         <ComputeSection />

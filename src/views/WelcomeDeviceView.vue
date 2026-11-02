@@ -54,10 +54,24 @@ function leave(): void {
 <template>
   <UpdateRequiredView v-if="update" :local="update.local" :realm="update.realm" />
   <div v-else class="relative flex min-h-full items-center justify-center overflow-hidden px-4 py-10">
+    <div
+      aria-hidden="true"
+      class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_50%_0%,black_30%,transparent_75%)]"
+    />
+    <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0" />
 
     <div class="surface relative w-full max-w-3xl overflow-hidden">
+      <div
+        aria-hidden="true"
+        class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-aruna-aqua/60 to-transparent"
+      />
       <div class="grid md:grid-cols-[0.95fr_1.05fr]">
         <div class="relative overflow-hidden border-b border-border/70 p-6 md:border-b-0 md:border-r md:p-7">
+          <div
+            aria-hidden="true"
+            class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_0%_0%,black_35%,transparent_80%)]"
+          />
+          <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0" />
           <img
             :src="iconMark"
             alt=""

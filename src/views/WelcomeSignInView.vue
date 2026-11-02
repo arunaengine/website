@@ -26,6 +26,11 @@ onMounted(() => void probeRealm())
 
 <template>
   <div class="relative flex min-h-full items-center justify-center overflow-hidden px-4 py-10">
+    <div
+      aria-hidden="true"
+      class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_50%_0%,black_30%,transparent_75%)]"
+    />
+    <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0" />
 
     <RealmUnreachable v-if="unreachable" class="relative" />
 
