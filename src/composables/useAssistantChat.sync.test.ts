@@ -164,6 +164,10 @@ vi.stubGlobal('window', {
     removeItem: (key: string) => {
       stored.delete(key)
     },
+    get length() {
+      return stored.size
+    },
+    key: (index: number) => [...stored.keys()][index] ?? null,
   },
 })
 
@@ -370,7 +374,7 @@ describe('pushing', () => {
       remote: { revision: head.revision, nextSeq: head.next_seq, tailKey: 'u7' },
     }
     tab.save({ ...held, chats: [...held.chats, theirs] }, ['n-7'])
-    for (const listener of storageListeners) listener({ key: `${tab.key}:index` })
+    for (const listener of storageListeners) listener({ key: `${tab.key}:chat:n-7` })
     node.log.length = 0
 
     chat.renameChat('n-7', 'Renamed here')

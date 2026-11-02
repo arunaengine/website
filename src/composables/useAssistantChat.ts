@@ -1474,7 +1474,7 @@ function adoptStoredChats() {
 
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   window.addEventListener('storage', (event) => {
-    if (chatStore?.indexChanged(event.key)) adoptStoredChats()
+    if (chatStore?.listChanged(event.key)) adoptStoredChats()
   })
 }
 

@@ -14,8 +14,8 @@ const MAX_TITLE_LENGTH = 80
 const MAX_TEXT_LENGTH = 8_000
 /** Web pages kept per answer; a search rarely cites more. */
 const MAX_SOURCES = 50
-/** Room kept beside the largest single chat for the index. */
-const INDEX_ROOM = 20_000
+/** Room kept beside the largest single chat for the other keys of its scope. */
+const SPARE_CHARS = 1_000
 
 export interface AssistantChatScope {
   apiBaseUrl: string
@@ -52,10 +52,13 @@ export interface AssistantChatState {
 export interface AssistantChatStorage {
   getItem(key: string): string | null
   setItem(key: string, value: string): void
-  removeItem?(key: string): void
-  /** Lets a load find a chat key the index lost. */
-  readonly length?: number
-  key?(index: number): string | null
+}
+
+/** The storage the chats need: they are listed by going through its keys. */
+export interface AssistantChatKeys extends AssistantChatStorage {
+  removeItem(key: string): void
+  readonly length: number
+  key(index: number): string | null
 }
 
 let idCounter = 0
@@ -86,7 +89,7 @@ function storageKey(scope: AssistantChatScope): string {
   return `${ASSISTANT_CHAT_STORAGE_KEY}:${assistantChatScopeKey(scope)}`
 }
 
-function browserStorage(): AssistantChatStorage | null {
+function browserStorage(): AssistantChatKeys | null {
   if (typeof window === 'undefined') return null
   try {
     return window.localStorage
@@ -280,210 +283,186 @@ function fittedChat(chat: AssistantChatRecord): { chat: AssistantChatRecord; raw
   const compact = compactChat(chat)
   for (const next of [chat, compact, { ...compact, history: [] }]) {
     const raw = serialize(next)
-    if (raw && raw.length <= MAX_ASSISTANT_STORAGE_CHARS - INDEX_ROOM) return { chat: next, raw }
+    if (raw && raw.length <= MAX_ASSISTANT_STORAGE_CHARS - SPARE_CHARS) return { chat: next, raw }
   }
   return null
 }
 
-interface ChatIndex {
-  version: 1
-  activeChatId: string
-  /** Each stored chat with its time, to trim the oldest first. */
-  chats: Record<string, { updatedAt: number }>
-}
-
-function readIndex(storage: AssistantChatStorage, key: string): ChatIndex {
-  const parsed = readJson(storage, key)
-  const chats: ChatIndex['chats'] = {}
-  if (parsed && record(parsed.chats)) {
-    for (const [id, entry] of Object.entries(parsed.chats)) {
-      if (record(entry)) chats[id] = { updatedAt: numberValue(entry.updatedAt, 0) }
-    }
-  }
-  return { version: 1, activeChatId: typeof parsed?.activeChatId === 'string' ? parsed.activeChatId : '', chats }
-}
-
-/** The part of navigator.locks the store uses. */
-export interface AssistantChatLocks {
-  request(name: string, callback: () => unknown): Promise<unknown>
-}
-
-function browserLocks(): AssistantChatLocks | null {
+/** The tab's own storage, so each tab keeps its own chat on screen. */
+function browserSession(): AssistantChatStorage | null {
   if (typeof window === 'undefined') return null
-  return window.navigator?.locks ?? null
+  try {
+    return window.sessionStorage ?? null
+  } catch {
+    return null
+  }
+}
+
+function updatedOf(raw: string): number {
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return record(parsed) ? numberValue(parsed.updatedAt, 0) : 0
+  } catch {
+    return 0
+  }
 }
 
 /**
- * Keeps each chat under its own key beside an index. Every write runs under
- * one lock per scope and stores only the chats this tab changed or deleted.
+ * Keeps each chat under its own key and writes at once. A tab writes only the
+ * chats it changed or deleted; the same chat changed in two tabs is last-writer-wins.
  */
-export function createAssistantChatStore(scope: AssistantChatScope, storage = browserStorage(), locks = browserLocks()) {
+export function createAssistantChatStore(
+  scope: AssistantChatScope,
+  storage: AssistantChatKeys | null = browserStorage(),
+  session: AssistantChatStorage | null = browserSession(),
+) {
   const key = storageKey(scope)
-  const indexKey = `${key}:index`
   const chatPrefix = `${key}:chat:`
-  const lockName = `aruna-assistant-history:${assistantChatScopeKey(scope)}`
+  const activeKey = `${key}:active`
+  const active = session ?? storage
   const chatKey = (id: string) => `${chatPrefix}${encodeURIComponent(id)}`
-  // The state last saved here, and the chats it changed that are not stored yet.
-  let latest: AssistantChatState | null = null
-  const dirty = new Set<string>()
-  let queued = false
-  let written: Promise<unknown> = Promise.resolve()
+  // Chats changed here that the browser refused to store; the next save tries them again.
+  const unsaved = new Set<string>()
 
-  function remove(id: string) {
-    try {
-      storage?.removeItem?.(chatKey(id))
-    } catch {
-      // A chat left behind is listed again on the next load.
+  /** Every value this scope stores, by key, as storage holds it right now. */
+  function stored(): Map<string, string> {
+    const values = new Map<string, string>()
+    if (!storage) return values
+    for (let at = 0; at < storage.length; at += 1) {
+      const name = storage.key(at)
+      const value = name?.startsWith(`${key}:`) ? storage.getItem(name) : null
+      if (name && value !== null) values.set(name, value)
     }
+    return values
   }
 
-  /** Every chat id the index or a chat key names. */
-  function storedIds(index: ChatIndex): Set<string> {
-    const ids = new Set(Object.keys(index.chats))
-    if (storage && typeof storage.key === 'function' && typeof storage.length === 'number') {
-      for (let at = 0; at < storage.length; at += 1) {
-        const name = storage.key(at)
-        if (name?.startsWith(chatPrefix)) ids.add(decodeURIComponent(name.slice(chatPrefix.length)))
+  /**
+   * Writes the given chats of the state, or removes those it no longer holds,
+   * and trims the oldest other chats to stay under the caps. Returns the ids not stored.
+   */
+  function write(state: AssistantChatState, ids: Iterable<string>, onlyAbsent = false): string[] {
+    if (!storage) return []
+    const values = stored()
+    const kept = chatKey(state.activeChatId)
+    const chatNames = () => [...values.keys()].filter((name) => name.startsWith(chatPrefix))
+    const used = () => [...values.values()].reduce((sum, value) => sum + value.length, 0)
+    const over = () => used() > MAX_ASSISTANT_STORAGE_CHARS || chatNames().length > MAX_ASSISTANT_CHATS
+    // Two tabs trimming at once may both remove an old chat; that only frees more room.
+    const trimOldest = (except: string): boolean => {
+      const oldest = chatNames()
+        .filter((name) => name !== kept && name !== except)
+        .sort((a, b) => updatedOf(values.get(a) ?? '') - updatedOf(values.get(b) ?? ''))[0]
+      if (!oldest) return false
+      storage.removeItem(oldest)
+      values.delete(oldest)
+      return true
+    }
+    const failed: string[] = []
+    for (const id of ids) {
+      const name = chatKey(id)
+      const chat = state.chats.find((entry) => entry.id === id)
+      if (!chat) {
+        storage.removeItem(name)
+        values.delete(name)
+        continue
+      }
+      if (onlyAbsent && values.has(name)) continue
+      const fitted = fittedChat(chat)
+      if (!fitted) continue
+      values.set(name, fitted.raw)
+      while (over()) if (!trimOldest(name)) break
+      if (used() > MAX_ASSISTANT_STORAGE_CHARS) {
+        // Not even beside the chat on screen does this one fit, so it is not stored.
+        storage.removeItem(name)
+        values.delete(name)
+        continue
+      }
+      try {
+        storage.setItem(name, fitted.raw)
+      } catch {
+        try {
+          if (!trimOldest(name)) throw new Error('nothing left to trim')
+          storage.setItem(name, fitted.raw)
+        } catch {
+          failed.push(id)
+          const now = storage.getItem(name)
+          if (now === null) values.delete(name)
+          else values.set(name, now)
+        }
       }
     }
-    return ids
+    return failed
   }
 
-  /** Moves the history kept under one key into per-chat keys; false keeps it for a later try. */
-  function migrate(): boolean {
-    if (!storage || storage.getItem(key) === null || storage.getItem(indexKey) !== null) return true
+  /** Moves the history kept under one key into per-chat keys; returns the chats not moved yet. */
+  function migrate(): AssistantChatRecord[] {
+    if (!storage || storage.getItem(key) === null) return []
     const parsed = readJson(storage, key)
     const state = parsed?.version === 1 && record(parsed.state) ? normalizeState(parsed.state) : null
-    const done: string[] = []
-    try {
-      if (state) {
-        const index: ChatIndex = { version: 1, activeChatId: state.activeChatId, chats: {} }
-        for (const chat of state.chats) {
-          const fitted = fittedChat(chat)
-          if (!fitted) continue
-          storage.setItem(chatKey(chat.id), fitted.raw)
-          done.push(chat.id)
-          index.chats[chat.id] = { updatedAt: chat.updatedAt }
-        }
-        storage.setItem(indexKey, serialize(index) ?? '')
-      }
-    } catch {
-      for (const id of done) remove(id)
-      return false
-    }
-    try {
-      storage.removeItem?.(key)
-    } catch {
-      // With the index written, a load reads the per-chat keys and never this one.
-    }
-    return true
-  }
-
-  /** Stores the changed chats, the index and the trim, from what storage holds right now. */
-  function flush() {
-    if (!storage || !migrate() || !latest) return
-    const state = latest
-    const changed = [...dirty]
-    dirty.clear()
-    const index = readIndex(storage, indexKey)
-    const sizes = new Map<string, number>()
-    for (const id of storedIds(index)) {
-      const raw = storage.getItem(chatKey(id))
-      if (raw === null) delete index.chats[id]
-      else {
-        sizes.set(id, raw.length)
-        index.chats[id] ??= { updatedAt: 0 }
-      }
-    }
-    const before = new Set(sizes.keys())
-    const writes = new Map<string, string>()
-    for (const id of changed) {
-      const chat = state.chats.find((entry) => entry.id === id)
-      const fitted = chat ? fittedChat(chat) : null
-      if (chat && fitted) {
-        writes.set(id, fitted.raw)
-        sizes.set(id, fitted.raw.length)
-        index.chats[id] = { updatedAt: chat.updatedAt }
-      } else if (!chat) {
-        sizes.delete(id)
-        delete index.chats[id]
-      }
-    }
-    index.activeChatId = state.activeChatId
-    // Whole chats go, oldest first, until the count and the total fit; the chat on screen stays.
-    const oldest = [...sizes.keys()]
-      .filter((id) => id !== state.activeChatId)
-      .sort((a, b) => (index.chats[a]?.updatedAt ?? 0) - (index.chats[b]?.updatedAt ?? 0))
-    const used = () => [...sizes.values()].reduce((sum, size) => sum + size, 0) + (serialize(index)?.length ?? 0)
-    for (const id of oldest) {
-      if (sizes.size <= MAX_ASSISTANT_CHATS && used() <= MAX_ASSISTANT_STORAGE_CHARS) break
-      sizes.delete(id)
-      delete index.chats[id]
-      writes.delete(id)
-    }
-    for (const id of before) if (!sizes.has(id)) remove(id)
-    for (const [id, raw] of writes) {
+    if (state) {
       try {
-        storage.setItem(chatKey(id), raw)
+        if (active && active.getItem(activeKey) === null) active.setItem(activeKey, state.activeChatId)
       } catch {
-        // Quota/private-mode failures keep the chat in memory and try it again on the next save.
-        dirty.add(id)
-        if (!before.has(id)) delete index.chats[id]
+        // The newest chat shows instead.
       }
+      // A chat another tab already stored keeps that copy, which may hold a newer answer.
+      const failed = write(state, state.chats.map((chat) => chat.id), true)
+      if (failed.length) return state.chats.filter((chat) => failed.includes(chat.id))
     }
     try {
-      storage.setItem(indexKey, serialize(index) ?? '')
+      storage.removeItem(key)
     } catch {
-      // The chats are stored; a load lists them again without the index.
+      // Every chat is stored per key now; the old key is read again but changes nothing.
     }
+    return []
   }
 
-  function schedule() {
-    if (!locks) {
-      // Without Web Locks, re-reading right before the write is the best a tab can do.
-      flush()
-      return
-    }
-    if (queued) return
-    queued = true
-    written = locks.request(lockName, () => {
-      queued = false
-      flush()
-    }).catch(() => {})
-  }
-
-  /** The state as this tab keeps it; only the storage write waits for the lock. */
+  /** The state as this tab holds it; the changed chats are in storage when this returns. */
   function save(state: AssistantChatState, changed: Iterable<string> = state.chats.map((chat) => chat.id)) {
-    latest = normalizeState(state)
-    for (const id of changed) dirty.add(id)
-    if (storage) schedule()
-    return latest
+    const next = normalizeState(state)
+    if (!storage) return next
+    try {
+      active?.setItem(activeKey, next.activeChatId)
+    } catch {
+      // The newest chat shows after a reload instead.
+    }
+    for (const id of changed) unsaved.add(id)
+    const failed = write(next, [...unsaved])
+    unsaved.clear()
+    for (const id of failed) unsaved.add(id)
+    return next
   }
 
   function load(): AssistantChatState {
     if (!storage) return emptyState()
-    if (storage.getItem(indexKey) === null && storage.getItem(key) !== null) {
-      // Read from the old key until a write under the lock has moved it.
-      const parsed = readJson(storage, key)
-      schedule()
-      return parsed?.version === 1 && record(parsed.state) ? normalizeState(parsed.state) : emptyState()
+    const pending = migrate()
+    const chats: Array<Record<string, unknown> | AssistantChatRecord> = []
+    for (const [name, value] of stored()) {
+      if (!name.startsWith(chatPrefix)) continue
+      try {
+        const chat = JSON.parse(value) as unknown
+        if (record(chat) && chat.id === decodeURIComponent(name.slice(chatPrefix.length))) chats.push(chat)
+      } catch {
+        // An unreadable chat is left out.
+      }
     }
-    const index = readIndex(storage, indexKey)
-    const chats: unknown[] = []
-    for (const id of storedIds(index)) {
-      const chat = readJson(storage, chatKey(id))
-      if (chat?.id === id) chats.push(chat)
+    for (const chat of pending) if (!chats.some((entry) => entry.id === chat.id)) chats.push(chat)
+    let shown = ''
+    try {
+      shown = active?.getItem(activeKey) ?? ''
+    } catch {
+      // The newest chat shows instead.
     }
-    return normalizeState({ activeChatId: index.activeChatId, chats })
+    return normalizeState({ activeChatId: shown, chats })
   }
 
   return {
     key,
     load,
     save,
-    /** True for a storage event that changed this scope's list of chats. */
-    indexChanged: (changed: string | null) => changed === null || changed === indexKey,
-    /** Settles once the writes queued so far are done. */
-    whenWritten: () => written,
+    /** True for a storage event that changed a chat of this scope. */
+    listChanged: (changed: string | null) => changed === null || changed.startsWith(chatPrefix),
+    /** The chats changed here that storage refused so far. */
+    unsavedChats: () => new Set(unsaved),
   }
 }

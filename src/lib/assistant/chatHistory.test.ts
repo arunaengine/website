@@ -1,14 +1,14 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   MAX_ASSISTANT_CHATS,
   MAX_ASSISTANT_STORAGE_CHARS,
   assistantChatScopeKey,
   createAssistantChatStore,
   newAssistantChat,
-  type AssistantChatStorage,
+  type AssistantChatKeys,
 } from './chatHistory'
 
-function storage(): AssistantChatStorage & { value: string | null; values: Map<string, string>; largest: number } {
+function storage(): AssistantChatKeys & { value: string | null; values: Map<string, string>; largest: number } {
   return {
     value: null,
     values: new Map(),
@@ -376,20 +376,6 @@ describe('two tabs', () => {
     expect(saved().find((entry) => entry.id === 'c-1')?.messages.map((message) => message.id)).toEqual(order)
   })
 
-  it('lists a chat whose index entry is missing and drops an entry without its chat', () => {
-    const store = createAssistantChatStore(user, backing)
-    store.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1']), chat('c-2', ['t2'])] })
-    const index = [...backing.values.keys()].find((key) => key.endsWith(':index')) ?? ''
-    const chatKey = (id: string) => [...backing.values.keys()].find((key) => key.endsWith(`:chat:${id}`)) ?? ''
-    const entries = JSON.parse(backing.values.get(index) ?? '{}') as { chats: Record<string, unknown> }
-    delete entries.chats['c-2']
-    entries.chats['gone'] = { updatedAt: 99, size: 10 }
-    backing.values.set(index, JSON.stringify(entries))
-    expect(chatKey('c-2')).not.toBe('')
-
-    expect(saved().map((entry) => entry.id).sort()).toEqual(['c-1', 'c-2'])
-  })
-
   it('moves the old single-key history into one key per chat once', () => {
     const store = createAssistantChatStore(user, backing)
     backing.setItem(store.key, JSON.stringify({
@@ -424,7 +410,7 @@ describe('two tabs', () => {
   })
 })
 
-describe('writing under a lock', () => {
+describe('what a tab writes', () => {
   const user = scope('user-locks')
   let backing: ReturnType<typeof storage>
 
@@ -463,19 +449,16 @@ describe('writing under a lock', () => {
     return store.key
   }
 
-  it('writes only the chats a tab says it changed', async () => {
-    const locks = memoryLocks()
-    const tabA = createAssistantChatStore(user, backing, locks)
-    const tabB = createAssistantChatStore(user, backing, locks)
+  it('writes only the chats a tab says it changed', () => {
+    const tabA = createAssistantChatStore(user, backing)
+    const tabB = createAssistantChatStore(user, backing)
     tabA.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1']), chat('c-2', ['t2'])] })
-    await tabA.whenWritten()
     tabA.load()
     tabB.load()
 
     tabB.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1', 't4'], 20), chat('c-2', ['t2'])] }, ['c-1'])
     // Tab A still shows the old copy of c-1, touched in memory but not changed by it.
     tabA.save({ activeChatId: 'c-2', chats: [chat('c-1', ['t1'], 25), chat('c-2', ['t2'], 30, 'Renamed')] }, ['c-2'])
-    await Promise.all([tabA.whenWritten(), tabB.whenWritten()])
 
     const stored = saved()
     expect(stored.find((entry) => entry.id === 'c-1')?.messages.map((message) => message.id)).toEqual(['t1', 't1-a', 't4', 't4-a'])
@@ -499,35 +482,30 @@ describe('writing under a lock', () => {
     expect(saved().map((entry) => entry.id).sort()).toEqual(['c-1', 'c-2'])
   })
 
-  it('moves the old history once when two tabs load it at the same time', async () => {
-    const locks = memoryLocks()
+  it('never writes the old history over a chat another tab stored since', () => {
     const key = legacy([chat('c-1', ['t1']), chat('c-2', ['t2'])])
-    const tabA = createAssistantChatStore(user, backing, locks)
-    const tabB = createAssistantChatStore(user, backing, locks)
-    const held = tabA.load()
-    tabB.load()
+    createAssistantChatStore(user, backing).save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1', 't4'], 20)] }, ['c-1'])
 
-    tabA.save({ ...held, chats: [chat('a-1', ['ta'], 40), ...held.chats] }, ['a-1'])
-    await Promise.all([tabA.whenWritten(), tabB.whenWritten()])
+    const tabA = createAssistantChatStore(user, backing).load()
+    const tabB = createAssistantChatStore(user, backing).load()
 
     expect(backing.values.has(key)).toBe(false)
-    expect(saved().map((entry) => entry.id).sort()).toEqual(['a-1', 'c-1', 'c-2'])
+    for (const loaded of [tabA, tabB, { chats: saved() }]) {
+      expect(loaded.chats.map((entry) => entry.id).sort()).toEqual(['c-1', 'c-2'])
+      expect(loaded.chats.find((entry) => entry.id === 'c-1')?.messages).toHaveLength(4)
+    }
   })
 
-  it('stays under the size cap when the index lost a chat size', async () => {
-    const store = createAssistantChatStore(user, backing, memoryLocks())
-    store.save({ activeChatId: 'a-1', chats: [big('a-1', 10)] })
-    await store.whenWritten()
-    const index = [...backing.values.keys()].find((name) => name.endsWith(':index')) ?? ''
-    const entries = JSON.parse(backing.values.get(index) ?? '{}') as { chats: Record<string, { size?: number }> }
-    for (const entry of Object.values(entries.chats)) entry.size = 10
-    backing.values.set(index, JSON.stringify(entries))
+  it('stays under the size cap when two tabs save large chats', () => {
+    const tabA = createAssistantChatStore(user, backing)
+    const tabB = createAssistantChatStore(user, backing)
+    tabA.save({ activeChatId: 'a-1', chats: [big('a-1', 10)] })
 
-    store.save({ activeChatId: 'b-3', chats: [big('b-1', 20), big('b-2', 21), big('b-3', 22), big('a-1', 10)] }, ['b-1', 'b-2', 'b-3'])
-    await store.whenWritten()
+    tabB.save({ activeChatId: 'b-3', chats: [big('b-1', 20), big('b-2', 21), big('b-3', 22)] })
 
-    expect(usedChars(backing, store.key)).toBeLessThanOrEqual(MAX_ASSISTANT_STORAGE_CHARS)
-    expect(saved().map((entry) => entry.id)).toContain('b-3')
+    expect(usedChars(backing, tabB.key)).toBeLessThanOrEqual(MAX_ASSISTANT_STORAGE_CHARS)
+    expect(backing.largest).toBeLessThanOrEqual(MAX_ASSISTANT_STORAGE_CHARS)
+    expect(saved().map((entry) => entry.id)).toEqual(['b-3', 'b-2', 'b-1'])
   })
 
   it('keeps the active chat when the count limit drops older ones', () => {
@@ -540,5 +518,105 @@ describe('writing under a lock', () => {
     expect(kept.chats.map((entry) => entry.id)).toContain('c-0')
     expect(kept.chats).toHaveLength(MAX_ASSISTANT_CHATS)
     expect(saved().map((entry) => entry.id)).toContain('c-0')
+  })
+})
+
+describe('writing at once', () => {
+  const user = scope('user-sync')
+  let backing: ReturnType<typeof storage>
+
+  beforeEach(() => {
+    backing = storage()
+  })
+
+  function chat(id: string, turns: string[], updatedAt = 10) {
+    return {
+      ...newAssistantChat(id, 1),
+      id,
+      updatedAt,
+      messages: turns.map((turn, index) => ({ id: turn, role: 'user' as const, text: `${turn} asked`, calls: [], at: index + 1 })),
+      history: [],
+    }
+  }
+
+  function saved() {
+    return createAssistantChatStore(user, backing).load().chats.map((entry) => entry.id)
+  }
+
+  it('stores a save at once, so a reload right after keeps it', () => {
+    vi.stubGlobal('window', { navigator: { locks: memoryLocks() } })
+    try {
+      createAssistantChatStore(user, backing).save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1'])] }, ['c-1'])
+
+      expect(saved()).toEqual(['c-1'])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('keeps saving after a refused lock request', async () => {
+    vi.stubGlobal('window', { navigator: { locks: { request: () => Promise.reject(new Error('refused')) } } })
+    try {
+      const store = createAssistantChatStore(user, backing)
+      store.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1'])] }, ['c-1'])
+      await Promise.resolve()
+      store.save({ activeChatId: 'c-2', chats: [chat('c-2', ['t2'], 20), chat('c-1', ['t1'])] }, ['c-2'])
+      await Promise.resolve()
+
+      expect(saved()).toEqual(['c-2', 'c-1'])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('makes room for a chat the browser refused once', () => {
+    const store = createAssistantChatStore(user, backing)
+    store.save({ activeChatId: 'c-2', chats: [chat('c-1', ['t1'], 10), chat('c-2', ['t2'], 20)] })
+    const setItem = backing.setItem.bind(backing)
+    let refusals = 1
+    backing.setItem = (name, value) => {
+      if (name.endsWith(':chat:c-3') && refusals-- > 0) throw new Error('QuotaExceededError')
+      setItem(name, value)
+    }
+
+    store.save({ activeChatId: 'c-3', chats: [chat('c-3', ['t3'], 30), chat('c-2', ['t2'], 20), chat('c-1', ['t1'], 10)] }, ['c-3'])
+
+    expect(saved()).toEqual(['c-3', 'c-2'])
+  })
+
+  it('stores a refused chat with the next save', () => {
+    const store = createAssistantChatStore(user, backing)
+    const setItem = backing.setItem.bind(backing)
+    backing.setItem = (name, value) => {
+      if (name.endsWith(':chat:c-1')) throw new Error('QuotaExceededError')
+      setItem(name, value)
+    }
+    const state = { activeChatId: 'c-1', chats: [chat('c-1', ['t1'])] }
+    store.save(state, ['c-1'])
+    expect(saved()).not.toContain('c-1')
+
+    backing.setItem = setItem
+    store.save(state, [])
+
+    expect(saved()).toEqual(['c-1'])
+  })
+
+  it('stays under the size cap while moving the old history', () => {
+    const large = (id: string, updatedAt: number, size: number) => ({
+      ...chat(id, ['t'], updatedAt),
+      history: [{ role: 'user' as const, content: 'x'.repeat(size) }],
+    })
+    const chats = [large('m-1', 10, 280_000), large('m-2', 20, 280_000), large('m-3', 30, 280_000)]
+    const legacy = () => JSON.stringify({ version: 1, state: { activeChatId: 'm-3', chats } })
+    chats[0] = large('m-1', 10, 280_000 + MAX_ASSISTANT_STORAGE_CHARS - 10 - legacy().length)
+    const key = createAssistantChatStore(user, backing).key
+    backing.setItem(key, legacy())
+    expect(legacy().length).toBe(MAX_ASSISTANT_STORAGE_CHARS - 10)
+
+    const restored = createAssistantChatStore(user, backing).load()
+
+    expect(usedChars(backing, key)).toBeLessThanOrEqual(MAX_ASSISTANT_STORAGE_CHARS)
+    expect(backing.values.has(key)).toBe(false)
+    expect(restored.chats.map((entry) => entry.id)).toContain('m-3')
   })
 })

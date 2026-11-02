@@ -50,6 +50,10 @@ vi.stubGlobal('window', {
     removeItem: (key: string) => {
       stored.delete(key)
     },
+    get length() {
+      return stored.size
+    },
+    key: (index: number) => [...stored.keys()][index] ?? null,
   },
 })
 

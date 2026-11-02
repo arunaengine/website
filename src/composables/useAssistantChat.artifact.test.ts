@@ -13,7 +13,7 @@ const s3 = vi.hoisted(() => ({
 vi.mock('@/composables/useS3', () => ({ useS3: () => s3, s3ErrorMessage: (err: unknown) => String(err) }))
 
 vi.stubGlobal('window', {
-  localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+  localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {}, length: 0, key: () => null },
 })
 URL.createObjectURL = vi.fn(() => 'blob:aruna/file')
 URL.revokeObjectURL = vi.fn()
