@@ -511,16 +511,16 @@ async function leave() {
             />
           </template>
         </OverviewCell>
-        <OverviewCell label="Objects" :icon="Files" :to="isMember ? { name: 'buckets', query: { group: group.group_id } } : undefined">
+        <OverviewCell label="Objects" :icon="Files" tone="sky" :to="isMember ? { name: 'buckets', query: { group: group.group_id } } : undefined">
           <template #value>{{ objectCounts ? formatCount(objectCounts.total) : 'Unknown' }}</template>
           <span v-if="buckets !== null"><Package /><b>{{ bucketsComplete ? '' : 'at least ' }}{{ formatCount(bucketRows.length) }}</b> {{ bucketRows.length === 1 ? 'bucket' : 'buckets' }}</span>
           <span v-if="objectCounts?.physicalBlobs != null"><Copy /><b>{{ formatCount(objectCounts.physicalBlobs) }}</b> {{ objectCounts.physicalBlobs === 1 ? 'physical blob location' : 'physical blob locations' }}</span>
         </OverviewCell>
-        <OverviewCell label="Datasets" :icon="FileJson2" :to="{ name: 'datasets', query: { group: group.group_id } }">
+        <OverviewCell label="Datasets" :icon="FileJson2" tone="aqua" :to="{ name: 'datasets', query: { group: group.group_id } }">
           <template #value>{{ purposeCountLabel(purposeCounts.datasets) }}</template>
           <span v-if="purposeCounts.profiles != null"><ListChecks /><b>{{ formatCount(purposeCounts.profiles) }}</b> {{ purposeCounts.profiles === 1 ? 'profile' : 'profiles' }}</span>
         </OverviewCell>
-        <OverviewCell label="Runs" :icon="Workflow">
+        <OverviewCell label="Runs" :icon="Workflow" tone="ok">
           <template #value>{{ purposeCountLabel(purposeCounts.runs) }}</template>
           <span v-if="groupRuns.length && recentRuns.state.value === 'ready'"><CircleCheck class="text-status-ok" /><b>{{ completedRuns }}/{{ groupRuns.length }}</b> recent completed</span>
         </OverviewCell>

@@ -1,14 +1,15 @@
 <script setup lang="ts">
-// A stat card: the label, the figure with its unit, a neutral icon tile and a footer of icon facts
+// A stat card: the label, the figure with its unit, a tinted icon tile and a footer of icon facts
 // (each number in <b>). With `to` the whole card opens that page; `stacked` puts the facts in a
 // column, and an action slot adds a button below them.
 import type { Component } from 'vue'
 import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import { Info } from '@lucide/vue'
-import IconTile from '@/components/ui/IconTile.vue'
+import IconTile, { type TileTone } from '@/components/ui/IconTile.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 
-withDefaults(defineProps<{ label: string; icon: Component; info?: string; to?: RouteLocationRaw; stacked?: boolean }>(), {
+withDefaults(defineProps<{ label: string; icon: Component; tone?: TileTone; info?: string; to?: RouteLocationRaw; stacked?: boolean }>(), {
+  tone: 'royal',
   info: undefined,
   to: undefined,
 })
@@ -34,7 +35,7 @@ withDefaults(defineProps<{ label: string; icon: Component; info?: string; to?: R
           <span v-if="$slots.unit" class="text-sm text-muted-foreground"><slot name="unit" /></span>
         </p>
       </div>
-      <IconTile :icon="icon" tone="muted" />
+      <IconTile :icon="icon" :tone="tone" />
     </div>
     <div
       v-if="$slots.default"

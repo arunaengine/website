@@ -371,7 +371,7 @@ const pageDescription = computed(() =>
                 <span><Link /><b>{{ formatBytes(realmTotals.referenced_bytes) }}</b> referenced</span>
               </template>
             </OverviewCell>
-            <OverviewCell label="Objects" :icon="Files" :to="{ name: 'buckets' }">
+            <OverviewCell label="Objects" :icon="Files" tone="aqua" :to="{ name: 'buckets' }">
               <template #value>{{ realmTotals ? formatCount(realmTotals.objects) : 'Unknown' }}</template>
               <span v-if="realmBucketsLine"><Package /><b>{{ realmBucketsLine.value }}</b> {{ realmBucketsLine.word }}</span>
             </OverviewCell>
@@ -380,7 +380,7 @@ const pageDescription = computed(() =>
             <OverviewCell label="Data" :icon="HardDrive">
               <template #value>{{ guestBytes !== null ? formatBytes(guestBytes) : 'Unknown' }}</template>
             </OverviewCell>
-            <OverviewCell label="Objects" :icon="Files" :to="{ name: 'buckets' }">
+            <OverviewCell label="Objects" :icon="Files" tone="aqua" :to="{ name: 'buckets' }">
               <template #value>{{ guestObjects !== null ? formatCount(guestObjects) : 'Unknown' }}</template>
             </OverviewCell>
           </template>
@@ -391,6 +391,7 @@ const pageDescription = computed(() =>
               v-else
               label="Runs"
               :icon="Workflow"
+              tone="ok"
               :to="{ name: 'compute' }"
               info="Runs of your groups. The realm counts no runs of its own."
             >
@@ -402,10 +403,10 @@ const pageDescription = computed(() =>
               </span>
             </OverviewCell>
           </template>
-          <OverviewCell v-else label="Datasets" :icon="FileJson2" :to="{ name: 'datasets' }">
+          <OverviewCell v-else label="Datasets" :icon="FileJson2" tone="ok" :to="{ name: 'datasets' }">
             <template #value>{{ guestRecords !== null ? formatCount(guestRecords) : 'Unknown' }}</template>
           </OverviewCell>
-          <OverviewCell label="Realm" :icon="Network" :to="currentUser ? { name: 'status' } : undefined">
+          <OverviewCell label="Realm" :icon="Network" :tone="offlineNodes ? 'failed' : 'ok'" :to="currentUser ? { name: 'status' } : undefined">
             <template #value>{{ realmNodeCount !== null ? formatCount(realmNodeCount) : 'Unknown' }}</template>
             <template v-if="realmNodeCount !== null" #unit>{{ plural(realmNodeCount, 'node', 'nodes') }}</template>
             <!-- One state signal: the online count, a warning when nodes are offline; the realm scope

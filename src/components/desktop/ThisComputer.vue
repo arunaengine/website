@@ -42,6 +42,7 @@ const showBind = ref(false)
 const pill = computed(() => nodePill(status.value))
 const running = computed(() => status.value?.state === 'running' && status.value.ready)
 const stopped = computed(() => status.value?.state === 'stopped' || status.value?.state === 'error')
+const stateTone = computed(() => (running.value ? 'ok' : status.value?.state === 'error' ? 'failed' : stopped.value ? 'warn' : 'sky'))
 const runsShown = computed(() => shown('compute'))
 
 // A read on its way is not the same as one that failed.
@@ -78,7 +79,7 @@ onMounted(async () => {
   <section aria-labelledby="computer-heading">
     <SectionHeading id="computer-heading" title="This computer" :icon="Laptop" />
     <div class="grid gap-3 sm:grid-cols-2 sm:gap-4" :class="runsShown ? 'xl:grid-cols-4' : 'xl:grid-cols-3'">
-      <OverviewCell :label="name" :icon="Power" stacked>
+      <OverviewCell :label="name" :icon="Power" :tone="stateTone" stacked>
         <template #label>
           <NodeNameEdit v-if="props.nodeId" :name="name" :value="value" :save="(next) => renameDevice(props.nodeId!, next)">{{ name }}</NodeNameEdit>
           <template v-else>{{ name }}</template>
@@ -98,7 +99,7 @@ onMounted(async () => {
         </template>
       </OverviewCell>
 
-      <OverviewCell label="Linked folders" :icon="FolderSync" stacked>
+      <OverviewCell label="Linked folders" :icon="FolderSync" tone="aqua" stacked>
         <template #value>{{ foldersState === 'ready' ? formatCount(folders.length) : waiting(foldersState) }}</template>
         <template v-if="foldersState === 'ready'" #unit>{{ plural(folders.length, 'folder', 'folders') }}</template>
         <template v-if="foldersState === 'ready' && folders.length">

@@ -89,7 +89,7 @@ const databaseText = computed(() => {
         <span><Server /><b>{{ lowerBound(atLeast, formatBytes(sum.stored)) }}</b> stored</span>
         <span><Link /><b>{{ lowerBound(referencedLower, formatBytes(sum.referenced)) }}</b> referenced</span>
       </OverviewCell>
-      <OverviewCell label="Objects" :icon="Files" :to="{ name: 'buckets' }">
+      <OverviewCell label="Objects" :icon="Files" tone="aqua" :to="{ name: 'buckets' }">
         <template #value>{{ lowerBound(atLeast, formatCount(sum.objects)) }}</template>
         <span v-if="buckets"><Package /><b>{{ buckets.value }}</b> {{ buckets.word }}</span>
         <span v-if="databaseText"><Database /><b>{{ databaseText.value }}</b> {{ databaseText.word }}</span>

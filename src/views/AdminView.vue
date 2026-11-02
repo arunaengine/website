@@ -330,15 +330,15 @@ async function save() {
               <template #value>{{ formatBytes(usageInfo.realm.stored_bytes ?? 0) }}</template>
               <span><Layers /><b>{{ formatBytes(usageInfo.realm.logical_bytes) }}</b> counted against quotas</span>
             </OverviewCell>
-            <OverviewCell label="Referenced data" :icon="Link2" info="Data that stays at its source.">
+            <OverviewCell label="Referenced data" :icon="Link2" tone="aqua" info="Data that stays at its source.">
               <template #value>{{ formatBytes(usageInfo.realm.referenced_bytes) }}</template>
               <span><ShieldCheck />Not counted against quotas</span>
             </OverviewCell>
-            <OverviewCell label="Objects" :icon="Files">
+            <OverviewCell label="Objects" :icon="Files" tone="sky">
               <template #value>{{ formatNumber(usageInfo.realm.objects) }}</template>
               <span><Database /><b>{{ formatNumber(usageInfo.realm.stored_blobs ?? 0) }}</b> physical blob locations</span>
             </OverviewCell>
-            <OverviewCell label="Buckets" :icon="Boxes" info="A bucket stored on several nodes counts once." :to="{ name: 'buckets' }">
+            <OverviewCell label="Buckets" :icon="Boxes" tone="ok" info="A bucket stored on several nodes counts once." :to="{ name: 'buckets' }">
               <template #value>{{ realmBuckets ? countText(realmBuckets, formatNumber) : formatNumber(usageInfo.realm.buckets) }}</template>
               <span v-if="realmNodeCount"><Server />Across <b>{{ formatNumber(realmNodeCount) }}</b> {{ realmNodeCount === 1 ? 'node' : 'nodes' }}</span>
             </OverviewCell>
