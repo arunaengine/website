@@ -868,13 +868,21 @@ export function useDataManager() {
     const current = () =>
       epoch === sessionEpoch.value && listing === listRequestId && name === bucket.value
       && groupId === selectedGroupId.value && !routeString(route.query.node)
-    const found = await searchBuckets(name, { limit: 50, groupId: groupId || undefined }).catch(() => null)
-    if (!current()) return
-    const hits = (found?.hits ?? []).filter((hit) => hit.bucket === name && (!groupId || hit.group_id === groupId))
+    const hits: BucketSearchHit[] = []
+    let complete = true
+    let cursor: string | undefined
+    do {
+      const found = await searchBuckets(name, { limit: 50, groupId: groupId || undefined, cursor }).catch(() => null)
+      if (!current()) return
+      hits.push(...(found?.hits ?? []).filter((hit) => hit.bucket === name && (!groupId || hit.group_id === groupId)))
+      complete &&= Boolean(found) && !found!.nodes_failed
+      cursor = found?.next_cursor && found.next_cursor !== cursor ? found.next_cursor : undefined
+    } while (cursor && !hits.length)
     const holder = hits.some((hit) => realmNodes.isLocalNode(hit.node_id)) ? null : hits[0]
-    // A failed search proves nothing; an answer without another holder means the bucket is gone.
+    // Only a full search without another holder means the bucket is gone; else it stays unknown.
     if (!holder) {
-      if (found) bucketMissing.value = true
+      if (complete) bucketMissing.value = true
+      else listError.value = 'Not every node answered, so the node with this bucket is unknown. Try again.'
       return
     }
     void navigate(() => {

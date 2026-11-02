@@ -853,7 +853,10 @@ async function onDrop(event: DragEvent) {
           <p class="mt-1 break-all font-mono text-[10px]">{{ listError }}</p>
           <Button variant="outline" size="sm" class="mt-2" @click="s3.clearSessions()"><KeyRound class="h-3.5 w-3.5" /> Close temporary sessions</Button>
         </Notice>
-        <p v-else-if="listError" class="border-b border-border px-4 py-3 text-xs text-destructive">{{ listError }}</p>
+        <p v-else-if="listError" class="border-b border-border px-4 py-3 text-xs text-destructive">
+          {{ listError }}
+          <button type="button" class="text-primary hover:underline" :disabled="retrySpinning" @click="onRetryObjects">Try again</button>
+        </p>
         <Notice v-else-if="listStale" tone="warning" class="rounded-none border-x-0 border-t-0">
           Some folders are shown from a copy and may be out of date.
         </Notice>

@@ -195,6 +195,30 @@ describe('deleted bucket', () => {
     await flush()
   })
 
+  it('stays unknown with a retry when a node did not answer the search', async () => {
+    const answer = searchBuckets.getMockImplementation()!
+    searchBuckets.mockImplementation(async () => ({ hits: [], nodes_queried: 2, nodes_failed: 1, failed_nodes: [] }))
+    const { manager } = await open({ group: 'g-a' })
+    expect(manager.bucketMissing.value).toBe(false)
+    expect(manager.listError.value).toContain('Not every node answered')
+    searchBuckets.mockImplementation(answer)
+    await flush()
+  })
+
+  it('reads every search page before it calls a bucket gone', async () => {
+    const answer = searchBuckets.getMockImplementation()!
+    searchBuckets.mockImplementation(async (_q: string, options?: unknown) => {
+      const more = !(options as { cursor?: string }).cursor
+      const hits = more ? [] : [{ bucket: 'gone', node_id: 'n-2', group_id: 'g-a' }]
+      return { hits, nodes_queried: 2, nodes_failed: 0, failed_nodes: [], ...(more ? { next_cursor: 'c2' } : {}) }
+    })
+    const { router, manager } = await open({ group: 'g-a' })
+    expect(manager.bucketMissing.value).toBe(false)
+    expect(router.currentRoute.value.query).toEqual({ group: 'g-a', node: 'n-2' })
+    searchBuckets.mockImplementation(answer)
+    await flush()
+  })
+
   it('is gone when no node of the group holds it', async () => {
     const { router, manager } = await open({ group: 'g-a' })
     expect(searchBuckets).toHaveBeenCalledWith('gone', { limit: 50, groupId: 'g-a' })
