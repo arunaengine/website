@@ -398,7 +398,7 @@ async function submit() {
         public: isPublic,
       })
       submitted.value = true
-      void router.push({ name: 'profile', params: { profileId: edited.id } })
+      void router.push({ name: 'profile', params: { profileId: edited.documentId } })
       return
     }
     const created = await createMetadata({
@@ -407,30 +407,9 @@ async function submit() {
       public: isPublic,
       rocrate: profileCrate,
     })
-    const profile = profiles.value.find((item) => item.id === basics.slug) ?? {
-      id: basics.slug,
-      documentId: created.document_id,
-      documentPath: created.document_path,
-      graphIri: created.graph_iri,
-      profileUri: created.graph_iri,
-      name: basics.name,
-      shortName: basics.name.split(/\s+/)[0] || basics.slug,
-      description: basics.description,
-      domain: 'RO-Crate Profile',
-      version: basics.version,
-      iconColor: '#335DC6',
-      entityRules,
-      propertyRules: builder.datasetEntity?.propertyRules ?? [],
-      schema: builder.generatedSchema,
-      // D9: carry the GENERATED mode (our rules merged over any imported mode), so
-      // the fallback profile matches what was written to the crate, not the raw
-      // imported mode, which would omit builder edits.
-      mode: entityRulesToMode(basics, entityRules, builder.importedMode ?? undefined),
-      suggestedKeywords: [],
-      managed: isPublic,
-    }
     submitted.value = true
-    void router.push({ name: 'profile', params: { profileId: profile.id } })
+    // The document id names this profile even when another group's profile shares its slug.
+    void router.push({ name: 'profile', params: { profileId: created.document_id } })
   } catch (err) {
     if (generation === seedGeneration && epoch === sessionEpoch.value) builder.submitError = errorMessage(err)
   } finally {

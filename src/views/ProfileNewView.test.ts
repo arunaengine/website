@@ -341,7 +341,7 @@ describe('ProfileNewView create', () => {
       '@type': ['Dataset', DX_PROFILE],
       name: 'Example profile',
     })
-    expect(routerPush).toHaveBeenCalledWith({ name: 'profile', params: { profileId: 'example-profile' } })
+    expect(routerPush).toHaveBeenCalledWith({ name: 'profile', params: { profileId: 'doc-new' } })
     mounted.app.unmount()
   })
 
@@ -453,7 +453,7 @@ describe('ProfileNewView edit', () => {
       public: false,
     }))
     expect(createMetadata).not.toHaveBeenCalled()
-    expect(routerPush).toHaveBeenCalledWith({ name: 'profile', params: { profileId: 'example' } })
+    expect(routerPush).toHaveBeenCalledWith({ name: 'profile', params: { profileId: 'doc-1' } })
     mounted.app.unmount()
   })
 
@@ -465,6 +465,13 @@ describe('ProfileNewView edit', () => {
 
     expect(loadProfileCrate).toHaveBeenCalledWith('doc-b')
     expect(input(mounted.root, 'data-field', 'name').value).toBe('Beta profile')
+
+    await click(button(mounted.root, 'Next'))
+    await click(button(mounted.root, 'Next'))
+    await click(button(mounted.root, 'Save profile'))
+    await flush()
+    expect(replaceMetadataRoCrate).toHaveBeenCalledWith('doc-b', expect.anything())
+    expect(routerPush).toHaveBeenCalledWith({ name: 'profile', params: { profileId: 'doc-b' } })
     mounted.app.unmount()
   })
 
