@@ -8,18 +8,36 @@ import {
   type AssistantChatStorage,
 } from './chatHistory'
 
-function storage(): AssistantChatStorage & { value: string | null; values: Map<string, string> } {
+function storage(): AssistantChatStorage & { value: string | null; values: Map<string, string>; largest: number } {
   return {
     value: null,
     values: new Map(),
+    largest: 0,
     getItem(key) {
       return this.values.get(key) ?? null
     },
     setItem(key, value) {
       this.value = value
+      this.largest = Math.max(this.largest, value.length)
       this.values.set(key, value)
     },
+    removeItem(key) {
+      this.values.delete(key)
+    },
+    get length() {
+      return this.values.size
+    },
+    key(index) {
+      return [...this.values.keys()][index] ?? null
+    },
   }
+}
+
+/** Characters the chat history of a scope holds across all its keys. */
+function usedChars(backing: ReturnType<typeof storage>, base: string): number {
+  let total = 0
+  for (const [key, value] of backing.values) if (key === base || key.startsWith(`${base}:`)) total += value.length
+  return total
 }
 
 const scope = (userId: string) => ({
@@ -73,16 +91,18 @@ describe('assistant chat history', () => {
         history: [{ role: 'user' as const, content: 'x'.repeat(60_000) }],
       }
     })
-    createAssistantChatStore(scope('user-a'), backing).save({
+    const store = createAssistantChatStore(scope('user-a'), backing)
+    store.save({
       activeChatId: chatState[0].id,
       chats: chatState,
     })
 
-    expect(backing.value?.length ?? 0).toBeLessThanOrEqual(MAX_ASSISTANT_STORAGE_CHARS)
-    const parsed = JSON.parse(backing.value ?? '{}') as { state?: { activeChatId?: string; chats: Array<{ id: string; title: string }> } }
-    expect(parsed.state?.chats.length).toBeLessThanOrEqual(MAX_ASSISTANT_CHATS)
-    expect(parsed.state?.chats[0]?.title).toBe(`Chat ${MAX_ASSISTANT_CHATS + 7}`)
-    expect(parsed.state?.activeChatId).toBe(parsed.state?.chats[0]?.id)
+    expect(usedChars(backing, store.key)).toBeLessThanOrEqual(MAX_ASSISTANT_STORAGE_CHARS)
+    expect(backing.largest).toBeLessThanOrEqual(MAX_ASSISTANT_STORAGE_CHARS)
+    const restored = createAssistantChatStore(scope('user-a'), backing).load()
+    expect(restored.chats.length).toBeLessThanOrEqual(MAX_ASSISTANT_CHATS)
+    expect(restored.chats[0]?.title).toBe(`Chat ${MAX_ASSISTANT_CHATS + 7}`)
+    expect(restored.activeChatId).toBe(restored.chats[0]?.id)
   })
 
   it('keeps a restored artifact card without its dead blob URL', () => {
@@ -265,5 +285,129 @@ describe('assistant chat history', () => {
     const restored = store.load()
     expect(restored.chats).toHaveLength(1)
     expect(restored.chats[0]?.history).toEqual([{ role: 'user', content: 'keep this' }])
+  })
+})
+
+// Two tabs share one storage; each saves the chats it holds in memory.
+describe('two tabs', () => {
+  const user = scope('user-tabs')
+  let backing: ReturnType<typeof storage>
+
+  beforeEach(() => {
+    backing = storage()
+  })
+
+  function chat(id: string, turns: string[], updatedAt = 10, title = id) {
+    return {
+      ...newAssistantChat(title, 1),
+      id,
+      updatedAt,
+      messages: turns.flatMap((turn, index) => [
+        { id: turn, role: 'user' as const, text: `${turn} asked`, calls: [], at: index * 10 + 1 },
+        { id: `${turn}-a`, role: 'assistant' as const, text: `${turn} answered`, calls: [], at: index * 10 + 2 },
+      ]),
+      history: [],
+    }
+  }
+
+  function saved() {
+    return createAssistantChatStore(user, backing).load().chats
+  }
+
+  function tabs() {
+    const tabA = createAssistantChatStore(user, backing)
+    const tabB = createAssistantChatStore(user, backing)
+    tabA.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1']), chat('c-2', ['t2'])] })
+    tabA.load()
+    tabB.load()
+    return { tabA, tabB }
+  }
+
+  it('keeps the chats two tabs create at the same time', () => {
+    const { tabA, tabB } = tabs()
+
+    tabA.save({ activeChatId: 'a-1', chats: [chat('a-1', ['ta'], 20), chat('c-1', ['t1']), chat('c-2', ['t2'])] })
+    tabB.save({ activeChatId: 'b-1', chats: [chat('b-1', ['tb'], 30), chat('c-1', ['t1']), chat('c-2', ['t2'])] })
+
+    expect(saved().map((entry) => entry.id).sort()).toEqual(['a-1', 'b-1', 'c-1', 'c-2'])
+  })
+
+  it('keeps a deletion while another tab saves a different chat', () => {
+    const { tabA, tabB } = tabs()
+
+    tabA.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1'])] })
+    tabB.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1', 't3'], 30), chat('c-2', ['t2'])] })
+
+    expect(saved().map((entry) => entry.id)).toEqual(['c-1'])
+  })
+
+  it('keeps an answer another tab completed when this tab renames a different chat', () => {
+    const { tabA, tabB } = tabs()
+
+    tabA.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1', 't4'], 20), chat('c-2', ['t2'])] })
+    tabB.save({ activeChatId: 'c-2', chats: [chat('c-1', ['t1']), chat('c-2', ['t2'], 30, 'Renamed')] })
+
+    const stored = saved()
+    expect(stored.find((entry) => entry.id === 'c-1')?.messages.map((message) => message.id)).toEqual(['t1', 't1-a', 't4', 't4-a'])
+    expect(stored.find((entry) => entry.id === 'c-2')?.title).toBe('Renamed')
+  })
+
+  it('writes one chat as a whole and keeps its turn order', () => {
+    // Two tabs writing the same chat: the last one wins, in its own order.
+    const { tabA, tabB } = tabs()
+
+    tabA.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1', 'tb'], 20), chat('c-2', ['t2'])] })
+    const kept = tabB.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1', 'ta'], 30), chat('c-2', ['t2'])] })
+
+    const order = ['t1', 't1-a', 'ta', 'ta-a']
+    expect(kept.chats.find((entry) => entry.id === 'c-1')?.messages.map((message) => message.id)).toEqual(order)
+    expect(saved().find((entry) => entry.id === 'c-1')?.messages.map((message) => message.id)).toEqual(order)
+  })
+
+  it('lists a chat whose index entry is missing and drops an entry without its chat', () => {
+    const store = createAssistantChatStore(user, backing)
+    store.save({ activeChatId: 'c-1', chats: [chat('c-1', ['t1']), chat('c-2', ['t2'])] })
+    const index = [...backing.values.keys()].find((key) => key.endsWith(':index')) ?? ''
+    const chatKey = (id: string) => [...backing.values.keys()].find((key) => key.endsWith(`:chat:${id}`)) ?? ''
+    const entries = JSON.parse(backing.values.get(index) ?? '{}') as { chats: Record<string, unknown> }
+    delete entries.chats['c-2']
+    entries.chats['gone'] = { updatedAt: 99, size: 10 }
+    backing.values.set(index, JSON.stringify(entries))
+    expect(chatKey('c-2')).not.toBe('')
+
+    expect(saved().map((entry) => entry.id).sort()).toEqual(['c-1', 'c-2'])
+  })
+
+  it('moves the old single-key history into one key per chat once', () => {
+    const store = createAssistantChatStore(user, backing)
+    backing.setItem(store.key, JSON.stringify({
+      version: 1,
+      state: { activeChatId: 'c-2', chats: [chat('c-1', ['t1']), chat('c-2', ['t2'], 20)] },
+    }))
+
+    const restored = store.load()
+
+    expect(restored.activeChatId).toBe('c-2')
+    expect(restored.chats.map((entry) => entry.id)).toEqual(['c-2', 'c-1'])
+    expect(backing.values.has(store.key)).toBe(false)
+    expect([...backing.values.keys()].filter((key) => key.includes(':chat:'))).toHaveLength(2)
+    expect(saved().map((entry) => entry.id)).toEqual(['c-2', 'c-1'])
+  })
+
+  it('trims whole chats, oldest first, to stay under the size cap', () => {
+    const big = (id: string, updatedAt: number) => ({
+      ...chat(id, [], updatedAt),
+      messages: [{ id: `${id}-m`, role: 'assistant' as const, text: 'x'.repeat(7_000), calls: [], at: 1 }],
+      history: [{ role: 'user' as const, content: 'x'.repeat(250_000) }],
+    })
+    const { tabA, tabB } = tabs()
+    tabA.save({ activeChatId: 'a-1', chats: [big('a-1', 20), big('a-2', 21)] })
+
+    tabB.save({ activeChatId: 'b-1', chats: [big('b-1', 30), big('b-2', 31)] })
+
+    const kept = saved().map((entry) => entry.id)
+    expect(kept).toEqual(['b-2', 'b-1', 'a-2'])
+    expect(usedChars(backing, createAssistantChatStore(user, backing).key)).toBeLessThanOrEqual(MAX_ASSISTANT_STORAGE_CHARS)
+    expect(backing.largest).toBeLessThanOrEqual(MAX_ASSISTANT_STORAGE_CHARS)
   })
 })

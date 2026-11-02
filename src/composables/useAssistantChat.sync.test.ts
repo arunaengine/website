@@ -327,6 +327,31 @@ describe('pushing', () => {
     expect(stopped?.messages.at(-1)?.error).toBe('Closing the assistant stopped this answer.')
   })
 
+  it('writes its own next turn at the next seq after another tab rewrote the chat', async () => {
+    const scope = await login()
+    const id: string = chat.activeChatId.value
+    await chat.send('t1', { route: '/' })
+    await settle()
+    // Another tab of this browser stores the same chat with a turn of its own.
+    const tab = createAssistantChatStore(scope)
+    const held = tab.load()
+    const theirs = decodeTurn(payload('tb', 'tb'))!
+    tab.save({
+      ...held,
+      chats: held.chats.map((entry) => (entry.id === id
+        ? { ...entry, messages: [...entry.messages, ...theirs.messages], history: [...entry.history, ...theirs.history] }
+        : entry)),
+    })
+    node.log.length = 0
+
+    await chat.send('ta', { route: '/' })
+    await settle()
+
+    expect(node.log).toEqual([`PUT turn ${id}/1 rev 2`])
+    expect(nodeTexts(id)).toEqual(['t1', 't1 answered', 'ta', 'ta answered'])
+    expect(texts(id)).toEqual(['t1', 't1 answered', 'ta', 'ta answered'])
+  })
+
   it('never creates an empty chat on the node', async () => {
     await login()
     node.log.length = 0
