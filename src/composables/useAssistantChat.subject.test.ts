@@ -16,6 +16,7 @@ const provider = {
 
 vi.mock('./useAssistantProviders', () => ({
   useAssistantProviders: () => ({
+    centralUnavailable: ref(false),
     ready: ref([provider]),
     providers: ref([provider]),
     listedModels: ref({}),

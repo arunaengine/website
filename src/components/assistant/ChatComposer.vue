@@ -72,7 +72,7 @@ const unlockOpen = ref(false)
 const keysLocked = computed(() =>
   vaultState.value === 'locked'
   && (!provider.value || (providerId.value !== '' && providerId.value !== provider.value.provider_id)))
-const { central } = useAssistantProviders()
+const { central, centralUnavailable } = useAssistantProviders()
 // Today's realm assistant calls, while it is the chosen provider and has a limit.
 const quota = computed(() => {
   const setup = central.value
@@ -191,6 +191,9 @@ function onKeydown(event: KeyboardEvent) {
       <AssistantSettings>
         <Button variant="outline" size="sm" @click="loadModels">Pick a provider</Button>
       </AssistantSettings>
+    </Notice>
+    <Notice v-if="centralUnavailable && !provider" tone="warning">
+      The realm assistant cannot be reached right now. Try again later or pick your own provider.
     </Notice>
     <Notice v-if="switchNotice" tone="info" class="flex flex-wrap items-center justify-between gap-3">
       <span>

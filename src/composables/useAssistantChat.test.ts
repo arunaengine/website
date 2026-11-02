@@ -24,6 +24,7 @@ URL.revokeObjectURL = vi.fn((url: string) => {
 const stored = new Map<string, string>()
 
 vi.stubGlobal('window', {
+  location: { origin: 'https://portal.test' },
   localStorage: {
     getItem: (key: string) => stored.get(key) ?? null,
     setItem: (key: string, value: string) => {
@@ -268,5 +269,35 @@ describe('provider configuration changes', () => {
     expect(chat.modelChoices.value.map(model => model.id)).toContain('new-model')
     expect(stored.get('aruna.assistant.model')).toBe('new-model')
     await providers.remove(direct.id)
+  })
+})
+
+describe('realm assistant outage', () => {
+  it('keeps the realm assistant chosen while it cannot be reached', async () => {
+    seed()
+    const { useAssistantProviders } = await import('./useAssistantProviders')
+    const providers = useAssistantProviders()
+    const own = { provider_id: '01JCNCTR0123456789ABCDEFGH', kind: 'openai', label: 'Own', models: [{ id: 'gpt-5' }], status: 'ready', created_at: '' }
+    let centralStatus = 503
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/system/assistant/providers')) return new Response(JSON.stringify({ providers: [own] }), { status: 200 })
+      if (url.endsWith('/system/assistant/central') && centralStatus === 200) {
+        return new Response(JSON.stringify({ kind: 'openai_compatible', label: 'Realm assistant', models: [{ id: 'm' }], used_today: 0, resets_at: '2026-11-03T00:00:00Z' }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ error: 'unavailable' }), { status: url.endsWith('/central') ? centralStatus : 404 })
+    })
+    const chat = useAssistantChat()
+    for (const choice of ['central', '']) {
+      chat.providerId.value = choice
+      await providers.load()
+      expect(providers.ready.value.map((entry) => entry.provider_id)).toEqual([own.provider_id])
+      expect(chat.provider.value).toBeNull()
+    }
+    chat.providerId.value = 'central'
+    centralStatus = 200
+    await providers.refreshCentral()
+    expect(chat.provider.value?.provider_id).toBe('central')
+    chat.providerId.value = ''
   })
 })

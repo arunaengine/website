@@ -21,6 +21,7 @@ vi.mock('./useAssistantProviders', async () => {
   state.ready = ready
   return {
     useAssistantProviders: () => ({
+    centralUnavailable: ref(false),
       ready,
       providers: ready,
       listedModels: ref({}),

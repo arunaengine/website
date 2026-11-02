@@ -4,6 +4,7 @@
 import { computed, ref, watch } from 'vue'
 import {
   apiErrorMessage,
+  CENTRAL_PROVIDER_ID,
   centralProvider,
   deleteAssistantProvider,
   fetchAssistantModels,
@@ -38,6 +39,8 @@ const browserStore = createBrowserProviderStore()
 const vault = useUserVault()
 const nodeProviders = ref<AssistantProvider[]>([])
 const central = ref<CentralAssistant | null>(null)
+/** Set when the realm assistant could not be read for another reason than being absent. */
+const centralUnavailable = ref(false)
 const providers = ref<AssistantProvider[]>([])
 const loading = ref(false)
 const loaded = ref(false)
@@ -86,15 +89,39 @@ function clearModels(providerId: string) {
 }
 
 function rebuild() {
-  // A setup without allowed models cannot answer anyone yet.
-  const shared = central.value?.models.length ? [centralProvider(central.value)] : []
+  // A setup without allowed models cannot answer anyone yet; an unreachable one stays listed.
+  const shared = centralUnavailable.value
+    ? [unreachableCentral()]
+    : central.value?.models.length ? [centralProvider(central.value)] : []
   providers.value = [
     ...shared,
     ...browserStore.state.providers.map(directSummary),
     ...sealed().map(directSummary),
     ...nodeProviders.value,
   ]
-  assistantAvailable.value = authenticated() && providers.value.some((provider) => provider.status === 'ready')
+  assistantAvailable.value = authenticated()
+    && (centralUnavailable.value || providers.value.some((provider) => provider.status === 'ready'))
+}
+
+function unreachableCentral(): AssistantProvider {
+  const known = central.value ? centralProvider(central.value) : null
+  return {
+    provider_id: CENTRAL_PROVIDER_ID,
+    kind: known?.kind ?? 'openai_compatible',
+    label: known?.label ?? 'Realm assistant',
+    models: known?.models ?? [],
+    status: 'error',
+    created_at: new Date(0).toISOString(),
+  }
+}
+
+/** The setup, null when none exists; a failure other than 404 marks it unreachable. */
+async function readCentral(): Promise<{ setup: CentralAssistant | null; unreachable: boolean }> {
+  try {
+    return { setup: await getCentralAssistant(client()), unreachable: false }
+  } catch {
+    return { setup: central.value, unreachable: true }
+  }
 }
 
 function direct(providerId: string): BrowserProvider | null {
@@ -145,19 +172,18 @@ async function revalidate(epoch: number, generation: number, identity: string): 
   error.value = null
   void vault.load()
   try {
-    const [response, setup] = await Promise.all([
-      listAssistantProviders(client()),
-      getCentralAssistant(client()).catch(() => null),
-    ])
+    const [response, read] = await Promise.all([listAssistantProviders(client()), readCentral()])
     if (!currentNodeContext(epoch, generation, identity)) return
     nodeProviders.value = response.providers
-    central.value = setup
+    central.value = read.setup
+    centralUnavailable.value = read.unreachable
     rebuild()
     loaded.value = true
   } catch (cause) {
     if (!currentNodeContext(epoch, generation, identity)) return
     nodeProviders.value = []
     central.value = null
+    centralUnavailable.value = false
     rebuild()
     error.value = apiErrorMessage(cause)
   } finally {
@@ -174,6 +200,7 @@ function resetNodeCache() {
   nodeGeneration += 1
   nodeProviders.value = []
   central.value = null
+  centralUnavailable.value = false
   loaded.value = false
   loading.value = false
   error.value = null
@@ -211,20 +238,17 @@ export function useAssistantProviders() {
     return promise
   }
 
-  /** Reads today's central usage again, as after a turn; a failure keeps the last numbers. */
+  /** Reads the realm assistant and today's usage again, as after a turn or an outage. */
   async function refreshCentral(): Promise<void> {
-    if (!authenticated() || !central.value) return
+    if (!authenticated() || (!central.value && !centralUnavailable.value)) return
     const epoch = sessionEpoch.value
     const generation = nodeGeneration
     const identity = identityKey()
-    try {
-      const setup = await getCentralAssistant(client())
-      if (!currentNodeContext(epoch, generation, identity)) return
-      central.value = setup
-      rebuild()
-    } catch {
-      // The next full load reads it again.
-    }
+    const read = await readCentral()
+    if (!currentNodeContext(epoch, generation, identity)) return
+    central.value = read.setup
+    centralUnavailable.value = read.unreachable
+    rebuild()
   }
 
   /** Serves the local direct providers and refreshes node providers behind them. */
@@ -383,6 +407,7 @@ export function useAssistantProviders() {
   return {
     providers,
     central,
+    centralUnavailable,
     refreshCentral,
     loading,
     loaded,

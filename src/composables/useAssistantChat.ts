@@ -1505,8 +1505,12 @@ const ready = computed(() => providers.ready.value)
 // removed provider leaves the selection empty until one is picked.
 const switching = ref<{ providerId: string; modelId: string } | null>(null)
 const removed = ref<{ id: string; label: string } | null>(null)
+// While the realm assistant cannot be reached, a choice of it, or of the default it is, waits.
+const centralWaits = computed(() =>
+  providers.centralUnavailable.value && (providerId.value === '' || providerId.value === CENTRAL_PROVIDER_ID))
 const provider = computed<AssistantProvider | null>(() =>
-  ready.value.find((entry) => entry.provider_id === providerId.value) ?? (removed.value ? null : ready.value[0] ?? null))
+  ready.value.find((entry) => entry.provider_id === providerId.value)
+    ?? (removed.value || centralWaits.value ? null : ready.value[0] ?? null))
 const model = computed(() => (provider.value ? providerModelId(provider.value, modelId.value) : ''))
 watch(provider, (next, previous) => {
   if (!next) return

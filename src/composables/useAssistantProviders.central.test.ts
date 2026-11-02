@@ -67,12 +67,18 @@ describe('central assistant entry', () => {
     expect(ids()).toEqual([own.provider_id])
   })
 
-  it('keeps own providers when the setup cannot be read', async () => {
+  it('marks the realm assistant unreachable instead of absent', async () => {
+    const providers = useAssistantProviders()
     getCentralAssistant.mockRejectedValueOnce(new Error('503'))
 
-    await useAssistantProviders().load()
+    await providers.load()
 
-    expect(ids()).toEqual([own.provider_id])
+    expect(ids()).toEqual(['central', own.provider_id])
+    expect(providers.ready.value.map((provider) => provider.provider_id)).toEqual([own.provider_id])
+    expect(providers.centralUnavailable.value).toBe(true)
+    await providers.refreshCentral()
+    expect(providers.centralUnavailable.value).toBe(false)
+    expect(providers.ready.value[0]?.provider_id).toBe('central')
   })
 
   it('reads the usage again after a turn', async () => {

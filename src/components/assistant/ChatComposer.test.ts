@@ -39,6 +39,7 @@ const aruna = {
 }
 
 const central = ref<{ daily_limit?: number | null; used_today: number; resets_at: string } | null>(null)
+const centralUnavailable = ref(false)
 const realmAssistant: AssistantProvider = { ...openai, provider_id: 'central', label: 'Realm assistant' }
 
 const vaultState = ref<'absent' | 'locked' | 'unlocked' | 'unsupported'>('absent')
@@ -113,7 +114,7 @@ const ChatComposer = compileClientComponent(new URL('./ChatComposer.vue', import
   '@/composables/useRealm': { useRealm: () => ({ realmId: ref('r-1') }) },
   '@/composables/useGroupSelection': { activeGroupId: ref('') },
   '@/composables/useAssistantChat': { useAssistantChat: () => chat },
-  '@/composables/useAssistantProviders': { useAssistantProviders: () => ({ central }) },
+  '@/composables/useAssistantProviders': { useAssistantProviders: () => ({ central, centralUnavailable }) },
   '@/lib/api': { CENTRAL_PROVIDER_ID: 'central' },
   '@/composables/useAssistantRunForm': { useAssistantRunForm: () => ({ bridge: { value: null } }) },
   '@/composables/useAssistantProfileForm': { useAssistantProfileForm: () => ({ bridge: { value: null } }) },
@@ -139,6 +140,7 @@ beforeEach(() => {
   keepCurrent.mockClear()
   vaultState.value = 'absent'
   central.value = null
+  centralUnavailable.value = false
   aruna.currentUser.value = null
   aruna.profiles.value = []
   aruna.myGroups.value = []
@@ -169,6 +171,15 @@ describe('ChatComposer', () => {
 
     expect(content(root)).toContain('0 of 50 left today')
     expect(control(root, 'Message').props.placeholder).toBe(`The realm assistant is back at ${reset}`)
+    expect(control(root, 'Send').props.disabled).toBe(true)
+  })
+
+  it('says when the realm assistant cannot be reached', async () => {
+    chat.provider.value = null
+    centralUnavailable.value = true
+    const { root } = await mountApp(ChatComposer)
+
+    expect(content(root)).toContain('The realm assistant cannot be reached right now.')
     expect(control(root, 'Send').props.disabled).toBe(true)
   })
 
