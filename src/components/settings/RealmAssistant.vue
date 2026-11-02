@@ -182,7 +182,7 @@ onMounted(async () => {
           <label class="space-y-1.5">
             <span class="text-xs font-medium">Address</span>
             <Input v-model="baseUrl" class="font-mono" aria-label="Address" placeholder="https://chat.example.org/api" />
-            <span v-if="kind === 'openai_compatible'" class="block text-[11px] text-muted-foreground">
+            <span v-if="kind === 'openai_compatible'" class="block text-xs text-muted-foreground">
               For Open WebUI, end the address with /api.
             </span>
           </label>
@@ -226,7 +226,7 @@ onMounted(async () => {
                 </button>
               </label>
             </div>
-            <p class="text-[11px] text-muted-foreground">Members can only pick these models.</p>
+            <p class="text-xs text-muted-foreground">Members can only pick these models.</p>
           </div>
           <label class="space-y-1.5">
             <span class="text-xs font-medium">Daily limit per member</span>
@@ -234,7 +234,7 @@ onMounted(async () => {
               <Input v-model="dailyLimit" inputmode="numeric" class="w-28 tabular-nums" aria-label="Daily limit per member" />
               <span class="text-sm text-muted-foreground">model calls</span>
             </span>
-            <span class="block text-[11px] text-muted-foreground">Empty means no limit. Resets at midnight UTC.</span>
+            <span class="block text-xs text-muted-foreground">Empty means no limit. Resets at midnight UTC.</span>
           </label>
           <details class="space-y-1.5 sm:col-span-2" open>
             <summary class="cursor-pointer text-xs font-medium">Session headers</summary>
@@ -248,7 +248,7 @@ onMounted(async () => {
                 <Input v-model="sessionHeader" class="font-mono" aria-label="Chat header" />
               </label>
             </div>
-            <p class="text-[11px] text-muted-foreground">Your server gets an anonymous user id and one id per chat. Never names or emails.</p>
+            <p class="text-xs text-muted-foreground">Your server gets an anonymous user id and one id per chat. Never names or emails.</p>
           </details>
           <Notice v-if="error || notice" :tone="error ? 'error' : 'success'" class="sm:col-span-2">{{ error ?? notice }}</Notice>
           <Notice v-if="confirmRemove" tone="warning" class="flex flex-wrap items-center justify-between gap-3 sm:col-span-2">

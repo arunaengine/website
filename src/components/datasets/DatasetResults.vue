@@ -103,7 +103,7 @@ function bucketHitRoute(hit: BucketSearchHit): RouteLocationRaw {
       <h2 class="font-display text-sm font-semibold text-aruna-navy">Buckets</h2>
       <Spinner v-if="bucketsSearching" show-label label="Searching…" />
       <span v-else class="text-xs text-muted-foreground">{{ bucketResults.length }}</span>
-      <span v-if="bucketsPartial && !bucketsSearching" role="status" class="flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
+      <span v-if="bucketsPartial && !bucketsSearching" role="status" class="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
         <AlertTriangle class="h-3.5 w-3.5" />
         {{ bucketNodesQueried - bucketNodesFailed }} of {{ bucketNodesQueried }} nodes answered
       </span>
@@ -121,7 +121,7 @@ function bucketHitRoute(hit: BucketSearchHit): RouteLocationRaw {
         <Badge :variant="isLocalNode(hit.node_id) ? 'accent' : 'outline'" size="sm" :title="hit.node_id">
           {{ isLocalNode(hit.node_id) ? 'this node' : nodeDisplayName(hit.node_id) }}
         </Badge>
-        <span class="text-[10px] text-muted-foreground" :title="hit.group_id">
+        <span class="text-xs text-muted-foreground" :title="hit.group_id">
           Group: {{ hit.group_name || truncateMiddle(hit.group_id) }}
         </span>
       </RouterLink>
@@ -144,7 +144,7 @@ function bucketHitRoute(hit: BucketSearchHit): RouteLocationRaw {
       >
         <UserRound class="h-3.5 w-3.5 text-primary/70" />
         <span class="font-medium text-foreground">{{ hit.name }}</span>
-        <span class="font-mono text-[10px] text-muted-foreground" :title="hit.user_id">{{ shortUserId(hit.user_id) }}</span>
+        <span class="font-mono text-xs text-muted-foreground" :title="hit.user_id">{{ shortUserId(hit.user_id) }}</span>
       </RouterLink>
     </div>
   </section>

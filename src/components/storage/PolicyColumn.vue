@@ -84,7 +84,7 @@ function label(policy: PolicyRefBody): string {
           <Badge v-if="owner(policy)" variant="outline" size="sm" class="ml-1">{{ owner(policy) }}</Badge>
         </li>
       </ul>
-      <p class="text-[11px] text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         A copy has to be allowed by all of them.
         <DocsLink icon topic="where-data-lives" section="Placement policies" class="ml-0.5" />
       </p>
@@ -93,7 +93,7 @@ function label(policy: PolicyRefBody): string {
       None: copies of this file are not governed.
       <DocsLink icon topic="where-data-lives" section="Placement policies" class="ml-0.5" />
     </p>
-    <p v-if="ownSet" class="text-[11px] text-muted-foreground">This file carries its own rules.</p>
+    <p v-if="ownSet" class="text-xs text-muted-foreground">This file carries its own rules.</p>
 
     <RouterLink
       v-if="!props.nodeId && shown('placement')"

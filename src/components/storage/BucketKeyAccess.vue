@@ -85,7 +85,7 @@ function extendKey(key: BucketKeyGeneration) {
               {{ unlockView(key.unlock, nodeManaged).label }}
             </Badge>
           </div>
-          <p class="break-all text-[11px] text-muted-foreground">
+          <p class="break-all text-xs text-muted-foreground">
             Fingerprint <span class="font-mono">{{ key.fingerprint }}</span>
           </p>
           <p class="text-xs text-muted-foreground">

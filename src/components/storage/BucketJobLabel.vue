@@ -8,8 +8,8 @@ defineProps<{ job: BucketJob }>()
 </script>
 
 <template>
-  <span class="inline-flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground" data-testid="bucket-job">
-    <Spinner v-if="job.state === 'running'" show-label :label="bucketJobLabel(job)" class="text-[11px]" />
+  <span class="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground" data-testid="bucket-job">
+    <Spinner v-if="job.state === 'running'" show-label :label="bucketJobLabel(job)" class="text-xs" />
     <template v-else>
       <span class="size-1.5 rounded-full bg-amber-500" aria-hidden="true" />
       {{ bucketJobLabel(job) }}

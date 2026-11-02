@@ -172,19 +172,19 @@ async function look(policy: PolicyRefBody = lookup.value) {
             </Button>
           </div>
           <template v-if="entry.document">
-            <p class="mt-3 text-[11px] text-muted-foreground">Copies may be stored on a node that fits any of these:</p>
+            <p class="mt-3 text-xs text-muted-foreground">Copies may be stored on a node that fits any of these:</p>
             <div class="mt-1 flex flex-wrap gap-1.5">
               <Badge v-for="(selector, index) in entry.document.allowed" :key="index" variant="outline" size="sm">
                 {{ conditions(selector) }}
               </Badge>
             </div>
             <details class="mt-3 rounded-md border border-border px-3 py-2">
-              <summary class="cursor-pointer text-[11px] font-medium text-foreground">Advanced</summary>
-              <dl class="mt-2 grid grid-cols-[4rem_minmax(0,1fr)] gap-x-2 text-[11px] text-muted-foreground">
+              <summary class="cursor-pointer text-xs font-medium text-foreground">Advanced</summary>
+              <dl class="mt-2 grid grid-cols-[4rem_minmax(0,1fr)] gap-x-2 text-xs text-muted-foreground">
                 <dt>id</dt>
                 <dd class="font-mono">{{ entry.ref.policy_id }}</dd>
                 <dt>digest</dt>
-                <dd class="break-all font-mono text-[10px]">{{ entry.ref.digest }}</dd>
+                <dd class="break-all font-mono text-xs">{{ entry.ref.digest }}</dd>
                 <dt>published</dt>
                 <dd>{{ formatDateTime(entry.document.created_at_ms) }}</dd>
               </dl>
@@ -197,9 +197,9 @@ async function look(policy: PolicyRefBody = lookup.value) {
             <Spinner v-if="listLoadingMore" label="Loading more policies" class="text-current" />
             {{ listLoadingMore ? 'Loading…' : 'Load more' }}
           </Button>
-          <span class="text-[11px] text-muted-foreground">{{ entries.length }} loaded</span>
+          <span class="text-xs text-muted-foreground">{{ entries.length }} loaded</span>
         </div>
-        <p v-else-if="listed && !listComplete" class="text-[11px] text-muted-foreground">
+        <p v-else-if="listed && !listComplete" class="text-xs text-muted-foreground">
           This is one page of a longer listing, so a policy may exist that it did not name.
         </p>
       </div>
@@ -219,7 +219,7 @@ async function look(policy: PolicyRefBody = lookup.value) {
               <Search class="size-3.5" /> {{ lookupBusy ? 'Looking up…' : 'Look up' }}
             </Button>
           </div>
-          <p v-if="!lookupReady" class="text-[11px] text-muted-foreground">
+          <p v-if="!lookupReady" class="text-xs text-muted-foreground">
             Both halves are needed: an id alone could be answered with other bytes.
           </p>
           <p v-if="lookupError" class="text-xs text-destructive">{{ lookupError }}</p>

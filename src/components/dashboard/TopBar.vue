@@ -185,7 +185,7 @@ async function handleSignOut() {
             <Avatar :user="currentUser" size="sm" class="ring-0" />
             <div class="hidden min-w-0 max-w-40 flex-col text-left leading-none xl:flex">
               <div class="truncate text-[13px] font-medium leading-none text-foreground">{{ currentUser.name }}</div>
-              <div class="mt-0.5 truncate text-[11px] leading-none text-muted-foreground">
+              <div class="mt-0.5 truncate text-xs leading-none text-muted-foreground">
                 {{ homeRealm ?? `${realm.shortName}, ${role.replace('realm-', '')}` }}
               </div>
             </div>

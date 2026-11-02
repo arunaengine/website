@@ -133,7 +133,7 @@ function openLog(row: Row) {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in shown" :key="`${row.nodeId}/${row.share.id}`" class="border-t border-border text-[11px]">
+              <tr v-for="row in shown" :key="`${row.nodeId}/${row.share.id}`" class="border-t border-border text-xs">
                 <td class="max-w-[22rem] px-5 py-2.5">
                   <button type="button" class="block max-w-full truncate text-left text-primary hover:underline" :title="`${targetPath(row.share.target)}, open the access log`" @click="openLog(row)">
                     {{ targetPath(row.share.target) }}

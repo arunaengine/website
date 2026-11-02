@@ -152,7 +152,7 @@ const VIEWS = [
          shown as "about"; only a short page ends the listing. -->
     <div v-if="browseSource.length || browsePage > 1 || hasNextPage" class="flex flex-col items-center gap-2">
       <p
-        class="text-[11px] text-muted-foreground"
+        class="text-xs text-muted-foreground"
         :title="pageCount !== null && !favouritesOnly ? 'The node estimates this count per group, so the number of pages is approximate.' : undefined"
       >
         {{ browseSummary }}

@@ -83,13 +83,13 @@ const { realm } = useAruna()
           :to="{ name: 'dataset', params: { id: line.hit.document_id } }"
           class="surface group flex h-full flex-col gap-3 p-4 transition-shadow hover:shadow-md"
         >
-          <span class="w-fit text-[10px] text-muted-foreground">Purpose unknown</span>
+          <span class="w-fit text-xs text-muted-foreground">Purpose unknown</span>
           <div>
             <h3 v-if="line.title" class="font-display text-sm font-semibold text-aruna-navy">{{ line.title }}</h3>
             <h3 v-else class="break-all font-mono text-xs font-semibold text-aruna-navy">{{ line.hit.document_path }}</h3>
             <p v-if="line.snippet" class="mt-1 line-clamp-2 text-xs text-muted-foreground">{{ line.snippet }}</p>
           </div>
-          <div class="mt-auto flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <div class="mt-auto flex items-center justify-between gap-2 text-xs text-muted-foreground">
             <span class="truncate font-mono">{{ truncateMiddle(line.hit.document_id) }}</span>
             <div class="flex shrink-0 items-center gap-1.5">
               <Badge v-if="textQuery" variant="outline" size="sm">score {{ line.hit.score.toFixed(2) }}</Badge>
@@ -99,7 +99,7 @@ const { realm } = useAruna()
         </RouterLink>
       </template>
     </div>
-    <p v-if="hiddenByProfile > 0" class="mt-3 text-[11px] text-muted-foreground">
+    <p v-if="hiddenByProfile > 0" class="mt-3 text-xs text-muted-foreground">
       {{ hiddenByProfile }} result(s) without loaded details are hidden by the profile filter.
     </p>
   </section>
@@ -129,7 +129,7 @@ const { realm } = useAruna()
     <div class="mt-4 flex flex-col items-center gap-2">
       <p
         v-if="searchPageCount > 1 || searchHasNext"
-        class="text-[11px] text-muted-foreground"
+        class="text-xs text-muted-foreground"
         title="Search pages are walked with an opaque cursor and the node counts no matches, so there is no page total."
       >
         {{ searchSummary }}
@@ -143,14 +143,14 @@ const { realm } = useAruna()
         :disabled="searchRestarting"
         @update:page="showSearchPage"
       />
-      <p v-if="!searchHasNext && !searchPaging && !searchRestarting && !searchPageError" class="py-2 text-center text-[11px] text-muted-foreground">
+      <p v-if="!searchHasNext && !searchPaging && !searchRestarting && !searchPageError" class="py-2 text-center text-xs text-muted-foreground">
         {{ truncated || searchDepthCapped
           ? 'End of the first results, refine the query to reach matches past the node depth cap.'
           : 'End of results.' }}
       </p>
     </div>
   </template>
-  <p v-else-if="!cursorEnabled && capped" class="py-2 text-center text-[11px] text-muted-foreground">
+  <p v-else-if="!cursorEnabled && capped" class="py-2 text-center text-xs text-muted-foreground">
     Showing the first 100 matches by relevance, refine the query to narrow results.
   </p>
 </template>

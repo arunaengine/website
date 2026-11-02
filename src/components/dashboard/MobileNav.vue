@@ -59,7 +59,7 @@ const moreActive = computed(() => moreNav.value.some(isActive))
           :to="item.to"
           :data-tour="navAnchor(item.label)"
           :aria-current="isActive(item) ? 'page' : undefined"
-          class="flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-0.5 py-1 text-[10px] font-medium leading-tight transition-colors hover:bg-muted hover:text-foreground"
+          class="flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-0.5 py-1 text-xs font-medium leading-tight transition-colors hover:bg-muted hover:text-foreground"
           :class="isActive(item) ? 'bg-primary/10 text-primary' : 'text-muted-foreground'"
         >
           <component :is="item.icon" class="h-4 w-4 shrink-0" />
@@ -67,7 +67,7 @@ const moreActive = computed(() => moreNav.value.some(isActive))
         </RouterLink>
         <button
           type="button"
-          class="flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-0.5 py-1 text-[10px] font-medium leading-tight transition-colors hover:bg-muted hover:text-foreground"
+          class="flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-0.5 py-1 text-xs font-medium leading-tight transition-colors hover:bg-muted hover:text-foreground"
           :class="moreOpen || moreActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground'"
           aria-haspopup="dialog"
           :aria-expanded="moreOpen"

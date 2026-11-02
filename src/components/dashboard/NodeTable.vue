@@ -142,7 +142,7 @@ function lastSeen(node: RealmNodeInfo): string | null {
                   </RouterLink>
                   <span v-else class="block truncate font-medium text-foreground max-sm:whitespace-normal" :title="row.name">{{ row.name }}</span>
                   <!-- What the hidden columns would say, in a small line under the name. -->
-                  <span class="flex flex-wrap gap-x-2 text-[11px] text-muted-foreground">
+                  <span class="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
                     <span class="sm:hidden lg:inline xl:hidden">{{ typeLabel(row) }}</span>
                     <span v-if="row.here">This computer</span>
                     <span v-else-if="!onePlace && where(row)" class="2xl:hidden">{{ where(row) }}</span>

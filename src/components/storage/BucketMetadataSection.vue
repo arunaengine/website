@@ -219,8 +219,8 @@ function linked(answer: BucketMetadataAnswer) {
       />
       <div v-if="canAdmin" class="flex items-center justify-end gap-2">
         <Spinner v-if="busy" />
-        <span v-else-if="savedNow && !changed" role="status" class="text-[11px] text-muted-foreground">Saved.</span>
-        <span v-else-if="draftParser !== undefined" class="text-[11px] text-muted-foreground">Press Save to keep the rules.</span>
+        <span v-else-if="savedNow && !changed" role="status" class="text-xs text-muted-foreground">Saved.</span>
+        <span v-else-if="draftParser !== undefined" class="text-xs text-muted-foreground">Press Save to keep the rules.</span>
         <Button variant="ghost" size="sm" :disabled="busy || !changed" @click="discard">Discard</Button>
         <Button size="sm" :disabled="busy || !changed" @click="save">Save</Button>
       </div>

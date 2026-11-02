@@ -24,7 +24,7 @@ const facts = computed(() =>
 <template>
   <dl class="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-4">
     <div v-for="fact in facts" :key="fact.label" class="min-w-0">
-      <dt class="text-[11px] text-muted-foreground">{{ fact.label }}</dt>
+      <dt class="text-xs text-muted-foreground">{{ fact.label }}</dt>
       <dd class="truncate text-xs" :class="fact.value ? 'text-foreground' : 'text-muted-foreground'" :title="fact.title">{{ fact.value || '-' }}</dd>
     </div>
   </dl>

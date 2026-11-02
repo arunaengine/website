@@ -138,7 +138,7 @@ async function releaseCopy() {
 
         <div v-if="diagnostics.violations.length" class="overflow-x-auto rounded-md border border-border">
           <table class="w-full min-w-[720px] text-left text-xs">
-            <caption class="caption-top px-3 py-2 text-left text-[11px] text-muted-foreground">
+            <caption class="caption-top px-3 py-2 text-left text-xs text-muted-foreground">
               Copies this node holds back, with the exact version each belongs to.
             </caption>
             <thead class="border-y border-border bg-muted/40 text-muted-foreground">
@@ -153,7 +153,7 @@ async function releaseCopy() {
               <tr v-for="violation in diagnostics.violations" :key="`${violation.bucket}:${violation.key}:${violation.version_id}`">
                 <td class="px-3 py-2">
                   <div class="font-medium">{{ violation.bucket }}</div>
-                  <div class="font-mono text-[11px] text-muted-foreground">{{ violation.key }}</div>
+                  <div class="font-mono text-xs text-muted-foreground">{{ violation.key }}</div>
                 </td>
                 <td class="px-3 py-2 font-mono" :title="violation.version_id">{{ truncateMiddle(violation.version_id) }}</td>
                 <td class="px-3 py-2">

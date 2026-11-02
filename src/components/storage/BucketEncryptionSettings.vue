@@ -170,7 +170,7 @@ async function confirm() {
           Rotate key
         </Button>
       </div>
-      <p v-if="status.mode !== 'off' && locked" class="text-[11px] text-muted-foreground">
+      <p v-if="status.mode !== 'off' && locked" class="text-xs text-muted-foreground">
         Rotation needs the bucket unlocked.
       </p>
       <Notice v-if="failure && !pending" tone="error">{{ failure }}</Notice>

@@ -266,7 +266,7 @@ function onPublished(policy: PolicyResponse) {
               <p class="truncate text-sm text-foreground">
                 {{ policyName(policy) || 'Unnamed reference' }}
               </p>
-              <p class="text-[11px] text-muted-foreground">
+              <p class="text-xs text-muted-foreground">
                 <Badge v-if="ownerBadge(policy)" variant="outline" size="sm">{{ ownerBadge(policy) }}</Badge>
                 <span v-else>Owner not reported by this node</span>
               </p>
@@ -316,9 +316,9 @@ function onPublished(policy: PolicyResponse) {
             <Save class="size-3.5" /> {{ saving ? 'Saving…' : 'Save' }}
           </Button>
           <Button variant="outline" :disabled="saving || !dirty" @click="reset">Discard changes</Button>
-          <span v-if="!dirty" class="text-[11px] text-muted-foreground">Nothing changed yet.</span>
+          <span v-if="!dirty" class="text-xs text-muted-foreground">Nothing changed yet.</span>
         </div>
-        <p class="text-[11px] text-muted-foreground">
+        <p class="text-xs text-muted-foreground">
           Saving replaces the whole set and governs objects written afterwards.
         </p>
 
@@ -326,7 +326,7 @@ function onPublished(policy: PolicyResponse) {
           <summary class="cursor-pointer text-xs font-medium text-foreground">Advanced</summary>
           <div class="mt-3 space-y-3">
             <div class="flex flex-wrap items-center justify-between gap-2">
-              <p class="text-[11px] text-muted-foreground">
+              <p class="text-xs text-muted-foreground">
                 A reference is the policy id plus the digest of its definition, for a policy this
                 node does not list.
               </p>
@@ -338,7 +338,7 @@ function onPublished(policy: PolicyResponse) {
               class="grid gap-2 rounded-md border border-border bg-background p-3 md:grid-cols-[minmax(12rem,0.8fr)_minmax(20rem,1.4fr)]"
             >
               <div>
-                <label class="text-[11px] font-medium text-foreground">Policy id</label>
+                <label class="text-xs font-medium text-foreground">Policy id</label>
                 <Input
                   v-model="policy.policy_id"
                   class="mt-1 font-mono text-xs"
@@ -346,7 +346,7 @@ function onPublished(policy: PolicyResponse) {
                 />
               </div>
               <div>
-                <label class="text-[11px] font-medium text-foreground">Definition digest</label>
+                <label class="text-xs font-medium text-foreground">Definition digest</label>
                 <Input
                   v-model="policy.digest"
                   class="mt-1 font-mono text-xs"
@@ -354,7 +354,7 @@ function onPublished(policy: PolicyResponse) {
                 />
               </div>
             </div>
-            <p class="text-[11px] text-muted-foreground">
+            <p class="text-xs text-muted-foreground">
               Attached set generation {{ placement.generation }}. Saving checks it, so a change
               somebody else made is refused instead of overwritten.
             </p>

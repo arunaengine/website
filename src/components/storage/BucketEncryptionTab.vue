@@ -121,7 +121,7 @@ const WARNINGS = [
           <h2 class="font-display text-sm font-semibold text-aruna-navy">Encryption</h2>
           <DocsLink icon topic="encrypted-buckets" />
           <Badge v-if="lock" :variant="stateVariant(lock.label)" data-lock-state>{{ lock.label }}</Badge>
-          <span class="ml-auto inline-flex items-center gap-2 text-[11px] text-muted-foreground">
+          <span class="ml-auto inline-flex items-center gap-2 text-xs text-muted-foreground">
             <template v-if="encryption.nodeId.value">
               Reported by <NodeLabel :node-id="encryption.nodeId.value" size="sm" />
             </template>

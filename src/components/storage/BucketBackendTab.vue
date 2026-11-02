@@ -86,7 +86,7 @@ const groupDefault = computed(() => targetLabel(groupTarget.value, backends.valu
       <div class="px-5 py-4">
         <Skeleton v-if="!loaded" class="h-4 w-40" />
         <p v-else class="text-sm text-foreground">{{ groupDefault }}</p>
-        <p class="mt-0.5 text-[11px] text-muted-foreground">
+        <p class="mt-0.5 text-xs text-muted-foreground">
           Where new uploads go unless a rule below says otherwise.
           <RouterLink
             v-if="props.groupId"

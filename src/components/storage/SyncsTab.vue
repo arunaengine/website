@@ -247,7 +247,7 @@ function remove(row: SyncRow) {
             <span class="min-w-0 flex-1 truncate font-mono" :title="counterpart(row).label">
               {{ counterpart(row).label }}
             </span>
-            <span class="flex shrink-0 items-center gap-3 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
+            <span class="flex shrink-0 items-center gap-3 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
               <span v-if="details[row.relationship.id]">{{ details[row.relationship.id].pending_jobs }} pending</span>
               <span v-if="details[row.relationship.id]?.oldest_lag_ms != null">
                 lag {{ formatDuration(details[row.relationship.id].oldest_lag_ms ?? 0) }}
@@ -263,7 +263,7 @@ function remove(row: SyncRow) {
           </div>
 
           <div class="mt-2 flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
-            <span class="mr-auto flex items-center gap-2 text-[11px] text-muted-foreground">
+            <span class="mr-auto flex items-center gap-2 text-xs text-muted-foreground">
               <Badge
                 v-if="hostedOn[row.relationship.id]"
                 variant="secondary"
@@ -277,12 +277,12 @@ function remove(row: SyncRow) {
             </span>
 
             <template v-if="confirmingId === row.relationship.id">
-              <span class="text-[11px] text-muted-foreground">Delete this sync? Data already synced is kept.</span>
-              <Button variant="outline" size="sm" class="h-6 px-2 text-[11px]" @click="confirmingId = null">Cancel</Button>
+              <span class="text-xs text-muted-foreground">Delete this sync? Data already synced is kept.</span>
+              <Button variant="outline" size="sm" class="h-6 px-2 text-xs" @click="confirmingId = null">Cancel</Button>
               <Button
                 variant="destructive"
                 size="sm"
-                class="h-6 px-2 text-[11px]"
+                class="h-6 px-2 text-xs"
                 :disabled="busyId === row.relationship.id"
                 @click="remove(row)"
               >
@@ -291,11 +291,11 @@ function remove(row: SyncRow) {
             </template>
             <template v-else>
               <template v-if="row.direction === 'outgoing' && row.relationship.mode !== 'reference'">
-                <span class="text-[11px] text-muted-foreground">When the source points elsewhere</span>
+                <span class="text-xs text-muted-foreground">When the source points elsewhere</span>
                 <Select
                   :model-value="row.relationship.reference_handling"
                   :options="REFERENCE_OPTIONS"
-                  class="h-7 w-56 text-[11px]"
+                  class="h-7 w-56 text-xs"
                   aria-label="What to do when a source object points at data elsewhere"
                   :disabled="busyId !== null"
                   @update:model-value="(value: string) => setReferenceHandling(row, value)"
@@ -340,17 +340,17 @@ function remove(row: SyncRow) {
 
           <p
             v-if="details[row.relationship.id]?.pending_jobs && row.relationship.reference_handling === 'materialize'"
-            class="mt-1 text-[11px] text-muted-foreground"
+            class="mt-1 text-xs text-muted-foreground"
           >
             Data the source only points at is fetched before it is sent, so a large source can stay
             queued for a while.
           </p>
-          <p v-if="awaitingKey(row)" class="mt-1 text-[11px] text-amber-700 dark:text-amber-300">
+          <p v-if="awaitingKey(row)" class="mt-1 text-xs text-amber-700 dark:text-amber-300">
             {{ awaitingKey(row) }} {{ awaitingKey(row) === 1 ? 'copy is' : 'copies are' }} waiting for the source
             bucket to be unlocked.
           </p>
-          <p v-if="lastError(row)" class="mt-1 break-all text-[11px] text-destructive">{{ lastError(row) }}</p>
-          <p v-if="rowError[row.relationship.id]" class="mt-1 break-all text-[11px] text-destructive">
+          <p v-if="lastError(row)" class="mt-1 break-all text-xs text-destructive">{{ lastError(row) }}</p>
+          <p v-if="rowError[row.relationship.id]" class="mt-1 break-all text-xs text-destructive">
             {{ rowError[row.relationship.id] }}
           </p>
         </li>
