@@ -95,7 +95,7 @@ const tone = computed(() => {
         }"
       />
       <span
-        class="absolute inset-y-0 left-0 rounded-full transition-all"
+        class="absolute inset-y-0 left-0 rounded-full transition-[width,background-color]"
         :style="{ width: `${usedPct}%`, backgroundColor: tone }"
       />
       <!-- Quota marker. -->

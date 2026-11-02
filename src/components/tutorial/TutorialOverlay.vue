@@ -168,7 +168,7 @@ onUnmounted(() => {
       />
       <div
         v-if="spot"
-        class="absolute rounded-lg ring-2 ring-primary transition-all duration-200 motion-reduce:transition-none"
+        class="absolute rounded-lg ring-2 ring-primary transition-[top,left,width,height] duration-200 motion-reduce:transition-none"
         :style="spotStyle"
         aria-hidden="true"
       />

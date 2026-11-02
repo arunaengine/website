@@ -73,7 +73,7 @@ function abort() {
       aria-valuemin="0"
       aria-valuemax="100"
     >
-      <div class="h-full bg-primary transition-all" :style="{ width: `${percent(job)}%` }" />
+      <div class="h-full bg-primary transition-[width]" :style="{ width: `${percent(job)}%` }" />
     </div>
     <p v-if="!job.starting" class="text-xs tabular-nums text-muted-foreground">
       {{ formatNumber(job.done) }}<template v-if="job.total"> of {{ job.counted ? '' : 'at least ' }}{{ formatNumber(job.total) }}</template>

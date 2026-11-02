@@ -72,7 +72,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
     <div class="fixed inset-0 z-[70]">
       <div
         v-if="spot"
-        class="absolute rounded-lg ring-2 ring-primary transition-all duration-200"
+        class="absolute rounded-lg ring-2 ring-primary transition-[top,left,width,height] duration-200"
         :style="spotStyle"
         aria-hidden="true"
       />
@@ -100,7 +100,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               <span
                 v-for="dot in tourCount"
                 :key="dot"
-                class="h-1.5 rounded-full transition-all duration-200 motion-reduce:transition-none"
+                class="h-1.5 rounded-full transition-[width,background-color] duration-200 motion-reduce:transition-none"
                 :class="dot === tourIndex + 1 ? 'w-5 bg-primary' : dot < tourIndex + 1 ? 'w-1.5 bg-primary/50' : 'w-1.5 bg-border'"
               />
             </div>
