@@ -203,12 +203,12 @@ const MORE = 50
 
 /**
  * Signed out, the folders below linked parts that a visitor opened in place, keyed by part and
- * prefix. "Show more" lists the folder again with more entries. Answers of an earlier dataset drop.
+ * prefix. "Show more" appends the next page. Answers of an earlier dataset drop.
  */
 export function usePartFolders(datasetId: Ref<string>) {
   const { listBucketObjects, sessionEpoch } = useAruna()
   const { isLocalNode } = useRealmNodes()
-  const folders = ref(new Map<string, { list: PartEntry[]; more: boolean; loading: boolean; error?: string | null }>())
+  const folders = ref(new Map<string, { list: PartEntry[]; more: boolean; loading: boolean; error?: string | null; cursor?: string }>())
   let generation = 0
   watch([datasetId, sessionEpoch], () => {
     generation++
@@ -217,39 +217,42 @@ export function usePartFolders(datasetId: Ref<string>) {
 
   const keyOf = (part: LinkedPartFacts, prefix: string) => `${part.target?.id ?? ''}\n${prefix}`
 
-  async function list(part: LinkedPartFacts, prefix: string, limit: number) {
+  async function list(part: LinkedPartFacts, prefix: string, cursor?: string) {
     const target = part.target
     if (!target?.bucket) return
     const key = keyOf(part, prefix)
     const round = generation
-    const known = folders.value.get(key)
-    folders.value = new Map(folders.value).set(key, { list: known?.list ?? [], more: false, loading: true })
+    const known = cursor ? folders.value.get(key) : undefined
+    folders.value = new Map(folders.value).set(key, { list: known?.list ?? [], more: false, loading: true, cursor })
     const node = target.node_id && !isLocalNode(target.node_id) ? target.node_id : null
     let error: string | null = null
-    const page = await listBucketObjects(target.bucket, { prefix: prefix || undefined, delimiter: '/', limit: limit + 1 }, node).catch((cause: unknown) => {
+    const page = await listBucketObjects(target.bucket, { prefix: prefix || undefined, delimiter: '/', cursor, limit: MORE }, node).catch((cause: unknown) => {
       error = apiErrorMessage(cause)
       return null
     })
     if (round !== generation || !folders.value.has(key)) return
-    const entries = page ? entryList(target, prefix, page, isLocalNode, part.download) : (known?.list ?? [])
+    const entries = page ? entryList(target, prefix, page, isLocalNode, part.download) : []
+    const next = page ? (page.next_cursor ?? undefined) : cursor
     folders.value = new Map(folders.value).set(key, {
-      list: entries.slice(0, page ? limit : undefined),
-      more: page ? entries.length > limit || Boolean(page.next_cursor) : false,
+      list: [...(known?.list ?? []), ...entries],
+      more: Boolean(next),
       loading: false,
       error,
+      cursor: next,
     })
   }
 
   function toggle(part: LinkedPartFacts, prefix: string) {
     const key = keyOf(part, prefix)
-    if (!folders.value.has(key)) return void list(part, prefix, MORE)
+    if (!folders.value.has(key)) return void list(part, prefix)
     const next = new Map(folders.value)
     next.delete(key)
     folders.value = next
   }
 
-  function more(part: LinkedPartFacts, prefix: string, shown: number) {
-    void list(part, prefix, shown + MORE)
+  // The root of a part has no cursor yet, so its first page is read again in full.
+  function more(part: LinkedPartFacts, prefix: string) {
+    void list(part, prefix, folders.value.get(keyOf(part, prefix))?.cursor)
   }
 
   return { folders, keyOf, toggle, more }

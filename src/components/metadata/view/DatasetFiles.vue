@@ -404,7 +404,7 @@ function openPreview(row: DataEntity) {
                   </tr>
                   <tr v-else class="border-t border-border-subtle">
                     <td :colspan="columns" class="py-1.5 pr-3" :style="{ paddingLeft: `${2.5 + item.depth * 1.5}rem` }">
-                      <button type="button" class="text-xs text-primary hover:underline disabled:opacity-60" :disabled="item.loading" @click="moreFolder(partOf(row)!, item.prefix, item.shown)">Show more</button>
+                      <button type="button" class="text-xs text-primary hover:underline disabled:opacity-60" :disabled="item.loading" @click="moreFolder(partOf(row)!, item.prefix)">Show more</button>
                     </td>
                   </tr>
                 </template>

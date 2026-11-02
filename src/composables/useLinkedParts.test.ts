@@ -222,12 +222,31 @@ describe('usePartFolders', () => {
     toggle(part, 'g/')
     await settle()
 
-    expect(aruna.listBucketObjects).toHaveBeenCalledWith('refseq', { prefix: 'g/', delimiter: '/', limit: 51 }, 'n2')
+    expect(aruna.listBucketObjects).toHaveBeenCalledWith('refseq', { prefix: 'g/', delimiter: '/', limit: 50 }, 'n2')
     const opened = folders.value.get(keyOf(part, 'g/'))!
     expect(opened.list.map((entry) => [entry.name, entry.prefix ?? null])).toEqual([['x', 'g/x/'], ['a.txt', null]])
     expect(opened.list[1].download).toContain(encodeURIComponent('arn:aruna:r:n2:s3/refseq/g/a.txt@v'))
     toggle(part, 'g/')
     expect(folders.value.size).toBe(0)
+    scope.stop()
+  })
+
+  it('appends the next page on show more, past the first page the node returns', async () => {
+    aruna.listBucketObjects
+      .mockResolvedValueOnce({ bucket: 'refseq', prefixes: [], objects: [{ key: 'g/a.txt', version_id: 'v', size: 1 }], next_cursor: 'c2' })
+      .mockResolvedValueOnce({ bucket: 'refseq', prefixes: [], objects: [{ key: 'g/b.txt', version_id: 'v', size: 1 }], next_cursor: null })
+    const scope = effectScope()
+    const { folders, keyOf, toggle, more } = scope.run(() => usePartFolders(ref('d1')))!
+    toggle(part, 'g/')
+    await settle()
+    expect(folders.value.get(keyOf(part, 'g/'))?.more).toBe(true)
+    more(part, 'g/')
+    await settle()
+
+    expect(aruna.listBucketObjects).toHaveBeenLastCalledWith('refseq', { prefix: 'g/', delimiter: '/', cursor: 'c2', limit: 50 }, 'n2')
+    const opened = folders.value.get(keyOf(part, 'g/'))!
+    expect(opened.list.map((entry) => entry.name)).toEqual(['a.txt', 'b.txt'])
+    expect(opened.more).toBe(false)
     scope.stop()
   })
 
