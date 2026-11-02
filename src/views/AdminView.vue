@@ -21,6 +21,7 @@ import DataPlacementPanel from '@/components/storage/DataPlacementPanel.vue'
 import PoliciesSection from '@/components/policies/PoliciesSection.vue'
 import FederationSettings from '@/components/federation/FederationSettings.vue'
 import FeatureDefaults from '@/components/settings/FeatureDefaults.vue'
+import RealmAssistant from '@/components/settings/RealmAssistant.vue'
 import EffectivePolicies from '@/components/policies/EffectivePolicies.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -43,7 +44,7 @@ import {
 } from '@/views/adminQuota'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
-import { ChevronDown, Cpu, Database, Files, Gauge, Globe, HardDrive, Layers, Link2, ListTodo, Boxes, MapPinned, Server, Save, Plus, ServerCog, ShieldAlert, Trash2, ShieldCheck, SlidersHorizontal, Users, UserCog, Workflow } from '@lucide/vue'
+import { ChevronDown, Cpu, Sparkles, Database, Files, Gauge, Globe, HardDrive, Layers, Link2, ListTodo, Boxes, MapPinned, Server, Save, Plus, ServerCog, ShieldAlert, Trash2, ShieldCheck, SlidersHorizontal, Users, UserCog, Workflow } from '@lucide/vue'
 
 const router = useRouter()
 const realmNodeCount = computed(() => (realmInfo.value?.nodes ?? []).filter((node) => node.kind !== 'user').length)
@@ -65,6 +66,7 @@ const tabs = adminTabs({ placement: placementAdminEnabled, policies: policiesEna
 const TAB_ICONS: Record<string, unknown> = {
   realm: Gauge,
   compute: Cpu,
+  assistant: Sparkles,
   jobs: ListTodo,
   placement: Workflow,
   'data-placement': MapPinned,
@@ -302,6 +304,8 @@ async function save() {
       </div>
 
       <TabsContent value="compute" class="mt-0"><ComputeAdminPanel /></TabsContent>
+
+      <TabsContent value="assistant" class="mt-0 w-full px-4 py-6 sm:px-6"><RealmAssistant /></TabsContent>
 
       <TabsContent v-if="tabs.some((entry) => entry.id === 'jobs')" value="jobs" class="mt-0 w-full px-4 py-6 sm:px-6"><JobsPanel in-place /></TabsContent>
 

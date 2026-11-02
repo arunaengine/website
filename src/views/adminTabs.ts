@@ -10,6 +10,7 @@ export function adminTabs(features: { placement: boolean; policies: boolean; job
   return [
     { id: 'realm', label: 'Quota & usage' },
     { id: 'compute', label: 'Compute' },
+    { id: 'assistant', label: 'Assistant' },
     ...(features.jobs ? [{ id: 'jobs', label: 'Jobs' }] : []),
     ...(features.placement
       ? [
