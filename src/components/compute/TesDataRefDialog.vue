@@ -195,7 +195,7 @@ async function folderFiles(bucket: string, nodeId: string | null, prefix: string
   return files
 }
 
-// Each remote pick has its number; reopening the picker or a newer pick ends an older one.
+// Each remote pick has its number; closing or reopening the picker or a newer pick ends an older one.
 let pickRun = 0
 async function addRemote(pick: RemotePick) {
   const place = database.value
@@ -208,7 +208,7 @@ async function addRemote(pick: RemotePick) {
   const run = ++pickRun
   const epoch = sessionEpoch.value
   const mount = mountDirNormalized.value
-  const current = () => run === pickRun && epoch === sessionEpoch.value && database.value === place && mount === mountDirNormalized.value
+  const current = () => run === pickRun && props.open && epoch === sessionEpoch.value && database.value === place && mount === mountDirNormalized.value
   folderBusy.value = true
   folderError.value = null
   try {
@@ -243,8 +243,8 @@ async function addRemote(pick: RemotePick) {
 watch(
   () => props.open,
   (open) => {
-    if (!open) return
     pickRun++
+    if (!open) return
     folderBusy.value = false
     folderError.value = null
     mountDir.value = props.mountDefault
