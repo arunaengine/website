@@ -111,7 +111,7 @@ function inventoryRows(preflight: StorageDeletionPreflight) {
       <Notice v-else-if="props.sourceStatus === 'error'" tone="warning">
         <p class="font-medium">Source-binding lookup failed.</p>
         <p>Existing source bindings are unknown.</p>
-        <p v-if="props.sourceError" class="mt-1 break-all font-mono text-[10px]">{{ props.sourceError }}</p>
+        <p v-if="props.sourceError" class="mt-1 break-all font-mono text-xs">{{ props.sourceError }}</p>
       </Notice>
       <Notice v-else-if="props.sourceStatus === 'unknown'" tone="warning">
         Source-binding coverage is unknown for this scope.

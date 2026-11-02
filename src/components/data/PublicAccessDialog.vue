@@ -123,10 +123,10 @@ async function apply(action: 'grant' | 'revoke') {
                 {{ row.isPublic ? 'public' : 'private' }}
               </Badge>
             </div>
-            <p v-if="row.inherited.length" class="text-[11px] text-muted-foreground">
+            <p v-if="row.inherited.length" class="text-xs text-muted-foreground">
               Through the rule on {{ ruleName(row.inherited[0]) }}
             </p>
-            <p v-if="row.url" class="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+            <p v-if="row.url" class="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
               <span class="min-w-0 truncate font-mono" :title="row.url">{{ row.url }}</span>
               <CopyButton :value="row.url" label="Copy the public address" />
             </p>

@@ -94,7 +94,7 @@ const tooltipLeft = computed(() => (hoverPoint.value ? Math.min(85, Math.max(15,
 <template>
   <div>
     <div class="flex gap-2">
-      <div class="flex w-16 shrink-0 flex-col justify-between py-0.5 text-right text-[10px] tabular-nums text-muted-foreground">
+      <div class="flex w-16 shrink-0 flex-col justify-between py-0.5 text-right text-xs tabular-nums text-muted-foreground">
         <span>{{ formatBytes(yMax) }}</span>
         <span>0</span>
       </div>
@@ -125,7 +125,7 @@ const tooltipLeft = computed(() => (hoverPoint.value ? Math.min(85, Math.max(15,
           :style="{ top: `${topPctForValue(quotaRef)}%` }"
         >
           <span class="inline-block h-0.5 w-2" style="background-color: #d97706" />
-          <span class="text-[10px] text-muted-foreground">Quota · {{ formatBytes(quotaRef) }}</span>
+          <span class="text-xs text-muted-foreground">Quota · {{ formatBytes(quotaRef) }}</span>
         </div>
         <div
           v-if="ceilingRef != null"
@@ -133,7 +133,7 @@ const tooltipLeft = computed(() => (hoverPoint.value ? Math.min(85, Math.max(15,
           :style="{ top: `${topPctForValue(ceilingRef)}%` }"
         >
           <span class="inline-block h-0.5 w-2" style="background-color: #dc2626" />
-          <span class="text-[10px] text-muted-foreground">Hard cap · {{ formatBytes(ceilingRef) }}</span>
+          <span class="text-xs text-muted-foreground">Hard cap · {{ formatBytes(ceilingRef) }}</span>
         </div>
 
         <span
@@ -147,24 +147,24 @@ const tooltipLeft = computed(() => (hoverPoint.value ? Math.min(85, Math.max(15,
           :style="{ left: `${tooltipLeft}%` }"
         >
           <div class="font-medium text-foreground tabular-nums">{{ formatBytes(hoverPoint.v) }}</div>
-          <div class="text-[10px] text-muted-foreground">{{ formatDateTime(hoverPoint.t) }}</div>
-          <div v-if="pointBadge(hoverPoint.point)" class="mt-0.5 text-[10px] font-medium text-muted-foreground">
+          <div class="text-xs text-muted-foreground">{{ formatDateTime(hoverPoint.t) }}</div>
+          <div v-if="pointBadge(hoverPoint.point)" class="mt-0.5 text-xs font-medium text-muted-foreground">
             {{ pointBadge(hoverPoint.point)!.label }}
           </div>
         </div>
       </div>
     </div>
 
-    <div class="mt-1 flex justify-between pl-[4.5rem] text-[10px] text-muted-foreground">
+    <div class="mt-1 flex justify-between pl-[4.5rem] text-xs text-muted-foreground">
       <span>{{ firstDate }}</span>
       <span>{{ lastDate }}</span>
     </div>
 
     <details class="mt-2">
-      <summary class="cursor-pointer text-[11px] text-muted-foreground">View as table</summary>
+      <summary class="cursor-pointer text-xs text-muted-foreground">View as table</summary>
       <div class="mt-2 max-h-48 overflow-y-auto rounded-md border border-border">
         <table class="w-full text-xs">
-          <thead class="sticky top-0 bg-muted/50 text-[10px] text-muted-foreground">
+          <thead class="sticky top-0 bg-muted/50 text-xs text-muted-foreground">
             <tr>
               <th class="px-2 py-1 text-left font-semibold">Timestamp</th>
               <th class="px-2 py-1 text-right font-semibold">Logical bytes</th>

@@ -184,16 +184,16 @@ async function removeRole(role: ApiRole) {
                 @click="rulesOf = role"
               >
                 <Badge size="sm" :variant="levelVariant(customSummary(role).level)">{{ customSummary(role).level }}</Badge>
-                <span class="text-[11px] text-muted-foreground">{{ customSummary(role).count }} {{ customSummary(role).count === 1 ? 'rule' : 'rules' }}</span>
+                <span class="text-xs text-muted-foreground">{{ customSummary(role).count }} {{ customSummary(role).count === 1 ? 'rule' : 'rules' }}</span>
                 <Info class="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
               </button>
               <span v-else class="text-muted-foreground">-</span>
             </td>
-            <td class="px-3 py-2.5 text-right text-[11px] tabular-nums text-muted-foreground">
+            <td class="px-3 py-2.5 text-right text-xs tabular-nums text-muted-foreground">
               {{ role.public ? 'everyone' : role.assigned_users ? role.assigned_users.length : '-' }}
             </td>
             <td v-if="canManage" class="px-5 py-2.5 text-right">
-              <span v-if="role.name === 'admin'" class="inline-flex items-center gap-1 text-[11px] text-muted-foreground" title="The admin role cannot be changed or deleted.">
+              <span v-if="role.name === 'admin'" class="inline-flex items-center gap-1 text-xs text-muted-foreground" title="The admin role cannot be changed or deleted.">
                 <Lock class="h-3 w-3" /> protected
               </span>
               <template v-else>
@@ -240,7 +240,7 @@ async function removeRole(role: ApiRole) {
             <Badge size="sm" :variant="levelVariant(rule.level)" class="mt-0.5 shrink-0">{{ rule.level }}</Badge>
             <span class="min-w-0">
               <span class="block">{{ rule.label }}</span>
-              <span class="block break-all font-mono text-[10px] text-muted-foreground">{{ rule.path }}</span>
+              <span class="block break-all font-mono text-xs text-muted-foreground">{{ rule.path }}</span>
             </span>
           </li>
         </ul>

@@ -113,7 +113,7 @@ async function onDrop(event: DragEvent) {
       …or pick a whole folder
     </button>
   </div>
-  <p class="text-[11px] text-muted-foreground">
+  <p class="text-xs text-muted-foreground">
     Folders keep their structure. Uploads go on while you browse.
   </p>
 </template>

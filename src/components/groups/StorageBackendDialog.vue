@@ -232,7 +232,7 @@ async function setRemoved(remove: boolean) {
             </div>
           </div>
 
-          <p v-if="isEdit" class="flex items-start gap-2 text-[11px] text-muted-foreground">
+          <p v-if="isEdit" class="flex items-start gap-2 text-xs text-muted-foreground">
             <Lock
               class="mt-0.5 h-3 w-3 shrink-0"
               aria-label="Locked"
@@ -261,7 +261,7 @@ async function setRemoved(remove: boolean) {
           <label v-if="schema.toggle" class="flex items-center justify-between gap-3 text-xs">
             <span>
               <span class="font-medium text-foreground">{{ schema.toggle.label }}</span>
-              <span class="block text-[11px] text-muted-foreground">{{ schema.toggle.hint }}</span>
+              <span class="block text-xs text-muted-foreground">{{ schema.toggle.hint }}</span>
             </span>
             <Switch
               :checked="toggleOn"
@@ -285,7 +285,7 @@ async function setRemoved(remove: boolean) {
           </button>
           <fieldset v-else class="space-y-3 rounded-md border border-border p-3">
             <legend class="px-1 text-xs font-semibold text-foreground">{{ isEdit ? 'Replace keys' : 'Credentials' }}</legend>
-            <p class="text-[11px] text-muted-foreground">
+            <p class="text-xs text-muted-foreground">
               Stored write-only: the node never shows them again.
               <template v-if="schema.secretOneOf">One of the two is enough.</template>
               <template v-if="isEdit"> Leave blank to keep the current ones.</template>
@@ -306,11 +306,11 @@ async function setRemoved(remove: boolean) {
           <Notice v-if="submitError" tone="error">
             {{ submitSummary }}
             <details v-if="submitSummary !== submitError.trim()" class="mt-1">
-              <summary class="cursor-pointer text-[11px]">Details</summary>
-              <p class="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px]">{{ submitError }}</p>
+              <summary class="cursor-pointer text-xs">Details</summary>
+              <p class="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap break-words font-mono text-xs">{{ submitError }}</p>
             </details>
           </Notice>
-          <p class="text-[11px] text-muted-foreground">
+          <p class="text-xs text-muted-foreground">
             Aruna checks the keys before it saves them.
           </p>
         </div>

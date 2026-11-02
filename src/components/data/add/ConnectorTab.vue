@@ -116,10 +116,10 @@ function addTypedConnectorPath() {
             <Plus class="h-3.5 w-3.5" /> Add
           </Button>
         </div>
-        <p v-if="connectorPathError" class="mt-1 text-[11px] text-destructive">
+        <p v-if="connectorPathError" class="mt-1 text-xs text-destructive">
           Use a relative path without leading '/', backslashes, or '.'/'..' segments.
         </p>
-        <p v-else class="mt-1 text-[11px] text-muted-foreground">
+        <p v-else class="mt-1 text-xs text-muted-foreground">
           End a folder path with '/' or use '.' to add the connector root.
         </p>
       </div>

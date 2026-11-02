@@ -174,7 +174,7 @@ watch(
         Custom…
       </button>
     </div>
-    <p class="mt-1.5 text-[11px] text-muted-foreground">
+    <p class="mt-1.5 text-xs text-muted-foreground">
       {{ activeScope ? activeScope.hint : customOpen ? 'Browse below and pick exactly what this rule covers.' : 'Pick a scope, or choose Custom… for something more specific.' }}
     </p>
 
@@ -208,7 +208,7 @@ watch(
           <RefreshButton :busy="spinning" size="xs" label="Reload" @click="onReload" />
         </div>
         <div class="px-3 pb-3 pt-2">
-          <p class="text-[11px] text-muted-foreground">
+          <p class="text-xs text-muted-foreground">
             Choose a folder to include everything inside it, or a single dataset.
           </p>
           <div class="scrollbar-thin mt-1.5 max-h-80 min-h-28 overflow-y-auto">
@@ -230,10 +230,10 @@ watch(
             />
           </div>
           <div v-if="tree && !pathsExhausted" class="mt-1.5 flex items-center gap-2">
-            <Button variant="outline" size="sm" class="h-7 text-[11px]" :disabled="loading" :aria-busy="loading" @click="load(true)">
+            <Button variant="outline" size="sm" class="h-7 text-xs" :disabled="loading" :aria-busy="loading" @click="load(true)">
               <Spinner v-if="loading" label="Loading more paths" class="text-current" /> Load more paths
             </Button>
-            <span class="text-[11px] text-muted-foreground">
+            <span class="text-xs text-muted-foreground">
               {{ pathsEstimate === null ? `${paths.length} loaded` : `${paths.length} of about ${pathsEstimate}` }}; a folder scope covers everything under it.
             </span>
           </div>
@@ -244,7 +244,7 @@ watch(
         <div class="flex items-center justify-between gap-2 border-b border-border/70 px-3 py-2">
           <h2 class="font-display text-sm font-semibold text-aruna-navy">Files</h2>
           <div class="flex min-w-0 items-center gap-1.5">
-            <span class="shrink-0 text-[11px] text-muted-foreground">Node</span>
+            <span class="shrink-0 text-xs text-muted-foreground">Node</span>
             <Select
               :model-value="nodeChoice"
               :options="nodeOptions"
@@ -270,7 +270,7 @@ watch(
             </span>
           </button>
           <template v-if="browsableNode">
-            <p class="mt-1 text-[11px] text-muted-foreground">
+            <p class="mt-1 text-xs text-muted-foreground">
               Open a bucket and choose a folder to include everything inside it, or a single file.
             </p>
             <div class="scrollbar-thin mt-1.5 max-h-80 min-h-24 overflow-y-auto">
@@ -282,11 +282,11 @@ watch(
               />
             </div>
           </template>
-          <p v-else-if="nodeChoice === 'all'" class="mt-1 text-[11px] text-muted-foreground">
+          <p v-else-if="nodeChoice === 'all'" class="mt-1 text-xs text-muted-foreground">
             Pick a specific node to narrow the scope; folders can be browsed on the node this portal is connected to.
           </p>
           <template v-else>
-            <p class="mt-1 text-[11px] text-muted-foreground">
+            <p class="mt-1 text-xs text-muted-foreground">
               This portal can only browse folders on its own node, type a bucket or folder path instead.
             </p>
             <div class="mt-1.5 flex items-center gap-2">

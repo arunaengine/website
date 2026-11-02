@@ -150,7 +150,7 @@ const excludedForms = computed(() =>
           ? 'Reference and last-resolvable-location impact are unknown for those keys.'
           : 'Reference and last-resolvable-location impact are unknown.' }}
       </p>
-      <p class="mt-1 break-all font-mono text-[10px]">{{ error }}</p>
+      <p class="mt-1 break-all font-mono text-xs">{{ error }}</p>
     </Notice>
     <template v-else-if="preflight">
       <Notice v-if="partial" tone="warning" class="font-medium">

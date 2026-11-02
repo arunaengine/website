@@ -94,14 +94,14 @@ onMounted(() => void load(false))
       <Skeleton class="h-5" />
       <Skeleton class="h-5" />
     </div>
-    <p v-else-if="status === 'forbidden'" class="text-[11px] text-muted-foreground">
+    <p v-else-if="status === 'forbidden'" class="text-xs text-muted-foreground">
       Only group members can browse files; pick a scope above.
     </p>
-    <p v-else-if="status === 'unavailable'" class="text-[11px] text-muted-foreground">
+    <p v-else-if="status === 'unavailable'" class="text-xs text-muted-foreground">
       File browsing is not available on this node; pick a scope above.
     </p>
     <p v-else-if="error" class="text-xs text-destructive">{{ error }}</p>
-    <p v-else-if="!entries.length" class="text-[11px] text-muted-foreground">
+    <p v-else-if="!entries.length" class="text-xs text-muted-foreground">
       {{ prefix ? 'This folder is empty.' : 'This group has no buckets yet; pick a scope above.' }}
     </p>
     <ul v-else class="space-y-0.5">
@@ -121,7 +121,7 @@ onMounted(() => void load(false))
             <button
               type="button"
               :class="[
-                'rounded px-1.5 py-0.5 text-[10px] transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100',
+                'rounded px-1.5 py-0.5 text-xs transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100',
                 selected?.includes(subtreeSuffix(entry.permission_path)) ? 'text-primary opacity-100' : 'text-muted-foreground opacity-0',
               ]"
               :title="`Select this folder, includes everything inside (${subtreeSuffix(entry.permission_path)})`"
@@ -159,7 +159,7 @@ onMounted(() => void load(false))
       <li v-if="nextToken">
         <button
           type="button"
-          class="rounded px-1.5 py-1 text-[11px] font-medium text-primary hover:bg-muted disabled:opacity-60"
+          class="rounded px-1.5 py-1 text-xs font-medium text-primary hover:bg-muted disabled:opacity-60"
           :disabled="loadingMore"
           @click="load(true)"
         >

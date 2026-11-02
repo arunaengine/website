@@ -149,7 +149,7 @@ async function confirmDelete(connector: RepositoryConnector) {
           <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
             {{ connector.endpoint }}<template v-if="connector.community"> · {{ connector.community }}</template>
           </span>
-          <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime(connector.updated_at) }}</span>
+          <span class="shrink-0 text-xs text-muted-foreground">{{ relativeTime(connector.updated_at) }}</span>
           <template v-if="canWrite">
             <template v-if="confirmingId === connector.connector_id">
               <span class="text-xs text-foreground">Delete this repository? It cannot be deleted while dataset links still use it.</span>

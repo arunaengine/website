@@ -110,7 +110,7 @@ function saveChoice() {
     </div>
     <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
       <div class="min-w-0 space-y-1">
-        <p class="text-[11px] text-muted-foreground">
+        <p class="text-xs text-muted-foreground">
           Where new datasets of this group store their files. Each dataset gets its own folder, named after the dataset id.
           <DocsLink icon topic="dataset-git" section="Where pushed files are stored" class="ml-0.5" />
         </p>
@@ -126,8 +126,8 @@ function saveChoice() {
           New datasets go to: <span class="font-mono">{{ location.bucket }}/{{ location.prefix }}</span>
           <Badge v-if="isGenerated" size="sm" variant="outline" class="ml-1">Generated group bucket</Badge>
         </p>
-        <p v-if="stored" class="text-[11px] text-muted-foreground">{{ stored }}</p>
-        <p v-if="canAdmin" class="text-[11px] text-muted-foreground">Changing it does not move existing datasets or their files.</p>
+        <p v-if="stored" class="text-xs text-muted-foreground">{{ stored }}</p>
+        <p v-if="canAdmin" class="text-xs text-muted-foreground">Changing it does not move existing datasets or their files.</p>
       </div>
       <Button v-if="canAdmin" variant="ghost" size="sm" class="h-7 px-2 text-aruna-navy dark:text-foreground" @click="edit">Edit</Button>
     </div>

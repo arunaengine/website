@@ -289,7 +289,7 @@ async function submit() {
           <label v-if="schema.toggle" class="flex items-center justify-between gap-3 text-xs">
             <span>
               <span class="font-medium text-foreground">{{ schema.toggle.label }}</span>
-              <span class="block text-[11px] text-muted-foreground">{{ schema.toggle.hint }}</span>
+              <span class="block text-xs text-muted-foreground">{{ schema.toggle.hint }}</span>
             </span>
             <Switch
               :checked="toggleOn"
@@ -300,11 +300,11 @@ async function submit() {
 
           <fieldset class="space-y-3 rounded-md border border-border p-3">
             <legend class="px-1 text-xs font-semibold text-foreground">Credentials (optional)</legend>
-            <p v-if="toggleActive" class="text-[11px] text-muted-foreground">
+            <p v-if="toggleActive" class="text-xs text-muted-foreground">
               A public bucket is read anonymously, so no credentials are sent.
             </p>
             <template v-else>
-              <p class="text-[11px] text-muted-foreground">
+              <p class="text-xs text-muted-foreground">
                 Stored write-only, the node never returns them.
               </p>
               <div v-for="field in schema.secret" :key="field.key">
@@ -346,7 +346,7 @@ async function submit() {
             <span>Connection failed{{ testResult.error ? `: ${testResult.error}` : '.' }}</span>
           </Notice>
           <Notice v-else-if="testError" tone="error">Connection test failed: {{ testError }}</Notice>
-          <p v-if="testUnsupported" class="text-[11px] text-muted-foreground">
+          <p v-if="testUnsupported" class="text-xs text-muted-foreground">
             Connection tests are not supported by this node yet.
           </p>
 

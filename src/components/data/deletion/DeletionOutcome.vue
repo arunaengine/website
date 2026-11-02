@@ -14,7 +14,7 @@ const props = defineProps<{ outcome: SelectionOutcome }>()
     </p>
     <div v-if="props.outcome.committed.length" class="space-y-1">
       <p class="font-medium text-emerald-700 dark:text-emerald-300">Committed entries</p>
-      <ul class="space-y-1 pl-4 font-mono text-[10px] text-muted-foreground">
+      <ul class="space-y-1 pl-4 font-mono text-xs text-muted-foreground">
         <li v-for="key in props.outcome.committed" :key="key" class="list-disc break-all">{{ key }}</li>
       </ul>
       <p class="text-muted-foreground">Only these confirmed-successful entries were cleared from the selection.</p>
@@ -23,7 +23,7 @@ const props = defineProps<{ outcome: SelectionOutcome }>()
       <p class="font-medium">Failed entries</p>
       <ul class="space-y-1 pl-4">
         <li v-for="issue in props.outcome.failed" :key="issue.key" class="list-disc break-all">
-          <span class="font-mono text-[10px]">{{ issue.key }}</span>: {{ issue.message }}
+          <span class="font-mono text-xs">{{ issue.key }}</span>: {{ issue.message }}
         </li>
       </ul>
       <p>Failed entries stay selected for review or retry.</p>
@@ -32,7 +32,7 @@ const props = defineProps<{ outcome: SelectionOutcome }>()
       <p class="font-medium">Unknown entries</p>
       <ul class="space-y-1 pl-4">
         <li v-for="issue in props.outcome.unknown" :key="issue.key" class="list-disc break-all">
-          <span class="font-mono text-[10px]">{{ issue.key }}</span>: {{ issue.message }}
+          <span class="font-mono text-xs">{{ issue.key }}</span>: {{ issue.message }}
         </li>
       </ul>
       <p>The transport returned no definitive result. Unknown entries stay selected for review or retry.</p>

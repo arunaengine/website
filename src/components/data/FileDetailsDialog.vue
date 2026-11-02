@@ -347,7 +347,7 @@ const generalItems = computed<Detail[]>(() => [
       <DialogTitle class="truncate text-base font-semibold text-foreground" :title="props.name">
         {{ props.name || props.objectKey || 'File' }}
       </DialogTitle>
-      <p class="mt-0.5 font-mono text-[11px] text-muted-foreground">
+      <p class="mt-0.5 font-mono text-xs text-muted-foreground">
         <span class="break-all">{{ props.bucket }}/{{ props.objectKey }}</span>
       </p>
     </template>
@@ -445,7 +445,7 @@ const generalItems = computed<Detail[]>(() => [
                 <Button variant="outline" size="sm" class="h-7" @click="publicOpen = true"><Globe class="h-3.5 w-3.5" /> Access…</Button>
               </span>
               <span v-if="fileUrl" class="mt-1 flex min-w-0 items-center gap-1">
-                <a :href="fileUrl" target="_blank" rel="noopener noreferrer" class="min-w-0 truncate font-mono text-[11px] text-primary hover:underline" :title="fileUrl">{{ fileUrl }}</a>
+                <a :href="fileUrl" target="_blank" rel="noopener noreferrer" class="min-w-0 truncate font-mono text-xs text-primary hover:underline" :title="fileUrl">{{ fileUrl }}</a>
                 <CopyButton :value="fileUrl" label="Copy the public link" />
               </span>
             </template>

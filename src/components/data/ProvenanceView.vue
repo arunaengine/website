@@ -487,7 +487,7 @@ const CardView = defineComponent({
         title: view.path,
         'data-box': cardProps.card.node.key,
       }, [
-        h('span', { class: 'flex items-center gap-1.5 text-[11px] text-muted-foreground' }, head),
+        h('span', { class: 'flex items-center gap-1.5 text-xs text-muted-foreground' }, head),
         h('span', { class: 'mt-0.5 text-[13px] font-medium leading-[18px] text-foreground' }, [title]),
         detail.length ? h('span', { class: 'mt-0.5 truncate text-xs text-muted-foreground [&>*+*]:ml-2', title: view.detail || undefined }, detail) : null,
       ])

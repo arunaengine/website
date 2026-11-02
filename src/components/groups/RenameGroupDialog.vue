@@ -91,7 +91,7 @@ async function save() {
         />
         <p v-if="problem" class="text-xs text-destructive">{{ problem }}</p>
         <p v-else class="text-xs text-muted-foreground">1 to {{ GROUP_NAME_MAX_LENGTH }} characters.</p>
-        <p class="font-mono text-[10px] text-muted-foreground">{{ props.groupId }}</p>
+        <p class="font-mono text-xs text-muted-foreground">{{ props.groupId }}</p>
         <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
       </div>
 

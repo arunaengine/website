@@ -660,7 +660,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         <Spinner v-if="bucketsLoading" show-label label="Loading buckets…" class="px-3 py-4" />
         <Notice v-else-if="bucketsError && bucketsAuthError" tone="warning" class="m-3">
           <p>The temporary S3 session was rejected. Close it, then explicitly open this node and group again.</p>
-          <p class="mt-1 break-all font-mono text-[10px]">{{ bucketsError }}</p>
+          <p class="mt-1 break-all font-mono text-xs">{{ bucketsError }}</p>
           <Button variant="outline" size="sm" class="mt-2" @click="s3.clearSessions()"><KeyRound class="h-3.5 w-3.5" /> Close temporary sessions</Button>
         </Notice>
         <p v-else-if="bucketsError && !bucketsLoaded" class="px-3 py-3 text-xs text-destructive">{{ bucketsError }}</p>

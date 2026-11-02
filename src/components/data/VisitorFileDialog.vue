@@ -31,7 +31,7 @@ const rows = computed(() => {
   <DetailDialog :open="Boolean(file)" fit @update:open="(open: boolean) => !open && emit('close')">
     <template #header>
       <DialogTitle class="truncate text-base font-semibold text-foreground" :title="file?.name">{{ file?.name }}</DialogTitle>
-      <p class="mt-0.5 font-mono text-[11px] text-muted-foreground"><span class="break-all">{{ bucket }}/{{ file?.key }}</span></p>
+      <p class="mt-0.5 font-mono text-xs text-muted-foreground"><span class="break-all">{{ bucket }}/{{ file?.key }}</span></p>
     </template>
     <template v-if="download" #actions>
       <Button size="sm" as-child>

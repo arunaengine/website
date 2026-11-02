@@ -208,7 +208,7 @@ onBeforeUnmount(() => {
             <KeyRound class="mr-0.5 h-3 w-3" /> credentials
           </Badge>
           <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{{ endpointOf(connector) }}</span>
-          <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime(connector.updated_at) }}</span>
+          <span class="shrink-0 text-xs text-muted-foreground">{{ relativeTime(connector.updated_at) }}</span>
           <template v-if="checkResults[connector.connector_id]">
             <Badge size="sm"
               v-if="checkResults[connector.connector_id].ok"

@@ -153,7 +153,7 @@ function rowEditable(row: BuilderRow): boolean {
           description="Add files or connector sources from the tabs above."
         />
         <table v-else class="w-full text-sm">
-          <thead class="bg-muted/50 text-[11px] text-muted-foreground">
+          <thead class="bg-muted/50 text-xs text-muted-foreground">
             <tr>
               <th class="px-3 py-1.5 text-left font-semibold">Source</th>
               <th class="px-3 py-1.5 text-left font-semibold">Target key</th>
@@ -173,12 +173,12 @@ function rowEditable(row: BuilderRow): boolean {
                   v-if="row.strategy && rowEditable(row)"
                   :model-value="row.strategy"
                   :options="STRATEGY_OPTIONS"
-                  class="mt-1 h-7 w-56 text-[10px]"
+                  class="mt-1 h-7 w-56 text-xs"
                   :aria-label="`Staging strategy for ${row.source}`"
                   @update:model-value="(value: string) => (row.strategy = value as 'snapshot' | 'reference')"
                 />
-                <span v-else-if="row.strategy" class="text-[10px] text-muted-foreground">{{ row.strategy }}</span>
-                <span v-else-if="row.size !== null" class="text-[10px] text-muted-foreground">{{ formatBytes(row.size) }}</span>
+                <span v-else-if="row.strategy" class="text-xs text-muted-foreground">{{ row.strategy }}</span>
+                <span v-else-if="row.size !== null" class="text-xs text-muted-foreground">{{ formatBytes(row.size) }}</span>
               </td>
               <td class="px-3 py-2">
                 <Input
@@ -187,7 +187,7 @@ function rowEditable(row: BuilderRow): boolean {
                   class="h-8 font-mono text-xs"
                   @update:model-value="(v: string | number) => basket.editKey(row.id, String(v))"
                 />
-                <p v-if="rowOverwrites(row)" class="mt-1 flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400">
+                <p v-if="rowOverwrites(row)" class="mt-1 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
                   <AlertTriangle class="h-3 w-3 shrink-0" /> Overwrites existing object
                 </p>
               </td>
@@ -208,17 +208,17 @@ function rowEditable(row: BuilderRow): boolean {
                   v-if="row.state === 'submitting' && row.finishing"
                   :label="UPLOAD_FINISHING_MESSAGE"
                   show-label
-                  class="mt-1 text-[10px]"
+                  class="mt-1 text-xs"
                 />
-                <p v-if="row.state === 'submitting' && row.phase" class="mt-1 text-[10px] text-muted-foreground">
+                <p v-if="row.state === 'submitting' && row.phase" class="mt-1 text-xs text-muted-foreground">
                   {{ row.phase }}<template v-if="row.progressTotal != null">,
                     {{ row.progressUnit === 'bytes' ? formatBytes(row.progressCurrent ?? 0) : row.progressCurrent }}
                     / {{ row.progressUnit === 'bytes' ? formatBytes(row.progressTotal) : row.progressTotal }}
                   </template>
                   <span v-if="row.currentPath" class="block truncate font-mono" :title="row.currentPath">{{ row.currentPath }}</span>
                 </p>
-                <p v-if="row.blockedReason && row.state === 'blocked'" class="mt-1 text-[10px] text-amber-700 dark:text-amber-400">{{ row.blockedReason }}</p>
-                <p v-if="row.error" class="mt-1 text-[10px] text-destructive">{{ row.error }}</p>
+                <p v-if="row.blockedReason && row.state === 'blocked'" class="mt-1 text-xs text-amber-700 dark:text-amber-400">{{ row.blockedReason }}</p>
+                <p v-if="row.error" class="mt-1 text-xs text-destructive">{{ row.error }}</p>
               </td>
               <td class="px-3 py-2">
                 <div class="flex items-center justify-end gap-1">

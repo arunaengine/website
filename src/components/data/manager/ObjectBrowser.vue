@@ -719,7 +719,7 @@ async function onDrop(event: DragEvent) {
                       {{ referenceGroupLabel(group) }}
                     </RouterLink>
                     <span v-else class="block truncate" :title="referenceGroupLabel(group)">{{ referenceGroupLabel(group) }}</span>
-                    <span v-if="group.sourcePaths.length" class="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground" :title="group.sourcePaths.join('\n')">
+                    <span v-if="group.sourcePaths.length" class="mt-0.5 block truncate font-mono text-xs text-muted-foreground" :title="group.sourcePaths.join('\n')">
                       {{ group.sourcePaths.join(', ') }}<template v-if="group.count > group.sourcePaths.length">, …</template>
                     </span>
                   </span>
@@ -850,7 +850,7 @@ async function onDrop(event: DragEvent) {
         <template v-else>
         <Notice v-if="listError && listAuthError" tone="warning" class="rounded-none border-x-0 border-t-0">
           <p>The temporary S3 session was rejected. Close it, then explicitly open this node and group again.</p>
-          <p class="mt-1 break-all font-mono text-[10px]">{{ listError }}</p>
+          <p class="mt-1 break-all font-mono text-xs">{{ listError }}</p>
           <Button variant="outline" size="sm" class="mt-2" @click="s3.clearSessions()"><KeyRound class="h-3.5 w-3.5" /> Close temporary sessions</Button>
         </Notice>
         <p v-else-if="listError" class="border-b border-border px-4 py-3 text-xs text-destructive">

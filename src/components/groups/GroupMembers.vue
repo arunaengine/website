@@ -182,7 +182,7 @@ async function removeMember(member: GroupMember, roleId?: string) {
                 <Popover>
                   <button type="button" class="max-w-full truncate text-left text-sm font-medium text-foreground decoration-dotted underline-offset-2 hover:underline">
                     {{ displayName(member) }}
-                    <span v-if="member.user_id === currentUser?.id" class="text-[11px] font-normal text-muted-foreground">(you)</span>
+                    <span v-if="member.user_id === currentUser?.id" class="text-xs font-normal text-muted-foreground">(you)</span>
                   </button>
                   <template #content>
                     <div class="space-y-2">
@@ -201,9 +201,9 @@ async function removeMember(member: GroupMember, roleId?: string) {
                         </a>
                       </div>
                       <div class="rounded-md border border-border bg-muted/40 px-2 py-1.5">
-                        <div class="text-[10px] text-muted-foreground">User ID</div>
+                        <div class="text-xs text-muted-foreground">User ID</div>
                         <div class="flex items-center justify-between gap-2">
-                          <span class="break-all font-mono text-[10px] text-foreground">{{ member.user_id }}</span>
+                          <span class="break-all font-mono text-xs text-foreground">{{ member.user_id }}</span>
                           <CopyButton :value="member.user_id" label="Copy user ID" />
                         </div>
                       </div>
@@ -219,7 +219,7 @@ async function removeMember(member: GroupMember, roleId?: string) {
                     </div>
                   </template>
                 </Popover>
-                <div class="truncate font-mono text-[10px] text-muted-foreground" :title="member.user_id">{{ shortId(member.user_id) }}</div>
+                <div class="truncate font-mono text-xs text-muted-foreground" :title="member.user_id">{{ shortId(member.user_id) }}</div>
               </div>
             </div>
           </td>
@@ -281,7 +281,7 @@ async function removeMember(member: GroupMember, roleId?: string) {
               @click="selectedUser = hit; query = hit.name"
             >
               <span class="truncate text-foreground">{{ hit.name }}</span>
-              <span class="shrink-0 font-mono text-[10px] text-muted-foreground">{{ shortUserId(hit.user_id) }}</span>
+              <span class="shrink-0 font-mono text-xs text-muted-foreground">{{ shortUserId(hit.user_id) }}</span>
             </button>
           </div>
         </div>
@@ -290,7 +290,7 @@ async function removeMember(member: GroupMember, roleId?: string) {
           <UserPlus class="h-3.5 w-3.5" /> Add
         </Button>
       </div>
-      <div v-if="selectedUser" class="mt-1.5 text-[11px] text-muted-foreground">
+      <div v-if="selectedUser" class="mt-1.5 text-xs text-muted-foreground">
         Adding <span class="font-medium text-foreground">{{ selectedUser.name }}</span>
         <span class="font-mono" :title="selectedUser.user_id">({{ shortUserId(selectedUser.user_id) }})</span>
       </div>

@@ -134,12 +134,12 @@ async function confirm(req: JoinRequest) {
         <div class="flex flex-wrap items-center gap-3 px-3 py-2">
           <div class="min-w-0 flex-1">
             <div class="truncate text-sm font-medium text-foreground">{{ requesterName(req) }}</div>
-            <div v-if="req.user_name" class="truncate font-mono text-[10px] text-muted-foreground">
+            <div v-if="req.user_name" class="truncate font-mono text-xs text-muted-foreground">
               {{ req.user_id.slice(0, 8) }}
             </div>
             <p v-if="req.message" class="mt-0.5 text-xs italic text-muted-foreground">"{{ req.message }}"</p>
           </div>
-          <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime(req.created_at) }}</span>
+          <span class="shrink-0 text-xs text-muted-foreground">{{ relativeTime(req.created_at) }}</span>
           <div class="flex shrink-0 items-center gap-1.5">
             <Button size="sm" :disabled="busy || deciding !== null" @click="startApprove(req)">
               <Check class="h-3.5 w-3.5" /> Approve
@@ -165,7 +165,7 @@ async function confirm(req: JoinRequest) {
                 </Badge>
               </button>
             </div>
-            <p v-if="!selectedRoleIds.length" class="mt-1.5 text-[11px] text-muted-foreground">
+            <p v-if="!selectedRoleIds.length" class="mt-1.5 text-xs text-muted-foreground">
               Select at least one role to assign on approval.
             </p>
             <div class="mt-3 flex items-center gap-2">

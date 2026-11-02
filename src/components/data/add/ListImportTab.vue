@@ -300,7 +300,7 @@ const SELECT = 'h-9 w-full rounded-md border border-input bg-field px-2 text-sm'
       <span class="text-muted-foreground">saved as</span>
       <Input v-model="targetTemplate" class="font-mono text-xs" aria-label="Saved as" />
     </div>
-    <p v-if="columns.length" class="text-[11px] text-muted-foreground">Filled from the Use column. Edit to combine columns.</p>
+    <p v-if="columns.length" class="text-xs text-muted-foreground">Filled from the Use column. Edit to combine columns.</p>
     <p v-if="unknown.length" class="text-xs text-destructive">The list has no column {{ unknown.join(', ') }}.</p>
 
     <div v-if="options" class="grid gap-3 rounded-md border border-border bg-muted/40 p-4 text-xs sm:grid-cols-4">
@@ -339,11 +339,11 @@ const SELECT = 'h-9 w-full rounded-md border border-input bg-field px-2 text-sm'
           {{ matching.length }} of {{ preview.rows.length }}{{ partial ? ' first' : '' }} rows
           <span v-if="targets.length" class="font-mono text-xs"><ArrowRight class="inline h-3 w-3 align-[-1px]" aria-hidden="true" /> {{ targets.slice(0, 2).join(', ') }}{{ targets.length > 2 ? `, +${targets.length - 2}` : '' }}</span>
         </p>
-        <p class="text-[11px] text-muted-foreground">
+        <p class="text-xs text-muted-foreground">
           {{ hasSize ? 'Sizes are known, so no extra request per file.' : 'Files are linked, not copied.' }}
           <template v-if="checksumNames.length"> {{ checksumNames.join(' and ') }} is saved and checked on read.</template>
         </p>
-        <p v-if="!connectorSel" class="text-[11px] text-destructive">Choose under More options how the files are read.</p>
+        <p v-if="!connectorSel" class="text-xs text-destructive">Choose under More options how the files are read.</p>
       </div>
       <Button variant="ghost" size="sm" @click="options = !options">More options</Button>
       <Button :disabled="!ready" @click="start">Start import</Button>

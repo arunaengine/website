@@ -40,7 +40,7 @@ async function createOtherRelationships() {
 </script>
 
 <template>
-  <p class="text-[11px] text-muted-foreground">
+  <p class="text-xs text-muted-foreground">
     Copy (once) copies the files now. Reference shows them here without copying.
   </p>
 
@@ -65,7 +65,7 @@ async function createOtherRelationships() {
         on {{ realmNodes.displayName(sourceNodeId) }}
       </Badge>
       <div class="ml-auto flex items-center gap-1.5">
-        <label class="text-[11px] text-muted-foreground">Add as</label>
+        <label class="text-xs text-muted-foreground">Add as</label>
         <Select v-model="otherDefaultMode" :options="OTHER_MODE_OPTIONS" class="h-8 w-36 text-xs" />
       </div>
     </div>
@@ -123,12 +123,12 @@ async function createOtherRelationships() {
             </Button>
           </div>
         </div>
-        <p class="truncate text-[10px] text-muted-foreground" :title="`${bucket}/${otherTargetPrefix(row)}`">
+        <p class="truncate text-xs text-muted-foreground" :title="`${bucket}/${otherTargetPrefix(row)}`">
           into {{ bucket }}/{{ otherTargetPrefix(row) }}
         </p>
         <label
           v-if="offerPlaintext(row) && (row.state === 'ready' || row.state === 'error')"
-          class="flex items-center gap-2 text-[11px] text-foreground"
+          class="flex items-center gap-2 text-xs text-foreground"
         >
           <Switch
             :checked="row.plaintext"
@@ -137,10 +137,10 @@ async function createOtherRelationships() {
           />
           Store the copy unencrypted
         </label>
-        <p v-if="row.error" class="text-[10px] text-destructive">{{ row.error }}</p>
+        <p v-if="row.error" class="text-xs text-destructive">{{ row.error }}</p>
       </li>
     </ul>
-    <p v-if="plaintextOffered" class="border-t border-border px-3 py-1.5 text-[10px] text-muted-foreground">
+    <p v-if="plaintextOffered" class="border-t border-border px-3 py-1.5 text-xs text-muted-foreground">
       Some sources are encrypted. Storing a copy unencrypted is needed when this bucket is not encrypted, and only key
       holders of the source bucket may choose it.
     </p>
@@ -148,7 +148,7 @@ async function createOtherRelationships() {
       The copies marked to be stored unencrypted are written into {{ bucket }} without encryption. Anyone who may read
       this bucket can read them without a key.
     </Notice>
-    <p class="border-t border-border px-3 py-1.5 text-[10px] text-muted-foreground">
+    <p class="border-t border-border px-3 py-1.5 text-xs text-muted-foreground">
       Each import becomes a sync relationship; created ones appear under the bucket's sync status.
     </p>
   </section>

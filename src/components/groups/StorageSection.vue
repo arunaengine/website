@@ -424,7 +424,7 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
         <div class="rounded-b-lg border-t border-border bg-muted/30 px-3 pb-2.5 pt-1.5 text-xs">
           <div
             v-if="rowsOf(backend.backend_id).length || defaultId === backend.backend_id"
-            :class="[GRID, 'border-b border-border py-1 text-[11px] text-muted-foreground']"
+            :class="[GRID, 'border-b border-border py-1 text-xs text-muted-foreground']"
           >
             <span>Aruna bucket</span><span /><span>S3 bucket</span><span>New uploads named</span><span>Synced</span><span />
           </div>
@@ -488,7 +488,7 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
               <div v-if="problems?.id === row.link.import_id" class="col-span-full py-1" data-testid="sync-problems">
                 <p v-if="!problems.files" class="text-muted-foreground">Loading…</p>
                 <p v-else-if="!problems.files.length" class="text-muted-foreground">The node lists no files for this sync.</p>
-                <ul v-else class="space-y-0.5 text-[11px]">
+                <ul v-else class="space-y-0.5 text-xs">
                   <li v-for="(file, at) in problems.files.slice(0, 20)" :key="`${at}\n${file.path}`" class="break-all">
                     <span class="font-mono">{{ file.path }}</span>: <span class="text-destructive">{{ file.reason }}</span>
                   </li>

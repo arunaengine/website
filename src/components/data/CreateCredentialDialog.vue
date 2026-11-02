@@ -281,7 +281,7 @@ async function submitToken() {
             <component :is="option.icon" class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
             <span class="min-w-0">
               <span class="block text-sm font-medium text-foreground">{{ option.title }}</span>
-              <span class="block text-[11px] text-muted-foreground">{{ option.hint }}</span>
+              <span class="block text-xs text-muted-foreground">{{ option.hint }}</span>
             </span>
           </button>
         </div>
@@ -294,7 +294,7 @@ async function submitToken() {
           <div>
             <label class="text-xs font-medium text-foreground">Expires after</label>
             <Select v-model="tokenExpiresIn" :options="TOKEN_EXPIRY_OPTIONS" class="mt-1" />
-            <p class="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+            <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
               A day is the maximum. The node shortens it further when your own sign-in expires sooner.
             </p>
           </div>
@@ -333,7 +333,7 @@ async function submitToken() {
                 </Button>
               </div>
               <Button variant="outline" size="sm" @click="addRestriction"><Plus class="h-3.5 w-3.5" /> Add restriction</Button>
-              <p class="text-[11px] leading-relaxed text-muted-foreground">
+              <p class="text-xs leading-relaxed text-muted-foreground">
                 Patterns are S3 key paths. Relative patterns are scoped under the group root. Only a trailing <code class="font-mono">/**</code> wildcard is supported; other wildcards are rejected. Without restrictions the key carries your own access in the group, read only included.
               </p>
             </div>
@@ -348,11 +348,11 @@ async function submitToken() {
               Encrypted buckets (optional)
             </button>
             <div v-if="showEncrypted" class="mt-2 space-y-2">
-              <p class="text-[11px] leading-relaxed text-muted-foreground">
+              <p class="text-xs leading-relaxed text-muted-foreground">
                 The key also gets a session token that reads your part of the chosen buckets while they are locked.
                 Key holders issue its keys; while a bucket is unlocked, the node issues them at once.
               </p>
-              <p v-if="!groupId" class="text-[11px] text-muted-foreground">Select a group first.</p>
+              <p v-if="!groupId" class="text-xs text-muted-foreground">Select a group first.</p>
               <Spinner v-else-if="tokenState === 'loading'" show-label label="Checking the buckets of this group" />
               <Notice v-else-if="tokenState === 'refused'" tone="info">
                 You may not list the buckets of this group on this node.
@@ -365,14 +365,14 @@ async function submitToken() {
                   <input type="checkbox" :checked="encryptedBuckets.includes(name)" @click="toggleBucket(name)" />
                   <span class="break-all font-mono">{{ name }}</span>
                 </label>
-                <p v-if="!tokenChoices.length" class="text-[11px] text-muted-foreground">
+                <p v-if="!tokenChoices.length" class="text-xs text-muted-foreground">
                   No bucket of this group on this node is encrypted.
                 </p>
-                <p v-if="unchecked" class="text-[11px] text-muted-foreground">
+                <p v-if="unchecked" class="text-xs text-muted-foreground">
                   {{ unchecked }} {{ unchecked === 1 ? 'bucket' : 'buckets' }} could not be checked and
                   {{ unchecked === 1 ? 'is' : 'are' }} not offered.
                 </p>
-                <p v-if="partial" class="text-[11px] text-muted-foreground">
+                <p v-if="partial" class="text-xs text-muted-foreground">
                   Only the first 1000 buckets of this group were checked.
                 </p>
               </template>
@@ -397,14 +397,14 @@ async function submitToken() {
         <div class="space-y-2 text-sm">
           <div class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
             <div class="min-w-0">
-              <div class="text-[10px] text-muted-foreground">Access key ID</div>
+              <div class="text-xs text-muted-foreground">Access key ID</div>
               <div class="break-all font-mono text-xs">{{ created.access_key_id }}</div>
             </div>
             <CopyButton :value="created.access_key_id" label="Copy access key ID" />
           </div>
           <div class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
             <div class="min-w-0">
-              <div class="text-[10px] text-muted-foreground">Secret access key</div>
+              <div class="text-xs text-muted-foreground">Secret access key</div>
               <div class="break-all font-mono text-xs">{{ created.access_secret }}</div>
             </div>
             <CopyButton :value="created.access_secret" label="Copy secret access key" />
@@ -412,24 +412,24 @@ async function submitToken() {
           <template v-if="sessionToken">
             <div class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
               <div class="min-w-0">
-                <div class="text-[10px] text-muted-foreground">Session token</div>
+                <div class="text-xs text-muted-foreground">Session token</div>
                 <div class="break-all font-mono text-xs">{{ sessionToken }}</div>
               </div>
               <CopyButton :value="sessionToken" label="Copy session token" />
             </div>
-            <p class="text-[11px] leading-relaxed text-muted-foreground">
+            <p class="text-xs leading-relaxed text-muted-foreground">
               Set it as <code class="font-mono">aws_session_token</code> in your S3 client, or as
               <code class="font-mono">AWS_SESSION_TOKEN</code>, next to the key and secret. Without it the key cannot
               read the chosen buckets while they are locked.
             </p>
           </template>
-          <p v-if="sessionToken && created.key_requests?.length" class="text-[11px] leading-relaxed text-muted-foreground">
+          <p v-if="sessionToken && created.key_requests?.length" class="text-xs leading-relaxed text-muted-foreground">
             Some keys of the token wait for a key holder. Until they are issued, it cannot read those parts while the
             bucket is locked.
           </p>
           <div class="relative rounded-md border border-border bg-muted/40 px-3 py-2">
-            <div class="text-[10px] text-muted-foreground">CLI usage</div>
-            <pre class="mt-1 whitespace-pre-wrap break-all font-mono text-[11px] leading-5">{{ cliSnippet }}</pre>
+            <div class="text-xs text-muted-foreground">CLI usage</div>
+            <pre class="mt-1 whitespace-pre-wrap break-all font-mono text-xs leading-5">{{ cliSnippet }}</pre>
             <div class="absolute right-2 top-2"><CopyButton :value="cliSnippet" label="Copy CLI snippet" /></div>
           </div>
         </div>
@@ -442,7 +442,7 @@ async function submitToken() {
           :expires-at="tokenExpiresAt"
           notice="The token is shown once and cannot be retrieved later. The portal never stores it."
         />
-        <p class="text-[11px] leading-relaxed text-muted-foreground">
+        <p class="text-xs leading-relaxed text-muted-foreground">
           Send it as <code class="font-mono">Authorization: Bearer …</code> to the REST API of this node. It does not sign
           S3 requests. The session it belongs to is listed under Sessions, where you can revoke it.
         </p>
