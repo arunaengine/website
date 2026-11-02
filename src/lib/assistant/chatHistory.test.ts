@@ -620,3 +620,34 @@ describe('writing at once', () => {
     expect(restored.chats.map((entry) => entry.id)).toContain('m-3')
   })
 })
+
+describe('the final store rules', () => {
+  const user = scope('user-final')
+  let backing: ReturnType<typeof storage>
+
+  beforeEach(() => {
+    backing = storage()
+  })
+
+  function sized(id: string, updatedAt: number, size: number) {
+    return {
+      ...newAssistantChat(id, 1),
+      id,
+      updatedAt,
+      messages: [{ id: `${id}-q`, role: 'user' as const, text: `${id} asked`, calls: [], at: 1 }],
+      history: [{ role: 'user' as const, content: 'x'.repeat(size) }],
+    }
+  }
+
+  it('keeps the stored copy and the change of a chat that no longer fits', () => {
+    const store = createAssistantChatStore(user, backing)
+    const small = sized('b-1', 10, 1_000)
+    store.save({ activeChatId: 'a-1', chats: [sized('a-1', 20, 600_000), small] })
+
+    store.save({ activeChatId: 'a-1', chats: [sized('a-1', 20, 600_000), sized('b-1', 30, 500_000)] }, ['b-1'])
+
+    expect(store.unsavedChats().has('b-1')).toBe(true)
+    const stored = createAssistantChatStore(user, backing).load().chats.find((entry) => entry.id === 'b-1')
+    expect(stored?.updatedAt).toBe(10)
+  })
+})

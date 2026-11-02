@@ -369,12 +369,14 @@ export function createAssistantChatStore(
       if (onlyAbsent && values.has(name)) continue
       const fitted = fittedChat(chat)
       if (!fitted) continue
+      const previous = values.get(name)
       values.set(name, fitted.raw)
       while (over()) if (!trimOldest(name)) break
       if (used() > MAX_ASSISTANT_STORAGE_CHARS) {
-        // Not even beside the chat on screen does this one fit, so it is not stored.
-        storage.removeItem(name)
-        values.delete(name)
+        // It does not fit beside the chats kept; the stored copy stays and the change waits.
+        if (previous === undefined) values.delete(name)
+        else values.set(name, previous)
+        failed.push(id)
         continue
       }
       try {
