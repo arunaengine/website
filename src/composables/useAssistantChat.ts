@@ -1440,6 +1440,26 @@ function syncChatScope() {
   void syncChats(nextStore.key)
 }
 
+/** Takes chats another tab added or deleted; the chat on screen and a running one stay as held. */
+function adoptStoredChats() {
+  if (!chatStore || !historyReady.value) return
+  const held = new Set([activeChatId.value, activeTurn?.chatId ?? ''])
+  const chats = chatStore.load().chats.map((chat) => (held.has(chat.id) ? chatById(chat.id) ?? chat : chat))
+  for (const id of held) {
+    const chat = chatById(id)
+    if (chat && !chats.some((entry) => entry.id === id)) chats.push(chat)
+  }
+  for (const chat of chatState.chats) if (!chats.some((entry) => entry.id === chat.id)) chatSyncs.delete(chat.id)
+  chatState = { ...chatState, chats }
+  updateChatList()
+}
+
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('storage', (event) => {
+    if (chatStore?.indexChanged(event.key)) adoptStoredChats()
+  })
+}
+
 function syncEpoch() {
   if (assistantEpoch === sessionEpoch.value) return
   assistantEpoch = sessionEpoch.value

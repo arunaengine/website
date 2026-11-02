@@ -54,8 +54,12 @@ vi.mock('@/lib/api', async (importOriginal) => ({
 }))
 
 const stored = new Map<string, string>()
+const storageListeners: Array<(event: { key: string | null }) => void> = []
 vi.stubGlobal('window', {
   history: { length: 2 },
+  addEventListener: (type: string, listener: (event: { key: string | null }) => void) => {
+    if (type === 'storage') storageListeners.push(listener)
+  },
   localStorage: {
     getItem: (key: string) => stored.get(key) ?? null,
     setItem: (key: string, value: string) => {
@@ -293,6 +297,22 @@ describe('deleting another chat', () => {
 
     expect(chat.messages.value.at(-1)?.text).toBe('first half second half')
     panel.app.unmount()
+  })
+})
+
+describe('another tab', () => {
+  it('adds and deletes chats in the list of this tab', async () => {
+    login()
+    const scope = { apiBaseUrl: 'https://node.test', realmId: 'r-1', userId: `u-${users}` }
+    const tab = createAssistantChatStore(scope)
+    const held = tab.load()
+    const added = { ...newAssistantChat('From the other tab'), id: 'c-tab', updatedAt: 20_000 }
+    tab.save({ ...held, chats: [added, ...held.chats.filter((entry) => entry.id !== 'c-new')] })
+
+    for (const listener of storageListeners) listener({ key: `${tab.key}:index` })
+
+    expect(chat.chats.value.map((entry) => entry.id).sort()).toEqual(['c-old', 'c-tab'])
+    expect(chat.activeChatId.value).toBe('c-old')
   })
 })
 
