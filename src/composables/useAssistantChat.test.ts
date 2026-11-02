@@ -174,6 +174,19 @@ describe('loadArtifact', () => {
     expect(loaded.text).toBe('a\n'.repeat(8_192))
   })
 
+  it('reads the start and then more of a text file larger than the cap, since every text read is bounded', async () => {
+    const fetchMock = serve(new TextEncoder().encode('line\n'.repeat(50_000)))
+    vi.stubGlobal('fetch', fetchMock)
+    const ref = { bucket: 'work', key: 'logs/huge.log', contentType: 'text/plain', size: 30 * 1024 * 1024 }
+    const first = await loadArtifact(ref)
+    const more = await loadArtifact(ref, 200_000)
+
+    expect(first).toMatchObject({ kind: 'text', truncated: true })
+    expect(more).toMatchObject({ kind: 'text', truncated: true })
+    expect(more.text?.length).toBeGreaterThan(first.text?.length ?? 0)
+    expect(fetchMock).toHaveBeenLastCalledWith(expect.any(String), { headers: { Range: 'bytes=0-199999' } })
+  })
+
   it('reads more of a text file only when asked to', async () => {
     const fetchMock = serve(new TextEncoder().encode('line\n'.repeat(10_000)))
     vi.stubGlobal('fetch', fetchMock)

@@ -663,7 +663,8 @@ export async function loadArtifact(ref: ArtifactRef, textLimit?: number): Promis
   const name = ref.filename || ref.key.split('/').pop() || ref.key
   const contentType = ref.contentType || 'application/octet-stream'
   const classified = classifyObject({ key: name, contentType: ref.contentType })
-  const oversize = typeof ref.size === 'number' && ref.size > ARTIFACT_CAP
+  // Only a whole read needs the size guard; a text read is bounded, so a large text still shows its start.
+  const oversize = typeof ref.size === 'number' && ref.size > ARTIFACT_CAP && !TEXT_KINDS.has(classified.kind)
   // A size is named only when the caller or the store stated it, never as the bytes read so far.
   const download = async (tooLarge: boolean, size = ref.size): Promise<LoadedArtifact> => ({
     url: await s3.downloadUrl(ref.bucket, ref.key, nodeId, ref.versionId),
