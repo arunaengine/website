@@ -18,14 +18,6 @@ const wordmark = computed(() =>
     id="overview"
     class="relative overflow-hidden border-b border-border bg-background"
   >
-    <div
-      aria-hidden="true"
-      class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_50%_0%,black_30%,transparent_75%)]"
-    />
-    <div
-      aria-hidden="true"
-      class="wash-primary pointer-events-none absolute inset-0"
-    />
 
     <div class="container relative max-w-3xl pb-24 pt-20 text-center sm:pt-24">
       <!-- Brand lockup: wave mark + ARUNA wordmark (always the image assets, never typed) -->
@@ -51,7 +43,7 @@ const wordmark = computed(() =>
       <h1
         class="mt-12 text-balance font-display text-3xl font-semibold leading-[1.12] tracking-tight text-aruna-navy sm:text-4xl md:text-[42px]"
       >
-        Federated data. <span class="text-gradient">Sovereign control.</span>
+        Federated data. Sovereign control.
       </h1>
 
       <p class="mx-auto mt-5 max-w-xl text-base text-muted-foreground">
@@ -78,7 +70,6 @@ const wordmark = computed(() =>
         <div
           class="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground"
         >
-          <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
           Open source, Apache 2.0 and MIT
         </div>
       </div>

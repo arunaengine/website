@@ -19,21 +19,11 @@ import ComputeLane from '@/components/landing/ComputeLane.vue'
       </div>
       <div class="mt-12 grid gap-4 lg:grid-cols-2">
         <Card class="relative flex flex-col gap-4 overflow-hidden p-5">
-          <div
-            aria-hidden="true"
-            class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_50%_50%,black_30%,transparent_72%)]"
-          />
-          <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0" />
           <h3 class="font-display text-base font-semibold text-aruna-navy">Move compute to the data.</h3>
           <ComputeLane direction="to-data" />
           <p class="text-sm text-muted-foreground">Large or restricted datasets stay put. The job runs next to them.</p>
         </Card>
         <Card class="relative flex flex-col gap-4 overflow-hidden p-5">
-          <div
-            aria-hidden="true"
-            class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_50%_50%,black_30%,transparent_72%)]"
-          />
-          <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0" />
           <h3 class="font-display text-base font-semibold text-aruna-navy">Move data to compute.</h3>
           <ComputeLane direction="to-compute" />
           <p class="text-sm text-muted-foreground">When another site is the better place to run, the data is staged there and the result comes back.</p>

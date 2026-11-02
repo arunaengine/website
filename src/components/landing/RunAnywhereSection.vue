@@ -17,10 +17,6 @@ const nodes = [
 
 <template>
   <section id="run-anywhere" class="band section relative overflow-hidden">
-    <div
-      aria-hidden="true"
-      class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_90%_100%_at_50%_60%,black_40%,transparent_100%)]"
-    />
     <div class="container relative max-w-5xl">
       <div class="mx-auto max-w-2xl text-center">
         <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Run anywhere</div>

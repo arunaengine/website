@@ -52,12 +52,6 @@ const trail = computed(() => [...(section.value ? [section.value] : []), ...prop
       cn('relative overflow-hidden border-b border-border-subtle bg-background/70 backdrop-blur', $props.class)
     "
   >
-    <!-- The landing hero's grid and wash, dimmed to a page accent. -->
-    <div
-      aria-hidden="true"
-      class="grid-faint pointer-events-none absolute inset-0 opacity-60 [mask-image:radial-gradient(ellipse_at_50%_0%,black_20%,transparent_75%)]"
-    />
-    <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0 opacity-60" />
     <div :class="cn('w-full px-4 sm:px-6 relative flex flex-col gap-2 pb-6 pt-6', contentClass)">
       <nav aria-label="Breadcrumb" class="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] leading-[18px] text-muted-foreground">
         <Globe class="size-3.5 shrink-0" aria-hidden="true" />

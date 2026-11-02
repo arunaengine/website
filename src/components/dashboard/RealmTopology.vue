@@ -134,17 +134,6 @@ const label = computed(() =>
     </p>
     <p v-if="!nodes.length" class="absolute inset-0 grid place-items-center text-sm text-muted-foreground">This realm has no nodes yet.</p>
     <svg v-else :viewBox="`0 0 ${box.w} ${box.h}`" class="absolute inset-0 h-full w-full" role="img" :aria-label="label">
-      <defs>
-        <radialGradient id="topology-glow" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0%" stop-color="#4E86D7" stop-opacity="0.12" />
-          <stop offset="100%" stop-color="#4E86D7" stop-opacity="0" />
-        </radialGradient>
-        <radialGradient id="topology-glow-hub" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0%" stop-color="#55C4DE" stop-opacity="0.22" />
-          <stop offset="100%" stop-color="#55C4DE" stop-opacity="0" />
-        </radialGradient>
-      </defs>
-      <ellipse :cx="box.cx" :cy="box.hubY + 40" :rx="box.spreadX + 90" :ry="box.spreadY + 110" fill="url(#topology-glow)" />
 
       <template v-for="edge in edges" :key="edge.id">
         <line v-if="edge.connected" :x1="edge.x1" :y1="edge.y1" :x2="edge.x2" :y2="edge.y2" stroke="#10b981" stroke-opacity="0.7" stroke-width="2" stroke-linecap="round" />
@@ -193,7 +182,6 @@ const label = computed(() =>
       >
         <title>{{ nodeName(spot.node) }}</title>
         <circle :cx="spot.x" :cy="spot.y" :r="spot.r + 10" fill="none" stroke="hsl(var(--primary))" stroke-width="2" :opacity="highlight === spot.node.node_id ? 0.6 : 0" />
-        <circle v-if="spot.isHub" :cx="spot.x" :cy="spot.y" :r="spot.r + 18" fill="url(#topology-glow-hub)" />
         <circle :cx="spot.x" :cy="spot.y" :r="spot.r" fill="hsl(var(--card))" :stroke="spot.isHub ? '#55C4DE' : KIND_STROKE[spot.node.kind]" stroke-width="2" />
         <path v-if="importing(spot.node)" :d="arc(spot.x, spot.y)" fill="none" stroke="#55C4DE" stroke-width="2.5" stroke-linecap="round" />
         <circle :cx="spot.x" :cy="spot.y" :r="spot.isHub ? 6.5 : 6" :fill="spot.isHub ? '#55C4DE' : nodeOnline(spot.node) ? '#10b981' : 'hsl(var(--muted-foreground))'" />
