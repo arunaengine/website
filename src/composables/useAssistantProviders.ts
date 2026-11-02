@@ -1,14 +1,17 @@
 // Browser providers are direct connections whose key lives in this browser
 // session or, when the user chose so, sealed on the node. Node-managed
-// provider summaries are merged with both lists.
+// provider summaries and the realm's central assistant are merged with both lists.
 import { computed, ref, watch } from 'vue'
 import {
   apiErrorMessage,
+  centralProvider,
   deleteAssistantProvider,
   fetchAssistantModels,
+  getCentralAssistant,
   listAssistantProviders,
   type AssistantModel,
   type AssistantProvider,
+  type CentralAssistant,
 } from '@/lib/api'
 import {
   createBrowserProviderStore,
@@ -34,6 +37,7 @@ const KEY_GONE = 'Enter the key again in settings to list models.'
 const browserStore = createBrowserProviderStore()
 const vault = useUserVault()
 const nodeProviders = ref<AssistantProvider[]>([])
+const central = ref<CentralAssistant | null>(null)
 const providers = ref<AssistantProvider[]>([])
 const loading = ref(false)
 const loaded = ref(false)
@@ -82,7 +86,10 @@ function clearModels(providerId: string) {
 }
 
 function rebuild() {
+  // A setup without allowed models cannot answer anyone yet.
+  const shared = central.value?.models.length ? [centralProvider(central.value)] : []
   providers.value = [
+    ...shared,
     ...browserStore.state.providers.map(directSummary),
     ...sealed().map(directSummary),
     ...nodeProviders.value,
@@ -138,14 +145,19 @@ async function revalidate(epoch: number, generation: number, identity: string): 
   error.value = null
   void vault.load()
   try {
-    const response = await listAssistantProviders(client())
+    const [response, setup] = await Promise.all([
+      listAssistantProviders(client()),
+      getCentralAssistant(client()).catch(() => null),
+    ])
     if (!currentNodeContext(epoch, generation, identity)) return
     nodeProviders.value = response.providers
+    central.value = setup
     rebuild()
     loaded.value = true
   } catch (cause) {
     if (!currentNodeContext(epoch, generation, identity)) return
     nodeProviders.value = []
+    central.value = null
     rebuild()
     error.value = apiErrorMessage(cause)
   } finally {
@@ -161,6 +173,7 @@ async function revalidate(epoch: number, generation: number, identity: string): 
 function resetNodeCache() {
   nodeGeneration += 1
   nodeProviders.value = []
+  central.value = null
   loaded.value = false
   loading.value = false
   error.value = null
@@ -196,6 +209,22 @@ export function useAssistantProviders() {
     const promise = revalidate(epoch, generation, identity)
     inFlight = { epoch, generation, identity, promise }
     return promise
+  }
+
+  /** Reads today's central usage again, as after a turn; a failure keeps the last numbers. */
+  async function refreshCentral(): Promise<void> {
+    if (!authenticated() || !central.value) return
+    const epoch = sessionEpoch.value
+    const generation = nodeGeneration
+    const identity = identityKey()
+    try {
+      const setup = await getCentralAssistant(client())
+      if (!currentNodeContext(epoch, generation, identity)) return
+      central.value = setup
+      rebuild()
+    } catch {
+      // The next full load reads it again.
+    }
   }
 
   /** Serves the local direct providers and refreshes node providers behind them. */
@@ -353,6 +382,8 @@ export function useAssistantProviders() {
   rebuild()
   return {
     providers,
+    central,
+    refreshCentral,
     loading,
     loaded,
     error,
