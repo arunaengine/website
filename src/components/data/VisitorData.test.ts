@@ -16,6 +16,7 @@ const folder = {
   previousPage: vi.fn(),
 }
 const folderArgs: unknown[][] = []
+const failedNodes = ref(0)
 const s3Url = 'https://s3.n2.test'
 
 const Pass = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
@@ -33,7 +34,7 @@ beforeAll(async () => {
   vi.doMock('@/composables/useBucketUsage', () => ({ useListedUsage: () => ({ ensure: vi.fn(), partsOf: () => null, textOf: () => null }), usageText: () => '' }))
   vi.doMock('@/composables/usePublicData', async (original) => ({
     ...(await original<typeof import('@/composables/usePublicData')>()),
-    usePublicBuckets: () => ({ buckets, loading: ref(false), error: ref(null) }),
+    usePublicBuckets: () => ({ buckets, loading: ref(false), error: ref(null), failedNodes, reload: vi.fn() }),
     usePublicFolder: (...args: unknown[]) => {
       folderArgs.push(args)
       return folder
@@ -52,6 +53,7 @@ beforeEach(() => {
   folder.denied.value = false
   folder.error.value = null
   folderArgs.length = 0
+  failedNodes.value = 0
 })
 
 async function render(): Promise<string> {
@@ -78,6 +80,16 @@ describe('VisitorData', () => {
     for (const word of ['Upload', 'New folder', 'New bucket', 'Delete', 'Share', 'Settings', 'type="checkbox"']) {
       expect(text).not.toContain(word)
     }
+  })
+
+  it('says the public list is incomplete when nodes did not answer', async () => {
+    const all = buckets.value
+    buckets.value = []
+    failedNodes.value = 2
+    const text = (await render()).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+    buckets.value = all
+    expect(text).toContain('2 nodes did not answer. Retry')
+    expect(text).not.toContain('This realm has no public buckets.')
   })
 
   it('says a refused bucket is not public and offers sign in', async () => {

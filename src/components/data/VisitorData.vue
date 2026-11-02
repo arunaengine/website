@@ -37,7 +37,7 @@ const realmNodes = useRealmNodes()
 const usage = useListedUsage()
 const text = (value: unknown) => (typeof value === 'string' ? value : '')
 
-const { buckets, loading: bucketsLoading, error: bucketsError } = usePublicBuckets()
+const { buckets, loading: bucketsLoading, error: bucketsError, failedNodes, reload: reloadBuckets } = usePublicBuckets()
 const filter = ref('')
 const shown = computed(() => {
   const term = filter.value.trim().toLowerCase()
@@ -96,7 +96,7 @@ watch([bucket, s3Prefix], () => (details.value = null))
 <template>
   <section class="grid gap-x-6 gap-y-8 @min-[960px]:grid-cols-[300px_minmax(0,1fr)] @min-[1536px]:grid-cols-[340px_minmax(0,1fr)]">
     <aside class="min-w-0 self-start">
-      <SectionHeading title="Public buckets" :icon="Boxes" :count="bucketsLoading ? undefined : formatCount(shown.length)" />
+      <SectionHeading title="Public buckets" :icon="Boxes" :count="bucketsLoading ? undefined : `${formatCount(shown.length)}${failedNodes ? '+' : ''}`" />
       <div class="surface">
         <div class="px-3.5 pb-1 pt-3">
           <Input v-model="filter" placeholder="Find a bucket" aria-label="Find a bucket" class="h-8 text-xs" />
@@ -104,7 +104,7 @@ watch([bucket, s3Prefix], () => (details.value = null))
         <Spinner v-if="bucketsLoading && !buckets.length" show-label label="Loading buckets…" class="px-3 py-4" />
         <p v-else-if="bucketsError" class="px-3.5 py-3 text-xs text-destructive">{{ bucketsError }}</p>
         <p v-else-if="!shown.length" class="px-3.5 py-3 text-xs text-muted-foreground">
-          {{ filter.trim() ? 'No public bucket has this name.' : 'This realm has no public buckets.' }}
+          {{ filter.trim() ? 'No public bucket has this name.' : failedNodes ? 'No public buckets found.' : 'This realm has no public buckets.' }}
         </p>
         <ul v-else class="pb-1">
           <li v-for="row in pageRows" :key="`${row.set_id ?? row.node_id}/${row.bucket}`">
@@ -120,6 +120,10 @@ watch([bucket, s3Prefix], () => (details.value = null))
           </li>
         </ul>
         <ListPager v-if="shown.length > 10" v-model:page="listPage" v-model:page-size="listSize" :total="shown.length" class="border-t border-border-subtle" />
+        <p v-if="failedNodes" class="border-t border-border/70 px-3.5 py-2 text-xs text-muted-foreground">
+          {{ failedNodes }} {{ failedNodes === 1 ? 'node' : 'nodes' }} did not answer.
+          <button type="button" class="text-primary hover:underline" @click="reloadBuckets()">Retry</button>
+        </p>
       </div>
     </aside>
 

@@ -55,6 +55,17 @@ describe('usePublicBuckets', () => {
     again.stop()
   })
 
+  it('keeps the nodes that did not answer a page', async () => {
+    aruna.searchBuckets
+      .mockResolvedValueOnce({ hits: [hit('bakta', 'n2')], nodes_failed: 1, failed_nodes: ['n3'], next_cursor: 'c2' })
+      .mockResolvedValueOnce({ hits: [], nodes_failed: 0, failed_nodes: [], next_cursor: null })
+    const scope = effectScope()
+    const state = scope.run(() => usePublicBuckets())!
+    await settle()
+    expect(state.failedNodes.value).toBe(1)
+    scope.stop()
+  })
+
   it('shows the failure instead of an empty list', async () => {
     aruna.searchBuckets.mockRejectedValue(new Error('Not authorized'))
     const scope = effectScope()

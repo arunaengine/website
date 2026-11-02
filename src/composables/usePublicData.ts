@@ -35,12 +35,15 @@ export function usePublicBuckets() {
   const found = ref<BucketSearchHit[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
+  // Nodes that did not answer a page; the list is then incomplete.
+  const failedNodes = ref(0)
   let round = 0
 
   async function load() {
     const mine = ++round
     found.value = []
     error.value = null
+    failedNodes.value = 0
     // A session lists its own buckets; this list is only for visitors.
     if (currentUser.value) return
     loading.value = true
@@ -51,6 +54,7 @@ export function usePublicBuckets() {
         const page = await searchBuckets('', { limit: 50, cursor })
         if (mine !== round) return
         found.value = [...found.value, ...page.hits.filter((hit) => !isHiddenBucket(hit.bucket))]
+        failedNodes.value = Math.max(failedNodes.value, page.nodes_failed)
         if (cursor) seen.add(cursor)
         cursor = page.next_cursor && !seen.has(page.next_cursor) ? page.next_cursor : undefined
       } while (cursor)
@@ -64,7 +68,7 @@ export function usePublicBuckets() {
   watch([sessionEpoch, () => Boolean(currentUser.value)], () => void load(), { immediate: true })
   const buckets = computed(() =>
     mergeSets(found.value.filter((hit) => isTarget(hit.node_id)), (id) => id === nodeInfo.value?.node.peer_id))
-  return { buckets, loading, error, reload: load }
+  return { buckets, loading, error, failedNodes, reload: load }
 }
 
 /** One folder of a public bucket, a page at a time, listed on the node `nodeId` (null: this one). */
