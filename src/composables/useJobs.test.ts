@@ -30,5 +30,22 @@ describe('system jobs list', () => {
     expect(list.jobs.value.map((entry) => entry.job_id)).toEqual(['import', 'pid'])
     expect(list.listState.value).toBe('ready')
     expect(list.nextCursor.value).toBe('c1')
+    expect(list.remoteFailed.value).toBe(1)
+  })
+
+  it('reads the next pages of other nodes on load more', async () => {
+    listJobs.mockImplementation(async (params: { cursor?: string }, client: { baseUrl: string }) => {
+      if (!client.baseUrl.includes('n2')) return { jobs: [job('own', '2026-11-01T03:00:00Z')] }
+      return params.cursor === 'r2'
+        ? { jobs: [job('old', '2026-10-30T00:00:00Z')] }
+        : { jobs: [job('new', '2026-11-01T02:00:00Z')], next_cursor: 'r2' }
+    })
+    const list = useJobsList({ others: () => [{ baseUrl: 'https://n2.test/api/v1', token: 't' }] })
+    await list.load()
+    expect(list.hasMore.value).toBe(true)
+    await list.loadMore()
+
+    expect(list.jobs.value.map((entry) => entry.job_id)).toEqual(['own', 'new', 'old'])
+    expect(list.hasMore.value).toBe(false)
   })
 })

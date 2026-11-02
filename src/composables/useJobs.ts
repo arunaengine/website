@@ -114,6 +114,10 @@ export function useJobsList(options: JobsListOptions = {}) {
   const moreError = ref<string | null>(null)
   const lastPollError = ref<string | null>(null)
   const stateFilter = ref<'' | JobState>('')
+  // Other nodes that did not answer, and those with more pages, read again by loadMore.
+  const remoteFailed = ref(0)
+  const remoteCursors = ref<{ client: ApiClientOptions; cursor: string }[]>([])
+  const hasMore = computed(() => Boolean(nextCursor.value) || remoteCursors.value.length > 0)
   // Stale responses are dropped via a request id (ObjectBrowserPanel pattern).
   let requestId = 0
 
@@ -125,6 +129,8 @@ export function useJobsList(options: JobsListOptions = {}) {
     requestId++
     jobs.value = []
     nextCursor.value = null
+    remoteFailed.value = 0
+    remoteCursors.value = []
     pagesLoaded.value = 0
     listError.value = null
     moreError.value = null
@@ -154,6 +160,11 @@ export function useJobsList(options: JobsListOptions = {}) {
       const added = remote.flatMap((other) => other?.jobs ?? []).filter((job) => !known.has(job.job_id) && known.add(job.job_id))
       jobs.value = added.length ? [...page.jobs, ...added].sort((a, b) => b.created_at.localeCompare(a.created_at)) : page.jobs
       nextCursor.value = page.next_cursor ?? null
+      remoteFailed.value = remote.filter((other) => !other).length
+      remoteCursors.value = others.flatMap((other, index) => {
+        const cursor = remote[index]?.next_cursor
+        return cursor ? [{ client: other, cursor }] : []
+      })
       pagesLoaded.value = 1
       moreError.value = null
       listState.value = 'ready'
@@ -179,19 +190,29 @@ export function useJobsList(options: JobsListOptions = {}) {
       clearNoUser()
       return
     }
-    if (!nextCursor.value || loadingMore.value || refreshing.value) return
+    if (!hasMore.value || loadingMore.value || refreshing.value) return
     const id = ++requestId
     loadingMore.value = true
     moreError.value = null
     try {
-      const page = await listJobs(
-        { limit: pageSize, cursor: nextCursor.value, state: stateFilter.value || undefined },
-        resolveClient(),
-      )
+      const state = stateFilter.value || undefined
+      const pending = remoteCursors.value
+      const [page, ...remote] = await Promise.all([
+        nextCursor.value ? listJobs({ limit: pageSize, cursor: nextCursor.value, state }, resolveClient()) : null,
+        ...pending.map((other) => listJobs({ limit: pageSize, cursor: other.cursor, state }, other.client).catch(() => null)),
+      ])
       if (id !== requestId) return
       const known = new Set(jobs.value.map((job) => job.job_id))
-      jobs.value = [...jobs.value, ...page.jobs.filter((job) => !known.has(job.job_id))]
-      nextCursor.value = page.next_cursor ?? null
+      const added = [page, ...remote].flatMap((answer) => answer?.jobs ?? []).filter((job) => !known.has(job.job_id) && known.add(job.job_id))
+      jobs.value = pending.length ? [...jobs.value, ...added].sort((a, b) => b.created_at.localeCompare(a.created_at)) : [...jobs.value, ...added]
+      if (page) nextCursor.value = page.next_cursor ?? null
+      // A node that did not answer keeps its cursor, so the next load asks it again.
+      remoteFailed.value = remote.filter((other) => !other).length
+      remoteCursors.value = pending.flatMap((other, index) => {
+        const answer = remote[index]
+        if (!answer) return [other]
+        return answer.next_cursor ? [{ client: other.client, cursor: answer.next_cursor }] : []
+      })
       pagesLoaded.value += 1
     } catch (err) {
       if (id !== requestId) return
@@ -237,6 +258,8 @@ export function useJobsList(options: JobsListOptions = {}) {
     listState,
     listError,
     nextCursor,
+    hasMore,
+    remoteFailed,
     refreshing,
     loadingMore,
     moreError,

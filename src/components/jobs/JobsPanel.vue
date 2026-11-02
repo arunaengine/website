@@ -62,7 +62,8 @@ const {
   jobs,
   listState,
   listError,
-  nextCursor,
+  hasMore,
+  remoteFailed,
   loadingMore,
   moreError,
   lastPollError,
@@ -131,6 +132,10 @@ onMounted(() => void list.load())
       System jobs are the background work <span class="font-medium text-foreground">a node runs for your account</span>, staging, provenance and maintenance. You cannot start one here, only follow it or cancel it.
     </p>
 
+    <Notice v-if="painted && listState === 'ready' && remoteFailed" tone="warning">
+      {{ remoteFailed }} {{ remoteFailed === 1 ? 'node' : 'nodes' }} did not answer, so their system jobs are missing.
+      <button type="button" class="text-primary hover:underline" @click="reload">Retry</button>
+    </Notice>
     <ListSkeleton v-if="!painted" header :rows="5" label="Loading system jobs" />
 
     <Notice v-else-if="listState === 'unsupported'" tone="warning">
@@ -153,7 +158,7 @@ onMounted(() => void list.load())
       v-else
       :state="shellState"
       :error="listError || 'The system jobs could not be listed.'"
-      empty-title="No system jobs yet"
+      :empty-title="remoteFailed ? 'No system jobs found' : 'No system jobs yet'"
       empty-description="Background work a node runs for your account appears here."
       @retry="reload"
     >
@@ -228,7 +233,7 @@ onMounted(() => void list.load())
         </tbody>
       </table>
 
-      <template v-if="nextCursor || moreError" #footer>
+      <template v-if="hasMore || moreError" #footer>
         <div class="flex flex-wrap items-center gap-2">
           <Button variant="ghost" size="sm" :disabled="loadingMore" :aria-busy="loadingMore" @click="list.loadMore()">
             <Spinner v-if="loadingMore" label="Loading more system jobs" class="text-current" /> Load more
