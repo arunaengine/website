@@ -1160,6 +1160,12 @@ function removeChat(id: string) {
   watchRegistry?.dropChat(id)
   markChatRead(id)
   chatSyncs.delete(id)
+  // The record of the chat on screen may predate text streamed since the last save.
+  const current = activeChat()
+  if (current && !wasActive) {
+    current.messages = messages.value
+    current.history = history
+  }
   const remaining = chatState.chats.filter((chat) => chat.id !== id)
   const replacement = remaining[0] ?? newAssistantChat()
   chatState = {

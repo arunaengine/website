@@ -31,13 +31,14 @@ vi.mock('./useAssistantProviders', () => ({
 }))
 
 // An answer that streams its first half, then waits until the test opens the gate.
-const stream = vi.hoisted(() => ({ gate: null as null | Promise<void>, open: () => {} }))
+const stream = vi.hoisted(() => ({ gate: null as null | Promise<void>, open: () => {}, tail: null as null | Promise<void> }))
 
 vi.mock('@/lib/assistant/chat', () => ({
   runTurn: async (options: { onText: (delta: string) => void }) => {
     options.onText('first half ')
     if (stream.gate) await stream.gate
     options.onText('second half')
+    if (stream.tail) await stream.tail
     return { messages: [{ role: 'assistant', content: 'first half second half' }], error: null }
   },
 }))
@@ -267,6 +268,30 @@ describe('a stopped answer', () => {
 
     expect(chat.messages.value.map((message) => message.text)).toEqual(['old question', 'a question', 'first half '])
     expect(chat.messages.value.at(-1)?.error).toBeTruthy()
+    panel.app.unmount()
+  })
+})
+
+describe('deleting another chat', () => {
+  it('keeps the text streamed since the last save', async () => {
+    const panel = await panelOnOldChat()
+    hold()
+    let finish = () => {}
+    stream.tail = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    const running = chat.send('a question', { route: '/' })
+    await vi.waitFor(() => expect(content(panel.root)).toContain('assistant: first half'))
+    chat.renameChat('c-new', 'Renamed')
+    stream.open()
+    await vi.waitFor(() => expect(chat.messages.value.at(-1)?.text).toBe('first half second half'))
+
+    chat.deleteChat('c-new')
+    stream.tail = null
+    finish()
+    await running
+
+    expect(chat.messages.value.at(-1)?.text).toBe('first half second half')
     panel.app.unmount()
   })
 })
