@@ -91,7 +91,7 @@ const graphShown = ref(false)
             <dd class="min-w-0 space-y-1">
               <p class="text-foreground/85">{{ inputs }}</p>
               <div v-if="run.inputDatasets.length" class="flex flex-wrap gap-1">
-                <template v-for="source in run.inputDatasets" :key="source.name">
+                <template v-for="source in run.inputDatasets" :key="source.id">
                   <a
                     v-if="source.link"
                     :href="source.link"

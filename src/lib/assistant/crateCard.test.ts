@@ -52,8 +52,8 @@ describe('runCard', () => {
     })
     // A release counts only for files without their bucket's database.
     expect(run.inputDatasets).toEqual([
-      { name: 'Bakta database (light)', link: 'https://doi.org/10.5281/zenodo.14916843' },
-      { name: 'NCBI RefSeq genomes' },
+      { id: '#bucket-metadata-01', name: 'Bakta database (light)', link: 'https://doi.org/10.5281/zenodo.14916843' },
+      { id: '#bucket-metadata-02', name: 'NCBI RefSeq genomes' },
     ])
     expect(inputsText(run)).toBe('2\u00a0datasets, 3\u00a0files')
     expect(outputsText(run)).toBe('2\u00a0result files, 3.9\u00a0KiB')
@@ -65,6 +65,17 @@ describe('runCard', () => {
 
     expect(run.outputBytes).toBeUndefined()
     expect(outputsText(run)).toBe('2\u00a0result files')
+  })
+
+  it('keeps two input datasets apart when they share a name', () => {
+    const crate = runCrate({ object: [{ '@id': 'a' }, { '@id': 'b' }] }, [
+      { '@id': 'a', '@type': 'File', isPartOf: [{ '@id': '#bucket-metadata-01' }] },
+      { '@id': 'b', '@type': 'File', isPartOf: [{ '@id': '#bucket-metadata-02' }] },
+      { '@id': '#bucket-metadata-01', '@type': 'Dataset', name: 'Reference genomes' },
+      { '@id': '#bucket-metadata-02', '@type': 'Dataset', name: 'Reference genomes' },
+    ])
+
+    expect(runCard(crate)?.inputDatasets).toHaveLength(2)
   })
 
   it('names a run that is still going as running', () => {

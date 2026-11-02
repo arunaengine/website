@@ -13,7 +13,7 @@ export interface RunCard {
   duration: string
   nodeId?: string
   tool?: string
-  inputDatasets: Array<{ name: string; link?: string }>
+  inputDatasets: Array<{ id: string; name: string; link?: string }>
   inputFiles: number
   outputFiles: number
   /** Only when every output names its size. */
@@ -47,14 +47,13 @@ function knownBytes(files: Array<{ contentSize?: string }>): number | undefined 
 }
 
 // A bucket's database at admission names the dataset; a release counts only for files without one.
-function inputDatasets(inputs: RunCrateFileRef[]): Array<{ name: string; link?: string }> {
-  const found = new Map<string, { name: string; link?: string }>()
+function inputDatasets(inputs: RunCrateFileRef[]): RunCard['inputDatasets'] {
+  const found = new Map<string, RunCard['inputDatasets'][number]>()
   for (const file of inputs) {
     const parts = file.partOf ?? []
     const database = parts.filter((part) => part.kind === 'database')
     for (const part of database.length ? database : parts) {
-      const name = part.name || part.id
-      if (!found.has(name)) found.set(name, { name, ...(part.links[0] ? { link: part.links[0] } : {}) })
+      if (!found.has(part.id)) found.set(part.id, { id: part.id, name: part.name || part.id, ...(part.links[0] ? { link: part.links[0] } : {}) })
     }
   }
   return [...found.values()]
