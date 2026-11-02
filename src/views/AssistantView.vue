@@ -48,7 +48,6 @@ const {
   openWith,
   newChat,
   renameChat,
-  selectLatestChat,
   ensureProviders,
   retry,
 } = useAssistantChat()
@@ -95,7 +94,6 @@ const prompts = computed<Suggestion[]>(() => [
 ])
 
 onMounted(() => {
-  selectLatestChat()
   hidePanel()
   assistantPageOpen.value = true
   if (currentUser.value) ensureProviders()

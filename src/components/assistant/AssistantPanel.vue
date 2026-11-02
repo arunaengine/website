@@ -21,7 +21,6 @@ const {
   hidePanel,
   closePanel,
   newChat,
-  selectLatestChat,
   retry,
 } = useAssistantChat()
 
@@ -30,7 +29,6 @@ const deleteCallId = computed(() =>
 
 // The same conversation continues on the page; the panel steps aside.
 function openFullView() {
-  selectLatestChat()
   hidePanel()
   void router.push({ name: 'assistant' })
 }

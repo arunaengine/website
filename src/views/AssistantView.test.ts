@@ -155,10 +155,10 @@ describe('AssistantView', () => {
     expect(content(root)).not.toContain('What can I help you with?')
   })
 
-  it('opens the most recent chat when the page mounts', async () => {
+  it('keeps the chat on screen when the page mounts', async () => {
     await mountApp(AssistantView)
 
-    expect(selectLatestChat).toHaveBeenCalledOnce()
+    expect(selectLatestChat).not.toHaveBeenCalled()
   })
 
   it('shows the chat list in a drawer on a phone', async () => {
