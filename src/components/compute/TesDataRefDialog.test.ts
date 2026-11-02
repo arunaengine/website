@@ -221,6 +221,22 @@ describe('TES input picker databases', () => {
     ])
   })
 
+  it('drops a pick whose distribution answers after the account changed', async () => {
+    let answer!: () => void
+    getBucketDistribution.mockImplementationOnce(() => new Promise((_, reject) => (answer = () => reject(new ApiError(404, 'Not found')))))
+    const added: unknown[] = []
+    const { root } = await mountApp(component, { props: { open: true, mode: 'input', onAdd: (entry: unknown) => added.push(entry) } })
+    ;(element(root, (node) => node.props.role === 'radiogroup').props['onUpdate:modelValue'] as (value: string) => void)('databases')
+    await flush()
+
+    await click(button(root, 'Far database'))
+    await click(button(root, 'pick far-db n2'))
+    sessionEpoch.value++
+    answer()
+    for (let round = 0; round < 5; round++) await flush()
+    expect(added).toEqual([])
+  })
+
   it('keeps a folder of a database on this node as one folder input', async () => {
     const added: unknown[] = []
     const { root } = await mountApp(component, { props: { open: true, mode: 'input', onAdd: (entry: unknown) => added.push(entry) } })

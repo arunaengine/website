@@ -195,6 +195,8 @@ async function folderFiles(bucket: string, nodeId: string | null, prefix: string
   return files
 }
 
+// Each remote pick has its number; reopening the picker or a newer pick ends an older one.
+let pickRun = 0
 async function addRemote(pick: RemotePick) {
   const place = database.value
   const realmId = nodeInfo.value?.node.realm_id
@@ -203,6 +205,10 @@ async function addRemote(pick: RemotePick) {
     folderError.value = 'Enter a valid absolute mount directory first, for example /work/in/.'
     return
   }
+  const run = ++pickRun
+  const epoch = sessionEpoch.value
+  const mount = mountDirNormalized.value
+  const current = () => run === pickRun && epoch === sessionEpoch.value && database.value === place && mount === mountDirNormalized.value
   folderBusy.value = true
   folderError.value = null
   try {
@@ -212,13 +218,15 @@ async function addRemote(pick: RemotePick) {
       if (cause instanceof ApiError && cause.status === 404) return null
       throw cause
     })
+    if (!current()) return
     const view = status && fromStatus(status)
     const holder = view ? (key: string) => keyHolder(view, key) ?? place.nodeId : undefined
     const local = !node && !view
     const folders = local
       ? pick.folders
       : await Promise.all(pick.folders.map(async (folder) => ({ ...folder, files: await folderFiles(place.bucket, node, folder.prefix) })))
-    const entries = pickedEntries({ realmId, nodeId: place.nodeId, bucket: place.bucket, local, holder }, pick.files, folders, mountDirNormalized.value)
+    if (!current()) return
+    const entries = pickedEntries({ realmId, nodeId: place.nodeId, bucket: place.bucket, local, holder }, pick.files, folders, mount)
     if (!entries.length) {
       folderError.value = 'The selection contains no files.'
       return
@@ -226,9 +234,9 @@ async function addRemote(pick: RemotePick) {
     for (const entry of entries) emit('add', entry)
     emit('update:open', false)
   } catch (err) {
-    folderError.value = errorMessage(err)
+    if (current()) folderError.value = errorMessage(err)
   } finally {
-    folderBusy.value = false
+    if (run === pickRun) folderBusy.value = false
   }
 }
 
@@ -236,6 +244,7 @@ watch(
   () => props.open,
   (open) => {
     if (!open) return
+    pickRun++
     folderBusy.value = false
     folderError.value = null
     mountDir.value = props.mountDefault
