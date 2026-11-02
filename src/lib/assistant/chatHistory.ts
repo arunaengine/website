@@ -324,13 +324,13 @@ export function createAssistantChatStore(
   // Chats changed here that the browser refused to store; the next save tries them again.
   const unsaved = new Set<string>()
 
-  /** Every value this scope stores, by key, as storage holds it right now. */
+  /** Every value this scope stores, by key, as storage holds it right now; the old key counts too. */
   function stored(): Map<string, string> {
     const values = new Map<string, string>()
     if (!storage) return values
     for (let at = 0; at < storage.length; at += 1) {
       const name = storage.key(at)
-      const value = name?.startsWith(`${key}:`) ? storage.getItem(name) : null
+      const value = name === key || name?.startsWith(`${key}:`) ? storage.getItem(name) : null
       if (name && value !== null) values.set(name, value)
     }
     return values
@@ -342,15 +342,20 @@ export function createAssistantChatStore(
    */
   function write(state: AssistantChatState, ids: Iterable<string>, onlyAbsent = false): string[] {
     if (!storage) return []
-    const values = stored()
-    const kept = chatKey(state.activeChatId)
+    // Deletions and the chat on screen first, then the newest, so a full storage keeps those.
+    const rank = (id: string) =>
+      (id === state.activeChatId ? Infinity : state.chats.find((chat) => chat.id === id)?.updatedAt ?? Infinity)
+    const names = [...ids].sort((a, b) => rank(b) - rank(a))
+    let values = stored()
+    // The chat on screen and the chats this write stores are never trimmed.
+    const kept = new Set([state.activeChatId, ...names].map(chatKey))
     const chatNames = () => [...values.keys()].filter((name) => name.startsWith(chatPrefix))
     const used = () => [...values.values()].reduce((sum, value) => sum + value.length, 0)
     const over = () => used() > MAX_ASSISTANT_STORAGE_CHARS || chatNames().length > MAX_ASSISTANT_CHATS
     // Two tabs trimming at once may both remove an old chat; that only frees more room.
-    const trimOldest = (except: string): boolean => {
+    const trimOldest = (): boolean => {
       const oldest = chatNames()
-        .filter((name) => name !== kept && name !== except)
+        .filter((name) => !kept.has(name))
         .sort((a, b) => updatedOf(values.get(a) ?? '') - updatedOf(values.get(b) ?? ''))[0]
       if (!oldest) return false
       storage.removeItem(oldest)
@@ -358,7 +363,7 @@ export function createAssistantChatStore(
       return true
     }
     const failed: string[] = []
-    for (const id of ids) {
+    for (const id of names) {
       const name = chatKey(id)
       const chat = state.chats.find((entry) => entry.id === id)
       if (!chat) {
@@ -371,7 +376,7 @@ export function createAssistantChatStore(
       if (!fitted) continue
       const previous = values.get(name)
       values.set(name, fitted.raw)
-      while (over()) if (!trimOldest(name)) break
+      while (over()) if (!trimOldest()) break
       if (used() > MAX_ASSISTANT_STORAGE_CHARS) {
         // It does not fit beside the chats kept; the stored copy stays and the change waits.
         if (previous === undefined) values.delete(name)
@@ -383,15 +388,15 @@ export function createAssistantChatStore(
         storage.setItem(name, fitted.raw)
       } catch {
         try {
-          if (!trimOldest(name)) throw new Error('nothing left to trim')
+          if (!trimOldest()) throw new Error('nothing left to trim')
           storage.setItem(name, fitted.raw)
         } catch {
           failed.push(id)
-          const now = storage.getItem(name)
-          if (now === null) values.delete(name)
-          else values.set(name, now)
         }
       }
+      // Another tab may have written meanwhile, so the total is measured again.
+      values = stored()
+      while (over()) if (!trimOldest()) break
     }
     return failed
   }

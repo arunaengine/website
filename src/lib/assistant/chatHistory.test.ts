@@ -673,4 +673,32 @@ describe('the final store rules', () => {
 
     expect(createAssistantChatStore(user, backing).load().chats.map((entry) => entry.id)).toEqual(['c-2'])
   })
+
+  it('counts the old history key toward the size cap', () => {
+    const store = createAssistantChatStore(user, backing)
+    store.save({ activeChatId: 'o-1', chats: [sized('o-1', 5, 300_000)] })
+    const held = store.load()
+    // History an unfinished move left under the old key.
+    backing.setItem(store.key, JSON.stringify({ version: 1, state: { activeChatId: 'l-1', chats: [sized('l-1', 6, 300_000)] } }))
+
+    store.save({ ...held, activeChatId: 'a-1', chats: [sized('a-1', 40, 300_000), ...held.chats] }, ['a-1'])
+
+    expect(usedChars(backing, store.key)).toBeLessThanOrEqual(MAX_ASSISTANT_STORAGE_CHARS)
+  })
+
+  it('trims again when another tab wrote while this one was writing', () => {
+    const store = createAssistantChatStore(user, backing)
+    store.save({ activeChatId: 'o-1', chats: [sized('o-1', 5, 300_000)] })
+    const setItem = backing.setItem.bind(backing)
+    backing.setItem = (key, value) => {
+      // Another tab stores a large chat in the same moment.
+      if (key.endsWith(':chat:a-1')) setItem(`${store.key}:chat:b-1`, JSON.stringify(sized('b-1', 50, 350_000)))
+      setItem(key, value)
+    }
+
+    store.save({ activeChatId: 'a-1', chats: [sized('a-1', 40, 300_000), sized('o-1', 5, 300_000)] }, ['a-1'])
+
+    expect(usedChars(backing, store.key)).toBeLessThanOrEqual(MAX_ASSISTANT_STORAGE_CHARS)
+    expect(createAssistantChatStore(user, backing).load().chats.map((entry) => entry.id)).toEqual(['b-1', 'a-1'])
+  })
 })
