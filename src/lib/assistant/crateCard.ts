@@ -1,6 +1,6 @@
 // The facts a dataset card and a run record card show, read once from the
 // crate so the card and the note the model gets back always agree.
-import { crateGraph, crateRootId, dataEntitiesOf, stringProp } from '@/lib/dataEntities'
+import { crateGraph, crateRootId, dataEntitiesOf, stringProp, typeShortName } from '@/lib/dataEntities'
 import { formatCount } from '@/lib/formatCount'
 import { parseRunCrate, resultsFolder, runDuration, runState, type RunCrateFileRef } from '@/lib/runCrate'
 import { formatBytes } from '@/lib/utils'
@@ -91,7 +91,7 @@ export function datasetCard(crate: unknown): DatasetCard {
   const rootId = crateRootId(crate)
   const root = graph.find((entity) => entity['@id'] === rootId) ?? graph.find((entity) => entity['@id'] === './')
   const parts = dataEntitiesOf(crate)
-  const files = parts.filter((part) => !part.types.includes('Dataset'))
+  const files = parts.filter((part) => !part.types.map(typeShortName).includes('Dataset'))
   const folders = parts.length - files.length
   const bytes = folders ? undefined : knownBytes(files)
   return {

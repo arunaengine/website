@@ -127,6 +127,12 @@ describe('datasetCard', () => {
     expect(sizeRow(card)).toEqual({ label: 'Parts', value: '1\u00a0folder, 1\u00a0file' })
   })
 
+  it('knows a folder by its full type IRI too', () => {
+    const card = datasetCard(dataset([{ '@id': 'raw/', '@type': 'http://schema.org/Dataset' }, { '@id': 'a.csv', '@type': 'File', contentSize: '10' }]))
+
+    expect(card).toMatchObject({ files: 1, folders: 1 })
+  })
+
   it('shows no size row for a dataset without parts', () => {
     expect(sizeRow(datasetCard(dataset([])))).toBeNull()
   })
