@@ -95,7 +95,7 @@ describe('show_stats', () => {
     const { tools } = harness()
     const output = await runTool(tools.show_stats, { title: 'Realm', items: [{ label: 'Objects', value: '44,012,331' }] })
 
-    expect(output).toMatchObject({ card: 'Shown to the user as a card: "Realm" with Objects 44,012,331.' })
+    expect(output).toMatchObject({ card: 'Shown to the user as a card: "Realm" with "Objects": "44,012,331".' })
   })
 })
 
@@ -164,7 +164,7 @@ describe('show_job', () => {
     expect(output).toEqual({
       shown: true,
       card: expect.stringMatching(
-        /^Shown to the user as a card: job "gc analysis" in state succeeded, finished 4 Sep 2026, \d\d:\d\d, on node node-2, outputs 1 file, 82 B\.$/,
+        /^Shown to the user as a card: job "gc analysis" in state "succeeded", finished 4 Sep 2026, \d\d:\d\d, on node "node-2", outputs 1 file, 82 B\.$/,
       ),
       updated: false,
       state: 'succeeded',
