@@ -148,6 +148,7 @@ describe('ProfilesView', () => {
       { ...profile, id: 'shared', documentId: 'doc-a', name: 'Alpha profile' },
       { ...profile, id: 'shared', documentId: 'doc-b', name: 'Beta profile' },
     ]
+    profileItems.value = [{ document_id: 'doc-b', group_id: 'group-1' }]
     route.name = 'profile'
     route.params = { profileId: 'doc-b' }
     const mounted = await mountApp(ProfilesView)
@@ -157,7 +158,10 @@ describe('ProfilesView', () => {
     expect(marked.map((node) => content(node))).toEqual([expect.stringContaining('Beta profile')])
     await click(marked[0])
     expect(routerPush).toHaveBeenCalledWith({ name: 'profile', params: { profileId: 'doc-b' } })
+    await click(button(mounted.root, 'Edit'))
+    expect(routerPush).toHaveBeenCalledWith({ name: 'profile-edit', params: { profileId: 'doc-b' } })
     mounted.app.unmount()
+    profileItems.value = [{ document_id: 'doc-1', group_id: 'group-1' }]
     route.name = 'profiles'
     route.params = {}
   })

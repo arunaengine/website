@@ -48,12 +48,15 @@ const {
   sessionEpoch,
 } = useAruna()
 
-// The edit route carries the profile slug; the create route carries none. The
+// The edit route carries the profile's document id or slug; the create route carries none. The
 // profile itself comes from the loaded list, so its rules arrive with the crate.
 const editId = computed(() => String(route.params.profileId ?? ''))
-const editProfile = computed<MetadataProfile | null>(() =>
-  editId.value ? profiles.value.find((profile) => profile.id === editId.value) ?? null : null,
-)
+const named = (profile: MetadataProfile, id: string) => profile.documentId === id || profile.id === id
+const editProfile = computed<MetadataProfile | null>(() => {
+  const id = editId.value
+  if (!id) return null
+  return profiles.value.find((profile) => profile.documentId === id) ?? profiles.value.find((profile) => profile.id === id) ?? null
+})
 const isEditing = computed(() => Boolean(editId.value))
 const s3 = useS3()
 const { publishProfileArtifacts } = useProfilePublish()
@@ -330,7 +333,7 @@ watch(
     }
     if (generation !== seedGeneration || editId.value !== id) return
     const current = editProfile.value
-    if (!seeded.value && current?.id === id) {
+    if (!seeded.value && current && named(current, id)) {
       seedDraft(current)
       if (parsed?.datePublished) builder.datePublished = parsed.datePublished
       if (parsed?.license) builder.license = parsed.license

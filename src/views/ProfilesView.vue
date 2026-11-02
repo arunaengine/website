@@ -79,10 +79,14 @@ const selectedId = computed(() => selected.value?.id || (route.params.profileId 
 const isSelected = (profile: MetadataProfile) => selected.value?.id === profile.id && selected.value?.documentId === profile.documentId
 const preferredId = computed(() => currentUser.value?.preferredProfileId ?? '')
 
-// A slug that two profiles share opens by document id.
-function select(profile: MetadataProfile) {
+// A slug that two profiles share is named by document id.
+function routeId(profile: MetadataProfile) {
   const shared = profile.documentId && visibleProfiles.value.some((other) => other.id === profile.id && other.documentId !== profile.documentId)
-  router.push({ name: 'profile', params: { profileId: shared ? profile.documentId! : profile.id } })
+  return shared ? profile.documentId! : profile.id
+}
+
+function select(profile: MetadataProfile) {
+  router.push({ name: 'profile', params: { profileId: routeId(profile) } })
 }
 
 // Membership in the owning group is the same write heuristic the metadata
@@ -93,7 +97,7 @@ const canEditSelected = computed(() => {
 })
 
 function openEdit(profile: MetadataProfile) {
-  router.push({ name: 'profile-edit', params: { profileId: profile.id } })
+  router.push({ name: 'profile-edit', params: { profileId: routeId(profile) } })
 }
 
 function openCreate() {
@@ -103,7 +107,7 @@ function openCreate() {
 // Opens the builder on this profile with the public choice preselected; the
 // author still confirms it by saving.
 function makePublic(profile: MetadataProfile) {
-  router.push({ name: 'profile-edit', params: { profileId: profile.id }, query: { visibility: 'public' } })
+  router.push({ name: 'profile-edit', params: { profileId: routeId(profile) }, query: { visibility: 'public' } })
 }
 
 async function confirmDelete() {

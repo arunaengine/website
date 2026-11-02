@@ -457,6 +457,17 @@ describe('ProfileNewView edit', () => {
     mounted.app.unmount()
   })
 
+  it('edits the profile a document id names when groups share its slug', async () => {
+    profiles.value = [{ ...storedProfile, name: 'Alpha profile', documentId: 'doc-a' }, { ...storedProfile, name: 'Beta profile', documentId: 'doc-b' }]
+    route.params = { profileId: 'doc-b' }
+    const mounted = await mountApp(ProfileNewView)
+    await flush()
+
+    expect(loadProfileCrate).toHaveBeenCalledWith('doc-b')
+    expect(input(mounted.root, 'data-field', 'name').value).toBe('Beta profile')
+    mounted.app.unmount()
+  })
+
   it('preserves unmodeled content through the actual edit and save path', async () => {
     const original = await fetchRoCrateRaw()
     loadProfileCrate.mockResolvedValue(Rocrate.parseProfileCrate(original))
