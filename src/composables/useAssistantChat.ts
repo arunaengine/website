@@ -730,25 +730,20 @@ function abortTurn(): TurnContext | null {
   return turn
 }
 
-/** Aborts the turn on screen; a watcher's turn keeps running in its own chat. */
-function abortShownTurn() {
-  if (activeTurn && activeTurn.resumeText === undefined) discardTurn(abortTurn())
-}
-
 function discardTurn(turn: TurnContext | null) {
   if (!turn) return
   setMessagesOf(turn.chatId, messagesOf(turn.chatId).filter((message) =>
     message.id !== turn.userMessageId && message.id !== turn.messageId))
 }
 
-// Closing the panel stops the answer but keeps the transcript, so the chat is
-// still there, with a retry, when the page opens the assistant again.
-function stopShownTurn() {
+// Stops the answer on screen but keeps its question and partial text, with a
+// retry; a watcher's turn keeps running in its own chat.
+function stopShownTurn(note: string) {
   if (!activeTurn || activeTurn.resumeText !== undefined) return
   const turn = abortTurn()
   if (!turn) return
   const message = messagesOf(turn.chatId).find((entry) => entry.id === turn.messageId)
-  if (message && !message.error) message.error = 'Closing the assistant stopped this answer.'
+  if (message && !message.error) message.error = note
 }
 
 // ── Background watchers ────────────────────────────────────────────────────
@@ -1624,7 +1619,8 @@ export function useAssistantChat() {
 
   function newChat() {
     syncEpoch()
-    discardTurn(abortTurn())
+    if (activeTurn?.resumeText !== undefined) discardTurn(abortTurn())
+    else stopShownTurn('Starting a new chat stopped this answer.')
     persistCurrentChat()
     if (!chatStore || !historyReady.value) {
       resetConversation()
@@ -1638,7 +1634,7 @@ export function useAssistantChat() {
     if (!chatStore || !historyReady.value || !chatState.chats.some((chat) => chat.id === id)) return
     markChatRead(id)
     if (activeChatId.value === id) return
-    abortShownTurn()
+    stopShownTurn('Opening another chat stopped this answer.')
     persistCurrentChat()
     chatState = { ...chatState, activeChatId: id }
     applyChatState(chatState)
@@ -1723,7 +1719,7 @@ export function useAssistantChat() {
   function closePanel() {
     syncEpoch()
     open.value = false
-    stopShownTurn()
+    stopShownTurn('Closing the assistant stopped this answer.')
     persistCurrentChat()
   }
 

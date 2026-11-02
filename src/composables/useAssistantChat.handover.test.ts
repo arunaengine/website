@@ -236,3 +236,37 @@ describe('panel and full page', () => {
     panel.app.unmount()
   })
 })
+
+describe('a stopped answer', () => {
+  it('keeps its question when New chat stops it', async () => {
+    const panel = await panelOnOldChat()
+    hold()
+    const running = chat.send('a question', { route: '/' })
+    await vi.waitFor(() => expect(content(panel.root)).toContain('assistant: first half'))
+
+    await click(control(panel.root, 'Start a new chat'))
+    stream.open()
+    await running
+    chat.selectChat('c-old')
+
+    expect(chat.messages.value.map((message) => message.text)).toEqual(['old question', 'a question', 'first half '])
+    expect(chat.messages.value.at(-1)?.error).toBeTruthy()
+    panel.app.unmount()
+  })
+
+  it('keeps its question when another chat is opened', async () => {
+    const panel = await panelOnOldChat()
+    hold()
+    const running = chat.send('a question', { route: '/' })
+    await vi.waitFor(() => expect(content(panel.root)).toContain('assistant: first half'))
+
+    chat.selectChat('c-new')
+    stream.open()
+    await running
+    chat.selectChat('c-old')
+
+    expect(chat.messages.value.map((message) => message.text)).toEqual(['old question', 'a question', 'first half '])
+    expect(chat.messages.value.at(-1)?.error).toBeTruthy()
+    panel.app.unmount()
+  })
+})
