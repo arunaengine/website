@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// A public file's details for a visitor: what the listing knows, where it is stored, and its download.
+// A public file's details for a visitor: what the listing knows, its bucket's nodes, and its download.
 import { computed } from 'vue'
 import RowList from '@/components/distributed/RowList.vue'
 import Button from '@/components/ui/Button.vue'
@@ -21,7 +21,7 @@ const rows = computed(() => {
     { label: 'Size', value: file.size !== null ? formatBytes(file.size) : '-' },
     { label: 'Modified', value: file.lastModified ? formatDate(file.lastModified) : '-' },
     ...(file.contentType ? [{ label: 'Type', value: file.contentType }] : []),
-    { label: 'Stored on', value: props.nodes.map((id) => realmNodes.displayName(id)).join(', ') || '-' },
+    { label: 'Bucket nodes', value: props.nodes.map((id) => realmNodes.displayName(id)).join(', ') || '-' },
     { label: 'Version', value: file.versionId, mono: true },
   ]
 })
