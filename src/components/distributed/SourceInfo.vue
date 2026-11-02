@@ -43,7 +43,7 @@ const emit = defineEmits<{ (e: 'copy'): void }>()
         <tbody class="divide-y divide-border">
           <tr v-for="digest in info.digests" :key="digest.algorithm">
             <td class="px-3 py-2">{{ digest.algorithm }}</td>
-            <td class="break-all px-3 py-2 font-mono text-[11px]">{{ digest.digest }}</td>
+            <td class="break-all px-3 py-2 font-mono text-xs">{{ digest.digest }}</td>
             <td class="px-3 py-2">{{ digest.scope }}</td>
             <td class="px-3 py-2">{{ digest.origin }}</td>
           </tr>

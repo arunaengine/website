@@ -112,7 +112,7 @@ onUnmounted(() => window.clearTimeout(confirmTimer))
   <div class="overflow-x-auto">
     <table class="w-full text-left text-sm">
       <thead>
-        <tr class="border-b border-border text-[11px] text-muted-foreground">
+        <tr class="border-b border-border text-xs text-muted-foreground">
           <th class="px-3 py-2 font-medium">{{ props.kindHeader }}</th>
           <th v-if="props.showOwner" class="px-3 py-2 font-medium">Owner</th>
           <th class="px-3 py-2 font-medium">Enrollment id</th>
@@ -140,7 +140,7 @@ onUnmounted(() => window.clearTimeout(confirmTimer))
           </td>
           <td class="px-3 py-2.5">
             <div class="tabular-nums text-xs text-foreground/90">{{ expiresLabel(row) }}</div>
-            <div v-if="row.expiresHint" class="text-[10px] text-muted-foreground">{{ row.expiresHint }}</div>
+            <div v-if="row.expiresHint" class="text-xs text-muted-foreground">{{ row.expiresHint }}</div>
           </td>
           <td class="px-3 py-2.5">
             <div class="flex flex-col items-start gap-0.5">
@@ -148,14 +148,14 @@ onUnmounted(() => window.clearTimeout(confirmTimer))
               <RouterLink
                 v-if="row.status === 'claimed' && row.claimedBy && row.claimedLink"
                 :to="row.claimedLink"
-                class="font-mono text-[10px] text-primary hover:underline"
+                class="font-mono text-xs text-primary hover:underline"
                 :title="row.claimedBy"
               >
                 {{ truncateMiddle(row.claimedBy, 8, 6) }}
               </RouterLink>
               <span
                 v-else-if="row.status === 'claimed' && row.claimedBy"
-                class="font-mono text-[10px] text-muted-foreground"
+                class="font-mono text-xs text-muted-foreground"
                 :title="row.claimedBy"
               >
                 {{ truncateMiddle(row.claimedBy, 8, 6) }}

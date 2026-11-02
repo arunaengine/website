@@ -183,7 +183,7 @@ onUnmounted(() => {
         <div class="p-4">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="text-[10px] font-semibold text-primary">Tutorial</p>
+              <p class="text-xs font-semibold text-primary">Tutorial</p>
               <h2 class="mt-1 font-display text-sm font-semibold text-aruna-navy">{{ tutorialStep?.title }}</h2>
             </div>
             <div class="flex shrink-0 items-center gap-1">
@@ -197,7 +197,7 @@ onUnmounted(() => {
           </div>
           <p class="mt-2 text-sm leading-relaxed text-foreground/85">{{ tutorialStep?.body }}</p>
           <div class="mt-4 flex items-center justify-between gap-2">
-            <span class="text-[11px] text-muted-foreground">Step {{ tutorialIndex + 1 }} of {{ tutorialCount }}</span>
+            <span class="text-xs text-muted-foreground">Step {{ tutorialIndex + 1 }} of {{ tutorialCount }}</span>
             <div class="flex items-center gap-2">
               <Button variant="outline" size="sm" :disabled="tutorialIndex === 0" @click="backTutorialStep">Back</Button>
               <Button size="sm" @click="nextTutorialStep">{{ last ? 'Finish' : 'Next' }}</Button>

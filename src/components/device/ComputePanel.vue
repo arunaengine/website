@@ -132,7 +132,7 @@ const chosenMissing = computed(() => {
         <div class="flex items-center justify-between gap-3">
           <div>
             <span class="text-xs font-medium text-foreground">Run jobs on this computer</span>
-            <p class="text-[11px] text-muted-foreground">
+            <p class="text-xs text-muted-foreground">
               Jobs run next to your data. Aruna never sends work here on its own.
             </p>
           </div>
@@ -193,7 +193,7 @@ const chosenMissing = computed(() => {
         <div class="flex items-center justify-between gap-3">
           <div>
             <span class="text-xs font-medium text-foreground">Keep failed jobs</span>
-            <p class="text-[11px] text-muted-foreground">
+            <p class="text-xs text-muted-foreground">
               Leave the files of a failed job on disk so you can look at them.
             </p>
           </div>
@@ -210,10 +210,10 @@ const chosenMissing = computed(() => {
 
         <Notice v-if="saveError" tone="error">{{ saveError }}</Notice>
 
-        <p class="text-[11px] text-muted-foreground">Saving restarts Aruna on this computer for a few seconds.</p>
+        <p class="text-xs text-muted-foreground">Saving restarts Aruna on this computer for a few seconds.</p>
         <div class="flex flex-wrap items-center gap-3">
           <Button :disabled="saving" @click="save">{{ saving ? 'Saving…' : 'Save' }}</Button>
-          <span v-if="saved" class="text-[11px] text-muted-foreground">Saved.</span>
+          <span v-if="saved" class="text-xs text-muted-foreground">Saved.</span>
           <RouterLink :to="{ name: 'compute' }" class="ml-auto text-xs font-medium text-primary hover:underline">
             See runs in Compute
           </RouterLink>

@@ -104,7 +104,7 @@ function startSignIn() {
               class="mt-1"
               placeholder="Paste onboarding secret"
             />
-            <p class="mt-1 text-[11px] text-muted-foreground">
+            <p class="mt-1 text-xs text-muted-foreground">
               Claims the realm admin role for the first account. Applied when you sign in.
             </p>
           </div>

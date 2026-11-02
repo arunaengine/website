@@ -87,10 +87,10 @@ function moved(transfer: DeviceTransfer): string {
             >{{ title }}</RouterLink
           >
           <Badge :variant="chip.variant" size="sm">{{ chip.label }}</Badge>
-          <span v-if="fileCount" class="text-[11px] text-muted-foreground">{{ fileCount }}</span>
+          <span v-if="fileCount" class="text-xs text-muted-foreground">{{ fileCount }}</span>
         </div>
 
-        <p v-if="folder" class="mt-1 truncate text-[11px] text-muted-foreground" :title="folder.root">
+        <p v-if="folder" class="mt-1 truncate text-xs text-muted-foreground" :title="folder.root">
           <span class="hash">{{ folder.root }}</span>
           <ArrowRight class="inline h-3 w-3 align-[-1px]" aria-hidden="true" /> {{ remotePath(folder.remote.bucket, folder.remote.prefix) }} on
           <NodeLabel :node-id="folder.remote.node_id" size="sm" />
@@ -98,7 +98,7 @@ function moved(transfer: DeviceTransfer): string {
         <p v-else-if="document" class="hash mt-1 truncate">{{ subtitle }}</p>
 
         <Notice v-if="chip.detail && noticeTone" :tone="noticeTone" class="mt-1">{{ chip.detail }}</Notice>
-        <p v-else-if="chip.detail" class="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+        <p v-else-if="chip.detail" class="mt-1 text-xs leading-relaxed text-muted-foreground">
           {{ chip.detail }}
         </p>
       </div>
@@ -116,7 +116,7 @@ function moved(transfer: DeviceTransfer): string {
     </div>
 
     <div v-if="shownTransfers.length" class="mt-3 space-y-2 border-t border-border/70 pt-2.5">
-      <div v-for="transfer in shownTransfers" :key="transfer.id" class="flex items-center gap-2 text-[11px]">
+      <div v-for="transfer in shownTransfers" :key="transfer.id" class="flex items-center gap-2 text-xs">
         <ArrowUpFromLine v-if="transfer.direction === 'upload'" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <ArrowDownToLine v-else class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <div class="min-w-0 flex-1">
@@ -136,7 +136,7 @@ function moved(transfer: DeviceTransfer): string {
           class="h-1.5 w-28 shrink-0"
         />
       </div>
-      <p v-if="transfers.length > shownTransfers.length" class="text-[11px] text-muted-foreground">
+      <p v-if="transfers.length > shownTransfers.length" class="text-xs text-muted-foreground">
         and {{ transfers.length - shownTransfers.length }} more
       </p>
     </div>

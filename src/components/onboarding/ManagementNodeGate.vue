@@ -84,7 +84,7 @@ watch(
             <ArrowRightLeft class="h-3.5 w-3.5" /> Switch to {{ portals[0].url }}
           </Button>
         </template>
-        <p class="mt-2 text-[11px] text-muted-foreground">
+        <p class="mt-2 text-xs text-muted-foreground">
           Switching ends this session; sign in again on the management node.
         </p>
       </template>

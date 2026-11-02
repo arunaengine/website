@@ -157,16 +157,16 @@ function remove(id: string) {
                 <!-- The owner names an enrolled device; an enrollment in flight has no node to name yet. -->
                 <NodeNameEdit v-if="row.nodeId" :name="row.name ?? row.shortId" :value="row.value" :save="(name) => renameDevice(row.nodeId!, name)">
                   <RouterLink v-if="row.name" :to="deviceLink(row.nodeId)" class="text-foreground hover:underline">{{ row.name }}</RouterLink>
-                  <span v-else class="font-mono text-[11px] text-muted-foreground">{{ row.shortId }}</span>
+                  <span v-else class="font-mono text-xs text-muted-foreground">{{ row.shortId }}</span>
                 </NodeNameEdit>
                 <span v-else class="inline-flex items-center gap-1">
                   <span v-if="row.name" class="text-foreground">{{ row.name }}</span>
-                  <span v-else class="font-mono text-[11px] text-muted-foreground">{{ row.shortId }}</span>
+                  <span v-else class="font-mono text-xs text-muted-foreground">{{ row.shortId }}</span>
                 </span>
               </td>
               <td class="py-2.5 pr-4">
                 <span class="inline-flex items-center gap-1">
-                  <code class="font-mono text-[11px] text-muted-foreground" :title="row.enrollmentId">{{ truncateMiddle(row.enrollmentId) }}</code>
+                  <code class="font-mono text-xs text-muted-foreground" :title="row.enrollmentId">{{ truncateMiddle(row.enrollmentId) }}</code>
                   <CopyButton :value="row.enrollmentId" label="Copy enrollment id" />
                 </span>
               </td>
@@ -177,7 +177,7 @@ function remove(id: string) {
               <td class="py-2.5 pr-4 text-muted-foreground">{{ row.lastSeen || '-' }}</td>
               <td class="py-2.5 text-right">
                 <div v-if="confirming === row.id" class="flex items-center justify-end gap-2">
-                  <span class="text-[11px] text-muted-foreground">{{ row.status === 'pending' ? 'Its code stops working.' : 'It has to be enrolled again.' }}</span>
+                  <span class="text-xs text-muted-foreground">{{ row.status === 'pending' ? 'Its code stops working.' : 'It has to be enrolled again.' }}</span>
                   <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="busyIds.has(row.id)" @click="remove(row.id)"><Trash2 class="h-3.5 w-3.5" /> Remove</Button>
                   <Button variant="ghost" size="sm" @click="confirming = ''">Cancel</Button>
                 </div>

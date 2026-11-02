@@ -60,7 +60,7 @@ function linkHere() {
     <ul v-else class="divide-y divide-border">
       <li v-for="entry in logins" :key="entry.login" class="flex flex-wrap items-center gap-3 px-5 py-3">
         <RealmTag :realm-id="entry.realmId" :name="entry.name" />
-        <span class="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground" :title="entry.login">{{ entry.login }}</span>
+        <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground" :title="entry.login">{{ entry.login }}</span>
         <Button size="sm" variant="outline" :disabled="Boolean(removing)" @click="remove(entry.login)">Remove</Button>
       </li>
     </ul>

@@ -49,7 +49,7 @@ const width = computed(() =>
     />
     <span
       v-if="subtitle && variant === 'lockup'"
-      class="tagline mt-1.5 text-[9px]"
+      class="tagline mt-1.5 text-xs"
     >
       {{ subtitle }}
     </span>

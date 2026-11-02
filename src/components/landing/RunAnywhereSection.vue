@@ -19,7 +19,7 @@ const nodes = [
   <section id="run-anywhere" class="band section relative overflow-hidden">
     <div class="container relative max-w-5xl">
       <div class="mx-auto max-w-2xl text-center">
-        <div class="text-[11px] font-semibold text-primary">Run anywhere</div>
+        <div class="text-xs font-semibold text-primary">Run anywhere</div>
         <h2 class="mt-3 text-balance font-display text-3xl font-semibold tracking-tight text-aruna-navy sm:text-4xl">
           One system, not a fleet of services.
         </h2>

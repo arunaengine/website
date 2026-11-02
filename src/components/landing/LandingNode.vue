@@ -29,7 +29,7 @@ const props = defineProps<{
     <div class="mt-2 flex items-center gap-2">
       <Badge size="sm">{{ props.tag }}</Badge>
     </div>
-    <div class="hash mt-1 text-[11px] text-muted-foreground">{{ props.meta }}</div>
+    <div class="hash mt-1 text-xs text-muted-foreground">{{ props.meta }}</div>
     <div v-if="$slots.default || props.states" class="relative mt-2 flex min-h-[22px] items-center">
       <slot />
       <template v-if="props.states">

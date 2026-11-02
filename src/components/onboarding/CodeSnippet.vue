@@ -10,9 +10,9 @@ defineProps<{ title: string; code: string; hint?: string }>()
 
 <template>
   <div class="relative rounded-md border border-border bg-muted/40 px-3 py-2">
-    <div class="text-[10px] text-muted-foreground">{{ title }}</div>
-    <pre class="mt-1 overflow-x-auto whitespace-pre font-mono text-[11px] leading-5 text-foreground/90">{{ code }}</pre>
-    <p v-if="hint" class="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">{{ hint }}</p>
+    <div class="text-xs text-muted-foreground">{{ title }}</div>
+    <pre class="mt-1 overflow-x-auto whitespace-pre font-mono text-xs leading-5 text-foreground/90">{{ code }}</pre>
+    <p v-if="hint" class="mt-1.5 text-xs leading-relaxed text-muted-foreground">{{ hint }}</p>
     <div class="absolute right-2 top-2"><CopyButton :value="code" :label="`Copy ${title}`" /></div>
   </div>
 </template>

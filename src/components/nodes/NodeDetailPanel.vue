@@ -72,7 +72,7 @@ defineProps<{
     <!-- Labels are for admins; they wait folded until asked for. -->
     <details v-if="Object.keys(node.info?.labels ?? {}).length" class="border-t border-border/70 pt-3">
       <summary class="cursor-pointer font-display text-sm font-semibold text-aruna-navy">Labels ({{ Object.keys(node.info?.labels ?? {}).length }})</summary>
-      <ul class="mt-1.5 space-y-0.5 font-mono text-[11px] text-foreground/90">
+      <ul class="mt-1.5 space-y-0.5 font-mono text-xs text-foreground/90">
         <li v-for="(value, key) in node.info?.labels" :key="key" class="break-all">{{ key }}={{ value }}</li>
       </ul>
     </details>
@@ -99,7 +99,7 @@ defineProps<{
         <div>
           <dt class="type-label">Objects</dt>
           <dd class="mt-0.5 font-mono text-xs tabular-nums text-foreground/90">{{ formatNumber(probe.usage.objects) }}</dd>
-          <dd class="mt-0.5 text-[11px] text-muted-foreground">{{ formatNumber(probe.usage.stored_blobs ?? 0) }} physical blob locations</dd>
+          <dd class="mt-0.5 text-xs text-muted-foreground">{{ formatNumber(probe.usage.stored_blobs ?? 0) }} physical blob locations</dd>
         </div>
         <div>
           <dt class="type-label">Stored</dt>

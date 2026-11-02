@@ -31,7 +31,7 @@ const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
         <DialogTitle class="truncate text-base font-semibold text-foreground" :title="props.name">
           {{ props.name || 'Preview' }}
         </DialogTitle>
-        <p class="mt-0.5 font-mono text-[11px] text-muted-foreground">
+        <p class="mt-0.5 font-mono text-xs text-muted-foreground">
           <span class="break-all">{{ props.bucket }}/{{ props.objectKey }}</span>
           <span v-if="props.size !== undefined">, {{ formatBytes(props.size) }}</span>
         </p>

@@ -17,7 +17,7 @@ const expanded = ref(false)
 <template>
   <div class="space-y-2">
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <p v-if="!compact || safe.removed || safe.truncated" class="text-[11px] text-muted-foreground">
+      <p v-if="!compact || safe.removed || safe.truncated" class="text-xs text-muted-foreground">
         Shown without scripts and without anything it loads from elsewhere.
         <span v-if="safe.removed">{{ safe.removed }} {{ safe.removed === 1 ? 'part was' : 'parts were' }} left out.</span>
         <span v-if="safe.truncated">The file is too large to show whole.</span>
@@ -36,7 +36,7 @@ const expanded = ref(false)
 
     <pre
       v-if="source"
-      class="scrollbar-thin max-h-[60vh] overflow-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-[11px] leading-relaxed"
+      class="scrollbar-thin max-h-[60vh] overflow-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-xs leading-relaxed"
     >{{ props.text }}</pre>
     <iframe
       v-else

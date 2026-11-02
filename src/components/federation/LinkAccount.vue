@@ -108,13 +108,13 @@ function cancel() {
       <template v-else>
         <div class="flex flex-wrap items-center gap-2">
           <RealmTag :realm-id="home.realmId" :name="home.name" />
-          <span class="font-mono text-[11px] text-muted-foreground" :title="foreignUser">{{ foreignUser }}</span>
+          <span class="font-mono text-xs text-muted-foreground" :title="foreignUser">{{ foreignUser }}</span>
         </div>
         <div class="flex items-center gap-3 rounded-md bg-muted/60 px-3 py-2">
           <Avatar :user="localUser" size="md" />
           <div class="min-w-0">
             <p class="truncate text-sm font-medium text-foreground">{{ localUser.name }}</p>
-            <p class="truncate text-[11px] text-muted-foreground">{{ realm.name }}</p>
+            <p class="truncate text-xs text-muted-foreground">{{ realm.name }}</p>
           </div>
         </div>
         <ul class="list-disc space-y-1 pl-5 text-sm text-foreground/90">

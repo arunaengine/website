@@ -72,11 +72,11 @@ async function apply(): Promise<void> {
       <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
         Mint a code in the portal under Settings, Devices, then open its link here or paste the code.
       </p>
-      <ul class="mt-2 list-disc space-y-0.5 pl-4 text-[11px] text-muted-foreground">
+      <ul class="mt-2 list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
         <li>The code is one-time and expires.</li>
         <li>This device joins as a user node bound to your account.</li>
       </ul>
-      <p v-if="fromLink" class="mt-2 text-[11px] text-muted-foreground">
+      <p v-if="fromLink" class="mt-2 text-xs text-muted-foreground">
         Aruna Desktop acted on the enrollment link you opened; its outcome is below.
       </p>
     </div>
@@ -91,10 +91,10 @@ async function apply(): Promise<void> {
         :invalid="invalid ? 'error' : undefined"
         placeholder="aruna://enroll?secret=…"
       />
-      <p v-if="invalid" class="mt-1 text-[11px] text-destructive">
+      <p v-if="invalid" class="mt-1 text-xs text-destructive">
         That is neither an aruna://enroll link nor an enrollment code.
       </p>
-      <p v-else-if="parsed?.realm" class="mt-1 text-[11px] text-muted-foreground">
+      <p v-else-if="parsed?.realm" class="mt-1 text-xs text-muted-foreground">
         Realm {{ truncateMiddle(parsed.realm, 10, 6) }}<span v-if="parsed.seedUrl"> via {{ parsed.seedUrl }}</span>
       </p>
     </div>

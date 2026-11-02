@@ -21,7 +21,7 @@ const totalRows = computed(() => Math.max(rows.value.length - 1, 0))
 
 <template>
   <div class="space-y-2">
-    <p class="text-[11px] text-muted-foreground">
+    <p class="text-xs text-muted-foreground">
       Showing {{ body.length }} of {{ totalRows }} row{{ totalRows === 1 ? '' : 's' }}.
     </p>
     <div class="max-h-[68vh] overflow-auto rounded-md border border-border">

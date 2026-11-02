@@ -156,7 +156,7 @@ async function save() {
         <div>
           <label for="federation-registry" class="text-xs font-medium text-foreground">Registry address (optional)</label>
           <Input id="federation-registry" v-model="registryUrl" placeholder="https://registry.example.org" class="mt-1" />
-          <p class="mt-1 text-[11px] text-muted-foreground">Leave blank to skip the registry.</p>
+          <p class="mt-1 text-xs text-muted-foreground">Leave blank to skip the registry.</p>
         </div>
       </div>
       <div class="flex items-start gap-3">
@@ -168,7 +168,7 @@ async function save() {
         />
         <div>
           <p class="text-sm font-medium text-foreground">List this realm in the registry</p>
-          <p class="text-[11px] text-muted-foreground">
+          <p class="text-xs text-muted-foreground">
             {{ registryUrl.trim() ? 'Others can find it by name.' : 'Add a registry address first.' }}
           </p>
         </div>
@@ -199,7 +199,7 @@ async function save() {
         </div>
         <label class="flex items-start gap-2.5 text-sm">
           <input v-model="mode" type="radio" value="any" class="mt-1" />
-          <span>Any realm<span class="block text-[11px] text-muted-foreground">Anyone with a realm can log in here.</span></span>
+          <span>Any realm<span class="block text-xs text-muted-foreground">Anyone with a realm can log in here.</span></span>
         </label>
       </fieldset>
       <Notice v-if="failure" tone="error">{{ failure }}</Notice>

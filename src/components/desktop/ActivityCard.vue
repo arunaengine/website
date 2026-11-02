@@ -190,7 +190,7 @@ const when = (ms: number | null): string => (ms ? relativeTime(new Date(ms).toIS
           <span class="ml-1 text-xs text-muted-foreground">done</span>
         </p>
         <div v-if="progress" class="min-w-48 flex-1">
-          <div class="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+          <div class="flex items-center justify-between gap-3 text-xs text-muted-foreground">
             <span>Total progress</span>
             <span>{{ formatBytes(progress.done) }} of {{ formatBytes(progress.total) }}</span>
           </div>
@@ -202,14 +202,14 @@ const when = (ms: number | null): string => (ms ? relativeTime(new Date(ms).toIS
             class="mt-1 h-1.5"
           />
         </div>
-        <p class="w-full text-[11px] text-muted-foreground">{{ lastCheck }}</p>
+        <p class="w-full text-xs text-muted-foreground">{{ lastCheck }}</p>
       </div>
 
       <div class="px-5 pt-3">
         <FilterChips v-model="filter" :options="chips" aria-label="Filter activity" />
         <p
           v-if="decisionsNote"
-          class="mt-2 flex flex-wrap items-center gap-2 text-[11px]"
+          class="mt-2 flex flex-wrap items-center gap-2 text-xs"
           :class="decisionsNote.tone === 'error' ? 'text-destructive' : 'text-muted-foreground'"
         >
           <span>{{ decisionsNote.text }}</span>
@@ -242,10 +242,10 @@ const when = (ms: number | null): string => (ms ? relativeTime(new Date(ms).toIS
               <span class="hash min-w-0 truncate text-[12px] text-foreground" :title="row.path">{{ row.path }}</span>
               <Badge :variant="stateVariant(row.state)" size="sm">{{ transferLabel(row) }}</Badge>
             </div>
-            <p v-if="row.state === 'failed' && row.message" class="mt-0.5 text-[11px] text-destructive">{{ row.message }}</p>
-            <p v-else class="mt-0.5 text-[11px] text-muted-foreground">{{ folder }}</p>
+            <p v-if="row.state === 'failed' && row.message" class="mt-0.5 text-xs text-destructive">{{ row.message }}</p>
+            <p v-else class="mt-0.5 text-xs text-muted-foreground">{{ folder }}</p>
           </div>
-          <span class="text-[11px] text-muted-foreground">{{ moved(row) }}</span>
+          <span class="text-xs text-muted-foreground">{{ moved(row) }}</span>
           <Progress
             v-if="isMoving(row) || row.state === 'queued'"
             :value="transferPercent(row) ?? 0"

@@ -109,7 +109,7 @@ function send() {
           <input v-model="withFiles" type="radio" :value="false" class="mt-1" />
           <span>
             <span class="block text-sm font-semibold">Metadata only</span>
-            <span class="block text-[11px] text-muted-foreground">Files stay at {{ homeName }}.</span>
+            <span class="block text-xs text-muted-foreground">Files stay at {{ homeName }}.</span>
           </span>
         </label>
         <label
@@ -119,7 +119,7 @@ function send() {
           <input v-model="withFiles" type="radio" :value="true" class="mt-1" />
           <span>
             <span class="block text-sm font-semibold">Metadata and files</span>
-            <span class="block text-[11px] text-muted-foreground">Only checked files will be copied.</span>
+            <span class="block text-xs text-muted-foreground">Only checked files will be copied.</span>
           </span>
         </label>
       </fieldset>
@@ -137,7 +137,7 @@ function send() {
             <span class="text-xs text-muted-foreground">{{ size(file) }}</span>
           </label>
         </div>
-        <p v-if="files && linked" class="mt-1.5 text-[11px] text-muted-foreground">
+        <p v-if="files && linked" class="mt-1.5 text-xs text-muted-foreground">
           {{ linked }} linked {{ linked === 1 ? 'file stays a link' : 'files stay links' }}.
         </p>
       </fieldset>

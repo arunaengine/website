@@ -29,12 +29,12 @@ const emit = defineEmits<{ (e: 'allow'): void; (e: 'cancel'): void }>()
       <ArrowRight class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       <RealmTag :realm-id="serving.realmId" :name="serving.name" />
     </div>
-    <p class="-mt-2 break-all font-mono text-[11px] text-muted-foreground">{{ serving.portalUrl }}</p>
+    <p class="-mt-2 break-all font-mono text-xs text-muted-foreground">{{ serving.portalUrl }}</p>
     <div class="flex items-center gap-3 rounded-md bg-muted/60 px-3 py-2">
       <Avatar :user="user" size="md" />
       <div class="min-w-0">
         <p class="truncate text-sm font-medium text-foreground">{{ user.name }}</p>
-        <p class="truncate font-mono text-[11px] text-muted-foreground" :title="user.id">{{ user.id }}</p>
+        <p class="truncate font-mono text-xs text-muted-foreground" :title="user.id">{{ user.id }}</p>
       </div>
     </div>
     <div>

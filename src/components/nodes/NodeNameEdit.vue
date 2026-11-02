@@ -50,7 +50,7 @@ async function submit() {
     <Input v-model="draft" :aria-label="`New name for ${name}`" placeholder="Empty resets the name" maxlength="64" class="h-8 w-44 text-xs" />
     <Button type="submit" size="sm" :disabled="busy">Save</Button>
     <Button type="button" variant="ghost" size="sm" :disabled="busy" @click="editing = false">Cancel</Button>
-    <p v-if="error" role="alert" class="basis-full text-[11px] text-destructive">{{ error }}</p>
+    <p v-if="error" role="alert" class="basis-full text-xs text-destructive">{{ error }}</p>
   </form>
   <span v-else class="inline-flex min-w-0 items-center gap-0.5">
     <slot />

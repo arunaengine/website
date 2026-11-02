@@ -944,7 +944,7 @@ async function copyTo(destination: CopyDestination) {
       <IconButton label="Hide files" aria-expanded="true" size="icon-sm" class="shrink-0" @click="emit('hide')"><PanelLeft class="size-3.5" /></IconButton>
     </header>
     <div class="space-y-3 px-3 py-3">
-      <nav v-if="treeReady" aria-label="Current folder" class="flex items-center overflow-hidden whitespace-nowrap text-[11px] text-muted-foreground">
+      <nav v-if="treeReady" aria-label="Current folder" class="flex items-center overflow-hidden whitespace-nowrap text-xs text-muted-foreground">
         <template v-for="(crumb, index) in shownCrumbs" :key="crumb?.path ?? '…'">
           <ChevronRight v-if="index" class="h-3 w-3 shrink-0" />
           <span v-if="!crumb" :title="hiddenCrumbs">…</span>
@@ -1025,7 +1025,7 @@ async function copyTo(destination: CopyDestination) {
               <span class="truncate">{{ row.kind === 'dir' ? `${row.name}/` : row.name }}</span>
               <span v-if="linkedRow(row)" class="shrink-0 text-muted-foreground" aria-label="Linked" title="Linked only: reads stream from the source, no bytes are stored here"><Link class="size-3" /></span>
             </span>
-            <span class="text-right text-[10px] tabular-nums text-muted-foreground">
+            <span class="text-right text-xs tabular-nums text-muted-foreground">
               <Spinner v-if="row.kind === 'dir' && files.directory(row.path)?.loading" />
               <template v-else-if="row.kind === 'file'">{{ formatBytes(row.bytes) }}</template>
             </span>

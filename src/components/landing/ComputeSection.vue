@@ -9,7 +9,7 @@ import ComputeLane from '@/components/landing/ComputeLane.vue'
   <section id="compute" class="section">
     <div class="container max-w-5xl">
       <div class="mx-auto max-w-2xl text-center">
-        <div class="text-[11px] font-semibold text-primary">Compute</div>
+        <div class="text-xs font-semibold text-primary">Compute</div>
         <h2 class="mt-3 text-balance font-display text-3xl font-semibold tracking-tight text-aruna-navy sm:text-4xl">
           Data where it belongs. Compute where it makes sense.
         </h2>

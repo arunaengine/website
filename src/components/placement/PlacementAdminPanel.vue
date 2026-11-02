@@ -316,12 +316,12 @@ watch(
                   <Input v-model="strategyDraft.strategy_id" class="mt-1 font-mono" placeholder="A new id" :disabled="busy" />
                 </div>
                 <div v-else>
-                  <div class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                  <div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span class="font-mono">{{ strategyDraft.strategy_id }}</span>
                     <span v-if="selectedIsDefault" class="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">realm default</span>
                     <Badge v-if="selectedIsJobFamily" variant="accent">Run family</Badge>
                   </div>
-                  <p v-if="selectedIsJobFamily" class="mt-1 text-[11px] text-muted-foreground">
+                  <p v-if="selectedIsJobFamily" class="mt-1 text-xs text-muted-foreground">
                     Places run family records. It cannot be removed, and its shard count is frozen.
                   </p>
                 </div>
@@ -365,7 +365,7 @@ watch(
               <Button size="sm" :disabled="busy || !bindingGroupId.trim() || !bindingStrategyId" @click="saveGroupBinding">Set binding</Button>
             </div>
             <p v-if="bindingError" class="text-xs text-destructive">{{ bindingError }}</p>
-            <p v-if="otherBindingCount || config?.overrides.length" class="text-[11px] text-muted-foreground">
+            <p v-if="otherBindingCount || config?.overrides.length" class="text-xs text-muted-foreground">
               {{ otherBindingCount }} binding(s) that are not per group and
               {{ config?.overrides.length ?? 0 }} node pin(s) are kept and stay readable through the API.
             </p>

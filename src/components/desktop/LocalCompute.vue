@@ -59,7 +59,7 @@ onMounted(() => void load())
       class="flex flex-wrap items-center gap-3 border-t border-border bg-muted/20 px-5 py-2.5 text-xs"
     >
       <span class="font-medium text-foreground">Nextflow and Snakemake</span>
-      <code v-if="tes" class="surface-muted flex min-w-0 items-center gap-2 px-2.5 py-1 font-mono text-[11px]">
+      <code v-if="tes" class="surface-muted flex min-w-0 items-center gap-2 px-2.5 py-1 font-mono text-xs">
         <span class="truncate">{{ tes }}</span>
         <CopyButton :value="tes" label="Copy address" />
       </code>

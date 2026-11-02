@@ -74,12 +74,12 @@ const absoluteLabel = computed(() =>
     </Notice>
     <div class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
       <div class="min-w-0">
-        <div class="text-[10px] text-muted-foreground">{{ secretLabel }}</div>
+        <div class="text-xs text-muted-foreground">{{ secretLabel }}</div>
         <div class="break-all font-mono text-xs">{{ secret }}</div>
       </div>
       <CopyButton :value="secret" :label="`Copy ${secretLabel.toLowerCase()}`" />
     </div>
-    <div v-if="expiresAt != null" class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+    <div v-if="expiresAt != null" class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
       <Badge size="sm" :variant="expired ? 'destructive' : 'outline'">
         {{ expired ? 'Expired' : `Expires in ${countdownLabel}` }}
       </Badge>

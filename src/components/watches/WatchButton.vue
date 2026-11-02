@@ -274,7 +274,7 @@ const onDelete = () => exclusive(async () => {
     </Button>
     <template #content>
       <p class="text-sm font-semibold text-foreground">{{ title }}</p>
-      <p class="mt-0.5 truncate font-mono text-[11px] text-muted-foreground" :title="resourceLabel">{{ resourceLabel }}</p>
+      <p class="mt-0.5 truncate font-mono text-xs text-muted-foreground" :title="resourceLabel">{{ resourceLabel }}</p>
       <fieldset class="mt-3 space-y-2">
         <legend class="text-xs font-medium text-foreground">Notify me about</legend>
         <label
@@ -297,7 +297,7 @@ const onDelete = () => exclusive(async () => {
           </span>
         </label>
       </fieldset>
-      <p class="mt-3 text-[11px] text-muted-foreground">Shown under the bell in the top bar.</p>
+      <p class="mt-3 text-xs text-muted-foreground">Shown under the bell in the top bar.</p>
       <Notice v-if="dialogError" tone="error" class="mt-3">{{ dialogError }}</Notice>
       <div class="mt-3 flex justify-end gap-2">
         <template v-if="watching">
@@ -356,11 +356,11 @@ const onDelete = () => exclusive(async () => {
       <div class="space-y-3">
         <!-- Human identity first; the canonical path is a technical detail. -->
         <div class="surface-muted px-3 py-2.5">
-          <div class="text-[11px] text-muted-foreground">
+          <div class="text-xs text-muted-foreground">
             {{ isData ? 'Watched folder' : 'Watched path' }}
           </div>
           <div class="mt-1 truncate text-sm font-medium text-foreground" :title="resourceLabel">{{ resourceLabel }}</div>
-          <p class="mt-1 flex flex-wrap items-center gap-1 text-[11px] leading-relaxed text-muted-foreground">
+          <p class="mt-1 flex flex-wrap items-center gap-1 text-xs leading-relaxed text-muted-foreground">
             <template v-if="isData">
               <span>New uploads to {{ scopeLabel }} on</span>
               <NodeLabel v-if="parsed?.nodeId" :node-id="parsed.nodeId" size="sm" />
@@ -370,8 +370,8 @@ const onDelete = () => exclusive(async () => {
             <span v-else>New datasets anywhere in {{ groupName }}</span>
           </p>
           <details class="mt-1.5">
-            <summary class="cursor-pointer select-none text-[11px] text-muted-foreground/80 hover:text-foreground">Technical path</summary>
-            <code class="mt-1 block break-all font-mono text-[11px] text-muted-foreground">{{ pathPrefix }}</code>
+            <summary class="cursor-pointer select-none text-xs text-muted-foreground/80 hover:text-foreground">Technical path</summary>
+            <code class="mt-1 block break-all font-mono text-xs text-muted-foreground">{{ pathPrefix }}</code>
           </details>
         </div>
 

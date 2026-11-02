@@ -110,10 +110,10 @@ async function create(): Promise<void> {
           <span class="text-xs font-medium text-foreground">Group</span>
           <Select v-model="groupId" class="mt-1" :options="groupOptions" aria-label="Group the key belongs to" />
         </label>
-        <p v-if="!available" class="text-[11px] text-destructive">
+        <p v-if="!available" class="text-xs text-destructive">
           Aruna is not running on this computer, so a key cannot be made now.
         </p>
-        <p v-else class="text-[11px] text-muted-foreground">You will see the secret once, right after this step.</p>
+        <p v-else class="text-xs text-muted-foreground">You will see the secret once, right after this step.</p>
         <RefusalNote v-if="error" :message="error" />
       </div>
 

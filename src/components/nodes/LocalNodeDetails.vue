@@ -118,8 +118,8 @@ const META = 'flex flex-wrap items-center gap-x-5 gap-y-1 type-secondary [&>span
         >
           <span class="min-w-16 shrink-0 whitespace-nowrap text-xs font-medium text-foreground">{{ iface.label }}</span>
           <!-- One state word per interface, as for the services; a problem reads in red. -->
-          <span :class="['shrink-0 text-[11px]', statusProblem(iface.status) ? 'text-destructive' : 'text-foreground']">{{ (iface.status || 'unknown').replace(/_/g, ' ') }}</span>
-          <span class="min-w-0 flex-1 truncate text-right font-mono text-[11px] text-muted-foreground" :title="iface.url">
+          <span :class="['shrink-0 text-xs', statusProblem(iface.status) ? 'text-destructive' : 'text-foreground']">{{ (iface.status || 'unknown').replace(/_/g, ' ') }}</span>
+          <span class="min-w-0 flex-1 truncate text-right font-mono text-xs text-muted-foreground" :title="iface.url">
             {{ iface.url || '-' }}
           </span>
           <template v-if="'oai' in iface && iface.url">
@@ -161,7 +161,7 @@ const META = 'flex flex-wrap items-center gap-x-5 gap-y-1 type-secondary [&>span
             <!-- A working backend says nothing; a backend with a problem says it in one word. -->
             <span
               v-if="statusProblem(backend.status)"
-              class="text-[11px]"
+              class="text-xs"
               :class="statusProblem(backend.status)!.failed ? 'text-destructive' : 'text-amber-700 dark:text-amber-300'"
             >{{ statusProblem(backend.status)!.word }}</span>
           </div>
@@ -175,7 +175,7 @@ const META = 'flex flex-wrap items-center gap-x-5 gap-y-1 type-secondary [&>span
             />
             <p
               v-else-if="backend.quota.quotaBytes != null"
-              class="text-[11px] text-muted-foreground"
+              class="text-xs text-muted-foreground"
               title="This node does not report how much is stored here, so nothing is rejected for going over."
             >
               Limit {{ formatBytes(backend.quota.quotaBytes) }} · set by the operator, not enforced yet

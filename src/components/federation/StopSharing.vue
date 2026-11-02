@@ -70,6 +70,6 @@ async function stop() {
         </Button>
       </div>
     </template>
-    <p v-if="failure" class="text-[11px] text-destructive">{{ failure }}</p>
+    <p v-if="failure" class="text-xs text-destructive">{{ failure }}</p>
   </section>
 </template>

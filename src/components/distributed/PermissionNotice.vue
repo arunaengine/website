@@ -19,7 +19,7 @@ const shown = computed(() => props.glob ?? nodeGlob(props.bucket))
     </p>
     <p class="mt-1">
       Use a node glob instead, for example
-      <code class="break-all rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">{{ shown }}</code>
+      <code class="break-all rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">{{ shown }}</code>
       <CopyButton :value="shown" label="Copy the node glob" class="ml-1 align-middle" />
     </p>
   </Notice>

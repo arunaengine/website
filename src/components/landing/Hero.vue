@@ -68,7 +68,7 @@ const wordmark = computed(() =>
 
       <div class="mt-12 flex flex-wrap items-center justify-center gap-2.5">
         <div
-          class="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground"
+          class="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground"
         >
           Open source, Apache 2.0 and MIT
         </div>

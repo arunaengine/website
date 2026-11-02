@@ -286,7 +286,7 @@ watch(
               <div class="space-y-5 p-5">
                 <div v-if="draft.links.length" class="overflow-x-auto rounded-md border border-border">
                   <table class="w-full min-w-[680px] text-left text-xs">
-                    <caption class="caption-top px-3 py-2 text-left text-[11px] text-muted-foreground">
+                    <caption class="caption-top px-3 py-2 text-left text-xs text-muted-foreground">
                       Links are directed: eu to us and us to eu are distinct entries and may have different bandwidth.
                     </caption>
                     <thead class="border-y border-border bg-muted/40 text-muted-foreground">
@@ -336,7 +336,7 @@ watch(
                       <Input v-model="draft.pessimistic_bandwidth.value" type="number" min="0" aria-label="Pessimistic default bandwidth" />
                       <Select v-model="draft.pessimistic_bandwidth.unit" :options="bandwidthUnitOptions" class="w-28 shrink-0" aria-label="Pessimistic default bandwidth unit" />
                     </div>
-                    <p class="mt-1 text-[11px] text-muted-foreground">
+                    <p class="mt-1 text-xs text-muted-foreground">
                       Used when no directed link is configured.
                     </p>
                   </div>
@@ -347,12 +347,12 @@ watch(
                   <div>
                     <label class="text-xs font-medium text-foreground">Witness base delay (ms)</label>
                     <Input v-model="draft.witness_base_delay_ms" type="number" min="1" step="1" class="mt-1" />
-                    <p class="mt-1 text-[11px] text-muted-foreground">Must be greater than zero.</p>
+                    <p class="mt-1 text-xs text-muted-foreground">Must be greater than zero.</p>
                   </div>
                   <div>
                     <label class="text-xs font-medium text-foreground">Session idle timeout (ms)</label>
                     <Input v-model="draft.session_idle_after_ms" type="number" min="1" step="1" class="mt-1" />
-                    <p class="mt-1 text-[11px] text-muted-foreground">
+                    <p class="mt-1 text-xs text-muted-foreground">
                       How long a notebook session may sit idle before the node ends it. A session may pick a shorter one.
                     </p>
                   </div>
@@ -367,7 +367,7 @@ watch(
               <div class="space-y-6 p-5">
                 <div>
                   <h4 class="text-xs font-semibold text-foreground">Realm default quota</h4>
-                  <p class="mt-1 text-[11px] text-muted-foreground">
+                  <p class="mt-1 text-xs text-muted-foreground">
                     An empty field is unbounded and is omitted from the request, never serialized as zero.
                   </p>
                   <ComputeQuotaFields v-model="draft.default_group_quota" class="mt-3" />
@@ -377,7 +377,7 @@ watch(
                   <div class="flex flex-wrap items-start justify-between gap-2">
                     <div>
                       <h4 class="text-xs font-semibold text-foreground">Per-group overrides</h4>
-                      <p class="mt-1 text-[11px] text-muted-foreground">
+                      <p class="mt-1 text-xs text-muted-foreground">
                         A group override replaces the realm default wholesale; omitted dimensions stay unbounded and are not merged from the default.
                       </p>
                     </div>
@@ -426,7 +426,7 @@ watch(
             </SectionHeading>
             <div class="surface">
             <div class="space-y-5 p-5">
-              <p class="text-[11px] text-muted-foreground">
+              <p class="text-xs text-muted-foreground">
                 Reserved resources are physical per-node capacity; group demand is logical admitted work. They are separate controls and are never summed.
               </p>
               <ErrorPanel v-if="snapshotError" :message="snapshotError" @retry="loadSnapshots" />
@@ -448,10 +448,10 @@ watch(
                       <tr v-for="node in snapshots.nodes" :key="node.node_id">
                         <td class="px-3 py-2">
                           <div class="font-mono" :title="node.node_id">{{ truncateMiddle(node.node_id) }}</div>
-                          <div class="mt-0.5 text-[10px] text-muted-foreground" :title="observedAt(node.observed_at_ms)">
+                          <div class="mt-0.5 text-xs text-muted-foreground" :title="observedAt(node.observed_at_ms)">
                             observed {{ observedAt(node.observed_at_ms) }}
                           </div>
-                          <div class="text-[10px] text-muted-foreground">membership {{ node.membership_generation }}, publisher {{ node.publisher_generation }}</div>
+                          <div class="text-xs text-muted-foreground">membership {{ node.membership_generation }}, publisher {{ node.publisher_generation }}</div>
                         </td>
                         <td class="px-3 py-2 font-mono">{{ formatNumber(node.reserved.count) }}</td>
                         <td class="px-3 py-2 font-mono">{{ formatNumber(node.reserved.cpu_cores) }}</td>
@@ -496,7 +496,7 @@ watch(
                       <StatCard label="RAM" :value="formatBytes(snapshots.group.demand.ram_bytes)" :hint="`Quota ${quotaValue(snapshots.group.quota.max_ram_bytes, 'bytes')}`" />
                       <StatCard label="Disk" :value="formatBytes(snapshots.group.demand.disk_bytes)" :hint="`Quota ${quotaValue(snapshots.group.quota.max_disk_bytes, 'bytes')}`" />
                     </div>
-                    <p class="mt-3 text-[11px] text-muted-foreground">
+                    <p class="mt-3 text-xs text-muted-foreground">
                       Per-run ceilings: {{ quotaValue(snapshots.group.quota.max_job_cpu_cores) }} CPU,
                       {{ quotaValue(snapshots.group.quota.max_job_ram_bytes, 'bytes') }} RAM,
                       {{ quotaValue(snapshots.group.quota.max_job_disk_bytes, 'bytes') }} disk,
@@ -528,7 +528,7 @@ watch(
                 <Switch :checked="Boolean(snapshots) && !snapshots?.operator_draining" :disabled="drainBusy || !snapshots" aria-label="Accept new compute work on this node" @update:checked="(accepting: boolean) => setDrain(!accepting)" />
                 {{ snapshots?.operator_draining ? 'Draining' : 'Accepting new compute work' }}
               </label>
-              <p class="text-[11px] text-muted-foreground">
+              <p class="text-xs text-muted-foreground">
                 Draining stops new selections and launch offers. Admitted, queued, preparing, and running work is unaffected; returning requires an explicit undrain.
               </p>
               <p v-if="drainError" class="text-xs text-destructive">{{ drainError }}</p>

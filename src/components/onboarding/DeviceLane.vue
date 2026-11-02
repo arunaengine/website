@@ -201,17 +201,17 @@ const stages = computed(() => watchStages(watchState.value))
           <div>
             <label class="text-xs font-medium text-foreground" for="device-name">Device name</label>
             <Input id="device-name" v-model="deviceName" placeholder="work-laptop" class="mt-1" />
-            <p class="mt-1 text-[11px] text-muted-foreground">
+            <p class="mt-1 text-xs text-muted-foreground">
               The name this device shows in Aruna. Aruna Desktop asks for its own name.
             </p>
           </div>
           <div>
             <label class="text-xs font-medium text-foreground">Platform</label>
             <Select v-model="platform" :options="PLATFORM_OPTIONS" aria-label="Device platform" class="mt-1" />
-            <p class="mt-1 text-[11px] text-muted-foreground">Selects which Aruna Desktop build the hand-off names.</p>
+            <p class="mt-1 text-xs text-muted-foreground">Selects which Aruna Desktop build the hand-off names.</p>
           </div>
         </div>
-        <p class="text-[11px] text-muted-foreground">
+        <p class="text-xs text-muted-foreground">
           {{ capLabel }} Enrolled devices and codes you have not redeemed yet both take a slot.
         </p>
         <RefusalNote v-if="mintError" :message="mintError" />
@@ -228,7 +228,7 @@ const stages = computed(() => watchStages(watchState.value))
             {{ minting ? 'Enrolling…' : 'Enroll this device' }}
           </Button>
         </div>
-        <p v-if="atCap && !minted" class="text-[11px] text-muted-foreground">
+        <p v-if="atCap && !minted" class="text-xs text-muted-foreground">
           You hold every device this realm allows. Remove one under Settings, Devices, to enroll another.
         </p>
       </div>

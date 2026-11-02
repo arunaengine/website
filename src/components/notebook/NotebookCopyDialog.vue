@@ -113,13 +113,13 @@ function confirm() {
             class="mt-1"
             @update:model-value="pickBucket"
           />
-          <Spinner v-if="loading && !loaded" show-label label="Loading buckets…" class="mt-1 flex text-[11px]" />
-          <p v-else-if="loadError" class="mt-1 text-[11px] text-destructive">{{ loadError }}</p>
+          <Spinner v-if="loading && !loaded" show-label label="Loading buckets…" class="mt-1 flex text-xs" />
+          <p v-else-if="loadError" class="mt-1 text-xs text-destructive">{{ loadError }}</p>
         </div>
         <div v-if="bucket" class="rounded-md border border-border p-2">
           <ObjectBrowserPanel :key="bucket" flush :bucket="bucket" :node-id="nodeId" :group-id="groupId ?? undefined" @navigate="onNavigate" />
         </div>
-        <p class="truncate font-mono text-[11px] text-muted-foreground" :title="target">{{ target }}</p>
+        <p class="truncate font-mono text-xs text-muted-foreground" :title="target">{{ target }}</p>
       </div>
 
       <DialogFooter>
