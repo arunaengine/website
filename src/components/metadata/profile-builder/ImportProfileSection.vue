@@ -316,7 +316,7 @@ async function fromUrl() {
       <Button type="button" variant="outline" size="sm" @click="fileInput?.click()">
         <Upload class="size-3.5" /> Upload file
       </Button>
-      <span class="text-[11px] text-muted-foreground">or</span>
+      <span class="text-xs text-muted-foreground">or</span>
       <div class="flex min-w-[220px] flex-1 items-center gap-2">
         <Input v-model="url" placeholder="https://…/mode.json or …/shapes.ttl" @keydown.enter="fromUrl" />
         <Button type="button" variant="outline" size="sm" :disabled="busy || !url.trim()" @click="fromUrl">

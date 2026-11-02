@@ -111,7 +111,7 @@ watch([from, to], () => {
         <p v-else-if="!rows.length" class="text-sm text-muted-foreground">No metadata changes.</p>
         <div v-else class="overflow-x-auto rounded-md border border-border">
           <table class="w-full text-sm">
-            <thead class="bg-muted/30 text-[11px] text-muted-foreground">
+            <thead class="bg-muted/30 text-xs text-muted-foreground">
               <tr>
                 <th class="px-3 py-2 text-left font-semibold">Entity</th>
                 <th class="px-3 py-2 text-left font-semibold">Property</th>
@@ -126,7 +126,7 @@ watch([from, to], () => {
                     <span class="font-medium text-foreground">{{ row.entity.label || row.entity.id }}</span>
                     <Badge v-if="row.entity.change === 'added'" variant="success" size="sm" class="ml-1.5">added</Badge>
                     <Badge v-else-if="row.entity.change === 'removed'" variant="destructive" size="sm" class="ml-1.5">removed</Badge>
-                    <span v-if="row.entity.label" class="block font-mono text-[11px] text-muted-foreground">{{ row.entity.id }}</span>
+                    <span v-if="row.entity.label" class="block font-mono text-xs text-muted-foreground">{{ row.entity.id }}</span>
                   </td>
                   <template v-if="property">
                     <td class="px-3 py-2 font-mono text-xs">{{ property.name }}</td>

@@ -11,9 +11,9 @@ defineProps<{
 
 <template>
   <div>
-    <label class="text-[11px] font-medium text-muted-foreground">Allowed values</label>
+    <label class="text-xs font-medium text-muted-foreground">Allowed values</label>
     <Input v-model="property.enumOptions" class="mt-0.5" placeholder="LC-MS, MALDI-TOF" :disabled="disabled" :invalid="error ? 'error' : undefined" />
-    <p v-if="error" class="mt-0.5 text-[11px] text-destructive">{{ error }}</p>
-    <p v-else class="mt-0.5 text-[11px] text-muted-foreground">Comma-separated list of the values users may pick.</p>
+    <p v-if="error" class="mt-0.5 text-xs text-destructive">{{ error }}</p>
+    <p v-else class="mt-0.5 text-xs text-muted-foreground">Comma-separated list of the values users may pick.</p>
   </div>
 </template>

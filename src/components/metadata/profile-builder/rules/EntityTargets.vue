@@ -86,18 +86,18 @@ function createEntityRule(uri: string) {
 <template>
   <div class="mt-2 space-y-2">
     <div>
-      <label class="text-[11px] font-medium text-muted-foreground">Referenced entity types</label>
-      <p class="text-[11px] text-muted-foreground">{{ referenceHelp }}</p>
+      <label class="text-xs font-medium text-muted-foreground">Referenced entity types</label>
+      <p class="text-xs text-muted-foreground">{{ referenceHelp }}</p>
     </div>
     <div class="flex flex-wrap items-center gap-1.5">
       <span
         v-for="target in selectedTargets"
         :key="target.uri"
-        class="inline-flex items-center gap-1 rounded-full border border-aruna-royal/60 bg-aruna-royal/10 px-2.5 py-1 text-[11px] text-foreground"
+        class="inline-flex items-center gap-1 rounded-full border border-aruna-royal/60 bg-aruna-royal/10 px-2.5 py-1 text-xs text-foreground"
         :title="target.uri"
       >
         {{ target.label }}
-        <span v-if="target.hasShape" class="text-[10px] text-muted-foreground">(shape)</span>
+        <span v-if="target.hasShape" class="text-xs text-muted-foreground">(shape)</span>
         <button
           v-if="!disabled"
           type="button"
@@ -108,7 +108,7 @@ function createEntityRule(uri: string) {
           <X class="size-3" />
         </button>
       </span>
-      <span v-if="!selectedTargets.length" class="text-[11px] text-muted-foreground">No target type yet, add one:</span>
+      <span v-if="!selectedTargets.length" class="text-xs text-muted-foreground">No target type yet, add one:</span>
     </div>
     <EntityTypePicker
       v-if="!disabled"
@@ -123,7 +123,7 @@ function createEntityRule(uri: string) {
       v-for="target in unresolvedTargets"
       :key="target.uri"
       tone="warning"
-      class="flex flex-wrap items-center gap-2 border-dashed px-2.5 py-1.5 text-[11px]"
+      class="flex flex-wrap items-center gap-2 border-dashed px-2.5 py-1.5 text-xs"
     >
       <span>No entity rule defines <b>{{ target.label }}</b>, no sub-form is generated for it yet.</span>
       <Button v-if="!disabled" type="button" variant="outline" size="sm" @click="createEntityRule(target.uri)">

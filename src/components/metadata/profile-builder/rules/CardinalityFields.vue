@@ -12,13 +12,13 @@ defineProps<{
 <template>
   <div class="grid gap-2 sm:grid-cols-2">
     <div>
-      <label class="text-[11px] font-medium text-muted-foreground">Min entries</label>
+      <label class="text-xs font-medium text-muted-foreground">Min entries</label>
       <Input v-model="property.minItems" type="number" min="1" class="mt-0.5" placeholder="optional" :disabled="disabled" :invalid="error ? 'error' : undefined" />
     </div>
     <div>
-      <label class="text-[11px] font-medium text-muted-foreground">Max entries</label>
+      <label class="text-xs font-medium text-muted-foreground">Max entries</label>
       <Input v-model="property.maxItems" type="number" min="1" class="mt-0.5" placeholder="optional" :disabled="disabled" :invalid="error ? 'error' : undefined" />
     </div>
-    <p v-if="error" class="text-[11px] text-destructive sm:col-span-2">{{ error }}</p>
+    <p v-if="error" class="text-xs text-destructive sm:col-span-2">{{ error }}</p>
   </div>
 </template>

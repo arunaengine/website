@@ -212,9 +212,9 @@ function violationsFor(property: string) {
       <div class="text-sm font-medium text-foreground">Rules</div>
       <div v-for="entity in ruleSentences" :key="entity.key" class="mt-2">
         <div class="text-xs font-medium text-muted-foreground">{{ entity.label }}</div>
-        <p v-if="!entity.rules.length" class="mt-1 text-[11px] text-muted-foreground">No property rules.</p>
+        <p v-if="!entity.rules.length" class="mt-1 text-xs text-muted-foreground">No property rules.</p>
         <ul v-else class="mt-1 space-y-1">
-          <li v-for="rule in entity.rules" :key="rule.key" class="flex flex-wrap items-center gap-1.5 text-[11px] text-foreground">
+          <li v-for="rule in entity.rules" :key="rule.key" class="flex flex-wrap items-center gap-1.5 text-xs text-foreground">
             <Badge :variant="obligationBadgeVariant(rule.obligation)" size="sm">{{ rule.obligation }}</Badge>
             <span class="font-medium">{{ rule.label }}</span>
             <span class="text-muted-foreground">{{ rule.target }}</span>
@@ -231,7 +231,7 @@ function violationsFor(property: string) {
       <div v-for="entity in constraintSummary" :key="entity.label" class="mt-2">
         <div class="text-xs font-medium text-muted-foreground">{{ entity.label }}</div>
         <ul class="mt-1 space-y-1">
-          <li v-for="rule in entity.rules" :key="rule.label" class="text-[11px] text-foreground">
+          <li v-for="rule in entity.rules" :key="rule.label" class="text-xs text-foreground">
             <span class="inline-flex items-center gap-1.5">
               <Badge :variant="obligationBadgeVariant(rule.obligation)" size="sm">{{ PROFILE_OBLIGATION_LABELS[rule.obligation].label }}</Badge>
               <span class="font-medium">{{ rule.label }}</span>
@@ -253,7 +253,7 @@ function violationsFor(property: string) {
         (including any documented round-trip simplifications).
         Required (MUST) values that are empty show an error, recommended (SHOULD) values show an amber warning.
       </p>
-      <p v-if="roundTrip.error" class="mt-2 text-[11px] text-destructive">
+      <p v-if="roundTrip.error" class="mt-2 text-xs text-destructive">
         The emitted RO-Crate could not be parsed back ({{ roundTrip.error }}), the preview below falls back to the in-memory rules.
       </p>
       <div v-if="!controls.length" class="mt-3 text-xs text-muted-foreground">
@@ -273,7 +273,7 @@ function violationsFor(property: string) {
               {{ PROFILE_OBLIGATION_LABELS[control.obligation].label }}
             </Badge>
           </label>
-          <div class="mt-1 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+          <div class="mt-1 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
             References
             <span class="font-medium text-foreground">{{ control.entityRule ? entityTypeLabel(control.entityRule.type) : entityTypeLabel(control.entityTypes?.[0] ?? '') || 'an entity' }}</span>
            , added as {{ control.multiple ? 'one or more sub-forms' : 'a sub-form' }} when creating a dataset.
@@ -281,7 +281,7 @@ function violationsFor(property: string) {
           <p
             v-for="violation in violationsFor(control.property)"
             :key="violation.ruleId + violation.pointer"
-            class="mt-1 text-[11px]"
+            class="mt-1 text-xs"
             :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'"
           >
             {{ violation.message }}
@@ -331,12 +331,12 @@ function violationsFor(property: string) {
           />
         </p>
         <div class="mt-2 flex flex-wrap items-center gap-1.5">
-          <span class="text-[11px] font-medium text-muted-foreground">Download:</span>
+          <span class="text-xs font-medium text-muted-foreground">Download:</span>
           <button
             v-for="artifact in artifactDownloads"
             :key="artifact.label"
             type="button"
-            class="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-foreground transition-colors hover:border-aruna-royal/60 hover:bg-aruna-royal/10"
+            class="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-foreground transition-colors hover:border-aruna-royal/60 hover:bg-aruna-royal/10"
             @click="downloadText(artifact.text, artifact.filename, artifact.type)"
           >
             <Download class="size-3" /> {{ artifact.label }}
@@ -352,30 +352,30 @@ function violationsFor(property: string) {
           </TabsList>
 
           <TabsContent value="schema">
-            <p class="mb-2 text-[11px] text-muted-foreground">Validation rules (<code>schema.json</code>), value constraints plus which properties are required (MUST) and recommended (SHOULD).</p>
-            <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ artifactTexts.schema }}</pre>
+            <p class="mb-2 text-xs text-muted-foreground">Validation rules (<code>schema.json</code>), value constraints plus which properties are required (MUST) and recommended (SHOULD).</p>
+            <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-xs text-foreground/80">{{ artifactTexts.schema }}</pre>
           </TabsContent>
 
           <TabsContent value="mode">
-            <p class="mb-2 text-[11px] text-muted-foreground">Describo/Crate-O-compatible mode file (<code>mode.json</code>), form structure only, usable directly in those editors.</p>
-            <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ artifactTexts.mode }}</pre>
+            <p class="mb-2 text-xs text-muted-foreground">Describo/Crate-O-compatible mode file (<code>mode.json</code>), form structure only, usable directly in those editors.</p>
+            <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-xs text-foreground/80">{{ artifactTexts.mode }}</pre>
           </TabsContent>
 
           <TabsContent value="html">
-            <p class="mb-2 text-[11px] text-muted-foreground">Human-readable specification (<code>profile.html</code>), the RFC-2119 wording of the rules.</p>
-            <pre class="max-h-72 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ artifactTexts.html }}</pre>
+            <p class="mb-2 text-xs text-muted-foreground">Human-readable specification (<code>profile.html</code>), the RFC-2119 wording of the rules.</p>
+            <pre class="max-h-72 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs text-foreground/80">{{ artifactTexts.html }}</pre>
           </TabsContent>
 
           <TabsContent value="shapes">
-            <p class="mb-2 text-[11px] text-muted-foreground">
+            <p class="mb-2 text-xs text-muted-foreground">
               Unified generated and imported SHACL shapes (<code>shapes.ttl</code>), used by the node to validate datasets.
             </p>
-            <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ artifactTexts.shapes }}</pre>
+            <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-xs text-foreground/80">{{ artifactTexts.shapes }}</pre>
           </TabsContent>
 
           <TabsContent value="crate">
-            <p class="mb-2 text-[11px] text-muted-foreground">The complete profile that is saved, all generated files travel inside it.</p>
-            <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ builder.generatedCrateText }}</pre>
+            <p class="mb-2 text-xs text-muted-foreground">The complete profile that is saved, all generated files travel inside it.</p>
+            <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-xs text-foreground/80">{{ builder.generatedCrateText }}</pre>
           </TabsContent>
         </Tabs>
       </div>

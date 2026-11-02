@@ -84,11 +84,11 @@ async function save() {
 
 <template>
   <div class="space-y-2">
-    <Spinner v-if="loading" show-label label="Loading the dataset…" class="flex text-[11px]" />
+    <Spinner v-if="loading" show-label label="Loading the dataset…" class="flex text-xs" />
     <template v-else-if="draft && rows.length">
       <div class="divide-y divide-border" :class="ROW_LIST">
         <div v-for="row in rows" :key="`${row.entityId} ${row.property}`">
-          <p v-if="entityLabel(row.entityId)" class="pt-2 text-[11px] text-muted-foreground">For {{ entityLabel(row.entityId) }}</p>
+          <p v-if="entityLabel(row.entityId)" class="pt-2 text-xs text-muted-foreground">For {{ entityLabel(row.entityId) }}</p>
           <PropertyRow
             :draft="draft"
             :entity="findEntity(draft, row.entityId)!"
@@ -105,6 +105,6 @@ async function save() {
         Save to the dataset
       </Button>
     </template>
-    <p v-if="error" role="alert" class="text-[11px] text-destructive">{{ error }}</p>
+    <p v-if="error" role="alert" class="text-xs text-destructive">{{ error }}</p>
   </div>
 </template>

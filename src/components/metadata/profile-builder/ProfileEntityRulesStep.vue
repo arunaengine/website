@@ -73,12 +73,12 @@ function scrollToShape(uid: number) {
       v-if="collapsed"
       class="sticky top-0 z-10 -mx-1 flex flex-wrap items-center gap-1 rounded-lg border border-border bg-card/95 px-2 py-1.5 backdrop-blur"
     >
-      <span class="px-1 text-[11px] font-medium text-muted-foreground">{{ orderedEntities.length }} shapes</span>
+      <span class="px-1 text-xs font-medium text-muted-foreground">{{ orderedEntities.length }} shapes</span>
       <button
         v-for="entity in orderedEntities"
         :key="entity.uid"
         type="button"
-        class="rounded-full px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+        class="rounded-full px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
         @click="scrollToShape(entity.uid)"
       >
         {{ entity.label || entityTypeLabel(entity.type) }}
@@ -102,7 +102,7 @@ function scrollToShape(uid: number) {
         button-label="Add entity shape"
         @pick="(choice) => builder.addEntityRuleForType(choice.uri, choice.label)"
       />
-      <p class="text-[11px] text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         Tip: picking an entity-valued property (e.g. Creator) and choosing "Add Person rules" creates the shape for you.
       </p>
     </div>
