@@ -185,7 +185,13 @@ onUnmounted(() => listening?.removeEventListener('scroll', measure))
               <TableCard v-if="call.view?.kind === 'table'" v-bind="call.view" />
               <ChartCard v-else-if="call.view?.kind === 'chart'" v-bind="call.view" />
               <StatsCard v-else-if="call.view?.kind === 'stats'" v-bind="call.view" />
-              <CrateCard v-else-if="call.view?.kind === 'crate'" :title="call.view.title" :crate="call.view.crate" :document-id="call.view.documentId" />
+              <CrateCard
+                v-else-if="call.view?.kind === 'crate'"
+                :title="call.view.title"
+                :crate="call.view.crate"
+                :document-id="call.view.documentId"
+                :summary="call.view.summary"
+              />
               <ArtifactCard v-else-if="call.view?.kind === 'artifact'" :title="call.view.title" :caption="call.view.caption" :artifact="call.view.artifact" />
               <JobCard v-else-if="call.view?.kind === 'job'" :view="call.view" />
               <ObjectCard v-else-if="call.view?.kind === 'object'" :view="call.view" />
