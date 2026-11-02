@@ -20,10 +20,11 @@ const setup: CentralAssistant = {
   resets_at: '2026-11-03T00:00:00Z',
 }
 const getCentralAssistant = vi.fn(async (): Promise<CentralAssistant | null> => setup)
+const listAssistantProviders = vi.fn(async () => ({ providers: [own] }))
 
 vi.mock('@/lib/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  listAssistantProviders: vi.fn(async () => ({ providers: [own] })),
+  listAssistantProviders,
   getCentralAssistant,
 }))
 vi.mock('./useUserVault', () => ({
@@ -78,6 +79,28 @@ describe('central assistant entry', () => {
     expect(providers.centralUnavailable.value).toBe(true)
     await providers.refreshCentral()
     expect(providers.centralUnavailable.value).toBe(false)
+    expect(providers.ready.value[0]?.provider_id).toBe('central')
+  })
+
+  it('keeps the realm assistant state when the own list fails too', async () => {
+    const providers = useAssistantProviders()
+    listAssistantProviders.mockRejectedValueOnce(new Error('503'))
+    getCentralAssistant.mockRejectedValueOnce(new Error('503'))
+
+    await providers.load()
+
+    expect(ids()).toEqual(['central'])
+    expect(providers.centralUnavailable.value).toBe(true)
+    expect(providers.error.value).toBeTruthy()
+  })
+
+  it('lists the realm assistant when only the own list fails', async () => {
+    const providers = useAssistantProviders()
+    listAssistantProviders.mockRejectedValueOnce(new Error('503'))
+
+    await providers.load()
+
+    expect(ids()).toEqual(['central'])
     expect(providers.ready.value[0]?.provider_id).toBe('central')
   })
 

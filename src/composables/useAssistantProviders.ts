@@ -172,20 +172,21 @@ async function revalidate(epoch: number, generation: number, identity: string): 
   error.value = null
   void vault.load()
   try {
-    const [response, read] = await Promise.all([listAssistantProviders(client()), readCentral()])
+    // The realm assistant is read on its own, so a failed own list never hides its state.
+    const [listed, read] = await Promise.all([
+      listAssistantProviders(client()).then(
+        (response) => ({ providers: response.providers, failed: false, cause: null as unknown }),
+        (cause: unknown) => ({ providers: [], failed: true, cause }),
+      ),
+      readCentral(),
+    ])
     if (!currentNodeContext(epoch, generation, identity)) return
-    nodeProviders.value = response.providers
+    nodeProviders.value = listed.providers
     central.value = read.setup
     centralUnavailable.value = read.unreachable
     rebuild()
-    loaded.value = true
-  } catch (cause) {
-    if (!currentNodeContext(epoch, generation, identity)) return
-    nodeProviders.value = []
-    central.value = null
-    centralUnavailable.value = false
-    rebuild()
-    error.value = apiErrorMessage(cause)
+    if (listed.failed) error.value = apiErrorMessage(listed.cause)
+    else loaded.value = true
   } finally {
     if (currentNodeContext(epoch, generation, identity)) {
       loading.value = false
