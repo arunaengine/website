@@ -70,16 +70,19 @@ const deleteError = ref<string | null>(null)
 const visibleProfiles = computed(() => profiles.value)
 
 // A persistent profile link names the document id; the list names profiles by their slug.
-const selectedId = computed(() => {
+const selected = computed(() => {
   const asked = route.params.profileId as string
-  const byDocument = asked ? visibleProfiles.value.find((profile) => profile.documentId === asked)?.id : undefined
-  return byDocument || asked || visibleProfiles.value[0]?.id || ''
+  const list = visibleProfiles.value
+  return (asked && list.find((profile) => profile.documentId === asked)) || list.find((profile) => profile.id === (asked || list[0]?.id))
 })
-const selected = computed(() => visibleProfiles.value.find((profile) => profile.id === selectedId.value))
+const selectedId = computed(() => selected.value?.id || (route.params.profileId as string) || '')
+const isSelected = (profile: MetadataProfile) => selected.value?.id === profile.id && selected.value?.documentId === profile.documentId
 const preferredId = computed(() => currentUser.value?.preferredProfileId ?? '')
 
-function select(id: string) {
-  router.push({ name: 'profile', params: { profileId: id } })
+// A slug that two profiles share opens by document id.
+function select(profile: MetadataProfile) {
+  const shared = profile.documentId && visibleProfiles.value.some((other) => other.id === profile.id && other.documentId !== profile.documentId)
+  router.push({ name: 'profile', params: { profileId: shared ? profile.documentId! : profile.id } })
 }
 
 // Membership in the owning group is the same write heuristic the metadata
@@ -340,12 +343,12 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
         </SectionHeading>
         <div class="surface max-h-[80vh] overflow-y-auto scrollbar-thin">
         <ul v-if="visibleProfiles.length" class="divide-y divide-border">
-          <li v-for="profile in visibleProfiles" :key="profile.id">
+          <li v-for="profile in visibleProfiles" :key="profile.documentId ?? profile.id">
             <button
               type="button"
               class="flex w-full items-start gap-3 border-l-2 px-4 py-3 text-left transition-colors hover:bg-muted/30"
-              :class="selectedId === profile.id ? 'border-primary bg-primary/5' : 'border-transparent'"
-              @click="select(profile.id)"
+              :class="isSelected(profile) ? 'border-primary bg-primary/5' : 'border-transparent'"
+              @click="select(profile)"
             >
               <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" :style="{ backgroundColor: profile.iconColor }">
                 <ListChecks class="h-4 w-4" />

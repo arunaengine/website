@@ -1,7 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, reactive, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { button, click, compileClientComponent, content, moduleDefault, mountApp } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 import * as Assignable from '@/lib/profiles/assignable'
 import * as Labels from '@/lib/profiles/labels'
 import * as ProfileMode from '@/lib/profiles/mode'
@@ -138,6 +138,25 @@ describe('ProfilesView', () => {
 
     expect(content(mounted.root)).toContain('Example profile')
     expect(content(mounted.root)).not.toContain('Select a visible profile.')
+    mounted.app.unmount()
+    route.name = 'profiles'
+    route.params = {}
+  })
+
+  it('opens the document a link names when two groups share its slug', async () => {
+    profiles.value = [
+      { ...profile, id: 'shared', documentId: 'doc-a', name: 'Alpha profile' },
+      { ...profile, id: 'shared', documentId: 'doc-b', name: 'Beta profile' },
+    ]
+    route.name = 'profile'
+    route.params = { profileId: 'doc-b' }
+    const mounted = await mountApp(ProfilesView)
+
+    expect(content(nodes(mounted.root).find((node) => node.tag === 'h1')!)).toBe('Beta profile')
+    const marked = nodes(mounted.root).filter((node) => node.tag === 'button' && String(node.props.class).includes('border-primary'))
+    expect(marked.map((node) => content(node))).toEqual([expect.stringContaining('Beta profile')])
+    await click(marked[0])
+    expect(routerPush).toHaveBeenCalledWith({ name: 'profile', params: { profileId: 'doc-b' } })
     mounted.app.unmount()
     route.name = 'profiles'
     route.params = {}
