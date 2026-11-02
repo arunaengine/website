@@ -1,4 +1,5 @@
 import type { ModelMessage } from 'ai'
+import { joinTurns, splitTurns, turnKey, type ChatTurn } from './chatTurns'
 import type { ChatMessage, ToolCallView } from './types'
 
 // Transcripts are kept in this browser and, where the node serves the routes,
@@ -14,6 +15,8 @@ const MAX_TITLE_LENGTH = 80
 const MAX_TEXT_LENGTH = 8_000
 /** Web pages kept per answer; a search rarely cites more. */
 const MAX_SOURCES = 50
+/** How long a deleted chat's id is kept, so a tab open that long cannot write it back. */
+const TOMBSTONE_MS = 30 * 24 * 60 * 60 * 1000
 
 export interface AssistantChatScope {
   apiBaseUrl: string
@@ -55,6 +58,8 @@ export interface AssistantChatStorage {
 interface PersistedPayload {
   version: 1
   state: AssistantChatState
+  /** Ids of chats a tab deleted, with the time. */
+  deleted?: Record<string, number>
 }
 
 let idCounter = 0
@@ -223,10 +228,9 @@ function emptyState(): AssistantChatState {
   return { activeChatId: chat.id, chats: [chat] }
 }
 
-function normalizeState(value: unknown): AssistantChatState {
-  if (!record(value) || !Array.isArray(value.chats)) return emptyState()
+function normalizeChats(value: unknown[]): AssistantChatRecord[] {
   const seen = new Set<string>()
-  const chats = value.chats
+  return value
     .map((chat) => normalizeChat(chat))
     .filter((chat): chat is AssistantChatRecord => {
       if (!chat || seen.has(chat.id)) return false
@@ -235,6 +239,11 @@ function normalizeState(value: unknown): AssistantChatState {
     })
     .sort((a, b) => b.updatedAt - a.updatedAt)
     .slice(0, MAX_ASSISTANT_CHATS)
+}
+
+function normalizeState(value: unknown): AssistantChatState {
+  if (!record(value) || !Array.isArray(value.chats)) return emptyState()
+  const chats = normalizeChats(value.chats)
   if (!chats.length) return emptyState()
   const activeChatId = typeof value.activeChatId === 'string' && chats.some((chat) => chat.id === value.activeChatId)
     ? value.activeChatId
@@ -242,17 +251,50 @@ function normalizeState(value: unknown): AssistantChatState {
   return { activeChatId, chats }
 }
 
-function parseState(storage: AssistantChatStorage | null, key: string): AssistantChatState {
-  if (!storage) return emptyState()
+function readPayload(storage: AssistantChatStorage | null, key: string): Record<string, unknown> | null {
+  if (!storage) return null
   try {
     const raw = storage.getItem(key)
-    if (!raw || raw.length > MAX_ASSISTANT_STORAGE_CHARS * 2) return emptyState()
+    if (!raw || raw.length > MAX_ASSISTANT_STORAGE_CHARS * 2) return null
     const parsed = JSON.parse(raw) as unknown
-    if (!record(parsed) || parsed.version !== 1 || !record(parsed.state)) return emptyState()
-    return normalizeState(parsed.state)
+    if (!record(parsed) || parsed.version !== 1 || !record(parsed.state)) return null
+    return parsed
   } catch {
-    return emptyState()
+    return null
   }
+}
+
+function parseState(storage: AssistantChatStorage | null, key: string): AssistantChatState {
+  const payload = readPayload(storage, key)
+  return payload ? normalizeState(payload.state) : emptyState()
+}
+
+function liveTombstones(value: unknown, now: number): Record<string, number> {
+  const kept: Record<string, number> = {}
+  if (!record(value)) return kept
+  for (const [id, at] of Object.entries(value)) if (typeof at === 'number' && now - at < TOMBSTONE_MS) kept[id] = at
+  return kept
+}
+
+/**
+ * This tab's chat with the turns another tab added to the stored copy. A turn
+ * this tab held before and dropped stays dropped; the newer record names the chat.
+ */
+function mergeChat(mine: AssistantChatRecord, stored: AssistantChatRecord, held: Set<string>): AssistantChatRecord {
+  const own = splitTurns(mine.messages, mine.history)
+  const keys = new Set(own.map(turnKey))
+  const added = splitTurns(stored.messages, stored.history)
+    .filter((turn) => turnKey(turn) && !keys.has(turnKey(turn)) && !held.has(turnKey(turn)))
+  const base = stored.updatedAt > mine.updatedAt ? stored : mine
+  if (!added.length) return { ...base, messages: mine.messages, history: mine.history }
+  // This tab's order stays; each added turn goes before the first turn that started later.
+  const startOf = (turn: ChatTurn) => turn.messages[0]?.at ?? 0
+  for (const turn of added) {
+    const index = own.findIndex((entry) => startOf(entry) > startOf(turn))
+    own.splice(index < 0 ? own.length : index, 0, turn)
+  }
+  const joined = joinTurns(own)
+  return { ...base, messages: joined.messages, history: joined.history }
 }
 
 function serialize(payload: PersistedPayload): string | null {
@@ -273,36 +315,63 @@ function compactChat(chat: AssistantChatRecord): AssistantChatRecord {
   }
 }
 
-function boundedState(state: AssistantChatState): { state: AssistantChatState; raw: string | null } {
+function boundedState(
+  state: AssistantChatState,
+  deleted: Record<string, number>,
+): { state: AssistantChatState; raw: string | null } {
   let next: AssistantChatState = normalizeState(state)
-  let raw = serialize({ version: 1, state: next })
+  let raw = serialize({ version: 1, state: next, deleted })
   while (raw && raw.length > MAX_ASSISTANT_STORAGE_CHARS && next.chats.length > 1) {
     next = { ...next, chats: next.chats.slice(0, -1) }
     if (!next.chats.some((chat) => chat.id === next.activeChatId)) next = { ...next, activeChatId: next.chats[0].id }
-    raw = serialize({ version: 1, state: next })
+    raw = serialize({ version: 1, state: next, deleted })
   }
   if (raw && raw.length > MAX_ASSISTANT_STORAGE_CHARS) {
     next = { ...next, chats: next.chats.map(compactChat) }
-    raw = serialize({ version: 1, state: next })
+    raw = serialize({ version: 1, state: next, deleted })
   }
   // A circular or still oversized model payload should not make chat actions
   // throw. The final fallback retains names and recent visible text only.
   if (!raw || raw.length > MAX_ASSISTANT_STORAGE_CHARS) {
     next = { ...next, chats: next.chats.map((chat) => ({ ...compactChat(chat), history: [] })) }
-    raw = serialize({ version: 1, state: next })
+    raw = serialize({ version: 1, state: next, deleted })
   }
   return { state: next, raw }
 }
 
 export function createAssistantChatStore(scope: AssistantChatScope, storage = browserStorage()) {
   const key = storageKey(scope)
+  // The chats this tab holds, with the message ids each held, to tell its own
+  // deletions from what another tab added since.
+  let held = new Map<string, Set<string>>()
+  const ids = (chat: AssistantChatRecord) => new Set(chat.messages.map((message) => message.id))
   return {
     key,
     load(): AssistantChatState {
-      return parseState(storage, key)
+      const state = parseState(storage, key)
+      held = new Map(state.chats.map((chat) => [chat.id, ids(chat)]))
+      return state
     },
+    // Reads the stored chats again right before writing and merges them in, so
+    // tabs sharing this storage do not overwrite each other's chats.
     save(state: AssistantChatState): AssistantChatState {
-      const bounded = boundedState(state)
+      const now = Date.now()
+      const payload = readPayload(storage, key)
+      const stored = payload && record(payload.state) && Array.isArray(payload.state.chats)
+        ? normalizeChats(payload.state.chats)
+        : []
+      const deleted = liveTombstones(payload?.deleted, now)
+      const mine = new Map(state.chats.map((chat) => [chat.id, chat]))
+      for (const id of held.keys()) if (!mine.has(id)) deleted[id] = now
+      const chats = state.chats.filter((chat) => !(chat.id in deleted)).map((chat) => {
+        const other = stored.find((entry) => entry.id === chat.id)
+        return other ? mergeChat(chat, other, held.get(chat.id) ?? new Set()) : chat
+      })
+      for (const chat of stored) {
+        if (!mine.has(chat.id) && !held.has(chat.id) && !(chat.id in deleted) && chat.messages.length) chats.push(chat)
+      }
+      const bounded = boundedState({ ...state, chats }, deleted)
+      held = new Map(bounded.state.chats.map((chat) => [chat.id, ids(mine.get(chat.id) ?? chat)]))
       if (storage && bounded.raw) {
         try {
           storage.setItem(key, bounded.raw)
