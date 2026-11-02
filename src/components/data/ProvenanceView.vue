@@ -73,6 +73,8 @@ let generation = 0
 // Where it went: runs and datasets that name the same bytes. Only stored files have a content id.
 const went = ref<{ runs: string[]; datasets: string[] } | null>(null)
 const wentState = ref<'idle' | 'loading' | 'ready' | 'failed'>('idle')
+// Whether the dataset's buckets named every run that wrote into them.
+const writersRead = ref<'complete' | 'partial' | 'failed'>('complete')
 
 /** Holds while the graph still belongs to the start that is shown now. */
 function fenced() {
@@ -88,6 +90,7 @@ watch(
     stop()
     went.value = null
     wentState.value = 'idle'
+    writersRead.value = 'complete'
     opened.value = new Map()
     full.value = false
     Object.assign(graph, emptyGraph())
@@ -100,12 +103,14 @@ watch(
   { immediate: true },
 )
 
-// A dataset that names a bucket shows the runs that wrote into it; a node without the lookup adds none.
+// A dataset that names a bucket shows the runs that wrote into it; a failed or partial answer says so.
 async function readWriters(documentId: string, crate: unknown) {
   const current = fenced()
   const answers = await Promise.all(linkedBuckets(crate).map((part) => getBucketRuns(part.bucket, part.prefix, part.nodeId).catch(() => null)))
   const runIds = answers.flatMap((answer) => answer?.runs.map((run) => run.run_id) ?? [])
-  if (!current() || !runIds.length) return
+  if (!current()) return
+  writersRead.value = answers.includes(null) ? 'failed' : answers.some((answer) => !answer!.complete) ? 'partial' : 'complete'
+  if (!runIds.length) return
   addWriters(graph, documentId, runIds)
   void readDirect()
 }
@@ -560,6 +565,8 @@ const legend = computed(() => {
     </div>
     <Notice v-if="exportError" tone="error">{{ exportError }}</Notice>
     <p v-else-if="exported" role="status" class="text-xs text-muted-foreground">Saved as provenance.zip.</p>
+    <Notice v-if="writersRead === 'failed'" tone="warning">The runs that wrote into this dataset’s buckets could not be read.</Notice>
+    <Notice v-else-if="writersRead === 'partial'" tone="warning">Some runs that wrote into this dataset’s buckets may be missing.</Notice>
 
     <div :class="start.kind === 'dataset' ? 'surface overflow-hidden' : ''">
       <div v-if="walking" role="status" class="flex flex-wrap items-center gap-2 px-4 pt-3 text-xs text-muted-foreground">

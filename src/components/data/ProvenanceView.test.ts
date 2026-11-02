@@ -143,6 +143,19 @@ describe('provenance view', () => {
     expect(aruna.getRun).toHaveBeenCalledWith('k12')
   })
 
+  it('says when the runs that wrote into a dataset bucket are unread or partial', async () => {
+    const part = 'arn:aruna:r:n2:s3/bakta-results/'
+    const crate = { '@graph': [{ '@id': './', '@type': 'Dataset', hasPart: [{ '@id': part }] }, { '@id': part, '@type': 'Dataset', name: 'bakta-results' }] }
+    const start = { kind: 'dataset', documentId: 'd6', title: 'Bakta annotation results', crate }
+    aruna.getBucketRuns.mockRejectedValueOnce(new Error('down'))
+    const failed = await mountApp(component, { props: { start } })
+    await vi.waitFor(() => expect(content(failed.root)).toContain('could not be read'))
+
+    aruna.getBucketRuns.mockResolvedValueOnce({ runs: [], complete: false })
+    const partial = await mountApp(component, { props: { start } })
+    await vi.waitFor(() => expect(content(partial.root)).toContain('may be missing'))
+  })
+
   it('names the person and the device an input was uploaded from', async () => {
     aruna.getVersionOrigin.mockReset().mockResolvedValue(origin({ origin: { kind: 'upload', node_id: 'n2', device: 'd1' } }))
     const root = await render()
