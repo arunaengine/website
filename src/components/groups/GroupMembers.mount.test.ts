@@ -10,6 +10,14 @@ const search = vi.fn(searchUsers)
 const directory = new Map<string, { user_id: string; name: string; attributes: Record<string, string>; merged_into?: string }>()
 const addGroupMember = vi.fn(async () => undefined)
 const removeGroupMember = vi.fn(async (..._args: unknown[]) => undefined)
+const revokeMemberTokens = vi.fn(async (..._args: unknown[]) => ({ revoked: 2, all_tokens: false }))
+const ConfirmStub = defineComponent({
+  props: { open: Boolean, title: String, description: String },
+  emits: ['confirm'],
+  setup: (props, { emit }) => () => props.open
+    ? h('div', { 'data-confirm': props.title }, [props.description, h('button', { onClick: () => emit('confirm') }, 'Confirm')])
+    : null,
+})
 const Empty = defineComponent(() => () => null)
 const Button = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const Input = defineComponent({
@@ -39,6 +47,9 @@ const GroupMembers = compileClientComponent(new URL('./GroupMembers.vue', import
   '@/components/ui/Popover.vue': moduleDefault(defineComponent((_, { slots }) => () => h('div', slots.default?.()))),
   '@/components/ui/CopyButton.vue': moduleDefault(Empty),
   '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('i', p.label) })),
+  '@/components/ui/ConfirmDialog.vue': moduleDefault(ConfirmStub),
+  '@/composables/aruna/state': { refreshContext: () => ({ epoch: 1, client: { token: 't' } }) },
+  '@/lib/api': { revokeMemberTokens },
 })
 
 afterEach(() => {
@@ -108,6 +119,27 @@ describe('group member picker', () => {
     })
     expect(content(mounted.root)).toContain('Alice (merged)')
     expect(content(mounted.root)).not.toContain('Bob')
+    mounted.app.unmount()
+  })
+
+  it('labels admins and revokes the group access of one member after a confirmation', async () => {
+    const members = [
+      { user_id: 'a1', name: 'Ada', roles: [{ role_id: 'r1', name: 'owners' }], admin: true },
+      { user_id: 'u1', name: 'Bob', roles: [{ role_id: 'r2', name: 'user' }], admin: false },
+    ]
+    const mounted = await mountApp(GroupMembers, {
+      props: { groupId: 'g1', members, roles: [{ role_id: 'r2', name: 'user' }], canManage: true },
+    })
+    const row = (name: string) => element(mounted.root, (node) => node.tag === 'tr' && content(node).includes(name))
+    expect(content(row('Ada'))).toContain('Admin')
+    expect(content(row('Bob'))).not.toContain('Admin')
+    await click(element(row('Bob'), (node) => node.tag === 'button' && content(node).includes('Revoke access')))
+    expect(revokeMemberTokens).not.toHaveBeenCalled()
+    const dialog = element(mounted.root, (node) => node.props['data-confirm'] === 'Revoke access to this group')
+    await click(element(dialog, (node) => node.tag === 'button'))
+    expect(revokeMemberTokens).toHaveBeenCalledWith('g1', 'u1', { token: 't' })
+    expect(content(mounted.root)).toContain('2 tokens of Bob revoked.')
+    expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
 })
