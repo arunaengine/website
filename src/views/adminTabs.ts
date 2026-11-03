@@ -9,6 +9,7 @@ export interface AdminTab {
 export function adminTabs(features: { placement: boolean; policies: boolean; jobs?: boolean }): AdminTab[] {
   return [
     { id: 'realm', label: 'Quota & usage' },
+    { id: 'groups', label: 'Groups' },
     { id: 'compute', label: 'Compute' },
     { id: 'assistant', label: 'Assistant' },
     ...(features.jobs ? [{ id: 'jobs', label: 'Jobs' }] : []),

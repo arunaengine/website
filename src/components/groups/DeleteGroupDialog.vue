@@ -7,6 +7,7 @@ import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import Button from '@/components/ui/Button.vue'
+import Input from '@/components/ui/Input.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
@@ -21,7 +22,8 @@ import { ApiError, sortDeletionCheck, type DeletionCheck, type NodeDeletionBlock
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { errorMessage } from '@/lib/utils'
 
-const props = defineProps<{ open: boolean; groupId: string }>()
+// With `confirmName`, deleting also needs the group name typed out.
+const props = defineProps<{ open: boolean; groupId: string; confirmName?: string }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
   (e: 'deleted'): void
@@ -45,6 +47,8 @@ const removing = ref<string | null>(null)
 const removeError = ref<{ key: string; message: string } | null>(null)
 let checkSeq = 0
 
+const typedName = ref('')
+const nameConfirmed = computed(() => !props.confirmName || typedName.value === props.confirmName)
 const canDelete = computed(() => unavailable.value || Boolean(check.value?.clear))
 const hint = computed(() => {
   if (canDelete.value) return 'Deleting a group cannot be undone.'
@@ -81,6 +85,7 @@ watch(
     refusal.value = null
     confirming.value = null
     removeError.value = null
+    typedName.value = ''
     void runCheck()
   },
   { immediate: true },
@@ -236,6 +241,12 @@ function bucketRoute(nodeId: string, bucket: string) {
             Nothing left on: {{ check.empty.map((id) => displayName(id)).join(', ') }}
           </p>
         </template>
+        <div v-if="props.confirmName && canDelete" class="space-y-1.5">
+          <label class="text-xs font-medium text-foreground" for="delete-group-name">
+            Type <span class="font-mono">{{ props.confirmName }}</span> to confirm
+          </label>
+          <Input id="delete-group-name" v-model="typedName" autocomplete="off" />
+        </div>
         <Notice v-if="refusal" tone="error">{{ refusal }}</Notice>
       </div>
 
@@ -245,7 +256,7 @@ function bucketRoute(nodeId: string, bucket: string) {
         <DialogClose as-child><Button variant="outline">Close</Button></DialogClose>
         <Button
           variant="destructive"
-          :disabled="!canDelete || checking || deleting || saving || writesDisabled"
+          :disabled="!canDelete || !nameConfirmed || checking || deleting || saving || writesDisabled"
           :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
           @click="remove"
         >
