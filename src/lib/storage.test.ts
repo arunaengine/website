@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BACKEND_KIND_SCHEMAS,
   backendQuota,
   backendSummary,
   copyHeldBack,
   copyOrigin,
   copyState,
+  folderProblem,
   shortError,
   targetLabel,
   tenantClasses,
@@ -151,5 +153,33 @@ describe('shortError', () => {
 
   it('replaces a very long text with a fixed message', () => {
     expect(shortError(`backend error ${'x'.repeat(400)}`)).toBe('The node could not save the backend.')
+  })
+})
+
+describe('local folder kind', () => {
+  it('needs a root, takes an optional folder and no credentials', () => {
+    const schema = BACKEND_KIND_SCHEMAS.fs
+    expect(schema.label).toBe('Local folder')
+    expect(schema.public.map((field) => [field.key, Boolean(field.required)])).toEqual([
+      ['root', true],
+      ['folder', false],
+    ])
+    expect(schema.secret).toEqual([])
+    expect(schema.identity).toEqual(['root', 'folder'])
+  })
+
+  it('accepts an empty folder or a relative one ending with a slash', () => {
+    for (const folder of ['', '  ', 'raw/', 'raw/2026/', 'a b/c.d/']) expect(folderProblem(folder)).toBeNull()
+  })
+
+  it('refuses what the node refuses', () => {
+    expect(folderProblem('raw')).toMatch(/slash/)
+    for (const folder of ['/raw/', 'a//b/', './a/', 'a/../b/', '../', '/']) {
+      expect(folderProblem(folder)).toMatch(/relative/)
+    }
+  })
+
+  it('summarizes a folder by its root', () => {
+    expect(backendSummary(backend('fs', { root: 'projects', folder: 'raw/' }))).toBe('projects · raw/')
   })
 })
