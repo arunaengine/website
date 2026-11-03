@@ -15,6 +15,7 @@ import {
   flush,
   mountApp,
   moduleDefault,
+  nodes,
 } from '@/test/clientRender'
 
 function relationship(state: string, extra: Partial<SyncRelationship> = {}): SyncRelationship {
@@ -51,7 +52,8 @@ const SelectStub = defineComponent({
   props: { modelValue: String, options: { type: Array, default: () => [] } },
   setup: (props) => () => h('select', { value: props.modelValue }),
 })
-const StatusDotStub = defineComponent({ props: { label: String }, setup: (props) => () => h('span', props.label) })
+const StatusMarkStub = defineComponent({ props: { label: String }, setup: (props) => () => h('i', { 'data-mark': props.label }) })
+const StatusPillStub = defineComponent({ props: { state: String }, setup: (props) => () => h('b', { 'data-pill': props.state }, props.state) })
 
 const tab = compileClientComponent(new URL('./SyncsTab.vue', import.meta.url), {
   vue: VueRuntime,
@@ -65,7 +67,8 @@ const tab = compileClientComponent(new URL('./SyncsTab.vue', import.meta.url), {
   '@/components/ui/RefreshButton.vue': moduleDefault(Slotted('button')),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Spinner.vue': moduleDefault(Slotted('span')),
-  '@/components/ui/StatusDot.vue': moduleDefault(StatusDotStub),
+  '@/components/ui/StatusMark.vue': moduleDefault(StatusMarkStub),
+  '@/components/ui/StatusPill.vue': moduleDefault(StatusPillStub),
   '@/composables/useAruna': {
     useAruna: () => ({
       getSyncRelationship,
@@ -115,6 +118,19 @@ describe('bucket syncs tab', () => {
     expect(text).toContain('Only syncs you created are listed.')
     expect(text).toContain('Keep in sync')
     expect(text).toContain('reef-mirror')
+  })
+
+  it('marks a running sync with a check and names any other state once', async () => {
+    const running = await render('enabled')
+    expect(element(running, (node) => node.props['data-mark'] !== undefined).props['data-mark']).toBe('Enabled')
+    expect(nodes(running).some((node) => node.props['data-pill'] !== undefined)).toBe(false)
+
+    for (const [state, word] of [['paused', 'Paused'], ['failed', 'Failed']]) {
+      const root = await render(state)
+      expect(element(root, (node) => node.props['data-pill'] !== undefined).props['data-pill']).toBe(word)
+      expect(nodes(root).some((node) => node.props['data-mark'] !== undefined)).toBe(false)
+      expect(content(root).match(new RegExp(word, 'g'))).toHaveLength(1)
+    }
   })
 
   it('pauses and resumes through the state patch', async () => {
