@@ -19,10 +19,14 @@ const InputStub = defineComponent({
     h('input', { ...attrs, value: props.modelValue, onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value) }),
 })
 const SelectStub = defineComponent({
-  props: { modelValue: { type: String, default: '' }, ariaLabel: String },
+  props: { modelValue: { type: String, default: '' }, ariaLabel: String, options: { type: Array, default: () => [] } },
   emits: ['update:modelValue'],
   setup: (props, { emit }) => () =>
-    h('select', { 'aria-label': props.ariaLabel, value: props.modelValue, onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value) }),
+    h(
+      'select',
+      { 'aria-label': props.ariaLabel, value: props.modelValue, onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value) },
+      (props.options as { value: string; label: string }[]).map((option) => h('option', { value: option.value }, option.label)),
+    ),
 })
 
 const Dialog = compileClientComponent(new URL('./NewBucketsDialog.vue', import.meta.url), {
@@ -50,11 +54,11 @@ type Root = Parameters<typeof content>[0]
 const field = (root: Root, label: string) => element(root, (node) => node.props['aria-label'] === label)
 const save = (root: Root) => element(root, (node) => node.tag === 'button' && node.props.type === 'submit')
 
-async function mount(routing: Record<string, unknown>) {
+async function mount(routing: Record<string, unknown>, backends: unknown[] = [SPIRE]) {
   const open = ref(false)
   const mounted = await mountApp(
     defineComponent(() => () =>
-      h(Dialog, { open: open.value, groupId: 'g1', groupName: 'spire', backends: [SPIRE], routing: { group_id: 'g1', warnings: [], ...routing }, links: [] }),
+      h(Dialog, { open: open.value, groupId: 'g1', groupName: 'spire', backends, routing: { group_id: 'g1', warnings: [], ...routing }, links: [] }),
     ),
   )
   open.value = true
@@ -101,5 +105,13 @@ describe('NewBucketsDialog', () => {
     expect(content(root)).toContain('After saving: new bucket samples → Aruna storage')
     await submit(root)
     expect(putGroupRouting).toHaveBeenCalledWith('g1', null)
+  })
+
+  it('does not offer a local folder as the storage for new buckets', async () => {
+    const folder = { backend_id: 'f1', group_id: 'g1', kind: 'fs', name: 'raw-folder', public_config: { root: 'projects' } }
+    const { root } = await mount({}, [SPIRE, folder])
+    const options = content(field(root, 'Storage'))
+    expect(options).toContain('spire')
+    expect(options).not.toContain('raw-folder')
   })
 })
