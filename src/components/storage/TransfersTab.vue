@@ -19,7 +19,14 @@ import { featureEnabled } from '@/lib/config'
 import { ArrowLeftRight, ChevronDown, CloudDownload, Plus } from '@lucide/vue'
 
 // `ownerNodes`: the nodes that run the bucket's staging jobs, null for this node; null while unknown.
-const props = defineProps<{ bucket: string; nodeId: string | null; ownerNodes?: (string | null)[] | null; groupId: string | null }>()
+// `focusSync` names a sync a link points at, such as one from a notification.
+const props = defineProps<{
+  bucket: string
+  nodeId: string | null
+  ownerNodes?: (string | null)[] | null
+  groupId: string | null
+  focusSync?: string | null
+}>()
 
 const stagingEnabled = featureEnabled('stagingJobs')
 const { shown } = usePortalFeatures()
@@ -118,6 +125,7 @@ const stagingOpen = ref(false)
       :node-id="nodeId"
       embedded
       :quiet="kind === 'all'"
+      :focus="focusSync ?? null"
       @new-sync="syncOpen = true"
       @count="(count: number | null) => setCount('syncs', count)"
     />

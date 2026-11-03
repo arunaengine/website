@@ -2,7 +2,7 @@
 // Every sync relationship that touches this bucket, in the list grammar. The
 // backend lists, runs, pauses and deletes only what the caller created, so the
 // tab says so instead of pretending to be a complete picture.
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import DocsLink from '@/components/ui/DocsLink.vue'
@@ -24,7 +24,8 @@ import { errorMessage, formatBytes, formatDuration, relativeTime } from '@/lib/u
 import { ArrowLeft, ArrowRight, Pause, Play, Plus, Trash2 } from '@lucide/vue'
 
 // Inside the Transfers tab the tab owns the header, and `quiet` drops the empty state.
-const props = defineProps<{ bucket: string; nodeId: string | null; embedded?: boolean; quiet?: boolean }>()
+// `focus` marks the sync a link names and scrolls to it once the list is loaded.
+const props = defineProps<{ bucket: string; nodeId: string | null; embedded?: boolean; quiet?: boolean; focus?: string | null }>()
 const emit = defineEmits<{
   (event: 'new-sync'): void
   (event: 'changed'): void
@@ -68,6 +69,19 @@ const listState = computed<'loading' | 'error' | 'empty' | 'ready'>(() => {
   if (listError.value) return 'error'
   return rows.value.length ? 'ready' : 'empty'
 })
+
+// Only a complete list can say that the linked sync is gone.
+const focusMissing = computed(
+  () => Boolean(props.focus) && listState.value !== 'loading' && listState.value !== 'error' && !remoteError.value
+    && !rows.value.some((row) => row.relationship.id === props.focus),
+)
+let focusShown = ''
+watch([listState, () => props.focus], async ([state, focus]) => {
+  if (state !== 'ready' || !focus || focusShown === focus) return
+  focusShown = focus
+  await nextTick()
+  document.getElementById(`sync-${focus}`)?.scrollIntoView({ block: 'nearest' })
+}, { immediate: true })
 
 // A failed list, or one another node could not complete, says nothing about the count.
 watch([listState, remoteError], ([state]) => {
@@ -218,6 +232,7 @@ function remove(row: SyncRow) {
     </div>
 
     <Notice v-if="remoteError" tone="warning">{{ remoteError }}</Notice>
+    <Notice v-if="focusMissing" tone="info">The linked sync is not listed. It may have been deleted, or someone else created it.</Notice>
     <Notice v-if="!pausingSupported" tone="info">
       This node does not serve pausing a sync, so the pause control is hidden.
     </Notice>
@@ -231,7 +246,14 @@ function remove(row: SyncRow) {
       @retry="load()"
     >
       <ul class="divide-y divide-border">
-        <li v-for="row in rows" :key="row.relationship.id" class="px-5 py-3.5">
+        <li
+          v-for="row in rows"
+          :id="`sync-${row.relationship.id}`"
+          :key="row.relationship.id"
+          class="px-5 py-3.5"
+          :class="row.relationship.id === focus ? 'bg-primary/10' : ''"
+          :aria-current="row.relationship.id === focus ? 'true' : undefined"
+        >
           <div class="flex items-center gap-2 text-xs">
             <StatusDot :tone="stateTone(row.relationship.state)" :label="row.relationship.state" />
             <Badge v-if="embedded" variant="secondary" size="sm" class="shrink-0">Sync</Badge>

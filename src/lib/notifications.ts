@@ -41,6 +41,13 @@ function keyPrefix(key: string): string {
   return key.split('/').slice(0, -1).join('/')
 }
 
+// A sync event opens the Transfers tab of its bucket with that sync marked.
+function syncLink(n: ApiNotification): RouteLocationRaw | null {
+  if (!n.bucket) return null
+  const query = { tab: 'transfers', ...(n.node_id ? { node: n.node_id } : {}), ...(n.relationship_id ? { sync: n.relationship_id } : {}) }
+  return { name: 'bucket-storage', params: { bucketId: n.bucket }, query }
+}
+
 // Registry of the notification kinds the backend actually emits (stable
 // `name()` strings; see aruna docs/design/notifications.md §9). A kind nobody
 // emits is not registered: an unknown kind already degrades to a generic row,
@@ -118,8 +125,7 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
   // Emitted for s3-namespace watches when a sync relationship finishes a run
   // (sync_completed with versions_synced) or records a failure (sync_failed
   // with the error text). Both carry bucket + node_id; the deep link opens the
-  // bucket on its hosting node (Data treats the local node id in
-  // ?node= as the connected node).
+  // bucket's syncs on its hosting node.
   sync_completed: {
     icon: ArrowLeftRight,
     title: (n) => (n.bucket ? `Bucket sync completed for ${n.bucket}` : 'Bucket sync completed'),
@@ -127,10 +133,7 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
       typeof n.versions_synced === 'number'
         ? `${n.versions_synced} version${n.versions_synced === 1 ? '' : 's'} synced`
         : n.path,
-    link: (n) =>
-      n.bucket
-        ? { name: 'bucket', params: { bucketId: n.bucket }, query: n.node_id ? { node: n.node_id } : {} }
-        : null,
+    link: syncLink,
   },
   // Sent to each key holder when a node restart locked a vault-locked bucket
   // that was unlocked before; opens its Encryption tab on that node.
@@ -166,10 +169,7 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
     icon: AlertTriangle,
     title: (n) => (n.bucket ? `Bucket sync failed for ${n.bucket}` : 'Bucket sync failed'),
     detail: (n) => n.error ?? n.path,
-    link: (n) =>
-      n.bucket
-        ? { name: 'bucket', params: { bucketId: n.bucket }, query: n.node_id ? { node: n.node_id } : {} }
-        : null,
+    link: syncLink,
   },
 }
 
