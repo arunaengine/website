@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { displayArchiveRows, type ExportReportRow } from './rocrateArchive'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { displayArchiveRows, fetchArchiveReport, type ExportReportRow } from './rocrateArchive'
 
 const included: ExportReportRow = {
   entry_key: '0:main', code: 'included', detail: { entity_id: 'source', zip_path: 'results/file.csv' },
@@ -30,5 +30,22 @@ describe('archive report presentation', () => {
     expect(rows[0]).toEqual(denied)
     expect(rows[1].detail.validation).toEqual(invalid.detail.validation)
     expect(rows[1].message).toBe('The archive path needs attention.')
+  })
+})
+
+describe('archive requests', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it.each([
+    ['an absolute API base on another origin', 'https://node.test/api/v1/', 'https://node.test/api/v1/compute/jobs/j1/report?limit=5'],
+    ['a same-origin API base', '/api/v1', 'https://portal.test/api/v1/compute/jobs/j1/report?limit=5'],
+  ])('build the URL from %s', async (_, baseUrl, expected) => {
+    vi.stubGlobal('window', { location: { origin: 'https://portal.test' } })
+    const fetch = vi.fn(async () => new Response('{}', { status: 200 }))
+    vi.stubGlobal('fetch', fetch)
+
+    await fetchArchiveReport('j1', { baseUrl }, { limit: 5 })
+
+    expect(String((fetch.mock.calls[0] as unknown[])[0])).toBe(expected)
   })
 })

@@ -2,6 +2,7 @@ import { computed, ref, watch } from 'vue'
 import {
   ApiError,
   apiRequest,
+  apiUrl,
   type ApiNotification,
   type ApiRequestOptions,
   type MarkReadRequest,
@@ -244,8 +245,7 @@ async function connectStream(generation: number) {
   const controller = new AbortController()
   streamAbort = controller
   try {
-    const baseUrl = apiBaseUrl.value.replace(/\/$/, '')
-    const response = await fetch(new URL(`${baseUrl}/system/notifications/stream`, window.location.origin), {
+    const response = await fetch(apiUrl('/system/notifications/stream', {}, { baseUrl: apiBaseUrl.value }), {
       headers: {
         Accept: 'text/event-stream',
         Authorization: `Bearer ${authToken.value}`,
