@@ -17,6 +17,7 @@ import ConnectorsSection from '@/components/groups/ConnectorsSection.vue'
 import RepositoriesSection from '@/components/groups/RepositoriesSection.vue'
 import StorageSection from '@/components/groups/StorageSection.vue'
 import GroupLocationSection from '@/components/groups/GroupLocationSection.vue'
+import GroupAuditTrail from '@/components/groups/GroupAuditTrail.vue'
 import PoliciesSection from '@/components/policies/PoliciesSection.vue'
 import EffectivePolicies from '@/components/policies/EffectivePolicies.vue'
 import GroupMembers from '@/components/groups/GroupMembers.vue'
@@ -34,7 +35,7 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { ArrowRight, Boxes, Cable, ChartArea, ChevronRight, CircleCheck, Clock, Copy, Database, FileJson2, Files, FolderOpen, Globe, HardDrive, Inbox, LayoutDashboard, Link, ListChecks, Lock, LogOut, Package, Pencil, Server, ShieldAlert, ShieldCheck, Trash2, Users, Workflow } from '@lucide/vue'
+import { ArrowRight, Boxes, Cable, ChartArea, ChevronRight, CircleCheck, Clock, Copy, Database, FileJson2, Files, FolderOpen, Globe, HardDrive, Inbox, LayoutDashboard, Link, ListChecks, Lock, LogOut, Package, Pencil, ScrollText, Server, ShieldAlert, ShieldCheck, Trash2, Users, Workflow } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
@@ -230,7 +231,7 @@ const sourcesVisible = computed(() => isMember.value && (shown('connectors') || 
 const connectorLinked = computed(() => typeof route.query.connector === 'string')
 
 // Route-driven tab state (?tab=…) so sections deep-link like ComputeView.
-const TAB_NAMES = ['stats', 'members', 'roles', 'sources', 'storage', 'policies']
+const TAB_NAMES = ['stats', 'members', 'roles', 'sources', 'storage', 'policies', 'audit']
 const routeTab = useRouteTab(TAB_NAMES, 'stats')
 // The bare ?connector=<id> deep link is one-shot: picking any tab releases it so
 // the stats tab does not bounce back to sources.
@@ -243,6 +244,7 @@ const tab = computed({
     if (value === 'sources' && !isMember.value) return 'stats'
     if (value === 'storage' && !canAdminStorage.value) return 'stats'
     if (value === 'policies' && !policiesTabVisible.value) return 'stats'
+    if (value === 'audit' && !canAdminGroup.value) return 'stats'
     return value
   },
   set(next: string) {
@@ -560,6 +562,9 @@ async function leave() {
               <Badge v-if="backendCount !== null" variant="outline" size="count">{{ backendCount }}</Badge>
               <Skeleton v-else class="size-5 rounded-full" />
             </TabsTrigger>
+            <TabsTrigger v-if="canAdminGroup" value="audit" class="gap-1.5">
+              <ScrollText class="h-3.5 w-3.5" /> Audit trail
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -743,6 +748,10 @@ async function leave() {
             />
             <GroupLocationSection :group="group" can-admin :reload="storageTick" class="border-t border-border" @changed="group = $event" />
           </div>
+        </TabsContent>
+
+        <TabsContent v-if="canAdminGroup" value="audit" class="mt-0">
+          <GroupAuditTrail v-if="tab === 'audit'" :group-id="group.group_id" />
         </TabsContent>
       </Tabs>
     </template>

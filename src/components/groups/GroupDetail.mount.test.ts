@@ -10,7 +10,7 @@ import * as GroupAdmin from '@/lib/groupAdmin'
 import * as Quota from '@/lib/quota'
 import * as Utils from '@/lib/utils'
 
-const TAB_NAMES = ['stats', 'members', 'roles', 'sources', 'storage', 'policies']
+const TAB_NAMES = ['stats', 'members', 'roles', 'sources', 'storage', 'policies', 'audit']
 const leaveGroup = vi.fn(async (_group: string) => undefined)
 const getGroupUsage = vi.fn(async (): Promise<Record<string, unknown>> => ({ quota: null }))
 const listBuckets = vi.fn(async (..._args: unknown[]) => ({ hits: [] as object[], complete: true }))
@@ -143,6 +143,7 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   '@/components/ui/TabsTrigger.vue': moduleDefault(TriggerStub),
   '@/components/ui/TabsContent.vue': moduleDefault(PanelStub),
   '@/components/groups/ConnectorsSection.vue': moduleDefault(Empty),
+  '@/components/groups/GroupAuditTrail.vue': moduleDefault(Empty),
   '@/components/groups/RepositoriesSection.vue': moduleDefault(Empty),
   '@/components/groups/StorageSection.vue': moduleDefault(
     defineComponent({ props: { datasetBucket: String }, setup: (p) => () => h('div', { 'data-dataset-bucket': p.datasetBucket }) }),
@@ -210,6 +211,13 @@ describe('Group detail tabs', () => {
       expect(router.currentRoute.value.name).toBe('group')
       expect(element(root, (node) => node.props['data-active'] !== undefined).props['data-active']).toBe(name)
     }
+  })
+
+  it('keeps the audit trail to group admins', async () => {
+    group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [MEMBER_ROLE] }
+    const { root } = await mount('/app/groups/g1?tab=audit')
+    expect(element(root, (node) => node.props['data-active'] !== undefined).props['data-active']).toBe('stats')
+    expect(nodes(root).some((node) => node.props['data-tab'] === 'audit')).toBe(false)
   })
 
   it('opens the tab a deep link names', async () => {
