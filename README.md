@@ -55,6 +55,27 @@ Production builds do not use the Vite development proxy. By default the portal c
 VITE_ARUNA_API_BASE_URL=https://node.example.org/api/v1 npm run build
 ```
 
+## Runtime configuration
+
+The same build runs when a node serves it, when it is hosted on another origin, and inside Aruna Desktop. At startup the portal reads `/portal-config.json` from its own origin. Unknown fields are ignored and missing fields keep their defaults:
+
+- `apiBaseUrl`: the REST base, either same-origin (`/api/v1`, the default) or absolute (`https://node.example.org/api/v1`). Every API request, download and event stream is built from it.
+- `authCallbackOrigin`: the origin of the registered OIDC `redirect_uri`. Empty means the page's own origin.
+- `features`, `terminology`, `registryUrl` and `login`: optional surfaces, the terminology gateway, the realm registry and the login choices.
+
+A build-time `VITE_ARUNA_API_BASE_URL` wins over the served file. An API base the user picks in the portal is remembered in the browser and wins over both.
+
+A desktop shell injects its context before the portal loads, as `window.__ARUNA_DESKTOP__`:
+
+- `apiBaseUrl`: the API base the portal uses; `/api/v1` when absent.
+- `authCallbackOrigin`: the loopback origin of the OIDC callback (RFC 8252).
+- `realmUrl`: the realm the device remembers.
+- `revision`: a number that grows with each change; only a later context replaces the one in use.
+- `features`: boolean flags, such as `desktop`, `systemBrowserAuth` and `embeddedAuth`.
+- `bridge`: `{ invoke, version }` for native calls.
+
+A malformed context is ignored, and the portal then behaves as it does on the web. The native side of this contract lives in Aruna Desktop's `src/bridge.rs`.
+
 Preview the production build locally:
 
 ```bash
