@@ -24,6 +24,7 @@ import {
   listGroupConnectors,
   replaceGroupConnector,
 } from './aruna/connectors'
+import { listGroupAudit } from './aruna/audit'
 import {
   fetchRoCrateRaw,
   fetchRevisedCrate,
@@ -271,6 +272,7 @@ export function useAruna() {
     getGroupUsageHistory,
     createS3Credentials,
     listGroupConnectors,
+    listGroupAudit,
     getGroupConnector,
     createGroupConnector,
     replaceGroupConnector,
