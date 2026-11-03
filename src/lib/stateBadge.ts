@@ -115,6 +115,11 @@ const STATE_TONE: Record<string, StateTone> = {
   blocked: 'attention',
   'no usable key': 'attention',
   'directory unavailable': 'attention',
+  // Tokens and accounts.
+  active: 'done',
+  expired: 'idle',
+  revoked: 'attention',
+  banned: 'attention',
 }
 
 /** The tone for a state string; anything unknown reads as a neutral count. */
