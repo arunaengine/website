@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Link an S3 bucket of a storage to an Aruna bucket, then run its first sync.
+// Link an S3 bucket or local folder of a storage to an Aruna bucket, then run its first sync.
 import { computed, ref, useId, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -14,10 +14,12 @@ import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useImportRoots } from '@/composables/useImportRoots'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { ApiError, createBackendImport, runBackendImport, type BackendImport, type GroupBackendResponse } from '@/lib/api'
 import { NAMING_OPTIONS, namingPattern, type NamingChoice } from '@/lib/bucketNaming'
 import { folderPath } from '@/lib/linkedFolders'
+import { folderProblem } from '@/lib/storage'
 import { arunaConflict, bucketProblem, linkConflict, splitsBuckets } from '@/lib/storageRules'
 import { errorMessage } from '@/lib/utils'
 
@@ -25,6 +27,8 @@ const props = defineProps<{
   open: boolean
   groupId: string
   backend: GroupBackendResponse | null
+  /** All storages of the group, to pick where a read-only folder writes. */
+  backends: GroupBackendResponse[]
   links: BackendImport[]
 }>()
 const emit = defineEmits<{ (e: 'update:open', value: boolean): void; (e: 'saved', runError?: string): void }>()
@@ -39,16 +43,43 @@ const s3Bucket = ref('')
 const folder = ref('')
 const arunaBucket = ref('')
 const naming = ref<NamingChoice>('plain')
+const writer = ref('')
 const saving = ref(false)
 const submitError = ref<string | null>(null)
+
+const folderMode = computed(() => props.backend?.kind === 'fs')
+const { roots, state: rootsState, error: rootsError, load: reloadRoots } = useImportRoots(
+  computed(() => props.groupId),
+  computed(() => props.open && folderMode.value),
+)
+const rootInfo = computed(() => roots.value.find((root) => root.name === props.backend?.public_config.root))
+// A read-only folder cannot take new uploads, so another storage must.
+const needsWriter = computed(() => folderMode.value && rootsState.value === 'ready' && rootInfo.value?.writable !== true)
+const writable = (other: GroupBackendResponse) =>
+  other.kind !== 'fs' || roots.value.some((root) => root.name === other.public_config.root && root.writable)
+const writers = computed(() =>
+  props.backends
+    .filter((other) => other.backend_id !== props.backend?.backend_id && !other.disabled && writable(other))
+    .map((other) => ({ value: other.backend_id, label: other.name })),
+)
+const rootProblem = computed(() => {
+  if (!folderMode.value || rootsState.value !== 'ready') return null
+  return rootInfo.value ? null : 'The node operator no longer approves this folder.'
+})
 
 const splits = computed(() => Boolean(props.backend && splitsBuckets(props.backend)))
 const storagePath = computed(() => (splits.value ? `${s3Bucket.value.trim()}/${folderPath(folder.value)}` : folderPath(folder.value)))
 const bucket = computed(() => arunaBucket.value.trim() || (splits.value ? s3Bucket.value.trim() : ''))
-const ready = computed(() => Boolean(bucket.value && (!splits.value || s3Bucket.value.trim())))
+const ready = computed(
+  () =>
+    Boolean(bucket.value && (!splits.value || s3Bucket.value.trim())) &&
+    (!folderMode.value || (rootsState.value === 'ready' && !rootProblem.value)) &&
+    (!needsWriter.value || writers.value.some((option) => option.value === writer.value)),
+)
 const problem = computed(() => {
   if (!props.backend || !ready.value) return null
   return (
+    (folderMode.value ? folderProblem(storagePath.value) : null) ??
     bucketProblem(bucket.value) ??
     arunaConflict(props.links, bucket.value, '') ??
     linkConflict(props.backend, props.links, storagePath.value, null, true)
@@ -62,6 +93,7 @@ watch(
     s3Bucket.value = ''
     folder.value = ''
     arunaBucket.value = ''
+    writer.value = ''
     naming.value = 'plain'
     submitError.value = null
   },
@@ -86,6 +118,7 @@ async function submit() {
         backend_prefix: storagePath.value,
         bucket: bucket.value,
         key_prefix: '',
+        ...(needsWriter.value ? { write_backend_id: writer.value } : {}),
         write_pattern: namingPattern(naming.value, ''),
       },
       client,
@@ -112,7 +145,7 @@ async function submit() {
   <Dialog :open="open" @update:open="(value: boolean) => emit('update:open', value)">
     <DialogContent class="max-w-xl">
       <DialogHeader>
-        <DialogTitle>Link an S3 bucket</DialogTitle>
+        <DialogTitle>{{ folderMode ? 'Link a folder' : 'Link an S3 bucket' }}</DialogTitle>
         <DialogDescription>
           Files already in it show up in Aruna. Nothing is copied.
           <StorageFeatureLink question="elsewhere" class="ml-1" />
@@ -141,6 +174,20 @@ async function submit() {
             <label class="text-xs font-medium">New uploads are named</label>
             <Select v-model="naming" :options="NAMES" aria-label="New uploads are named" class="mt-1" />
           </div>
+        </div>
+        <p v-if="rootsState === 'loading'" class="text-xs text-muted-foreground">Loading approved folders…</p>
+        <Notice v-else-if="rootsState === 'failed'" tone="error">
+          {{ rootsError }}
+          <button type="button" class="ml-1 underline" @click="reloadRoots">Try again</button>
+        </Notice>
+        <p v-if="rootProblem" class="text-xs text-destructive">{{ rootProblem }}</p>
+        <div v-if="needsWriter && rootInfo">
+          <label class="text-xs font-medium">Write new uploads to</label>
+          <Select v-model="writer" :options="writers" placeholder="Pick a storage" aria-label="Write new uploads to" class="mt-1" />
+          <p class="mt-1 text-[11px] text-muted-foreground">
+            This folder is read-only, so Aruna cannot write new files into it.
+            {{ writers.length ? 'Pick another storage that takes them.' : 'Add another storage that takes them first.' }}
+          </p>
         </div>
         <p v-if="problem" class="text-xs text-destructive">{{ problem }}</p>
         <p v-else-if="ready" class="text-xs text-muted-foreground">
