@@ -18,7 +18,8 @@ const { currentUser, realm } = useAruna()
 const { linkProvider, providerLink, stage } = useAuth()
 
 const { options, accountUrl } = portalConfig().login
-const linkable = options.filter((option) => Object.keys(option.linkParams).length)
+// An upstream login has no Keycloak account to link to; the account merge joins it instead.
+const linkable = options.filter((option) => !option.upstream && Object.keys(option.linkParams).length)
 // A session from another realm has no account at this realm's Keycloak.
 const shown = computed(() => {
   const user = currentUser.value

@@ -111,6 +111,15 @@ describe('linked logins in settings', () => {
     app.unmount()
   })
 
+  it('offers no link for an upstream login, which the account merge joins', async () => {
+    login = { options: [{ ...NFDI, upstream: { provider: 'iam4nfdi', bridge: 'https://bridge.test/v3-bridge/iam4nfdi' } }], accountUrl: ACCOUNT_URL }
+    const { root, app } = await render()
+    expect(content(root)).toContain('Add another account')
+    expect(content(root)).not.toContain('NFDI AAI')
+    expect(() => button(root, 'Link')).toThrow()
+    app.unmount()
+  })
+
   it('stays hidden for a session from another realm', async () => {
     userId.value = 'u1@Other'
     const { root, app } = await render()
