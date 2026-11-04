@@ -1,0 +1,165 @@
+/* Hero: headline, a world map whose routes meet at the bucket, and the standards line. */
+.lp {
+  .hero {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-bottom: 1px solid var(--edge-soft);
+    background:
+      radial-gradient(ellipse at 12% -10%, rgba(85, 196, 222, .13), transparent 50%),
+      radial-gradient(ellipse at 88% -6%, rgba(54, 62, 201, .16), transparent 55%),
+      var(--base);
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, .055) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, .055) 1px, transparent 1px),
+      linear-gradient(to right, rgba(255, 255, 255, .028) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, .028) 1px, transparent 1px);
+    background-size: 128px 128px, 128px 128px, 32px 32px, 32px 32px;
+    mask-image: radial-gradient(ellipse 90% 85% at 50% 0%, #000 35%, transparent 100%);
+  }
+  .h25 { padding: 88px 32px 0; text-align: center; }
+  .h25-copy { max-width: 860px; margin: 0 auto; }
+  .h25 h1 { font: 600 72px/1.03 var(--font-h); letter-spacing: -.03em; text-wrap: balance; margin: 0; }
+  .h25 h1 .l1, .h25 h1 .l2 { display: block; text-wrap: balance; }
+  .h25 h1 .l1 { color: var(--fg); }
+  .h25 h1 .l2 { color: #82d7e7; }
+  .h25 .sub { margin: 20px auto 0; max-width: 760px; font-size: 18px; line-height: 1.55; color: var(--muted); text-wrap: balance; }
+  .h25 .cta { display: flex; justify-content: center; gap: 12px; margin-top: 28px; }
+  .h25 .sec { background: rgba(255, 255, 255, .06); border-color: #3b4557; }
+
+  .h25-vis { margin: 48px auto 0; text-align: left; }
+  .hvis { position: relative; min-width: 0; }
+  .world { display: block; width: 100%; height: auto; overflow: visible; }
+  .w-land { fill: #232f47; stroke: #3a4763; stroke-width: .7; opacity: .82; transition: opacity .8s ease; }
+  .w-link { fill: none; stroke: var(--aqua); stroke-opacity: .6; stroke-width: 1.4; transition: stroke-opacity .4s; }
+  .w-link.hub { stroke-width: 1.5; }
+  .w-link.on { stroke-opacity: 1; stroke-width: 1.9; filter: drop-shadow(0 0 2px rgba(85, 196, 222, .4)); }
+  .w-pill { fill: rgba(11, 11, 14, .92); stroke: rgba(255, 255, 255, .16); stroke-width: .8; }
+  .w-name { font: 600 10.5px var(--font-b); fill: var(--fg); }
+  .w-place { font: 400 10.5px var(--font-b); fill: #a9b2c0; }
+  .w-ring { fill: rgba(85, 196, 222, .12); stroke: var(--aqua); stroke-width: 1.2; }
+  .w-pin { fill: #0d1117; stroke: var(--aqua); stroke-width: 1.4; }
+  .w-ring, .w-pin, .w-pill { transition: fill .3s, stroke .3s, filter .3s; }
+  .w-ico { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; color: var(--aqua); pointer-events: none; }
+  .w-ico svg { width: 11px; height: 11px; stroke-width: 2.4; }
+  .w-site.on .w-pill { stroke: var(--aqua); }
+  .w-site.on .w-ring { fill: rgba(85, 196, 222, .2); stroke-width: 1.4; filter: drop-shadow(0 0 4px rgba(85, 196, 222, .45)); }
+  .w-site.on .w-pin { fill: var(--aqua); filter: drop-shadow(0 0 6px rgba(85, 196, 222, .6)); }
+  .w-site.on .w-ico { color: #0b0b0e; }
+
+  /* The bucket sits over the lower map; the logo badge on its top edge is where routes meet. */
+  .hb {
+    position: relative;
+    left: 50%;
+    z-index: 1;
+    width: 820px;
+    max-width: calc(100vw - 64px);
+    margin: -25% auto 0;
+    transform: translateX(-50%);
+    background: #131418;
+    border: 1px solid rgba(85, 196, 222, .28);
+    border-radius: 12px;
+    box-shadow: 0 0 0 1px rgba(85, 196, 222, .06), 0 0 48px -8px rgba(85, 196, 222, .28), 0 30px 80px -30px rgba(0, 0, 0, .8);
+  }
+  .hb::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    z-index: 2;
+    width: 44px;
+    height: 44px;
+    margin: -22px 0 0 -22px;
+    border-radius: 50%;
+    background: #0d1117 url('@/assets/brand/favicon.png') center / 34px no-repeat;
+    border: 1.5px solid var(--aqua);
+    box-shadow: 0 0 0 6px rgba(85, 196, 222, .12), 0 0 22px rgba(85, 196, 222, .55);
+  }
+  .hb-h { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--edge-soft); border-radius: 12px 12px 0 0; }
+  .hb-h svg { width: 16px; height: 16px; stroke: var(--muted); }
+  .hb-h code { font-size: 14px; font-weight: 600; color: var(--aqua); }
+  .hb-h small { margin-left: auto; font-size: 13px; color: var(--muted); white-space: nowrap; }
+  #hrows { list-style: none; padding: 6px 0; border-radius: 0 0 12px 12px; }
+  #hrows li {
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr) 88px 236px;
+    gap: 12px;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 22px;
+    border-radius: 6px;
+    box-shadow: inset 2px 0 0 transparent;
+  }
+  #hrows li.on { background: rgba(85, 196, 222, .1); box-shadow: inset 2px 0 0 var(--aqua); }
+  #hrows li > svg { width: 14px; height: 14px; stroke: var(--dim); }
+  #hrows code { font-size: 13.5px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #hrows li.on code { color: #fff; font-weight: 500; }
+  #hrows .sz { padding-right: 20px; font-size: 13px; font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; color: #c7ceda; }
+  #hrows .at { display: flex; align-items: baseline; gap: 7px; font-size: 13.5px; font-weight: 500; color: var(--fg-2); white-space: nowrap; }
+  #hrows .at svg { width: 14px; height: 14px; align-self: center; stroke: var(--dim); }
+  #hrows .at small { font-size: 12.5px; font-weight: 400; color: #a7b0c0; }
+  .hnote { margin-top: 14px; font-size: 13px; color: var(--muted); text-align: center; }
+
+  .h25-std {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    max-width: 1200px;
+    margin: 56px auto 0;
+    padding: 28px 0 32px;
+    border-top: 1px solid var(--edge-soft);
+  }
+  .h25-std > span { font-size: 13px; color: var(--dim); }
+  .h25-std ul { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 28px; list-style: none; padding: 0; }
+  .h25-std li { font: 500 15px var(--font-h); color: #a7b0be; }
+
+  /* Wide screens size the hero by the window height, so the bucket stays in view. */
+  @media (min-width: 901px) {
+    .h25 { padding-top: clamp(60px, calc(15vh - 75px), 150px); }
+    .h25 h1 { font-size: clamp(60px, calc(20px + 4.4vh), 76px); }
+    .h25 .sub { margin-top: clamp(18px, calc(5vh - 27px), 40px); }
+    .h25 .sub .t-l > span { display: block; }
+    .h25 .cta { margin-top: clamp(28px, calc(6vh - 26px), 60px); }
+    .h25-vis { max-width: 1040px; margin-top: clamp(24px, calc(10vh - 66px), 96px); }
+    .w-name { font-size: 9.6px; }
+    .w-place { font-size: 9px; }
+    .hb { margin: -24% 0 0; }
+    #hrows li { min-height: 30px; padding-top: 3px; padding-bottom: 3px; }
+  }
+
+  @media (max-width: 900px) {
+    .h25 { padding: 40px 0 0; }
+    .h25-copy { padding: 0 16px; }
+    .h25 h1 { font-size: 38px; line-height: 1.08; }
+    .h25 .cta { flex-direction: column; gap: 10px; }
+    .h25 .cta a { flex: none; width: 100%; height: 48px; }
+    .h25-vis { max-width: none; margin: 28px 16px 0; }
+    .hvis { display: flex; flex-direction: column; }
+    .w-ring { r: 18px; }
+    .w-pin { r: 16px; }
+    .w-ico { transform: scale(1.7); }
+    .w-pill, .w-name, .w-place { display: none; }
+    .hb { left: 0; width: 100%; max-width: none; transform: none; }
+    .hb::before { width: 34px; height: 34px; margin: -40px 0 0 -17px; background-size: 26px; }
+    .hb-h { flex-wrap: wrap; row-gap: 2px; }
+    .hb-h small { display: block; width: 100%; margin: 0 0 0 26px; font-size: 12.5px; }
+    #hrows li { grid-template-columns: 16px minmax(0, 1fr) auto; padding: 8px 14px; }
+    #hrows code { overflow: visible; }
+    #hrows .sz { display: none; }
+    #hrows .at { font-size: 12.5px; color: var(--muted); }
+    #hrows .at small { display: none; }
+    .hnote { display: none; }
+    .h25-std { margin: 56px 16px 0; padding: 24px 0 28px; }
+    .h25-std ul { gap: 8px 18px; }
+  }
+}
