@@ -1,12 +1,14 @@
 <script setup lang="ts">
+import LoginOptions from '@/components/auth/LoginOptions.vue'
 import AppLogo from '@/components/layout/AppLogo.vue'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { createNewAccount, joinExistingAccount, matchBusy, matchFailure, matchStale } from '@/composables/accountMatch'
 import { useAuth } from '@/composables/useAuth'
+import { portalConfig } from '@/lib/config'
 import { isDesktop } from '@/lib/desktop'
-import { onMounted, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink, type LocationQuery } from 'vue-router'
 
 const route = useRoute()
@@ -14,6 +16,9 @@ const router = useRouter()
 const { completeSignIn, requestSignIn, stage, stageError } = useAuth()
 // The shell has no guest surface to fall back to: signing in is the way in.
 const inDesktop = isDesktop()
+// With configured logins the person picks the login of the existing account.
+const hasLogins = portalConfig().login.options.length > 0
+const choosing = ref(false)
 
 function retry() {
   void requestSignIn({ redirectTo: '/app' })
@@ -35,6 +40,7 @@ function searchOf(query: LocationQuery): URLSearchParams {
 }
 
 async function exchange(): Promise<void> {
+  choosing.value = false
   stage.value = 'idle'
   stageError.value = null
   try {
@@ -48,6 +54,11 @@ async function exchange(): Promise<void> {
 async function settle(answer: Promise<string | null>) {
   const target = await answer
   if (target) await router.replace(target)
+}
+
+function join() {
+  if (hasLogins) choosing.value = true
+  else void settle(joinExistingAccount())
 }
 
 onMounted(exchange)
@@ -76,9 +87,13 @@ watch(
           <div class="mt-6 flex flex-wrap justify-center gap-2">
             <Button v-if="matchStale" @click="retry">Sign in again</Button>
             <template v-else>
-              <Button :disabled="matchBusy" @click="settle(joinExistingAccount())">This is me</Button>
+              <Button :disabled="matchBusy" @click="join">This is me</Button>
               <Button variant="outline" :disabled="matchBusy" @click="settle(createNewAccount())">Create a new account</Button>
             </template>
+          </div>
+          <div v-if="choosing && !matchStale" class="mt-6 text-left">
+            <p class="mb-3 text-center text-sm text-muted-foreground">Choose how you sign in with it.</p>
+            <LoginOptions :disabled="matchBusy" @choose="(login) => settle(joinExistingAccount(login))" />
           </div>
         </template>
         <template v-else-if="stage !== 'error'">
