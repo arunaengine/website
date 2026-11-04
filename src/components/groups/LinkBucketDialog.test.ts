@@ -1,14 +1,22 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { compileClientComponent, content, element, flush, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
+import { click, compileClientComponent, content, element, flush, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
 import * as Api from '@/lib/api'
 import * as BucketNaming from '@/lib/bucketNaming'
 import * as LinkedFolders from '@/lib/linkedFolders'
+import * as Storage from '@/lib/storage'
 import * as StorageRules from '@/lib/storageRules'
 import * as Utils from '@/lib/utils'
+import type { RootsState } from '@/composables/useImportRoots'
 
 const createBackendImport = vi.fn()
+const folders = {
+  roots: ref<Api.ImportRoot[]>([]),
+  state: ref<RootsState>('ready'),
+  error: ref<string | null>(null),
+  load: vi.fn(),
+}
 const runBackendImport = vi.fn()
 const Slot = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 const ButtonStub = defineComponent({
@@ -22,10 +30,14 @@ const InputStub = defineComponent({
     h('input', { ...attrs, value: props.modelValue, onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value) }),
 })
 const SelectStub = defineComponent({
-  props: { modelValue: { type: String, default: '' }, ariaLabel: String },
+  props: { modelValue: { type: String, default: '' }, ariaLabel: String, options: { type: Array, default: () => [] } },
   emits: ['update:modelValue'],
   setup: (props, { emit }) => () =>
-    h('select', { 'aria-label': props.ariaLabel, value: props.modelValue, onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value) }),
+    h(
+      'select',
+      { 'aria-label': props.ariaLabel, value: props.modelValue, onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value) },
+      (props.options as { value: string; label: string }[]).map((option) => h('option', { value: option.value }, option.label)),
+    ),
 })
 
 const Dialog = compileClientComponent(new URL('./LinkBucketDialog.vue', import.meta.url), {
@@ -42,28 +54,31 @@ const Dialog = compileClientComponent(new URL('./LinkBucketDialog.vue', import.m
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
+  '@/composables/useImportRoots': { useImportRoots: () => folders },
   '@/composables/useAruna': { useAruna: () => ({ apiBaseUrl: ref('https://api'), authToken: ref('t'), sessionEpoch: ref(0) }) },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
   '@/lib/api': { ...Api, createBackendImport, runBackendImport },
   '@/lib/bucketNaming': BucketNaming,
   '@/lib/linkedFolders': LinkedFolders,
+  '@/lib/storage': Storage,
   '@/lib/storageRules': StorageRules,
   '@/lib/utils': Utils,
 })
 
-const SPIRE = { backend_id: 's1', group_id: 'g1', kind: 's3', name: 'spire', public_config: { endpoint: 'https://s3' } }
+const SPIRE: Api.GroupBackendResponse = { backend_id: 's1', group_id: 'g1', kind: 's3', name: 'spire', public_config: { endpoint: 'https://s3' } }
 const LINKED = { import_id: 'i1', backend_id: 's1', backend_prefix: 'lab-old/', bucket: 'old', key_prefix: '', created_at: '' }
 type Root = Parameters<typeof content>[0]
 const byId = (root: Root, suffix: string) =>
   element(root, (node) => node.tag === 'input' && String(node.props.id ?? '').endsWith(suffix))
+const byLabel = (root: Root, label: string) => element(root, (node) => node.props['aria-label'] === label)
 const save = (root: Root) => element(root, (node) => node.tag === 'button' && node.props.type === 'submit')
 
-async function mount() {
+async function mount(backend: Api.GroupBackendResponse = SPIRE, backends: Api.GroupBackendResponse[] = [SPIRE]) {
   const open = ref(false)
   const events: unknown[] = []
   const mounted = await mountApp(
     defineComponent(() => () =>
-      h(Dialog, { open: open.value, groupId: 'g1', backend: SPIRE, links: [LINKED], onSaved: (error?: string) => events.push(error) }),
+      h(Dialog, { open: open.value, groupId: 'g1', backend, backends, links: [LINKED], onSaved: (error?: string) => events.push(error) }),
     ),
   )
   open.value = true
@@ -80,6 +95,10 @@ async function submit(root: Root) {
 beforeEach(() => {
   createBackendImport.mockReset().mockResolvedValue({ import_id: 'i2' })
   runBackendImport.mockReset().mockResolvedValue({ job_id: 'j' })
+  folders.roots.value = []
+  folders.state.value = 'ready'
+  folders.error.value = null
+  folders.load.mockClear()
 })
 
 describe('LinkBucketDialog', () => {
@@ -113,5 +132,91 @@ describe('LinkBucketDialog', () => {
     await typeValue(byId(root, '-s3'), 'lab-raw')
     await submit(root)
     expect(String(events[0])).toContain('Linked, but the first sync did not start')
+  })
+
+  describe('local folder', () => {
+    const folder = (name: string, root: string): Api.GroupBackendResponse => ({
+      backend_id: name,
+      group_id: 'g1',
+      kind: 'fs',
+      name,
+      public_config: { root },
+    })
+    const readOnly = folder('raw', 'projects')
+    const others = [
+      readOnly,
+      SPIRE,
+      { ...SPIRE, backend_id: 's2', name: 'removed-s3', disabled: true },
+      folder('frozen', 'archive'),
+      folder('open-folder', 'scratch'),
+      folder('unlisted', 'gone'),
+    ]
+    const approved = [
+      { name: 'projects', writable: false },
+      { name: 'archive', writable: false },
+      { name: 'scratch', writable: true },
+    ]
+
+    it('links a writable folder without asking where to write', async () => {
+      folders.roots.value = approved
+      const { root } = await mount(folder('open-folder', 'scratch'), others)
+      expect(content(root)).toContain('Link a folder')
+      expect(() => byLabel(root, 'Write new uploads to')).toThrow()
+      await typeValue(byId(root, '-aruna'), 'runs')
+      await submit(root)
+      expect(createBackendImport.mock.calls[0][1]).not.toHaveProperty('write_backend_id')
+    })
+
+    it('needs a writable storage for a read-only folder and offers only those', async () => {
+      folders.roots.value = approved
+      const { root } = await mount(readOnly, others)
+      await typeValue(byId(root, '-aruna'), 'runs')
+      expect(content(root)).toContain('This folder is read-only')
+      expect(save(root).props.disabled).toBe(true)
+      const options = content(byLabel(root, 'Write new uploads to'))
+      expect(options).toContain('spire')
+      expect(options).toContain('open-folder')
+      for (const refused of ['removed-s3', 'frozen', 'unlisted', 'raw']) expect(options).not.toContain(refused)
+      await typeValue(byLabel(root, 'Write new uploads to'), 's1')
+      expect(save(root).props.disabled).toBe(false)
+      await submit(root)
+      expect(createBackendImport.mock.calls[0][1]).toMatchObject({ backend_id: 'raw', write_backend_id: 's1' })
+    })
+
+    it('says so when no other storage can take the writes', async () => {
+      folders.roots.value = approved
+      const { root } = await mount(readOnly, [readOnly])
+      await typeValue(byId(root, '-aruna'), 'runs')
+      expect(content(root)).toContain('Add another storage that takes them first.')
+      expect(save(root).props.disabled).toBe(true)
+    })
+
+    it('waits for the approved folders and reports a failed read', async () => {
+      folders.state.value = 'loading'
+      const { root } = await mount(readOnly, others)
+      await typeValue(byId(root, '-aruna'), 'runs')
+      expect(content(root)).toContain('Loading approved folders…')
+      expect(save(root).props.disabled).toBe(true)
+      folders.state.value = 'failed'
+      folders.error.value = 'node down'
+      await flush()
+      expect(content(root)).toContain('node down')
+      expect(save(root).props.disabled).toBe(true)
+      await click(element(root, (node) => node.tag === 'button' && content(node) === 'Try again'))
+      expect(folders.load).toHaveBeenCalledTimes(1)
+    })
+
+    it('refuses a folder that is no longer approved or has odd names', async () => {
+      folders.roots.value = approved
+      const { root } = await mount(folder('unlisted', 'gone'), others)
+      await typeValue(byId(root, '-aruna'), 'runs')
+      expect(content(root)).toContain('The node operator no longer approves this folder.')
+      expect(save(root).props.disabled).toBe(true)
+      const open = await mount(folder('open-folder', 'scratch'), others)
+      await typeValue(byId(open.root, '-aruna'), 'runs')
+      await typeValue(byId(open.root, '-folder'), 'a/../b')
+      expect(content(open.root)).toContain('Use a relative folder')
+      expect(save(open.root).props.disabled).toBe(true)
+    })
   })
 })

@@ -24,6 +24,8 @@ export interface BackendKindSchema {
   secret: BackendField[]
   /** When set, exactly one of these secrets suffices; otherwise all are needed. */
   secretOneOf?: string[]
+  /** Hides the credentials form for a kind that needs none. */
+  keyless?: boolean
   /** Optional boolean public key, written as "true" or omitted. */
   toggle?: { key: string; label: string; hint: string }
 }
@@ -106,6 +108,25 @@ export const BACKEND_KIND_SCHEMAS: Record<GroupBackendKind, BackendKindSchema> =
       { key: 'application_key', label: 'Application key', required: true },
     ],
   },
+  fs: {
+    label: 'Local folder',
+    identity: ['root', 'folder'],
+    public: [
+      { key: 'root', label: 'Approved folder', required: true },
+      { key: 'folder', label: 'Folder inside it', placeholder: 'raw/2026/' },
+    ],
+    secret: [],
+    keyless: true,
+  },
+}
+
+/** Why a folder inside an approved root is not accepted; null when it is fine or empty. */
+export function folderProblem(folder: string): string | null {
+  const value = folder.trim()
+  if (!value) return null
+  if (!value.endsWith('/')) return 'End the folder with a slash.'
+  const bad = value.slice(0, -1).split('/').some((name) => name === '' || name === '.' || name === '..')
+  return value.startsWith('/') || bad ? 'Use a relative folder without empty names, "." or "..".' : null
 }
 
 export const BACKEND_KINDS = Object.keys(BACKEND_KIND_SCHEMAS) as GroupBackendKind[]
@@ -120,7 +141,7 @@ export function backendSummary(backend: GroupBackendResponse): string {
   const keys = schema ? schema.identity : Object.keys(backend.public_config)
   const parts = keys.map((key) => backend.public_config[key]).filter(Boolean)
   const root = backend.public_config.root
-  if (root) parts.push(root)
+  if (root && !keys.includes('root')) parts.push(root)
   return parts.join(' · ')
 }
 

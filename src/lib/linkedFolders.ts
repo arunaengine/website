@@ -9,8 +9,9 @@ export function folderPath(value: string): string {
 
 const STORE_KEYS = ['bucket', 'container', 'filesystem']
 
-/** The bucket, container or filesystem a backend points at. */
+/** The bucket, container, filesystem or approved folder a backend points at. */
 export function storeName(backend: GroupBackendResponse): string {
+  if (backend.kind === 'fs') return backend.public_config.root ?? backend.name
   const key = STORE_KEYS.find((name) => backend.public_config[name])
   return key ? backend.public_config[key] : backend.name
 }

@@ -14,6 +14,11 @@ export function splitsBuckets(backend: GroupBackendResponse): boolean {
   return backend.kind === 's3' && !backend.public_config.bucket
 }
 
+/** Whether new files may be routed to the storage; a local folder serves imports only. */
+export function canRoute(backend: GroupBackendResponse): boolean {
+  return backend.kind !== 'fs'
+}
+
 /** The bucket and the folder of a path on a storage. */
 export function splitPath(backend: GroupBackendResponse, path: string): { bucket: string; folder: string } {
   if (!splitsBuckets(backend)) return { bucket: storeName(backend), folder: path }

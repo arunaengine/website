@@ -14,7 +14,8 @@ import {
 } from '@/test/clientRender'
 import * as Storage from '@/lib/storage'
 import * as Utils from '@/lib/utils'
-import type { GroupBackendRequest, GroupBackendResponse } from '@/lib/api'
+import type { GroupBackendRequest, GroupBackendResponse, ImportRoot } from '@/lib/api'
+import type { RootsState } from '@/composables/useImportRoots'
 
 const saved: GroupBackendResponse = {
   backend_id: 'b1',
@@ -28,6 +29,12 @@ const replaceGroupBackend = vi.fn(async (_group: string, _id: string, _body: Gro
 const disableGroupBackend = vi.fn(async (_group: string, _id: string) => {})
 const enableGroupBackend = vi.fn(async (_group: string, _id: string) => saved)
 const saving = ref(false)
+const folders = {
+  roots: ref<ImportRoot[]>([]),
+  state: ref<RootsState>('ready'),
+  error: ref<string | null>(null),
+  load: vi.fn(),
+}
 
 const Passthrough = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 const Empty = defineComponent(() => () => null)
@@ -69,6 +76,7 @@ const StorageBackendDialog = compileClientComponent(new URL('./StorageBackendDia
   '@/lib/storage': Storage,
   '@/lib/utils': Utils,
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
+  '@/composables/useImportRoots': { useImportRoots: () => folders },
   '@/composables/useAruna': {
     useAruna: () => ({ createGroupBackend, replaceGroupBackend, disableGroupBackend, enableGroupBackend, saving }),
   },
@@ -124,6 +132,10 @@ describe('Storage dialog connection', () => {
     replaceGroupBackend.mockClear()
     disableGroupBackend.mockClear()
     saving.value = false
+    folders.roots.value = []
+    folders.state.value = 'ready'
+    folders.error.value = null
+    folders.load.mockClear()
   })
 
   it('saves a setting without keys, so the stored keys stay', async () => {
@@ -239,5 +251,109 @@ describe('Storage dialog connection', () => {
     expect(disableGroupBackend).not.toHaveBeenCalled()
     await click(buttonWith(root, 'Remove'))
     expect(disableGroupBackend).toHaveBeenCalledWith('g1', 'b1')
+  })
+
+  describe('local folder', () => {
+    const pick = async (root: Root) => typeValue(byLabel(root, 'Type'), 'fs')
+    const approved = [
+      { name: 'projects', writable: false },
+      { name: 'scratch', writable: true },
+    ]
+
+    it('has no credentials and sends the root and folder it was given', async () => {
+      folders.roots.value = approved
+      const { root } = await mount()
+      await pick(root)
+      expect(nodes(root).some((node) => node.tag === 'fieldset')).toBe(false)
+      expect(content(root)).not.toContain('Aruna checks the keys')
+      await typeValue(byId(root, '-name'), 'raw')
+      expect(save(root).props.disabled).toBe(true)
+      await typeValue(byLabel(root, 'Approved folder'), 'scratch')
+      await typeValue(byId(root, '-pub-folder'), 'runs/2026/')
+      await submit(root)
+      expect(createGroupBackend.mock.calls[0][1]).toEqual({
+        name: 'raw',
+        kind: 'fs',
+        public_config: { root: 'scratch', folder: 'runs/2026/' },
+        secret_config: {},
+      })
+    })
+
+    it('says whether the chosen folder is read-only or writable', async () => {
+      folders.roots.value = approved
+      const { root } = await mount()
+      await pick(root)
+      await typeValue(byLabel(root, 'Approved folder'), 'projects')
+      expect(content(root)).toContain('Read-only: Aruna can read files here but not write them.')
+      await typeValue(byLabel(root, 'Approved folder'), 'scratch')
+      expect(content(root)).toContain('Writable: Aruna can read and write files here.')
+    })
+
+    it('shows loading, failure with a retry, and the empty list', async () => {
+      folders.state.value = 'loading'
+      const { root } = await mount()
+      await pick(root)
+      expect(content(root)).toContain('Loading approved folders…')
+      folders.state.value = 'failed'
+      folders.error.value = 'node down'
+      await flush()
+      expect(content(root)).toContain('node down')
+      expect(content(root)).not.toContain('has not approved any folders')
+      await click(buttonWith(root, 'Try again'))
+      expect(folders.load).toHaveBeenCalledTimes(1)
+      folders.state.value = 'ready'
+      await flush()
+      expect(content(root)).toContain('The node operator has not approved any folders for this group.')
+    })
+
+    it('refuses a folder the node would refuse', async () => {
+      folders.roots.value = approved
+      const { root } = await mount()
+      await pick(root)
+      await typeValue(byId(root, '-name'), 'raw')
+      await typeValue(byLabel(root, 'Approved folder'), 'scratch')
+      for (const bad of ['runs', '/runs/', 'a//b/', './a/', 'a/../b/']) {
+        await typeValue(byId(root, '-pub-folder'), bad)
+        expect(save(root).props.disabled).toBe(true)
+        expect(content(root)).toMatch(/End the folder with a slash\.|Use a relative folder/)
+      }
+      await typeValue(byId(root, '-pub-folder'), 'runs/')
+      expect(save(root).props.disabled).toBe(false)
+    })
+
+    it('does not save a root the list no longer approves', async () => {
+      folders.roots.value = approved
+      const { root } = await mount()
+      await pick(root)
+      await typeValue(byId(root, '-name'), 'raw')
+      await typeValue(byLabel(root, 'Approved folder'), 'scratch')
+      expect(save(root).props.disabled).toBe(false)
+      folders.roots.value = [approved[0]]
+      await flush()
+      expect(save(root).props.disabled).toBe(true)
+    })
+
+    it('forgets an S3 root prefix when the type changes to a local folder', async () => {
+      folders.roots.value = [{ name: 'aruna/', writable: true }]
+      const { root } = await mount()
+      await typeValue(byId(root, '-pub-root'), 'aruna/')
+      await pick(root)
+      expect(byLabel(root, 'Approved folder').props.value).toBe('')
+      await typeValue(byId(root, '-name'), 'raw')
+      expect(save(root).props.disabled).toBe(true)
+    })
+
+    it('keeps the stored root of an edit fixed and keyless', async () => {
+      const { root } = await mount({ ...saved, kind: 'fs', public_config: { root: 'gone' } })
+      expect(byLabel(root, 'Approved folder').props.disabled).toBe(true)
+      expect(content(root)).not.toContain('Replace keys')
+      await typeValue(byId(root, '-name'), 'renamed')
+      await submit(root)
+      expect(replaceGroupBackend.mock.calls[0][2]).toMatchObject({
+        kind: 'fs',
+        public_config: { root: 'gone' },
+        secret_config: {},
+      })
+    })
   })
 })

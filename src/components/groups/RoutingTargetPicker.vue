@@ -3,6 +3,7 @@ import Select from '@/components/ui/Select.vue'
 import { computed } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { tenantClasses } from '@/lib/storage'
+import { canRoute } from '@/lib/storageRules'
 import type { GroupBackendResponse, RoutingTarget } from '@/lib/api'
 
 const props = withDefaults(
@@ -34,7 +35,7 @@ const current = computed(() => {
 const options = computed(() => {
   const list: { value: string; label: string }[] = []
   if (props.allowDefault) list.push({ value: DEFAULT_VALUE, label: 'Node default' })
-  for (const backend of props.backends) {
+  for (const backend of props.backends.filter(canRoute)) {
     const value = `backend:${backend.backend_id}`
     // A disabled backend refuses new uploads; keep it listed only while stored.
     if (backend.disabled && current.value !== value) continue

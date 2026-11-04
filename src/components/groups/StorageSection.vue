@@ -522,7 +522,7 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
             :title="offline"
             @click="openLink(backend)"
           >
-            + Link an S3 bucket
+            {{ backend.kind === 'fs' ? '+ Link a folder' : '+ Link an S3 bucket' }}
           </Button>
         </div>
       </section>
@@ -587,7 +587,14 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
       :links="links"
       @saved="load"
     />
-    <LinkBucketDialog v-model:open="linkDialog" :group-id="groupId" :backend="linkBackend" :links="links" @saved="onLinked" />
+    <LinkBucketDialog
+      v-model:open="linkDialog"
+      :group-id="groupId"
+      :backend="linkBackend"
+      :backends="backends ?? []"
+      :links="links"
+      @saved="onLinked"
+    />
     <!-- One instance per bucket, gone when closed, so no job or poll outlives it. -->
     <BucketEditDialog
       v-if="editing && editDialog"

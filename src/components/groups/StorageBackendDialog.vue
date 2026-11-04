@@ -13,8 +13,9 @@ import Switch from '@/components/ui/Switch.vue'
 import { computed, ref, shallowRef, useId, watch } from 'vue'
 import { Database, Lock } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
+import { useImportRoots } from '@/composables/useImportRoots'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
-import { BACKEND_KINDS, BACKEND_KIND_SCHEMAS, backendSchema, shortError } from '@/lib/storage'
+import { BACKEND_KINDS, BACKEND_KIND_SCHEMAS, backendSchema, folderProblem, shortError } from '@/lib/storage'
 import type { GroupBackendKind, GroupBackendResponse } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
 import Notice from '@/components/ui/Notice.vue'
@@ -46,6 +47,21 @@ const removing = ref(false)
 // The Remove or Enable storage on its way, for the backend it was sent for; saving is set for it too.
 const toggling = shallowRef<{ backendId: string; remove: boolean } | null>(null)
 const submitError = ref<string | null>(null)
+
+const folderMode = computed(() => kind.value === 'fs')
+const { roots, state: rootsState, error: rootsError, load: reloadRoots } = useImportRoots(
+  computed(() => props.groupId),
+  computed(() => props.open && folderMode.value),
+)
+const rootChoice = computed(() => roots.value.find((root) => root.name === publicValues.value.root))
+// A stored folder keeps its name in the list even when the node no longer approves it.
+const rootOptions = computed(() => {
+  const list = roots.value.map((root) => ({ value: root.name, label: root.name }))
+  const stored = publicValues.value.root
+  if (isEdit.value && stored && !rootChoice.value) list.push({ value: stored, label: stored })
+  return list
+})
+const folderError = computed(() => (folderMode.value ? folderProblem(publicValues.value.folder ?? '') : null))
 
 const submitSummary = computed(() => (submitError.value ? shortError(submitError.value) : ''))
 
@@ -98,8 +114,18 @@ const submitDisabled = computed(() => {
   // Nothing typed and nothing changed: there is nothing to save.
   if (isEdit.value && !settingsChanged.value && !credentialsEntered.value) return true
   if (missingRequired.value || !name.value.trim()) return true
+  if (folderMode.value && (folderError.value || (!isEdit.value && !rootChoice.value))) return true
   return needsCredentials.value && credentialsIncomplete.value
 })
+
+// A root name and an S3 root prefix share a key but mean different things.
+function pickKind(next: GroupBackendKind) {
+  if ((next === 'fs') !== folderMode.value) {
+    delete publicValues.value.root
+    delete publicValues.value.folder
+  }
+  kind.value = next
+}
 
 watch(
   () => props.open,
@@ -194,7 +220,13 @@ async function setRemoved(remove: boolean) {
           {{ backend ? backend.name : 'Add storage' }}
         </DialogTitle>
         <DialogDescription>
-          {{ isEdit ? 'Keys saved.' : 'Storage your group runs, like your own S3.' }}
+          {{
+            schema.keyless
+              ? 'A folder on the node that the node operator approved for your group.'
+              : isEdit
+                ? 'Keys saved.'
+                : 'Storage your group runs, like your own S3.'
+          }}
         </DialogDescription>
       </DialogHeader>
 
@@ -227,7 +259,7 @@ async function setRemoved(remove: boolean) {
                 :disabled="isEdit"
                 aria-label="Type"
                 class="mt-1"
-                @update:model-value="(v: string) => (kind = v as GroupBackendKind)"
+                @update:model-value="(v: string) => pickKind(v as GroupBackendKind)"
               />
             </div>
           </div>
@@ -246,15 +278,44 @@ async function setRemoved(remove: boolean) {
               <label :for="`${uid}-pub-${field.key}`" class="text-xs font-medium text-foreground">
                 {{ field.label }}<span v-if="!field.required" class="text-muted-foreground"> (optional)</span>
               </label>
+              <template v-if="folderMode && field.key === 'root'">
+                <Select
+                  :model-value="publicValues.root ?? ''"
+                  :options="rootOptions"
+                  :disabled="fixed.has('root') || settingsLocked || rootsState === 'loading'"
+                  placeholder="Pick a folder"
+                  aria-label="Approved folder"
+                  class="mt-1"
+                  @update:model-value="(v: string) => (publicValues.root = v)"
+                />
+                <p v-if="rootsState === 'loading'" class="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <Spinner label="Loading approved folders" /> Loading approved folders…
+                </p>
+                <Notice v-else-if="rootsState === 'failed'" tone="error" class="mt-1">
+                  {{ rootsError }}
+                  <button type="button" class="ml-1 underline" @click="reloadRoots">Try again</button>
+                </Notice>
+                <p v-else-if="rootsState === 'ready' && !roots.length" class="mt-1 text-[11px] text-muted-foreground">
+                  The node operator has not approved any folders for this group.
+                </p>
+                <p v-else-if="rootChoice" class="mt-1 text-[11px] text-muted-foreground">
+                  {{ rootChoice.writable ? 'Writable: Aruna can read and write files here.' : 'Read-only: Aruna can read files here but not write them.' }}
+                </p>
+              </template>
               <Input
+                v-else
                 :id="`${uid}-pub-${field.key}`"
                 :model-value="publicValues[field.key] ?? ''"
                 class="mt-1 font-mono text-xs"
                 :placeholder="field.placeholder"
                 :required="field.required"
+                :invalid="folderMode && field.key === 'folder' && folderError ? 'error' : undefined"
                 :disabled="fixed.has(field.key) || settingsLocked"
                 @update:model-value="(v: string | number) => (publicValues[field.key] = String(v))"
               />
+              <p v-if="folderMode && field.key === 'folder' && folderError" class="mt-1 text-[11px] text-destructive">
+                {{ folderError }}
+              </p>
             </div>
           </div>
 
@@ -276,14 +337,14 @@ async function setRemoved(remove: boolean) {
           </Notice>
 
           <button
-            v-if="isEdit && !keysOpen"
+            v-if="!schema.keyless && isEdit && !keysOpen"
             type="button"
             class="text-xs text-muted-foreground hover:text-foreground"
             @click="keysOpen = true"
           >
             Replace keys
           </button>
-          <fieldset v-else class="space-y-3 rounded-md border border-border p-3">
+          <fieldset v-else-if="!schema.keyless" class="space-y-3 rounded-md border border-border p-3">
             <legend class="px-1 text-xs font-semibold text-foreground">{{ isEdit ? 'Replace keys' : 'Credentials' }}</legend>
             <p class="text-[11px] text-muted-foreground">
               Stored write-only: the node never shows them again.
@@ -310,7 +371,7 @@ async function setRemoved(remove: boolean) {
               <p class="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px]">{{ submitError }}</p>
             </details>
           </Notice>
-          <p class="text-[11px] text-muted-foreground">
+          <p v-if="!schema.keyless" class="text-[11px] text-muted-foreground">
             Aruna checks the keys before it saves them.
           </p>
         </div>

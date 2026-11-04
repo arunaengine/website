@@ -17,7 +17,7 @@ import { useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import type { BackendImport, GroupBackendResponse, GroupRoutingResponse } from '@/lib/api'
 import { fillTemplate, templateProblem } from '@/lib/bucketNaming'
-import { defaultBucket, defaultConflict, splitsBuckets, suggestBucket } from '@/lib/storageRules'
+import { canRoute, defaultBucket, defaultConflict, splitsBuckets, suggestBucket } from '@/lib/storageRules'
 import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{
@@ -46,7 +46,7 @@ const ARUNA = 'aruna'
 const storeOptions = computed(() => [
   { value: ARUNA, label: 'Aruna storage' },
   ...props.backends
-    .filter((backend) => !backend.disabled || backend.backend_id === store.value)
+    .filter((backend) => canRoute(backend) && (!backend.disabled || backend.backend_id === store.value))
     .map((backend) => ({ value: backend.backend_id, label: backend.name })),
 ])
 const backend = computed(() => props.backends.find((entry) => entry.backend_id === store.value) ?? null)

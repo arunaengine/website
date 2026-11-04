@@ -10,7 +10,7 @@ import { apiRequest, type ApiClientOptions } from './client'
 // nodes), the enable route and the credentials route (both 404 there). DELETE
 // disables the backend once that lands; before it, DELETE is a hard delete and
 // can answer 409 while the backend still holds data.
-export type GroupBackendKind = 's3' | 'gcs' | 'azblob' | 'azdls' | 'b2'
+export type GroupBackendKind = 's3' | 'gcs' | 'azblob' | 'azdls' | 'b2' | 'fs'
 
 export interface GroupBackendResponse {
   backend_id: string
@@ -49,6 +49,18 @@ export interface GroupBackendRequest {
 /** The group's storages as one node answers them; useAruna's list asks the connected node. */
 export function getGroupBackends(groupId: string, client: ApiClientOptions): Promise<ListGroupBackendsResponse> {
   return apiRequest<ListGroupBackendsResponse>(`/data/groups/${encodeURIComponent(groupId)}/storage/backends`, {}, client)
+}
+
+// GET /data/groups/{gid}/storage/import-roots: the folders the node operator approved for the
+// group, by name and never by path. Same authorization as the backend list. A `fs` backend names
+// one root; a read-only root cannot receive writes.
+export interface ImportRoot {
+  name: string
+  writable: boolean
+}
+
+export function getImportRoots(groupId: string, client: ApiClientOptions): Promise<{ roots: ImportRoot[] }> {
+  return apiRequest(`/data/groups/${encodeURIComponent(groupId)}/storage/import-roots`, {}, client)
 }
 
 // GET /data/groups/{gid}/storage/buckets: one page of the group's buckets on this node, in name
