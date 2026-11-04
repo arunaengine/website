@@ -97,7 +97,8 @@ const PageHeaderStub = defineComponent({
     return () => h('header', [h('h1', props.title), h('p', props.description), slots.actions?.()])
   },
 })
-const RouterLinkStub = defineComponent((_, { attrs, slots }) => () => h('a', attrs, slots.default?.()))
+// The target is written out, so a test can check where a link leads.
+const RouterLinkStub = defineComponent((_, { attrs, slots }) => () => h('a', { ...attrs, 'data-to': JSON.stringify(attrs.to) }, slots.default?.()))
 const SkeletonStub = defineComponent(() => () => h('span', 'loading'))
 const OverviewCellStub = defineComponent({
   props: { label: String, info: String },
@@ -531,6 +532,19 @@ describe('authenticated dashboard scope', () => {
 
     currentUser.value = { id: 'user-id', name: 'Ada Lovelace', email: '' }
     expect(await renderedText()).not.toContain('Your profile has no name')
+  })
+
+  it('keeps the Groups section without groups and offers to create one', async () => {
+    signedInRealm()
+    myGroups.value = []
+    const html = await renderToString(createSSRApp(DashboardView))
+    const text = await renderedText()
+
+    expect(text).toContain('Groups A bucket stored on several nodes counts once.')
+    expect(text).toContain('You are not a member of any group yet, create one to get started. Create a group')
+    expect(text).not.toContain('group quota cards')
+    // The link opens the create dialog of the Groups page.
+    expect(html).toContain(`data-to="${JSON.stringify({ name: 'groups', query: { create: 'group' } }).replace(/"/g, '&quot;')}"`)
   })
 
   it('shows the realm figures in the same cells when the account stored that scope', async () => {

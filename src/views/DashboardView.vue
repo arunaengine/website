@@ -25,7 +25,7 @@ import Notice from '@/components/ui/Notice.vue'
 import type { RealmView } from '@/composables/aruna/realm'
 import type { RealmNodeInfo } from '@/lib/api'
 import { givenName } from '@/components/nodes/node-display'
-import { Activity, BookOpen, ChevronDown, CircleCheck, Copy, Download, FileJson2, Files, Gauge, HardDrive, Link, ListChecks, LoaderCircle, Network, Package, Server, TriangleAlert, Users, Workflow, X } from '@lucide/vue'
+import { Activity, BookOpen, ChevronDown, CircleCheck, Copy, Download, FileJson2, Files, Gauge, HardDrive, Link, ListChecks, LoaderCircle, Network, Package, Plus, Server, TriangleAlert, Users, Workflow, X } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
@@ -436,13 +436,19 @@ const pageDescription = computed(() =>
       </section>
 
       <!-- The scope picks the band below the Overview: my groups, or the realm's nodes. -->
-      <section v-if="currentUser && scope === 'personal' && myGroups.length" aria-labelledby="dashboard-groups-heading">
+      <section v-if="currentUser && scope === 'personal'" aria-labelledby="dashboard-groups-heading">
         <SectionHeading id="dashboard-groups-heading" title="Groups" :icon="Users" info="A bucket stored on several nodes counts once.">
-          <template #actions>
+          <template v-if="myGroups.length" #actions>
             <ViewToggle v-model="groupView" />
           </template>
         </SectionHeading>
-        <GroupQuotaCards :refresh-revision="cardsRevision" :view="groupView" />
+        <GroupQuotaCards v-if="myGroups.length" :refresh-revision="cardsRevision" :view="groupView" />
+        <EmptyState v-else title="You are not a member of any group yet, create one to get started.">
+          <template #icon><Users class="size-6" /></template>
+          <Button variant="outline" size="sm" as-child>
+            <RouterLink :to="{ name: 'groups', query: { create: 'group' } }"><Plus class="h-3.5 w-3.5" /> Create a group</RouterLink>
+          </Button>
+        </EmptyState>
       </section>
 
       <!-- The topology on the left, the table on the right; both open a node's details. -->
