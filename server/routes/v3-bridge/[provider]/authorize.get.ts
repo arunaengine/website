@@ -26,8 +26,8 @@ export default defineEventHandler(async event => {
     throw createError({statusCode: 400, statusMessage: 'Invalid authorization request'})
   }
   const realmPart = target.isDefault ? '' : `@${Buffer.from(target.realm).toString('base64url')}`
-  const upstream = {
-    ...query,
+  const upstream: Record<string, string> = {
+    ...query as Record<string, string>,
     redirect_uri: target.config.redirectUrl,
     state: portal ? portalState(provider, redirect_uri as string, state as string) : `v3.${provider}${realmPart}.${state}`,
   }
