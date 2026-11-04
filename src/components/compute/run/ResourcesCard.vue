@@ -142,8 +142,8 @@ const checkLabel = computed(() => (resourcesValid.value ? 'Complete' : 'Check th
       </RunTile>
     </dl>
 
-    <p v-if="!cpuCoresValid" class="mt-1.5 text-[11px] text-destructive">CPU cores: a whole number of 1 or more.</p>
-    <p v-if="!ramGbValid" class="mt-1.5 text-[11px] text-destructive">RAM must be greater than zero.</p>
-    <p v-if="!diskGbValid" class="mt-1.5 text-[11px] text-destructive">Disk must be greater than zero.</p>
+    <p v-if="!cpuCoresValid" class="mt-1.5 text-xs text-destructive">CPU cores: a whole number of 1 or more.</p>
+    <p v-if="!ramGbValid" class="mt-1.5 text-xs text-destructive">RAM must be greater than zero.</p>
+    <p v-if="!diskGbValid" class="mt-1.5 text-xs text-destructive">Disk must be greater than zero.</p>
   </RunSection>
 </template>

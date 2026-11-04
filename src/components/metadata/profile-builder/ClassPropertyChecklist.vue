@@ -123,7 +123,7 @@ function addSelected() {
         </Button>
       </div>
 
-      <p class="text-[11px] text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         Curated properties for {{ typeLabel }}; each selection is added as an Optional rule you can adjust afterwards.
         Properties already on this shape are checked and locked.
       </p>
@@ -144,13 +144,13 @@ function addSelected() {
           />
           <span class="min-w-0">
             <span class="font-medium">{{ option.label }}</span>
-            <code class="ml-1 rounded bg-muted px-1 text-[10px]">{{ option.name }}</code>
-            <span v-if="used" class="ml-1 text-[10px]">(already added)</span>
-            <span class="block text-[11px] text-muted-foreground">{{ option.description }}</span>
+            <code class="ml-1 rounded bg-muted px-1 text-xs">{{ option.name }}</code>
+            <span v-if="used" class="ml-1 text-xs">(already added)</span>
+            <span class="block text-xs text-muted-foreground">{{ option.description }}</span>
           </span>
         </label>
       </div>
-      <p v-else class="rounded-md border border-dashed border-border px-3 py-2 text-[11px] text-muted-foreground">
+      <p v-else class="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
         No common properties match "{{ query }}".
       </p>
 

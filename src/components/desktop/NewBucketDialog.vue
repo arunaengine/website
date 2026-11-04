@@ -200,7 +200,7 @@ async function submit() {
               :invalid="nameProblem ? 'error' : undefined"
               @keyup.enter="submit"
             />
-            <span v-if="nameProblem" class="mt-1 block text-[11px] text-destructive">{{ nameProblem }}</span>
+            <span v-if="nameProblem" class="mt-1 block text-xs text-destructive">{{ nameProblem }}</span>
           </label>
           <label class="block">
             <span class="text-xs font-medium text-foreground">Group</span>
@@ -267,7 +267,7 @@ async function submit() {
               </tbody>
             </table>
           </div>
-          <p v-if="!places.length" class="mt-1 text-[11px] text-muted-foreground">No realm node is known yet.</p>
+          <p v-if="!places.length" class="mt-1 text-xs text-muted-foreground">No realm node is known yet.</p>
         </div>
 
         <label v-if="!props.forLink" class="flex items-start gap-2" :class="here ? 'opacity-60' : ''">
@@ -281,7 +281,7 @@ async function submit() {
           />
           <span>
             <span class="block text-sm text-foreground">Then link a folder on this computer</span>
-            <span class="block text-[11px] text-muted-foreground">Opens Link a local folder with this bucket filled in.</span>
+            <span class="block text-xs text-muted-foreground">Opens Link a local folder with this bucket filled in.</span>
           </span>
         </label>
 

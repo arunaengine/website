@@ -381,7 +381,7 @@ function reasonTone(link: RepositoryLink): string {
               />
               <Button type="submit" size="sm" :disabled="!tokenDraft.trim()">Save token</Button>
               <Button type="button" variant="ghost" size="sm" @click="closeToken">Cancel</Button>
-              <span class="basis-full text-[11px] text-muted-foreground">
+              <span class="basis-full text-xs text-muted-foreground">
                 Stored sealed for this repository endpoint and never shown again.
               </span>
             </form>

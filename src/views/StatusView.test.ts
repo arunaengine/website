@@ -149,7 +149,7 @@ describe('first status paint', () => {
     const text = await renderedText()
 
     expect(text).toContain('Loading realm status')
-    expect(text).not.toContain('No nodes reported for this realm yet.')
+    expect(text).not.toContain('No nodes reported for this realm yet')
   })
 
   it('settles the first paint on either info outcome without changing probe commits', () => {

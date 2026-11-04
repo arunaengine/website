@@ -47,7 +47,7 @@ function copyLabel(state: string | undefined): string {
 
     <div v-if="report.gaps.length" class="overflow-x-auto rounded-md border border-border">
       <table class="w-full min-w-[620px] text-left text-xs">
-        <caption class="caption-top px-3 py-2 text-left text-[11px] text-muted-foreground">
+        <caption class="caption-top px-3 py-2 text-left text-xs text-muted-foreground">
           Objects that do not carry the bucket's rules yet.
         </caption>
         <thead class="border-y border-border bg-muted/40 text-muted-foreground">
@@ -80,7 +80,7 @@ function copyLabel(state: string | undefined): string {
 
     <details v-if="report.target_policies.length" class="rounded-md border border-border px-3 py-2">
       <summary class="cursor-pointer text-xs font-medium text-foreground">Advanced</summary>
-      <div class="mt-2 text-[11px] text-muted-foreground">
+      <div class="mt-2 text-xs text-muted-foreground">
         <p>Compared against these policy references, at generation {{ report.generation }}.</p>
         <p
           v-for="policy in report.target_policies"

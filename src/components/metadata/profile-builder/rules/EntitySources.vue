@@ -29,12 +29,12 @@ function toggleEntitySource(source: ProfileEntitySource) {
 
 <template>
   <div>
-    <label class="text-[11px] font-medium text-muted-foreground">Allowed sources</label>
+    <label class="text-xs font-medium text-muted-foreground">Allowed sources</label>
     <div class="mt-1 space-y-1">
       <label
         v-for="option in entitySourceOptions"
         :key="option.source"
-        class="flex cursor-pointer items-start gap-2 rounded-md border px-2.5 py-1.5 text-[11px] transition-colors"
+        class="flex cursor-pointer items-start gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors"
         :class="selectedSources.includes(option.source)
           ? 'border-aruna-royal/60 bg-aruna-royal/10'
           : 'border-border hover:border-primary/40'"

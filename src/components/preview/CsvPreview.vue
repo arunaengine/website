@@ -21,12 +21,12 @@ const totalRows = computed(() => Math.max(rows.value.length - 1, 0))
 
 <template>
   <div class="space-y-2">
-    <p class="text-[11px] text-muted-foreground">
+    <p class="text-xs text-muted-foreground">
       Showing {{ body.length }} of {{ totalRows }} row{{ totalRows === 1 ? '' : 's' }}.
     </p>
     <div class="max-h-[68vh] overflow-auto rounded-md border border-border">
       <table class="w-full border-collapse text-xs">
-        <thead class="sticky top-0 bg-muted/70 text-left uppercase tracking-wider text-muted-foreground backdrop-blur">
+        <thead class="sticky top-0 bg-muted/70 text-left text-muted-foreground backdrop-blur">
           <tr>
             <th
               v-for="(cell, index) in header"

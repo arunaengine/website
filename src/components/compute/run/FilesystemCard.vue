@@ -92,7 +92,7 @@ const checkLabel = computed(() => {
     <ResultsHome :disabled="noOutputs" class="mb-2" @choose="sendOutputsTo" />
     <section v-if="dataView === 'tree'" data-tutorial="run-filesystem" class="surface-inline space-y-2.5 p-3.5">
       <div class="flex items-center gap-2">
-        <p class="flex-1 text-[11px] text-muted-foreground">
+        <p class="flex-1 text-xs text-muted-foreground">
           What the run sees at run time. Use a folder's + menu to add things there.
           <DocsLink topic="compute-run" label="Docs" />
         </p>
@@ -125,10 +125,10 @@ const checkLabel = computed(() => {
           @unmark-script="unmarkScript"
         />
       </div>
-      <p v-if="!inputsValid" class="text-[11px] text-destructive">
+      <p v-if="!inputsValid" class="text-xs text-destructive">
         Each input needs an absolute container path, unique across all staged files.
       </p>
-      <p v-if="outputRows.length && !outputsValid" class="text-[11px] text-destructive">
+      <p v-if="outputRows.length && !outputsValid" class="text-xs text-destructive">
         Each capture needs a bucket and a key; a folder capture (path ending in /) needs a key ending in /.
       </p>
     </section>
@@ -180,7 +180,7 @@ const checkLabel = computed(() => {
                   />
                 </div>
               </div>
-              <div class="flex min-w-0 items-center gap-2 font-mono text-[11px] text-muted-foreground">
+              <div class="flex min-w-0 items-center gap-2 font-mono text-xs text-muted-foreground">
                 <Badge variant="outline" size="sm" class="shrink-0 gap-1 font-sans">
                   <component :is="isDirCapture(row.path) ? Folder : FileText" class="h-3 w-3" />
                   {{ isDirCapture(row.path) ? 'Folder' : 'File' }}
@@ -196,15 +196,15 @@ const checkLabel = computed(() => {
             <Button variant="outline" size="sm" @click="openInputDialog()"><ListPlus class="size-3.5" /> Add input</Button>
             <Button variant="outline" size="sm" @click="addOutputRow"><Plus class="size-3.5" /> Add output</Button>
           </div>
-          <p v-if="outputRows.length && !outputsValid" class="text-[11px] text-destructive">
+          <p v-if="outputRows.length && !outputsValid" class="text-xs text-destructive">
             Each capture needs a bucket and a key; a folder capture (path ending in /) needs a key ending in /.
           </p>
         </div>
       </div>
     </template>
-    <p v-if="noOutputs" class="mt-2 text-[11px] text-amber-700 dark:text-amber-300">
+    <p v-if="noOutputs" class="mt-2 text-xs text-amber-700 dark:text-amber-300">
       Nothing is captured, so this run stores no outputs. Only stdout and stderr are kept.
     </p>
-    <p v-else class="mt-2 text-[11px] text-muted-foreground">stdout and stderr are always captured.</p>
+    <p v-else class="mt-2 text-xs text-muted-foreground">stdout and stderr are always captured.</p>
   </RunSection>
 </template>

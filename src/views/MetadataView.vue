@@ -494,7 +494,7 @@ function jumpTo(entityId: string) {
 
       <EmptyState
         v-else-if="docState === 'forbidden'"
-        title="This dataset is not public."
+        title="This dataset is not public"
         :description="currentUser ? 'Sign in with an account that can see it.' : 'Sign in with an account that can see it, using the button in the top bar.'"
       >
         <Button variant="outline" as-child>

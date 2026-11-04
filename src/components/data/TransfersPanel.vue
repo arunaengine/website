@@ -77,7 +77,7 @@ function transferVariant(item: UploadQueueItem): BadgeVariant {
       <span class="text-xs font-semibold text-foreground">
         {{ activeCount ? `Uploading ${activeCount} file${activeCount === 1 ? '' : 's'}` : 'Transfers' }}
       </span>
-      <span v-if="overallProgress !== null" class="font-mono text-[11px] text-muted-foreground">{{ overallProgress }}%</span>
+      <span v-if="overallProgress !== null" class="font-mono text-xs text-muted-foreground">{{ overallProgress }}%</span>
       <span class="ml-auto flex items-center gap-1">
         <Spinner v-if="activeCount" label="Uploading" class="text-primary" />
         <component :is="collapsed ? ChevronUp : ChevronDown" class="h-4 w-4 text-muted-foreground" />
@@ -96,11 +96,11 @@ function transferVariant(item: UploadQueueItem): BadgeVariant {
             v-if="item.state !== 'uploading' && item.state !== 'queued'"
             :variant="transferVariant(item)"
             size="sm"
-            class="shrink-0 uppercase"
+            class="shrink-0"
           >
             {{ item.pausedForSession ? 'PAUSED' : item.state }}
           </Badge>
-          <span v-else class="shrink-0 font-mono text-[11px] text-muted-foreground">{{ item.progress }}%</span>
+          <span v-else class="shrink-0 font-mono text-xs text-muted-foreground">{{ item.progress }}%</span>
           <Button
             v-if="item.state === 'uploading' || item.state === 'queued'"
             variant="ghost"
@@ -133,25 +133,25 @@ function transferVariant(item: UploadQueueItem): BadgeVariant {
           v-if="item.state === 'uploading' && item.finishing"
           :label="UPLOAD_FINISHING_MESSAGE"
           show-label
-          class="text-[10px]"
+          class="text-xs"
         />
         <p
           v-if="item.overwrite && item.state !== 'error' && item.state !== 'canceled'"
-          class="flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400"
+          class="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400"
         >
           <AlertTriangle class="h-3 w-3 shrink-0" /> Overwrites existing object
         </p>
         <p
           v-if="item.error"
-          class="break-words text-[10px]"
+          class="break-words text-xs"
           :class="item.state === 'uploading' ? 'text-muted-foreground' : item.pausedForSession ? 'text-amber-700 dark:text-amber-400' : 'text-destructive'"
         >{{ item.error }}</p>
         <div v-if="item.state === 'error' || item.state === 'canceled'" class="flex items-center gap-2">
-          <button class="text-[10px] font-medium text-primary hover:underline" @click="queue.retry(item)">Retry</button>
+          <button class="text-xs font-medium text-primary hover:underline" @click="queue.retry(item)">Retry</button>
           <RouterLink
             v-if="item.quotaExceeded"
             :to="item.groupId ? { name: 'group', params: { id: item.groupId }, hash: '#storage-use' } : { name: 'groups' }"
-            class="text-[10px] font-medium text-primary hover:underline"
+            class="text-xs font-medium text-primary hover:underline"
           >
             View group quota
           </RouterLink>

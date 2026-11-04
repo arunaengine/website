@@ -79,7 +79,7 @@ import LegalPage from '@/components/legal/LegalPage.vue'
 
     <template #en>
       <h2>Terms of service</h2>
-      <p class="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+      <p class="text-sm font-medium text-muted-foreground">
         (translation, not legally binding)
       </p>
       <p>

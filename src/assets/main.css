@@ -247,7 +247,7 @@
     @apply font-display text-2xl font-semibold tracking-tight text-aruna-navy md:text-3xl;
   }
   .eyebrow {
-    @apply font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-primary/80;
+    @apply font-mono text-xs font-medium text-primary/80;
   }
   /* Long-form text on the public pages: news posts and legal pages. */
   .article-body {
@@ -309,7 +309,7 @@
     @apply border-border;
   }
   /* The shared table: a 36 px header in 12 px medium muted, no fill, subtle dividers, 44 px rows
-     (56 with .data-table-tall), a hover fill, numbers right-aligned, row actions on hover or focus. */
+     (56 with .data-table-tall), a hover fill, numbers right-aligned. */
   .data-table {
     @apply w-full text-sm leading-5;
   }
@@ -330,13 +330,6 @@
   }
   .data-table :is(th, td).num {
     @apply text-right tabular-nums;
-  }
-  .data-table .row-actions {
-    @apply opacity-0 transition-opacity;
-  }
-  .data-table tr:hover .row-actions,
-  .data-table tr:focus-within .row-actions {
-    @apply opacity-100;
   }
 
   .chip {

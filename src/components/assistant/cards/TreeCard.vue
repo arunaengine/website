@@ -55,10 +55,10 @@ const files = computed(() => rows.value.filter((row) => !row.folder).length)
       <BucketLink
         v-if="view.bucket"
         :bucket="view.bucket"
-        class="shrink-0 truncate text-[11px] text-primary hover:underline"
+        class="shrink-0 truncate text-xs text-primary hover:underline"
         :title="`Open the bucket ${view.bucket}`"
       >{{ view.bucket }}</BucketLink>
-      <span class="shrink-0 text-[11px] text-muted-foreground">{{ files }} {{ files === 1 ? 'file' : 'files' }}</span>
+      <span class="shrink-0 text-xs text-muted-foreground">{{ files }} {{ files === 1 ? 'file' : 'files' }}</span>
     </div>
     <ul class="scrollbar-thin max-h-72 overflow-auto py-1.5">
       <li
@@ -79,7 +79,7 @@ const files = computed(() => rows.value.filter((row) => !row.folder).length)
           :title="`${view.bucket}/${row.path}`"
         >{{ row.name }}</ObjectLink>
         <span v-else class="min-w-0 flex-1 truncate text-foreground/85" :title="row.path">{{ row.name }}</span>
-        <span v-if="row.size !== undefined" class="shrink-0 font-mono text-[10px] text-muted-foreground">
+        <span v-if="row.size !== undefined" class="shrink-0 font-mono text-xs text-muted-foreground">
           {{ formatBytes(row.size) }}
         </span>
       </li>

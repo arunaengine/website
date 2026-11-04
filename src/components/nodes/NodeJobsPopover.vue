@@ -129,17 +129,17 @@ function others(count: number): string {
             <td class="w-full max-w-0">
               <template v-if="job.target && 'bucket' in job.target">
                 <RouterLink :to="{ name: 'bucket', params: { bucketId: job.target.bucket }, query: { node: nodeId } }" class="block truncate text-foreground hover:underline">{{ job.target.bucket }}</RouterLink>
-                <span v-if="job.target.path" class="block truncate font-mono text-[11px] text-muted-foreground">{{ job.target.path }}</span>
+                <span v-if="job.target.path" class="block truncate font-mono text-xs text-muted-foreground">{{ job.target.path }}</span>
               </template>
               <template v-else-if="job.target">
                 <RouterLink :to="{ name: 'dataset', params: { id: job.target.dataset_id } }" class="block truncate text-foreground hover:underline">Dataset</RouterLink>
-                <span class="block truncate font-mono text-[11px] text-muted-foreground">{{ job.target.dataset_id }}</span>
+                <span class="block truncate font-mono text-xs text-muted-foreground">{{ job.target.dataset_id }}</span>
               </template>
             </td>
             <td class="num">
               <template v-if="progress(job)">
                 <span class="whitespace-nowrap tabular-nums">{{ progress(job)!.share ?? progress(job)!.detail }}</span>
-                <span v-if="progress(job)!.share" class="block whitespace-nowrap text-[11px] text-muted-foreground">{{ progress(job)!.detail }}</span>
+                <span v-if="progress(job)!.share" class="block whitespace-nowrap text-xs text-muted-foreground">{{ progress(job)!.detail }}</span>
               </template>
               <span v-else class="whitespace-nowrap text-muted-foreground">Not known</span>
             </td>

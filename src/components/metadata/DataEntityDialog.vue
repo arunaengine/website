@@ -161,7 +161,7 @@ async function copyId() {
             class="chip shrink-0 text-primary hover:border-primary/40"
             @click="back"
           ><ArrowLeft class="h-3 w-3" /> Back</button>
-          <span class="min-w-0 truncate font-mono text-[11px] text-muted-foreground" :title="currentId">{{ currentId }}</span>
+          <span class="min-w-0 truncate font-mono text-xs text-muted-foreground" :title="currentId">{{ currentId }}</span>
           <Button variant="ghost" size="icon-sm" class="shrink-0 text-muted-foreground" :aria-label="copied ? 'Copied' : 'Copy id'" @click="copyId">
             <Check v-if="copied" class="size-3.5 text-primary" />
             <Copy v-else class="size-3.5" />
@@ -171,7 +171,7 @@ async function copyId() {
         <div class="flex flex-wrap gap-1.5">
           <template v-for="chip in typeChips" :key="chip.uri">
             <ExternalLink v-if="chip.href" :href="chip.href" :label="chip.label" class="chip text-primary" :title="chip.uri" />
-            <Badge v-else variant="outline" size="sm" class="uppercase">{{ chip.label }}</Badge>
+            <Badge v-else variant="outline" size="sm">{{ chip.label }}</Badge>
           </template>
           <Badge v-if="entity.profileLabel" variant="outline" size="sm">{{ entity.profileLabel }}</Badge>
         </div>

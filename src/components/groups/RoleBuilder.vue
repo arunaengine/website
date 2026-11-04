@@ -178,16 +178,16 @@ async function submit() {
 
     <div class="grid gap-6 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
       <div class="min-w-0">
-        <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Name</div>
+        <div class="text-xs font-semibold text-muted-foreground">Name</div>
         <div class="mt-1.5 max-w-sm">
           <label class="sr-only" for="role-name">Role name</label>
           <Input id="role-name" v-model="name" placeholder="e.g. curators" />
-          <p v-if="nameReserved" class="mt-1 text-[11px] text-destructive">
+          <p v-if="nameReserved" class="mt-1 text-xs text-destructive">
             The names "admin" and "user" are reserved for built-in roles.
           </p>
         </div>
 
-        <div class="mt-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Who holds this role</div>
+        <div class="mt-4 text-xs font-semibold text-muted-foreground">Who holds this role</div>
         <OptionToggle
           :model-value="isPublic ? 'everyone' : 'members'"
           :options="HOLDER_OPTIONS"
@@ -267,7 +267,7 @@ async function submit() {
               </Button>
             </li>
           </ul>
-          <p v-if="notice" class="mt-1.5 text-[11px] text-muted-foreground">{{ notice }}</p>
+          <p v-if="notice" class="mt-1.5 text-xs text-muted-foreground">{{ notice }}</p>
           <GrantNodeWarning :paths="grants.map((grant) => grant.suffix)" :role="name.trim()" />
 
           <div class="mt-4">
@@ -278,19 +278,19 @@ async function submit() {
             >
               <ChevronRight :class="['h-3.5 w-3.5 shrink-0 transition-transform', showRaw && 'rotate-90']" />
               Technical details
-              <span class="text-[10px] font-normal text-muted-foreground">
+              <span class="text-xs font-normal text-muted-foreground">
                 {{ grants.length }} {{ grants.length === 1 ? 'path' : 'paths' }}
               </span>
             </button>
             <div v-if="showRaw" class="mt-2 rounded-md border border-border bg-muted/20 p-3">
-              <p class="break-all font-mono text-[10px] text-muted-foreground">{{ prefix }}</p>
+              <p class="break-all font-mono text-xs text-muted-foreground">{{ prefix }}</p>
               <ul v-if="grants.length" class="mt-1.5 space-y-0.5">
-                <li v-for="grant in grants" :key="grant.suffix" class="flex items-center gap-2 font-mono text-[11px]">
+                <li v-for="grant in grants" :key="grant.suffix" class="flex items-center gap-2 font-mono text-xs">
                   <span class="min-w-0 truncate text-foreground/80" :title="`${prefix}${grant.suffix}`">{{ grant.suffix }}</span>
-                  <span class="ml-auto shrink-0 uppercase text-muted-foreground">{{ grant.level }}</span>
+                  <span class="ml-auto shrink-0 text-muted-foreground">{{ grant.level }}</span>
                 </li>
               </ul>
-              <p v-else class="mt-1.5 font-mono text-[11px] text-muted-foreground">(no paths yet)</p>
+              <p v-else class="mt-1.5 font-mono text-xs text-muted-foreground">(no paths yet)</p>
               <div class="mt-2 flex items-center gap-2">
                 <Input v-model="rawPath" class="h-8 font-mono text-xs" placeholder="data/** or meta/reports/**" @keydown.enter.prevent="commitRaw" />
                 <Select
@@ -302,15 +302,15 @@ async function submit() {
                 />
                 <Button variant="outline" size="sm" class="shrink-0" :disabled="!rawPath.trim() || !!rawProblem" @click="commitRaw">Add</Button>
               </div>
-              <p v-if="rawProblem" class="mt-1.5 text-[11px] text-destructive">{{ rawProblem }}</p>
-              <p class="mt-1.5 text-[11px] text-muted-foreground">
+              <p v-if="rawProblem" class="mt-1.5 text-xs text-destructive">{{ rawProblem }}</p>
+              <p class="mt-1.5 text-xs text-muted-foreground">
                 Paths are relative to this group; a trailing ** covers everything below the path.
               </p>
             </div>
           </div>
 
           <p v-if="error" class="mt-3 text-xs text-destructive">{{ error }}</p>
-          <p v-if="role" class="mt-3 text-[11px] text-muted-foreground">
+          <p v-if="role" class="mt-3 text-xs text-muted-foreground">
             Saving replaces the role with an updated copy; assigned members keep it.
           </p>
 

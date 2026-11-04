@@ -200,7 +200,7 @@ defineExpose({ reload: load })
                     <Button
                       variant="ghost"
                       size="sm"
-                      class="ml-1 h-6 px-1.5 text-[10px]"
+                      class="ml-1 h-6 px-1.5 text-xs"
                       :aria-pressed="selected.has(entry.path)"
                       @click="toggle(entry, !selected.has(entry.path))"
                     >
@@ -229,10 +229,10 @@ defineExpose({ reload: load })
                     <ObjectIcon :name="entry.name" class="h-4 w-4" /> <span class="truncate">{{ entry.name }}</span>
                   </span>
                 </td>
-                <td class="px-2 py-1.5 text-right font-mono text-[11px] text-muted-foreground">
+                <td class="px-2 py-1.5 text-right font-mono text-xs text-muted-foreground">
                   {{ entry.kind === 'file' && entry.size !== undefined ? formatBytes(entry.size) : '-' }}
                 </td>
-                <td class="px-2 py-1.5 text-right text-[11px] text-muted-foreground">
+                <td class="px-2 py-1.5 text-right text-xs text-muted-foreground">
                   {{ entry.modified_ms ? relativeTime(new Date(entry.modified_ms).toISOString()) : '-' }}
                 </td>
               </tr>
@@ -245,13 +245,13 @@ defineExpose({ reload: load })
             </tbody>
           </table>
         </div>
-        <div v-if="truncated" class="border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground">
+        <div v-if="truncated" class="border-t border-border px-3 py-1.5 text-xs text-muted-foreground">
           Listing truncated, open a folder to narrow it down.
         </div>
       </div>
 
       <div v-if="selectable" class="mt-2 flex items-center justify-between gap-2">
-        <span class="text-[11px] text-muted-foreground">
+        <span class="text-xs text-muted-foreground">
           {{ selectedList.length ? `${selectedList.length} selected` : checkedPaths?.size ? 'Existing references are checked; use Restage to add one to the basket.' : 'Select files or folders to import.' }}
         </span>
         <Button size="sm" :disabled="!selectedList.length" @click="addSelected">

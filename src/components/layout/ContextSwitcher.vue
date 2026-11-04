@@ -64,7 +64,7 @@ function roleOf(id: string) {
         <!-- The realm name and short id stay visible next to the group; a phone keeps the name only. -->
         <span class="flex min-w-0 flex-col leading-none">
           <span
-            class="flex max-w-28 gap-1 text-[9px] font-semibold uppercase leading-none tracking-wider text-muted-foreground sm:max-w-40"
+            class="flex max-w-28 gap-1 text-xs font-semibold leading-none text-muted-foreground sm:max-w-40"
             :title="realmId"
           >
             <span class="min-w-0 truncate">{{ hasGroups ? realmDisplayName : 'Realm' }}</span>

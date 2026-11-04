@@ -368,7 +368,7 @@ watch(advancedNeedsAttention, (needsAttention) => {
 
 <template>
   <div class="rounded-lg border border-border border-l-2 bg-card p-3" :class="accentClass">
-    <div v-if="anyLock" class="mb-2 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+    <div v-if="anyLock" class="mb-2 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
       <Lock class="h-3 w-3" /> RO-Crate baseline
     </div>
 
@@ -379,22 +379,22 @@ watch(advancedNeedsAttention, (needsAttention) => {
     <template v-if="isPreservedSelect">
       <div class="grid gap-2 sm:grid-cols-2">
         <div>
-          <label class="text-[11px] font-medium text-muted-foreground">Label</label>
+          <label class="text-xs font-medium text-muted-foreground">Label</label>
           <Input v-model="property.label" class="mt-0.5" :disabled="anyLock" />
         </div>
         <div>
-          <label class="text-[11px] font-medium text-muted-foreground">Value type</label>
+          <label class="text-xs font-medium text-muted-foreground">Value type</label>
           <Select v-model="property.kind" :options="kindOptions" class="mt-0.5" disabled />
         </div>
         <div class="sm:col-span-2">
-          <label class="text-[11px] font-medium text-muted-foreground">Description shown to users</label>
+          <label class="text-xs font-medium text-muted-foreground">Description shown to users</label>
           <Input v-model="property.description" class="mt-0.5" placeholder="What this value should contain." :disabled="anyLock" />
         </div>
       </div>
-      <p class="mt-2 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+      <p class="mt-2 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
         Preserved from import, {{ preservedOptionCount }} {{ preservedOptionCount === 1 ? 'option' : 'options' }}. Edit the option list in Describo/Crate-O; label and description are editable here.
       </p>
-      <p class="mt-2 text-[11px] text-muted-foreground">{{ PROFILE_OBLIGATION_LABELS[property.obligation].help }}</p>
+      <p class="mt-2 text-xs text-muted-foreground">{{ PROFILE_OBLIGATION_LABELS[property.obligation].help }}</p>
     </template>
 
     <template v-else>
@@ -403,16 +403,16 @@ watch(advancedNeedsAttention, (needsAttention) => {
          the single Advanced disclosure below. -->
     <div class="grid gap-2 sm:grid-cols-2">
       <div>
-        <label class="text-[11px] font-medium text-muted-foreground">Label</label>
+        <label class="text-xs font-medium text-muted-foreground">Label</label>
         <Input v-model="property.label" class="mt-0.5" placeholder="License" :disabled="anyLock" @blur="autofillName" />
       </div>
       <div>
-        <label class="text-[11px] font-medium text-muted-foreground">Value type</label>
+        <label class="text-xs font-medium text-muted-foreground">Value type</label>
         <Select v-model="property.kind" :options="kindOptions" class="mt-0.5" :disabled="kindDisabled" />
       </div>
     </div>
     <div class="mt-2">
-      <label class="text-[11px] font-medium text-muted-foreground">Description shown to users</label>
+      <label class="text-xs font-medium text-muted-foreground">Description shown to users</label>
       <Input v-model="property.description" class="mt-0.5" placeholder="What this value should contain." :disabled="anyLock" />
     </div>
 
@@ -427,7 +427,7 @@ watch(advancedNeedsAttention, (needsAttention) => {
     />
 
     <!-- M5: hasPart must be an entity reference or the dataset dialog cannot bind it. -->
-    <p v-if="hasPartKindError" class="mt-2 text-[11px] text-destructive">{{ hasPartKindError }}</p>
+    <p v-if="hasPartKindError" class="mt-2 text-xs text-destructive">{{ hasPartKindError }}</p>
 
     <!-- WS2: the multiple-values toggle stays on the primary surface; the min/max
          entry counts it unlocks live in Advanced. keyword-list is always a list,
@@ -436,7 +436,7 @@ watch(advancedNeedsAttention, (needsAttention) => {
       <label class="flex items-center justify-between gap-2">
         <span>
           Allow multiple values
-          <span class="block text-[11px] text-muted-foreground">Users can supply a list instead of a single value.</span>
+          <span class="block text-xs text-muted-foreground">Users can supply a list instead of a single value.</span>
         </span>
         <Switch :checked="property.multipleValues" :disabled="anyLock" @update:checked="(value: boolean) => (property.multipleValues = value)" />
       </label>
@@ -452,7 +452,7 @@ watch(advancedNeedsAttention, (needsAttention) => {
       :is-has-part="isHasPart"
     />
 
-    <p class="mt-2 text-[11px] text-muted-foreground">{{ PROFILE_OBLIGATION_LABELS[property.obligation].help }}</p>
+    <p class="mt-2 text-xs text-muted-foreground">{{ PROFILE_OBLIGATION_LABELS[property.obligation].help }}</p>
 
     <!-- One Advanced disclosure for every power setting. Collapsed by default;
          auto-opens when the rule already carries advanced content (see
@@ -460,7 +460,7 @@ watch(advancedNeedsAttention, (needsAttention) => {
     <div class="mt-2">
       <button
         type="button"
-        class="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+        class="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
         :aria-expanded="advancedOpen"
         @click="advancedOpen = !advancedOpen"
       >
@@ -472,16 +472,16 @@ watch(advancedNeedsAttention, (needsAttention) => {
         <!-- Technical identifiers: the machine identifiers behind this rule
              (RO-Crate property name and ontology term URI). -->
         <div>
-          <div class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Technical identifiers</div>
+          <div class="text-xs font-medium text-muted-foreground">Technical identifiers</div>
           <div class="mt-1 grid gap-2 rounded-md border border-border p-3 sm:grid-cols-2">
             <div>
-              <label class="text-[11px] font-medium text-muted-foreground">Property name</label>
+              <label class="text-xs font-medium text-muted-foreground">Property name</label>
               <Input v-model="property.valueName" class="mt-0.5" placeholder="license" :disabled="anyLock" />
-              <p v-if="valueNameError" class="mt-0.5 text-[11px] text-destructive">{{ valueNameError }}</p>
-              <p v-else class="mt-0.5 text-[11px] text-muted-foreground">The compact JSON key in the RO-Crate.</p>
+              <p v-if="valueNameError" class="mt-0.5 text-xs text-destructive">{{ valueNameError }}</p>
+              <p v-else class="mt-0.5 text-xs text-muted-foreground">The compact JSON key in the RO-Crate.</p>
             </div>
             <div>
-              <label class="text-[11px] font-medium text-muted-foreground">Property term</label>
+              <label class="text-xs font-medium text-muted-foreground">Property term</label>
               <Select
                 :model-value="pickerValue"
                 :options="termOptions"
@@ -498,12 +498,12 @@ watch(advancedNeedsAttention, (needsAttention) => {
                   @keydown.enter="commitExternalUri"
                 />
                 <VocabSuggestions :query="String(property.propertyUri ?? '')" kind="property" @pick="applyVocabTerm" />
-                <p class="mt-0.5 text-[11px] text-muted-foreground">
+                <p class="mt-0.5 text-xs text-muted-foreground">
                   Type to search schema.org and Dublin Core, or paste any absolute term URI from an existing ontology.
                 </p>
               </div>
             </div>
-            <p class="break-all font-mono text-[11px] text-muted-foreground sm:col-span-2">{{ resolvedUri }}</p>
+            <p class="break-all font-mono text-xs text-muted-foreground sm:col-span-2">{{ resolvedUri }}</p>
           </div>
         </div>
 

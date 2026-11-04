@@ -426,14 +426,14 @@ const secretRows = computed<SecretRow[]>(() =>
               <div>
                 <label class="text-xs font-medium text-foreground">Seed URL</label>
                 <Input v-model="seedUrl" placeholder="https://node.example.org" class="mt-1 font-mono" />
-                <p class="mt-1 text-[11px] text-muted-foreground">
+                <p class="mt-1 text-xs text-muted-foreground">
                   Must be reachable from the new node; <code class="font-mono">/api/v1</code> is appended automatically.
                 </p>
               </div>
               <div class="max-w-xs">
                 <label class="text-xs font-medium text-foreground">Expires after</label>
                 <Select v-model="expiresIn" :options="EXPIRY_OPTIONS" class="mt-1" />
-                <p class="mt-1 text-[11px] text-muted-foreground">The node clamps this to between 1 minute and 24 hours.</p>
+                <p class="mt-1 text-xs text-muted-foreground">The node clamps this to between 1 minute and 24 hours.</p>
               </div>
               <Notice v-if="mintError" tone="error">{{ mintError }}</Notice>
               <div class="flex justify-between">
@@ -493,7 +493,7 @@ const secretRows = computed<SecretRow[]>(() =>
             <div>
               <label class="text-xs font-medium text-foreground">Public API URL <span class="text-muted-foreground">(optional)</span></label>
               <Input v-model="apiPublicUrl" placeholder="https://node.example.org" class="mt-1 font-mono" />
-              <p class="mt-1 text-[11px] text-muted-foreground">
+              <p class="mt-1 text-xs text-muted-foreground">
                 The REST URL this node advertises to the realm. Required if the node serves the portal
                 (<code class="font-mono">PORTAL_MODE=artifact</code>), because the SPA is loaded from another origin.
               </p>
@@ -501,7 +501,7 @@ const secretRows = computed<SecretRow[]>(() =>
             <div>
               <label class="text-xs font-medium text-foreground">Public S3 URL <span class="text-muted-foreground">(optional)</span></label>
               <Input v-model="s3PublicUrl" placeholder="https://s3.example.org" class="mt-1 font-mono" />
-              <p class="mt-1 text-[11px] text-muted-foreground">
+              <p class="mt-1 text-xs text-muted-foreground">
                 The S3 endpoint this node advertises. Defaults to the S3 bind address, which is only reachable if
                 clients share the node's network.
               </p>
@@ -514,7 +514,7 @@ const secretRows = computed<SecretRow[]>(() =>
               <div>
                 <label class="text-xs font-medium text-foreground">Ops port <span class="text-muted-foreground">(optional)</span></label>
                 <Input v-model="opsPort" type="number" min="1" placeholder="3002" class="mt-1" />
-                <p class="mt-1 text-[11px] text-muted-foreground">Health endpoint, bound to loopback only.</p>
+                <p class="mt-1 text-xs text-muted-foreground">Health endpoint, bound to loopback only.</p>
               </div>
             </div>
 
@@ -530,7 +530,7 @@ const secretRows = computed<SecretRow[]>(() =>
             />
             <CodeSnippet title="docker-compose.yml" :code="composeSnippet" />
 
-            <p class="text-[11px] leading-relaxed text-muted-foreground">
+            <p class="text-xs leading-relaxed text-muted-foreground">
               Realm description and OIDC providers are realm-level and sync automatically during onboarding. Do not set
               them on the new node. The secret above is embedded in these snippets and exists only in this page until you leave.
             </p>
@@ -560,7 +560,7 @@ const secretRows = computed<SecretRow[]>(() =>
                 </Button>
               </template>
             </ClaimWatchStep>
-            <p v-if="watchTerminal === 'registration'" class="text-[11px] leading-relaxed text-muted-foreground">
+            <p v-if="watchTerminal === 'registration'" class="text-xs leading-relaxed text-muted-foreground">
               This secret was redeemed at sign-up to claim the initial realm-admin role, so there is no node to bring
               online.
             </p>

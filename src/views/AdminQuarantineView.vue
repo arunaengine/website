@@ -349,11 +349,11 @@ async function runPrunePass() {
                   <span v-else class="text-muted-foreground" title="The payload never decoded into an event.">undecoded</span>
                 </td>
                 <td class="max-w-56 px-5 py-3">
-                  <span class="block truncate font-mono text-[11px] text-foreground/80" :title="record.target">
+                  <span class="block truncate font-mono text-xs text-foreground/80" :title="record.target">
                     {{ record.target ?? '-' }}
                   </span>
                 </td>
-                <td class="px-5 py-3 text-[11px] text-muted-foreground">
+                <td class="px-5 py-3 text-xs text-muted-foreground">
                   <NodeLabel v-if="record.origin_node_id" :node-id="record.origin_node_id" size="sm" />
                   <template v-else>-</template>
                 </td>
@@ -390,7 +390,7 @@ async function runPrunePass() {
 
         <footer
           v-if="!listError && (pageIndex > 0 || nextCursor)"
-          class="flex items-center justify-between gap-3 border-t border-border bg-muted/20 px-5 py-2 text-[11px] text-muted-foreground"
+          class="flex items-center justify-between gap-3 border-t border-border bg-muted/20 px-5 py-2 text-xs text-muted-foreground"
           :aria-busy="listLoading"
         >
           <span class="flex items-center gap-2" aria-live="polite">
@@ -431,11 +431,11 @@ async function runPrunePass() {
               <h2 class="font-display text-lg font-semibold text-aruna-navy">
                 {{ inspected.record.family ? `Rejected ${inspected.record.family} event` : 'Rejected sync event' }}
               </h2>
-              <div class="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+              <div class="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
                 <span class="truncate">{{ inspected.record.id }}</span>
                 <CopyButton :value="inspected.record.id" label="Copy record id" />
               </div>
-              <p v-if="inspectError" class="text-[11px] text-amber-700 dark:text-amber-300">
+              <p v-if="inspectError" class="text-xs text-amber-700 dark:text-amber-300">
                 Refresh failed ({{ inspectError }}), showing the listed state.
               </p>
             </div>
@@ -460,7 +460,7 @@ async function runPrunePass() {
               <Skeleton v-if="inspectLoading && !inspected.event" class="h-10" />
               <pre
                 v-else-if="inspected.event"
-                class="whitespace-pre-wrap break-words rounded-md bg-muted/40 px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground"
+                class="whitespace-pre-wrap break-words rounded-md bg-muted/40 px-3 py-2 font-mono text-xs leading-relaxed text-foreground"
                 >{{ inspected.event }}</pre>
               <p v-else class="text-xs text-muted-foreground">The retained bytes do not decode into a sync event.</p>
             </section>

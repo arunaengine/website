@@ -38,7 +38,7 @@ const shown = computed(() => crumbs.value.slice(-2))
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
           <DropdownMenuItem v-for="crumb in hidden" :key="crumb.path" @click="emit('navigate', crumb.path)">
-            <Folder class="h-3.5 w-3.5 text-primary" /> {{ crumb.name }}
+            <Folder class="h-3.5 w-3.5 text-muted-foreground" /> {{ crumb.name }}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

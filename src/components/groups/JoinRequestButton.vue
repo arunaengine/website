@@ -88,7 +88,7 @@ async function withdraw() {
 <template>
   <template v-if="visible">
     <div v-if="pending" class="flex items-center gap-1.5">
-      <Badge size="sm" variant="warn" class="uppercase">requested</Badge>
+      <Badge size="sm" variant="warn">requested</Badge>
       <Button
         variant="ghost"
         size="sm"

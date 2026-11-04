@@ -117,16 +117,16 @@ async function apply(action: 'grant' | 'revoke') {
           <li v-for="row in rows" :key="row.label" class="min-w-0 space-y-1 px-3 py-2">
             <div class="flex items-center justify-between gap-3">
               <span class="min-w-0 break-all">{{ row.label }}</span>
-              <Badge :variant="row.isPublic ? 'success' : 'secondary'" size="sm" class="shrink-0 uppercase">
+              <Badge :variant="row.isPublic ? 'success' : 'secondary'" size="sm" class="shrink-0">
                 <Globe v-if="row.isPublic" class="mr-0.5 size-3" aria-hidden="true" />
                 <Lock v-else class="mr-0.5 size-3" aria-hidden="true" />
                 {{ row.isPublic ? 'public' : 'private' }}
               </Badge>
             </div>
-            <p v-if="row.inherited.length" class="text-[11px] text-muted-foreground">
+            <p v-if="row.inherited.length" class="text-xs text-muted-foreground">
               Through the rule on {{ ruleName(row.inherited[0]) }}
             </p>
-            <p v-if="row.url" class="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+            <p v-if="row.url" class="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
               <span class="min-w-0 truncate font-mono" :title="row.url">{{ row.url }}</span>
               <CopyButton :value="row.url" label="Copy the public address" />
             </p>

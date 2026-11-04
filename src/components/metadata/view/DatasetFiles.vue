@@ -332,7 +332,7 @@ function openPreview(row: DataEntity) {
                     >{{ row.name }}</button>
                     <Badge v-if="externalHost(row)" variant="outline" size="sm" :title="`Kept at ${externalHost(row)}`">External</Badge>
                   </span>
-                  <span v-if="partOf(row)?.problem" class="block text-[11px] text-muted-foreground" :style="{ paddingLeft: `${3.75 + row.depth * 1.5}rem` }">{{ partOf(row)!.problem }}</span>
+                  <span v-if="partOf(row)?.problem" class="block text-xs text-muted-foreground" :style="{ paddingLeft: `${3.75 + row.depth * 1.5}rem` }">{{ partOf(row)!.problem }}</span>
                 </td>
                 <td class="truncate px-3 py-1.5 text-right text-xs text-muted-foreground max-sm:hidden" :title="formatsOf(row)">{{ formatsOf(row) }}</td>
                 <td class="whitespace-nowrap px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground max-sm:hidden">{{ filesOf(row) }}</td>

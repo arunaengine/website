@@ -158,7 +158,7 @@ async function preview() {
   <IconButton v-if="canPreview" label="Preview" :disabled="busy" @click.stop="preview">
     <Eye class="size-3.5" />
   </IconButton>
-  <p v-if="failure && !open" class="basis-full text-right text-[11px] text-destructive">{{ failure }}</p>
+  <p v-if="failure && !open" class="basis-full text-right text-xs text-destructive">{{ failure }}</p>
   <DetailDialog v-model:open="open" @update:open="open || invalidate()">
     <template #header>
       <DialogTitle class="truncate text-base font-semibold text-foreground" :title="name">{{ name }}</DialogTitle>

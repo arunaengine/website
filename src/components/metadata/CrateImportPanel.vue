@@ -209,7 +209,7 @@ function reset() {
           <Switch :checked="isPublic" aria-label="Publish the imported dataset" @update:checked="isPublic = $event" />
           <span class="text-xs text-foreground">Make the imported dataset public</span>
         </div>
-        <p class="text-[11px] text-muted-foreground">
+        <p class="text-xs text-muted-foreground">
           The archive is uploaded privately first, then unpacked in the background. You need write access to the bucket and the group.
         </p>
       </template>
@@ -224,7 +224,7 @@ function reset() {
       </section>
 
       <p v-if="submitError" class="text-xs text-destructive">{{ submitError }}</p>
-      <p v-if="uploadId && !activeJobId" class="text-[11px] text-muted-foreground">
+      <p v-if="uploadId && !activeJobId" class="text-xs text-muted-foreground">
         Uploaded {{ formatBytes(uploadedBytes) }}; the import has not started yet.
       </p>
     </div>

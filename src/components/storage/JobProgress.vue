@@ -73,9 +73,9 @@ function abort() {
       aria-valuemin="0"
       aria-valuemax="100"
     >
-      <div class="h-full bg-primary transition-all" :style="{ width: `${percent(job)}%` }" />
+      <div class="h-full bg-primary transition-[width]" :style="{ width: `${percent(job)}%` }" />
     </div>
-    <p v-if="!job.starting" class="text-[11px] tabular-nums text-muted-foreground">
+    <p v-if="!job.starting" class="text-xs tabular-nums text-muted-foreground">
       {{ formatNumber(job.done) }}<template v-if="job.total"> of {{ job.counted ? '' : 'at least ' }}{{ formatNumber(job.total) }}</template>
       <template v-if="job.kind === 'rename'"> renamed</template>
       <template v-if="job.skipped && job.kind !== 'rename'">, {{ formatNumber(job.skipped) }} skipped</template>
@@ -83,7 +83,7 @@ function abort() {
       <template v-if="job.waiting">, waiting</template>
       <template v-if="job.left">, {{ job.left }}</template>
     </p>
-    <p v-if="job.kind === 'rename'" class="text-[11px] text-muted-foreground">Runs on the server. You can close this window.</p>
+    <p v-if="job.kind === 'rename'" class="text-xs text-muted-foreground">Runs on the server. You can close this window.</p>
     <div v-if="asking" class="space-y-2 rounded-md border border-border bg-muted/40 px-3 py-2">
       <p class="text-sm font-medium text-foreground">{{ abortTitle(job) }}</p>
       <p class="text-xs text-muted-foreground">{{ abortSentence(job) }}</p>

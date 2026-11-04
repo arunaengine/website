@@ -57,9 +57,9 @@ async function mint() {
     <div class="surface overflow-hidden">
 
     <div class="border-b border-border px-5 py-3">
-      <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">MCP endpoint</div>
+      <div class="text-xs font-semibold text-muted-foreground">MCP endpoint</div>
       <div v-if="mcpUrl" class="mt-1 flex flex-wrap items-center gap-1.5 rounded-md border border-border bg-muted/30 px-3 py-2">
-        <code class="min-w-0 break-all font-mono text-[11px] text-foreground">{{ mcpUrl }}</code>
+        <code class="min-w-0 break-all font-mono text-xs text-foreground">{{ mcpUrl }}</code>
         <CopyButton :value="mcpUrl" label="Copy the MCP endpoint" />
       </div>
       <Notice v-else tone="info" class="mt-1">MCP is not available on this node.</Notice>
@@ -104,10 +104,10 @@ async function mint() {
               This token is shown once. Copy it now; it cannot be read again, and anyone holding it acts as you.
             </Notice>
             <div class="flex flex-wrap items-center gap-1.5 rounded-md border border-border bg-muted/30 px-3 py-2">
-              <code class="min-w-0 break-all font-mono text-[11px] text-foreground">{{ token }}</code>
+              <code class="min-w-0 break-all font-mono text-xs text-foreground">{{ token }}</code>
               <CopyButton :value="token" label="Copy the session token" />
             </div>
-            <p class="text-[11px] text-muted-foreground" :title="formatDateTime(expiresAt)">
+            <p class="text-xs text-muted-foreground" :title="formatDateTime(expiresAt)">
               Expires {{ relativeTime(expiresAt) }}.
             </p>
           </div>
@@ -126,7 +126,7 @@ async function mint() {
               <span class="text-xs font-medium text-foreground">{{ snippet.title }}</span>
               <CopyButton v-if="token" :value="snippet.code" :label="`Copy the ${snippet.title} snippet`" />
             </div>
-            <pre class="scrollbar-thin overflow-x-auto px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground">{{ snippet.code }}</pre>
+            <pre class="scrollbar-thin overflow-x-auto px-3 py-2 font-mono text-xs leading-relaxed text-foreground">{{ snippet.code }}</pre>
           </div>
         </div>
       </li>

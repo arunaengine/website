@@ -216,8 +216,8 @@ async function submit(): Promise<void> {
               <FolderOpen class="h-3.5 w-3.5" /> Choose
             </Button>
           </div>
-          <p v-if="pickError" class="mt-1 text-[11px] text-destructive">{{ pickError }}</p>
-          <p v-else class="mt-1 text-[11px] text-muted-foreground">{{ folderHint }}</p>
+          <p v-if="pickError" class="mt-1 text-xs text-destructive">{{ pickError }}</p>
+          <p v-else class="mt-1 text-xs text-muted-foreground">{{ folderHint }}</p>
         </div>
 
         <div>
@@ -235,11 +235,11 @@ async function submit(): Promise<void> {
           </div>
           <template v-else>
             <LinkBucketPicker v-model="query" class="mt-1" @select="pickSuggestion" @new="askNew" />
-            <p class="mt-1 text-[11px] text-muted-foreground">
+            <p class="mt-1 text-xs text-muted-foreground">
               Shows every bucket you can use, with its place. Nothing is created unless you choose New bucket.
             </p>
           </template>
-          <p v-if="bucketInvalid" class="mt-1 text-[11px] text-destructive">{{ bucketInvalid }}</p>
+          <p v-if="bucketInvalid" class="mt-1 text-xs text-destructive">{{ bucketInvalid }}</p>
         </div>
 
         <div>
@@ -258,7 +258,7 @@ async function submit(): Promise<void> {
                 <component :is="choice.icon" class="h-4 w-4 shrink-0 text-primary" />
                 {{ choice.title }}
               </span>
-              <span class="text-[11px] leading-snug text-muted-foreground">{{ choice.text }}</span>
+              <span class="text-xs leading-snug text-muted-foreground">{{ choice.text }}</span>
             </button>
           </div>
         </div>
@@ -273,12 +273,12 @@ async function submit(): Promise<void> {
                 Only this part of the bucket <span class="text-muted-foreground">(optional)</span>
               </span>
               <Input v-model="prefix" class="mt-1 font-mono text-xs" placeholder="2026/run-17/" aria-label="Prefix" />
-              <span class="mt-1 block text-[11px] text-muted-foreground">Leave empty to use the whole bucket.</span>
+              <span class="mt-1 block text-xs text-muted-foreground">Leave empty to use the whole bucket.</span>
             </label>
             <div v-if="uploads" class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <span class="text-xs font-medium text-foreground">Pass on deletions</span>
-                <p class="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                <p class="mt-0.5 text-xs leading-snug text-muted-foreground">
                   When you delete a file here, it is also deleted in Aruna. Earlier versions can still be restored.
                 </p>
               </div>

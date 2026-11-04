@@ -178,7 +178,7 @@ function addKeyword() {
             aria-label="Profile"
             @update:model-value="(value: string) => emit('profile', value)"
           />
-          <p class="mt-1 text-[11px] text-muted-foreground">
+          <p class="mt-1 text-xs text-muted-foreground">
             A profile pre-fills what it asks for and checks the draft against it. Nothing is locked,
             and "No profile" removes it again. Public profiles and the profiles of this dataset's group
             can be assigned; other groups' profiles are not listed.
@@ -189,7 +189,7 @@ function addKeyword() {
     </div>
 
     <div class="border-t border-border">
-      <p class="px-5 pb-1 pt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <p class="px-5 pb-1 pt-3 text-xs font-medium text-muted-foreground">
         More properties
       </p>
       <PropertyEditor

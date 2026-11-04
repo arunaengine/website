@@ -81,7 +81,7 @@ function onFocusOut(event: FocusEvent) {
       v-if="open"
       class="absolute left-0 right-0 top-10 z-40 overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md"
     >
-      <p v-if="error" class="px-3 py-2 text-[11px] text-destructive">{{ error }}</p>
+      <p v-if="error" class="px-3 py-2 text-xs text-destructive">{{ error }}</p>
       <Spinner v-else-if="searching && !rows.length" show-label label="Finding buckets…" class="px-3 py-2" />
       <ul v-if="rows.length" role="listbox" class="max-h-64 overflow-y-auto py-1">
         <li v-for="row in rows" :key="row.hit.arn">
@@ -106,7 +106,7 @@ function onFocusOut(event: FocusEvent) {
           </button>
         </li>
       </ul>
-      <p v-else-if="searched && !searching && !error && !more" class="px-3 py-2 text-[11px] text-muted-foreground">
+      <p v-else-if="searched && !searching && !error && !more" class="px-3 py-2 text-xs text-muted-foreground">
         No bucket matched.
       </p>
       <button

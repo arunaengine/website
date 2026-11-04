@@ -192,7 +192,7 @@ watch(
           @click="setScope('submission')"
         >Submission</Button>
       </div>
-      <p class="text-[11px] text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         {{ scope === 'family' ? 'Current request family' : 'All request families for this submission' }}
       </p>
     </div>
@@ -208,7 +208,7 @@ watch(
 
       <template v-else>
         <div v-if="sortedRecords.length" class="overflow-x-auto rounded-md border border-border">
-          <table class="w-full min-w-[48rem] text-left text-[11px]">
+          <table class="w-full min-w-[48rem] text-left text-xs">
             <thead class="bg-muted/50 text-muted-foreground">
               <tr>
                 <th scope="col" class="w-44 px-3 py-2 font-medium">Event time</th>
@@ -222,7 +222,7 @@ watch(
                   {{ formatAuditTime(record.at_ms) }}
                 </td>
                 <td class="px-3 py-2">
-                  <Badge variant="secondary" size="sm" class="uppercase">{{ KIND_LABEL[record.kind] ?? record.kind }}</Badge>
+                  <Badge variant="secondary" size="sm">{{ KIND_LABEL[record.kind] ?? record.kind }}</Badge>
                   <Badge
                     v-if="record.conflicting_family"
                     variant="outline"
@@ -231,7 +231,7 @@ watch(
                   >conflicting family</Badge>
                 </td>
                 <td class="px-3 py-2">
-                  <div class="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[10px] text-muted-foreground">
+                  <div class="flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs text-muted-foreground">
                     <span v-for="detail in recordDetails(record)" :key="detail">{{ detail }}</span>
                   </div>
                 </td>
@@ -245,19 +245,19 @@ watch(
           <Button v-if="nextCursor" variant="ghost" size="sm" :disabled="loadingMore" :aria-busy="loadingMore" @click="load(false)">
             <Spinner v-if="loadingMore" label="Loading more audit records" class="text-current" /> Load more
           </Button>
-          <p v-if="moreError" class="text-[11px] text-destructive">{{ moreError }}</p>
+          <p v-if="moreError" class="text-xs text-destructive">{{ moreError }}</p>
         </div>
 
         <section v-if="conflicts.length" class="space-y-2 rounded-md border border-border bg-muted/20 p-3">
           <div>
             <h3 class="text-xs font-semibold text-foreground">Record-key conflicts</h3>
-            <p class="text-[11px] text-muted-foreground">
+            <p class="text-xs text-muted-foreground">
               These records were refused because a different digest already occupied the same stable key.
             </p>
           </div>
           <ul class="divide-y divide-border" aria-label="Audit record conflicts">
-            <li v-for="conflict in conflicts" :key="conflict.digest" class="grid gap-1 py-2 text-[11px] sm:grid-cols-[6rem_1fr]">
-              <Badge variant="outline" size="sm" class="w-fit uppercase">{{ conflict.kind }}</Badge>
+            <li v-for="conflict in conflicts" :key="conflict.digest" class="grid gap-1 py-2 text-xs sm:grid-cols-[6rem_1fr]">
+              <Badge variant="outline" size="sm" class="w-fit">{{ conflict.kind }}</Badge>
               <div class="space-y-0.5 text-muted-foreground">
                 <p :title="conflict.digest">Refused digest <span class="font-mono">{{ truncateMiddle(conflict.digest) }}</span></p>
                 <p :title="conflict.retained">Retained digest <span class="font-mono">{{ truncateMiddle(conflict.retained) }}</span></p>
@@ -267,7 +267,7 @@ watch(
           </ul>
         </section>
 
-        <div v-if="projectionDigest" class="space-y-1 text-[11px] text-muted-foreground">
+        <div v-if="projectionDigest" class="space-y-1 text-xs text-muted-foreground">
           <div class="flex flex-wrap items-center gap-2">
             <span>Projection digest <span class="font-mono" :title="projectionDigest">{{ truncateMiddle(projectionDigest) }}</span></span>
             <Badge v-if="partial" variant="outline" size="sm" class="text-muted-foreground">Partial responder view</Badge>

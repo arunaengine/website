@@ -230,7 +230,7 @@ async function save() {
               aria-label="Custom name"
               :invalid="nameError ? 'error' : undefined"
             />
-            <p class="mt-1 text-[11px] text-muted-foreground">
+            <p class="mt-1 text-xs text-muted-foreground">
               <span class="font-mono">{name}</span> is the file name, <span class="font-mono">{id}</span> the version ID.
             </p>
             <p v-if="nameError" class="mt-1 text-xs text-destructive">{{ nameError }}</p>

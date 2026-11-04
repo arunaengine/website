@@ -14,7 +14,7 @@ const props = defineProps<{
   /** The display name the realm stores now; null when unset. */
   value?: string | null
   save: (name: string | null) => Promise<void>
-  /** Shows the Pencil only while the surrounding `group` is hovered or holds focus. */
+  /** Shows the Pencil in the muted text color. */
   quiet?: boolean
   /** An outline icon button, as it stands among the page header's buttons. */
   outline?: boolean
@@ -50,14 +50,14 @@ async function submit() {
     <Input v-model="draft" :aria-label="`New name for ${name}`" placeholder="Empty resets the name" maxlength="64" class="h-8 w-44 text-xs" />
     <Button type="submit" size="sm" :disabled="busy">Save</Button>
     <Button type="button" variant="ghost" size="sm" :disabled="busy" @click="editing = false">Cancel</Button>
-    <p v-if="error" role="alert" class="basis-full text-[11px] text-destructive">{{ error }}</p>
+    <p v-if="error" role="alert" class="basis-full text-xs text-destructive">{{ error }}</p>
   </form>
   <span v-else class="inline-flex min-w-0 items-center gap-0.5">
     <slot />
     <IconButton
       :label="`Rename ${name}`"
       :variant="outline ? 'outline' : undefined"
-      :class="quiet ? 'opacity-0 focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100' : undefined"
+      :class="quiet ? 'text-muted-foreground' : undefined"
       @click="start"
     >
       <Pencil :class="outline ? 'size-4' : 'h-3 w-3'" />

@@ -90,15 +90,15 @@ const csv = computed(() => Papa.unparse([props.columns, ...props.rows.map((row) 
       <BucketLink
         v-if="bucket"
         :bucket="bucket"
-        class="shrink-0 truncate text-[11px] text-primary hover:underline"
+        class="shrink-0 truncate text-xs text-primary hover:underline"
         :title="`Open the bucket ${bucket}`"
       >{{ bucket }}</BucketLink>
-      <span class="shrink-0 text-[11px] text-muted-foreground">{{ rows.length }} {{ rows.length === 1 ? 'row' : 'rows' }}</span>
+      <span class="shrink-0 text-xs text-muted-foreground">{{ rows.length }} {{ rows.length === 1 ? 'row' : 'rows' }}</span>
       <CopyButton :value="csv" label="Copy as CSV" />
     </div>
     <div class="scrollbar-thin max-h-72 overflow-auto">
       <table class="w-full table-auto text-left">
-        <thead class="sticky top-0 bg-muted/60 text-[10px] uppercase tracking-wider text-muted-foreground backdrop-blur">
+        <thead class="sticky top-0 bg-muted/60 text-xs text-muted-foreground backdrop-blur">
           <tr>
             <th v-for="(column, index) in columns" :key="index" class="whitespace-nowrap px-2.5 py-1.5 font-semibold">
               <button type="button" class="inline-flex items-center gap-1 hover:text-foreground" @click="sort(index)">

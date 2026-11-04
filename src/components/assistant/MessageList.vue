@@ -145,18 +145,18 @@ onUnmounted(() => listening?.removeEventListener('scroll', measure))
               <template #icon>
                 <Radar class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
               </template>
-              <time v-if="message.at" class="text-[10px] text-muted-foreground/70" :title="exact(message.at)">
+              <time v-if="message.at" class="text-xs text-muted-foreground/70" :title="exact(message.at)">
                 {{ ago(message.at) }}
               </time>
             </FoldRow>
             <p
               v-if="unfolded.has(message.id)"
-              class="whitespace-pre-wrap break-words rounded-md border border-border bg-muted/10 px-2.5 py-1.5 text-[11px] text-muted-foreground"
+              class="whitespace-pre-wrap break-words rounded-md border border-border bg-muted/10 px-2.5 py-1.5 text-xs text-muted-foreground"
             >{{ message.text }}</p>
           </div>
           <!-- A row the portal wrote for the reader, such as a model change. -->
           <div v-else-if="message.marker" class="flex justify-center">
-            <span class="rounded-full border border-border bg-muted/30 px-2.5 py-0.5 text-[10px] text-muted-foreground">
+            <span class="rounded-full border border-border bg-muted/30 px-2.5 py-0.5 text-xs text-muted-foreground">
               {{ message.text }}
             </span>
           </div>
@@ -165,14 +165,14 @@ onUnmounted(() => listening?.removeEventListener('scroll', measure))
               class="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-primary/10 px-3.5 py-2 leading-relaxed text-foreground"
               :class="props.size === 'full' ? 'text-sm' : 'text-xs'"
             >{{ message.text }}</div>
-            <time v-if="message.at" class="px-1 text-[10px] text-muted-foreground/70" :title="exact(message.at)">
+            <time v-if="message.at" class="px-1 text-xs text-muted-foreground/70" :title="exact(message.at)">
               {{ ago(message.at) }}
             </time>
           </div>
 
           <div v-else class="min-w-0" :class="props.size === 'full' ? 'space-y-2.5' : 'space-y-1.5'">
-            <p class="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-              <Sparkles class="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+            <p class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Sparkles class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
               Assistant
               <time v-if="message.at" class="font-normal text-muted-foreground/70" :title="exact(message.at)">
                 {{ ago(message.at) }}

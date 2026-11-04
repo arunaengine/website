@@ -96,11 +96,11 @@ const summary = computed(() => props.policy.expression.trim() || 'No expression 
           <span class="truncate text-sm font-medium text-foreground">
             {{ policy.name || 'Unnamed policy' }}
           </span>
-          <Badge :variant="policy.kind === 'require' ? 'warn' : 'destructive'" size="sm" class="uppercase">
+          <Badge :variant="policy.kind === 'require' ? 'warn' : 'destructive'" size="sm">
             {{ policy.kind }}
           </Badge>
-          <Badge v-if="!policy.enabled" variant="secondary" size="sm" class="uppercase">off</Badge>
-          <Badge v-if="problems.length" variant="warn" size="sm" class="uppercase">incomplete</Badge>
+          <Badge v-if="!policy.enabled" variant="secondary" size="sm">off</Badge>
+          <Badge v-if="problems.length" variant="warn" size="sm">incomplete</Badge>
         </div>
         <p v-if="!open" class="mt-1 truncate font-mono text-xs text-muted-foreground">{{ summary }}</p>
       </div>

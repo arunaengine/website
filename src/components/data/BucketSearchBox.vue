@@ -201,7 +201,7 @@ function pinNodeId(hit: BucketSearchHit): string | null {
         <span>Partial results, {{ nodesQueried - nodesFailed }} of {{ nodesQueried }} nodes answered; matches on failed nodes are missing.</span>
       </Notice>
 
-      <p v-if="error" class="px-2.5 py-2 text-[11px] text-destructive">{{ error }}</p>
+      <p v-if="error" class="px-2.5 py-2 text-xs text-destructive">{{ error }}</p>
 
       <Spinner v-else-if="searching && !visibleHits.length" show-label label="Searching buckets…" class="px-2.5 py-2" />
 
@@ -226,7 +226,7 @@ function pinNodeId(hit: BucketSearchHit): string | null {
                 <dt class="text-muted-foreground">Node</dt>
                 <dd class="min-w-0 break-all"><NodeLabel :node-id="hit.node_id" size="sm" /></dd>
                 <dt class="text-muted-foreground">Group</dt>
-                <dd class="min-w-0 break-all"><span class="font-medium">{{ hit.group_name || 'Unnamed group' }}</span><br><span class="font-mono text-[10px]">{{ hit.group_id }}</span></dd>
+                <dd class="min-w-0 break-all"><span class="font-medium">{{ hit.group_name || 'Unnamed group' }}</span><br><span class="font-mono text-xs">{{ hit.group_id }}</span></dd>
               </dl>
             </template>
             <template v-if="mode === 'browse' && !isLocalNode(hit.node_id)" #actions>
@@ -245,7 +245,7 @@ function pinNodeId(hit: BucketSearchHit): string | null {
         </li>
       </ul>
 
-      <p v-else-if="searched && !searching" class="px-2.5 py-2 text-[11px] text-muted-foreground">
+      <p v-else-if="searched && !searching" class="px-2.5 py-2 text-xs text-muted-foreground">
         {{ allowNew ? 'No existing bucket matched. This name will create a new target bucket.' : 'No buckets matched.' }}
       </p>
 

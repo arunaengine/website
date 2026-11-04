@@ -89,13 +89,13 @@ watch(currentUser, () => void ensureLoaded())
 
       <EmptyState
         v-else-if="!currentUser"
-        title="Sign in to manage your watches."
+        title="Sign in to manage your watches"
         description="Watches belong to your account and follow you across devices."
       />
 
       <EmptyState
         v-else-if="!available"
-        title="Watches are not available."
+        title="Watches are not available"
         description="This node does not serve watch subscriptions for your session."
       />
 

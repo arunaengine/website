@@ -276,13 +276,7 @@ const realmNodeCount = computed(() => infraNodes.value.length || (publicOverview
 
 // While a stored session restores, keep the copy neutral instead of flashing
 // the guest greeting and its sign-in hint.
-const pageTitle = computed(() =>
-  currentUser.value
-    ? `Welcome back, ${currentUser.value.name.split(' ')[0]}.`
-    : authPending.value
-      ? 'Welcome back.'
-      : 'Aruna data portal',
-)
+const pageTitle = computed(() => (currentUser.value || authPending.value ? 'Dashboard' : 'Aruna data portal'))
 const pageDescription = computed(() =>
   currentUser.value || authPending.value
     ? desktop

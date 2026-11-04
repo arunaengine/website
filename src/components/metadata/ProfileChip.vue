@@ -82,14 +82,14 @@ function retry(event: Event) {
   <span class="inline-flex shrink-0 flex-wrap items-center gap-1">
     <span
       v-if="!props.statusOnly"
-      class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary"
+      class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs text-primary"
       :title="title"
     >
       <ListChecks class="h-3 w-3" /> Reference: {{ chip.label }}
     </span>
     <span
       v-if="hasProfileReference"
-      class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]"
+      class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs"
       :class="validationClass"
       :title="validationTitle"
     >

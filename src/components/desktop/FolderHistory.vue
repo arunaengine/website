@@ -32,15 +32,15 @@ defineExpose({ reload: () => decisions.load(props.folderId) })
         <History class="h-4 w-4 text-primary" />
         <h2 class="font-display text-sm font-semibold text-aruna-navy">History</h2>
       </div>
-      <span class="text-[11px] text-muted-foreground">Your decisions</span>
+      <span class="text-xs text-muted-foreground">Your decisions</span>
     </header>
-    <p v-if="decisions.state.value === 'loading' || decisions.state.value === 'idle'" class="px-4 py-3 text-[11px] text-muted-foreground">
+    <p v-if="decisions.state.value === 'loading' || decisions.state.value === 'idle'" class="px-4 py-3 text-xs text-muted-foreground">
       Reading the history…
     </p>
-    <p v-else-if="decisions.state.value === 'unsupported'" class="px-4 py-3 text-[11px] text-muted-foreground">
+    <p v-else-if="decisions.state.value === 'unsupported'" class="px-4 py-3 text-xs text-muted-foreground">
       This version of Aruna does not keep a history of decisions yet.
     </p>
-    <p v-else-if="decisions.state.value !== 'ready'" class="px-4 py-3 text-[11px] text-destructive">
+    <p v-else-if="decisions.state.value !== 'ready'" class="px-4 py-3 text-xs text-destructive">
       The history could not be read{{ decisions.error.value ? `: ${decisions.error.value}` : '.' }}
     </p>
     <ul v-else-if="entries.length" class="divide-y divide-border/70">
@@ -51,14 +51,14 @@ defineExpose({ reload: () => decisions.load(props.folderId) })
         :class="entry.outcome === 'failed' ? 'text-destructive' : entry.outcome === 'stale' ? 'text-amber-700 dark:text-amber-300' : 'text-foreground'"
       >
         {{ entry.text }}
-        <span v-if="entry.atMs" class="mt-0.5 block text-[11px] text-muted-foreground">{{ dayTime(entry.atMs) }}</span>
+        <span v-if="entry.atMs" class="mt-0.5 block text-xs text-muted-foreground">{{ dayTime(entry.atMs) }}</span>
       </li>
     </ul>
-    <p v-else class="px-4 py-3 text-[11px] text-muted-foreground">You have not decided anything in this folder yet.</p>
-    <p v-if="decisions.partial.value" class="px-4 pb-2 text-[11px] text-muted-foreground">
+    <p v-else class="px-4 py-3 text-xs text-muted-foreground">You have not decided anything in this folder yet.</p>
+    <p v-if="decisions.partial.value" class="px-4 pb-2 text-xs text-muted-foreground">
       Part of the history could not be read.
     </p>
-    <p class="border-t border-border/70 px-4 py-2 text-[11px] text-muted-foreground">
+    <p class="border-t border-border/70 px-4 py-2 text-xs text-muted-foreground">
       Every file is listed, not only these. Open
       <RouterLink :to="{ name: 'device' }" class="text-primary hover:underline">This computer</RouterLink>
       for what is moving now.

@@ -156,7 +156,7 @@ function addCustom() {
       </div>
 
       <div v-if="commonTerms.length">
-        <div class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        <div class="text-xs font-medium text-muted-foreground">
           Common for {{ typeLabel }}
         </div>
         <div class="mt-1 flex flex-wrap gap-1.5">
@@ -164,7 +164,7 @@ function addCustom() {
             v-for="option in commonTerms"
             :key="option.uri"
             type="button"
-            class="rounded-full border border-border px-2.5 py-1 text-[11px] text-foreground transition-colors hover:border-aruna-royal/60 hover:bg-aruna-royal/10"
+            class="rounded-full border border-border px-2.5 py-1 text-xs text-foreground transition-colors hover:border-aruna-royal/60 hover:bg-aruna-royal/10"
             :title="option.description"
             @click="pickCommon(option)"
           >
@@ -184,13 +184,13 @@ function addCustom() {
       <button
         v-if="trimmed(query)"
         type="button"
-        class="block w-full rounded-md border border-dashed border-border px-3 py-2 text-left text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+        class="block w-full rounded-md border border-dashed border-border px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
         @click="addCustom"
       >
         <Plus class="mr-1 inline size-3" /> Create custom property "{{ trimmed(query) }}"
       </button>
 
-      <p class="text-[11px] text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         Picked properties are added as Optional; set Required or Recommended on the row afterwards.
       </p>
     </div>

@@ -90,13 +90,13 @@ const writeChoices = [
             required
             @update:model-value="selectModel"
           />
-          <p v-if="shownProvider === CENTRAL_PROVIDER_ID" class="mt-1 text-[11px] text-muted-foreground">
+          <p v-if="shownProvider === CENTRAL_PROVIDER_ID" class="mt-1 text-xs text-muted-foreground">
             The realm admin chose the models.
           </p>
-          <p v-else class="mt-1 text-[11px] text-muted-foreground">
+          <p v-else class="mt-1 text-xs text-muted-foreground">
             Pick an id, or type one and press Enter. A change applies to the next turn; a chat with history asks first.
           </p>
-          <p v-if="modelsError" class="mt-1 text-[11px] text-muted-foreground">{{ modelsError }}</p>
+          <p v-if="modelsError" class="mt-1 text-xs text-muted-foreground">{{ modelsError }}</p>
         </div>
         <div v-if="effortChoices.length">
           <p class="text-xs font-medium text-foreground">Reasoning</p>
@@ -119,7 +119,7 @@ const writeChoices = [
             aria-label="Web search"
             @update:model-value="(value: string) => setWebSearch(value === 'on')"
           />
-          <p class="mt-1 text-[11px] text-muted-foreground">
+          <p class="mt-1 text-xs text-muted-foreground">
             The provider runs the search; a provider without one keeps working unchanged.
           </p>
         </div>
@@ -133,7 +133,7 @@ const writeChoices = [
             aria-label="Writes"
             @update:model-value="(value: string) => setApproveWrites(value === 'ask')"
           />
-          <p class="mt-1 text-[11px] text-muted-foreground">
+          <p class="mt-1 text-xs text-muted-foreground">
             {{ approveWrites
               ? 'Every write asks you first.'
               : 'Writes run without asking; the chat says what ran.' }}

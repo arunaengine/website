@@ -920,7 +920,7 @@ async function save(anyway = false) {
                   <Notice tone="warning" :title="restrictedFiles.length ? 'Not everyone can read these files' : 'Some file access could not be checked'">
                     <p v-if="restrictedFiles.length">The dataset is public, but these files are not publicly readable. Readers will see them listed and cannot download them.</p>
                     <p v-if="publicUnchecked">Some files could not be checked. Retry the check, or save anyway knowing that readers may not be able to download all files.</p>
-                    <ul class="mt-1 list-disc space-y-0.5 pl-4 font-mono text-[11px]">
+                    <ul class="mt-1 list-disc space-y-0.5 pl-4 font-mono text-xs">
                       <li v-for="file in restrictedFiles" :key="file.entity_id" class="break-all">{{ fileLabel(file) }}</li>
                     </ul>
                     <p v-if="grantUnresolved.length" class="mt-1">

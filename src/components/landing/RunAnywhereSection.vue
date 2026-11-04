@@ -23,7 +23,7 @@ const nodes = [
     />
     <div class="container relative max-w-5xl">
       <div class="mx-auto max-w-2xl text-center">
-        <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Run anywhere</div>
+        <div class="text-xs font-semibold text-primary">Run anywhere</div>
         <h2 class="mt-3 text-balance font-display text-3xl font-semibold tracking-tight text-aruna-navy sm:text-4xl">
           One system, not a fleet of services.
         </h2>
@@ -37,7 +37,7 @@ const nodes = [
             <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <component :is="node.icon" class="h-4 w-4" aria-hidden="true" />
             </div>
-            <Badge size="sm" class="uppercase tracking-wide">{{ node.tag }}</Badge>
+            <Badge size="sm">{{ node.tag }}</Badge>
           </div>
           <h3 class="font-display text-base font-semibold text-aruna-navy">{{ node.title }}</h3>
           <p class="text-sm text-muted-foreground">{{ node.line }}</p>

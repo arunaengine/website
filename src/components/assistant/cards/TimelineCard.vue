@@ -19,7 +19,7 @@ function label(state: string): string {
     <div class="flex items-center gap-2 border-b border-border/60 px-2.5 py-1.5">
       <History class="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
       <span class="min-w-0 flex-1 truncate font-medium text-foreground">{{ view.title }}</span>
-      <span class="shrink-0 text-[11px] text-muted-foreground">
+      <span class="shrink-0 text-xs text-muted-foreground">
         {{ view.events.length }} {{ view.events.length === 1 ? 'event' : 'events' }}
       </span>
     </div>
@@ -30,7 +30,7 @@ function label(state: string): string {
         <div class="flex items-baseline gap-2">
           <span class="min-w-0 flex-1 text-foreground/90">{{ event.label }}</span>
           <Badge v-if="event.state" size="sm" :variant="stateVariant(event.state)">{{ label(event.state) }}</Badge>
-          <span class="shrink-0 text-[11px] text-muted-foreground" :title="event.at">{{ relativeTime(event.at) }}</span>
+          <span class="shrink-0 text-xs text-muted-foreground" :title="event.at">{{ relativeTime(event.at) }}</span>
         </div>
         <p v-if="event.detail" class="mt-0.5 leading-relaxed text-muted-foreground">{{ event.detail }}</p>
       </li>

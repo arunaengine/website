@@ -119,8 +119,8 @@ function changeType(choice: { uri: string; label: string }) {
           <h4 data-tour="profile-shape" data-tutorial="profile-shape" class="text-sm font-semibold text-foreground">{{ entity.label || 'Untitled entity' }}</h4>
         </Tooltip>
       </button>
-      <span class="text-[11px] text-muted-foreground">{{ entityTypeLabel(entity.type) }}</span>
-      <span class="text-[11px] text-muted-foreground">
+      <span class="text-xs text-muted-foreground">{{ entityTypeLabel(entity.type) }}</span>
+      <span class="text-xs text-muted-foreground">
         {{ entity.properties.length }} {{ entity.properties.length === 1 ? 'rule' : 'rules' }}
       </span>
       <Badge v-if="isRoot" variant="royal">Root dataset</Badge>
@@ -138,7 +138,7 @@ function changeType(choice: { uri: string; label: string }) {
         v-for="reference in references"
         :key="`${reference.entityLabel}-${reference.valueName}`"
         data-tour="profile-reference" data-tutorial="profile-reference"
-        class="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
+        class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
       >
         via {{ reference.valueName }} on {{ reference.entityLabel }}
       </span>
@@ -159,33 +159,33 @@ function changeType(choice: { uri: string; label: string }) {
       </Button>
     </header>
 
-    <p v-if="!isRoot && expanded" class="border-b border-border px-4 py-1.5 text-[11px] text-muted-foreground">
+    <p v-if="!isRoot && expanded" class="border-b border-border px-4 py-1.5 text-xs text-muted-foreground">
       Applied when a {{ entity.label || entityTypeLabel(entity.type) }} is described; it does not require one to exist on its own.
     </p>
 
     <div v-if="showDetails && expanded" class="grid gap-3 border-b border-border px-4 py-3 sm:grid-cols-2">
       <div>
-        <label class="text-[11px] font-medium text-muted-foreground">Label</label>
+        <label class="text-xs font-medium text-muted-foreground">Label</label>
         <Input v-model="entity.label" class="mt-0.5" :disabled="isRoot" />
       </div>
       <div v-if="isCustomType">
         <Tooltip label="The short name this custom type gets in the generated files, e.g. Specimen. It must stay distinct from every property name.">
-          <label class="text-[11px] font-medium text-muted-foreground">Class name</label>
+          <label class="text-xs font-medium text-muted-foreground">Class name</label>
         </Tooltip>
         <Input v-model="entity.className" class="mt-0.5" placeholder="e.g. Specimen" />
       </div>
       <div class="sm:col-span-2">
-        <label class="text-[11px] font-medium text-muted-foreground">Type</label>
-        <p class="mt-0.5 break-all font-mono text-[11px] text-muted-foreground">{{ normalizeTypeUri(entity.type) }}</p>
+        <label class="text-xs font-medium text-muted-foreground">Type</label>
+        <p class="mt-0.5 break-all font-mono text-xs text-muted-foreground">{{ normalizeTypeUri(entity.type) }}</p>
         <div v-if="!isRoot" class="mt-1.5">
           <EntityTypePicker :builder="builder" button-label="Change type" @pick="changeType" />
         </div>
-        <p v-if="!isRoot" class="mt-1 text-[11px] text-muted-foreground">
+        <p v-if="!isRoot" class="mt-1 text-xs text-muted-foreground">
           Changing the type keeps the rules below. Properties referencing the old type keep their target until you update them; this shape then shows as unreferenced.
         </p>
       </div>
       <div class="sm:col-span-2">
-        <label class="text-[11px] font-medium text-muted-foreground">Description</label>
+        <label class="text-xs font-medium text-muted-foreground">Description</label>
         <Textarea v-model="entity.description" class="mt-0.5" rows="2" :disabled="isRoot" />
       </div>
     </div>
@@ -193,7 +193,7 @@ function changeType(choice: { uri: string; label: string }) {
     <Notice
       v-if="isUnreferenced"
       tone="info"
-      class="flex flex-wrap items-center gap-2 rounded-none border-0 border-b px-4 py-2 text-[11px]"
+      class="flex flex-wrap items-center gap-2 rounded-none border-0 border-b px-4 py-2 text-xs"
     >
       <Info class="size-3.5 shrink-0" />
       <span>
@@ -208,7 +208,7 @@ function changeType(choice: { uri: string; label: string }) {
     <Notice
       v-else-if="isSharedDataset"
       tone="info"
-      class="flex flex-wrap items-center gap-2 rounded-none border-0 border-b px-4 py-2 text-[11px]"
+      class="flex flex-wrap items-center gap-2 rounded-none border-0 border-b px-4 py-2 text-xs"
     >
       <Info class="size-3.5 shrink-0" />
       <span>This shape targets every Dataset, including the root, so its rules also apply there.</span>
@@ -230,7 +230,7 @@ function changeType(choice: { uri: string; label: string }) {
         @over="dragOver(index)"
         @drop="dragIndex = null"
       />
-      <p v-if="!entity.properties.length" class="rounded-md border border-dashed border-border px-3 py-2 text-[11px] text-muted-foreground">
+      <p v-if="!entity.properties.length" class="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
         No rules yet. Add the properties a {{ entity.label || entityTypeLabel(entity.type) }} must, should or may carry.
       </p>
       <div data-tour="profile-add-property" data-tutorial="profile-add-property" class="space-y-1.5 pt-1">

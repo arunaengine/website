@@ -72,7 +72,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
     <div class="fixed inset-0 z-[70]">
       <div
         v-if="spot"
-        class="absolute rounded-lg ring-2 ring-primary transition-all duration-200"
+        class="absolute rounded-lg ring-2 ring-primary transition-[top,left,width,height] duration-200"
         :style="spotStyle"
         aria-hidden="true"
       />
@@ -88,7 +88,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         <div class="p-4">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">Guided tour</p>
+              <p class="text-xs font-semibold text-primary">Guided tour</p>
               <h2 class="mt-1 font-display text-sm font-semibold text-aruna-navy">{{ currentStep?.title }}</h2>
             </div>
             <Button variant="ghost" size="icon-sm" aria-label="End the tour" @click="stopTour">
@@ -101,7 +101,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               <span
                 v-for="dot in tourCount"
                 :key="dot"
-                class="h-1.5 rounded-full transition-all duration-200 motion-reduce:transition-none"
+                class="h-1.5 rounded-full transition-[width,background-color] duration-200 motion-reduce:transition-none"
                 :class="dot === tourIndex + 1 ? 'w-5 bg-primary' : dot < tourIndex + 1 ? 'w-1.5 bg-primary/50' : 'w-1.5 bg-border'"
               />
             </div>

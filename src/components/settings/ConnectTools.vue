@@ -288,14 +288,14 @@ function made(iso: string): string {
           <div class="mt-2 grid gap-2 sm:grid-cols-2">
             <div class="surface-inline flex items-center justify-between gap-2 bg-card px-3 py-2">
               <div class="min-w-0">
-                <p class="text-[11px] uppercase tracking-wide text-muted-foreground">Key ID</p>
+                <p class="text-xs text-muted-foreground">Key ID</p>
                 <p class="truncate font-mono text-xs text-foreground">{{ fresh.accessKeyId }}</p>
               </div>
               <CopyButton :value="fresh.accessKeyId" label="Copy key ID" />
             </div>
             <div class="surface-inline flex items-center justify-between gap-2 bg-card px-3 py-2">
               <div class="min-w-0">
-                <p class="text-[11px] uppercase tracking-wide text-muted-foreground">Secret</p>
+                <p class="text-xs text-muted-foreground">Secret</p>
                 <p class="truncate font-mono text-xs text-foreground">{{ fresh.secret }}</p>
               </div>
               <CopyButton :value="fresh.secret" label="Copy secret" />
@@ -315,7 +315,7 @@ function made(iso: string): string {
               </Badge>
               <Badge v-else variant="default" size="sm"><Laptop class="h-3 w-3" /> This computer</Badge>
             </div>
-            <p class="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+            <p class="mt-0.5 truncate font-mono text-xs text-muted-foreground">
               {{ key.access_key_id }}<template v-if="made(key.expires_at)"> · expires {{ made(key.expires_at) }}</template>
             </p>
           </div>

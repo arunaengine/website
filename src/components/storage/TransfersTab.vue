@@ -114,7 +114,7 @@ const stagingOpen = ref(false)
 
     <EmptyState
       v-if="kind === 'all' && allEmpty"
-      title="Nothing is copied into or out of this bucket."
+      title="Nothing is copied into or out of this bucket"
       description="Use Add to create a second bucket that follows this one, or to stage data."
     />
 

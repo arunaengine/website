@@ -25,9 +25,9 @@ const MARK = { add: '+', remove: '-', same: ' ' }
     <div class="flex items-center gap-2 border-b border-border/60 px-2.5 py-1.5">
       <GitCompare class="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
       <span class="min-w-0 flex-1 truncate font-medium text-foreground">{{ view.title }}</span>
-      <span class="shrink-0 font-mono text-[10px] text-muted-foreground">+{{ added }} -{{ removed }}</span>
+      <span class="shrink-0 font-mono text-xs text-muted-foreground">+{{ added }} -{{ removed }}</span>
     </div>
-    <p class="border-b border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground">
+    <p class="border-b border-border/60 px-2.5 py-1 text-xs text-muted-foreground">
       {{ view.beforeLabel }} <ArrowRight class="inline h-3 w-3 align-[-1px]" aria-hidden="true" /> {{ view.afterLabel }}
     </p>
     <p v-if="!added && !removed" class="px-3 py-2.5 text-muted-foreground">The two texts are the same.</p>
@@ -35,7 +35,7 @@ const MARK = { add: '+', remove: '-', same: ' ' }
       <div
         v-for="(line, index) in lines"
         :key="index"
-        class="flex gap-2 px-2.5 font-mono text-[11px] leading-5"
+        class="flex gap-2 px-2.5 font-mono text-xs leading-5"
         :class="TONE[line.op]"
       >
         <span class="shrink-0 select-none opacity-70" aria-hidden="true">{{ MARK[line.op] }}</span>

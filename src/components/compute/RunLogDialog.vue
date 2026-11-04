@@ -96,7 +96,7 @@ function download() {
   <DetailDialog :open="open" @update:open="(v: boolean) => emit('update:open', v)">
     <template #header>
       <DialogTitle class="font-display text-base font-semibold text-aruna-navy">Run log</DialogTitle>
-      <p class="mt-0.5 text-[11px] text-muted-foreground">Captured output of {{ name }}.</p>
+      <p class="mt-0.5 text-xs text-muted-foreground">Captured output of {{ name }}.</p>
     </template>
 
     <div class="flex h-full min-h-0 flex-col gap-3">
@@ -122,7 +122,7 @@ function download() {
       </div>
 
       <div
-        class="scrollbar-thin min-h-0 flex-1 overflow-auto rounded-md border border-border bg-muted/30 py-2 font-mono text-[11px] leading-relaxed"
+        class="scrollbar-thin min-h-0 flex-1 overflow-auto rounded-md border border-border bg-muted/30 py-2 font-mono text-xs leading-relaxed"
       >
         <p v-if="!lines.length" class="px-3 text-muted-foreground">This stream is empty.</p>
         <p v-else-if="!rows.length" class="px-3 text-muted-foreground">No line matches {{ find }}.</p>
@@ -140,7 +140,7 @@ function download() {
     </div>
 
     <template #footer>
-      <p class="text-[11px] text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         {{ rows.length }} of {{ lines.length }} line{{ lines.length === 1 ? '' : 's' }} shown.
       </p>
     </template>

@@ -177,11 +177,11 @@ async function submit() {
         <span class="text-xs font-medium text-foreground">Files to read</span>
         <Button variant="outline" size="sm" @click="inputsOpen = true"><Plus class="size-3.5" /> Add</Button>
       </div>
-      <p v-if="!draft.inputs.length" class="text-[11px] text-muted-foreground">
+      <p v-if="!draft.inputs.length" class="text-xs text-muted-foreground">
         No files staged. A picked object is read into the container at the path beside it.
       </p>
       <div v-for="(row, index) in draft.inputs" :key="`${row.bucket}/${row.key}/${index}`" class="flex items-center gap-2">
-        <span class="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground" :title="`s3://${row.bucket}/${row.key}`">
+        <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground" :title="`s3://${row.bucket}/${row.key}`">
           {{ row.key }}
         </span>
         <Input v-model="row.path" class="font-mono text-xs" aria-label="Path in the container" />
@@ -196,7 +196,7 @@ async function submit() {
         <span class="text-xs font-medium text-foreground">Files to keep</span>
         <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add</Button>
       </div>
-      <p v-if="!draft.outputs.length" class="text-[11px] text-muted-foreground">
+      <p v-if="!draft.outputs.length" class="text-xs text-muted-foreground">
         Nothing is kept yet. A captured path is stored in {{ context.workspaceBucket || 'the workspace bucket' }}.
       </p>
       <div v-for="(row, index) in draft.outputs" :key="index" class="flex items-center gap-2">
@@ -218,7 +218,7 @@ async function submit() {
       <Button size="sm" :disabled="!ready || submitting" @click="submit">
         <Send class="size-3.5" /> {{ submitting ? 'Sending…' : jobId ? 'Run again' : 'Run this step' }}
       </Button>
-      <span class="text-[11px] text-muted-foreground">Runs as an ordinary job, not in the kernel.</span>
+      <span class="text-xs text-muted-foreground">Runs as an ordinary job, not in the kernel.</span>
     </div>
 
     <JobCard v-if="jobId" :view="jobView" />

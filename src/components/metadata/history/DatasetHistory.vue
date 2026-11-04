@@ -204,7 +204,7 @@ function discardKept(conflict: VersionConflict) {
         title="History is not available on this node"
         description="Another node holds this dataset's history."
       />
-      <EmptyState v-else-if="history.state.value === 'forbidden'" title="You cannot see the history of this dataset." />
+      <EmptyState v-else-if="history.state.value === 'forbidden'" title="You cannot see the history of this dataset" />
       <ErrorPanel
         v-else-if="history.state.value !== 'ready'"
         :message="history.problemMessage.value || 'Failed to load the history.'"

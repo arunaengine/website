@@ -109,7 +109,7 @@ const fullPath = computed(() => {
 
       <div class="min-w-0 space-y-5">
         <section class="min-w-0">
-          <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Group</p>
+          <p class="mb-1 text-xs font-medium text-muted-foreground">Group</p>
           <GroupSelect
             :model-value="draft.groupId"
             :options="groupOptions"
@@ -127,7 +127,7 @@ const fullPath = computed(() => {
         </section>
 
         <section v-if="mode === 'create'" class="min-w-0">
-          <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Folder</p>
+          <p class="mb-1 text-xs font-medium text-muted-foreground">Folder</p>
           <p v-if="!draft.groupId" class="text-xs text-muted-foreground">Choose a group first.</p>
           <template v-else>
             <div class="min-w-0 rounded-md border border-border bg-muted/20 px-1.5">
@@ -161,7 +161,7 @@ const fullPath = computed(() => {
         </section>
 
         <section class="min-w-0">
-          <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Path</p>
+          <p class="mb-1 text-xs font-medium text-muted-foreground">Path</p>
           <p
             class="break-all rounded-md border border-dashed border-border px-3 py-2 font-mono text-xs text-foreground"
             :title="previewPath"
@@ -183,7 +183,7 @@ const fullPath = computed(() => {
               Customise the last part
             </Button>
             <div v-else class="mt-2 min-w-0">
-              <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <p class="mb-1 text-xs font-medium text-muted-foreground">
                 Name in the path
               </p>
               <Input
@@ -193,7 +193,7 @@ const fullPath = computed(() => {
                 placeholder="dataset-name"
                 @update:model-value="(value: string | number) => emit('slug', slugify(String(value)))"
               />
-              <p class="mt-1 text-[11px] text-muted-foreground">
+              <p class="mt-1 text-xs text-muted-foreground">
                 Derived from the dataset name. Letters, numbers and dashes.
               </p>
             </div>
@@ -201,8 +201,8 @@ const fullPath = computed(() => {
         </section>
 
         <section v-if="mode === 'create' && draft.groupId" class="min-w-0">
-          <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Storage location</p>
-          <p class="mb-2 text-[11px] text-muted-foreground">
+          <p class="mb-1 text-xs font-medium text-muted-foreground">Storage location</p>
+          <p class="mb-2 text-xs text-muted-foreground">
             Where files pushed to this dataset with Git are stored. Prefilled with the group's dataset location.
             The folder named after the dataset id is added when the dataset is created.
           </p>
@@ -213,7 +213,7 @@ const fullPath = computed(() => {
             prefix-placeholder="folder/"
             @update:model-value="(value) => emit('storage', value)"
           />
-          <p v-if="storageTarget" class="mt-2 break-all text-[11px] text-muted-foreground">
+          <p v-if="storageTarget" class="mt-2 break-all text-xs text-muted-foreground">
             Files go to <span class="font-mono text-foreground">{{ storageTarget }}</span>
             <Button
               v-if="!storageIsDefault && groupLocation"
@@ -228,7 +228,7 @@ const fullPath = computed(() => {
         </section>
 
         <section class="min-w-0">
-          <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Visibility</p>
+          <p class="mb-1 text-xs font-medium text-muted-foreground">Visibility</p>
           <div role="radiogroup" aria-label="Visibility" class="grid gap-2 sm:grid-cols-2">
             <button
               v-for="option in VISIBILITY"
@@ -246,10 +246,10 @@ const fullPath = computed(() => {
                 <component :is="option.icon" class="h-3.5 w-3.5 text-primary/70" />
                 {{ option.label }}
               </span>
-              <span class="mt-0.5 block text-[11px] text-muted-foreground">{{ option.hint }}</span>
+              <span class="mt-0.5 block text-xs text-muted-foreground">{{ option.hint }}</span>
             </button>
           </div>
-          <p v-if="draft.groupId" class="mt-1 text-[11px] text-muted-foreground">
+          <p v-if="draft.groupId" class="mt-1 text-xs text-muted-foreground">
             <RouterLink
               :to="{ name: 'group', params: { id: draft.groupId }, hash: '#policies' }"
               class="font-medium text-primary hover:underline"
@@ -259,7 +259,7 @@ const fullPath = computed(() => {
       </div>
 
       <DialogFooter class="min-w-0 items-center sm:justify-between">
-        <p class="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground" :title="fullPath">
+        <p class="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground" :title="fullPath">
           {{ fullPath }}
         </p>
         <Button size="sm" class="shrink-0" @click="emit('update:open', false)">Done</Button>

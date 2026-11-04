@@ -159,12 +159,12 @@ watch(
       <div>
         <label class="text-xs font-medium text-foreground">Group</label>
         <GroupSelect v-model="builder.groupId" :options="builder.groupOptions" class="mt-1" placeholder="Choose a group" :disabled="locked" :invalid="fieldError('group') ? 'error' : undefined" />
-        <p v-if="fieldError('group')" class="mt-1 text-[11px] text-destructive">{{ fieldError('group') }}</p>
+        <p v-if="fieldError('group')" class="mt-1 text-xs text-destructive">{{ fieldError('group') }}</p>
       </div>
       <div>
         <label class="text-xs font-medium text-foreground">Name</label>
         <Input v-model="builder.name" class="mt-1" placeholder="Proteomics dataset Profile" :invalid="fieldError('name') ? 'error' : undefined" />
-        <p v-if="fieldError('name')" class="mt-1 text-[11px] text-destructive">{{ fieldError('name') }}</p>
+        <p v-if="fieldError('name')" class="mt-1 text-xs text-destructive">{{ fieldError('name') }}</p>
       </div>
       <div>
         <Tooltip label="The short name in the profile's path and in the w3id address datasets point at. It cannot change once the profile is stored.">
@@ -178,33 +178,33 @@ watch(
           :invalid="fieldError('slug') ? 'error' : undefined"
           @update:model-value="(value: string | number) => builder.setSlug(value)"
         />
-        <p class="mt-1 text-[11px] text-muted-foreground">
+        <p class="mt-1 text-xs text-muted-foreground">
           <template v-if="locked">The stored path <code>profiles/{{ builder.slug }}</code> is fixed while editing.</template>
           <template v-else>Used in the profile path <code>profiles/{{ builder.slug || 'slug' }}</code>. Auto-filled from the name until you edit it.</template>
         </p>
-        <p v-if="fieldError('slug')" class="mt-1 text-[11px] text-destructive">{{ fieldError('slug') }}</p>
+        <p v-if="fieldError('slug')" class="mt-1 text-xs text-destructive">{{ fieldError('slug') }}</p>
       </div>
       <div>
         <label class="text-xs font-medium text-foreground">Version</label>
         <Input v-model="builder.version" class="mt-1" placeholder="0.1.0" :invalid="fieldError('version') ? 'error' : undefined" />
-        <p v-if="fieldError('version')" class="mt-1 text-[11px] text-destructive">{{ fieldError('version') }}</p>
+        <p v-if="fieldError('version')" class="mt-1 text-xs text-destructive">{{ fieldError('version') }}</p>
       </div>
       <div>
         <label class="text-xs font-medium text-foreground">Date published</label>
         <Input v-model="builder.datePublished" type="date" class="mt-1" :invalid="fieldError('datePublished') ? 'error' : undefined" />
-        <p v-if="fieldError('datePublished')" class="mt-1 text-[11px] text-destructive">{{ fieldError('datePublished') }}</p>
+        <p v-if="fieldError('datePublished')" class="mt-1 text-xs text-destructive">{{ fieldError('datePublished') }}</p>
       </div>
       <div>
         <label class="text-xs font-medium text-foreground">License URL</label>
         <Input v-model="builder.license" class="mt-1" :invalid="fieldError('license') ? 'error' : undefined" />
-        <p v-if="fieldError('license')" class="mt-1 text-[11px] text-destructive">{{ fieldError('license') }}</p>
+        <p v-if="fieldError('license')" class="mt-1 text-xs text-destructive">{{ fieldError('license') }}</p>
       </div>
     </div>
 
     <div>
       <label class="text-xs font-medium text-foreground">Description</label>
       <Textarea v-model="builder.description" class="mt-1" rows="2" placeholder="What this profile is for and who should use it." :invalid="fieldError('description') ? 'error' : undefined" />
-      <p v-if="fieldError('description')" class="mt-1 text-[11px] text-destructive">{{ fieldError('description') }}</p>
+      <p v-if="fieldError('description')" class="mt-1 text-xs text-destructive">{{ fieldError('description') }}</p>
     </div>
 
     <ProfileVisibility :builder="builder" :reference-warning="referenceWarning" />
@@ -226,7 +226,7 @@ watch(
         <ChevronDown class="h-4 w-4 text-muted-foreground transition-transform" :class="shapesOpen ? 'rotate-180' : ''" />
       </button>
       <div v-if="shapesOpen" class="space-y-3 border-t border-border px-3 py-3">
-        <p class="text-[11px] text-muted-foreground">
+        <p class="text-xs text-muted-foreground">
           Uploading SHACL shapes adds supported properties to the editable form rules. The original constraints are preserved in the same unified <code>shapes.ttl</code>, including constraints without a form equivalent.
         </p>
 
@@ -248,7 +248,7 @@ watch(
           <Button v-if="!builder.customShapesMeta" type="button" variant="outline" size="sm" :disabled="shapesBusy" @click="shapesFileInput?.click()">
             <Upload class="size-3.5" /> Upload .ttl
           </Button>
-          <span v-if="!builder.customShapesMeta" class="text-[11px] text-muted-foreground">or</span>
+          <span v-if="!builder.customShapesMeta" class="text-xs text-muted-foreground">or</span>
           <div class="flex min-w-[220px] flex-1 items-center gap-2">
             <Input v-model="shapesUrl" placeholder="https://…/shapes.ttl" @keydown.enter="shapesFromUrl" />
             <Button type="button" variant="outline" size="sm" :disabled="shapesBusy || !shapesUrl.trim()" @click="shapesFromUrl">
@@ -258,7 +258,7 @@ watch(
           </div>
         </div>
 
-        <p v-if="shapesError" class="text-[11px] text-destructive">{{ shapesError }}</p>
+        <p v-if="shapesError" class="text-xs text-destructive">{{ shapesError }}</p>
       </div>
     </div>
   </section>

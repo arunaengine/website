@@ -157,7 +157,7 @@ const dois = computed(() => doiRows(secondaryIdentifiers(rows.value, 'doi'), pro
           <p v-if="state === 'requested' || state === 'processing'" class="text-xs text-muted-foreground">
             Registration runs automatically in the background on the PID authority; the identifier is
             not live until it finishes.
-            <code v-if="view.job_id" class="ml-1 font-mono text-[11px]">{{ view.job_id }}</code>
+            <code v-if="view.job_id" class="ml-1 font-mono text-xs">{{ view.job_id }}</code>
           </p>
           <p v-else-if="state === 'active' && isPublic" class="text-xs text-muted-foreground">
             The identifier redirects anonymous visitors to this dataset's RO-Crate.

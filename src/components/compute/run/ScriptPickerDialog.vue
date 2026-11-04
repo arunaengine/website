@@ -47,10 +47,10 @@ const {
         </div>
       </Notice>
       <ObjectBrowserPanel v-else all-nodes @select="onScriptPick" />
-      <p v-if="loadScriptBusy && !(pendingScriptPick && editorHasCustomContent)" class="text-[11px] text-muted-foreground">
+      <p v-if="loadScriptBusy && !(pendingScriptPick && editorHasCustomContent)" class="text-xs text-muted-foreground">
         Loading script…
       </p>
-      <p v-if="loadScriptError" class="text-[11px] text-destructive">{{ loadScriptError }}</p>
+      <p v-if="loadScriptError" class="text-xs text-destructive">{{ loadScriptError }}</p>
       <DialogFooter>
         <DialogClose as-child><Button variant="outline">Close</Button></DialogClose>
       </DialogFooter>

@@ -347,7 +347,7 @@ async function save() {
               <span v-if="realmNodeCount"><Server />Across <b>{{ formatNumber(realmNodeCount) }}</b> {{ realmNodeCount === 1 ? 'node' : 'nodes' }}</span>
             </OverviewCell>
           </div>
-          <EmptyState v-else title="Realm totals need a signed-in session on a quota-aware node." />
+          <EmptyState v-else title="Realm totals need a signed-in session on a quota-aware node" />
         </section>
 
         <section id="policy" class="scroll-mt-24" aria-labelledby="admin-policy-heading">
@@ -362,7 +362,7 @@ async function save() {
                 <template v-if="!draft.defaultQuota.unlimited">
                   <Input v-model="draft.defaultQuota.value" type="number" min="0" placeholder="0" class="w-32" />
                   <Select v-model="draft.defaultQuota.unit" :options="unitOptions" class="w-24" />
-                  <span class="text-[11px] text-muted-foreground">= {{ formatBytes(fieldBytes(draft.defaultQuota) ?? 0) }}</span>
+                  <span class="text-xs text-muted-foreground">= {{ formatBytes(fieldBytes(draft.defaultQuota) ?? 0) }}</span>
                 </template>
               </div>
             </div>
@@ -407,7 +407,7 @@ async function save() {
                 <Input v-model="o.grace" type="number" min="100" placeholder="grace %" class="w-28" :disabled="o.quota.unlimited" />
                 <Button variant="ghost" size="sm" class="ml-auto text-destructive hover:text-destructive" @click="removeOverride(i)"><Trash2 class="h-3.5 w-3.5" /></Button>
               </div>
-              <div class="mt-1.5 text-[11px] text-muted-foreground">
+              <div class="mt-1.5 text-xs text-muted-foreground">
                 <template v-if="o.quota.unlimited">Unlimited, exempts this group from byte quotas entirely.</template>
                 <template v-else>
                   <span v-if="quotaFieldValid(o.quota)">Quota {{ formatBytes(fieldBytes(o.quota) ?? 0) }}</span>
@@ -426,15 +426,15 @@ async function save() {
               <div class="flex flex-wrap items-center gap-2">
                 <div class="min-w-0" :title="u.user_id">
                   <RouterLink :to="{ name: 'user', params: { id: u.user_id } }" class="block truncate text-sm font-medium text-foreground hover:underline">{{ capName(u) }}</RouterLink>
-                  <div v-if="capHasName(u)" class="truncate font-mono text-[10px] text-muted-foreground">{{ shortUserId(u.user_id) }}</div>
+                  <div v-if="capHasName(u)" class="truncate font-mono text-xs text-muted-foreground">{{ shortUserId(u.user_id) }}</div>
                 </div>
                 <div class="ml-auto flex items-center gap-2">
-                  <label :for="`user-cap-${i}`" class="text-[11px] font-medium text-muted-foreground">Max groups</label>
+                  <label :for="`user-cap-${i}`" class="text-xs font-medium text-muted-foreground">Max groups</label>
                   <Input :id="`user-cap-${i}`" v-model="u.max_groups" type="number" min="0" placeholder="Unlimited" class="w-24 text-right" />
                   <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="removeUserCap(i)"><Trash2 class="h-3.5 w-3.5" /></Button>
                 </div>
               </div>
-              <p class="mt-1.5 text-[11px] text-muted-foreground">{{ maxGroupsPreview(u.max_groups) }}</p>
+              <p class="mt-1.5 text-xs text-muted-foreground">{{ maxGroupsPreview(u.max_groups) }}</p>
             </div>
             <p v-if="!draft.userCaps.length" class="text-xs text-muted-foreground">No per-user overrides. The global maximum applies to everyone.</p>
             <div class="relative max-w-md">
@@ -451,7 +451,7 @@ async function save() {
                   @click="addUserCap(hit)"
                 >
                   <span class="truncate text-foreground">{{ hit.name || shortUserId(hit.user_id) }}</span>
-                  <span class="shrink-0 font-mono text-[10px] text-muted-foreground" :title="hit.user_id">{{ shortUserId(hit.user_id) }}</span>
+                  <span class="shrink-0 font-mono text-xs text-muted-foreground" :title="hit.user_id">{{ shortUserId(hit.user_id) }}</span>
                 </button>
               </div>
             </div>

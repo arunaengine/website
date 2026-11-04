@@ -42,7 +42,7 @@ function when(updatedAt: number): string {
   <section aria-label="Assistant chats" class="flex min-h-0 flex-col overflow-hidden">
     <div class="flex shrink-0 items-center justify-between gap-2 px-3 py-2">
       <span class="text-xs font-medium text-muted-foreground">Chats</span>
-      <span v-if="historyReady" class="text-[11px] tabular-nums text-muted-foreground">{{ chats.length }}</span>
+      <span v-if="historyReady" class="text-xs tabular-nums text-muted-foreground">{{ chats.length }}</span>
       <Spinner v-else />
     </div>
 
@@ -95,7 +95,7 @@ function when(updatedAt: number): string {
                 {{ chat.title }}
               </span>
             </span>
-            <span class="mt-0.5 block truncate text-[11px] text-muted-foreground">
+            <span class="mt-0.5 block truncate text-xs text-muted-foreground">
               {{ when(chat.updatedAt) }} · {{ chat.messages.length }} {{ chat.messages.length === 1 ? 'message' : 'messages' }}
             </span>
           </button>
@@ -103,7 +103,7 @@ function when(updatedAt: number): string {
             <Button
               variant="ghost"
               size="icon-sm"
-              class="shrink-0 opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+              class="shrink-0 text-muted-foreground"
               :aria-label="`Rename ${chat.title}`"
               :title="`Rename ${chat.title}`"
               @click="beginRename(chat.id, chat.title)"
@@ -111,7 +111,7 @@ function when(updatedAt: number): string {
             <Button
               variant="ghost"
               size="icon-sm"
-              class="shrink-0 text-destructive opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+              class="shrink-0 text-muted-foreground hover:text-destructive"
               :aria-label="`Delete ${chat.title}`"
               :title="`Delete ${chat.title}`"
               @click="deleteChat(chat.id)"

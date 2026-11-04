@@ -173,7 +173,7 @@ function pickRemote(hit: TermHit) {
     v-if="matches.length || showRemoteSection"
     class="mt-1.5 rounded-md border border-border bg-muted/20 px-2.5 py-2"
   >
-    <p v-if="heading" class="mb-1 flex items-center gap-1 text-[11px] font-medium text-foreground">
+    <p v-if="heading" class="mb-1 flex items-center gap-1 text-xs font-medium text-foreground">
       <Lightbulb class="h-3 w-3 shrink-0 text-amber-500" /> {{ heading }}
     </p>
     <ul v-if="matches.length" class="space-y-0.5">
@@ -182,7 +182,7 @@ function pickRemote(hit: TermHit) {
              handler on it cannot unmount this list before the click lands. -->
         <button
           type="button"
-          class="flex w-full items-baseline gap-1.5 rounded px-1.5 py-1 text-left text-[11px] transition-colors hover:bg-muted"
+          class="flex w-full items-baseline gap-1.5 rounded px-1.5 py-1 text-left text-xs transition-colors hover:bg-muted"
           :title="term.uri"
           @mousedown.prevent
           @click="emit('pick', term)"
@@ -197,7 +197,7 @@ function pickRemote(hit: TermHit) {
     <!-- Section 2: streamed remote hits. Only ever additive on top of the
          bundled results; a degraded provider shows a hint + status dot. -->
     <div v-if="showRemoteSection" :class="matches.length ? 'mt-1.5 border-t border-border/60 pt-1.5' : ''">
-      <p class="mb-0.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+      <p class="mb-0.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
         More from terminology services
         <Spinner v-if="remotePending" label="Searching terminology services…" class="[&>svg]:size-3" />
         <StatusDot v-if="degraded.length" tone="attention" :label="degradedTooltip" class="size-1.5" />
@@ -206,7 +206,7 @@ function pickRemote(hit: TermHit) {
         <li v-for="hit in remoteHits" :key="hit.iri">
           <button
             type="button"
-            class="flex w-full items-baseline gap-1.5 rounded px-1.5 py-1 text-left text-[11px] transition-colors hover:bg-muted"
+            class="flex w-full items-baseline gap-1.5 rounded px-1.5 py-1 text-left text-xs transition-colors hover:bg-muted"
             :title="hit.iri"
             @mousedown.prevent
             @click="pickRemote(hit)"
@@ -221,7 +221,7 @@ function pickRemote(hit: TermHit) {
       </ul>
       <p
         v-if="showDegradedHint"
-        class="mt-1 flex items-baseline gap-1.5 text-[11px] text-muted-foreground"
+        class="mt-1 flex items-baseline gap-1.5 text-xs text-muted-foreground"
       >
         <span class="min-w-0">Remote terminology service unreachable, showing bundled vocabulary.</span>
         <button

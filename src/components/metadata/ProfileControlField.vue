@@ -266,7 +266,7 @@ function update(value: unknown) {
           <X />
         </Button>
       </div>
-      <p v-if="!scalarRows.length" class="mt-1 text-[11px] text-muted-foreground">No values yet.</p>
+      <p v-if="!scalarRows.length" class="mt-1 text-xs text-muted-foreground">No values yet.</p>
       <Button variant="outline" size="sm" class="mt-1" :disabled="disabled" @click="addScalarRow">
         <Plus class="size-3.5" /> Add value
       </Button>
@@ -297,7 +297,7 @@ function update(value: unknown) {
           <span class="truncate">{{ option.label }}</span>
         </label>
       </div>
-      <p v-else class="mt-1 text-[11px] text-muted-foreground">No usable options.</p>
+      <p v-else class="mt-1 text-xs text-muted-foreground">No usable options.</p>
     </template>
     <Select
       v-else-if="control.control === 'select'"
@@ -320,7 +320,7 @@ function update(value: unknown) {
         placeholder="Choose an option"
         @update:model-value="(value: string) => update(value)"
       />
-      <p v-else class="mt-1 text-[11px] text-muted-foreground">No usable options.</p>
+      <p v-else class="mt-1 text-xs text-muted-foreground">No usable options.</p>
     </template>
     <label v-else-if="control.control === 'checkbox'" class="mt-1 flex items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-sm" :class="invalidBoxClass">
       <span>{{ control.description || 'Enabled' }}</span>
@@ -358,7 +358,7 @@ function update(value: unknown) {
           @update:model-value="(value: string) => update(value)"
         />
       </template>
-      <p v-else-if="entityInput === 'existing-crate'" class="mt-1 text-[11px] text-muted-foreground">Add a data reference below, then pick it here.</p>
+      <p v-else-if="entityInput === 'existing-crate'" class="mt-1 text-xs text-muted-foreground">Add a data reference below, then pick it here.</p>
       <!-- external (multiple): a repeatable list of reference URIs. -->
       <div v-else-if="control.multiple">
         <div class="flex justify-end">
@@ -380,7 +380,7 @@ function update(value: unknown) {
               <X />
             </Button>
           </div>
-          <p v-if="referenceError(reference)" class="mt-1 text-[11px] text-destructive">{{ REFERENCE_URI_MESSAGE }}</p>
+          <p v-if="referenceError(reference)" class="mt-1 text-xs text-destructive">{{ REFERENCE_URI_MESSAGE }}</p>
         </div>
       </div>
       <!-- external / depth-1 nested reference (single): one absolute URI. -->
@@ -406,13 +406,13 @@ function update(value: unknown) {
       v-bind="constraintAttrs"
       @update:model-value="(value: string | number) => update(value)"
     />
-    <p v-if="showDescription" class="mt-1 text-[11px] text-muted-foreground">{{ control.description }}</p>
-    <p v-if="constraintHint" class="mt-1 text-[11px] text-muted-foreground">{{ constraintHint }}</p>
+    <p v-if="showDescription" class="mt-1 text-xs text-muted-foreground">{{ control.description }}</p>
+    <p v-if="constraintHint" class="mt-1 text-xs text-muted-foreground">{{ constraintHint }}</p>
     <template v-for="violation in violations ?? []" :key="violation.ruleId + violation.pointer">
-      <p class="mt-1 text-[11px]" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">
+      <p class="mt-1 text-xs" :class="violation.severity === 'error' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'">
         {{ violation.message }}
       </p>
-      <p v-if="violation.hint" class="text-[11px] text-muted-foreground">{{ violation.hint }}</p>
+      <p v-if="violation.hint" class="text-xs text-muted-foreground">{{ violation.hint }}</p>
     </template>
   </div>
 </template>

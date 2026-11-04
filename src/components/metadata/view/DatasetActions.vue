@@ -151,19 +151,19 @@ async function toggleFav() {
     <DropdownMenuContent align="end" class="w-80 p-1.5">
       <template v-if="run">
         <DropdownMenuItem class="cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2" @click="copyToClipboard(locationHref())">
-          <Link class="h-4 w-4 shrink-0 text-primary" /> Copy link
+          <Link class="h-4 w-4 shrink-0 text-muted-foreground" /> Copy link
         </DropdownMenuItem>
         <DropdownMenuItem v-if="current && canWrite" class="cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2" @click="router.push({ name: 'dataset-edit', params: { id: detailId } })">
-          <Pencil class="h-4 w-4 shrink-0 text-primary" /> Edit
+          <Pencil class="h-4 w-4 shrink-0 text-muted-foreground" /> Edit
         </DropdownMenuItem>
         <DropdownMenuItem v-if="current && assistantAvailable" class="cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2" @click="askAi">
-          <Sparkles class="h-4 w-4 shrink-0 text-primary" /> Ask AI
+          <Sparkles class="h-4 w-4 shrink-0 text-muted-foreground" /> Ask AI
         </DropdownMenuItem>
         <DropdownMenuSeparator />
       </template>
       <template v-if="currentUser">
         <DropdownMenuItem class="cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2" @click="emit('share')">
-          <Share2 class="h-4 w-4 shrink-0 text-primary" /> Share
+          <Share2 class="h-4 w-4 shrink-0 text-muted-foreground" /> Share
         </DropdownMenuItem>
         <DropdownMenuSeparator />
       </template>
@@ -173,7 +173,7 @@ async function toggleFav() {
         :disabled="!crateHasEntities"
         @click="downloadCrateJson(currentCrate)"
       >
-        <FileJson2 class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <FileJson2 class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
         <span class="min-w-0">
           <span class="block text-sm font-medium text-foreground">Metadata file only</span>
           <span class="block text-xs leading-relaxed text-muted-foreground">Downloads ro-crate-metadata.json without any data files.</span>
@@ -184,7 +184,7 @@ async function toggleFav() {
         class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5"
         @click="emit('export')"
       >
-        <FileArchive class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <FileArchive class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
         <span class="min-w-0">
           <span class="block text-sm font-medium text-foreground">Whole dataset as a zip archive</span>
           <span class="block text-xs leading-relaxed text-muted-foreground">The metadata with the data files it references, prepared in the background.</span>
@@ -195,7 +195,7 @@ async function toggleFav() {
         class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5"
         @click="emit('publish')"
       >
-        <Send class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <Send class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
         <span class="min-w-0">
           <span class="block text-sm font-medium text-foreground">Publish to repository</span>
           <span class="block text-xs leading-relaxed text-muted-foreground">Deposits the dataset in a repository such as Zenodo.</span>
@@ -205,7 +205,7 @@ async function toggleFav() {
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Import</DropdownMenuLabel>
         <DropdownMenuItem class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5" @click="emit('import')">
-          <Upload class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <Upload class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
           <span class="min-w-0">
             <span class="block text-sm font-medium text-foreground">Replace this dataset from a file</span>
             <span class="block text-xs leading-relaxed text-muted-foreground">Overwrites it with an uploaded ro-crate-metadata.json, previewed first.</span>
@@ -214,7 +214,7 @@ async function toggleFav() {
       </template>
       <DropdownMenuSeparator />
       <DropdownMenuItem class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5" @click="emit('raw')">
-        <Code2 class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <Code2 class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
         <span class="block text-sm font-medium text-foreground">View raw JSON-LD</span>
       </DropdownMenuItem>
       <template v-if="current && canWrite">

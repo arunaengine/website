@@ -281,10 +281,10 @@ watch(
           aria-label="Container mount directory"
           :invalid="!mountDirValid ? 'error' : undefined"
         />
-        <p v-if="!mountDirValid" class="mt-1 text-[11px] text-destructive">
+        <p v-if="!mountDirValid" class="mt-1 text-xs text-destructive">
           Use an absolute directory path such as /work/in/.
         </p>
-        <p v-else class="mt-1 text-[11px] text-muted-foreground">
+        <p v-else class="mt-1 text-xs text-muted-foreground">
           Selected files are staged below this container directory; folders keep their name as a subdirectory.
         </p>
       </div>
@@ -312,8 +312,8 @@ watch(
         </div>
         <ObjectBrowserPanel v-else selectable @add="addSelection" @selection-change="pendingSelection = $event" />
         <div v-if="currentUser && (remoteOwn === null || remoteOwn.length || remoteState !== 'complete')" class="space-y-1">
-          <p class="text-[11px] font-medium text-foreground">{{ localHeld === false ? 'Your buckets' : 'On other nodes' }}</p>
-          <p v-if="remoteOwn === null" class="text-[11px] text-muted-foreground">Listing your buckets on the other nodes…</p>
+          <p class="text-xs font-medium text-foreground">{{ localHeld === false ? 'Your buckets' : 'On other nodes' }}</p>
+          <p v-if="remoteOwn === null" class="text-xs text-muted-foreground">Listing your buckets on the other nodes…</p>
           <button
             v-for="hit in remoteOwn ?? []"
             :key="`${hit.node_id}/${hit.bucket}`"
@@ -335,16 +335,16 @@ watch(
       <DatabasesTab v-else-if="source === 'databases'" bucket="" @choose="chooseDatabase" />
       <BucketSearchBox v-else mode="picker" placeholder="Find a bucket you may read…" @select="chooseBucket" />
       <div v-if="previewPaths.length" class="rounded-md border border-border bg-muted/20 px-3 py-2">
-        <p class="text-[11px] font-medium text-foreground">Will be staged as</p>
-        <ul class="mt-1 space-y-0.5 font-mono text-[11px] text-muted-foreground">
+        <p class="text-xs font-medium text-foreground">Will be staged as</p>
+        <ul class="mt-1 space-y-0.5 font-mono text-xs text-muted-foreground">
           <li v-for="line in previewPaths.slice(0, PREVIEW_LIMIT)" :key="line" class="truncate" :title="line">{{ line }}</li>
           <li v-if="previewPaths.length > PREVIEW_LIMIT" class="font-sans">and {{ previewPaths.length - PREVIEW_LIMIT }} more</li>
         </ul>
       </div>
-      <p v-if="folderBusy" class="mt-2 text-[11px] text-muted-foreground">Expanding selected folders…</p>
-      <p v-if="folderError" class="mt-2 text-[11px] text-destructive">{{ folderError }}</p>
+      <p v-if="folderBusy" class="mt-2 text-xs text-muted-foreground">Expanding selected folders…</p>
+      <p v-if="folderError" class="mt-2 text-xs text-destructive">{{ folderError }}</p>
 
-      <p class="text-[11px] text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         External sources (S3, HTTP, WebDAV, FTP) are referenced into a bucket first: in the
         <RouterLink :to="{ name: 'buckets' }" class="font-medium text-primary hover:underline">Data view</RouterLink>,
         open a bucket, choose Upload, then Add from…, and use From connector with the Reference strategy. Then pick the referenced objects here.

@@ -95,7 +95,7 @@ function tabindexFor(index: number): number {
             <Badge size="sm"
               v-if="option.badgeLabel"
               :variant="option.badgeVariant ?? 'outline'"
-              class="uppercase"
+             
             >
               {{ option.badgeLabel }}
             </Badge>
@@ -103,7 +103,7 @@ function tabindexFor(index: number): number {
           <span class="mt-1 block text-xs leading-relaxed text-muted-foreground">{{ option.description }}</span>
         </span>
       </button>
-      <Notice v-if="option.warning" tone="warning" class="mt-1.5 flex items-start gap-2 text-[11px]">
+      <Notice v-if="option.warning" tone="warning" class="mt-1.5 flex items-start gap-2 text-xs">
         <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
         <span>{{ option.warning }}</span>
       </Notice>

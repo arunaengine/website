@@ -47,7 +47,7 @@ defineProps<{ stages: WatchStage[]; error?: string | null }>()
           >
             {{ stage.label }}
           </div>
-          <div v-if="stage.detail" class="mt-0.5 break-all font-mono text-[11px] text-muted-foreground">
+          <div v-if="stage.detail" class="mt-0.5 break-all font-mono text-xs text-muted-foreground">
             {{ stage.detail }}
           </div>
         </div>

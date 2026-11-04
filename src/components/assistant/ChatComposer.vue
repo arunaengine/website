@@ -266,7 +266,7 @@ function onKeydown(event: KeyboardEvent) {
     </div>
     <p
       v-if="props.size === 'full' || quota"
-      class="flex items-center justify-between gap-3 px-1 text-[11px] text-muted-foreground"
+      class="flex items-center justify-between gap-3 px-1 text-xs text-muted-foreground"
     >
       <span v-if="props.size === 'full'">Enter sends, Shift+Enter starts a new line.</span>
       <span

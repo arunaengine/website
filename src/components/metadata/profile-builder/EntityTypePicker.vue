@@ -104,13 +104,13 @@ function pickVocab(term: VocabTerm) {
       </div>
 
       <div v-if="profileShapes.length">
-        <div class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Shapes in this profile</div>
+        <div class="text-xs font-medium text-muted-foreground">Shapes in this profile</div>
         <div class="mt-1 flex flex-wrap gap-1.5">
           <button
             v-for="option in profileShapes"
             :key="option.uri"
             type="button"
-            class="rounded-full border border-aruna-royal/40 bg-aruna-royal/5 px-2.5 py-1 text-[11px] text-foreground transition-colors hover:border-aruna-royal/70 hover:bg-aruna-royal/10"
+            class="rounded-full border border-aruna-royal/40 bg-aruna-royal/5 px-2.5 py-1 text-xs text-foreground transition-colors hover:border-aruna-royal/70 hover:bg-aruna-royal/10"
             :title="option.uri"
             @click="pick(option.uri, option.label)"
           >
@@ -120,13 +120,13 @@ function pickVocab(term: VocabTerm) {
       </div>
 
       <div v-if="curatedTypes.length">
-        <div class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Common types</div>
+        <div class="text-xs font-medium text-muted-foreground">Common types</div>
         <div class="mt-1 flex flex-wrap gap-1.5">
           <button
             v-for="option in curatedTypes"
             :key="option.uri"
             type="button"
-            class="rounded-full border border-border px-2.5 py-1 text-[11px] text-foreground transition-colors hover:border-aruna-royal/60 hover:bg-aruna-royal/10"
+            class="rounded-full border border-border px-2.5 py-1 text-xs text-foreground transition-colors hover:border-aruna-royal/60 hover:bg-aruna-royal/10"
             :title="option.uri"
             @click="pick(option.uri, option.label)"
           >
@@ -140,7 +140,7 @@ function pickVocab(term: VocabTerm) {
       <button
         v-if="customUri"
         type="button"
-        class="block w-full rounded-md border border-dashed border-border px-3 py-2 text-left text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+        class="block w-full rounded-md border border-dashed border-border px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
         @click="pick(customUri, entityTypeLabel(customUri))"
       >
         <Plus class="mr-1 inline size-3" /> Use type URI "{{ customUri }}"

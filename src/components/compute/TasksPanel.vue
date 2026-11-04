@@ -506,7 +506,7 @@ onUnmounted(() => {
       <span class="flex-1">Runs on {{ otherNodes.failed.join(', ') }} could not be read.</span>
       <Button variant="outline" size="sm" :disabled="spinning" @click="onReload">Retry</Button>
     </Notice>
-    <p v-if="otherNodes.truncated.length" class="text-[11px] text-muted-foreground">Only the newest 50 runs of {{ otherNodes.truncated.join(', ') }} are shown.</p>
+    <p v-if="otherNodes.truncated.length" class="text-xs text-muted-foreground">Only the newest 50 runs of {{ otherNodes.truncated.join(', ') }} are shown.</p>
 
     <section v-if="painted && shellState === 'ready'">
     <SectionHeading title="Overview" :icon="Gauge" />

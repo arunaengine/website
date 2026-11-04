@@ -19,7 +19,7 @@ const {
 </script>
 
 <template>
-  <p class="max-w-2xl rounded-md border border-border bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+  <p class="max-w-2xl rounded-md border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
     Added dependencies are checked against the registry automatically (browser-only, nothing is started); uv or Deno still performs the authoritative resolution when the run starts.
   </p>
   <div class="max-w-2xl space-y-2">
@@ -38,8 +38,8 @@ const {
         <Plus class="size-3.5" /> Add
       </Button>
     </div>
-    <p v-if="dependencyError" class="text-[11px] text-destructive">{{ dependencyError }}</p>
-    <p v-else class="text-[11px] text-muted-foreground">
+    <p v-if="dependencyError" class="text-xs text-destructive">{{ dependencyError }}</p>
+    <p v-else class="text-xs text-muted-foreground">
       <template v-if="runtimeId === 'python-uv'">
         Requirements are stored as hidden PEP 723 metadata in the uploaded script; the editor stays unchanged.
       </template>

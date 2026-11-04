@@ -94,14 +94,14 @@ watch(() => props.jobId, () => {
           <Button variant="outline" size="sm" :disabled="downloading" @click="download">
             <Download class="h-3.5 w-3.5" /> {{ downloading ? 'Downloading…' : 'Download run dataset' }}
           </Button>
-          <span v-if="status.size !== undefined" class="text-[11px] text-muted-foreground">
+          <span v-if="status.size !== undefined" class="text-xs text-muted-foreground">
             {{ formatBytes(status.size) }}
           </span>
           <Badge v-if="status.etag" variant="outline" size="sm" class="font-mono" :title="`ETag ${status.etag}`">
             {{ truncateMiddle(status.etag) }}
           </Badge>
         </div>
-        <p class="text-[11px] text-muted-foreground">
+        <p class="text-xs text-muted-foreground">
           The ETag is the archive's BLAKE3 hash: the same value identifies the same bytes.
         </p>
       </div>
@@ -132,6 +132,6 @@ watch(() => props.jobId, () => {
       </div>
     </template>
 
-    <p v-if="downloadError" class="text-[11px] text-destructive">{{ downloadError }}</p>
+    <p v-if="downloadError" class="text-xs text-destructive">{{ downloadError }}</p>
   </section>
 </template>

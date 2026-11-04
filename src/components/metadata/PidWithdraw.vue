@@ -145,7 +145,7 @@ async function confirm() {
           <div class="space-y-1">
             <label for="pid-withdraw-reason" class="text-xs font-medium text-foreground">Reason</label>
             <Textarea id="pid-withdraw-reason" v-model="reason" rows="3" :maxlength="REASON_MAX" />
-            <p class="text-[11px] text-muted-foreground">
+            <p class="text-xs text-muted-foreground">
               Required, {{ REASON_MAX - trimmedReason.length }} characters left.
             </p>
           </div>

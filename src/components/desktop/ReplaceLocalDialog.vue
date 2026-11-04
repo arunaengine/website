@@ -127,12 +127,12 @@ async function apply(): Promise<void> {
         <DialogTitle>{{ title }}</DialogTitle>
         <DialogDescription>
           <template v-if="removing && entry">
-            The realm no longer holds <code class="font-mono text-[11px]">{{ entry.path }}</code
-            >. Your copy is moved to <code class="font-mono text-[11px]">{{ trashPath }}</code
+            The realm no longer holds <code class="font-mono text-xs">{{ entry.path }}</code
+            >. Your copy is moved to <code class="font-mono text-xs">{{ trashPath }}</code
             >, never deleted, so you can still get it back from there.
           </template>
           <template v-else-if="entry">
-            The file at <code class="font-mono text-[11px]">{{ entry.path }}</code> is overwritten with the realm
+            The file at <code class="font-mono text-xs">{{ entry.path }}</code> is overwritten with the realm
             version. Your current bytes are gone afterwards.
           </template>
           <template v-else>
@@ -146,23 +146,23 @@ async function apply(): Promise<void> {
       <div class="space-y-4 py-1">
         <div v-if="entry" class="grid gap-3 sm:grid-cols-2">
           <section class="surface-inline border-primary/30 bg-primary/[0.06] px-3 py-2.5">
-            <h3 class="text-[11px] font-semibold uppercase tracking-wider text-foreground">On this computer</h3>
+            <h3 class="text-xs font-semibold text-foreground">On this computer</h3>
             <dl class="mt-2 space-y-1">
               <div v-for="detail in localDetails" :key="detail.label" class="flex items-baseline justify-between gap-3">
-                <dt class="text-[11px] text-muted-foreground">{{ detail.label }}</dt>
-                <dd class="truncate font-mono text-[11px] text-foreground">{{ detail.value }}</dd>
+                <dt class="text-xs text-muted-foreground">{{ detail.label }}</dt>
+                <dd class="truncate font-mono text-xs text-foreground">{{ detail.value }}</dd>
               </div>
             </dl>
           </section>
           <section class="surface-inline px-3 py-2.5">
-            <h3 class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">In the realm</h3>
-            <p v-if="removing" class="mt-2 text-[11px] text-muted-foreground">
+            <h3 class="text-xs font-semibold text-muted-foreground">In the realm</h3>
+            <p v-if="removing" class="mt-2 text-xs text-muted-foreground">
               Deleted. Earlier versions stay recoverable in the realm.
             </p>
             <dl v-else class="mt-2 space-y-1">
               <div v-for="detail in remoteDetails" :key="detail.label" class="flex items-baseline justify-between gap-3">
-                <dt class="text-[11px] text-muted-foreground">{{ detail.label }}</dt>
-                <dd class="truncate font-mono text-[11px] text-foreground">{{ detail.value }}</dd>
+                <dt class="text-xs text-muted-foreground">{{ detail.label }}</dt>
+                <dd class="truncate font-mono text-xs text-foreground">{{ detail.value }}</dd>
               </div>
             </dl>
           </section>
@@ -170,7 +170,7 @@ async function apply(): Promise<void> {
 
         <p
           v-if="!removing && entry?.conflicted_copy"
-          class="surface-muted px-3 py-2 text-[11px] leading-relaxed text-muted-foreground"
+          class="surface-muted px-3 py-2 text-xs leading-relaxed text-muted-foreground"
         >
           The realm version is already on this disk as
           <code class="font-mono">{{ entry.conflicted_copy }}</code
@@ -187,7 +187,7 @@ async function apply(): Promise<void> {
               aria-label="Folder name confirmation"
             />
           </label>
-          <p class="text-[11px] text-muted-foreground">
+          <p class="text-xs text-muted-foreground">
             {{ folder.counters.conflicts }} both changed and {{ folder.counters.pending_replacements }} waiting to be
             replaced. Files in sync are untouched, and the
             {{ folder.counters.remote_deleted }} deleted in the realm stay where they are: removals are decided one file

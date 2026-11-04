@@ -66,7 +66,7 @@ async function confirmRevoke(session: UserSession) {
       <template #actions>
         <template v-if="others.length">
           <template v-if="confirmingOthers">
-            <span class="text-[11px] text-muted-foreground">Sign out {{ others.length }} other {{ others.length === 1 ? 'sign-in' : 'sign-ins' }}?</span>
+            <span class="text-xs text-muted-foreground">Sign out {{ others.length }} other {{ others.length === 1 ? 'sign-in' : 'sign-ins' }}?</span>
             <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="!listed || loading" @click="signOutOthers">Sign out</Button>
             <Button variant="ghost" size="sm" @click="confirmingOthers = false">Cancel</Button>
           </template>
@@ -95,11 +95,11 @@ async function confirmRevoke(session: UserSession) {
                 {{ SESSION_KIND_LABELS[session.kind] }}
                 <span v-if="session.current" class="ml-1.5 text-muted-foreground">(this browser)</span>
               </td>
-              <td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="formatDateTime(session.created_at)">
+              <td class="px-5 py-2.5 text-xs text-muted-foreground" :title="formatDateTime(session.created_at)">
                 {{ relativeTime(session.created_at) }}
               </td>
               <td
-                class="px-5 py-2.5 text-[11px]"
+                class="px-5 py-2.5 text-xs"
                 :class="session.revoked || expired(session) ? 'text-destructive' : 'text-muted-foreground'"
                 :title="formatDateTime(session.expires_at)"
               >
@@ -109,7 +109,7 @@ async function confirmRevoke(session: UserSession) {
                 <!-- This browser signs out from the account menu, not by revoking its own row. -->
                 <template v-if="!session.revoked && !session.current">
                   <div v-if="confirming === session.session_id" class="flex items-center justify-end gap-2">
-                    <span class="text-[11px] text-muted-foreground">Revoke this sign-in?</span>
+                    <span class="text-xs text-muted-foreground">Revoke this sign-in?</span>
                     <Button
                       variant="outline"
                       size="sm"

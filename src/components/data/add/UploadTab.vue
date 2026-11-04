@@ -85,10 +85,10 @@ async function onDrop(event: DragEvent) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="center" class="w-44">
           <DropdownMenuItem class="cursor-pointer" @click="pick('files')">
-            <Files class="h-3.5 w-3.5 text-primary" /> Files
+            <Files class="h-3.5 w-3.5 text-muted-foreground" /> Files
           </DropdownMenuItem>
           <DropdownMenuItem class="cursor-pointer" @click="pick('folder')">
-            <FolderInput class="h-3.5 w-3.5 text-primary" /> Folder
+            <FolderInput class="h-3.5 w-3.5 text-muted-foreground" /> Folder
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -113,7 +113,7 @@ async function onDrop(event: DragEvent) {
       …or pick a whole folder
     </button>
   </div>
-  <p class="text-[11px] text-muted-foreground">
+  <p class="text-xs text-muted-foreground">
     Folders keep their structure. Uploads go on while you browse.
   </p>
 </template>

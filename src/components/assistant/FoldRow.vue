@@ -10,7 +10,7 @@ defineEmits<{ (e: 'toggle'): void }>()
 <template>
   <button
     type="button"
-    class="flex w-full items-center gap-2 rounded-md border border-border bg-muted/20 px-2.5 py-1.5 text-left text-[11px]"
+    class="flex w-full items-center gap-2 rounded-md border border-border bg-muted/20 px-2.5 py-1.5 text-left text-xs"
     :aria-expanded="open"
     @click="$emit('toggle')"
   >

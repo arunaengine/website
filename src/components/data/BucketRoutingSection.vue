@@ -151,7 +151,7 @@ async function save() {
             :aria-label="`Key ${rule.exact ? 'match' : 'prefix'} of rule ${index + 1}`"
             @update:model-value="(v: string | number) => patchRule(index, { key_prefix: String(v) })"
           />
-          <label class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Switch
               :checked="rule.exact"
               :aria-label="`Match the exact key for rule ${index + 1}`"
@@ -198,7 +198,7 @@ async function save() {
         >
           {{ saving ? 'Saving…' : 'Save rules' }}
         </Button>
-        <p v-if="noTarget" class="text-[11px] text-muted-foreground">
+        <p v-if="noTarget" class="text-xs text-muted-foreground">
           Add a storage backend on the
           <RouterLink
             v-if="props.groupId"
@@ -228,7 +228,7 @@ async function save() {
         <span>{{ warning }}</span>
       </Notice>
 
-      <p class="text-[11px] text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         The most specific rule wins.
         <DocsLink icon topic="where-data-lives" section="Storage backend" class="ml-0.5" />
       </p>

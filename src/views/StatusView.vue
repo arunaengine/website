@@ -361,7 +361,7 @@ function closeNode() {
             @details="openNode"
           />
         </div>
-        <EmptyState v-else title="No nodes reported for this realm yet.">
+        <EmptyState v-else title="No nodes reported for this realm yet">
           <template #icon><Server class="size-6" /></template>
         </EmptyState>
       </section>

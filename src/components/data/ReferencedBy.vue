@@ -106,7 +106,7 @@ const nodeRows = computed(() =>
 )
 
 const BADGE =
-  'inline-flex items-center gap-1 rounded-full border border-transparent px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset focus:outline-none focus:ring-2 focus:ring-ring'
+  'inline-flex items-center gap-1 rounded-full border border-transparent px-2 py-0.5 text-xs font-medium ring-1 ring-inset focus:outline-none focus:ring-2 focus:ring-ring'
 const badgeClass = computed(() =>
   partial.value
     ? `${BADGE} bg-amber-50 text-amber-800 ring-amber-200 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-400/20`

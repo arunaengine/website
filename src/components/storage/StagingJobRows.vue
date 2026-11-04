@@ -189,7 +189,7 @@ function percent(job: StagingJob): number {
           <span class="min-w-0 flex-1 truncate font-mono" :title="job.progress.current_path ?? undefined">
             {{ job.progress.current_path ?? job.phase }}
           </span>
-          <span class="flex shrink-0 items-center gap-3 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
+          <span class="flex shrink-0 items-center gap-3 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
             <span>started {{ relativeTime(job.submitted_at) }}</span>
             <span v-if="progressText(job)">{{ progressText(job) }}</span>
           </span>
@@ -202,20 +202,20 @@ function percent(job: StagingJob): number {
           :critical="101"
           class="mt-2 h-1.5"
         />
-        <p v-if="job.paused_until" class="mt-1 text-[11px] text-muted-foreground">
+        <p v-if="job.paused_until" class="mt-1 text-xs text-muted-foreground">
           Waiting until {{ formatClock(job.paused_until) }}, the source asked to slow down.
         </p>
-        <p v-if="job.error" class="mt-1 break-all text-[11px] text-destructive">{{ job.error }}</p>
-        <p v-else-if="job.errors.length" class="mt-1 break-all text-[11px] text-destructive">
+        <p v-if="job.error" class="mt-1 break-all text-xs text-destructive">{{ job.error }}</p>
+        <p v-else-if="job.errors.length" class="mt-1 break-all text-xs text-destructive">
           {{ job.errors.length }} {{ job.errors.length === 1 ? 'file' : 'files' }} failed, first:
           <span class="font-mono">{{ job.errors[0].source_path }}</span>: {{ job.errors[0].error }}
         </p>
       </li>
     </ul>
-    <p v-if="truncated" class="border-t border-border px-5 py-2 text-[11px] text-muted-foreground">
+    <p v-if="truncated" class="border-t border-border px-5 py-2 text-xs text-muted-foreground">
       Only the newest staging jobs of {{ many ? 'each node' : 'this node' }} were checked.
     </p>
-    <p v-if="silent.length" class="border-t border-border px-5 py-2 text-[11px] text-muted-foreground">
+    <p v-if="silent.length" class="border-t border-border px-5 py-2 text-xs text-muted-foreground">
       Not answered by {{ silent.join(', ') }}, so its jobs are missing here.
     </p>
   </div>

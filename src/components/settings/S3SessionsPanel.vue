@@ -139,16 +139,16 @@ async function revoke(row: KeyRow) {
           </thead>
           <tbody>
             <tr v-for="row in rows" :key="`${row.kind}/${row.id}`" class="border-t border-border">
-              <td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ row.id }}</td>
-              <td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="row.groupId">
+              <td class="px-5 py-2.5 font-mono text-xs text-foreground">{{ row.id }}</td>
+              <td class="px-5 py-2.5 text-xs text-muted-foreground" :title="row.groupId">
                 <RouterLink v-if="row.groupId" :to="{ name: 'group', params: { id: row.groupId } }" class="hover:text-foreground hover:underline">{{ row.group }}</RouterLink>
                 <template v-else>{{ row.group }}</template>
               </td>
-              <td class="px-5 py-2.5 text-[11px] text-muted-foreground">
+              <td class="px-5 py-2.5 text-xs text-muted-foreground">
                 {{ row.kind }}
                 <Badge v-if="row.status !== 'active'" size="sm" :variant="row.status === 'revoked' ? 'destructive' : 'secondary'" class="ml-1.5">{{ row.status }}</Badge>
               </td>
-              <td class="px-5 py-2.5 text-[11px]" :class="expired(row.expires) ? 'text-destructive' : 'text-muted-foreground'">
+              <td class="px-5 py-2.5 text-xs" :class="expired(row.expires) ? 'text-destructive' : 'text-muted-foreground'">
                 {{ !row.expires ? '-' : expired(row.expires) ? `expired ${relativeTime(row.expires)}` : relativeTime(row.expires) }}
               </td>
               <td class="px-5 py-2.5 text-right">

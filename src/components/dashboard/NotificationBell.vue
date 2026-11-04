@@ -99,7 +99,7 @@ function onLoadMore(event: Event) {
         <Bell class="h-4 w-4" />
         <span
           v-if="unreadDisplay"
-          class="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground"
+          class="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-xs font-semibold leading-none text-primary-foreground"
           >{{ unreadDisplay }}</span
         >
       </Button>
@@ -151,7 +151,7 @@ function onLoadMore(event: Event) {
                 >
                   {{ display.title }}
                 </span>
-                <span class="shrink-0 text-[11px] text-muted-foreground">{{ timeOf(n) }}</span>
+                <span class="shrink-0 text-xs text-muted-foreground">{{ timeOf(n) }}</span>
               </div>
               <div v-if="display.detail" class="truncate text-xs text-muted-foreground">{{ display.detail }}</div>
             </div>

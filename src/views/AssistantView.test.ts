@@ -236,7 +236,7 @@ describe('AssistantView', () => {
 
     expect(has(root, 'data-empty')).toBe(true)
     expect(has(root, 'data-composer')).toBe(false)
-    expect(content(root)).toContain('No AI provider is ready yet.')
+    expect(content(root)).toContain('No AI provider is ready yet')
     expect(JSON.parse(String(element(root, (node) => node.tag === 'a').props['data-to'])))
       .toEqual({ name: 'settings', query: { tab: 'assistant' } })
   })

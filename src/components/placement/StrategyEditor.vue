@@ -109,7 +109,7 @@ function ruleLabel(rule: RealmPlacementStrategy['affinity'][number]): string {
           :disabled="disabled || shardCountLocked"
           :title="shardCountLocked ? 'The run family shard count is frozen.' : undefined"
         />
-        <p class="mt-1 text-[11px] text-muted-foreground">
+        <p class="mt-1 text-xs text-muted-foreground">
           {{ shardCountLocked ? 'Frozen for the run family.' : 'Power of two, at most 4096.' }}
         </p>
       </div>
@@ -122,9 +122,9 @@ function ruleLabel(rule: RealmPlacementStrategy['affinity'][number]): string {
       </label>
       <div v-if="!storeOnAll" class="mt-2 flex items-center gap-2">
         <Input v-model="replicaCount" type="number" min="1" step="1" class="w-28" :disabled="disabled" />
-        <span class="text-[11px] text-muted-foreground">copies per record</span>
+        <span class="text-xs text-muted-foreground">copies per record</span>
       </div>
-      <p class="mt-1 text-[11px] text-muted-foreground">
+      <p class="mt-1 text-xs text-muted-foreground">
         How many copies of each record the realm keeps for this scope.
       </p>
     </div>
@@ -138,7 +138,7 @@ function ruleLabel(rule: RealmPlacementStrategy['affinity'][number]): string {
         />
         Spread replicas across distinct locations
       </label>
-      <p v-if="spreadNote" class="mt-1 text-[11px] text-muted-foreground">
+      <p v-if="spreadNote" class="mt-1 text-xs text-muted-foreground">
         The realm currently reports only {{ knownLocations.length }}
         {{ knownLocations.length === 1 ? 'distinct location' : 'distinct locations' }}.
       </p>
@@ -163,10 +163,10 @@ function ruleLabel(rule: RealmPlacementStrategy['affinity'][number]): string {
           </Badge>
         </button>
       </div>
-      <p v-else class="mt-1.5 text-[11px] text-muted-foreground">
+      <p v-else class="mt-1.5 text-xs text-muted-foreground">
         The realm reports no placement locations yet, pinning becomes available once nodes are mapped.
       </p>
-      <p class="mt-1 text-[11px] text-muted-foreground">
+      <p class="mt-1 text-xs text-muted-foreground">
         Pinning restricts placement to the selected locations (affinity filter rules).
       </p>
     </div>
@@ -177,12 +177,12 @@ function ruleLabel(rule: RealmPlacementStrategy['affinity'][number]): string {
         <span
           v-for="(rule, i) in preservedRules"
           :key="i"
-          class="rounded-md border border-border bg-muted/40 px-2 py-0.5 font-mono text-[11px] text-muted-foreground"
+          class="rounded-md border border-border bg-muted/40 px-2 py-0.5 font-mono text-xs text-muted-foreground"
         >
           {{ ruleLabel(rule) }}
         </span>
       </div>
-      <p class="mt-1 text-[11px] text-muted-foreground">Preserved as-is on save; edit via the API.</p>
+      <p class="mt-1 text-xs text-muted-foreground">Preserved as-is on save; edit via the API.</p>
     </div>
   </div>
 </template>

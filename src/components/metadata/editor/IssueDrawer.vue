@@ -104,7 +104,7 @@ function jump(entityId: string) {
             <Badge :variant="TONE_VARIANT[entry.tone]" size="sm" class="mt-0.5 shrink-0">{{ TONE_LABEL[entry.tone] }}</Badge>
             <span class="min-w-0 flex-1 text-xs text-muted-foreground">
               {{ entry.message }}
-              <span v-if="entry.detail" class="ml-1 font-mono text-[10px]">{{ entry.detail }}</span>
+              <span v-if="entry.detail" class="ml-1 font-mono text-xs">{{ entry.detail }}</span>
             </span>
           </li>
         </ul>

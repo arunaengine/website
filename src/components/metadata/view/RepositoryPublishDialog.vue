@@ -392,7 +392,7 @@ async function submit() {
 
       <div class="scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
         <template v-if="!link && !activeJobId">
-          <p class="text-[11px] text-muted-foreground">
+          <p class="text-xs text-muted-foreground">
             {{ mode === 'link'
               ? `Aruna creates a draft${reserves ? `, reserves its ${identifierName(idKind)}` : ''} and keeps the draft in step with this dataset. You publish when it is ready.`
               : 'Creates one repository draft from the dataset as it is now. Later changes are not sent.' }}
@@ -408,14 +408,14 @@ async function submit() {
               aria-label="Repository"
               class="mt-1"
             />
-            <p v-else-if="kindsError" class="mt-2 text-[11px] text-destructive">{{ kindsError }}</p>
-            <p v-else-if="connectorsError" class="mt-2 text-[11px] text-destructive">{{ connectorsError }}</p>
-            <Spinner v-else-if="connectorsLoading || !repositoryConnectors" show-label label="Loading repositories…" class="mt-2 flex text-[11px]" />
+            <p v-else-if="kindsError" class="mt-2 text-xs text-destructive">{{ kindsError }}</p>
+            <p v-else-if="connectorsError" class="mt-2 text-xs text-destructive">{{ connectorsError }}</p>
+            <Spinner v-else-if="connectorsLoading || !repositoryConnectors" show-label label="Loading repositories…" class="mt-2 flex text-xs" />
             <div v-else-if="canWriteMeta" class="mt-2 space-y-1">
               <Button size="sm" variant="outline" :disabled="addingPreset" @click="addPreset">
                 <Plus class="h-3.5 w-3.5" /> Add Zenodo
               </Button>
-              <p class="text-[11px] text-muted-foreground">
+              <p class="text-xs text-muted-foreground">
                 This group has no repository yet. Other repositories can be added under the group's
                 <RouterLink
                   :to="{ name: 'group', params: { id: props.groupId }, query: { tab: 'sources' } }"
@@ -423,12 +423,12 @@ async function submit() {
                   @click="emit('update:open', false)"
                 >Sources</RouterLink>.
               </p>
-              <p v-if="presetError" role="alert" class="text-[11px] text-destructive">{{ presetError }}</p>
+              <p v-if="presetError" role="alert" class="text-xs text-destructive">{{ presetError }}</p>
             </div>
-            <p v-else class="mt-2 text-[11px] text-muted-foreground">
+            <p v-else class="mt-2 text-xs text-muted-foreground">
               This dataset's group has no repository yet. Ask someone who manages the group's metadata to add Zenodo.
             </p>
-            <p v-if="community" class="mt-1 text-[11px] text-muted-foreground">
+            <p v-if="community" class="mt-1 text-xs text-muted-foreground">
               Records are submitted to the community {{ community }} for review.
             </p>
           </div>
@@ -442,7 +442,7 @@ async function submit() {
               aria-label="Personal access token"
               class="mt-1 font-mono text-xs"
             />
-            <p class="mt-1 text-[11px] text-muted-foreground">
+            <p class="mt-1 text-xs text-muted-foreground">
               Create a token
               <ExternalLink v-if="tokenPage" :href="tokenPage" :label="`on ${label}`" />
               <template v-else>in your repository account</template>
@@ -455,14 +455,14 @@ async function submit() {
             </p>
           </div>
 
-          <p v-if="mode === 'link' && parentPulled" class="text-[11px] text-muted-foreground">
+          <p v-if="mode === 'link' && parentPulled" class="text-xs text-muted-foreground">
             This dataset imports updates from its source record ({{ parentId }}), so the new link starts a new record.
           </p>
           <label v-else-if="mode === 'link' && parent" class="flex items-start gap-2 text-xs text-foreground">
             <Switch :checked="continueSource" aria-label="Continue the source record" @update:checked="continueSource = $event" />
             <span>
               {{ parent.origin === 'published' ? 'Continue the published record' : 'Continue the source record' }}
-              <span class="block text-[11px] text-muted-foreground">
+              <span class="block text-xs text-muted-foreground">
                 <template v-if="parent.origin === 'published'">
                   New versions then join the record this dataset was published to before ({{ parentId }}) instead of
                   starting a new one.
@@ -486,7 +486,7 @@ async function submit() {
             <Switch :checked="publicFiles" aria-label="Files are public on the repository" @update:checked="publicFiles = $event" />
             <span>
               Files are public on the repository
-              <span class="block text-[11px] text-muted-foreground">
+              <span class="block text-xs text-muted-foreground">
                 {{ publicFiles ? 'Anyone can download the files once the record is published.' : 'Only the metadata is public; files stay restricted.' }}
               </span>
             </span>
@@ -496,10 +496,10 @@ async function submit() {
           </Notice>
 
           <section v-if="connectorId" class="space-y-2 rounded-md border border-border p-3" aria-label="Repository requirements">
-            <p v-if="checking" class="flex items-center gap-2 text-[11px] text-muted-foreground">
+            <p v-if="checking" class="flex items-center gap-2 text-xs text-muted-foreground">
               <Spinner class="text-primary" aria-hidden="true" /> Checking the dataset against {{ label }}…
             </p>
-            <p v-else-if="checkError" class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            <p v-else-if="checkError" class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               The check did not run: {{ checkError }}
               <Button variant="ghost" size="sm" class="h-6 px-1 text-xs" @click="runCheck">Retry</Button>
             </p>
@@ -515,17 +515,17 @@ async function submit() {
                 :shapes="profileShapes"
                 @saved="runCheck"
               />
-              <p v-if="blockedBy(false)" class="text-[11px] text-muted-foreground">
+              <p v-if="blockedBy(false)" class="text-xs text-muted-foreground">
                 Fields without an input here can be added in the dataset editor.
               </p>
-              <p v-if="blockedBy(true)" class="text-[11px] text-muted-foreground">
+              <p v-if="blockedBy(true)" class="text-xs text-muted-foreground">
                 Points about files or entities are fixed in the dataset itself, for example by removing files.
               </p>
               <template v-if="check.mapping.length">
                 <Button variant="ghost" size="sm" class="h-6 px-1 text-xs" @click="showMapping = !showMapping">
                   {{ showMapping ? 'Hide what goes where' : 'Show what goes where' }}
                 </Button>
-                <ul v-if="showMapping" class="space-y-0.5 text-[11px] text-muted-foreground">
+                <ul v-if="showMapping" class="space-y-0.5 text-xs text-muted-foreground">
                   <li v-for="(entry, index) in check.mapping" :key="index">
                     <span class="font-mono">{{ entry.entity_id }}</span>
                     to {{ entry.target }}<template v-if="entry.field">, field {{ entry.field }}</template>
@@ -544,7 +544,7 @@ async function submit() {
                 <Switch :checked="mode === 'export'" aria-label="Export once" @update:checked="mode = $event ? 'export' : 'link'" />
                 <span>
                   Export once
-                  <span class="block text-[11px] text-muted-foreground">No lasting link. Later changes are not sent.</span>
+                  <span class="block text-xs text-muted-foreground">No lasting link. Later changes are not sent.</span>
                 </span>
               </label>
               <Textarea
@@ -555,7 +555,7 @@ async function submit() {
                 :invalid="override.error ? 'error' : undefined"
                 aria-label="Metadata override"
               />
-              <p class="mt-1 text-[11px]" :class="override.error ? 'text-destructive' : 'text-muted-foreground'">
+              <p class="mt-1 text-xs" :class="override.error ? 'text-destructive' : 'text-muted-foreground'">
                 {{ override.error ?? 'Extra repository fields the dataset cannot hold. Required fields always come from the dataset.' }}
               </p>
             </template>
@@ -581,7 +581,7 @@ async function submit() {
               <span v-else class="font-mono">{{ link.remote.identifier }}</span>
               <CopyButton :value="link.remote.identifier" :label="`Copy ${identifierName(link.identifier_kind)}`" />
             </p>
-            <p v-if="!link.remote.identifier_reserved || reserves" class="text-[11px] text-muted-foreground">
+            <p v-if="!link.remote.identifier_reserved || reserves" class="text-xs text-muted-foreground">
               {{ link.remote.identifier_reserved ? 'Reserved, becomes active when published.' : 'Published and active.' }}
             </p>
           </div>
@@ -597,7 +597,7 @@ async function submit() {
               <Spinner v-if="publishing" class="text-current" aria-hidden="true" />
               {{ community ? 'Submit for review' : 'Publish' }}
             </Button>
-            <p v-if="link.pending" class="text-[11px] text-muted-foreground">Publishing waits until the running push has finished.</p>
+            <p v-if="link.pending" class="text-xs text-muted-foreground">Publishing waits until the running push has finished.</p>
           </template>
           <p v-if="publishError" role="alert" class="text-destructive">{{ publishError }}</p>
           <TransferJobStatus

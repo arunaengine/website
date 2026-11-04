@@ -200,7 +200,7 @@ function link(key: string) {
               >
                 {{ data.label }}
               </p>
-              <p class="h-4 truncate text-[10px] text-muted-foreground" :title="data.facts">{{ data.facts }}</p>
+              <p class="h-4 truncate text-xs text-muted-foreground" :title="data.facts">{{ data.facts }}</p>
             </div>
             <Badge :variant="BADGE_VARIANTS[data.kind as GraphNodeKind]" size="sm" class="shrink-0">
               {{ data.badge }}
@@ -214,7 +214,7 @@ function link(key: string) {
     <Controls :show-interactive="false" />
 
     <ul
-      class="absolute left-3 top-3 z-10 flex flex-wrap gap-x-3 gap-y-1 rounded-md border border-border/70 bg-card/90 px-2.5 py-1.5 text-[10px] text-muted-foreground"
+      class="absolute left-3 top-3 z-10 flex flex-wrap gap-x-3 gap-y-1 rounded-md border border-border/70 bg-card/90 px-2.5 py-1.5 text-xs text-muted-foreground"
       aria-label="Kinds of node"
     >
       <li v-for="kind in KINDS" :key="kind" class="flex items-center gap-1">
@@ -227,7 +227,7 @@ function link(key: string) {
       v-if="hasContext"
       variant="outline"
       size="sm"
-      class="absolute right-3 top-3 z-10 h-7 bg-card/90 text-[11px]"
+      class="absolute right-3 top-3 z-10 h-7 bg-card/90 text-xs"
       :aria-pressed="contextShown"
       @click="contextChoice = !contextShown"
     >

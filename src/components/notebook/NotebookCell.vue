@@ -138,8 +138,8 @@ function run() {
       <IconButton label="Drag to reorder cell" draggable="true" class="cursor-grab active:cursor-grabbing" @dragstart.stop="emit('drag-cell', $event)">
         <GripVertical class="size-3.5" />
       </IconButton>
-      <Select :model-value="kind" :options="typeOptions" :disabled="busy || (markdownLocked && cell.cell_type === 'markdown')" aria-label="Cell type" class="h-6 w-auto gap-1 rounded-full border-border bg-muted/40 px-2.5 py-0 text-[11px] font-medium shadow-none [&_svg]:size-3" @update:model-value="changeType" />
-      <code v-if="cell.cell_type === 'code'" class="font-mono text-[11px] text-muted-foreground">{{ counter }}</code>
+      <Select :model-value="kind" :options="typeOptions" :disabled="busy || (markdownLocked && cell.cell_type === 'markdown')" aria-label="Cell type" class="h-6 w-auto gap-1 rounded-full border-border bg-muted/40 px-2.5 py-0 text-xs font-medium shadow-none [&_svg]:size-3" @update:model-value="changeType" />
+      <code v-if="cell.cell_type === 'code'" class="font-mono text-xs text-muted-foreground">{{ counter }}</code>
       <Spinner v-if="runState === 'running'" :label="stateLabel" />
       <component
         :is="runMark.icon"

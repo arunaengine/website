@@ -166,7 +166,7 @@ async function goToTarget() {
             v-model="obligationModel"
             :options="obligationOptions"
             :disabled="obligationDisabled"
-            class="h-7 w-[132px] text-[11px]"
+            class="h-7 w-[132px] text-xs"
             :aria-label="`Obligation for ${property.label || 'untitled property'}`"
           />
         </div>
@@ -178,12 +178,12 @@ async function goToTarget() {
         @click="expanded = !expanded"
       >
         <span class="truncate text-sm font-medium text-foreground">{{ property.label || 'Untitled property' }}</span>
-        <span class="truncate text-[11px] text-muted-foreground">{{ summary }}</span>
+        <span class="truncate text-xs text-muted-foreground">{{ summary }}</span>
       </button>
       <button
         v-if="isEntityKind && property.entityTypes.length"
         type="button"
-        class="hidden shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-aruna-royal/60 hover:text-foreground sm:flex"
+        class="hidden shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-aruna-royal/60 hover:text-foreground sm:flex"
         :title="targetRule ? `Go to the shared ${targetLabel} rules` : `Define the rules that apply when a new ${targetLabel} is described`"
         @click="goToTarget"
       >

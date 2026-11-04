@@ -177,7 +177,7 @@ function pdfLocked(url: string) {
     <div class="flex flex-wrap items-center justify-between gap-2">
       <p
         v-if="props.referencedFrom || preview.referenced.value"
-        class="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground"
+        class="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"
       >
         <span v-if="props.referencedFrom" class="truncate" :title="`Referenced from ${props.referencedFrom.label}`">
           Referenced from

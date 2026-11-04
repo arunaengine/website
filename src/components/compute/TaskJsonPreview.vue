@@ -77,12 +77,12 @@ function toggleLabel(field: CollapsibleField): string {
 <template>
   <div class="rounded-md border border-border bg-muted/40 px-3 py-2">
     <div class="flex flex-wrap items-center gap-2">
-      <div class="text-[10px] uppercase tracking-wider text-muted-foreground">{{ title }}</div>
+      <div class="text-xs text-muted-foreground">{{ title }}</div>
       <div class="ml-auto flex items-center gap-1.5">
         <button
           v-if="inputsCollapsible"
           type="button"
-          class="rounded border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          class="rounded border border-border px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           @click="toggle('inputs')"
         >
           {{ toggleLabel('inputs') }}
@@ -90,7 +90,7 @@ function toggleLabel(field: CollapsibleField): string {
         <button
           v-if="outputsCollapsible"
           type="button"
-          class="rounded border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          class="rounded border border-border px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           @click="toggle('outputs')"
         >
           {{ toggleLabel('outputs') }}
@@ -99,6 +99,6 @@ function toggleLabel(field: CollapsibleField): string {
       </div>
     </div>
     <!-- Single line on purpose: whitespace inside <pre> is preserved verbatim. -->
-    <pre class="mt-1 overflow-x-auto whitespace-pre font-mono text-[11px] leading-5 text-foreground/90"><template v-for="(segment, i) in segments" :key="i"><button v-if="segment.kind === 'toggle'" type="button" class="rounded bg-muted px-1 text-muted-foreground transition-colors hover:text-foreground" :title="toggleLabel(segment.field)" @click="toggle(segment.field)">{{ segment.label }}</button><span v-else>{{ segment.text }}</span></template></pre>
+    <pre class="mt-1 overflow-x-auto whitespace-pre font-mono text-xs leading-5 text-foreground/90"><template v-for="(segment, i) in segments" :key="i"><button v-if="segment.kind === 'toggle'" type="button" class="rounded bg-muted px-1 text-muted-foreground transition-colors hover:text-foreground" :title="toggleLabel(segment.field)" @click="toggle(segment.field)">{{ segment.label }}</button><span v-else>{{ segment.text }}</span></template></pre>
   </div>
 </template>

@@ -403,8 +403,8 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
         <div class="flex items-center gap-2 px-3 py-2.5">
           <div class="min-w-0">
             <span class="text-sm font-semibold text-foreground">{{ backend.name }}</span>
-            <Badge size="sm" variant="secondary" class="ml-1.5 uppercase">{{ kindLabel(backend) }}</Badge>
-            <Badge v-if="backend.disabled" size="sm" variant="warn" class="ml-1 uppercase">removed</Badge>
+            <Badge size="sm" variant="secondary" class="ml-1.5">{{ kindLabel(backend) }}</Badge>
+            <Badge v-if="backend.disabled" size="sm" variant="warn" class="ml-1">removed</Badge>
             <p class="mt-0.5 truncate text-xs text-muted-foreground">{{ backend.public_config.endpoint ?? storeName(backend) }}</p>
           </div>
           <span class="flex-1" />
@@ -424,7 +424,7 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
         <div class="rounded-b-lg border-t border-border bg-muted/30 px-3 pb-2.5 pt-1.5 text-xs">
           <div
             v-if="rowsOf(backend.backend_id).length || defaultId === backend.backend_id"
-            :class="[GRID, 'border-b border-border py-1 text-[11px] uppercase tracking-wide text-muted-foreground']"
+            :class="[GRID, 'border-b border-border py-1 text-xs text-muted-foreground']"
           >
             <span>Aruna bucket</span><span /><span>S3 bucket</span><span>New uploads named</span><span>Synced</span><span />
           </div>
@@ -488,7 +488,7 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
               <div v-if="problems?.id === row.link.import_id" class="col-span-full py-1" data-testid="sync-problems">
                 <p v-if="!problems.files" class="text-muted-foreground">Loading…</p>
                 <p v-else-if="!problems.files.length" class="text-muted-foreground">The node lists no files for this sync.</p>
-                <ul v-else class="space-y-0.5 text-[11px]">
+                <ul v-else class="space-y-0.5 text-xs">
                   <li v-for="(file, at) in problems.files.slice(0, 20)" :key="`${at}\n${file.path}`" class="break-all">
                     <span class="font-mono">{{ file.path }}</span>: <span class="text-destructive">{{ file.reason }}</span>
                   </li>
@@ -531,7 +531,7 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
         <div class="flex items-center gap-2 px-3 py-2.5">
           <div class="min-w-0">
             <span class="text-sm font-semibold text-foreground">Aruna storage</span>
-            <Badge size="sm" variant="secondary" class="ml-1.5 uppercase">built in</Badge>
+            <Badge size="sm" variant="secondary" class="ml-1.5">built in</Badge>
             <p class="mt-0.5 text-xs text-muted-foreground">
               {{ defaultId ? 'Managed by Aruna on this node.' : 'Gets new buckets.' }}
             </p>

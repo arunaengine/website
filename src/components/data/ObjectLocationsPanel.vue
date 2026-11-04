@@ -201,7 +201,7 @@ Only the node that holds a file can say where its copies are; open the bucket on
       />
       <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />
       <template v-else-if="summary">
-        <div class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+        <div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span :title="`Version ${summary.version_id}`">
             {{ props.versionId ? 'Version' : 'Newest version' }}
             <span class="hash">{{ truncateMiddle(summary.version_id, 8, 6) }}</span>
@@ -226,16 +226,16 @@ Only the node that holds a file can say where its copies are; open the bucket on
               </RouterLink>
               <span
                 v-if="otherPath(copy)"
-                class="max-w-[14rem] truncate font-mono text-[11px] text-muted-foreground"
+                class="max-w-[14rem] truncate font-mono text-xs text-muted-foreground"
                 :title="otherPath(copy) ?? undefined"
               >
                 {{ otherPath(copy) }}
               </span>
-              <Badge v-if="copy.local" variant="outline" size="sm" class="uppercase">this node</Badge>
-              <Badge :variant="copyVariant(copy.state)" size="sm" class="uppercase" :title="copyState(copy.state).description">
+              <Badge v-if="copy.local" variant="outline" size="sm">this node</Badge>
+              <Badge :variant="copyVariant(copy.state)" size="sm" :title="copyState(copy.state).description">
                 {{ copyState(copy.state).label }}
               </Badge>
-              <span class="min-w-0 flex-1 truncate text-right text-[11px] text-muted-foreground">
+              <span class="min-w-0 flex-1 truncate text-right text-xs text-muted-foreground">
                 <template v-if="copy.storage === 'group-backend'">
                   Group backend
                   <span class="font-mono text-foreground/80">{{ copy.group_backend_name || 'unnamed' }}</span>
@@ -248,7 +248,7 @@ Only the node that holds a file can say where its copies are; open the bucket on
               </span>
             </div>
 
-            <p v-if="originLine(copy)" class="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            <p v-if="originLine(copy)" class="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span>{{ originLine(copy) }}</span>
               <RouterLink
                 v-if="copy.origin === 'sync' && copy.sync_relationship_id"
@@ -288,7 +288,7 @@ Only the node that holds a file can say where its copies are; open the bucket on
         <div v-if="!replicateUnsupported" class="space-y-2 rounded-md border border-border px-3 py-2">
           <div>
             <h3 class="text-xs font-medium text-foreground">Add a copy</h3>
-            <p class="text-[11px] text-muted-foreground">
+            <p class="text-xs text-muted-foreground">
               Ask another node to fetch this version; the copy is queued, not stored yet.
               <DocsLink icon topic="where-data-lives" section="Storage locations" class="ml-0.5" />
             </p>
@@ -302,7 +302,7 @@ Only the node that holds a file can say where its copies are; open the bucket on
               class="min-w-56"
               aria-label="Node to replicate to"
             />
-            <span v-else class="text-[11px] text-muted-foreground">
+            <span v-else class="text-xs text-muted-foreground">
               Every realm node this portal knows already holds or is fetching a copy.
             </span>
             <Button
@@ -319,7 +319,7 @@ Only the node that holds a file can say where its copies are; open the bucket on
             <label class="flex items-center justify-between gap-3 text-xs">
               <span>
                 <span class="font-medium text-foreground">Store the copy unencrypted</span>
-                <span class="block text-[11px] text-muted-foreground">
+                <span class="block text-xs text-muted-foreground">
                   This bucket is encrypted. This is needed when the bucket on that node is not encrypted, and only key
                   holders of this bucket may choose it.
                 </span>
@@ -335,10 +335,10 @@ Only the node that holds a file can say where its copies are; open the bucket on
               key.
             </Notice>
           </template>
-          <p v-if="replicateNote" class="text-[11px] text-emerald-700 dark:text-emerald-300">{{ replicateNote }}</p>
-          <p v-if="replicateError" class="text-[11px] text-destructive">{{ replicateError }}</p>
+          <p v-if="replicateNote" class="text-xs text-emerald-700 dark:text-emerald-300">{{ replicateNote }}</p>
+          <p v-if="replicateError" class="text-xs text-destructive">{{ replicateError }}</p>
         </div>
-        <p v-else class="text-[11px] text-muted-foreground">
+        <p v-else class="text-xs text-muted-foreground">
           This node does not offer replication requests.
         </p>
 

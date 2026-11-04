@@ -202,8 +202,8 @@ async function submit() {
             class="mt-1 font-mono text-xs"
             :placeholder="isInvenio ? 'https://zenodo.org/api/' : 'https://repository.example.org/oai2d'"
           />
-          <p v-if="endpointError" class="mt-1 text-[11px] text-destructive">{{ endpointError }}</p>
-          <p v-else-if="isInvenio" class="mt-1 text-[11px] text-muted-foreground">
+          <p v-if="endpointError" class="mt-1 text-xs text-destructive">{{ endpointError }}</p>
+          <p v-else-if="isInvenio" class="mt-1 text-xs text-muted-foreground">
             The repository API root, for example https://zenodo.org/api/ or https://sandbox.zenodo.org/api/.
           </p>
         </div>
@@ -213,13 +213,13 @@ async function submit() {
               Community <span class="text-muted-foreground">(optional)</span>
             </label>
             <Input :id="`${uid}-community`" v-model="community" class="mt-1 font-mono text-xs" placeholder="my-community" />
-            <p class="mt-1 text-[11px] text-muted-foreground">
+            <p class="mt-1 text-xs text-muted-foreground">
               Records published from Aruna are submitted to this community for review.
             </p>
           </div>
           <fieldset class="space-y-2 rounded-md border border-border p-3">
             <legend class="px-1 text-xs font-semibold text-foreground">Read token (optional)</legend>
-            <p class="text-[11px] text-muted-foreground">
+            <p class="text-xs text-muted-foreground">
               Only needed to import restricted records. Aruna stores it sealed for this repository and never shows it
               again. Publishing asks for your own token separately. Aruna never asks for your repository password.
             </p>
@@ -235,7 +235,7 @@ async function submit() {
               <Switch :checked="removeToken" aria-label="Remove the stored token" @update:checked="removeToken = $event" />
               Remove the stored token
             </label>
-            <p v-if="tokenNeedsChoice" class="text-[11px] text-destructive">
+            <p v-if="tokenNeedsChoice" class="text-xs text-destructive">
               The stored token belongs to the old address. Enter a new token or remove the stored one.
             </p>
           </fieldset>

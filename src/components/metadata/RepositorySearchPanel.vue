@@ -28,11 +28,11 @@ const { query, page, hits, total, pageCount, hasNext, loading, error, idle, run 
       <p class="text-xs text-destructive">{{ error }}</p>
       <Button variant="ghost" size="sm" @click="run">Retry</Button>
     </div>
-    <p v-else-if="idle" class="text-[11px] text-muted-foreground">Type words to search the repository.</p>
+    <p v-else-if="idle" class="text-xs text-muted-foreground">Type words to search the repository.</p>
     <Spinner v-else-if="loading" show-label label="Searching…" class="flex text-xs" />
     <EmptyState v-else-if="!hits.length" compact title="No matching records." />
     <template v-else>
-      <p class="text-[11px] text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         {{ total === null ? `${hits.length} records on this page` : `${total} records` }}
       </p>
       <ul class="max-h-60 space-y-1 overflow-y-auto">
@@ -45,11 +45,11 @@ const { query, page, hits, total, pageCount, hasNext, loading, error, idle, run 
             @click="emit('pick', hit)"
           >
             <span class="block text-sm font-medium text-foreground">{{ hit.title }}</span>
-            <span class="block text-[11px] text-muted-foreground">
+            <span class="block text-xs text-muted-foreground">
               {{ [hit.date, hit.creators.slice(0, 3).join('; '), hit.doi || hit.id].filter(Boolean).join(' · ') }}
             </span>
           </button>
-          <ExternalLink v-if="hit.url" :href="hit.url" label="Open in the repository" class="ml-2 text-[11px]" />
+          <ExternalLink v-if="hit.url" :href="hit.url" label="Open in the repository" class="ml-2 text-xs" />
         </li>
       </ul>
       <Pagination v-model:page="page" :page-count="pageCount" :has-next="hasNext" :disabled="loading" />

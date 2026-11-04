@@ -77,7 +77,7 @@ async function confirmCancel() {
           <JobStateBadge :state="job.state" />
           <Badge v-if="job.cancel_requested && !terminal" variant="warn">cancel requested</Badge>
         </div>
-        <div class="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+        <div class="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
           <span :title="job.job_id">{{ truncateMiddle(job.job_id) }}</span>
           <CopyButton :value="job.job_id" label="Copy the id" />
         </div>
@@ -107,7 +107,7 @@ async function confirmCancel() {
             :label="`Progress: ${progressText}`"
           />
           <p class="text-xs text-foreground">{{ progressText }}</p>
-          <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</p>
+          <p v-if="lastPollError" class="text-xs text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</p>
         </section>
 
         <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
@@ -133,7 +133,7 @@ async function confirmCancel() {
         <section v-if="job.error" class="space-y-2">
           <h3 class="font-display text-sm font-semibold text-aruna-navy">Last error</h3>
           <Notice tone="error" class="space-y-1.5">
-            <Badge :variant="errorKindVariant" size="sm" class="uppercase">{{ job.error.kind }}</Badge>
+            <Badge :variant="errorKindVariant" size="sm">{{ job.error.kind }}</Badge>
             <p class="whitespace-pre-wrap break-words">{{ job.error.message }}</p>
           </Notice>
         </section>
@@ -141,14 +141,14 @@ async function confirmCancel() {
         <section v-if="prettyResult !== null" class="space-y-2">
           <h3 class="font-display text-sm font-semibold text-aruna-navy">Result</h3>
           <pre
-            class="max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-[11px]"
+            class="max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-xs"
           >{{ prettyResult }}</pre>
         </section>
 
         <section v-if="prettyRunCrate !== null" class="space-y-2">
           <h3 class="font-display text-sm font-semibold text-aruna-navy">Run dataset</h3>
           <pre
-            class="max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-[11px]"
+            class="max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-xs"
           >{{ prettyRunCrate }}</pre>
         </section>
 
@@ -188,7 +188,7 @@ async function confirmCancel() {
               Cancellation was requested; it stops once the executor observes it.
             </p>
           </div>
-          <p v-if="cancelError" class="mt-2 text-[11px] text-destructive">{{ cancelError }}</p>
+          <p v-if="cancelError" class="mt-2 text-xs text-destructive">{{ cancelError }}</p>
         </section>
       </div>
     </div>

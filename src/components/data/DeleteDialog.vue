@@ -649,7 +649,7 @@ onUnmounted(() => {
         <ul v-if="request.kind === 'selection'" class="space-y-1 rounded-md border border-border px-3 py-2">
           <li class="font-medium text-foreground">Selected files and folders</li>
           <li class="max-h-28 overflow-y-auto">
-            <ul class="space-y-1 pl-4 font-mono text-[10px] text-muted-foreground">
+            <ul class="space-y-1 pl-4 font-mono text-xs text-muted-foreground">
               <li v-for="id in ids" :key="id" class="list-disc break-all">{{ id }}</li>
             </ul>
           </li>
@@ -754,7 +754,7 @@ onUnmounted(() => {
           </p>
           <div v-if="selection.deniedKeys.value.length" class="text-destructive">
             <p class="font-medium">Permanent deletion is not allowed for these entries</p>
-            <ul class="space-y-1 pl-4 font-mono text-[10px]">
+            <ul class="space-y-1 pl-4 font-mono text-xs">
               <li v-for="key in selection.deniedKeys.value" :key="key" class="list-disc break-all">{{ key }}</li>
             </ul>
           </div>

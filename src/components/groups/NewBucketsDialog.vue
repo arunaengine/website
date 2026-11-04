@@ -143,7 +143,7 @@ function optionClass(value: 'own' | 'shared') {
                 :invalid="mode === 'own' && problem ? 'error' : undefined"
                 @focus="mode = 'own'"
               />
-              <p class="mt-1 text-[11px] text-muted-foreground">
+              <p class="mt-1 text-xs text-muted-foreground">
                 <span class="font-mono">{bucket}</span> is the bucket name, <span class="font-mono">{group}</span> the group.
                 Files keep their names.
               </p>
@@ -161,7 +161,7 @@ function optionClass(value: 'own' | 'shared') {
                 :invalid="mode === 'shared' && problem ? 'error' : undefined"
                 @focus="mode = 'shared'"
               />
-              <p class="mt-1 text-[11px] text-muted-foreground">Aruna names the files there.</p>
+              <p class="mt-1 text-xs text-muted-foreground">Aruna names the files there.</p>
               <p v-if="mode === 'shared' && problem" class="mt-1 text-xs text-destructive">{{ problem }}</p>
             </div>
           </label>

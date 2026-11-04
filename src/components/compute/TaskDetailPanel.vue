@@ -975,28 +975,28 @@ async function confirmDelete() {
         <!-- What happened, in one place -->
         <Notice v-if="summary && showSummary" :tone="summary.tone" class="space-y-2 px-4 py-3">
           <p class="text-sm font-semibold">{{ summary.headline }}</p>
-          <p v-if="failed" class="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed">{{ failureMessage }}</p>
-          <p v-if="retryError" class="whitespace-pre-wrap break-words text-[11px] leading-relaxed">
+          <p v-if="failed" class="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">{{ failureMessage }}</p>
+          <p v-if="retryError" class="whitespace-pre-wrap break-words text-xs leading-relaxed">
             Attempt {{ nativeJob?.attempts }} failed, retrying: <span class="font-mono">{{ retryError }}</span>
           </p>
-          <div v-if="failed || nodeConstraint" class="flex flex-wrap items-center gap-1.5 text-[11px]">
-            <Badge v-if="failed && nativeJob?.error?.kind" variant="destructive" size="sm" class="uppercase">{{ nativeJob.error.kind }}</Badge>
+          <div v-if="failed || nodeConstraint" class="flex flex-wrap items-center gap-1.5 text-xs">
+            <Badge v-if="failed && nativeJob?.error?.kind" variant="destructive" size="sm">{{ nativeJob.error.kind }}</Badge>
             <Badge v-if="failed && exitCode !== undefined" variant="outline" size="sm">exit {{ exitCode }}</Badge>
             <Badge v-if="failed && nativeJob?.attempts" variant="outline" size="sm">
               {{ nativeJob.attempts }} attempt{{ nativeJob.attempts === 1 ? '' : 's' }}
             </Badge>
             <span v-if="nodeConstraint" class="inline-flex items-center gap-1">node <NodeLabel :node-id="nodeConstraint" size="sm" /></span>
           </div>
-          <p v-if="failed && stderrTail" class="truncate font-mono text-[11px]" :title="executorStderr(0)">
+          <p v-if="failed && stderrTail" class="truncate font-mono text-xs" :title="executorStderr(0)">
             stderr: {{ stderrTail }}
           </p>
-          <p v-if="task.state === 'QUEUED' && !awaitingKey" class="flex flex-wrap items-center gap-2 text-[11px]">
+          <p v-if="task.state === 'QUEUED' && !awaitingKey" class="flex flex-wrap items-center gap-2 text-xs">
             One node answers and runs it; another steps in after a while without a response.
             <DocsLink topic="compute-run" section="Follow the run" />
           </p>
         </Notice>
         <JobKeyWait v-if="awaitingKey" :waits="nativeJob?.awaiting_keys ?? []" />
-        <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Refresh failed, retrying.</p>
+        <p v-if="lastPollError" class="text-xs text-muted-foreground">Refresh failed, retrying.</p>
 
         <DetailList :items="facts" class="grid-cols-2 md:grid-cols-4">
           <template #node>
@@ -1130,7 +1130,7 @@ async function confirmDelete() {
             <summary class="cursor-pointer font-medium text-foreground">{{ outputSummary }}</summary>
             <div class="mt-2 space-y-1.5">
               <div class="overflow-x-auto rounded-lg border border-border-subtle">
-                <table class="w-full min-w-[48rem] text-left text-[11px]">
+                <table class="w-full min-w-[48rem] text-left text-xs">
                   <thead class="bg-muted/50 text-muted-foreground">
                     <tr>
                       <th scope="col" class="px-3 py-2 font-medium">File</th>
@@ -1356,11 +1356,11 @@ async function confirmDelete() {
             </template>
           </div>
         </div>
-        <p v-if="confirmingDelete" class="text-[11px] text-muted-foreground">
+        <p v-if="confirmingDelete" class="text-xs text-muted-foreground">
           Removes the run from the run list in every browser. Its outputs and run dataset stay.
         </p>
-        <p v-if="cancelError" class="text-[11px] text-destructive">{{ cancelError }}</p>
-        <p v-if="deleteError" class="text-[11px] text-destructive">{{ deleteError }}</p>
+        <p v-if="cancelError" class="text-xs text-destructive">{{ cancelError }}</p>
+        <p v-if="deleteError" class="text-xs text-destructive">{{ deleteError }}</p>
       </div>
     </template>
   </DetailDialog>

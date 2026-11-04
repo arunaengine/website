@@ -474,7 +474,7 @@ const isEmpty = computed(
       </aside>
 
       <div class="min-w-0">
-        <EmptyState v-if="!activeBucket" class="h-full" title="Select a bucket to browse its objects." />
+        <EmptyState v-if="!activeBucket" class="h-full" title="Select a bucket to browse its objects" />
         <template v-else>
           <div class="flex min-w-0 items-center gap-2 pb-2">
             <Breadcrumbs :bucket="activeBucket" :path="prefix" @navigate="navigateTo" />
@@ -486,7 +486,7 @@ const isEmpty = computed(
             <p v-if="listError" class="border-b border-border px-3 py-2 text-xs text-destructive">{{ listError }}</p>
             <div tabindex="0" role="region" aria-label="Objects" class="max-h-[260px] overflow-y-auto">
               <table class="w-full table-fixed text-sm">
-                <thead class="hidden bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground @xs:table-header-group">
+                <thead class="hidden bg-muted/50 text-xs text-muted-foreground @xs:table-header-group">
                   <tr>
                     <th v-if="selectable" class="w-10 px-3 py-1.5"></th>
                     <th scope="col" class="px-3 py-1.5 text-left font-semibold">Name</th>
@@ -578,7 +578,7 @@ const isEmpty = computed(
           </div>
 
           <div v-if="selectable" class="mt-2 flex items-center justify-between gap-2">
-            <span class="text-[11px] text-muted-foreground">
+            <span class="text-xs text-muted-foreground">
               {{ selectedList.length ? `${selectedList.length} selected` : 'Select objects or folders.' }}
             </span>
             <Button size="sm" :disabled="!selectedList.length" @click="addSelected">

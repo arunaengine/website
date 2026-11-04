@@ -108,7 +108,7 @@ watch(relatedDocs, (rows) => {
             :title="row.iri"
           />
           <span v-else class="min-w-0 truncate text-muted-foreground" :title="row.iri">{{ row.label }}</span>
-          <Badge variant="outline" size="sm" class="shrink-0 uppercase">{{ row.documentId ? 'in portal' : 'external' }}</Badge>
+          <Badge variant="outline" size="sm" class="shrink-0">{{ row.documentId ? 'in portal' : 'external' }}</Badge>
         </li>
       </ul>
       <ListPager v-if="paged" v-model:page="page" v-model:page-size="pageSize" :total="total" class="border-t border-border" />

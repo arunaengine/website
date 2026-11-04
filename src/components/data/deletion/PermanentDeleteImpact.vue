@@ -93,7 +93,7 @@ function toggle() {
           <span class="min-w-0 flex-1 truncate font-mono" :title="item.key">{{ item.key }}</span>
           <span class="shrink-0 tabular-nums text-muted-foreground">{{ formatBytes(item.bytes) }}</span>
         </div>
-        <p v-if="item.storage_file" class="truncate font-mono text-[11px] text-muted-foreground" :title="item.storage_file.path">
+        <p v-if="item.storage_file" class="truncate font-mono text-xs text-muted-foreground" :title="item.storage_file.path">
           {{ item.storage_file.kept ? 'stays' : 'deleted' }} in your storage: {{ item.storage_file.path }}<template v-if="item.storage_file.kept"> ({{ item.storage_file.kept }})</template>
         </p>
       </li>

@@ -105,7 +105,7 @@ async function save() {
 
       <div class="flex flex-wrap items-end gap-3">
         <div class="min-w-56">
-          <label class="text-[11px] font-medium text-foreground">Node</label>
+          <label class="text-xs font-medium text-foreground">Node</label>
           <Select
             v-model="selected"
             :options="options"
@@ -115,7 +115,7 @@ async function save() {
           />
         </div>
         <div class="min-w-56 flex-1">
-          <label for="node-location" class="text-[11px] font-medium text-foreground">Location</label>
+          <label for="node-location" class="text-xs font-medium text-foreground">Location</label>
           <Input
             id="node-location"
             v-model="location"
@@ -128,7 +128,7 @@ async function save() {
 
       <div>
         <div class="flex items-center justify-between gap-2">
-          <span class="text-[11px] font-medium text-foreground">Labels</span>
+          <span class="text-xs font-medium text-foreground">Labels</span>
           <Button size="sm" variant="ghost" :disabled="busy" @click="labels.push({ key: '', value: '' })">
             <Plus class="size-3.5" /> Add label
           </Button>
@@ -150,7 +150,7 @@ async function save() {
             </Button>
           </div>
         </div>
-        <p v-else class="mt-1.5 text-[11px] text-muted-foreground">This node publishes no label.</p>
+        <p v-else class="mt-1.5 text-xs text-muted-foreground">This node publishes no label.</p>
       </div>
 
       <RefusalNote v-if="saveError" :message="saveError" />
@@ -161,7 +161,7 @@ async function save() {
           <Spinner v-if="saving === selected" label="Saving the attributes" class="text-current" /><Save v-else class="size-3.5" /> Save attributes
         </Button>
         <Button variant="ghost" size="sm" :disabled="!dirty || busy" @click="reset">Reset</Button>
-        <span v-if="!dirty" class="text-[11px] text-muted-foreground">Nothing changed yet.</span>
+        <span v-if="!dirty" class="text-xs text-muted-foreground">Nothing changed yet.</span>
       </div>
     </div>
   </section>

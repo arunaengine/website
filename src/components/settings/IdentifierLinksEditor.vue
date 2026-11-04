@@ -64,7 +64,7 @@ function save(clear = false) {
     </div>
 
     <div class="space-y-2">
-      <div v-if="rules.length" class="hidden gap-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground sm:grid sm:grid-cols-[1.1fr_1fr_1.6fr_2fr_auto]">
+      <div v-if="rules.length" class="hidden gap-2 text-xs font-medium text-muted-foreground sm:grid sm:grid-cols-[1.1fr_1fr_1.6fr_2fr_auto]">
         <span>Name</span><span>Look in</span><span>Pattern</span><span>Link</span><span></span>
       </div>
       <div v-for="(rule, index) in rules" :key="index" class="grid gap-2 sm:grid-cols-[1.1fr_1fr_1.6fr_2fr_auto] sm:items-center">
@@ -95,7 +95,7 @@ function save(clear = false) {
         v-for="preset in PRESETS"
         :key="preset.name"
         type="button"
-        class="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-foreground/70 hover:bg-accent"
+        class="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-xs font-medium text-foreground/70 hover:bg-accent"
         @click="usePreset(preset.name)"
       >
         {{ preset.name }}

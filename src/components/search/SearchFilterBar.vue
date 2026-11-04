@@ -202,7 +202,7 @@ function resetAll() {
       <span
         v-for="chip in chips"
         :key="chip.key"
-        class="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 py-0.5 pl-2.5 pr-1 text-[11px] text-foreground"
+        class="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 py-0.5 pl-2.5 pr-1 text-xs text-foreground"
       >
         {{ chip.label }}
         <button
@@ -216,7 +216,7 @@ function resetAll() {
       </span>
       <button
         type="button"
-        class="ml-1 text-[11px] font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+        class="ml-1 text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
         @click="resetAll"
       >
         Reset all

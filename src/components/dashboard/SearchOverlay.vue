@@ -479,7 +479,7 @@ onBeforeUnmount(() => {
               />
               <kbd
                 aria-hidden="true"
-                class="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded border border-border bg-muted/70 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-flex"
+                class="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded border border-border bg-muted/70 px-1.5 py-0.5 font-mono text-xs text-muted-foreground sm:inline-flex"
               >
                 {{ shortcut }}
               </kbd>
@@ -502,7 +502,7 @@ onBeforeUnmount(() => {
                   aria-label="Object inventory search mode"
                   class="h-8 text-xs"
                 />
-                <p class="mt-2 text-[11px] text-muted-foreground">
+                <p class="mt-2 text-xs text-muted-foreground">
                   How far data object search reaches across the realm's nodes, here and on the search page.
                 </p>
               </template>
@@ -530,7 +530,7 @@ onBeforeUnmount(() => {
           >
             <p
               v-if="quickSummary"
-              class="border-b border-border/70 px-3 py-1.5 text-[11px] text-muted-foreground transition-opacity"
+              class="border-b border-border/70 px-3 py-1.5 text-xs text-muted-foreground transition-opacity"
               :class="quickStale ? 'opacity-40' : ''"
             >
               {{ quickSummary }}
@@ -594,7 +594,7 @@ onBeforeUnmount(() => {
                     v-if="!coverageComplete"
                     variant="ghost"
                     size="sm"
-                    class="h-8 shrink-0 px-2 text-[10px]"
+                    class="h-8 shrink-0 px-2 text-xs"
                     :disabled="quickPending"
                     @mousedown.prevent
                     @click="retryAll"
@@ -603,14 +603,14 @@ onBeforeUnmount(() => {
                   </Button>
                 </div>
               </div>
-              <p v-if="databaseProblem" role="status" class="border-t border-border/70 px-3 py-1.5 text-[10px] text-muted-foreground">
+              <p v-if="databaseProblem" role="status" class="border-t border-border/70 px-3 py-1.5 text-xs text-muted-foreground">
                 {{ databaseProblem }}
               </p>
               <p
                 v-if="quickObjectError"
                 role="status"
                 :title="quickObjectErrorDetail"
-                class="truncate border-t border-border/70 px-3 py-1.5 text-[10px] text-muted-foreground"
+                class="truncate border-t border-border/70 px-3 py-1.5 text-xs text-muted-foreground"
               >
                 {{ quickObjectErrorDetail }}
               </p>

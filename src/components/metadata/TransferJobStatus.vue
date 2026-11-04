@@ -36,6 +36,6 @@ const progressText = computed(() => (props.job ? formatJobProgress(props.job.pro
     <p class="text-xs text-destructive">{{ loadError }}</p>
     <Button variant="outline" size="sm" @click="emit('retry')">Try again</Button>
   </div>
-  <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</p>
+  <p v-if="lastPollError" class="text-xs text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</p>
   <p v-if="job?.error" class="whitespace-pre-wrap break-words text-xs text-destructive">{{ job.error.message }}</p>
 </template>

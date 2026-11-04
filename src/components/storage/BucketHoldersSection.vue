@@ -212,11 +212,11 @@ function confirmRemoval() {
               @click="chosen = hit; query = hit.name"
             >
               <span class="truncate">{{ hit.name }}</span>
-              <span class="font-mono text-[10px] text-muted-foreground">{{ shortUserId(hit.user_id) }}</span>
+              <span class="font-mono text-xs text-muted-foreground">{{ shortUserId(hit.user_id) }}</span>
             </button>
           </div>
         </div>
-        <p class="text-[11px] text-muted-foreground">The new key holder gets a copy at the next unlock.</p>
+        <p class="text-xs text-muted-foreground">The new key holder gets a copy at the next unlock.</p>
       </div>
       <Notice v-if="failure" tone="error">{{ failure }}</Notice>
     </div>

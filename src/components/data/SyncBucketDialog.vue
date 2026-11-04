@@ -308,8 +308,8 @@ function describeError(err: unknown): string {
                 @select="pickSuggestion"
               />
             </div>
-            <p v-if="bucketInvalid" class="mt-1 text-[11px] text-destructive">{{ bucketInvalid }}</p>
-            <p v-else-if="targetBucket.trim() && targetNodeId" class="mt-1 text-[11px] text-muted-foreground">
+            <p v-if="bucketInvalid" class="mt-1 text-xs text-destructive">{{ bucketInvalid }}</p>
+            <p v-else-if="targetBucket.trim() && targetNodeId" class="mt-1 text-xs text-muted-foreground">
               Created on {{ targetNodeLabel }} if it does not exist yet.
             </p>
           </div>
@@ -319,14 +319,14 @@ function describeError(err: unknown): string {
           <div>
             <label for="sync-source-prefix" class="text-xs font-medium text-foreground">Source prefix</label>
             <Input id="sync-source-prefix" v-model="sourcePrefix" placeholder="whole bucket" class="mt-1 h-8 font-mono text-xs" />
-            <p class="mt-1 text-[11px] text-muted-foreground">
+            <p class="mt-1 text-xs text-muted-foreground">
               Only keys under it are synced; empty means the whole bucket.
             </p>
           </div>
           <div>
             <label for="sync-target-prefix" class="text-xs font-medium text-foreground">Target prefix</label>
             <Input id="sync-target-prefix" v-model="targetPrefix" placeholder="bucket root" class="mt-1 h-8 font-mono text-xs" />
-            <p class="mt-1 text-[11px] text-muted-foreground">
+            <p class="mt-1 text-xs text-muted-foreground">
               Synced keys land under it at the target; empty means the root.
             </p>
           </div>
@@ -344,7 +344,7 @@ function describeError(err: unknown): string {
               @click="mode = option.value"
             >
               <span class="block text-[13px] font-medium text-foreground">{{ option.label }}</span>
-              <span class="mt-0.5 block text-[11px] text-muted-foreground">{{ option.description }}</span>
+              <span class="mt-0.5 block text-xs text-muted-foreground">{{ option.description }}</span>
             </button>
           </div>
         </div>
@@ -369,7 +369,7 @@ function describeError(err: unknown): string {
               @click="referenceHandling = option.value"
             >
               <span class="block text-[13px] font-medium text-foreground">{{ option.label }}</span>
-              <span class="mt-0.5 block text-[11px] text-muted-foreground">{{ option.description }}</span>
+              <span class="mt-0.5 block text-xs text-muted-foreground">{{ option.description }}</span>
             </button>
           </div>
         </div>
@@ -377,7 +377,7 @@ function describeError(err: unknown): string {
         <label class="flex items-center justify-between gap-3 text-xs">
           <span>
             <span class="font-medium text-foreground">Replicate deletions</span>
-            <span class="block text-[11px] text-muted-foreground">
+            <span class="block text-xs text-muted-foreground">
               Deleting a source object also writes a delete marker at the target.
             </span>
           </span>
@@ -387,7 +387,7 @@ function describeError(err: unknown): string {
         <label class="flex items-center justify-between gap-3 text-xs">
           <span>
             <span class="font-medium text-foreground">Sync in both directions</span>
-            <span class="block text-[11px] text-muted-foreground">
+            <span class="block text-xs text-muted-foreground">
               Also creates the sync back from the target, as a second relationship with the same settings.
             </span>
           </span>
@@ -403,7 +403,7 @@ function describeError(err: unknown): string {
           <label class="flex items-center justify-between gap-3 text-xs">
             <span>
               <span class="font-medium text-foreground">Store the copy unencrypted</span>
-              <span class="block text-[11px] text-muted-foreground">
+              <span class="block text-xs text-muted-foreground">
                 The source bucket is encrypted. This is needed when the target bucket is not encrypted, and only key
                 holders of the source bucket may choose it.
               </span>

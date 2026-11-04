@@ -378,8 +378,8 @@ defineExpose({ runNotebook })
         <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
           <Badge :variant="stateVariant">{{ stateLabel }}</Badge>
           <Badge v-if="session.live.value" variant="outline" size="sm">Kernel {{ session.kernel.value }}</Badge>
-          <span v-if="idleLeft" class="text-[11px] text-muted-foreground">Idle timeout: {{ idleLeft }}</span>
-          <span v-if="session.nodeId.value" class="text-[11px] text-muted-foreground">
+          <span v-if="idleLeft" class="text-xs text-muted-foreground">Idle timeout: {{ idleLeft }}</span>
+          <span v-if="session.nodeId.value" class="text-xs text-muted-foreground">
             on {{ displayName(session.nodeId.value) }}
           </span>
         </div>
@@ -405,7 +405,7 @@ defineExpose({ runNotebook })
           <Notice v-else-if="sessionsError" tone="error">Running sessions could not be listed: {{ sessionsError }}</Notice>
           <template v-else>
             <Notice v-if="endError" tone="error">The kernel could not be ended: {{ endError }}</Notice>
-            <p v-if="!sessionRows.length" class="text-[11px] text-muted-foreground">
+            <p v-if="!sessionRows.length" class="text-xs text-muted-foreground">
               {{ session.running.value ? 'No other running session was found.' : 'No running session was found. Start a kernel below.' }}
             </p>
             <ul v-else class="space-y-1.5">
@@ -416,7 +416,7 @@ defineExpose({ runNotebook })
                     <span class="truncate">{{ runtimeLabel(entry.runtime) }} on {{ displayName(entry.nodeId) }}</span>
                     <Badge v-if="entry.jobId === session.jobId.value" variant="outline" size="sm">Attached</Badge>
                   </p>
-                  <p class="truncate text-[11px] text-muted-foreground">
+                  <p class="truncate text-xs text-muted-foreground">
                     {{ entry.bucket }}, started {{ startedLabel(entry) }}
                     <span v-if="!matches(entry)">, other bucket or runtime</span>
                   </p>
@@ -435,7 +435,7 @@ defineExpose({ runNotebook })
                 </div>
               </li>
             </ul>
-            <p v-if="uncheckedJobs || moreJobs" class="text-[11px] text-muted-foreground">
+            <p v-if="uncheckedJobs || moreJobs" class="text-xs text-muted-foreground">
               {{ uncheckedJobs ? 'Some running jobs did not answer' : 'More running jobs were not read' }},
               so this list may be incomplete.
             </p>
@@ -497,24 +497,24 @@ defineExpose({ runNotebook })
           <label class="space-y-1 sm:col-span-2">
             <span class="text-xs font-medium text-foreground">Workspace bucket</span>
             <Input :model-value="meta?.workspace_bucket ?? ''" disabled aria-label="Workspace bucket" />
-            <span class="text-[11px] text-muted-foreground">The notebook and its files live here.</span>
+            <span class="text-xs text-muted-foreground">The notebook and its files live here.</span>
           </label>
           <label class="space-y-1">
             <span class="text-xs font-medium text-foreground">Bucket folder</span>
             <Input v-model="bucketFolder" placeholder="Whole bucket" aria-label="Bucket folder" class="font-mono text-xs" :disabled="session.running.value" />
-            <span class="text-[11px] text-muted-foreground">Only this folder of the bucket is mirrored into the kernel.</span>
+            <span class="text-xs text-muted-foreground">Only this folder of the bucket is mirrored into the kernel.</span>
           </label>
           <label class="space-y-1">
             <span class="text-xs font-medium text-foreground">Kernel folder</span>
             <Input v-model="kernelFolder" placeholder="data" aria-label="Kernel folder" class="font-mono text-xs" :disabled="session.running.value" />
-            <span class="text-[11px] text-muted-foreground">Where the bucket appears below {{ SESSION_WORKDIR }}. Files written there land in the bucket.</span>
+            <span class="text-xs text-muted-foreground">Where the bucket appears below {{ SESSION_WORKDIR }}. Files written there land in the bucket.</span>
           </label>
         </div>
 
         <div v-if="dependencies" class="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-muted/30 px-3 py-2">
           <div class="min-w-0">
             <p class="text-xs font-medium text-foreground">Dependencies</p>
-            <p class="text-[11px] text-muted-foreground">{{ dependencyFileName(dependencies) }} installs when the kernel starts.</p>
+            <p class="text-xs text-muted-foreground">{{ dependencyFileName(dependencies) }} installs when the kernel starts.</p>
           </div>
           <Button variant="outline" size="sm" @click="kernelOpen = false; dependenciesOpen = true">Edit</Button>
         </div>

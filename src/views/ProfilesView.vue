@@ -354,7 +354,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
               :class="isSelected(profile) ? 'border-primary bg-primary/5' : 'border-transparent'"
               @click="select(profile)"
             >
-              <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" :style="{ backgroundColor: profile.iconColor }">
+              <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
                 <ListChecks class="h-4 w-4" />
               </div>
               <div class="min-w-0 flex-1">
@@ -381,7 +381,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
         <div class="surface p-6">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="flex min-w-0 items-start gap-3">
-              <div class="grid h-12 w-12 shrink-0 place-items-center rounded-xl text-white" :style="{ backgroundColor: selected.iconColor }">
+              <div class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
                 <ListChecks class="h-6 w-6" />
               </div>
               <div class="min-w-0">
@@ -458,11 +458,11 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
           </OverviewCell>
           <!-- "Used by" needs a server-side count: the catalog is paged, so it
                cannot be counted client-side. Hidden until one is served. -->
-          <OverviewCell v-if="selected.usedCount !== undefined" label="Used by" :icon="FileJson2" tone="sky">
+          <OverviewCell v-if="selected.usedCount !== undefined" label="Used by" :icon="FileJson2">
             <template #value>{{ selected.usedCount }}</template>
             <template #unit>datasets</template>
           </OverviewCell>
-          <OverviewCell label="Suggested keywords" :icon="Tag" tone="aqua">
+          <OverviewCell label="Suggested keywords" :icon="Tag">
             <template #value>{{ selected.suggestedKeywords.length }}</template>
             <span v-for="keyword in selected.suggestedKeywords.slice(0, 6)" :key="keyword">#{{ keyword }}</span>
           </OverviewCell>
@@ -498,7 +498,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                 <b class="font-semibold text-aruna-navy">{{ entityTypeLabel(entry.rule.type) }}</b>
                 <span v-if="entry.rule.label && entry.rule.label.toLowerCase() !== entityTypeLabel(entry.rule.type).toLowerCase()" class="text-muted-foreground">- {{ entry.rule.label }}</span>
                 <!-- Derived obligation is explained by the property that references this type. -->
-                <span v-if="entry.via" class="text-[11px] text-muted-foreground">via <code class="hash rounded bg-muted px-1 py-0.5 text-foreground/70">{{ entry.via.valueName }}</code></span>
+                <span v-if="entry.via" class="text-xs text-muted-foreground">via <code class="hash rounded bg-muted px-1 py-0.5 text-foreground/70">{{ entry.via.valueName }}</code></span>
               </div>
               <p class="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                 {{ PROFILE_OBLIGATION_LABELS[entry.obligation].label }} entity<template v-if="entry.rule.description">, {{ entry.rule.description }}</template>
@@ -525,7 +525,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                         v-if="rule.propertyUri"
                         :href="rule.propertyUri"
                         :show-icon="false"
-                        class="inline-block max-w-[240px] truncate align-middle font-mono text-[10px] text-muted-foreground/70 hover:text-primary"
+                        class="inline-block max-w-[240px] truncate align-middle font-mono text-xs text-muted-foreground/70 hover:text-primary"
                         :title="rule.propertyUri"
                       />
                     </div>
@@ -536,7 +536,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                     <!-- What else the profile says of the value, as one plain line. -->
                     <p
                       v-if="(rule.kind === 'entity' && rule.entityTypes?.length) || rule.example || rule.enumOptions?.length || constraintSummary(rule).length"
-                      class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] text-muted-foreground"
+                      class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground"
                     >
                       <span v-if="rule.kind === 'entity' && rule.entityTypes?.length">References {{ rule.entityTypes.map(entityTypeLabel).join(', ') }}</span>
                       <span v-if="rule.example" class="font-mono">e.g. {{ rule.example }}</span>
@@ -553,13 +553,13 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
 
         <EmptyState
           v-else-if="selectedRuleState === 'ready' && (selected.shapesText || selected.customShapesText)"
-          title="No editable controls could be generated."
+          title="No editable controls could be generated"
           description="The retained SHACL requirements still apply during validation."
         />
-        <EmptyState v-else-if="selectedRuleState === 'empty'" title="No rules are defined for this profile." />
+        <EmptyState v-else-if="selectedRuleState === 'empty'" title="No rules are defined for this profile" />
       </section>
 
-      <EmptyState v-else title="Select a visible profile." />
+      <EmptyState v-else title="Select a visible profile" />
     </div>
 
     <Dialog :open="showDelete" @update:open="(value: boolean) => (showDelete = value)">

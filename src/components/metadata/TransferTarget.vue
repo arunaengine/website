@@ -178,9 +178,9 @@ watch([bucket, bucketPlaces], ([name]) => {
       v-if="bucketsLoading && !bucketsLoaded"
       show-label
       label="Loading buckets…"
-      class="mt-1 flex text-[11px]"
+      class="mt-1 flex text-xs"
     />
-    <p v-else-if="bucketsError && !authRejected" class="mt-1 text-[11px] text-destructive">{{ bucketsError }}</p>
+    <p v-else-if="bucketsError && !authRejected" class="mt-1 text-xs text-destructive">{{ bucketsError }}</p>
   </div>
   <div>
     <div class="flex items-center justify-between gap-2">
@@ -189,7 +189,7 @@ watch([bucket, bucketPlaces], ([name]) => {
         v-if="canBrowse && !authRejected && bucket"
         variant="ghost"
         size="sm"
-        class="h-5 px-1 text-[11px]"
+        class="h-5 px-1 text-xs"
         @click="browserOpen = !browserOpen"
       >
         <FolderTree class="size-3" /> {{ browserOpen ? 'Hide folders' : 'Browse folders' }}
@@ -211,11 +211,11 @@ watch([bucket, bucketPlaces], ([name]) => {
       <Button variant="outline" size="sm" :disabled="segmentInvalid" @click="addSegment">
         <FolderPlus class="size-3.5" /> Add subfolder
       </Button>
-      <span class="text-[11px] text-muted-foreground">The prefix does not have to exist, the import creates it.</span>
+      <span class="text-xs text-muted-foreground">The prefix does not have to exist, the import creates it.</span>
     </div>
   </div>
 
-  <p class="text-[11px] text-muted-foreground sm:col-span-2">
+  <p class="text-xs text-muted-foreground sm:col-span-2">
     Payload lands in <code class="rounded bg-muted px-1 font-mono">{{ targetPath }}</code>
     <template v-if="browseHint"> · {{ browseHint }}</template>
   </p>

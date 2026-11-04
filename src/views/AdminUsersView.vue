@@ -363,7 +363,7 @@ const sharedGroups = computed(() => {
                     <Badge v-for="key in attributeKeys(row.user).slice(0, 3)" :key="key" variant="outline" class="font-mono">
                       {{ key }}
                     </Badge>
-                    <span v-if="attributeKeys(row.user).length > 3" class="text-[11px] text-muted-foreground">
+                    <span v-if="attributeKeys(row.user).length > 3" class="text-xs text-muted-foreground">
                       +{{ attributeKeys(row.user).length - 3 }}
                     </span>
                   </span>
@@ -380,7 +380,7 @@ const sharedGroups = computed(() => {
 
         <footer
           v-if="!activeError && !searching && (pageIndex > 0 || nextCursor)"
-          class="flex items-center justify-between gap-3 border-t border-border bg-muted/20 px-5 py-2 text-[11px] text-muted-foreground"
+          class="flex items-center justify-between gap-3 border-t border-border bg-muted/20 px-5 py-2 text-xs text-muted-foreground"
           :aria-busy="listLoading"
         >
           <span class="flex items-center gap-2" aria-live="polite">
@@ -409,7 +409,7 @@ const sharedGroups = computed(() => {
         </footer>
         <footer
           v-else-if="!activeError && searching && searchTruncated"
-          class="border-t border-border bg-muted/20 px-5 py-2 text-[11px] text-muted-foreground"
+          class="border-t border-border bg-muted/20 px-5 py-2 text-xs text-muted-foreground"
         >
           Only the first {{ searchRows.length }} matches are shown, refine the search to narrow it down.
         </footer>
@@ -437,14 +437,14 @@ const sharedGroups = computed(() => {
         <div v-else-if="detail" class="space-y-6">
           <div class="space-y-1.5 pr-8">
             <h2 class="font-display text-lg font-semibold text-aruna-navy">{{ detail.name || 'Unnamed user' }}</h2>
-            <div class="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+            <div class="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
               <span class="truncate">{{ detail.user_id }}</span>
               <CopyButton :value="detail.user_id" label="Copy user id" />
             </div>
             <Button variant="outline" size="sm" class="mt-1" as-child>
               <RouterLink :to="{ name: 'user', params: { id: detail.user_id } }"><UserRound class="h-3.5 w-3.5" /> Open profile</RouterLink>
             </Button>
-            <p v-if="detailError" class="text-[11px] text-amber-700 dark:text-amber-300">
+            <p v-if="detailError" class="text-xs text-amber-700 dark:text-amber-300">
               Refresh failed ({{ detailError }}), showing the last loaded state.
             </p>
           </div>
@@ -474,7 +474,7 @@ const sharedGroups = computed(() => {
               <li
                 v-for="subject in detail.subject_ids"
                 :key="subject"
-                class="flex items-center gap-1.5 rounded-md bg-muted/40 px-2.5 py-1.5 font-mono text-[11px] text-foreground"
+                class="flex items-center gap-1.5 rounded-md bg-muted/40 px-2.5 py-1.5 font-mono text-xs text-foreground"
               >
                 <span class="min-w-0 break-all">{{ subject }}</span>
                 <CopyButton :value="subject" label="Copy subject id" />
@@ -506,7 +506,7 @@ const sharedGroups = computed(() => {
                 <Badge v-for="role in entry.roles" :key="role" variant="secondary">{{ role }}</Badge>
               </li>
             </ul>
-            <p class="text-[11px] text-muted-foreground">
+            <p class="text-xs text-muted-foreground">
               Group member lists are only visible to their members, so this shows the groups you share with this
               user, not their full memberships.
             </p>

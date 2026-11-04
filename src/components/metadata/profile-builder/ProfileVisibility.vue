@@ -48,7 +48,7 @@ const TOOLTIP = 'Public profiles are registered so any dataset can be validated 
       <Button v-if="readonly" variant="ghost" size="sm" @click="emit('change')">Change</Button>
     </div>
 
-    <p v-if="readonly" class="mt-1 text-[11px] text-muted-foreground">
+    <p v-if="readonly" class="mt-1 text-xs text-muted-foreground">
       {{ builder.isPublic ? PUBLIC_HINT : GROUP_PROFILE_HINT }}
     </p>
 
@@ -67,7 +67,7 @@ const TOOLTIP = 'Public profiles are registered so any dataset can be validated 
           <component :is="option.icon" class="h-3.5 w-3.5 text-primary/70" />
           {{ option.label }}
         </span>
-        <span class="mt-0.5 block text-[11px] text-muted-foreground">{{ option.hint }}</span>
+        <span class="mt-0.5 block text-xs text-muted-foreground">{{ option.hint }}</span>
       </button>
     </div>
 

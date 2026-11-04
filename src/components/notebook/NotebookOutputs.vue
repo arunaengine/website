@@ -23,15 +23,15 @@ function svgUrl(text: string): string {
     <div v-for="(output, index) in rendered" :key="index">
       <pre
         v-if="output.kind === 'stream'"
-        class="scrollbar-thin max-h-80 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed"
+        class="scrollbar-thin max-h-80 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed"
         :class="output.name === 'stderr' ? 'text-destructive' : 'text-foreground'"
       >{{ output.text }}</pre>
 
       <div v-else-if="output.kind === 'error'" class="rounded-md border border-destructive/40 bg-destructive/5 p-2">
-        <p class="font-mono text-[11px] font-semibold text-destructive">{{ output.ename }}: {{ output.evalue }}</p>
+        <p class="font-mono text-xs font-semibold text-destructive">{{ output.ename }}: {{ output.evalue }}</p>
         <pre
           v-if="output.traceback.length"
-          class="scrollbar-thin mt-1 max-h-80 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-muted-foreground"
+          class="scrollbar-thin mt-1 max-h-80 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-muted-foreground"
         >{{ plainTraceback(output.traceback) }}</pre>
       </div>
 
@@ -56,7 +56,7 @@ function svgUrl(text: string): string {
 
       <pre
         v-else
-        class="scrollbar-thin max-h-80 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-foreground"
+        class="scrollbar-thin max-h-80 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-foreground"
       >{{ output.text }}</pre>
     </div>
   </div>

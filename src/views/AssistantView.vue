@@ -269,8 +269,8 @@ function continueInPanel() {
             aria-label="Model and provider"
             @click="loadModels"
           >
-            <Sparkles class="size-3 shrink-0 text-primary" aria-hidden="true" />
-            <span class="truncate font-mono">{{ model || 'Choose a model' }}</span>
+            <Sparkles class="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span class="truncate" :class="model ? 'font-mono' : undefined">{{ model || 'Choose a model' }}</span>
           </button>
         </AssistantSettings>
         <Button
@@ -287,7 +287,7 @@ function continueInPanel() {
 
       <div v-if="!available" class="flex min-h-0 flex-1 items-center justify-center p-6">
         <EmptyState
-          title="No AI provider is ready yet."
+          title="No AI provider is ready yet"
           description="Add a provider under Settings, test it, and the assistant appears here and in the top bar."
         >
           <template #icon><MessageSquare class="h-6 w-6" /></template>
@@ -327,7 +327,7 @@ function continueInPanel() {
               class="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm hover:border-primary/40 hover:text-foreground"
               @click="useSuggestion(prompt)"
             >
-              <Sparkles class="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+              <Sparkles class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
               {{ prompt.text }}
             </button>
           </div>

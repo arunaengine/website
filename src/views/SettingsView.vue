@@ -313,8 +313,8 @@ const { mode: appearance, setTheme } = useTheme()
             </button>
             <div v-if="identityOpen" class="mt-2 flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
               <div class="min-w-0 flex-1">
-                <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Full user identity</div>
-                <code class="mt-0.5 block break-all font-mono text-[11px] leading-relaxed text-foreground/80">{{ userInfo.user.user_id }}</code>
+                <div class="text-xs font-semibold text-muted-foreground">Full user identity</div>
+                <code class="mt-0.5 block break-all font-mono text-xs leading-relaxed text-foreground/80">{{ userInfo.user.user_id }}</code>
               </div>
               <CopyButton :value="userInfo.user.user_id" label="Copy user identity" />
             </div>
@@ -323,12 +323,12 @@ const { mode: appearance, setTheme } = useTheme()
             <div>
               <label class="text-xs font-medium text-foreground">Onboarding secret (first admin, optional)</label>
               <Input v-model="onboardingSecret" class="mt-1" type="password" placeholder="Paste onboarding secret" />
-              <p class="mt-1 text-[11px] text-muted-foreground">Only for the first user on a fresh node, claims the realm admin role. Applied on the next sign-in.</p>
+              <p class="mt-1 text-xs text-muted-foreground">Only for the first user on a fresh node, claims the realm admin role. Applied on the next sign-in.</p>
             </div>
             <div>
               <label class="text-xs font-medium text-foreground">Existing API token (advanced)</label>
               <Input v-model="tokenDraft" class="mt-1" type="password" placeholder="Paste Aruna token" />
-              <p class="mt-1 text-[11px] text-muted-foreground">Skip single sign-on and authenticate with a previously issued token, then Apply connection.</p>
+              <p class="mt-1 text-xs text-muted-foreground">Skip single sign-on and authenticate with a previously issued token, then Apply connection.</p>
             </div>
           </div>
           <div class="grid gap-5 p-5 md:grid-cols-2">
@@ -336,7 +336,7 @@ const { mode: appearance, setTheme } = useTheme()
               <template v-if="!isDesktop()">
                 <label class="text-xs font-medium text-foreground">API base URL</label>
                 <Input v-model="apiBaseDraft" class="mt-1" placeholder="/api/v1" />
-                <p class="mt-1 text-[11px] text-muted-foreground">Release builds can pin this with VITE_ARUNA_API_BASE_URL; the /api proxy is development-only.</p>
+                <p class="mt-1 text-xs text-muted-foreground">Release builds can pin this with VITE_ARUNA_API_BASE_URL; the /api proxy is development-only.</p>
               </template>
               <a :href="swaggerUrl" target="_blank" rel="noopener" class="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline">
                 <ExternalLink class="h-3 w-3" /> API reference (Swagger UI)
@@ -345,7 +345,7 @@ const { mode: appearance, setTheme } = useTheme()
             <div v-if="isAuthenticated">
               <label class="text-xs font-medium text-foreground">Bearer token (advanced)</label>
               <Input v-model="tokenDraft" class="mt-1" type="password" placeholder="Paste Aruna token" />
-              <p class="mt-1 text-[11px] text-muted-foreground">Filled automatically by sign-in; paste a token here to authenticate manually.</p>
+              <p class="mt-1 text-xs text-muted-foreground">Filled automatically by sign-in; paste a token here to authenticate manually.</p>
             </div>
           </div>
           <div class="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
@@ -422,7 +422,7 @@ const { mode: appearance, setTheme } = useTheme()
           <div class="surface">
           <div class="grid gap-2 p-5 sm:grid-cols-2">
             <button v-for="profile in defaultProfiles" :key="profile.id" type="button" class="flex items-start gap-3 rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-primary/40" :class="preferredProfileId === profile.id ? 'border-primary/60 ring-1 ring-primary/30' : ''" @click="preferredProfileId = profile.id">
-              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" :style="{ backgroundColor: profile.iconColor }"><ListChecks class="h-4 w-4" /></span>
+              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground"><ListChecks class="h-4 w-4" /></span>
               <div class="min-w-0 flex-1"><div class="flex items-center gap-2"><span class="text-sm font-medium text-foreground">{{ profile.name }}</span><CircleCheck v-if="preferredProfileId === profile.id" class="size-4 shrink-0 text-status-ok" aria-label="Default" /></div><p class="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{{ profile.description }}</p></div>
             </button>
             <div v-if="!defaultProfiles.length" class="text-sm text-muted-foreground">No profile you can use is visible to you.</div>

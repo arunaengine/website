@@ -213,7 +213,7 @@ async function publish() {
       <div class="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h4 class="text-sm font-semibold text-foreground">Copies may be stored on</h4>
-          <p class="mt-1 text-[11px] text-muted-foreground">
+          <p class="mt-1 text-xs text-muted-foreground">
             Nodes that fit any card below; anything not listed is excluded.
           </p>
         </div>
@@ -239,7 +239,7 @@ async function publish() {
               v-for="mode in MODES"
               :key="mode.value"
               size="sm"
-              class="h-6 px-2 text-[11px]"
+              class="h-6 px-2 text-xs"
               :variant="card.mode === mode.value ? 'secondary' : 'ghost'"
               :aria-pressed="card.mode === mode.value"
               @click="setMode(index, mode.value)"
@@ -333,7 +333,7 @@ async function publish() {
               v-if="labelPairs.length"
               size="sm"
               variant="ghost"
-              class="h-6 px-2 text-[11px]"
+              class="h-6 px-2 text-xs"
               @click="addLabel(index)"
             >
               <Plus class="size-3.5" /> Add label
@@ -342,12 +342,12 @@ async function publish() {
           </div>
         </template>
 
-        <p v-if="nodes.length" class="text-[11px] text-muted-foreground">
+        <p v-if="nodes.length" class="text-xs text-muted-foreground">
           Matches {{ cardMatches(card) }} of {{ nodes.length }} nodes.
         </p>
       </article>
 
-      <p v-if="nodes.length" class="text-[11px] font-medium text-foreground">
+      <p v-if="nodes.length" class="text-xs font-medium text-foreground">
         This policy admits {{ matched }} of {{ nodes.length }} nodes right now.
       </p>
     </section>

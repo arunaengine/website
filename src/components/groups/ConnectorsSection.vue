@@ -198,22 +198,22 @@ onBeforeUnmount(() => {
           :class="highlightedId === connector.connector_id ? 'bg-primary/5 ring-2 ring-primary/50' : ''"
         >
           <span class="text-sm font-medium text-foreground">{{ connector.name }}</span>
-          <Badge size="sm" variant="secondary" class="uppercase">{{ connector.kind }}</Badge>
+          <Badge size="sm" variant="secondary">{{ connector.kind }}</Badge>
           <Badge size="sm"
             v-if="connector.has_secret_config"
             variant="outline"
-            class="uppercase"
+           
             title="Stored credentials; write-only, never displayed"
           >
             <KeyRound class="mr-0.5 h-3 w-3" /> credentials
           </Badge>
           <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{{ endpointOf(connector) }}</span>
-          <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime(connector.updated_at) }}</span>
+          <span class="shrink-0 text-xs text-muted-foreground">{{ relativeTime(connector.updated_at) }}</span>
           <template v-if="checkResults[connector.connector_id]">
             <Badge size="sm"
               v-if="checkResults[connector.connector_id].ok"
               variant="success"
-              class="uppercase"
+             
               :title="'latency_ms' in checkResults[connector.connector_id] && (checkResults[connector.connector_id] as ConnectorCheckResponse).latency_ms !== undefined ? `${(checkResults[connector.connector_id] as ConnectorCheckResponse).latency_ms} ms` : undefined"
             >
               ok{{ (checkResults[connector.connector_id] as ConnectorCheckResponse).latency_ms !== undefined ? ` · ${(checkResults[connector.connector_id] as ConnectorCheckResponse).latency_ms} ms` : '' }}

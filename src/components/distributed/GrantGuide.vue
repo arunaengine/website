@@ -18,7 +18,7 @@ defineProps<{ live: LiveState }>()
     <div class="space-y-2 px-5 py-4 text-xs text-muted-foreground">
       <p>A read that pulls from another node is checked on that node. Use * for the node, so the grant reaches every node.</p>
       <p>
-        <code class="break-all rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">{{ live.recommendedGrant }}</code>
+        <code class="break-all rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">{{ live.recommendedGrant }}</code>
         <CopyButton :value="live.recommendedGrant" label="Copy the node glob" class="ml-1 align-middle" />
       </p>
     </div>

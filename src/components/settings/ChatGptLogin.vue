@@ -146,14 +146,14 @@ onBeforeUnmount(stopPolling)
 
     <div v-if="waiting" class="space-y-2">
       <div class="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
-        <span class="text-[11px] uppercase tracking-wider text-muted-foreground">Code</span>
+        <span class="text-xs text-muted-foreground">Code</span>
         <code class="font-mono text-sm tracking-widest text-foreground">{{ userCode }}</code>
         <CopyButton :value="userCode" label="Copy the sign-in code" />
       </div>
       <Button variant="link" size="sm" class="h-auto p-0" @click="openVerification">
         <ExternalLink class="h-3.5 w-3.5" /> Open the OpenAI sign-in page
       </Button>
-      <p class="text-[11px] text-muted-foreground">Enter the code there; this card follows the result.</p>
+      <p class="text-xs text-muted-foreground">Enter the code there; this card follows the result.</p>
     </div>
 
     <Notice v-if="failure" tone="error">{{ failure }}</Notice>

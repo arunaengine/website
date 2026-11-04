@@ -93,10 +93,10 @@ defineExpose({ reload: load })
           <div class="flex flex-wrap items-center gap-2">
             <Badge variant="outline" size="sm">{{ scopeLabel(policy.scope) }}</Badge>
             <span class="text-sm font-medium text-foreground">{{ policy.name }}</span>
-            <Badge :variant="policy.kind === 'require' ? 'warn' : 'destructive'" size="sm" class="uppercase">
+            <Badge :variant="policy.kind === 'require' ? 'warn' : 'destructive'" size="sm">
               {{ policy.kind }}
             </Badge>
-            <Badge v-if="!policy.enabled" variant="secondary" size="sm" class="uppercase">off</Badge>
+            <Badge v-if="!policy.enabled" variant="secondary" size="sm">off</Badge>
           </div>
           <p v-if="policy.when" class="mt-1.5 font-mono text-xs text-muted-foreground">
             when {{ policy.when }}

@@ -186,11 +186,11 @@ async function quit(): Promise<void> {
 
       <dl class="grid gap-3 sm:grid-cols-2">
         <div class="surface-inline px-3 py-2">
-          <dt class="text-[10px] uppercase tracking-wide text-muted-foreground">This app</dt>
+          <dt class="text-xs text-muted-foreground">This app</dt>
           <dd class="mt-0.5 font-mono text-xs text-foreground">{{ local }}</dd>
         </div>
         <div class="surface-inline px-3 py-2">
-          <dt class="truncate text-[10px] uppercase tracking-wide text-muted-foreground">{{ name }}</dt>
+          <dt class="truncate text-xs text-muted-foreground">{{ name }}</dt>
           <dd class="mt-0.5 font-mono text-xs text-foreground">{{ realm }}</dd>
         </div>
       </dl>
@@ -234,7 +234,7 @@ async function quit(): Promise<void> {
         <Button variant="outline" size="sm" :disabled="control.busy.value || phase === 'downloading'" @click="checkAgain">
           <RefreshCw class="h-3.5 w-3.5" /> Check again
         </Button>
-        <span v-if="checked && status?.updateRequired" class="text-[11px] text-muted-foreground">
+        <span v-if="checked && status?.updateRequired" class="text-xs text-muted-foreground">
           The versions still differ.
         </span>
       </div>
@@ -254,7 +254,7 @@ async function quit(): Promise<void> {
       </div>
 
       <div class="text-center">
-        <button type="button" class="text-[11px] text-muted-foreground hover:text-foreground hover:underline" @click="quit">
+        <button type="button" class="text-xs text-muted-foreground hover:text-foreground hover:underline" @click="quit">
           Quit Aruna Desktop
         </button>
       </div>

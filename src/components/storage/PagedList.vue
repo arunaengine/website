@@ -50,7 +50,7 @@ watch(() => props.busy, (busy) => busy || (going.value = null))
         @change="(going = null), emit('filter', draft.trim())"
       />
       <span v-else />
-      <span class="text-[11px] tabular-nums text-muted-foreground">{{ summary ?? (shown || !hasNext ? rangeLabel(offset, shown, total, complete) : '') }}</span>
+      <span class="text-xs tabular-nums text-muted-foreground">{{ summary ?? (shown || !hasNext ? rangeLabel(offset, shown, total, complete) : '') }}</span>
       <span class="flex gap-2">
         <Button
           variant="outline"

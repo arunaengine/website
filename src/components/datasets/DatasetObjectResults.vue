@@ -77,7 +77,7 @@ function objectHitRoute(hit: ObjectSearchHit): RouteLocationRaw {
           v-model="objectSearchMode"
           :options="objectModeOptions"
           aria-label="Object inventory search mode"
-          class="h-8 w-auto text-[11px]"
+          class="h-8 w-auto text-xs"
         />
         <Button v-if="objectResults.length && objectCoverage" variant="outline" size="sm" @click="downloadObjectResults">
           <Download class="h-3.5 w-3.5" />
@@ -117,11 +117,11 @@ function objectHitRoute(hit: ObjectSearchHit): RouteLocationRaw {
         class="surface flex min-w-0 flex-col gap-3 p-4 transition-shadow hover:shadow-md"
       >
         <div class="flex flex-wrap items-center gap-1.5">
-          <Badge variant="secondary" size="sm" class="uppercase">Object</Badge>
+          <Badge variant="secondary" size="sm">Object</Badge>
           <Badge variant="outline" size="sm">{{ OBJECT_SEARCH_MODE_LABELS[hit.mode] }}</Badge>
         </div>
         <p class="break-all font-mono text-xs font-medium text-foreground">{{ hit.key }}</p>
-        <dl class="grid gap-1 text-[11px] text-muted-foreground">
+        <dl class="grid gap-1 text-xs text-muted-foreground">
           <div class="flex gap-1"><dt class="font-medium text-foreground/80">Node:</dt><dd :title="hit.issuer_node_id">{{ nodeDisplayName(hit.issuer_node_id) }}</dd></div>
           <div class="flex gap-1"><dt class="font-medium text-foreground/80">Group:</dt><dd class="truncate" :title="hit.group_id">{{ truncateMiddle(hit.group_id) }}</dd></div>
           <div class="flex gap-1"><dt class="font-medium text-foreground/80">Bucket:</dt><dd class="font-mono">{{ hit.bucket }}</dd></div>
@@ -134,7 +134,7 @@ function objectHitRoute(hit: ObjectSearchHit): RouteLocationRaw {
             <dd class="break-all font-mono">{{ hit.checksum.algorithm }}:{{ hit.checksum.value }}</dd>
           </div>
         </dl>
-        <div class="mt-auto flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted-foreground">
+        <div class="mt-auto flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
           <span v-if="hit.size !== null && hit.size !== undefined">{{ formatBytes(hit.size) }}</span>
           <span v-if="hit.updated_at" :title="hit.updated_at">Updated {{ relativeTime(hit.updated_at) }}</span>
           <span class="font-medium text-primary">Open in Data</span>

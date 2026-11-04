@@ -36,7 +36,7 @@ const rows = computed(() => {
           <tr v-for="row in rows" :key="row.holder">
             <td class="px-3 py-2"><span class="font-medium text-foreground">{{ row.holder }}</span> <span class="text-muted-foreground">{{ row.kind.toLowerCase() }}</span></td>
             <td class="px-3 py-2">{{ row.role }}</td>
-            <td class="px-3 py-2"><p v-for="path in row.paths" :key="path" class="break-all font-mono text-[11px]">{{ path }}</p></td>
+            <td class="px-3 py-2"><p v-for="path in row.paths" :key="path" class="break-all font-mono text-xs">{{ path }}</p></td>
             <td class="px-3 py-2">
               <Badge v-if="row.missing.length" variant="warn" size="sm">{{ bucket.members.length - row.missing.length }} of {{ bucket.members.length }}</Badge>
               <Badge v-else variant="success" size="sm">All {{ bucket.members.length }}</Badge>
