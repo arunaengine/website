@@ -1,4 +1,4 @@
-import {bridgeTarget, brokerRealm, fetchCachedOidcMetadata} from "~/server/utils/oidc";
+import {bridgeTarget, brokerRealm, fetchCachedOidcMetadata, portalCallback, portalCors} from "~/server/utils/oidc";
 
 const TOKEN_FIELDS = ['grant_type', 'code', 'redirect_uri', 'code_verifier', 'client_id', 'client_secret']
 
@@ -12,9 +12,43 @@ function basicClientId(authorization: string | undefined): string[] {
   }
 }
 
-// v3 Keycloak token URL: forwards the code exchange with the registered v2 redirect URI.
-// Client authentication passes through unchanged; bodies and tokens are never logged.
+type ProviderConfig = NonNullable<ReturnType<typeof bridgeTarget>>['config']
+
+// Portal code exchange with the bridge's own client credentials; returns only the ID token
+async function portalExchange(config: ProviderConfig, tokenEndpoint: string, form: URLSearchParams) {
+  const body = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code: form.get('code')!,
+    redirect_uri: config.redirectUrl,
+  })
+  if (config.code_challenge) body.set('code_verifier', form.get('code_verifier')!)
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Accept': 'application/json',
+  }
+  if (config.post_auth) {
+    body.set('client_id', config.clientId)
+    body.set('client_secret', config.clientSecret)
+  } else {
+    headers['Authorization'] = 'Basic ' + btoa(config.clientId + ':' + config.clientSecret)
+  }
+  const upstream = await fetch(tokenEndpoint, {method: 'POST', headers, body, redirect: 'manual'})
+  const reply = await upstream.json().catch(() => ({}))
+  if (!upstream.ok) {
+    const error = typeof reply.error === 'string' ? reply.error : 'server_error'
+    return {status: upstream.status === 400 || upstream.status === 401 ? upstream.status : 502, body: {error}}
+  }
+  if (typeof reply.id_token !== 'string') {
+    return {status: 502, body: {error: 'server_error', error_description: 'No ID token from provider'}}
+  }
+  const expires_in = typeof reply.expires_in === 'number' ? reply.expires_in : undefined
+  return {status: 200, body: {id_token: reply.id_token, token_type: 'Bearer', expires_in}}
+}
+
+// v3 Keycloak or portal token URL: exchanges the code with the registered v2 redirect URI.
+// Keycloak client authentication passes through unchanged; bodies and tokens are never logged.
 export default defineEventHandler(async event => {
+  portalCors(event)
   const provider = getRouterParam(event, 'provider') ?? ''
   if (!bridgeTarget(provider)) {
     throw createError({statusCode: 404, statusMessage: 'Not Found'})
@@ -33,9 +67,20 @@ export default defineEventHandler(async event => {
   }
   if (body.get('grant_type') !== 'authorization_code') return oauthError(400, 'unsupported_grant_type')
   if (!body.get('code')) return oauthError(400, 'invalid_request')
-  const target = bridgeTarget(provider, brokerRealm(body.get('redirect_uri'), provider))
-  if (!target || body.get('redirect_uri') !== target.brokerUrl) {
+  const portal = portalCallback(body.get('redirect_uri'))
+  const target = portal ? bridgeTarget(provider) : bridgeTarget(provider, brokerRealm(body.get('redirect_uri'), provider))
+  if (!target || (!portal && body.get('redirect_uri') !== target.brokerUrl)) {
     return oauthError(400, 'invalid_request', 'Login bridge target not allowed')
+  }
+  if (portal) {
+    if (body.get('client_id') !== target.config.clientId) return oauthError(401, 'invalid_client')
+    if (!body.get('code_verifier')) return oauthError(400, 'invalid_request')
+    const metadata = await fetchCachedOidcMetadata(target.config.wellKnownUrl)
+    if (Array.isArray(metadata)) return oauthError(502, 'temporarily_unavailable')
+    const result = await portalExchange(target.config, metadata.token_endpoint, body)
+    setResponseHeader(event, 'Cache-Control', 'no-store')
+    setResponseStatus(event, result.status)
+    return result.body
   }
 
   const authorization = getHeader(event, 'authorization')

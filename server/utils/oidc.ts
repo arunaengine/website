@@ -1,3 +1,5 @@
+import type {H3Event} from "h3";
+
 export type IdpMetadata = {
   issuer: string,
   authorization_endpoint: string,
@@ -110,4 +112,17 @@ export function portalReturn(state: string) {
   const [, provider = '', encoded = '', portal = ''] = /^v3p\.([^.]+)\.([\w-]+)\.(.+)$/s.exec(state) ?? []
   const callback = Buffer.from(encoded, 'base64url').toString()
   return portal && portalCallback(callback) && bridgeTarget(provider) ? {callback, state: portal} : undefined
+}
+
+// CORS for the portal token request: echoes only portal origins, never with credentials
+export function portalCors(event: H3Event) {
+  const origin = getRequestHeader(event, 'origin')
+  setResponseHeader(event, 'Vary', 'Origin')
+  if (portalOrigin(origin)) {
+    setResponseHeaders(event, {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    })
+  }
 }
