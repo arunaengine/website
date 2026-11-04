@@ -71,3 +71,29 @@ describe('share upload notifications', () => {
     expect(display.link).toEqual({ name: 'bucket', params: { bucketId: 'reef' }, query: { prefix: 'inbox', node: 'node-b', object: 'inbox/report (1).pdf' } })
   })
 })
+
+describe('sync notifications', () => {
+  it('opens the transfers of the bucket on its node with the sync marked', () => {
+    const notification: ApiNotification = {
+      id: 'notification-5', category: 'data.sync', kind: 'sync_completed', class: 'direct', created_at_ms: 1,
+      read: false, bucket: 'reef', node_id: 'node-b', relationship_id: 's-1', versions_synced: 2,
+    }
+    const display = describeNotification(notification, { groupName: () => undefined })
+    expect(display.detail).toBe('2 versions synced')
+    expect(display.link).toEqual({
+      name: 'bucket-storage',
+      params: { bucketId: 'reef' },
+      query: { tab: 'transfers', node: 'node-b', sync: 's-1' },
+    })
+  })
+
+  it('still opens the transfers when a failure names no sync', () => {
+    const notification: ApiNotification = {
+      id: 'notification-6', category: 'data.sync', kind: 'sync_failed', class: 'direct', created_at_ms: 1,
+      read: false, bucket: 'reef', error: 'target unreachable',
+    }
+    const display = describeNotification(notification, { groupName: () => undefined })
+    expect(display.detail).toBe('target unreachable')
+    expect(display.link).toEqual({ name: 'bucket-storage', params: { bucketId: 'reef' }, query: { tab: 'transfers' } })
+  })
+})

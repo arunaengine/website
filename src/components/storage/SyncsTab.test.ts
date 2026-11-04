@@ -1,6 +1,6 @@
 import { computed, defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useRefresh } from '@/composables/useRefresh'
 import * as Api from '@/lib/api'
 import * as StateBadge from '@/lib/stateBadge'
@@ -97,12 +97,12 @@ const tab = compileClientComponent(new URL('./SyncsTab.vue', import.meta.url), {
   '@/lib/utils': Utils,
 })
 
-async function render(state = 'enabled', extra: Partial<SyncRelationship> = {}) {
+async function render(state = 'enabled', extra: Partial<SyncRelationship> = {}, focus?: string) {
   rows.value = [{ relationship: relationship(state, extra), direction: 'outgoing' as const }]
   updateSyncRelationship.mockReset()
   updateSyncRelationship.mockResolvedValue(relationship(state))
   getSyncRelationship.mockResolvedValue({ relationship: relationship(state), pending_jobs: 0 })
-  const { root } = await mountApp(tab, { props: { bucket: 'reef-survey', nodeId: null } })
+  const { root } = await mountApp(tab, { props: { bucket: 'reef-survey', nodeId: null, focus } })
   await flush()
   return root
 }
@@ -168,6 +168,31 @@ describe('bucket syncs tab', () => {
       expect(quiet).not.toContain('waiting for the source bucket')
       expect(quiet).not.toContain('stores copies unencrypted')
     }
+  })
+})
+
+describe('a linked sync', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('marks the linked sync and scrolls to it', async () => {
+    const scrollIntoView = vi.fn()
+    const getElementById = vi.fn(() => ({ scrollIntoView }))
+    vi.stubGlobal('document', { getElementById })
+    const root = await render('enabled', {}, 's-1')
+
+    const row = element(root, (node) => node.tag === 'li')
+    expect(row.props['aria-current']).toBe('true')
+    expect(getElementById).toHaveBeenCalledWith('sync-s-1')
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    expect(content(root)).not.toContain('The linked sync is not listed')
+  })
+
+  it('says when the linked sync is not listed', async () => {
+    vi.stubGlobal('document', { getElementById: () => null })
+    const root = await render('enabled', {}, 's-9')
+
+    expect(element(root, (node) => node.tag === 'li').props['aria-current']).toBeUndefined()
+    expect(content(root)).toContain('The linked sync is not listed. It may have been deleted, or someone else created it.')
   })
 })
 

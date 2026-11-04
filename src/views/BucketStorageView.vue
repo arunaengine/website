@@ -260,7 +260,14 @@ const browserLink = computed(() => ({
         <FileSources v-if="example" :bucket="bucket" />
         <BucketSources v-else :bucket="bucket" :nodes="ownerNodes" :group-id="groupId" />
         <CopiesOfBucket v-if="example" :bucket="bucket" />
-        <TransfersTab v-else :bucket="bucket" :node-id="nodeId" :owner-nodes="ownerNodes" :group-id="groupId" />
+        <TransfersTab
+          v-else
+          :bucket="bucket"
+          :node-id="nodeId"
+          :owner-nodes="ownerNodes"
+          :group-id="groupId"
+          :focus-sync="typeof route.query.sync === 'string' ? route.query.sync : null"
+        />
       </TabsContent>
     </Tabs>
   </div>
