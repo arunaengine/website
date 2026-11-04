@@ -157,7 +157,7 @@ onBeforeUnmount(() => {
       <div class="edits" :class="{ merged }" :hidden="!editsShown">
         <b>{{ merged ? '3 edits merged into the realm' : 'Edits made offline on fish-lab' }}</b>
         <span v-show="kept > 0" class="disc sm"><ChevronDown />View the 3 edits</span>
-        <span v-for="(edit, index) in EDITS" v-show="index + 1 < kept" :key="edit.text"><component :is="edit.icon" /><em>{{ edit.text }}</em></span>
+        <span v-for="(edit, index) in EDITS" v-show="index < kept" :key="edit.text"><component :is="edit.icon" /><em>{{ edit.text }}</em></span>
       </div>
     </figure>
   </div>
