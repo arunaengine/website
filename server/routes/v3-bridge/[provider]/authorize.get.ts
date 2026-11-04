@@ -31,10 +31,13 @@ export default defineEventHandler(async event => {
     redirect_uri: target.config.redirectUrl,
     state: portal ? portalState(provider, redirect_uri as string, state as string) : `v3.${provider}${realmPart}.${state}`,
   }
-  // Portal logins send PKCE upstream only where the v2 login does
-  if (portal && !target.config.code_challenge) {
-    delete upstream.code_challenge
-    delete upstream.code_challenge_method
+  // Portal logins ask upstream for the v2 scope and send PKCE only where the v2 login does
+  if (portal) {
+    upstream.scope = target.config.scope.join(' ')
+    if (!target.config.code_challenge) {
+      delete upstream.code_challenge
+      delete upstream.code_challenge_method
+    }
   }
 
   const metadata = await fetchCachedOidcMetadata(target.config.wellKnownUrl)

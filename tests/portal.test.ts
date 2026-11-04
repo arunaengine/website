@@ -1,5 +1,5 @@
 import {beforeEach, describe, expect, test} from 'bun:test'
-import {createHandler, fetchCalls, idpMetadata, replyWith} from './harness'
+import {config, createHandler, fetchCalls, idpMetadata, replyWith} from './harness'
 import {portalCallback, portalOrigin, portalReturn, portalState} from '../server/utils/oidc'
 
 const handler = await createHandler()
@@ -76,8 +76,19 @@ describe('portal authorize', () => {
     const location = new URL(response.headers.get('location')!)
     expect(location.origin + location.pathname).toBe('https://lifescience.test/authorize')
     const sent = Object.fromEntries(location.searchParams)
-    expect(sent).toEqual({...portalAuth, redirect_uri: 'https://web.test/callback', state: sent.state})
+    expect(sent).toEqual({...portalAuth, redirect_uri: 'https://web.test/callback', scope: 'openid', state: sent.state})
     expect(portalReturn(sent.state)).toEqual({callback: portal, state: 'portal-state'})
+  })
+
+  test('asks upstream for the v2 scope of the provider', async () => {
+    const scope = config.provider.iam4nfdi.scope
+    config.provider.iam4nfdi.scope = ['openid', 'email']
+    try {
+      const response = await authorize('iam4nfdi', nfdiAuth)
+      expect(new URL(response.headers.get('location')!).searchParams.get('scope')).toBe('openid email')
+    } finally {
+      config.provider.iam4nfdi.scope = scope
+    }
   })
 
   test('drops pkce upstream for providers without it', async () => {
