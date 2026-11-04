@@ -21,6 +21,7 @@ import SectionHeading from '@/components/ui/SectionHeading.vue'
 import SignInPanel from '@/components/auth/SignInPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import Notice from '@/components/ui/Notice.vue'
 import type { RealmView } from '@/composables/aruna/realm'
 import type { RealmNodeInfo } from '@/lib/api'
 import { givenName } from '@/components/nodes/node-display'
@@ -274,6 +275,12 @@ const guestObjects = computed(() => publicOverview.value?.objects ?? null)
 // Without node records (a guest) the realm still names how many nodes it has configured.
 const realmNodeCount = computed(() => infraNodes.value.length || (publicOverview.value?.nodes_configured ?? null))
 
+// An upstream sign-in often brings no name, and the node then names the user by the user id.
+const unnamed = computed(() => {
+  const user = currentUser.value
+  return Boolean(user && (!user.name.trim() || user.name === user.id))
+})
+
 // While a stored session restores, keep the copy neutral instead of flashing
 // the guest greeting and its sign-in hint.
 const pageTitle = computed(() => (currentUser.value || authPending.value ? 'Dashboard' : 'Aruna data portal'))
@@ -307,6 +314,11 @@ const pageDescription = computed(() =>
 
       <template v-else>
       <SignInPanel v-if="!currentUser" compact />
+      <Notice v-else-if="unnamed && !authPending">
+        Your profile has no name{{ currentUser.email ? '' : ' or email' }}, so others see your user id.
+        Add {{ currentUser.email ? 'it' : 'them' }} in your
+        <RouterLink :to="{ name: 'settings', query: { tab: 'profile' } }" class="text-primary hover:underline">profile settings</RouterLink>.
+      </Notice>
 
       <!-- First visit on the web: the docs and the short tour first, tutorials behind them. -->
       <section

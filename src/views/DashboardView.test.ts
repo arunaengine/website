@@ -316,6 +316,7 @@ beforeAll(async () => {
     '@/components/nodes/node-display': NodeDisplay,
     '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
     '@/components/ui/EmptyState.vue': moduleDefault(EmptyStub),
+    '@/components/ui/Notice.vue': moduleDefault(PassStub),
     '@/components/ui/SectionHeading.vue': moduleDefault(SectionHeadingStub),
     '@/components/desktop/HomeCards.vue': moduleDefault(HomeCardsStub),
     '@/components/desktop/ThisComputer.vue': moduleDefault(ThisComputerStub),
@@ -518,6 +519,18 @@ describe('authenticated dashboard scope', () => {
 
     runsState.value = 'off'
     expect(await renderedText()).not.toContain('recent runs')
+  })
+
+  it('points a user without a name to the profile settings until a name is set', async () => {
+    signedInRealm()
+    currentUser.value = { id: 'user-id', name: 'user-id', email: '' }
+    expect(await renderedText()).toContain('Your profile has no name or email, so others see your user id. Add them in your profile settings')
+
+    currentUser.value = { id: 'user-id', name: '', email: 'ada@example.org' }
+    expect(await renderedText()).toContain('Your profile has no name, so others see your user id. Add it in your profile settings')
+
+    currentUser.value = { id: 'user-id', name: 'Ada Lovelace', email: '' }
+    expect(await renderedText()).not.toContain('Your profile has no name')
   })
 
   it('shows the realm figures in the same cells when the account stored that scope', async () => {
