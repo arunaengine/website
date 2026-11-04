@@ -1,7 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref, shallowRef } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { button, click, compileClientComponent, content, flush, moduleDefault, mountApp } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
 import type { MergeStep, OtherAccount } from '@/composables/useAccountMerge'
 import type { MergeAccountResponse, UserInfoResponse } from '@/lib/api'
 import { DEFAULT_PORTAL_CONFIG, type LoginOption, type PortalRuntimeConfig } from '@/lib/config'
@@ -151,6 +151,8 @@ describe('adding another account', () => {
     const { root, app } = await render()
     const text = content(root)
     expect(text).toContain('Merge Bob into this account?')
+    // The wide dialog size keeps the two columns of moved items readable.
+    expect(element(root, (node) => node.props.class === 'max-w-2xl')).toBeTruthy()
     expect(text).toContain('Sign-ins2')
     expect(text).toContain('Groups1')
     expect(text).toContain('Devices1, they sign in again')

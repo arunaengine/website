@@ -139,7 +139,7 @@ function close(value: boolean) {
   </div>
 
   <Dialog :open="open" @update:open="close">
-    <DialogContent class="max-w-lg">
+    <DialogContent class="max-w-2xl">
       <DialogHeader>
         <DialogTitle>{{ title }}</DialogTitle>
         <DialogDescription v-if="step === 'confirm' || step === 'merging'">
