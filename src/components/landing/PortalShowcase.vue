@@ -57,6 +57,17 @@ function select(id: string) {
   show(id)
 }
 
+// Arrow keys move between tabs and select them, as in the WAI-ARIA tabs pattern.
+function onKey(event: KeyboardEvent) {
+  const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key]
+  if (!step) return
+  event.preventDefault()
+  const index = (TABS.findIndex((tab) => tab.id === active.value) + step + TABS.length) % TABS.length
+  select(TABS[index].id)
+  const buttons = (event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="tab"]')
+  buttons[index]?.focus()
+}
+
 // The stage keeps the height of the tallest view, so cycling never moves the page.
 function fit() {
   const el = stage.value
@@ -118,12 +129,13 @@ defineExpose({ select })
       <p class="body"><span class="t-l">Files, descriptions, nodes and analyses of one study, as they look in Aruna.</span><span class="t-s">One study, as it looks in Aruna.</span></p>
     </div>
     <div class="wrap">
-      <div aria-label="Portal views" class="ptabs" role="tablist">
+      <div aria-label="Portal views" class="ptabs" role="tablist" @keydown="onKey">
         <button
           v-for="tab in TABS"
           :key="tab.id"
           :aria-controls="tab.id"
           :aria-selected="active === tab.id"
+          :tabindex="active === tab.id ? 0 : -1"
           role="tab"
           type="button"
           @click="select(tab.id)"
