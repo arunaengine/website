@@ -4,7 +4,7 @@ import { restoring } from '@/composables/aruna/state'
 import { tokenClaims } from '@/composables/aruna/renewal'
 import { ApiError, apiRequest, issueToken, signInHasNoAccount } from '@/lib/api'
 import type { RealmInfoResponse } from '@/lib/api'
-import { featureEnabled, portalConfig, type LoginOption } from '@/lib/config'
+import { featureEnabled, portalConfig, type LoginOption, type UpstreamLogin } from '@/lib/config'
 import { desktopBridge } from '@/lib/desktop'
 import { DESKTOP_CALLBACK_URI, DESKTOP_STATE_PREFIX } from '@/lib/desktopHandoff'
 import {
@@ -25,6 +25,7 @@ const REDIRECT_KEY = 'aruna.oidc.redirect'
 const ONBOARDING_KEY = 'aruna.oidc.onboardingSecret'
 const ID_TOKEN_KEY = 'aruna.oidc.idToken'
 const LINK_KEY = 'aruna.oidc.link'
+const UPSTREAM_KEY = 'aruna.oidc.upstream'
 
 export type SignInStage = 'idle' | 'redirecting' | 'exchanging' | 'registering' | 'match' | 'done' | 'error'
 
@@ -37,6 +38,8 @@ export interface SignInOptions {
   freshLogin?: boolean
   /** Extra authorization request parameters of the chosen login option. */
   params?: Record<string, string>
+  /** The upstream provider of the chosen login option, signed in through its bridge. */
+  upstream?: UpstreamLogin
 }
 
 /** The outcome of linking another login, shown once back in Settings. */
@@ -132,13 +135,14 @@ async function discover(url: string): Promise<OidcDiscoveryDocument> {
   return native ? native.oidcDiscovery(url) : fetchDiscovery(url)
 }
 
-async function resolveProvider() {
+async function resolveProvider(upstream?: UpstreamLogin | null) {
   const { realmInfo, apiBaseUrl } = useAruna()
   let info = realmInfo.value
   if (!info) {
     info = await apiRequest<RealmInfoResponse>('/system/realm', {}, { baseUrl: apiBaseUrl.value })
   }
-  const provider = info.oidc_providers[0]
+  const provider = upstream ? info.oidc_providers.find((entry) => entry.id === upstream.provider) : info.oidc_providers[0]
+  if (!provider && upstream) throw new Error(`The realm has no OIDC provider "${upstream.provider}", sign-in is not available.`)
   if (!provider) {
     throw new Error('The realm has no OIDC provider configured, sign-in is not available.')
   }
@@ -153,6 +157,24 @@ export async function oidcClient() {
   return { clientId, discovery: await discover(discoveryUrl), send: (await nativeOidc())?.oidcToken }
 }
 
+// An upstream login uses its bridge's endpoints, any other the realm provider's discovery.
+async function endpoints(upstream: UpstreamLogin | null) {
+  const { clientId, discoveryUrl } = await resolveProvider(upstream)
+  if (upstream) return { clientId, authorization: `${upstream.bridge}/authorize`, token: `${upstream.bridge}/token` }
+  const discovery = await discover(discoveryUrl)
+  return { clientId, authorization: discovery.authorization_endpoint, token: discovery.token_endpoint }
+}
+
+// The upstream login the pending sign-in started with; null for any other.
+function pendingUpstream(): UpstreamLogin | null {
+  try {
+    const stored = JSON.parse(window.sessionStorage.getItem(UPSTREAM_KEY) ?? 'null') as Partial<UpstreamLogin> | null
+    return typeof stored?.provider === 'string' && typeof stored.bridge === 'string' ? { provider: stored.provider, bridge: stored.bridge } : null
+  } catch {
+    return null
+  }
+}
+
 /** Redirects the browser to the realm's Keycloak login page (code + PKCE). */
 async function signIn(options: SignInOptions = {}) {
   return authorize(options)
@@ -164,8 +186,8 @@ async function authorize(options: SignInOptions & { link?: string }) {
   stage.value = 'redirecting'
   stageError.value = null
   try {
-    const { clientId, discoveryUrl } = await resolveProvider()
-    const discovery = await discover(discoveryUrl)
+    const upstream = options.upstream ?? null
+    const { clientId, authorization } = await endpoints(upstream)
     const verifier = randomUrlSafeString(48)
     const state = signInState()
     if (options.link) window.sessionStorage.setItem(LINK_KEY, options.link)
@@ -174,6 +196,8 @@ async function authorize(options: SignInOptions & { link?: string }) {
       window.sessionStorage.removeItem(ID_TOKEN_KEY)
     }
     window.sessionStorage.setItem(VERIFIER_KEY, verifier)
+    if (upstream) window.sessionStorage.setItem(UPSTREAM_KEY, JSON.stringify(upstream))
+    else window.sessionStorage.removeItem(UPSTREAM_KEY)
     window.sessionStorage.setItem(STATE_KEY, state)
     window.sessionStorage.setItem(REDIRECT_KEY, options.redirectTo ?? '/app')
     if (options.onboardingSecret?.trim()) {
@@ -183,7 +207,7 @@ async function authorize(options: SignInOptions & { link?: string }) {
     }
     beginAuthRedirect(
       buildAuthorizationUrl({
-        authorizationEndpoint: discovery.authorization_endpoint,
+        authorizationEndpoint: authorization,
         clientId,
         redirectUri: callbackUri(),
         state,
@@ -271,10 +295,9 @@ async function revokeHelper(token: string, baseUrl: string) {
 }
 
 async function redeemCode(code: string, verifier: string) {
-  const { clientId, discoveryUrl } = await resolveProvider()
-  const discovery = await discover(discoveryUrl)
+  const { clientId, token } = await endpoints(pendingUpstream())
   return exchangeAuthorizationCode({
-    tokenEndpoint: discovery.token_endpoint,
+    tokenEndpoint: token,
     clientId,
     redirectUri: callbackUri(),
     code,
@@ -340,6 +363,8 @@ async function completeSignIn(params: URLSearchParams): Promise<string | null> {
     // Aruna validates the audience against the client id, which Keycloak only
     // sets on the ID token; the access token is for the account API.
     const oidcToken = tokens.id_token ?? tokens.access_token
+    // An upstream login has no Keycloak session to end at sign-out.
+    const endSession = pendingUpstream() ? undefined : tokens.id_token
 
     stage.value = 'registering'
     const client = { baseUrl: aruna.apiBaseUrl.value, token: oidcToken }
@@ -355,12 +380,12 @@ async function completeSignIn(params: URLSearchParams): Promise<string | null> {
       )
     } catch (err) {
       if (!(err instanceof ApiError && err.code === 'account_match')) throw err
-      accountMatch.value = { oidcToken, idToken: tokens.id_token, redirectTo: window.sessionStorage.getItem(REDIRECT_KEY) || '/app' }
+      accountMatch.value = { oidcToken, idToken: endSession, redirectTo: window.sessionStorage.getItem(REDIRECT_KEY) || '/app' }
       stage.value = 'match'
       return null
     }
     const issued = await apiRequest<GetTokenResponse>('/access/token', {}, client)
-    await adoptSession(issued.token, tokens.id_token)
+    await adoptSession(issued.token, endSession)
 
     stage.value = 'done'
     const redirectTo = window.sessionStorage.getItem(REDIRECT_KEY) || '/app'
@@ -376,6 +401,7 @@ async function completeSignIn(params: URLSearchParams): Promise<string | null> {
       window.sessionStorage.removeItem(REDIRECT_KEY)
       window.sessionStorage.removeItem(ONBOARDING_KEY)
       window.sessionStorage.removeItem(LINK_KEY)
+      window.sessionStorage.removeItem(UPSTREAM_KEY)
     }
   }
 }

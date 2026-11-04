@@ -49,7 +49,8 @@ function choose(choice: LoginOption) {
   if (!options) return
   signInChoice.value = null
   const params = Object.keys(choice.params).length ? choice.params : undefined
-  void signIn(params ? { ...options, params } : options)
+  const upstream = choice.upstream
+  void signIn({ ...options, ...(params && { params }), ...(upstream && { upstream }) })
 }
 
 // Login with an account of another realm: a popup at that realm, then a session here.

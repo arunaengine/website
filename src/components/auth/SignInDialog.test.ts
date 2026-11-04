@@ -94,6 +94,15 @@ describe('sign-in dialog', () => {
     app.unmount()
   })
 
+  it('signs in with the upstream provider of a login', async () => {
+    const upstream = { provider: 'lifescience', bridge: 'https://bridge.test/v3-bridge/lifescience' }
+    config = { ...DEFAULT_PORTAL_CONFIG, login: { options: [{ ...option('LifeScience RI'), upstream }], accountUrl: '' } }
+    const { root, app } = await render()
+    await click(button(root, 'LifeScience RI'))
+    expect(signIn).toHaveBeenCalledWith({ redirectTo: '/app/data', onboardingSecret: 's1', upstream })
+    app.unmount()
+  })
+
   it('logs in with another realm from the last row', async () => {
     loginWithRealm.mockResolvedValue(null)
     const { root, app } = await render()
