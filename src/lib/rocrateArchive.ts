@@ -1,4 +1,4 @@
-import { ApiError, defaultApiBaseUrl, type ApiClientOptions } from './api'
+import { ApiError, apiUrl, type ApiClientOptions } from './api'
 
 // RO-Crate zip archive transfer, verified against aruna
 // api/src/routes/rocrate_import.rs (upload_rocrate, submit_import),
@@ -178,15 +178,6 @@ export function exportJobResult(result: unknown): ExportJobResult | null {
   return isRecord(result) && 'included' in result ? (result as unknown as ExportJobResult) : null
 }
 
-function archiveUrl(path: string, client: ApiClientOptions, query: Record<string, string | number | undefined> = {}) {
-  const baseUrl = (client.baseUrl || defaultApiBaseUrl()).replace(/\/$/, '')
-  const url = new URL(`${baseUrl}${path}`, window.location.origin)
-  for (const [key, value] of Object.entries(query)) {
-    if (value !== undefined && value !== '') url.searchParams.set(key, String(value))
-  }
-  return url
-}
-
 function authHeaders(client: ApiClientOptions, extra: Record<string, string> = {}): Headers {
   const headers = new Headers(extra)
   if (client.token) headers.set('Authorization', `Bearer ${client.token}`)
@@ -256,7 +247,7 @@ export async function uploadArchive(
 ): Promise<UploadArchiveResponse> {
   const mediaType = archiveMediaType(file.name)
   if (!mediaType) throw new ApiError(0, 'Only .zip and .eln archives can be imported.')
-  const response = await fetch(archiveUrl('/metadata/rocrate/uploads', client), {
+  const response = await fetch(apiUrl('/metadata/rocrate/uploads', {}, client), {
     method: 'POST',
     headers: authHeaders(client, { 'Content-Type': mediaType }),
     body: file,
@@ -272,7 +263,7 @@ export async function submitImport(
   request: SubmitImportRequest,
   client: ApiClientOptions,
 ): Promise<SubmitImportResponse> {
-  const response = await fetch(archiveUrl('/metadata/rocrate/imports', client), {
+  const response = await fetch(apiUrl('/metadata/rocrate/imports', {}, client), {
     method: 'POST',
     headers: authHeaders(client, { 'Content-Type': 'application/json' }),
     body: JSON.stringify(request),
@@ -288,7 +279,7 @@ export async function submitExport(
   idempotencyKey?: string,
 ): Promise<SubmitExportResponse> {
   const path = `/metadata/${encodeURIComponent(documentId)}/rocrate/exports`
-  const response = await fetch(archiveUrl(path, client), {
+  const response = await fetch(apiUrl(path, {}, client), {
     method: 'POST',
     headers: authHeaders(client, { 'Content-Type': 'application/json' }),
     body: JSON.stringify(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
@@ -305,7 +296,7 @@ export async function fetchArchiveReport<T>(
   options: { limit?: number; cursor?: string } = {},
 ): Promise<ArchiveReportResult<T>> {
   const path = `/compute/jobs/${encodeURIComponent(jobId)}/report`
-  const response = await fetch(archiveUrl(path, client, { limit: options.limit, cursor: options.cursor }), {
+  const response = await fetch(apiUrl(path, { limit: options.limit, cursor: options.cursor }, client), {
     headers: authHeaders(client),
   })
   if (response.ok) return { status: 'ready', page: (await response.json()) as ArchiveReportPage<T> }
@@ -338,7 +329,7 @@ function dispositionName(header: string | null): string | null {
 // simply follow a link; the body is buffered into a blob and saved.
 export async function downloadArchiveArtifact(jobId: string, client: ApiClientOptions): Promise<string> {
   const path = `/compute/jobs/${encodeURIComponent(jobId)}/artifacts/rocrate`
-  const response = await fetch(archiveUrl(path, client), { headers: authHeaders(client) })
+  const response = await fetch(apiUrl(path, {}, client), { headers: authHeaders(client) })
   if (!response.ok) throw archiveError(response, await errorBody(response), ARTIFACT_MESSAGES)
   const fileName = dispositionName(response.headers.get('content-disposition')) || `ro-crate-${jobId}.zip`
   const blob = await response.blob()
