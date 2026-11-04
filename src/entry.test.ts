@@ -111,6 +111,16 @@ describe('the portal entry', () => {
     ])
   })
 
+  it('turns off the eval probe of zod before the portal loads', async () => {
+    const scope = globalThis as { __zod_globalConfig?: Record<string, unknown> }
+    scope.__zod_globalConfig = { locale: 'kept' }
+    const { booted } = await load({ pathname: '/app', search: '' })
+
+    expect(booted).toHaveBeenCalledTimes(1)
+    expect(scope.__zod_globalConfig).toEqual({ locale: 'kept', jitless: true })
+    delete scope.__zod_globalConfig
+  })
+
   it.each([
     ['an unmarked web callback', { pathname: '/auth/callback', search: '?code=c1&state=s1' }, undefined],
     ['a marked state on another page', { pathname: '/app', search: '?state=desktop.s1' }, undefined],

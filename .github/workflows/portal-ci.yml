@@ -23,3 +23,5 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - run: npx playwright-core install --with-deps chromium-headless-shell
+      - run: node e2e/csp.mjs

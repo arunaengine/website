@@ -106,7 +106,7 @@ The standalone release manifest contains the portal name, package version, sourc
 
 ## GitHub Actions
 
-Pull requests and pushes to the branches listed in `.github/workflows/portal-ci.yml` install the committed npm lockfile with `npm ci`, then run `npm test` and `npm run build`.
+Pull requests and pushes to the branches listed in `.github/workflows/portal-ci.yml` install the committed npm lockfile with `npm ci`, then run `npm test` and `npm run build`. They then render the built portal in a headless Chromium under the content security policy an Aruna node sends and fail on any violation (`node e2e/csp.mjs`; set `CHROME_PATH` to use a local browser).
 
 Publish release assets with `.github/workflows/portal-release.yml`:
 
