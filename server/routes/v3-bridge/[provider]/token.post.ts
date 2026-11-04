@@ -75,13 +75,14 @@ export default defineEventHandler(async event => {
   if (portal) {
     if (body.get('client_id') !== target.config.clientId) return oauthError(401, 'invalid_client')
     if (!body.get('code_verifier')) return oauthError(400, 'invalid_request')
-    // Bridge PKCE: the code must come from this bridge's callback, once, for this callback and verifier
+    // Bridge PKCE: a bridge code from this bridge's callback, once, for this callback and verifier
     const pending = takeCode(body.get('code')!)
     if (!pending || pending.provider !== provider || pending.callback !== body.get('redirect_uri') ||
         !verifierMatches(body.get('code_verifier')!, pending.challenge)) {
       setResponseHeader(event, 'Cache-Control', 'no-store')
       return oauthError(400, 'invalid_grant')
     }
+    body.set('code', pending.code)
     const metadata = await fetchCachedOidcMetadata(target.config.wellKnownUrl)
     if (Array.isArray(metadata)) return oauthError(502, 'temporarily_unavailable')
     const result = await portalExchange(target.config, metadata.token_endpoint, body)

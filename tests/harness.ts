@@ -31,6 +31,15 @@ export const config: any = {
       code_challenge: false,
       post_auth: true,
     },
+    gfbio: {
+      wellKnownUrl: 'https://gfbio.test/.well-known/openid-configuration',
+      clientId: 'gfbio-client',
+      clientSecret: 'gfbio-secret',
+      redirectUrl: 'https://web.test/callback',
+      scope: ['openid'],
+      code_challenge: false,
+      post_auth: false,
+    },
   },
   v3Bridge: {realmUrl: 'https://kc.test/realms/aruna', providers: 'lifescience,iam4nfdi,gfbio'},
 }

@@ -1,5 +1,5 @@
 import type {H3Event} from "h3";
-import {createHash, timingSafeEqual} from "node:crypto";
+import {createHash, randomBytes, timingSafeEqual} from "node:crypto";
 
 export type IdpMetadata = {
   issuer: string,
@@ -141,25 +141,39 @@ export function portalReturn(state: string) {
     : undefined
 }
 
-type PendingCode = {provider: string, callback: string, challenge: string, expires: number}
+type PendingCode = {provider: string, code: string, callback: string, challenge: string, expires: number}
 
-// Codes sent back to a portal or app, each bound to its code challenge and callback.
-// In memory, single use, five minutes; a restart drops pending sign-ins.
+// Bridge codes sent back to a portal or app instead of the upstream code, each bound once to its
+// upstream code, callback and code challenge. In memory, single use, five minutes.
 const pendingCodes = new Map<string, PendingCode>()
 const PENDING_MS = 5 * 60 * 1000
+// Digests of upstream codes already bound, so a replayed upstream code gets no second binding
+const boundCodes = new Map<string, number>()
+const BOUND_MS = 10 * 60 * 1000
 
-export function rememberCode(code: string, entry: Omit<PendingCode, 'expires'>) {
+// A fresh bridge code for an upstream code, or undefined when that upstream code was bound before
+export function rememberCode(entry: Omit<PendingCode, 'expires'>) {
   const now = Date.now()
   for (const [key, pending] of pendingCodes) {
     if (pending.expires <= now) pendingCodes.delete(key)
   }
-  pendingCodes.set(code, {...entry, expires: now + PENDING_MS})
+  for (const [key, expires] of boundCodes) {
+    if (expires <= now) boundCodes.delete(key)
+  }
+  const digest = createHash('sha256').update(entry.code).digest('base64url')
+  if (boundCodes.has(digest)) return undefined
+  boundCodes.set(digest, now + BOUND_MS)
+  let handle: string
+  do handle = randomBytes(32).toString('base64url')
+  while (pendingCodes.has(handle))
+  pendingCodes.set(handle, {...entry, expires: now + PENDING_MS})
+  return handle
 }
 
-// The pending entry of a code, removed on first use; undefined when unknown, used or expired
-export function takeCode(code: string) {
-  const pending = pendingCodes.get(code)
-  pendingCodes.delete(code)
+// The binding of a bridge code, removed on first use; undefined when unknown, used or expired
+export function takeCode(handle: string) {
+  const pending = pendingCodes.get(handle)
+  pendingCodes.delete(handle)
   return pending && pending.expires > Date.now() ? pending : undefined
 }
 

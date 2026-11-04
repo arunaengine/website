@@ -26,13 +26,15 @@ export default defineEventHandler(async event => {
   if (typeof state === 'string' && (state.startsWith('v3.') || state.startsWith('v3p.'))) {
     let target: string | undefined
     let bridgedState: string | undefined
+    let bridgeCode: string | undefined
     if (state.startsWith('v3p.')) {
       const portal = portalReturn(state)
       target = portal?.callback
       bridgedState = portal?.state
-      // The code is redeemed at the bridge only with the verifier of this challenge
+      // The client gets a bridge code, redeemed only with the verifier of this challenge
       if (portal && typeof code === 'string' && code) {
-        rememberCode(code, {provider: portal.provider, callback: portal.callback, challenge: portal.challenge})
+        bridgeCode = rememberCode({provider: portal.provider, code, callback: portal.callback, challenge: portal.challenge})
+        if (!bridgeCode) target = undefined
       }
     } else {
       const [, alias = '', realm, keycloakState] =
@@ -47,6 +49,10 @@ export default defineEventHandler(async event => {
     const forward: Record<string, string> = {state: bridgedState}
     for (const key of ['code', 'error', 'error_description', 'iss']) {
       if (typeof query[key] === 'string') forward[key] = query[key] as string
+    }
+    if (state.startsWith('v3p.')) {
+      delete forward.code
+      if (bridgeCode) forward.code = bridgeCode
     }
     return sendRedirect(event, withQuery(target, forward))
   }

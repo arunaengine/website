@@ -28,11 +28,12 @@ function authorize(provider: string, params: Record<string, string>) {
   return handler(new Request(`https://web.test/v3-bridge/${provider}/authorize?${query}`))
 }
 
-// Runs authorize and the v2 callback, so the bridge binds the code to the challenge
+// Runs authorize and the v2 callback; answers the bridge code bound to the upstream code
 async function issueCode(provider: string, params: Record<string, string>, code: string) {
   const start = await authorize(provider, params)
   const state = new URL(start.headers.get('location')!).searchParams.get('state')!
-  return handler(new Request(`https://web.test/callback?code=${code}&state=${encodeURIComponent(state)}`))
+  const back = await handler(new Request(`https://web.test/callback?code=${code}&state=${encodeURIComponent(state)}`))
+  return new URL(back.headers.get('location')!).searchParams.get('code')!
 }
 
 test('portal callback rule', () => {
@@ -139,12 +140,16 @@ describe('portal callback', () => {
   test('sends code and portal state back to the portal', async () => {
     const start = await authorize('lifescience', portalAuth)
     const state = new URL(start.headers.get('location')!).searchParams.get('state')!
-    const back = await callback(`code=c-1&iss=x&next=https://evil.test&state=${encodeURIComponent(state)}`)
+    const back = await callback(`code=up-send&iss=x&next=https://evil.test&state=${encodeURIComponent(state)}`)
     expect(back.status).toBe(302)
     expect(back.headers.getSetCookie()).toEqual([])
     const location = new URL(back.headers.get('location')!)
     expect(location.origin + location.pathname).toBe(portal)
-    expect(Object.fromEntries(location.searchParams)).toEqual({code: 'c-1', iss: 'x', state: 'portal-state'})
+    const sent = Object.fromEntries(location.searchParams)
+    expect(sent).toEqual({code: sent.code, iss: 'x', state: 'portal-state'})
+    // An opaque bridge code, never the upstream one
+    expect(sent.code).toMatch(/^[\w-]{43}$/)
+    expect(back.headers.get('location')).not.toContain('up-send')
   })
 
   test('forwards provider errors to the portal', async () => {
@@ -190,8 +195,8 @@ describe('portal token', () => {
   }))
 
   test('returns only the id token', async () => {
-    await issueCode('lifescience', portalAuth, 'c-1')
-    const response = await token('lifescience', exchange)
+    const code = await issueCode('lifescience', portalAuth, 'up-ls')
+    const response = await token('lifescience', {...exchange, code})
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(response.headers.get('access-control-allow-origin')).toBe(origin)
@@ -200,18 +205,18 @@ describe('portal token', () => {
     const call = fetchCalls.find(c => c.url === 'https://lifescience.test/token')!
     expect(call.options.headers['Authorization']).toBe('Basic ' + btoa('ls-client:ls-secret'))
     expect(Object.fromEntries(call.options.body)).toEqual({
-      grant_type: 'authorization_code', code: 'c-1', redirect_uri: 'https://web.test/callback', code_verifier: verifier,
+      grant_type: 'authorization_code', code: 'up-ls', redirect_uri: 'https://web.test/callback', code_verifier: verifier,
     })
   })
 
   test('uses client secret post and no verifier where v2 does', async () => {
-    await issueCode('iam4nfdi', nfdiAuth, 'c-1')
-    const response = await token('iam4nfdi', {...exchange, client_id: 'aruna-engine.org/callback'})
+    const code = await issueCode('iam4nfdi', nfdiAuth, 'up-nfdi')
+    const response = await token('iam4nfdi', {...exchange, code, client_id: 'aruna-engine.org/callback'})
     expect(response.status).toBe(200)
     const call = fetchCalls.find(c => c.url === 'https://iam4nfdi.test/token')!
     expect(call.options.headers['Authorization']).toBeUndefined()
     expect(Object.fromEntries(call.options.body)).toEqual({
-      grant_type: 'authorization_code', code: 'c-1', redirect_uri: 'https://web.test/callback',
+      grant_type: 'authorization_code', code: 'up-nfdi', redirect_uri: 'https://web.test/callback',
       client_id: 'aruna-engine.org/callback', client_secret: 'nfdi-secret',
     })
   })
@@ -220,14 +225,14 @@ describe('portal token', () => {
     replyWith(url => url.endsWith('/token')
       ? Response.json({error: 'invalid_grant', access_token: 'leak'}, {status: 400})
       : idpMetadata(url))
-    await issueCode('lifescience', portalAuth, 'c-1')
-    const failed = await token('lifescience', exchange)
+    const failedCode = await issueCode('lifescience', portalAuth, 'up-fail')
+    const failed = await token('lifescience', {...exchange, code: failedCode})
     expect(failed.status).toBe(400)
     expect(await failed.json()).toEqual({error: 'invalid_grant'})
 
     replyWith(url => url.endsWith('/token') ? {access_token: 'at'} : idpMetadata(url))
-    await issueCode('lifescience', portalAuth, 'c-1')
-    const missing = await token('lifescience', exchange)
+    const missingCode = await issueCode('lifescience', portalAuth, 'up-missing')
+    const missing = await token('lifescience', {...exchange, code: missingCode})
     expect(missing.status).toBe(502)
     expect(await missing.json()).toEqual({error: 'server_error', error_description: 'No ID token from provider'})
   })
