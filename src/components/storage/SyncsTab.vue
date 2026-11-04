@@ -12,7 +12,8 @@ import Notice from '@/components/ui/Notice.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import StatusDot from '@/components/ui/StatusDot.vue'
+import StatusMark from '@/components/ui/StatusMark.vue'
+import StatusPill from '@/components/ui/StatusPill.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useBucketSyncs, type SyncRow } from '@/composables/useBucketSyncs'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -125,6 +126,10 @@ onBeforeUnmount(() => {
   clearPoll()
 })
 
+function stateWord(state: string): string {
+  return state.charAt(0).toUpperCase() + state.slice(1)
+}
+
 function counterpart(row: SyncRow): { nodeId: string | null; label: string } {
   const arn = row.direction === 'outgoing' ? row.relationship.target : row.relationship.source
   return { nodeId: parseArunaArn(arn)?.nodeId ?? null, label: arnLocationLabel(arn) }
@@ -233,7 +238,9 @@ function remove(row: SyncRow) {
       <ul class="divide-y divide-border">
         <li v-for="row in rows" :key="row.relationship.id" class="px-5 py-3.5">
           <div class="flex items-center gap-2 text-xs">
-            <StatusDot :tone="stateTone(row.relationship.state)" :label="row.relationship.state" />
+            <!-- A running sync gets a check; any other state its word. -->
+            <StatusMark v-if="stateTone(row.relationship.state) === 'done'" size="sm" :label="stateWord(row.relationship.state)" />
+            <StatusPill v-else :state="stateWord(row.relationship.state)" />
             <Badge v-if="embedded" variant="secondary" size="sm" class="shrink-0">Sync</Badge>
             <Badge variant="outline" size="sm" class="shrink-0">{{ syncModeLabel(row.relationship.mode) }}</Badge>
             <component
