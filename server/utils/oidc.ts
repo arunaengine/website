@@ -81,3 +81,33 @@ export function bridgeTarget(provider: string, realmUrl?: string) {
   }
   return {config, realm, isDefault: realm === fallback, brokerUrl: `${realm}/broker/${provider}/endpoint`}
 }
+
+const PORTAL_ORIGIN = /^https:\/\/([a-z0-9-]+\.)+aruna-engine\.org$/
+
+// True only for an https origin on a subdomain of aruna-engine.org, without port or userinfo
+export function portalOrigin(origin: unknown) {
+  return typeof origin === 'string' && PORTAL_ORIGIN.test(origin)
+}
+
+// True only for exactly https://<subdomain>.aruna-engine.org/auth/callback
+export function portalCallback(redirectUri: unknown) {
+  if (typeof redirectUri !== 'string') return false
+  try {
+    const origin = new URL(redirectUri).origin
+    return portalOrigin(origin) && redirectUri === `${origin}/auth/callback`
+  } catch {
+    return false
+  }
+}
+
+// State sent upstream for a portal login: provider, portal callback (base64url) and portal state
+export function portalState(provider: string, callback: string, state: string) {
+  return `v3p.${provider}.${Buffer.from(callback).toString('base64url')}.${state}`
+}
+
+// Checked portal callback and portal state of a wrapped portal state, else undefined
+export function portalReturn(state: string) {
+  const [, provider = '', encoded = '', portal = ''] = /^v3p\.([^.]+)\.([\w-]+)\.(.+)$/s.exec(state) ?? []
+  const callback = Buffer.from(encoded, 'base64url').toString()
+  return portal && portalCallback(callback) && bridgeTarget(provider) ? {callback, state: portal} : undefined
+}
