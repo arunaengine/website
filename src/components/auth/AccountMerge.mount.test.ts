@@ -4,12 +4,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, flush, moduleDefault, mountApp } from '@/test/clientRender'
 import type { MergeStep, OtherAccount } from '@/composables/useAccountMerge'
 import type { MergeAccountResponse, UserInfoResponse } from '@/lib/api'
+import { DEFAULT_PORTAL_CONFIG, type LoginOption, type PortalRuntimeConfig } from '@/lib/config'
 
 const step = ref<MergeStep>('idle')
 const failure = ref<string | null>(null)
 const other = shallowRef<OtherAccount | null>(null)
 const result = shallowRef<MergeAccountResponse | null>(null)
-const actions = { start: vi.fn(), copyVault: vi.fn(), merge: vi.fn(), attach: vi.fn(), cancel: vi.fn() }
+const actions = { choose: vi.fn(), start: vi.fn(), copyVault: vi.fn(), merge: vi.fn(), attach: vi.fn(), cancel: vi.fn() }
+const GFBIO: LoginOption = { name: 'GFBio SSO', description: '', logo: '', params: {}, linkParams: {}, upstream: { provider: 'gfbio', bridge: 'https://bridge.test/gfbio' } }
+const LEGACY: LoginOption = { name: 'Aruna (legacy)', description: '', logo: '', params: {}, linkParams: {} }
+const LOGINS: PortalRuntimeConfig = { ...DEFAULT_PORTAL_CONFIG, login: { options: [GFBIO, LEGACY], accountUrl: '' } }
+let config: PortalRuntimeConfig = DEFAULT_PORTAL_CONFIG
 const age = ref(30)
 const userInfo = ref<Partial<UserInfoResponse> | null>(null)
 
@@ -23,8 +28,15 @@ const Notice = defineComponent({
   props: { title: String },
   setup: (props, { slots }) => () => h('div', [props.title, slots.default?.()]),
 })
+const LoginOptions = compileClientComponent(new URL('./LoginOptions.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@/components/auth/ProviderLogo.vue': moduleDefault(defineComponent(() => () => null)),
+  '@/lib/config': { portalConfig: () => config },
+})
 const AccountMerge = compileClientComponent(new URL('./AccountMerge.vue', import.meta.url), {
   vue: VueRuntime,
+  '@/components/auth/LoginOptions.vue': moduleDefault(LoginOptions),
+  '@/lib/config': { portalConfig: () => config },
   '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => null) }),
   '@/components/ui/Button.vue': moduleDefault(Button),
   '@/components/ui/IconTile.vue': moduleDefault(defineComponent(() => () => null)),
@@ -71,6 +83,7 @@ beforeEach(() => {
   result.value = null
   age.value = 30
   userInfo.value = null
+  config = DEFAULT_PORTAL_CONFIG
   for (const action of Object.values(actions)) action.mockReset()
 })
 
@@ -82,6 +95,40 @@ describe('adding another account', () => {
     expect(content(root)).toContain('b0@R')
     await click(button(root, 'Add account'))
     expect(actions.start).toHaveBeenCalledTimes(1)
+    app.unmount()
+  })
+
+  it('asks for the login of the other account when logins are configured', async () => {
+    config = LOGINS
+    const { root, app } = await render()
+    await click(button(root, 'Add account'))
+    expect(actions.choose).toHaveBeenCalledTimes(1)
+    expect(actions.start).not.toHaveBeenCalled()
+    step.value = 'choose'
+    await flush()
+    expect(content(root)).toContain('Choose how you sign in with the other account.')
+    await click(button(root, 'GFBio SSO'))
+    expect(actions.start).toHaveBeenCalledWith(GFBIO)
+    await click(button(root, 'Aruna (legacy)'))
+    expect(actions.start).toHaveBeenLastCalledWith(LEGACY)
+    app.unmount()
+  })
+
+  it('confirms an old own login through the chosen login', async () => {
+    config = LOGINS
+    step.value = 'confirm'
+    other.value = account()
+    age.value = 400
+    const { root, app } = await render()
+    expect(content(root)).toContain('You confirm with your own login first.')
+    expect(() => button(root, 'Merge')).toThrow()
+    await click(button(root, 'GFBio SSO'))
+    expect(actions.merge).toHaveBeenCalledWith(GFBIO)
+    step.value = 'unregistered'
+    await flush()
+    expect(() => button(root, 'Attach sign-in')).toThrow()
+    await click(button(root, 'Aruna (legacy)'))
+    expect(actions.attach).toHaveBeenCalledWith(LEGACY)
     app.unmount()
   })
 

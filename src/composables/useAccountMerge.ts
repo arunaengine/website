@@ -19,6 +19,7 @@ import {
   type UserInfoResponse,
   type UserVaultHead,
 } from '@/lib/api'
+import type { LoginOption } from '@/lib/config'
 import { assertCurrentSession, refreshContext, userInfo } from './aruna/state'
 import { refresh, replaceToken } from './aruna/session'
 import { tokenClaims } from './aruna/renewal'
@@ -31,6 +32,7 @@ const OTHER_TOKEN_SECS = 15 * 60
 
 export type MergeStep =
   | 'idle'
+  | 'choose'
   | 'signing'
   | 'loading'
   | 'unregistered'
@@ -160,27 +162,34 @@ export function useAccountMerge() {
     await load(id, context)
   }
 
-  /** Signs in with the other account; call it in a click handler. */
-  async function start() {
+  /** Asks which login the other account uses. */
+  function choose() {
+    reset('choose')
+    failure.value = null
+  }
+
+  /** Signs in with the other account, through `login` once chosen; call it in a click handler. */
+  async function start(login?: LoginOption) {
     reset('signing')
     failure.value = null
     const id = run
     const context = refreshContext()
     try {
-      const tokens = await popupSignIn()
+      const tokens = await popupSignIn(login)
       guard(id, context.epoch)
       signInToken = tokens.id_token ?? tokens.access_token
       await exchange(id, context)
     } catch (error) {
-      if (id === run) fail(error, 'idle')
+      if (id === run) fail(error, login ? 'choose' : 'idle')
     }
   }
 
-  // A login older than 5 minutes signs in again first; a token of another account is refused.
-  async function ownClient(id: number, context: { epoch: number; client: ApiClientOptions }) {
+  // A login older than 5 minutes signs in again first, through `login` once chosen; a token of
+  // another account is refused.
+  async function ownClient(id: number, context: { epoch: number; client: ApiClientOptions }, login?: LoginOption) {
     const token = context.client.token ?? ''
     if (loginFresh(token)) return context.client
-    const tokens = await popupSignIn()
+    const tokens = await popupSignIn(login)
     guard(id, context.epoch)
     const baseUrl = context.client.baseUrl ?? ''
     const renewed = await issueToken(tokens.id_token ?? tokens.access_token, baseUrl)
@@ -231,8 +240,8 @@ export function useAccountMerge() {
     }
   }
 
-  /** Merges after the confirmation; call it in a click handler, it may sign in again. */
-  async function merge() {
+  /** Merges after the confirmation; call it in a click handler, it may sign in again with `login`. */
+  async function merge(login?: LoginOption) {
     if (step.value !== 'confirm') return
     if (!loginFresh(otherToken)) {
       reset()
@@ -244,7 +253,7 @@ export function useAccountMerge() {
     failure.value = null
     step.value = 'merging'
     try {
-      const client = await ownClient(id, context)
+      const client = await ownClient(id, context, login)
       result.value = await mergeAccount(otherToken, client)
       guard(id, context.epoch)
       step.value = 'merged'
@@ -256,8 +265,8 @@ export function useAccountMerge() {
     }
   }
 
-  /** Attaches a sign-in that has no account yet; call it in a click handler. */
-  async function attach() {
+  /** Attaches a sign-in that has no account yet; call it in a click handler, like `merge`. */
+  async function attach(login?: LoginOption) {
     if (step.value !== 'unregistered') return
     if (!loginFresh(signInToken)) {
       reset()
@@ -269,7 +278,7 @@ export function useAccountMerge() {
     failure.value = null
     step.value = 'loading'
     try {
-      const client = await ownClient(id, context)
+      const client = await ownClient(id, context, login)
       await attachSignIn(signInToken, client)
       guard(id, context.epoch)
       reset('attached')
@@ -293,5 +302,5 @@ export function useAccountMerge() {
     result.value = null
   }
 
-  return { step, failure, other, result, start, copyVault, merge, attach, cancel }
+  return { step, failure, other, result, choose, start, copyVault, merge, attach, cancel }
 }
