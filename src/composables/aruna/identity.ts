@@ -80,6 +80,9 @@ export function hasRealmGrant(suffix: string, need: 'Read' | 'Write'): boolean {
 // The backend authorizes quota edits with WRITE on exactly /{realm_id}/admin/config.
 export const isRealmAdmin = computed<boolean>(() => hasRealmGrant('admin/config', 'Write'))
 
+// Group statistics, tokens and deletion of any group need WRITE on /{realm_id}/admin/groups.
+export const canAdminGroups = computed<boolean>(() => hasRealmGrant('admin/groups', 'Write'))
+
 // The backend gates the user directory on READ of /{realm_id}/admin/u/**
 // (operations list_users / get_user); the seeded realm_admin Write grant on
 // /{realm_id}/admin/** covers it.

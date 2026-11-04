@@ -6,14 +6,16 @@ import AccessBadge from '@/components/ui/AccessBadge.vue'
 import Popover from '@/components/ui/Popover.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import { computed, ref, watch } from 'vue'
-import { ArrowRight, ShieldCheck, UserMinus, UserPlus, X } from '@lucide/vue'
+import { ArrowRight, KeyRound, ShieldCheck, UserMinus, UserPlus, X } from '@lucide/vue'
 import { useDebounceFn } from '@vueuse/core'
 import { useAruna } from '@/composables/useAruna'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { homeRealmLabel } from '@/composables/useFederation'
+import { refreshContext } from '@/composables/aruna/state'
 import { errorMessage, shortUserId } from '@/lib/utils'
-import type { ApiRole, GroupMember, UserSearchHit } from '@/lib/api'
+import { revokeMemberTokens, type ApiRole, type GroupMember, type UserSearchHit } from '@/lib/api'
 
 const props = defineProps<{
   groupId: string
@@ -22,7 +24,7 @@ const props = defineProps<{
   canManage: boolean
 }>()
 
-const emit = defineEmits<{ (e: 'changed'): void }>()
+const emit = defineEmits<{ (e: 'changed'): void; (e: 'revoked'): void }>()
 
 const { addGroupMember, removeGroupMember, searchUsers, saving, currentUser, sessionEpoch, realm } = useAruna()
 const { resolveUsers, cachedUser } = useUserDirectory()
@@ -125,7 +127,41 @@ watch([() => props.groupId, sessionEpoch], () => {
 })
 
 function isAdmin(member: GroupMember): boolean {
-  return member.roles.some((role) => role.name === 'admin')
+  return member.admin ?? member.roles.some((role) => role.name === 'admin')
+}
+
+// The member whose group access waits for confirmation, and the outcome.
+const revokeTarget = ref<GroupMember | null>(null)
+const revokeBusy = ref(false)
+const revokeError = ref<string | null>(null)
+const revokeResult = ref<string | null>(null)
+
+function askRevoke(member: GroupMember) {
+  revokeError.value = null
+  revokeResult.value = null
+  revokeTarget.value = member
+}
+
+async function confirmRevoke() {
+  const member = revokeTarget.value
+  if (!member || revokeBusy.value) return
+  const { epoch, client } = refreshContext()
+  const groupId = props.groupId
+  revokeBusy.value = true
+  revokeError.value = null
+  try {
+    const result = await revokeMemberTokens(groupId, member.user_id, client)
+    if (epoch !== sessionEpoch.value || groupId !== props.groupId) return
+    revokeTarget.value = null
+    revokeResult.value = result.all_tokens
+      ? `Every token of ${displayName(member)} is revoked.`
+      : `${result.revoked} ${result.revoked === 1 ? 'token' : 'tokens'} of ${displayName(member)} revoked.`
+    emit('revoked')
+  } catch (err) {
+    if (epoch === sessionEpoch.value) revokeError.value = errorMessage(err)
+  } finally {
+    revokeBusy.value = false
+  }
 }
 
 async function addMember() {
@@ -183,6 +219,7 @@ async function removeMember(member: GroupMember, roleId?: string) {
                   <button type="button" class="max-w-full truncate text-left text-sm font-medium text-foreground decoration-dotted underline-offset-2 hover:underline">
                     {{ displayName(member) }}
                     <span v-if="member.user_id === currentUser?.id" class="text-[11px] font-normal text-muted-foreground">(you)</span>
+                    <span v-if="isAdmin(member)" class="ml-1 text-[11px] font-medium text-primary">Admin</span>
                   </button>
                   <template #content>
                     <div class="space-y-2">
@@ -243,7 +280,10 @@ async function removeMember(member: GroupMember, roleId?: string) {
               </span>
             </div>
           </td>
-          <td v-if="canManage" class="px-5 py-2.5 text-right">
+          <td v-if="canManage" class="space-x-1 whitespace-nowrap px-5 py-2.5 text-right">
+            <Button variant="outline" size="sm" :disabled="revokeBusy" @click="askRevoke(member)">
+              <KeyRound class="h-3.5 w-3.5" /> Revoke access
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -263,6 +303,18 @@ async function removeMember(member: GroupMember, roleId?: string) {
     </table>
 
     <div v-if="memberError" class="border-t border-border px-5 py-2 text-xs text-destructive">{{ memberError }}</div>
+    <div v-if="revokeResult" class="border-t border-border px-5 py-2 text-xs text-muted-foreground" role="status">{{ revokeResult }}</div>
+
+    <ConfirmDialog
+      :open="revokeTarget !== null"
+      title="Revoke access to this group"
+      :description="revokeTarget ? `Revokes the S3 keys of ${displayName(revokeTarget)} for this group on this node. A service account of the group loses every token. Membership and other groups stay as they are.` : undefined"
+      confirm-label="Revoke access"
+      :busy="revokeBusy"
+      :error="revokeError"
+      @update:open="(open) => { if (!open) revokeTarget = null }"
+      @confirm="confirmRevoke"
+    />
 
     <div v-if="canManage" class="border-t border-border px-5 py-4">
       <div class="text-xs font-medium text-foreground">Add member</div>

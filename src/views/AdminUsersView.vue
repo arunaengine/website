@@ -15,14 +15,17 @@ import SectionHeading from '@/components/ui/SectionHeading.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
+import Notice from '@/components/ui/Notice.vue'
+import { refreshContext, sessionEpoch } from '@/composables/aruna/state'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useRefresh } from '@/composables/useRefresh'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { errorMessage, truncateMiddle } from '@/lib/utils'
-import type { ApiUser } from '@/lib/api'
+import { DEACTIVATED_ATTRIBUTE, revokeUserTokens, setAccountActive, type ApiUser } from '@/lib/api'
 import { useDebounceFn } from '@vueuse/core'
-import { ChevronLeft, ChevronRight, Search, ShieldCheck, UserRound, Users, UserSearch } from '@lucide/vue'
+import { Ban, ChevronLeft, ChevronRight, KeyRound, Search, UserCheck, ShieldCheck, UserRound, Users, UserSearch } from '@lucide/vue'
 
 const { bootstrapped, currentUser, canInspectUsers, apiGroups, listUsers, getUser, searchUsers } = useAruna()
 const { isAuthenticated } = useAuth()
@@ -30,6 +33,55 @@ const { isAuthenticated } = useAuth()
 const { resolveUser } = useUserDirectory()
 
 const ready = computed(() => bootstrapped.value && !!currentUser.value && canInspectUsers.value)
+
+// Revoking every token of the user shown in the details dialog.
+const revokeOpen = ref(false)
+const revokeBusy = ref(false)
+const revokeError = ref<string | null>(null)
+const revokeDone = ref<string | null>(null)
+
+async function revokeTokens(userId: string) {
+  if (revokeBusy.value) return
+  const { epoch, client } = refreshContext()
+  revokeBusy.value = true
+  revokeError.value = null
+  try {
+    await revokeUserTokens(userId, client)
+    if (epoch !== sessionEpoch.value) return
+    revokeOpen.value = false
+    revokeDone.value = userId
+  } catch (err) {
+    if (epoch === sessionEpoch.value) revokeError.value = errorMessage(err)
+  } finally {
+    revokeBusy.value = false
+  }
+}
+
+// Ban and unban of the user shown in the details dialog.
+const banOpen = ref(false)
+const banBusy = ref(false)
+const banError = ref<string | null>(null)
+
+function isBanned(user: ApiUser): boolean {
+  return Boolean(user.attributes?.[DEACTIVATED_ATTRIBUTE])
+}
+
+async function setBanned(user: ApiUser, banned: boolean) {
+  if (banBusy.value) return
+  const { epoch, client } = refreshContext()
+  banBusy.value = true
+  banError.value = null
+  try {
+    await setAccountActive(user.user_id, !banned, client)
+    if (epoch !== sessionEpoch.value) return
+    banOpen.value = false
+    await loadDetail(user.user_id)
+  } catch (err) {
+    if (epoch === sessionEpoch.value) banError.value = errorMessage(err)
+  } finally {
+    banBusy.value = false
+  }
+}
 
 // Search hits carry only id + name; rows from GET /users are complete.
 interface UserRow {
@@ -398,6 +450,24 @@ const sharedGroups = computed(() => {
           </div>
 
           <section class="space-y-2">
+            <h2 class="font-display text-sm font-semibold text-aruna-navy">Account actions</h2>
+            <div class="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" @click="revokeError = null; revokeOpen = true">
+                <KeyRound class="h-3.5 w-3.5" /> Revoke all tokens
+              </Button>
+              <Button v-if="isBanned(detail)" variant="outline" size="sm" :disabled="banBusy" @click="setBanned(detail, false)">
+                <UserCheck class="h-3.5 w-3.5" /> Unban
+              </Button>
+              <Button v-else variant="outline" size="sm" @click="banError = null; banOpen = true">
+                <Ban class="h-3.5 w-3.5" /> Ban
+              </Button>
+            </div>
+            <p v-if="isBanned(detail)" class="text-xs text-muted-foreground">This user is banned and cannot sign in.</p>
+            <Notice v-if="banError && !banOpen" tone="error">{{ banError }}</Notice>
+            <Notice v-if="revokeDone === detail.user_id" tone="success">Every token of this user is revoked.</Notice>
+          </section>
+
+          <section class="space-y-2">
             <h2 class="font-display text-sm font-semibold text-aruna-navy">Identity subjects</h2>
             <p v-if="!detail.subject_ids.length" class="text-xs text-muted-foreground">No linked identity subjects.</p>
             <ul v-else class="space-y-1">
@@ -445,5 +515,27 @@ const sharedGroups = computed(() => {
         </div>
       </DialogContent>
     </Dialog>
+
+    <ConfirmDialog
+      :open="banOpen && detail !== null"
+      title="Ban this user"
+      description="The user is signed out on every node and cannot sign in or get new tokens. Group memberships and data stay. You can unban later."
+      confirm-label="Ban"
+      :busy="banBusy"
+      :error="banError"
+      @update:open="(open) => (banOpen = open)"
+      @confirm="detail && setBanned(detail, true)"
+    />
+
+    <ConfirmDialog
+      :open="revokeOpen && detail !== null"
+      title="Revoke all tokens"
+      description="Every session, API token, S3 key and S3 session of this user stops working on every node. The user can sign in again."
+      confirm-label="Revoke all tokens"
+      :busy="revokeBusy"
+      :error="revokeError"
+      @update:open="(open) => (revokeOpen = open)"
+      @confirm="detail && revokeTokens(detail.user_id)"
+    />
   </div>
 </template>

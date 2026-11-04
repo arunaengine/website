@@ -36,6 +36,16 @@ const MEMBER_ROLE: Role = {
 }
 const group = ref({ display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [ADMIN_ROLE] })
 
+const getGroupStatistics = vi.fn(async (..._args: unknown[]) => ({ group_id: 'g1', members: 3 }))
+const canAdminGroups = ref(false)
+const StatsStub = defineComponent({
+  props: { stats: { type: Object, default: null } },
+  setup: (props) => () => h('div', { 'data-stats': String((props.stats as { members?: number } | null)?.members) }),
+})
+const TokensStub = defineComponent({
+  props: { groupId: String },
+  setup: (props) => () => h('div', { 'data-tokens': props.groupId }),
+})
 const listGroupConnectors = vi.fn(async () => ({ connectors: [{}, {}] }))
 const listGroupBackends = vi.fn(async () => ({ backends: [{}, {}, {}] }))
 const writesDisabled = ref(false)
@@ -90,8 +100,9 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   vue: VueRuntime,
   'vue-router': RouterRuntime,
   '@lucide/vue': icons,
-  '@/lib/api': Api,
+  '@/lib/api': { ...Api, getGroupStatistics },
   '@/lib/groupAdmin': GroupAdmin,
+  '@/composables/aruna/state': { refreshContext: () => ({ epoch: 1, client: {} }), sessionEpoch: ref(1) },
   '@/lib/quota': Quota,
   '@/lib/utils': Utils,
   '@/lib/config': { featureEnabled: () => true },
@@ -113,6 +124,7 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
       toMetadataDoc: () => ({ title: '' }),
       saving: ref(false),
       currentUser: ref({ id: 'user-1' }),
+      canAdminGroups,
     }),
   },
   '@/components/dashboard/PageHeader.vue': moduleDefault(
@@ -149,6 +161,8 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   ),
   '@/components/groups/GroupLocationSection.vue': moduleDefault(Empty),
   '@/components/groups/GroupMembers.vue': moduleDefault(Empty),
+  '@/components/groups/GroupStatsGrid.vue': moduleDefault(StatsStub),
+  '@/components/groups/GroupTokens.vue': moduleDefault(TokensStub),
   '@/components/groups/GroupDetailSkeleton.vue': moduleDefault(Empty),
   '@/components/groups/GroupRoles.vue': moduleDefault(Empty),
   '@/components/groups/JoinRequestButton.vue': moduleDefault(Empty),
@@ -424,5 +438,36 @@ describe('Group notifications', () => {
     expect(nodes(mounted.root).some((node) => node.props['aria-label'] === 'Join requests' || node.props['aria-label'] === 'You have unanswered join requests')).toBe(false)
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
+  })
+})
+
+describe('Group statistics and tokens', () => {
+  beforeEach(() => {
+    getGroupStatistics.mockClear()
+    canAdminGroups.value = false
+  })
+
+  it('shows the statistics and tokens to a group admin', async () => {
+    group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [ADMIN_ROLE] }
+    const { root, errors } = await mount('/app/groups/g1?tab=members')
+    expect(errors).toEqual([])
+    expect(getGroupStatistics).toHaveBeenCalledWith('g1', {})
+    expect(nodes(root).some((node) => node.props['data-stats'] === '3')).toBe(true)
+    expect(nodes(root).some((node) => node.props['data-tokens'] === 'g1')).toBe(true)
+  })
+
+  it('hides both from a member who is no admin', async () => {
+    group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [MEMBER_ROLE] }
+    const { root } = await mount('/app/groups/g1?tab=members')
+    expect(getGroupStatistics).not.toHaveBeenCalled()
+    expect(nodes(root).some((node) => node.props['data-tokens'] !== undefined)).toBe(false)
+  })
+
+  it('shows both to a realm groups administrator who is no member', async () => {
+    canAdminGroups.value = true
+    group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [] }
+    const { root } = await mount('/app/groups/g1?tab=members')
+    expect(getGroupStatistics).toHaveBeenCalledWith('g1', {})
+    expect(nodes(root).some((node) => node.props['data-tokens'] === 'g1')).toBe(true)
   })
 })

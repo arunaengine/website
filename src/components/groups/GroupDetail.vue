@@ -20,6 +20,8 @@ import GroupLocationSection from '@/components/groups/GroupLocationSection.vue'
 import PoliciesSection from '@/components/policies/PoliciesSection.vue'
 import EffectivePolicies from '@/components/policies/EffectivePolicies.vue'
 import GroupMembers from '@/components/groups/GroupMembers.vue'
+import GroupStatsGrid from '@/components/groups/GroupStatsGrid.vue'
+import GroupTokens from '@/components/groups/GroupTokens.vue'
 import GroupDetailSkeleton from '@/components/groups/GroupDetailSkeleton.vue'
 import GroupRoles from '@/components/groups/GroupRoles.vue'
 import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
@@ -34,7 +36,7 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { ArrowRight, Boxes, Cable, ChartArea, ChevronRight, CircleCheck, Clock, Copy, Database, FileJson2, Files, FolderOpen, Globe, HardDrive, Inbox, LayoutDashboard, Link, ListChecks, Lock, LogOut, Package, Pencil, Server, ShieldAlert, ShieldCheck, Trash2, Users, Workflow } from '@lucide/vue'
+import { ArrowRight, Boxes, Cable, ChartArea, ChevronRight, CircleCheck, Clock, Copy, Database, FileJson2, Files, FolderOpen, Gauge, Globe, HardDrive, Inbox, KeyRound, LayoutDashboard, Link, ListChecks, Lock, LogOut, Package, Pencil, Server, ShieldAlert, ShieldCheck, Trash2, Users, Workflow } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
@@ -60,7 +62,10 @@ import {
   type MetadataDocumentListItem,
   type UsageHistoryPoint,
   type UsageResponse,
+  type GroupStatistics,
+  getGroupStatistics,
 } from '@/lib/api'
+import { refreshContext, sessionEpoch } from '@/composables/aruna/state'
 
 const props = defineProps<{ groupId: string; name?: string }>()
 const emit = defineEmits<{ (e: 'left'): void; (e: 'deleted'): void }>()
@@ -78,6 +83,7 @@ const {
   toMetadataDoc,
   saving,
   currentUser,
+  canAdminGroups,
 } = useAruna()
 const { writesDisabled } = useConnectivity()
 const { joinRequestsEnabled } = useJoinRequests()
@@ -192,6 +198,29 @@ const canManage = computed(() =>
     ),
   ),
 )
+// Group admins and realm group administrators see counts and tokens, never more data.
+const canSeeAccess = computed(() => canManage.value || canAdminGroups.value)
+const groupStats = ref<GroupStatistics | null>(null)
+const groupStatsError = ref<string | null>(null)
+const tokensKey = ref(0)
+let statsSeq = 0
+
+async function loadStats() {
+  const seq = ++statsSeq
+  groupStats.value = null
+  groupStatsError.value = null
+  if (!canSeeAccess.value) return
+  const { epoch, client } = refreshContext()
+  try {
+    const stats = await getGroupStatistics(props.groupId, client)
+    if (seq === statsSeq && epoch === sessionEpoch.value) groupStats.value = stats
+  } catch (err) {
+    if (seq === statsSeq && epoch === sessionEpoch.value) groupStatsError.value = errorMessage(err)
+  }
+}
+
+watch([() => props.groupId, canSeeAccess, sessionEpoch, tokensKey], () => void loadStats(), { immediate: true })
+
 const connectorCount = ref<number | null>(null)
 const backendCount = ref<number | null>(null)
 const storageTick = ref(0)
@@ -564,6 +593,14 @@ async function leave() {
         </div>
 
         <TabsContent value="stats" class="mt-0 space-y-8">
+          <section v-if="canSeeAccess" aria-labelledby="group-statistics-heading">
+            <SectionHeading id="group-statistics-heading" title="Statistics" :icon="Gauge" info="Counts and sizes for this group. Jobs and tokens count what this node holds." />
+            <div class="surface p-5">
+              <ErrorPanel v-if="groupStatsError" :message="groupStatsError" @retry="loadStats" />
+              <Skeleton v-else-if="!groupStats" class="h-24" />
+              <GroupStatsGrid v-else :stats="groupStats" />
+            </div>
+          </section>
           <div class="grid gap-6 lg:grid-cols-2">
             <section v-if="isMember" class="flex flex-col" aria-labelledby="group-buckets-heading">
               <SectionHeading id="group-buckets-heading" title="Buckets" :icon="Boxes">
@@ -695,7 +732,14 @@ async function leave() {
                 :roles="group.roles"
                 :can-manage="canManage"
                 @changed="reload"
+                @revoked="tokensKey++"
               />
+            </div>
+          </section>
+          <section v-if="canSeeAccess" aria-labelledby="group-tokens-heading">
+            <SectionHeading id="group-tokens-heading" title="Tokens" :icon="KeyRound" info="Service account tokens and S3 keys bound to this group, as this node holds them." />
+            <div class="surface overflow-x-auto">
+              <GroupTokens :group-id="group.group_id" :reload-key="tokensKey" />
             </div>
           </section>
         </TabsContent>

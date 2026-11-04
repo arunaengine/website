@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   button,
   click,
+  typeValue,
   compileClientComponent,
   content,
   element,
@@ -34,6 +35,14 @@ const LinkStub = defineComponent({
   props: { to: { type: Object, required: true } },
   setup: (props, { slots }) => () => h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()),
 })
+const InputStub = defineComponent({
+  props: ['modelValue'],
+  emits: ['update:modelValue'],
+  setup: (props, { emit, attrs }) => () => h('input', {
+    ...attrs, value: props.modelValue,
+    onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
+  }),
+})
 const NodeLabelStub = defineComponent({
   props: { nodeId: { type: String, required: true } },
   setup: (props) => () => h('span', `name-${props.nodeId}`),
@@ -63,6 +72,7 @@ const DeleteGroupDialog = compileClientComponent(new URL('./DeleteGroupDialog.vu
   '@/components/ui/DialogFooter.vue': moduleDefault(Passthrough),
   '@/components/ui/DialogClose.vue': moduleDefault(Passthrough),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/NodeLabel.vue': moduleDefault(NodeLabelStub),
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
   '@/components/ui/RefreshButton.vue': moduleDefault(RefreshStub),
@@ -84,11 +94,11 @@ const CLEAR: GroupDeletionBlockers = {
   ],
 }
 
-async function mount() {
+async function mount(confirmName?: string) {
   const onDeleted = vi.fn()
   const onOpen = vi.fn()
   const mounted = await mountApp(DeleteGroupDialog, {
-    props: { open: true, groupId: 'g1', onDeleted, 'onUpdate:open': onOpen },
+    props: { open: true, groupId: 'g1', confirmName, onDeleted, 'onUpdate:open': onOpen },
   })
   await flush()
   return { ...mounted, onDeleted, onOpen }
@@ -225,6 +235,18 @@ describe('Delete group dialog', () => {
     expect(deleteGroup).toHaveBeenCalledWith('g1')
     expect(onDeleted).toHaveBeenCalledOnce()
     expect(onOpen).toHaveBeenCalledWith(false)
+  })
+
+  it('waits for the typed group name when one is asked for', async () => {
+    const { root } = await mount('Genomics lab')
+    expect(deleteButton(root).props.disabled).toBe(true)
+    const input = element(root, (node) => node.tag === 'input')
+    await typeValue(input, 'Genomics')
+    expect(deleteButton(root).props.disabled).toBe(true)
+    await typeValue(input, 'Genomics lab')
+    expect(deleteButton(root).props.disabled).toBe(false)
+    await click(deleteButton(root))
+    expect(deleteGroup).toHaveBeenCalledWith('g1')
   })
 
   it('treats a node that did not answer as unknown', async () => {

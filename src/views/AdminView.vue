@@ -15,6 +15,7 @@ import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ComputeAdminPanel from '@/components/compute-admin/ComputeAdminPanel.vue'
+import AdminGroupsPanel from '@/components/groups/AdminGroupsPanel.vue'
 import JobsPanel from '@/components/jobs/JobsPanel.vue'
 import PlacementAdminPanel from '@/components/placement/PlacementAdminPanel.vue'
 import DataPlacementPanel from '@/components/storage/DataPlacementPanel.vue'
@@ -65,6 +66,7 @@ const policiesEnabled = featureEnabled('policies')
 const tabs = adminTabs({ placement: placementAdminEnabled, policies: policiesEnabled, jobs: featureEnabled('jobs') })
 const TAB_ICONS: Record<string, unknown> = {
   realm: Gauge,
+  groups: Users,
   compute: Cpu,
   assistant: Sparkles,
   jobs: ListTodo,
@@ -302,6 +304,8 @@ async function save() {
           </TabsTrigger>
         </TabsList>
       </div>
+
+      <TabsContent value="groups" class="mt-0 w-full px-4 py-6 sm:px-6"><AdminGroupsPanel /></TabsContent>
 
       <TabsContent value="compute" class="mt-0"><ComputeAdminPanel /></TabsContent>
 

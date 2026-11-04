@@ -7,6 +7,7 @@ describe('realm administration tabs', () => {
 
     expect(tabs.map((tab) => tab.id)).toEqual([
       'realm',
+      'groups',
       'compute',
       'assistant',
       'placement',
@@ -25,12 +26,12 @@ describe('realm administration tabs', () => {
   it('offers the jobs tab after the assistant when system jobs are on', () => {
     const tabs = adminTabs({ placement: false, policies: false, jobs: true })
 
-    expect(tabs.map((tab) => tab.id)).toEqual(['realm', 'compute', 'assistant', 'jobs', 'federation', 'portal-features'])
+    expect(tabs.map((tab) => tab.id)).toEqual(['realm', 'groups', 'compute', 'assistant', 'jobs', 'federation', 'portal-features'])
   })
 
   it('drops both placement tabs when the feature is off', () => {
     const tabs = adminTabs({ placement: false, policies: false })
 
-    expect(tabs.map((tab) => tab.id)).toEqual(['realm', 'compute', 'assistant', 'federation', 'portal-features'])
+    expect(tabs.map((tab) => tab.id)).toEqual(['realm', 'groups', 'compute', 'assistant', 'federation', 'portal-features'])
   })
 })

@@ -58,6 +58,7 @@ import {
   updateGroup,
 } from './aruna/groups'
 import {
+  canAdminGroups,
   canInspectUsers,
   canManageOnboarding,
   canManageQuarantine,
@@ -215,6 +216,7 @@ export function useAruna() {
     realm,
     currentUser,
     isRealmAdmin,
+    canAdminGroups,
     canInspectUsers,
     canManageOnboarding,
     canManageQuarantine,

@@ -102,6 +102,8 @@ export interface GroupMember {
   user_id: string
   name?: string
   roles: GroupMemberRole[]
+  /** The member's roles grant WRITE on the group's admin path; absent on older nodes. */
+  admin?: boolean
 }
 
 export interface GroupMembersResponse {
