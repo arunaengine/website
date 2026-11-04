@@ -2,6 +2,7 @@
 // sign-in to that account, or create a new one anyway.
 import { ref, watch } from 'vue'
 import { ApiError, apiErrorMessage, apiRequest, attachSignIn, issueToken, signInHasNoAccount } from '@/lib/api'
+import type { LoginOption } from '@/lib/config'
 import { useAruna } from './useAruna'
 import { accountMatch, adoptSession, type AccountMatch } from './useAuth'
 import { loginFresh, mergeFailure } from './useAccountMerge'
@@ -46,10 +47,10 @@ function begin() {
 }
 
 /**
- * Signs in with the existing account in a popup and adds the new sign-in to it. Call it in a
- * click handler. Returns the route to continue to, or null when it did not finish.
+ * Signs in with the existing account in a popup, through `login` once chosen, and adds the new
+ * sign-in to it. Call it in a click handler. Returns the route to continue to, or null.
  */
-export async function joinExistingAccount(): Promise<string | null> {
+export async function joinExistingAccount(login?: LoginOption): Promise<string | null> {
   const match = accountMatch.value
   if (!match || matchBusy.value) return null
   if (!loginFresh(match.oidcToken)) {
@@ -60,7 +61,7 @@ export async function joinExistingAccount(): Promise<string | null> {
   begin()
   const { baseUrl, check } = fence(match)
   try {
-    const tokens = await popupSignIn()
+    const tokens = await popupSignIn(login)
     check()
     const token = await issueToken(tokens.id_token ?? tokens.access_token, baseUrl).catch((error: unknown) => {
       if (signInHasNoAccount(error)) throw new Error('That sign-in has no account either. Choose the one you used before.')
@@ -73,7 +74,8 @@ export async function joinExistingAccount(): Promise<string | null> {
       throw new Error('Your new sign-in already has an account. Sign in with it instead.')
     })
     check()
-    await adoptSession(token, tokens.id_token)
+    // An upstream login has no Keycloak session to end at sign-out.
+    await adoptSession(token, login?.upstream ? undefined : tokens.id_token)
     // A newer match that arrived meanwhile keeps the choice open, so nothing navigates away.
     if (accountMatch.value !== match) return null
     accountMatch.value = null

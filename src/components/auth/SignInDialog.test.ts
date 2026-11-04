@@ -27,6 +27,11 @@ const PickerStub = defineComponent({
   setup: (props, { emit }) => () =>
     h('button', { 'data-only': props.onlyRealmIds?.join(','), onClick: () => emit('pick', HOME) }, 'Pick home realm'),
 })
+const loginOptions = compileClientComponent(new URL('./LoginOptions.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@/components/auth/ProviderLogo.vue': moduleDefault(defineComponent(() => () => null)),
+  '@/lib/config': { portalConfig: () => config },
+})
 const dialog = compileClientComponent(new URL('./SignInDialog.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': { useRouter: () => ({ push }) },
@@ -40,12 +45,11 @@ const dialog = compileClientComponent(new URL('./SignInDialog.vue', import.meta.
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
   '@/components/ui/Spinner.vue': moduleDefault(Passthrough),
   '@/components/federation/RealmPicker.vue': moduleDefault(PickerStub),
-  '@/components/auth/ProviderLogo.vue': moduleDefault(defineComponent(() => () => null)),
+  '@/components/auth/LoginOptions.vue': moduleDefault(loginOptions),
   '@/composables/signInChoice': { signInChoice },
   '@/composables/useAruna': { useAruna: () => ({ realm: ref({ id: 'here', name: 'Demo realm' }), realmInfo }) },
   '@/composables/useAuth': { useAuth: () => ({ signIn }) },
   '@/composables/useFederation': { loginWithRealm },
-  '@/lib/config': { portalConfig: () => config },
 })
 
 function option(name: string, params: Record<string, string> = {}): LoginOption {
@@ -91,6 +95,15 @@ describe('sign-in dialog', () => {
     await click(button(root, 'NFDI AAI'))
     expect(signIn).toHaveBeenCalledWith({ redirectTo: '/app/data', onboardingSecret: 's1', params: { kc_idp_hint: 'iam4nfdi' } })
     expect(signInChoice.value).toBeNull()
+    app.unmount()
+  })
+
+  it('signs in with the upstream provider of a login', async () => {
+    const upstream = { provider: 'lifescience', bridge: 'https://bridge.test/v3-bridge/lifescience' }
+    config = { ...DEFAULT_PORTAL_CONFIG, login: { options: [{ ...option('LifeScience RI'), upstream }], accountUrl: '' } }
+    const { root, app } = await render()
+    await click(button(root, 'LifeScience RI'))
+    expect(signIn).toHaveBeenCalledWith({ redirectTo: '/app/data', onboardingSecret: 's1', upstream })
     app.unmount()
   })
 

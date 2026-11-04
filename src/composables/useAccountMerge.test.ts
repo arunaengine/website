@@ -6,7 +6,7 @@ const refresh = vi.fn(async () => undefined)
 const replaceToken = vi.fn()
 
 vi.mock('./popupSignIn', () => ({
-  popupSignIn: () => popupSignIn(),
+  popupSignIn: (...args: unknown[]) => popupSignIn(...args),
   cancelPopup: vi.fn(),
   SignInCancelled: class extends Error {},
 }))
@@ -164,6 +164,39 @@ describe('account merge', () => {
     expect(requests('POST', '/access/users/me/merge')[0].bearer).toBe(renewed)
     expect(replaceToken).toHaveBeenCalledWith(renewed)
     expect(merge.step.value).toBe('merged')
+  })
+
+  it('signs in with the chosen logins and merges with the upstream sign-in', async () => {
+    authToken.value = OWN_STALE
+    const upstream = (provider: string) => ({ name: provider, description: '', logo: '', params: {}, linkParams: {}, upstream: { provider, bridge: `https://bridge.test/${provider}` } })
+    const merge = useAccountMerge()
+    merge.choose()
+    expect(merge.step.value).toBe('choose')
+    await merge.start(upstream('gfbio'))
+    expect(popupSignIn).toHaveBeenLastCalledWith(upstream('gfbio'))
+    expect(requests('GET', '/access/token')[0].bearer).toBe(OIDC_B)
+    expect(merge.step.value).toBe('confirm')
+    const ownOidc = jwt({ sub: 'ls-a', auth_time: ageSecs(1) })
+    const renewed = jwt({ sub: A, auth_time: ageSecs(1) })
+    popupSignIn.mockResolvedValueOnce({ id_token: ownOidc, token_type: 'Bearer' })
+    answer('GET', '/access/token', ({ bearer }) => json({ token: bearer === ownOidc ? renewed : TOKEN_B }))
+    answer('POST', '/access/users/me/merge', json({ user_id: A, merged_user_id: B, attributes_not_copied: [] }))
+
+    await merge.merge(upstream('lifescience'))
+
+    expect(popupSignIn).toHaveBeenLastCalledWith(upstream('lifescience'))
+    const [sent] = requests('POST', '/access/users/me/merge')
+    expect(sent.bearer).toBe(renewed)
+    expect(sent.body).toEqual({ token: TOKEN_B })
+    expect(merge.step.value).toBe('merged')
+  })
+
+  it('returns to the login choice when a chosen sign-in fails', async () => {
+    popupSignIn.mockRejectedValueOnce(new Error('Sign-in was rejected (access_denied).'))
+    const merge = useAccountMerge()
+    await merge.start({ name: 'GFBio SSO', description: '', logo: '', params: {}, linkParams: {} })
+    expect(merge.step.value).toBe('choose')
+    expect(merge.failure.value).toContain('access_denied')
   })
 
   it('refuses a new login of another account than this one', async () => {

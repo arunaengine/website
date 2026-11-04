@@ -13,7 +13,7 @@ const refresh = vi.fn(async () => {
   currentUser.value = authToken.value ? { id: 'a1@R' } : null
 })
 
-vi.mock('./popupSignIn', () => ({ popupSignIn: () => popupSignIn(), SignInCancelled: class extends Error {} }))
+vi.mock('./popupSignIn', () => ({ popupSignIn: (...args: unknown[]) => popupSignIn(...args), SignInCancelled: class extends Error {} }))
 vi.mock('./useAruna', () => ({
   useAruna: () => ({
     apiBaseUrl,
@@ -125,6 +125,20 @@ describe('a first sign-in that matches an account', () => {
     expect(setAuthToken).not.toHaveBeenCalled()
     expect(calls.map((call) => call.path)).toEqual(['/access/users/register'])
     expect(storage.has('aruna.oidc.verifier')).toBe(false)
+  })
+
+  it('signs in with the chosen upstream login and keeps no ID token for sign-out', async () => {
+    await matched()
+    const login = { name: 'NFDI AAI', description: '', logo: '', params: {}, linkParams: {}, upstream: { provider: 'iam4nfdi', bridge: 'https://bridge.test/iam4nfdi' } }
+
+    await expect(joinExistingAccount(login)).resolves.toBe('/app/data')
+
+    expect(popupSignIn).toHaveBeenCalledWith(login)
+    expect(calls.find((call) => call.path === '/access/token' && call.bearer === EXISTING_SIGN_IN)).toBeTruthy()
+    const [attached] = calls.filter((call) => call.path === '/access/users/me/subjects')
+    expect(attached.bearer).toBe('realm-of-existing')
+    expect(attached.body).toEqual({ token: NEW_SIGN_IN })
+    expect(storage.has('aruna.oidc.idToken')).toBe(false)
   })
 
   it('adds the new sign-in to the existing account the person signs in with', async () => {

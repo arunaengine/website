@@ -6,6 +6,8 @@ import { setAuthOpener } from './useAuth'
 
 const PAGE_ORIGIN = 'https://portal.test'
 const TOKEN_ENDPOINT = 'https://idp.test/token'
+const BRIDGE = 'https://bridge.test/v3-bridge/lifescience'
+const LIFESCIENCE = { name: 'LifeScience RI', description: '', logo: '', params: {}, linkParams: {}, upstream: { provider: 'lifescience', bridge: BRIDGE } }
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -19,13 +21,20 @@ async function setup(served: Record<string, unknown> = {}, opened: unknown = und
   const tokenForms: Record<string, string>[] = []
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
-    if (url.endsWith('/system/realm')) return json({ oidc_providers: [{ audience: 'portal', discovery_url: discoveryUrl }] })
+    if (url.endsWith('/system/realm')) {
+      const upstream = { id: 'lifescience', audience: 'ls-client', discovery_url: 'https://ls.test/discovery' }
+      return json({ oidc_providers: [{ id: 'keycloak', audience: 'portal', discovery_url: discoveryUrl }, upstream] })
+    }
     if (url === discoveryUrl) {
       return json({ issuer: 'https://idp.test', authorization_endpoint: 'https://idp.test/authorize', token_endpoint: TOKEN_ENDPOINT })
     }
     if (url === TOKEN_ENDPOINT) {
       tokenForms.push(Object.fromEntries(new URLSearchParams(String(init?.body))))
       return json({ access_token: 'a2', id_token: 'i2', token_type: 'Bearer' })
+    }
+    if (url === `${BRIDGE}/token`) {
+      tokenForms.push({ endpoint: url, ...Object.fromEntries(new URLSearchParams(String(init?.body))) })
+      return json({ id_token: 'ls2', token_type: 'Bearer', expires_in: 300 })
     }
     return json({ error: 'unexpected' }, 404)
   }))
@@ -72,6 +81,36 @@ describe('popupSignIn', () => {
     expect(close).toHaveBeenCalled()
     // Answered once: a late copy of the callback finds nobody waiting.
     expect(receiveCallback(new URLSearchParams({ code: 'c2', state }))).toBe(false)
+  })
+
+  it('signs in with an upstream login at its bridge', async () => {
+    const { replace, tokenForms } = await setup()
+    const result = popupSignIn(LIFESCIENCE)
+    const url = await navigated(replace)
+    expect(`${url.origin}${url.pathname}`).toBe(`${BRIDGE}/authorize`)
+    expect(url.searchParams.get('client_id')).toBe('ls-client')
+    expect(url.searchParams.get('redirect_uri')).toBe(`${PAGE_ORIGIN}/auth/callback`)
+    expect(url.searchParams.get('code_challenge_method')).toBe('S256')
+    expect(url.searchParams.get('code_challenge')).toBeTruthy()
+    expect(url.searchParams.get('prompt')).toBe('login')
+    const state = url.searchParams.get('state')!
+    expect(state).toMatch(/^popup\.[\w-]{22}$/)
+
+    receiveCallback(new URLSearchParams({ code: 'c3', state }))
+    await expect(result).resolves.toMatchObject({ id_token: 'ls2' })
+    expect(tokenForms).toEqual([
+      expect.objectContaining({ endpoint: `${BRIDGE}/token`, client_id: 'ls-client', code: 'c3', redirect_uri: `${PAGE_ORIGIN}/auth/callback` }),
+    ])
+    expect(tokenForms[0].code_verifier).toBeTruthy()
+  })
+
+  it('sends the params of a legacy login to the realm provider', async () => {
+    const { replace } = await setup()
+    void popupSignIn({ ...LIFESCIENCE, upstream: undefined, params: { kc_idp_hint: 'lifescience' } }).catch(() => undefined)
+    const url = await navigated(replace)
+    expect(`${url.origin}${url.pathname}`).toBe('https://idp.test/authorize')
+    expect(url.searchParams.get('client_id')).toBe('portal')
+    expect(url.searchParams.get('kc_idp_hint')).toBe('lifescience')
   })
 
   it('reports a blocked popup', async () => {

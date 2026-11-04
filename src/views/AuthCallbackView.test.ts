@@ -4,17 +4,20 @@ import * as RouterRuntime from 'vue-router'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, moduleDefault, mountApp } from '@/test/clientRender'
+import { DEFAULT_PORTAL_CONFIG, type LoginOption, type PortalRuntimeConfig } from '@/lib/config'
 
 const stage = ref('idle')
 const stageError = ref<string | null>(null)
 const completeSignIn = vi.fn(async (_params: URLSearchParams): Promise<string | null> => '/app')
 const signIn = vi.fn()
 const requestSignIn = vi.fn()
-const joinExistingAccount = vi.fn(async (): Promise<string | null> => '/app')
+const joinExistingAccount = vi.fn(async (_login?: LoginOption): Promise<string | null> => '/app')
 const createNewAccount = vi.fn(async (): Promise<string | null> => '/app')
 const matchBusy = ref(false)
 const matchFailure = ref<string | null>(null)
 const matchStale = ref(false)
+const NFDI: LoginOption = { name: 'NFDI AAI', description: '', logo: '', params: {}, linkParams: {}, upstream: { provider: 'iam4nfdi', bridge: 'https://bridge.test/iam4nfdi' } }
+let config: PortalRuntimeConfig = DEFAULT_PORTAL_CONFIG
 
 const EmptyStub = defineComponent(() => () => null)
 const ButtonStub = defineComponent({
@@ -23,8 +26,15 @@ const ButtonStub = defineComponent({
 })
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
+const LoginOptions = compileClientComponent(new URL('../components/auth/LoginOptions.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@/components/auth/ProviderLogo.vue': moduleDefault(EmptyStub),
+  '@/lib/config': { portalConfig: () => config },
+})
 const AuthCallbackView = compileClientComponent(new URL('./AuthCallbackView.vue', import.meta.url), {
   vue: VueRuntime,
+  '@/components/auth/LoginOptions.vue': moduleDefault(LoginOptions),
+  '@/lib/config': { portalConfig: () => config },
   'vue-router': RouterRuntime,
   '@lucide/vue': icons,
   '@/components/layout/AppLogo.vue': moduleDefault(EmptyStub),
@@ -56,6 +66,7 @@ function codes(): string[] {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  config = DEFAULT_PORTAL_CONFIG
   stage.value = 'idle'
   stageError.value = null
   matchFailure.value = null
@@ -117,6 +128,24 @@ describe('completing a sign in', () => {
 
     await click(button(mounted.root, 'Create a new account'))
     expect(createNewAccount).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('dashboard'))
+    mounted.app.unmount()
+  })
+
+  it('asks for the login of the existing account when logins are configured', async () => {
+    config = { ...DEFAULT_PORTAL_CONFIG, login: { options: [NFDI], accountUrl: '' } }
+    completeSignIn.mockImplementationOnce(async () => {
+      stage.value = 'match'
+      return null
+    })
+    const router = await routed('/auth/callback?code=first&state=s1')
+    const mounted = await mountApp(AuthCallbackView, { router })
+    await vi.waitFor(() => expect(content(mounted.root)).toContain('An account with this email or name already exists'))
+    await click(button(mounted.root, 'This is me'))
+    expect(joinExistingAccount).not.toHaveBeenCalled()
+    expect(content(mounted.root)).toContain('Choose how you sign in with it.')
+    await click(button(mounted.root, 'NFDI AAI'))
+    expect(joinExistingAccount).toHaveBeenCalledWith(NFDI)
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('dashboard'))
     mounted.app.unmount()
   })

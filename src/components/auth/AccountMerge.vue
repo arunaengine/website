@@ -2,6 +2,7 @@
 // Adds another account the person can sign in with: it is merged into this one, or, when the
 // sign-in has no account yet, attached to it. Each step waits for a click of its own.
 import { computed } from 'vue'
+import LoginOptions from '@/components/auth/LoginOptions.vue'
 import Button from '@/components/ui/Button.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -14,6 +15,7 @@ import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useAruna } from '@/composables/useAruna'
 import { loginFresh, useAccountMerge } from '@/composables/useAccountMerge'
+import { portalConfig } from '@/lib/config'
 import { truncateMiddle } from '@/lib/utils'
 import {
   ArrowRight,
@@ -34,7 +36,9 @@ import {
 import type { Component } from 'vue'
 
 const { authToken, userInfo } = useAruna()
-const { step, failure, other, result, start, copyVault, merge, attach, cancel } = useAccountMerge()
+const { step, failure, other, result, choose, start, copyVault, merge, attach, cancel } = useAccountMerge()
+// With configured logins the person picks the login of each sign-in, otherwise the realm's own.
+const hasLogins = portalConfig().login.options.length > 0
 
 const open = computed(() => step.value !== 'idle' || failure.value !== null)
 const name = computed(() => other.value?.info.user.name ?? 'That account')
@@ -45,6 +49,13 @@ const merged = computed(
 const busy = computed(() => ['signing', 'loading', 'merging'].includes(step.value))
 // The merge then asks for this account's login first.
 const loginOld = computed(() => step.value === 'confirm' && !loginFresh(authToken.value))
+// An old own login is renewed through the login the person picks.
+const ownLogin = computed(() => hasLogins && ['confirm', 'unregistered'].includes(step.value) && !loginFresh(authToken.value))
+
+function add() {
+  if (hasLogins) choose()
+  else void start()
+}
 
 const title = computed(() => {
   switch (step.value) {
@@ -113,7 +124,7 @@ function close(value: boolean) {
         <div class="text-sm font-medium text-foreground">Add another account</div>
         <div class="text-xs text-muted-foreground">Sign in with it once to merge it into this one.</div>
       </div>
-      <Button size="sm" variant="outline" :disabled="open" @click="start">Add account</Button>
+      <Button size="sm" variant="outline" :disabled="open" @click="add">Add account</Button>
     </div>
     <div v-if="merged.length" class="border-t border-border px-5 py-3">
       <div class="type-label">Merged accounts</div>
@@ -134,9 +145,11 @@ function close(value: boolean) {
         <DialogDescription v-if="step === 'confirm' || step === 'merging'">
           {{ name }} is closed afterwards. Signing in with it opens this account.
         </DialogDescription>
+        <DialogDescription v-else-if="step === 'choose'">Choose how you sign in with the other account.</DialogDescription>
       </DialogHeader>
 
-      <Spinner v-if="step === 'signing'" show-label label="Sign in with the other account in the new window." />
+      <LoginOptions v-if="step === 'choose'" @choose="start" />
+      <Spinner v-else-if="step === 'signing'" show-label label="Sign in with the other account in the new window." />
       <Spinner v-else-if="step === 'loading'" show-label label="Reading the other account…" />
       <div v-else-if="stepTile && step !== 'attached'" class="flex items-start gap-3">
         <IconTile :icon="stepTile.icon" :tone="stepTile.tone" />
@@ -214,6 +227,11 @@ function close(value: boolean) {
         <p class="text-sm text-muted-foreground">You can now sign in with it.</p>
       </div>
 
+      <template v-if="ownLogin">
+        <Notice v-if="step === 'unregistered'">You confirm with your own login first.</Notice>
+        <LoginOptions @choose="(login) => (step === 'unregistered' ? attach(login) : merge(login))" />
+      </template>
+
       <Notice v-if="failure" tone="error">{{ failure }}</Notice>
 
       <DialogFooter>
@@ -222,9 +240,9 @@ function close(value: boolean) {
         </template>
         <template v-else>
           <Button variant="outline" @click="cancel">{{ step === 'vault-blocked' || step === 'idle' ? 'Close' : 'Cancel' }}</Button>
-          <Button v-if="step === 'unregistered'" @click="attach">Attach sign-in</Button>
+          <Button v-if="step === 'unregistered' && !ownLogin" @click="attach()">Attach sign-in</Button>
           <Button v-else-if="step === 'copy-vault'" @click="copyVault">Copy vault</Button>
-          <Button v-else-if="step === 'confirm' || step === 'merging'" :disabled="busy" @click="merge">
+          <Button v-else-if="(step === 'confirm' || step === 'merging') && !ownLogin" :disabled="busy" @click="merge()">
             <Spinner v-if="step === 'merging'" class="text-current" aria-hidden="true" /> Merge
           </Button>
         </template>
