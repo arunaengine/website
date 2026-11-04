@@ -21,6 +21,25 @@ describe('portal login config', () => {
     expect(login.accountUrl).toBe('https://idp.example.org/account')
   })
 
+  it('reads the provider and bridge of an upstream login only when both are set', () => {
+    const { login } = applyPortalConfig({
+      login: {
+        options: [
+          { name: 'LS', provider: ' lifescience ', bridge: 'https://bridge.example.org/v3-bridge/lifescience/' },
+          { name: 'No bridge', provider: 'gfbio' },
+          { name: 'No provider', bridge: 'https://bridge.example.org/v3-bridge/gfbio' },
+          { name: 'Bad', provider: 1, bridge: 'https://bridge.example.org' },
+        ],
+      },
+    })
+    expect(login.options.map((option) => option.upstream)).toEqual([
+      { provider: 'lifescience', bridge: 'https://bridge.example.org/v3-bridge/lifescience' },
+      undefined,
+      undefined,
+      undefined,
+    ])
+  })
+
   it('has no options and no account page without config', () => {
     expect(applyPortalConfig({}).login).toEqual({ options: [], accountUrl: '' })
   })

@@ -22,6 +22,14 @@ export interface LoginOption {
   params: Record<string, string>
   // Parameters that link this login to the signed-in account; empty means not linkable.
   linkParams: Record<string, string>
+  // Signs in at a realm OIDC provider through its login bridge instead of the first provider.
+  upstream?: UpstreamLogin
+}
+
+/** The `provider` id of a realm OIDC provider and the `bridge` base URL that serves its login. */
+export interface UpstreamLogin {
+  provider: string
+  bridge: string
 }
 
 export interface LoginConfig {
@@ -136,6 +144,13 @@ function stringMap(raw: unknown): Record<string, string> {
   return Object.fromEntries(Object.entries(raw).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
 }
 
+// Both fields or none: an option with only one keeps the plain sign-in.
+function upstreamLogin(option: Record<string, unknown>): UpstreamLogin | undefined {
+  const provider = typeof option.provider === 'string' ? option.provider.trim() : ''
+  const bridge = typeof option.bridge === 'string' ? option.bridge.trim().replace(/\/+$/, '') : ''
+  return provider && bridge ? { provider, bridge } : undefined
+}
+
 function loginConfig(raw: unknown): LoginConfig {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { options: [], accountUrl: '' }
   const login = raw as Record<string, unknown>
@@ -151,6 +166,7 @@ function loginConfig(raw: unknown): LoginConfig {
         logoLight: typeof option.logoLight === 'string' && option.logoLight ? option.logoLight : undefined,
         params: stringMap(option.params),
         linkParams: stringMap(option.linkParams),
+        upstream: upstreamLogin(option),
       },
     ]
   })
