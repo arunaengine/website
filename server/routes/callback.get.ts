@@ -1,6 +1,6 @@
 import type {v2AddOidcProviderResponse} from "~/composables/aruna_api_json";
 import {withQuery} from 'ufo'
-import {bridgeTarget, errorToPOJO, fetchCachedOidcMetadata} from "~/server/utils/oidc";
+import {bridgeTarget, errorToPOJO, fetchCachedOidcMetadata, portalReturn} from "~/server/utils/oidc";
 
 type AuthCodeRequest = {
   grant_type: 'authorization_code',
@@ -22,20 +22,29 @@ export default defineEventHandler(async event => {
   const query = getQuery(event)
   const {code, state} = query
 
-  // v3 login bridge: forward the response to the checked v3 Keycloak broker URL, no v2 login
-  if (typeof state === 'string' && state.startsWith('v3.')) {
-    const [, alias = '', realm, bridgedState = ''] =
-      /^v3\.([^.@]+)(?:@([\w-]+))?\.(.+)$/s.exec(state) ?? []
-    const realmUrl = realm === undefined ? undefined : Buffer.from(realm, 'base64url').toString()
-    const brokerUrl = bridgeTarget(alias, realmUrl)?.brokerUrl
-    if (!bridgedState || !brokerUrl) {
+  // v3 login bridge: forward the response to the checked portal callback or v3 Keycloak broker URL, no v2 login
+  if (typeof state === 'string' && (state.startsWith('v3.') || state.startsWith('v3p.'))) {
+    let target: string | undefined
+    let bridgedState: string | undefined
+    if (state.startsWith('v3p.')) {
+      const portal = portalReturn(state)
+      target = portal?.callback
+      bridgedState = portal?.state
+    } else {
+      const [, alias = '', realm, keycloakState] =
+        /^v3\.([^.@]+)(?:@([\w-]+))?\.(.+)$/s.exec(state) ?? []
+      const realmUrl = realm === undefined ? undefined : Buffer.from(realm, 'base64url').toString()
+      target = bridgeTarget(alias, realmUrl)?.brokerUrl
+      bridgedState = keycloakState
+    }
+    if (!bridgedState || !target) {
       throw createError({statusCode: 400, statusMessage: 'Invalid login bridge request'})
     }
     const forward: Record<string, string> = {state: bridgedState}
     for (const key of ['code', 'error', 'error_description', 'iss']) {
       if (typeof query[key] === 'string') forward[key] = query[key] as string
     }
-    return sendRedirect(event, withQuery(brokerUrl, forward))
+    return sendRedirect(event, withQuery(target, forward))
   }
 
   if (!code) {

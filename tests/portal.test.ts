@@ -107,3 +107,42 @@ describe('portal authorize', () => {
     expect(fetchCalls).toHaveLength(0)
   })
 })
+
+describe('portal callback', () => {
+  function callback(query: string) {
+    return handler(new Request(`https://web.test/callback?${query}`, {headers: {cookie: 'login_meta=keep; access_token=v2'}}))
+  }
+
+  test('sends code and portal state back to the portal', async () => {
+    const start = await authorize('lifescience', portalAuth)
+    const state = new URL(start.headers.get('location')!).searchParams.get('state')!
+    const back = await callback(`code=c-1&iss=x&next=https://evil.test&state=${encodeURIComponent(state)}`)
+    expect(back.status).toBe(302)
+    expect(back.headers.getSetCookie()).toEqual([])
+    const location = new URL(back.headers.get('location')!)
+    expect(location.origin + location.pathname).toBe(portal)
+    expect(Object.fromEntries(location.searchParams)).toEqual({code: 'c-1', iss: 'x', state: 'portal-state'})
+  })
+
+  test('forwards provider errors to the portal', async () => {
+    const state = portalState('iam4nfdi', portal, 's')
+    const back = await callback(`error=access_denied&state=${encodeURIComponent(state)}`)
+    expect(Object.fromEntries(new URL(back.headers.get('location')!).searchParams))
+      .toEqual({error: 'access_denied', state: 's'})
+  })
+
+  test('rejects foreign portal targets and unknown providers', async () => {
+    for (const state of [
+      portalState('lifescience', 'https://evil.test/auth/callback', 's'),
+      portalState('lifescience', 'https://v3.aruna-engine.org/auth/callback?next=x', 's'),
+      portalState('local', portal, 's'),
+      portalState('lifescience', portal, ''),
+      'v3p.lifescience.!!.s',
+    ]) {
+      const back = await callback(`code=c-1&state=${encodeURIComponent(state)}`)
+      expect(back.status).toBe(400)
+      expect(back.headers.get('location')).toBeNull()
+    }
+    expect(fetchCalls).toHaveLength(0)
+  })
+})
