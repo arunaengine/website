@@ -1,3 +1,6 @@
+import type {H3Event} from "h3";
+import {createHash, randomBytes, timingSafeEqual} from "node:crypto";
+
 export type IdpMetadata = {
   issuer: string,
   authorization_endpoint: string,
@@ -80,4 +83,117 @@ export function bridgeTarget(provider: string, realmUrl?: string) {
     return undefined
   }
   return {config, realm, isDefault: realm === fallback, brokerUrl: `${realm}/broker/${provider}/endpoint`}
+}
+
+const PORTAL_ORIGIN = /^https:\/\/([a-z0-9-]+\.)+aruna-engine\.org$/
+
+// True only for an https origin on a subdomain of aruna-engine.org, without port or userinfo
+export function portalOrigin(origin: unknown) {
+  return typeof origin === 'string' && PORTAL_ORIGIN.test(origin)
+}
+
+// The callback Aruna Desktop registers for its own scheme
+export const DESKTOP_CALLBACK = 'aruna://auth/callback'
+
+// True for an RFC 8252 loopback callback http://127.0.0.1:<port>/auth/callback or
+// http://[::1]:<port>/auth/callback (any port), or exactly the desktop scheme callback
+export function nativeCallback(redirectUri: unknown) {
+  if (redirectUri === DESKTOP_CALLBACK) return true
+  if (typeof redirectUri !== 'string') return false
+  try {
+    const url = new URL(redirectUri)
+    return url.protocol === 'http:' && (url.hostname === '127.0.0.1' || url.hostname === '[::1]') &&
+      redirectUri === `${url.origin}/auth/callback`
+  } catch {
+    return false
+  }
+}
+
+// True for exactly https://<subdomain>.aruna-engine.org/auth/callback or a native app callback
+export function portalCallback(redirectUri: unknown) {
+  if (nativeCallback(redirectUri)) return true
+  if (typeof redirectUri !== 'string') return false
+  try {
+    const origin = new URL(redirectUri).origin
+    return portalOrigin(origin) && redirectUri === `${origin}/auth/callback`
+  } catch {
+    return false
+  }
+}
+
+// True for an S256 code challenge: the base64url SHA-256 digest, 43 characters
+export function s256Challenge(challenge: unknown) {
+  return typeof challenge === 'string' && /^[\w-]{43}$/.test(challenge)
+}
+
+// State sent upstream for a portal login: provider, portal callback (base64url), code challenge and portal state
+export function portalState(provider: string, callback: string, challenge: string, state: string) {
+  return `v3p.${provider}.${Buffer.from(callback).toString('base64url')}.${challenge}.${state}`
+}
+
+// Checked portal callback, code challenge and portal state of a wrapped portal state, else undefined
+export function portalReturn(state: string) {
+  const [, provider = '', encoded = '', challenge = '', portal = ''] =
+    /^v3p\.([^.]+)\.([\w-]+)\.([\w-]+)\.(.+)$/s.exec(state) ?? []
+  const callback = Buffer.from(encoded, 'base64url').toString()
+  return portal && portalCallback(callback) && s256Challenge(challenge) && bridgeTarget(provider)
+    ? {provider, callback, challenge, state: portal}
+    : undefined
+}
+
+type PendingCode = {provider: string, code: string, callback: string, challenge: string, expires: number}
+
+// Bridge codes sent back to a portal or app instead of the upstream code, each bound once to its
+// upstream code, callback and code challenge. In memory, single use, five minutes.
+const pendingCodes = new Map<string, PendingCode>()
+const PENDING_MS = 5 * 60 * 1000
+// Digests of upstream codes already bound, so a replayed upstream code gets no second binding
+const boundCodes = new Map<string, number>()
+const BOUND_MS = 10 * 60 * 1000
+
+// A fresh bridge code for an upstream code, or undefined when that upstream code was bound before
+export function rememberCode(entry: Omit<PendingCode, 'expires'>) {
+  const now = Date.now()
+  for (const [key, pending] of pendingCodes) {
+    if (pending.expires <= now) pendingCodes.delete(key)
+  }
+  for (const [key, expires] of boundCodes) {
+    if (expires <= now) boundCodes.delete(key)
+  }
+  const digest = createHash('sha256').update(entry.code).digest('base64url')
+  if (boundCodes.has(digest)) return undefined
+  boundCodes.set(digest, now + BOUND_MS)
+  let handle: string
+  do handle = randomBytes(32).toString('base64url')
+  while (pendingCodes.has(handle))
+  pendingCodes.set(handle, {...entry, expires: now + PENDING_MS})
+  return handle
+}
+
+// The binding of a bridge code, removed on first use; undefined when unknown, used or expired
+export function takeCode(handle: string) {
+  const pending = pendingCodes.get(handle)
+  pendingCodes.delete(handle)
+  return pending && pending.expires > Date.now() ? pending : undefined
+}
+
+// True when the verifier's S256 digest equals the challenge (RFC 7636)
+export function verifierMatches(verifier: string, challenge: string) {
+  if (!/^[\w.~-]{43,128}$/.test(verifier)) return false
+  const digest = createHash('sha256').update(verifier).digest()
+  const expected = Buffer.from(challenge, 'base64url')
+  return expected.length === digest.length && timingSafeEqual(digest, expected)
+}
+
+// CORS for the portal token request: echoes only portal origins, never with credentials
+export function portalCors(event: H3Event) {
+  const origin = getRequestHeader(event, 'origin')
+  setResponseHeader(event, 'Vary', 'Origin')
+  if (portalOrigin(origin)) {
+    setResponseHeaders(event, {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    })
+  }
 }

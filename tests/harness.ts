@@ -31,6 +31,15 @@ export const config: any = {
       code_challenge: false,
       post_auth: true,
     },
+    gfbio: {
+      wellKnownUrl: 'https://gfbio.test/.well-known/openid-configuration',
+      clientId: 'gfbio-client',
+      clientSecret: 'gfbio-secret',
+      redirectUrl: 'https://web.test/callback',
+      scope: ['openid'],
+      code_challenge: false,
+      post_auth: false,
+    },
   },
   v3Bridge: {realmUrl: 'https://kc.test/realms/aruna', providers: 'lifescience,iam4nfdi,gfbio'},
 }
@@ -75,6 +84,8 @@ export async function createHandler() {
     .get('/callback', await route('callback.get.ts'))
     .get('/v3-bridge/:provider/authorize', await route('v3-bridge/[provider]/authorize.get.ts'))
     .post('/v3-bridge/:provider/token', await route('v3-bridge/[provider]/token.post.ts'))
+    .options('/v3-bridge/:provider/token', await route('v3-bridge/[provider]/token.options.ts'))
+    .get('/v3-bridge/:provider/.well-known/openid-configuration', await route('v3-bridge/[provider]/.well-known/openid-configuration.get.ts'))
   return h3.toWebHandler(h3.createApp().use(router))
 }
 
