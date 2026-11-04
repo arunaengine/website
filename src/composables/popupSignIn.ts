@@ -7,6 +7,7 @@ import {
   randomUrlSafeString,
   type OidcTokenResponse,
 } from '@/lib/oidc'
+import type { LoginOption } from '@/lib/config'
 import { POPUP_CHANNEL, POPUP_STATE_PREFIX } from '@/lib/popupHandoff'
 import { beginAuthRedirect, callbackUri, oidcClient, opensOutside, signInState } from './useAuth'
 
@@ -65,25 +66,26 @@ function waitFor(state: string): Promise<URLSearchParams> {
 }
 
 /**
- * Signs in once more and returns the provider's tokens. Call it in a click handler: the web
- * popup opens before the first await.
+ * Signs in once more with `login`, the realm's first provider without one, and returns the
+ * provider's tokens. Call it in a click handler: the web popup opens before the first await.
  */
-export async function popupSignIn(): Promise<OidcTokenResponse> {
+export async function popupSignIn(login?: LoginOption): Promise<OidcTokenResponse> {
   const outside = opensOutside()
   const popup = outside ? null : window.open('about:blank', '_blank', 'popup,width=560,height=760')
   if (!outside && !popup) throw new Error('The browser blocked the sign-in window. Allow popups for this site.')
   try {
-    const { clientId, discovery, send } = await oidcClient()
+    const { clientId, authorization, token, send } = await oidcClient(login?.upstream)
     const verifier = randomUrlSafeString(48)
     const state = signInState(POPUP_STATE_PREFIX)
     const redirectUri = callbackUri()
     const url = buildAuthorizationUrl({
-      authorizationEndpoint: discovery.authorization_endpoint,
+      authorizationEndpoint: authorization,
       clientId,
       redirectUri,
       state,
       codeChallenge: await pkceChallengeS256(verifier),
       freshLogin: true,
+      params: login?.params,
     })
     const answer = waitFor(state)
     if (popup) popup.location.replace(url)
@@ -94,7 +96,7 @@ export async function popupSignIn(): Promise<OidcTokenResponse> {
     const code = params.get('code')
     if (!code) throw new Error('The identity provider did not return an authorization code.')
     return await exchangeAuthorizationCode({
-      tokenEndpoint: discovery.token_endpoint,
+      tokenEndpoint: token,
       clientId,
       redirectUri,
       code,

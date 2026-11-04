@@ -151,10 +151,9 @@ async function resolveProvider(upstream?: UpstreamLogin | null) {
   return { clientId: provider.audience, discoveryUrl: provider.discovery_url, issuer: provider.issuer }
 }
 
-/** The realm's OIDC client, the provider's endpoints and the shell's token sender. */
-export async function oidcClient() {
-  const { clientId, discoveryUrl } = await resolveProvider()
-  return { clientId, discovery: await discover(discoveryUrl), send: (await nativeOidc())?.oidcToken }
+/** The client, endpoints and shell token sender of a login, or of the realm's first provider. */
+export async function oidcClient(upstream?: UpstreamLogin | null) {
+  return { ...(await endpoints(upstream ?? null)), send: (await nativeOidc())?.oidcToken }
 }
 
 // An upstream login uses its bridge's endpoints, any other the realm provider's discovery.
