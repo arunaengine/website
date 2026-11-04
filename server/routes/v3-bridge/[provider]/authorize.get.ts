@@ -1,5 +1,5 @@
 import {withQuery} from 'ufo'
-import {bridgeTarget, brokerRealm, fetchCachedOidcMetadata, portalCallback, portalState} from "~/server/utils/oidc";
+import {bridgeTarget, brokerRealm, fetchCachedOidcMetadata, portalCallback, portalState, s256Challenge} from "~/server/utils/oidc";
 
 // v3 Keycloak or portal authorization URL: sends the user to the provider with the registered v2 redirect URI
 export default defineEventHandler(async event => {
@@ -22,14 +22,16 @@ export default defineEventHandler(async event => {
       client_id !== target.config.clientId ||
       response_type !== 'code' ||
       !state ||
-      (portal && (query.code_challenge_method !== 'S256' || !query.code_challenge))) {
+      (portal && (query.code_challenge_method !== 'S256' || !s256Challenge(query.code_challenge)))) {
     throw createError({statusCode: 400, statusMessage: 'Invalid authorization request'})
   }
   const realmPart = target.isDefault ? '' : `@${Buffer.from(target.realm).toString('base64url')}`
   const upstream: Record<string, string> = {
     ...query as Record<string, string>,
     redirect_uri: target.config.redirectUrl,
-    state: portal ? portalState(provider, redirect_uri as string, state as string) : `v3.${provider}${realmPart}.${state}`,
+    state: portal
+      ? portalState(provider, redirect_uri as string, query.code_challenge as string, state as string)
+      : `v3.${provider}${realmPart}.${state}`,
   }
   // Portal logins ask upstream for the v2 scope and send PKCE only where the v2 login does
   if (portal) {

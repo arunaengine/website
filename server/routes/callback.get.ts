@@ -1,6 +1,6 @@
 import type {v2AddOidcProviderResponse} from "~/composables/aruna_api_json";
 import {withQuery} from 'ufo'
-import {bridgeTarget, errorToPOJO, fetchCachedOidcMetadata, portalReturn} from "~/server/utils/oidc";
+import {bridgeTarget, errorToPOJO, fetchCachedOidcMetadata, portalReturn, rememberCode} from "~/server/utils/oidc";
 
 type AuthCodeRequest = {
   grant_type: 'authorization_code',
@@ -30,6 +30,10 @@ export default defineEventHandler(async event => {
       const portal = portalReturn(state)
       target = portal?.callback
       bridgedState = portal?.state
+      // The code is redeemed at the bridge only with the verifier of this challenge
+      if (portal && typeof code === 'string' && code) {
+        rememberCode(code, {provider: portal.provider, callback: portal.callback, challenge: portal.challenge})
+      }
     } else {
       const [, alias = '', realm, keycloakState] =
         /^v3\.([^.@]+)(?:@([\w-]+))?\.(.+)$/s.exec(state) ?? []

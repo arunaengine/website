@@ -1,16 +1,19 @@
 import {beforeEach, describe, expect, test} from 'bun:test'
+import {createHash} from 'node:crypto'
 import {config, createHandler, fetchCalls, idpMetadata, replyWith} from './harness'
 import {portalCallback, portalOrigin, portalReturn, portalState} from '../server/utils/oidc'
 
 const handler = await createHandler()
 const portal = 'https://v3-debug.aruna-engine.org/auth/callback'
+const verifier = 'portal-verifier-'.padEnd(64, 'x')
+const challenge = createHash('sha256').update(verifier).digest('base64url')
 const portalAuth = {
   client_id: 'ls-client',
   redirect_uri: portal,
   response_type: 'code',
   scope: 'openid profile email',
   state: 'portal-state',
-  code_challenge: 'challenge',
+  code_challenge: challenge,
   code_challenge_method: 'S256',
 }
 const nfdiAuth = {...portalAuth, client_id: 'aruna-engine.org/callback'}
@@ -23,6 +26,13 @@ beforeEach(() => replyWith(url => {
 function authorize(provider: string, params: Record<string, string>) {
   const query = new URLSearchParams(params)
   return handler(new Request(`https://web.test/v3-bridge/${provider}/authorize?${query}`))
+}
+
+// Runs authorize and the v2 callback, so the bridge binds the code to the challenge
+async function issueCode(provider: string, params: Record<string, string>, code: string) {
+  const start = await authorize(provider, params)
+  const state = new URL(start.headers.get('location')!).searchParams.get('state')!
+  return handler(new Request(`https://web.test/callback?code=${code}&state=${encodeURIComponent(state)}`))
 }
 
 test('portal callback rule', () => {
@@ -59,11 +69,12 @@ test('portal callback rule', () => {
 })
 
 test('portal state round trip', () => {
-  const state = portalState('lifescience', portal, 'a.b.c')
+  const state = portalState('lifescience', portal, challenge, 'a.b.c')
   expect(state.startsWith('v3p.lifescience.')).toBe(true)
-  expect(portalReturn(state)).toEqual({callback: portal, state: 'a.b.c'})
-  const evil = portalState('lifescience', 'https://evil.test/auth/callback', 's')
-  for (const bad of [evil, portalState('local', portal, 's'), portalState('lifescience', portal, ''), 'v3p.lifescience', `v3.lifescience.s`]) {
+  expect(portalReturn(state)).toEqual({provider: 'lifescience', callback: portal, challenge, state: 'a.b.c'})
+  const evil = portalState('lifescience', 'https://evil.test/auth/callback', challenge, 's')
+  for (const bad of [evil, portalState('local', portal, challenge, 's'), portalState('lifescience', portal, challenge, ''),
+    portalState('lifescience', portal, 'short', 's'), 'v3p.lifescience', `v3.lifescience.s`]) {
     expect(portalReturn(bad)).toBeUndefined()
   }
 })
@@ -77,7 +88,7 @@ describe('portal authorize', () => {
     expect(location.origin + location.pathname).toBe('https://lifescience.test/authorize')
     const sent = Object.fromEntries(location.searchParams)
     expect(sent).toEqual({...portalAuth, redirect_uri: 'https://web.test/callback', scope: 'openid', state: sent.state})
-    expect(portalReturn(sent.state)).toEqual({callback: portal, state: 'portal-state'})
+    expect(portalReturn(sent.state)).toEqual({provider: 'lifescience', callback: portal, challenge, state: 'portal-state'})
   })
 
   test('asks upstream for the v2 scope of the provider', async () => {
@@ -108,6 +119,7 @@ describe('portal authorize', () => {
       {...portalAuth, response_type: 'token'},
       {...portalAuth, state: ''},
       {...portalAuth, code_challenge: ''},
+      {...portalAuth, code_challenge: 'challenge'},
       {...portalAuth, code_challenge_method: 'plain'},
     ]) {
       const response = await authorize('lifescience', params)
@@ -136,7 +148,7 @@ describe('portal callback', () => {
   })
 
   test('forwards provider errors to the portal', async () => {
-    const state = portalState('iam4nfdi', portal, 's')
+    const state = portalState('iam4nfdi', portal, challenge, 's')
     const back = await callback(`error=access_denied&state=${encodeURIComponent(state)}`)
     expect(Object.fromEntries(new URL(back.headers.get('location')!).searchParams))
       .toEqual({error: 'access_denied', state: 's'})
@@ -144,10 +156,10 @@ describe('portal callback', () => {
 
   test('rejects foreign portal targets and unknown providers', async () => {
     for (const state of [
-      portalState('lifescience', 'https://evil.test/auth/callback', 's'),
-      portalState('lifescience', 'https://v3.aruna-engine.org/auth/callback?next=x', 's'),
-      portalState('local', portal, 's'),
-      portalState('lifescience', portal, ''),
+      portalState('lifescience', 'https://evil.test/auth/callback', challenge, 's'),
+      portalState('lifescience', 'https://v3.aruna-engine.org/auth/callback?next=x', challenge, 's'),
+      portalState('local', portal, challenge, 's'),
+      portalState('lifescience', portal, challenge, ''),
       'v3p.lifescience.!!.s',
     ]) {
       const back = await callback(`code=c-1&state=${encodeURIComponent(state)}`)
@@ -159,7 +171,7 @@ describe('portal callback', () => {
 })
 
 describe('portal token', () => {
-  const exchange = {grant_type: 'authorization_code', code: 'c-1', redirect_uri: portal, code_verifier: 'v-1', client_id: 'ls-client'}
+  const exchange = {grant_type: 'authorization_code', code: 'c-1', redirect_uri: portal, code_verifier: verifier, client_id: 'ls-client'}
   const upstreamTokens = {access_token: 'at', refresh_token: 'rt', id_token: 'it', token_type: 'Bearer', expires_in: 300, scope: 'openid'}
   const origin = 'https://v3-debug.aruna-engine.org'
 
@@ -178,6 +190,7 @@ describe('portal token', () => {
   }))
 
   test('returns only the id token', async () => {
+    await issueCode('lifescience', portalAuth, 'c-1')
     const response = await token('lifescience', exchange)
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe('no-store')
@@ -187,11 +200,12 @@ describe('portal token', () => {
     const call = fetchCalls.find(c => c.url === 'https://lifescience.test/token')!
     expect(call.options.headers['Authorization']).toBe('Basic ' + btoa('ls-client:ls-secret'))
     expect(Object.fromEntries(call.options.body)).toEqual({
-      grant_type: 'authorization_code', code: 'c-1', redirect_uri: 'https://web.test/callback', code_verifier: 'v-1',
+      grant_type: 'authorization_code', code: 'c-1', redirect_uri: 'https://web.test/callback', code_verifier: verifier,
     })
   })
 
   test('uses client secret post and no verifier where v2 does', async () => {
+    await issueCode('iam4nfdi', nfdiAuth, 'c-1')
     const response = await token('iam4nfdi', {...exchange, client_id: 'aruna-engine.org/callback'})
     expect(response.status).toBe(200)
     const call = fetchCalls.find(c => c.url === 'https://iam4nfdi.test/token')!
@@ -206,11 +220,13 @@ describe('portal token', () => {
     replyWith(url => url.endsWith('/token')
       ? Response.json({error: 'invalid_grant', access_token: 'leak'}, {status: 400})
       : idpMetadata(url))
+    await issueCode('lifescience', portalAuth, 'c-1')
     const failed = await token('lifescience', exchange)
     expect(failed.status).toBe(400)
     expect(await failed.json()).toEqual({error: 'invalid_grant'})
 
     replyWith(url => url.endsWith('/token') ? {access_token: 'at'} : idpMetadata(url))
+    await issueCode('lifescience', portalAuth, 'c-1')
     const missing = await token('lifescience', exchange)
     expect(missing.status).toBe(502)
     expect(await missing.json()).toEqual({error: 'server_error', error_description: 'No ID token from provider'})
@@ -285,7 +301,7 @@ test('full portal login returns only the id token', async () => {
     headers: {'content-type': 'application/x-www-form-urlencoded', origin: 'https://v3-debug.aruna-engine.org'},
     body: new URLSearchParams({
       grant_type: 'authorization_code', code: returned.searchParams.get('code')!, redirect_uri: portal,
-      code_verifier: 'v-9', client_id: 'ls-client',
+      code_verifier: verifier, client_id: 'ls-client',
     }).toString(),
   }))
   expect(await response.json()).toEqual({id_token: 'it', token_type: 'Bearer', expires_in: 60})
