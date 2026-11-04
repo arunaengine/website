@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { accountMatch, useAuth } from './useAuth'
 import { loadPortalConfig } from '@/lib/config'
 import { pkceChallengeS256 } from '@/lib/oidc'
+import { shellContext } from '@/lib/desktop'
 
 const PAGE_ORIGIN = 'https://realm.aruna-engine.org'
 const BRIDGE = 'https://bridge.test/v3-bridge/lifescience'
@@ -69,6 +70,7 @@ function callsEnding(suffix: string) {
 
 afterEach(() => {
   accountMatch.value = null
+  shellContext.value = null
   vi.unstubAllGlobals()
 })
 
@@ -123,6 +125,37 @@ describe('sign-in with an upstream login', () => {
     expect(accountMatch.value?.oidcToken).toBe(idToken('ls-user'))
     expect(accountMatch.value?.idToken).toBeUndefined()
     expect(storage.has('aruna.oidc.upstream')).toBe(false)
+  })
+})
+
+describe('sign-in with an upstream login in Aruna Desktop', () => {
+  it('reads the bridge discovery natively and redeems the code through the shell', async () => {
+    await setup({
+      'aruna.oidc.state': 's1',
+      'aruna.oidc.verifier': 'v1',
+      'aruna.oidc.upstream': JSON.stringify(UPSTREAM),
+    })
+    const invoke = vi.fn(async (command: string) => {
+      if (command === 'oidc_discovery') return { authorization_endpoint: `${BRIDGE}/authorize`, token_endpoint: `${BRIDGE}/token` }
+      if (command === 'oidc_token') return { id_token: idToken('ls-user'), token_type: 'Bearer', expires_in: 300 }
+      throw new Error(`unexpected ${command}`)
+    })
+    shellContext.value = { apiBaseUrl: '/api', bridge: { invoke, version: 8 } }
+    await useAuth().completeSignIn(new URLSearchParams({ state: 's1', code: 'c1' }))
+    expect(invoke).toHaveBeenCalledWith('oidc_discovery', { url: `${BRIDGE}/.well-known/openid-configuration` })
+    expect(invoke).toHaveBeenCalledWith('oidc_token', {
+      endpoint: `${BRIDGE}/token`,
+      form: {
+        grant_type: 'authorization_code',
+        client_id: 'ls-client',
+        redirect_uri: `${PAGE_ORIGIN}/auth/callback`,
+        code: 'c1',
+        code_verifier: 'v1',
+      },
+    })
+    // The shell posts the form; the webview itself never calls the bridge.
+    expect(callsTo(`${BRIDGE}/token`)).toHaveLength(0)
+    expect(accountMatch.value?.oidcToken).toBe(idToken('ls-user'))
   })
 })
 

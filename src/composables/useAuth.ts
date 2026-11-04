@@ -157,9 +157,16 @@ export async function oidcClient(upstream?: UpstreamLogin | null) {
 }
 
 // An upstream login uses its bridge's endpoints, any other the realm provider's discovery.
+// A desktop shell posts only to a token endpoint a discovery named, so it reads the bridge's.
 async function endpoints(upstream: UpstreamLogin | null) {
   const { clientId, discoveryUrl } = await resolveProvider(upstream)
-  if (upstream) return { clientId, authorization: `${upstream.bridge}/authorize`, token: `${upstream.bridge}/token` }
+  if (upstream) {
+    const native = await nativeOidc()
+    const token = native
+      ? (await native.oidcDiscovery(`${upstream.bridge}/.well-known/openid-configuration`)).token_endpoint
+      : `${upstream.bridge}/token`
+    return { clientId, authorization: `${upstream.bridge}/authorize`, token }
+  }
   const discovery = await discover(discoveryUrl)
   return { clientId, authorization: discovery.authorization_endpoint, token: discovery.token_endpoint }
 }
