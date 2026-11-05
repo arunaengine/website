@@ -50,6 +50,11 @@ const homeRealm = shallowRef<VerifiedRealm | null>(null)
 const federating = ref(false)
 const federationError = ref<string | null>(null)
 
+function browsePublic() {
+  signInChoice.value = null
+  void router.push('/app/datasets')
+}
+
 async function loginElsewhere(home: VerifiedRealm) {
   const redirectTo = signInChoice.value?.redirectTo ?? '/app'
   homeRealm.value = home
@@ -108,6 +113,7 @@ async function loginElsewhere(home: VerifiedRealm) {
       <p class="text-xs leading-relaxed text-muted-foreground">
         New login with the email of an existing account? You sign in once with that account to link both.
       </p>
+      <Button variant="ghost" size="sm" @click="browsePublic">Browse public data without login</Button>
     </DialogContent>
   </Dialog>
 </template>
