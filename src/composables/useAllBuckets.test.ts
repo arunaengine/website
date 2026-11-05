@@ -13,9 +13,11 @@ vi.mock('@/composables/useAruna', async () => {
     useAruna: () => ({
       apiBaseUrl: state.apiBaseUrl,
       currentUser: identity.currentUser,
-      // The public database listing is its own request; these tests cover the group's pages.
-      searchBuckets: (q: string, options: { database?: boolean }) =>
-        options.database ? Promise.resolve({ hits: [], nodes_queried: 1, nodes_failed: 0, failed_nodes: [] }) : searchBuckets(q, options),
+      // The public bucket listings are their own requests; these tests cover the group's pages.
+      searchBuckets: (q: string, options: { groupId?: string; database?: boolean }) =>
+        options.database || !options.groupId
+          ? Promise.resolve({ hits: [], nodes_queried: 1, nodes_failed: 0, failed_nodes: [] })
+          : searchBuckets(q, options),
       sessionEpoch: state.sessionEpoch,
     }),
   }

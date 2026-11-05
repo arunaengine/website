@@ -151,8 +151,8 @@ describe('bucket list node choice', () => {
     void manager.onRefresh()
     await flush()
 
-    // The group's page and the public database listing.
-    expect(searchBuckets.mock.calls.length).toBe(before + 2)
+    // The group's page and the two public bucket listings.
+    expect(searchBuckets.mock.calls.length).toBe(before + 3)
   })
 
   it('refreshes an open bucket with one check and one list', async () => {

@@ -1,7 +1,7 @@
 // The buckets of every node, from the federated bucket search: one request per
 // page, so a realm of many nodes opens no S3 session per node.
 import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
-import { nodeInfo } from '@/composables/aruna/state'
+import { nodeInfo, userInfo } from '@/composables/aruna/state'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { ApiError, type BucketSearchHit } from '@/lib/api'
@@ -25,7 +25,7 @@ export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled:
   const { apiBaseUrl, currentUser, searchBuckets, sessionEpoch } = useAruna()
   const { isTarget } = useRealmNodes()
   const found = ref<BucketSearchHit[]>([])
-  // Public databases of other groups, readable with this group's session, follow its own buckets.
+  // Public buckets of other groups, readable with this group's session, follow its own buckets.
   const shared = ref<BucketSearchHit[]>([])
   // A distributed bucket is one row however many of its nodes answered. A device's buckets are
   // its owner's, not a place in the realm; the check follows the realm's node list as it changes.
@@ -109,13 +109,22 @@ export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled:
     }
   }
 
-  // A failed read leaves only the group's own buckets; it never blocks them.
+  // A failed read leaves only the group's own buckets; it never blocks them. A readable bucket of a
+  // group the caller is not in is readable through its public rules; the database list marks the rest.
   async function loadShared(term: string, id: number) {
     try {
-      const response = await searchBuckets(term, { database: true, limit: 50 })
+      const [readable, databases] = await Promise.all([
+        searchBuckets(term, { limit: 100 }),
+        searchBuckets(term, { database: true, limit: 50 }),
+      ])
       if (id !== seq) return
-      shared.value = response.hits.filter(
-        (hit) => hit.public && hit.group_id !== groupId.value && !isHiddenBucket(hit.bucket),
+      const member = new Set((userInfo.value?.groups ?? []).map((group) => group.group_id))
+      const marked = new Set(databases.hits.filter((hit) => hit.public).map((hit) => `${hit.node_id}/${hit.bucket}`))
+      shared.value = readable.hits.filter(
+        (hit) =>
+          hit.group_id !== groupId.value &&
+          !isHiddenBucket(hit.bucket) &&
+          (!member.has(hit.group_id) || marked.has(`${hit.node_id}/${hit.bucket}`)),
       )
     } catch {
       if (id === seq) shared.value = []
