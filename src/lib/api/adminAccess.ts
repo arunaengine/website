@@ -76,6 +76,12 @@ export function revokeUserTokens(userId: string, client: ApiClientOptions = {}):
   return apiRequest<void>(`/access/users/${encodeURIComponent(userId)}/tokens`, { method: 'DELETE' }, client)
 }
 
+/** Grants (PUT) or removes (DELETE) the realm admin role; answers every realm admin id, sorted. */
+export function setRealmAdmin(userId: string, admin: boolean, client: ApiClientOptions = {}): Promise<string[]> {
+  const path = `/system/realm/admins/${encodeURIComponent(userId)}`
+  return apiRequest<string[]>(path, { method: admin ? 'PUT' : 'DELETE' }, client)
+}
+
 // PUT /access/users/{id}/status: a ban ends every token at once and blocks sign-in until undone.
 export const DEACTIVATED_ATTRIBUTE = 'aruna-engine.org/deactivated'
 

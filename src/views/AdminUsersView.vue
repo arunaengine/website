@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
+import AccessBadge from '@/components/ui/AccessBadge.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
@@ -23,11 +24,12 @@ import { useAuth } from '@/composables/useAuth'
 import { useRefresh } from '@/composables/useRefresh'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { errorMessage, truncateMiddle } from '@/lib/utils'
-import { DEACTIVATED_ATTRIBUTE, revokeUserTokens, setAccountActive, type ApiUser } from '@/lib/api'
+import { DEACTIVATED_ATTRIBUTE, revokeUserTokens, setAccountActive, setRealmAdmin, type ApiUser } from '@/lib/api'
 import { useDebounceFn } from '@vueuse/core'
-import { Ban, ChevronLeft, ChevronRight, KeyRound, Search, UserCheck, ShieldCheck, UserRound, Users, UserSearch } from '@lucide/vue'
+import { Ban, ChevronLeft, ChevronRight, KeyRound, Search, UserCheck, ShieldCheck, UserRound, Users, UserSearch, X } from '@lucide/vue'
 
-const { bootstrapped, currentUser, canInspectUsers, apiGroups, listUsers, getUser, searchUsers } = useAruna()
+const { bootstrapped, currentUser, canInspectUsers, isRealmAdmin, apiGroups, listUsers, getUser, searchUsers, loadAuthenticated } =
+  useAruna()
 const { isAuthenticated } = useAuth()
 // Shared realm user cache; search hydration reuses it instead of a second one.
 const { resolveUser } = useUserDirectory()
@@ -80,6 +82,34 @@ async function setBanned(user: ApiUser, banned: boolean) {
     if (epoch === sessionEpoch.value) banError.value = errorMessage(err)
   } finally {
     banBusy.value = false
+  }
+}
+
+// No route reads the realm admins; until a change answers the full list, only the caller is known.
+const knownAdmins = ref<string[] | null>(null)
+const adminBusy = ref<string | null>(null)
+const adminError = ref<string | null>(null)
+watch(sessionEpoch, () => (knownAdmins.value = null))
+
+function realmAdmin(userId: string): boolean | null {
+  if (knownAdmins.value) return knownAdmins.value.includes(userId)
+  return userId === currentUser.value?.id ? true : null
+}
+
+async function setAdmin(userId: string, admin: boolean) {
+  if (adminBusy.value) return
+  const { epoch, client } = refreshContext()
+  adminBusy.value = userId
+  adminError.value = null
+  try {
+    const admins = await setRealmAdmin(userId, admin, client)
+    if (epoch !== sessionEpoch.value) return
+    knownAdmins.value = admins
+    if (!admin && userId === currentUser.value?.id) await loadAuthenticated().catch(() => undefined)
+  } catch (err) {
+    if (epoch === sessionEpoch.value) adminError.value = errorMessage(err)
+  } finally {
+    adminBusy.value = null
   }
 }
 
@@ -294,7 +324,7 @@ const sharedGroups = computed(() => {
 
     <div v-else class="w-full px-4 py-6 sm:px-6">
       <section aria-labelledby="realm-users-heading">
-        <SectionHeading id="realm-users-heading" title="Users" :icon="Users" info="Every user registered in this realm, read only.">
+        <SectionHeading id="realm-users-heading" title="Users" :icon="Users" info="Every user registered in this realm.">
           <template #actions>
             <label for="user-directory-search" class="sr-only">Search users by name or email</label>
             <Input
@@ -338,6 +368,7 @@ const sharedGroups = computed(() => {
             <thead>
               <tr>
                 <th scope="col" class="px-5 py-2.5 font-medium">Name</th>
+                <th v-if="isRealmAdmin" scope="col" class="px-5 py-2.5 font-medium">Realm role</th>
                 <th scope="col" class="px-5 py-2.5 font-medium">Subjects</th>
                 <th scope="col" class="px-5 py-2.5 font-medium">Attributes</th>
                 <th scope="col" class="px-5 py-2.5 text-right font-medium"><span class="sr-only">Actions</span></th>
@@ -352,6 +383,24 @@ const sharedGroups = computed(() => {
                 <td class="px-5 py-3">
                   <RouterLink :to="{ name: 'user', params: { id: row.user.user_id } }" class="font-medium text-foreground hover:underline">{{ row.user.name || 'Unnamed user' }}</RouterLink>
                   <div class="font-mono text-xs text-muted-foreground">{{ truncateMiddle(row.user.user_id, 10, 6) }}</div>
+                </td>
+                <td v-if="isRealmAdmin" class="px-5 py-3">
+                  <span v-if="realmAdmin(row.user.user_id)" class="inline-flex items-center gap-0.5">
+                    <AccessBadge access="realm-admin" label="Realm admin" />
+                    <button
+                      type="button"
+                      class="rounded-sm p-0.5 text-muted-foreground opacity-60 transition-opacity hover:opacity-100"
+                      title="Remove realm admin"
+                      aria-label="Remove realm admin"
+                      :disabled="adminBusy !== null"
+                      :aria-busy="adminBusy === row.user.user_id"
+                      @click="setAdmin(row.user.user_id, false)"
+                    >
+                      <Spinner v-if="adminBusy === row.user.user_id" label="Removing realm admin" />
+                      <X v-else class="h-3 w-3" />
+                    </button>
+                  </span>
+                  <span v-else class="text-muted-foreground">{{ realmAdmin(row.user.user_id) === false ? 'none' : '-' }}</span>
                 </td>
                 <td class="px-5 py-3 tabular-nums text-muted-foreground">
                   {{ row.hydrated ? row.user.subject_ids.length : '-' }}
@@ -368,7 +417,18 @@ const sharedGroups = computed(() => {
                     </span>
                   </span>
                 </td>
-                <td class="px-5 py-3 text-right">
+                <td class="space-x-1 whitespace-nowrap px-5 py-3 text-right">
+                  <Button
+                    v-if="isRealmAdmin && !realmAdmin(row.user.user_id)"
+                    variant="outline"
+                    size="sm"
+                    :disabled="adminBusy !== null"
+                    :aria-busy="adminBusy === row.user.user_id"
+                    @click="setAdmin(row.user.user_id, true)"
+                  >
+                    <Spinner v-if="adminBusy === row.user.user_id" label="Granting admin" class="text-current" />
+                    <ShieldCheck v-else class="h-3.5 w-3.5" /> Make admin
+                  </Button>
                   <Button variant="outline" size="sm" :aria-label="`Inspect ${row.user.name || row.user.user_id}`" @click="inspect(row)">
                     <Search class="h-3.5 w-3.5" /> Inspect
                   </Button>
@@ -377,6 +437,8 @@ const sharedGroups = computed(() => {
             </tbody>
           </table>
         </div>
+
+        <div v-if="adminError" class="border-t border-border px-5 py-2 text-xs text-destructive">{{ adminError }}</div>
 
         <footer
           v-if="!activeError && !searching && (pageIndex > 0 || nextCursor)"
