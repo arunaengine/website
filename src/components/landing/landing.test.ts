@@ -15,8 +15,8 @@ const ALLOWED = new Set([
   '/terms',
   'https://github.com/arunaengine/aruna',
   'https://github.com/arunaengine/aruna/issues',
-  'https://github.com/arunaengine/aruna#2-run-a-small-cluster-on-your-computer',
-  'https://github.com/arunaengine/aruna#3-run-a-single-node',
+  'https://github.com/arunaengine/aruna#small-local-realm',
+  'https://github.com/arunaengine/aruna#run-with-docker-single-node',
   'https://v3.aruna-engine.org',
   'https://v3.aruna-engine.org/app',
 ])

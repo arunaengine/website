@@ -17,12 +17,12 @@ import { GitBranch, Globe, Network, Terminal } from '@lucide/vue'
       <div>
         <span class="bi"><Network /></span><b>Build your own realm</b>
         <p>Run Aruna on your own nodes, with your own storage and sign-in. Connect to other realms whenever you want to share.</p>
-        <a class="primary" href="https://github.com/arunaengine/aruna#3-run-a-single-node">Run your own</a>
+        <a class="primary" href="https://github.com/arunaengine/aruna#run-with-docker-single-node">Run your own</a>
       </div>
     </div>
     <div class="wrap tail25">
       <a class="tl" href="https://github.com/arunaengine/aruna"><GitBranch />View the source on GitHub</a>
-      <a class="tl" href="https://github.com/arunaengine/aruna#2-run-a-small-cluster-on-your-computer"><Terminal />Try it on your own computer</a>
+      <a class="tl" href="https://github.com/arunaengine/aruna#small-local-realm"><Terminal />Try it on your own computer</a>
     </div>
   </section>
 </template>
