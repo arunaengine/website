@@ -136,11 +136,11 @@ async function copyId() {
 
 <template>
   <Dialog :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
-    <DialogContent class="max-h-[calc(100vh-2rem)] max-w-xl overflow-hidden">
+    <DialogContent class="max-w-xl">
       <DialogHeader>
         <DialogTitle class="flex min-w-0 items-center gap-2 pr-10">
           <Info class="h-4 w-4 shrink-0 text-primary" />
-          <span class="min-w-0 truncate">{{ entity?.name ?? 'Entity' }}</span>
+          <span class="min-w-0">{{ entity?.name ?? 'Entity' }}</span>
           <RouterLink
             v-if="entity"
             :to="{ name: 'datasets', query: { q: entity.name } }"
@@ -161,7 +161,7 @@ async function copyId() {
             class="chip shrink-0 text-primary hover:border-primary/40"
             @click="back"
           ><ArrowLeft class="h-3 w-3" /> Back</button>
-          <span class="min-w-0 truncate font-mono text-xs text-muted-foreground" :title="currentId">{{ currentId }}</span>
+          <span class="min-w-0 break-all font-mono text-xs text-muted-foreground">{{ currentId }}</span>
           <Button variant="ghost" size="icon-sm" class="shrink-0 text-muted-foreground" :aria-label="copied ? 'Copied' : 'Copy id'" @click="copyId">
             <Check v-if="copied" class="size-3.5 text-primary" />
             <Copy v-else class="size-3.5" />
@@ -204,7 +204,7 @@ async function copyId() {
               >
                 <Folder v-if="child.directory" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <FileIcon v-else class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <span class="truncate">{{ child.name }}</span>
+                <span class="min-w-0">{{ child.name }}</span>
               </button>
             </li>
           </ul>
@@ -222,9 +222,9 @@ async function copyId() {
               </thead>
               <tbody>
                 <tr v-for="ref in shown" :key="ref.key" class="border-b border-border-subtle last:border-0">
-                  <td class="max-w-0 py-1.5 pr-3">
-                    <RouterLink v-if="ref.dataset" :to="{ name: 'dataset', params: { id: ref.dataset } }" class="block truncate underline decoration-border underline-offset-4 hover:decoration-foreground" @click="emit('update:open', false)">{{ ref.name }}</RouterLink>
-                    <button v-else type="button" class="max-w-full truncate text-left underline decoration-border underline-offset-4 hover:decoration-foreground" :title="ref.id" @click="drill(ref.id)">{{ ref.name }}</button>
+                  <td class="py-1.5 pr-3">
+                    <RouterLink v-if="ref.dataset" :to="{ name: 'dataset', params: { id: ref.dataset } }" class="underline decoration-border underline-offset-4 hover:decoration-foreground" @click="emit('update:open', false)">{{ ref.name }}</RouterLink>
+                    <button v-else type="button" class="text-left underline decoration-border underline-offset-4 hover:decoration-foreground" :title="ref.id" @click="drill(ref.id)">{{ ref.name }}</button>
                   </td>
                   <td class="py-1.5 text-muted-foreground">{{ ref.property }}</td>
                 </tr>
