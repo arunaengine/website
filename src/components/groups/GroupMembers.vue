@@ -184,6 +184,27 @@ async function addMember() {
   }
 }
 
+// An existing member gains the admin role through the same add call, which keeps their other roles.
+const adminRoleId = computed(() => props.roles.find((role) => role.name === 'admin')?.role_id)
+const granting = ref<string | null>(null)
+
+async function makeAdmin(member: GroupMember) {
+  const roleId = adminRoleId.value
+  if (!roleId || granting.value) return
+  const groupId = props.groupId
+  const epoch = sessionEpoch.value
+  memberError.value = null
+  granting.value = member.user_id
+  try {
+    await addGroupMember(groupId, { user_id: member.user_id, role_ids: [roleId] })
+    if (groupId === props.groupId && epoch === sessionEpoch.value) emit('changed')
+  } catch (err) {
+    if (groupId === props.groupId && epoch === sessionEpoch.value) memberError.value = errorMessage(err)
+  } finally {
+    granting.value = null
+  }
+}
+
 async function removeMember(member: GroupMember, roleId?: string) {
   if (removing.value) return
   memberError.value = null
@@ -281,6 +302,17 @@ async function removeMember(member: GroupMember, roleId?: string) {
             </div>
           </td>
           <td v-if="canManage" class="space-x-1 whitespace-nowrap px-5 py-2.5 text-right">
+            <Button
+              v-if="adminRoleId && !isAdmin(member)"
+              variant="outline"
+              size="sm"
+              :disabled="saving || granting !== null"
+              :aria-busy="granting === member.user_id"
+              @click="makeAdmin(member)"
+            >
+              <Spinner v-if="granting === member.user_id" label="Granting admin" class="text-current" />
+              <ShieldCheck v-else class="h-3.5 w-3.5" /> Make admin
+            </Button>
             <Button variant="outline" size="sm" :disabled="revokeBusy" @click="askRevoke(member)">
               <KeyRound class="h-3.5 w-3.5" /> Revoke access
             </Button>
