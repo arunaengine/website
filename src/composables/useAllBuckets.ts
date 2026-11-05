@@ -25,9 +25,13 @@ export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled:
   const { apiBaseUrl, currentUser, searchBuckets, sessionEpoch } = useAruna()
   const { isTarget } = useRealmNodes()
   const found = ref<BucketSearchHit[]>([])
+  // Public databases of other groups, readable with this group's session, follow its own buckets.
+  const shared = ref<BucketSearchHit[]>([])
   // A distributed bucket is one row however many of its nodes answered. A device's buckets are
   // its owner's, not a place in the realm; the check follows the realm's node list as it changes.
-  const hits = computed(() => mergeSets(found.value.filter((hit) => isTarget(hit.node_id)), (id) => id === nodeInfo.value?.node.peer_id))
+  const hits = computed(() =>
+    mergeSets([...found.value, ...shared.value].filter((hit) => isTarget(hit.node_id)), (id) => id === nodeInfo.value?.node.peer_id),
+  )
   const failedNodes = ref(0)
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -48,6 +52,7 @@ export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled:
   function reset() {
     ++seq
     found.value = []
+    shared.value = []
     cursor = null
     more.value = false
     failedNodes.value = 0
@@ -73,6 +78,7 @@ export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled:
     const after = next ? cursor : null
     loading.value = true
     error.value = null
+    if (!after) void loadShared(term, id)
     try {
       const response = await searchBuckets(term, {
         limit: BUCKET_PAGE,
@@ -100,6 +106,19 @@ export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled:
         loading.value = false
         inFlight = null
       }
+    }
+  }
+
+  // A failed read leaves only the group's own buckets; it never blocks them.
+  async function loadShared(term: string, id: number) {
+    try {
+      const response = await searchBuckets(term, { database: true, limit: 50 })
+      if (id !== seq) return
+      shared.value = response.hits.filter(
+        (hit) => hit.public && hit.group_id !== groupId.value && !isHiddenBucket(hit.bucket),
+      )
+    } catch {
+      if (id === seq) shared.value = []
     }
   }
 

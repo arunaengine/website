@@ -556,7 +556,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
       <p class="sr-only" aria-live="polite">{{ orderNote }}</p>
       <Spinner v-if="checkingUsage" show-label label="Checking which buckets read in place…" class="px-3.5 pt-2" />
       <ul v-if="databaseMode" :id="`${listId}-group`" role="listbox" :class="listClass">
-        <DatabaseRows ref="databaseRows" :filter="bucketNameFilter" :active="bucket" :highlighted="activeIndex" @open="openBucketOn" />
+        <DatabaseRows ref="databaseRows" :filter="bucketNameFilter" :active="bucket" :highlighted="activeIndex" @open="(name, nodeId) => openBucketOn(name, nodeId)" />
       </ul>
       <template v-else-if="searchList">
         <Spinner v-if="all.loading.value && !all.hits.value.length" show-label label="Loading buckets…" class="px-3 py-4" />

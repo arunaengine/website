@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, type BucketSearchHit, type BucketSearchResponse } from '@/lib/api'
 
 const searchBuckets = vi.fn<
-  (q: string, options: { limit?: number; groupId?: string; cursor?: string }) => Promise<BucketSearchResponse>
+  (q: string, options: { limit?: number; groupId?: string; cursor?: string; database?: boolean }) => Promise<BucketSearchResponse>
 >()
 // The real session state and token setter; only the search request is a stand-in.
 vi.mock('@/composables/useAruna', async () => {
@@ -13,7 +13,9 @@ vi.mock('@/composables/useAruna', async () => {
     useAruna: () => ({
       apiBaseUrl: state.apiBaseUrl,
       currentUser: identity.currentUser,
-      searchBuckets,
+      // The public database listing is its own request; these tests cover the group's pages.
+      searchBuckets: (q: string, options: { database?: boolean }) =>
+        options.database ? Promise.resolve({ hits: [], nodes_queried: 1, nodes_failed: 0, failed_nodes: [] }) : searchBuckets(q, options),
       sessionEpoch: state.sessionEpoch,
     }),
   }
