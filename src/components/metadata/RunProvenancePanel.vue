@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import DetailList, { type Detail } from '@/components/ui/DetailList.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import IconTile from '@/components/ui/IconTile.vue'
+import ListPager from '@/components/ui/ListPager.vue'
 import Notice from '@/components/ui/Notice.vue'
 import SectionHeading from '@/components/ui/SectionHeading.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import { useAruna } from '@/composables/useAruna'
+import { usePagedList } from '@/composables/usePagedList'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useUserDirectory } from '@/composables/useUserDirectory'
@@ -18,10 +20,10 @@ import { featureEnabled } from '@/lib/config'
 import { drsDownloadHref, drsObjectHref, isDrsReference } from '@/lib/tes'
 import { parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { isArunaUserId } from '@/lib/identifiers'
-import { groupFiles, type FileGroup } from '@/lib/fileGroups'
+import { groupFiles, sharedFolder, type FileGroup } from '@/lib/fileGroups'
 import { sourceHost, type RunCrateFileRef, type RunCrateModel } from '@/lib/runCrate'
 import { formatBytes, formatDateTime, formatResourceGb, isHttpUrl, shortUserId, truncateMiddle } from '@/lib/utils'
-import { ChevronDown, ChevronRight, Database, Download, ExternalLink as ExternalLinkIcon, File as FileIcon, Files, Folder, LogIn, Terminal } from '@lucide/vue'
+import { ChevronRight, Download, ExternalLink as ExternalLinkIcon, Files, Folder, LogIn, Terminal } from '@lucide/vue'
 
 // `documentId`: the record's id, named with its API address; `published`: when the record was made.
 const props = defineProps<{ run: RunCrateModel; documentId?: string; published?: string }>()
@@ -140,65 +142,60 @@ function toRow(ref: RunCrateFileRef): FileRow {
   return { ...ref, link: resolveRef(ref), size }
 }
 
-const outputRows = computed(() => props.run.outputs.map(toRow))
 const folderRoute = (link: { bucketId: string; prefix: string; nodeId?: string }, run?: string) => ({
   name: 'bucket',
   params: { bucketId: link.bucketId },
   query: { ...(link.prefix ? { prefix: link.prefix } : {}), ...(link.nodeId ? { node: link.nodeId } : {}), ...(run ? { run } : {}) },
 })
-// A stored result opens its folder; a content address opens through DRS in a new tab.
-function rowLink(link: ResolvedLink) {
-  if (link.kind === 's3') return { to: folderRoute(link) }
-  if (link.kind === 'drs') return { href: link.object, target: '_blank', rel: 'noopener noreferrer' }
-  return {}
-}
-// "2 inputs, 3.8 GB"; a size only when every input names one.
+// The summed size, such as "3.8 GiB"; a size only when every file names one.
 function bytesOf(files: RunCrateFileRef[]): string {
-  const sizes = files.map((file) => Number(file.contentSize))
+  const sizes = files.map((file) => (file.contentSize?.trim() ? Number(file.contentSize) : NaN))
   return files.length && sizes.every((size) => Number.isFinite(size) && size >= 0) ? formatBytes(sizes.reduce((a, b) => a + b, 0)) : ''
 }
 // A database or a folder of files counts as one input.
 const inputSummary = computed(() => {
   const count = groupFiles(props.run.inputs, s3.endpoint.value).length
-  return count ? [`${count} ${count === 1 ? 'input' : 'inputs'}`, bytesOf(props.run.inputs)].filter(Boolean).join(', ') : ''
+  return count ? `${count} ${count === 1 ? 'input' : 'inputs'}` : ''
 })
-const outputBytes = computed(() => bytesOf(props.run.outputs))
-// The kinds of the results by their extensions, such as "GBFF, FAA, JSON".
-const outputKinds = computed(() => {
-  const kinds = props.run.outputs.map((file) => /\.([a-z0-9]+)(?:\.gz)?$/i.exec(file.name)?.[1]?.toUpperCase()).filter((kind): kind is string => Boolean(kind))
+// The kinds of the files by their extensions, such as "GBFF, FAA, JSON".
+function kindsOf(files: RunCrateFileRef[]): string {
+  const kinds = files.map((file) => /\.([a-z0-9]+)(?:\.gz)?$/i.exec(file.name)?.[1]?.toUpperCase()).filter((kind): kind is string => Boolean(kind))
   return [...new Set(kinds)].slice(0, 8).join(', ')
-})
+}
 
-// One folder all results went to, for the "Saved to" line; null when they are spread out.
-const savedTo = computed(() => {
-  const links = outputRows.value.map((row) => row.link)
-  const first = links[0]
-  if (!first || first.kind !== 's3') return null
-  return links.every((link) => link.kind === 's3' && link.bucketId === first.bucketId && link.prefix === first.prefix) ? first : null
-})
+// The folder all files of a card lie in, for its summary; null when they are spread out.
+function placeOf(files: RunCrateFileRef[]) {
+  const found = files.map((file) => parseDataIdentity(file, s3.endpoint.value))
+  const first = found[0]
+  if (!first?.s3) return null
+  const node = first.arn?.nodeId ?? ''
+  if (found.some((one) => one.s3?.bucket !== first.s3?.bucket || (one.arn?.nodeId ?? '') !== node)) return null
+  const link = s3Link(first.s3.bucket, sharedFolder(found.map((one) => one.s3?.key ?? '')), node || undefined)
+  return link.kind === 's3' ? link : null
+}
 
 // The device's name by the shared rule (its realm display name first), if the realm lists one.
 function deviceName(nodeId: string): string {
   return realmNodes.value.find((node) => node.nodeId === nodeId)?.given ?? ''
 }
 
-function inputNote(row: FileRow): string {
+function fileNote(row: FileRow, inPlace: boolean): string {
   if (row.device) return `from ${deviceName(row.device) || 'a device'}`
   const group = groupFiles([row], s3.endpoint.value)[0]
   if (group?.database || group?.release) return partNote(group, false)
   const legacy = [row.version ? `release ${row.version}` : '', row.identifier ? `DOI ${row.identifier}` : ''].filter(Boolean).join(', ')
   if (legacy) return legacy
-  return group?.bucket ? [group.bucket, group.nodeId ? `on ${displayName(group.nodeId)}` : ''].filter(Boolean).join(' ') : ''
+  return group?.bucket && !inPlace ? [group.bucket, group.nodeId ? `on ${displayName(group.nodeId)}` : ''].filter(Boolean).join(' ') : ''
 }
 
-// One row per database or crowded folder, opened to its files on request.
-const opened = ref(new Set<string>())
-// The results list shows five rows until all are asked for, wherever they were saved.
-const allResults = ref(false)
-function toggle(key: string) {
-  const next = new Set(opened.value)
+type CardKey = 'inputs' | 'results'
+// One row per database or crowded folder, open until closed. Each card keeps its own state,
+// as inputs and results in one bucket share a group key.
+const collapsed = ref<Record<CardKey, Set<string>>>({ inputs: new Set(), results: new Set() })
+function toggle(card: CardKey, key: string) {
+  const next = new Set(collapsed.value[card])
   if (!next.delete(key)) next.add(key)
-  opened.value = next
+  collapsed.value = { ...collapsed.value, [card]: next }
 }
 
 type ListRow = { kind: 'file'; key: string; row: FileRow; label: string; nested: boolean } | { kind: 'group'; key: string; group: FileGroup }
@@ -212,24 +209,26 @@ function fileLabel(file: RunCrateFileRef, group?: FileGroup): string {
   return stored || (file.name.split('/').filter(Boolean).pop() ?? file.name)
 }
 
-function listRows(files: RunCrateFileRef[]): ListRow[] {
-  return groupFiles(files, s3.endpoint.value).flatMap((group): ListRow[] => {
+// One folder of files is listed flat, as the summary already names the folder.
+function listRows(files: RunCrateFileRef[], card: CardKey): ListRow[] {
+  const groups = groupFiles(files, s3.endpoint.value)
+  const flat = groups.length === 1 && !groups[0]!.database && !groups[0]!.release
+  return groups.flatMap((group): ListRow[] => {
     const only = group.files.length === 1 ? group.files[0] : undefined
     if (only) return [{ kind: 'file', key: group.key, row: toRow(only), label: fileLabel(only), nested: false }]
-    const files = opened.value.has(group.key)
-      ? group.files.map((file) => ({ kind: 'file' as const, key: `${group.key}:${file.id}`, row: toRow(file), label: fileLabel(file, group), nested: true }))
+    const files = flat || !collapsed.value[card].has(group.key)
+      ? group.files.map((file) => ({ kind: 'file' as const, key: `${group.key}:${file.id}`, row: toRow(file), label: fileLabel(file, group), nested: !flat }))
       : []
-    return [{ kind: 'group', key: group.key, group }, ...files]
+    return flat ? files : [{ kind: 'group', key: group.key, group }, ...files]
   })
 }
-const inputList = computed(() => listRows(props.run.inputs))
-const outputList = computed(() => listRows(props.run.outputs))
-// Results in one folder are that folder's files; the summary above already names the folder.
-const resultRows = computed<ListRow[]>(() => {
-  const only = outputList.value.length === 1 ? outputList.value[0] : undefined
-  if (only?.kind !== 'group') return outputList.value
-  return only.group.files.map((file) => ({ kind: 'file', key: `${only.key}:${file.id}`, row: toRow(file), label: fileLabel(file, only.group), nested: false }))
-})
+const inputPager = reactive(usePagedList(computed(() => listRows(props.run.inputs, 'inputs'))))
+const resultPager = reactive(usePagedList(computed(() => listRows(props.run.outputs, 'results'))))
+// Inputs and results share one card layout: a summary row, then the paged file list.
+const cards = computed(() => [
+  { key: 'inputs' as const, title: 'Inputs', icon: LogIn, tone: 'muted' as const, files: props.run.inputs, empty: 'No declared inputs.', pager: inputPager, runId: undefined },
+  { key: 'results' as const, title: 'Results', icon: Files, tone: 'aqua' as const, files: props.run.outputs, empty: 'No results were captured.', pager: resultPager, runId: props.run.runId },
+].map((card) => ({ ...card, bytes: bytesOf(card.files), kinds: kindsOf(card.files), place: placeOf(card.files) })))
 
 function groupTitle(group: FileGroup): string {
   const name = group.database?.name ?? group.release?.name
@@ -256,108 +255,72 @@ function groupLinks(group: FileGroup): { href: string; label: string }[] {
   })
 }
 
+// A size only when every file of the group names one.
 function groupSize(group: FileGroup): string {
-  return `${group.bytes.complete ? '' : 'at least '}${formatBytes(group.bytes.total)}`
+  return group.bytes.complete ? formatBytes(group.bytes.total) : ''
 }
 </script>
 
 <template>
   <div class="space-y-6" aria-label="Run record">
     <Notice v-if="run.error" tone="error">{{ run.error }}</Notice>
-    <div class="grid gap-6 lg:grid-cols-2">
-      <section class="flex min-w-0 flex-col" aria-labelledby="run-inputs-heading">
-        <SectionHeading id="run-inputs-heading" title="Inputs" :icon="LogIn">
-          <template #actions>
-            <span v-if="inputSummary" class="text-xs tabular-nums text-muted-foreground">{{ inputSummary }}</span>
+    <div class="grid gap-6 lg:grid-cols-2 lg:items-start">
+      <section v-for="card in cards" :key="card.key" class="flex min-w-0 flex-col" :aria-labelledby="`run-${card.key}-heading`">
+        <SectionHeading :id="`run-${card.key}-heading`" :title="card.title" :icon="card.icon">
+          <template v-if="card.key === 'inputs' && inputSummary" #actions>
+            <span class="text-xs tabular-nums text-muted-foreground">{{ inputSummary }}</span>
           </template>
         </SectionHeading>
-        <div class="surface flex-1 overflow-hidden">
-          <p v-if="!inputList.length" class="px-5 py-4 text-sm text-muted-foreground">No declared inputs.</p>
-          <ul v-else class="divide-y divide-border-subtle">
-            <li v-for="entry in inputList" :key="entry.key">
-              <div v-if="entry.kind === 'group'" class="flex items-start gap-3 px-5 py-3">
-                <IconTile :icon="entry.group.database || entry.group.release ? Database : Folder" :tone="entry.group.database || entry.group.release ? 'royal' : 'muted'" size="sm" />
-                <span class="min-w-0 flex-1">
-                  <button type="button" class="flex items-center gap-1 text-left text-sm font-medium text-foreground hover:text-primary" :aria-expanded="opened.has(entry.key)" @click="toggle(entry.key)">
-                    <span class="break-words">{{ groupTitle(entry.group) }}</span>
-                    <ChevronRight class="h-3.5 w-3.5 shrink-0 transition-transform" :class="opened.has(entry.key) ? 'rotate-90' : ''" aria-hidden="true" />
+        <div class="surface overflow-hidden">
+          <p v-if="!card.files.length" class="px-5 py-4 text-sm text-muted-foreground">{{ card.empty }}</p>
+          <template v-else>
+            <div class="flex items-start gap-3 px-5 py-4">
+              <IconTile :icon="Folder" :tone="card.tone" size="sm" />
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-foreground">
+                  {{ card.files.length }} {{ card.files.length === 1 ? 'file' : 'files' }}
+                  <span v-if="card.bytes" class="ml-2 text-xs font-normal tabular-nums text-muted-foreground">{{ card.bytes }}</span>
+                </p>
+                <RouterLink v-if="card.place" :to="folderRoute(card.place, card.runId)" class="break-all font-mono text-xs text-primary hover:underline">{{ card.place.bucketId }}/{{ card.place.prefix ? `${card.place.prefix}/` : '' }}</RouterLink>
+                <p v-if="card.kinds" class="mt-0.5 text-xs text-muted-foreground">{{ card.kinds }}</p>
+              </div>
+            </div>
+            <ul class="divide-y divide-border-subtle border-t border-border-subtle">
+              <li v-for="entry in card.pager.shown" :key="entry.key">
+                <div v-if="entry.kind === 'group'" class="px-5 py-2">
+                  <button type="button" class="flex w-full items-center gap-2 text-left text-sm font-medium text-foreground hover:text-primary" :aria-expanded="!collapsed[card.key].has(entry.key)" @click="toggle(card.key, entry.key)">
+                    <ChevronRight class="h-3.5 w-3.5 shrink-0 transition-transform" :class="collapsed[card.key].has(entry.key) ? '' : 'rotate-90'" aria-hidden="true" />
+                    <span class="min-w-0 flex-1 break-words">{{ groupTitle(entry.group) }}</span>
+                    <span class="shrink-0 text-xs font-normal tabular-nums text-muted-foreground">{{ groupSize(entry.group) }}</span>
                   </button>
-                  <span class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                  <span v-if="groupNote(entry.group) || groupLinks(entry.group).length" class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-5.5 text-xs text-muted-foreground">
                     <span v-if="groupNote(entry.group)">{{ groupNote(entry.group) }}</span>
                     <ExternalLink v-for="link in groupLinks(entry.group)" :key="link.href" :href="link.href" :label="link.label" />
                   </span>
-                </span>
-                <span class="shrink-0 text-xs tabular-nums text-muted-foreground">{{ groupSize(entry.group) }}</span>
-              </div>
-              <component
-                :is="entry.row.link.kind === 's3' ? RouterLink : 'div'"
-                v-else
-                v-bind="entry.row.link.kind === 's3' ? { to: folderRoute(entry.row.link) } : {}"
-                class="flex items-start gap-3 px-5 py-3"
-                :class="[entry.nested ? 'pl-16' : '', entry.row.link.kind === 's3' ? 'hover:bg-muted/40' : '']"
-                :title="entry.row.id"
-              >
-                <IconTile v-if="!entry.nested" :icon="FileIcon" tone="muted" size="sm" />
-                <span class="min-w-0 flex-1">
-                  <span class="flex min-w-0 items-center gap-2 text-sm font-medium text-foreground">
-                    <ObjectIcon v-if="entry.nested" :name="entry.label" class="h-4 w-4" />
-                    <span class="truncate">{{ entry.label }}</span>
-                  </span>
-                  <span v-if="!entry.nested && inputNote(entry.row)" class="mt-0.5 block text-xs text-muted-foreground">{{ inputNote(entry.row) }}</span>
-                  <span v-if="entry.row.servedBy" class="mt-0.5 block text-xs text-muted-foreground" :title="entry.row.servedBy">Read from {{ sourceHost(entry.row.servedBy) }}</span>
-                  <span v-if="entry.row.link.kind === 'drs'" class="mt-0.5 flex items-center gap-2 text-xs">
-                    <a class="inline-flex items-center gap-1 text-primary hover:underline" :href="entry.row.link.object" target="_blank" rel="noopener noreferrer">Open the object <ExternalLinkIcon class="h-3 w-3" /></a>
-                    <a class="inline-flex items-center gap-1 text-primary hover:underline" :href="entry.row.link.download" target="_blank" rel="noopener noreferrer" :aria-label="`Download ${entry.row.name}`"><Download class="h-3 w-3" /> Download</a>
-                  </span>
-                </span>
-                <span class="shrink-0 text-xs tabular-nums text-muted-foreground">{{ entry.row.size }}</span>
-              </component>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <section class="flex min-w-0 flex-col" aria-labelledby="run-results-heading">
-        <SectionHeading id="run-results-heading" title="Results" :icon="Files" />
-        <div class="surface flex flex-1 flex-col">
-          <p v-if="!run.outputs.length" class="px-5 py-4 text-sm text-muted-foreground">No results were captured.</p>
-          <template v-else>
-            <div class="flex items-start gap-3 px-5 py-4">
-              <IconTile :icon="Folder" tone="aqua" size="sm" />
-              <div class="min-w-0 flex-1">
-                <p class="text-sm font-medium text-foreground">
-                  {{ run.outputs.length }} {{ run.outputs.length === 1 ? 'file' : 'files' }}
-                  <span v-if="outputBytes" class="ml-2 text-xs font-normal tabular-nums text-muted-foreground">{{ outputBytes }}</span>
-                </p>
-                <RouterLink v-if="savedTo" :to="folderRoute(savedTo, run.runId)" class="break-all font-mono text-xs text-primary hover:underline">{{ savedTo.bucketId }}/{{ savedTo.prefix ? `${savedTo.prefix}/` : '' }}</RouterLink>
-                <p v-if="outputKinds" class="mt-0.5 text-xs text-muted-foreground">{{ outputKinds }}</p>
-              </div>
-            </div>
-            <!-- Results in one folder are summed up above; spread ones list their folders. -->
-            <ul v-if="!savedTo" class="divide-y divide-border-subtle border-t border-border-subtle">
-              <li v-for="entry in allResults ? resultRows : resultRows.slice(0, 5)" :key="entry.key">
-                <button v-if="entry.kind === 'group'" type="button" class="flex w-full items-center gap-2 px-5 py-2 text-left text-sm text-foreground hover:bg-muted/40" :aria-expanded="opened.has(entry.key)" @click="toggle(entry.key)">
-                  <ChevronRight class="h-3.5 w-3.5 shrink-0 transition-transform" :class="opened.has(entry.key) ? 'rotate-90' : ''" aria-hidden="true" />
-                  <span class="min-w-0 flex-1 truncate">{{ groupTitle(entry.group) }}</span>
-                  <span class="shrink-0 text-xs tabular-nums text-muted-foreground">{{ groupSize(entry.group) }}</span>
-                </button>
+                </div>
                 <component
-                  :is="entry.row.link.kind === 's3' ? RouterLink : entry.row.link.kind === 'drs' ? 'a' : 'div'"
+                  :is="entry.row.link.kind === 's3' ? RouterLink : 'div'"
                   v-else
-                  v-bind="rowLink(entry.row.link)"
-                  class="flex items-center gap-2 px-5 py-2 text-sm"
-                  :class="[entry.nested ? 'pl-10' : '', entry.row.link.kind !== 'plain' ? 'hover:bg-muted/40' : '']"
+                  v-bind="entry.row.link.kind === 's3' ? { to: folderRoute(entry.row.link) } : {}"
+                  class="flex items-start gap-2 px-5 py-2 text-sm"
+                  :class="[entry.nested ? 'pl-10' : '', entry.row.link.kind === 's3' ? 'hover:bg-muted/40' : '']"
                   :title="entry.row.id"
                 >
-                  <ObjectIcon :name="entry.label" class="h-4 w-4" />
-                  <span class="min-w-0 flex-1 truncate text-foreground">{{ entry.label }}</span>
+                  <ObjectIcon :name="entry.label" class="mt-0.5 h-4 w-4" />
+                  <span class="min-w-0 flex-1">
+                    <span class="block break-words text-foreground">{{ entry.label }}</span>
+                    <span v-if="!entry.nested && fileNote(entry.row, Boolean(card.place))" class="mt-0.5 block text-xs text-muted-foreground">{{ fileNote(entry.row, Boolean(card.place)) }}</span>
+                    <span v-if="entry.row.servedBy" class="mt-0.5 block text-xs text-muted-foreground" :title="entry.row.servedBy">Read from {{ sourceHost(entry.row.servedBy) }}</span>
+                    <span v-if="entry.row.link.kind === 'drs'" class="mt-0.5 flex items-center gap-2 text-xs">
+                      <a class="inline-flex items-center gap-1 text-primary hover:underline" :href="entry.row.link.object" target="_blank" rel="noopener noreferrer">Open the object <ExternalLinkIcon class="h-3 w-3" /></a>
+                      <a class="inline-flex items-center gap-1 text-primary hover:underline" :href="entry.row.link.download" target="_blank" rel="noopener noreferrer" :aria-label="`Download ${entry.row.name}`"><Download class="h-3 w-3" /> Download</a>
+                    </span>
+                  </span>
                   <span class="shrink-0 text-xs tabular-nums text-muted-foreground">{{ entry.row.size }}</span>
                 </component>
               </li>
             </ul>
-            <div v-if="!savedTo && resultRows.length > 5 && !allResults" class="border-t border-border-subtle px-5 py-2.5">
-              <Button variant="outline" size="sm" @click="allResults = true"><ChevronDown class="h-4 w-4" /> Show all {{ run.outputs.length }} files</Button>
-            </div>
+            <ListPager v-if="card.pager.paged" v-model:page="card.pager.page" v-model:page-size="card.pager.pageSize" :total="card.pager.total" class="border-t border-border-subtle" />
           </template>
         </div>
       </section>

@@ -29,6 +29,12 @@ const RunProvenancePanel = compileClientComponent(new URL('./RunProvenancePanel.
       h('div', [h('dt', item.label), h('dd', slots[item.key ?? item.label]?.({ item }) ?? item.value)]))),
   })),
   '@/components/ui/IconTile.vue': moduleDefault(defineComponent(() => () => h('i'))),
+  '@/components/ui/ListPager.vue': moduleDefault(defineComponent({
+    props: { page: Number, pageSize: Number, total: Number },
+    emits: ['update:page'],
+    setup: (props, { emit }) => () => h('nav', [h('button', { onClick: () => emit('update:page', (props.page ?? 1) + 1) }, `Next page of ${props.total}`)]),
+  })),
+  '@/composables/usePagedList': await import('@/composables/usePagedList'),
   '@/components/ui/SectionHeading.vue': moduleDefault(defineComponent({ props: { title: String }, setup: (props, { slots }) => () => h('div', [h('h2', props.title), slots.actions?.()]) })),
   '@/components/data/ObjectIcon.vue': moduleDefault(defineComponent(() => () => h('i'))),
   '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
@@ -167,7 +173,7 @@ const stored = (bucket: string, key: string, size: string, extra: Record<string,
 })
 
 describe('RunProvenancePanel grouped files', () => {
-  it('collapses a database into one row and shows the first results of their folder', async () => {
+  it('opens groups at first, pages each card and toggles one card without moving the other', async () => {
     const inputs = [
       stored('laptop', 'my-genome/genome.fasta', '4900000', { device: 'device-1', name: 'work/in/genome.fasta' }),
       ...Array.from({ length: 66 }, (_, index) => stored('bakta-db', `db/part-${index}.dmnd`, '1000', { partOf: [DATABASE, RELEASE] })),
@@ -183,31 +189,57 @@ describe('RunProvenancePanel grouped files', () => {
     expect(text).toContain('release 6.0 light, 66 files')
     expect(text).toContain('DOI 10.5281/zenodo.14916843')
     expect(text).toContain('64.5\u00a0KiB')
-    // A database counts as one input; results in one folder are a summary of count and folder only.
+    // A database counts as one input; results in one folder name it in their summary row.
     expect(text).toContain('2 inputs')
+    expect(text).toContain('67 files')
     expect(text).toContain('13 files')
     expect(text).toContain('laptop/results/bakta/')
-    expect(text).not.toContain('genome-0.tsv')
-    expect(text).not.toContain('Show all 13 files')
-    expect(text).not.toContain('part-3.dmnd')
+    expect(text).toContain('part-3.dmnd1000\u00a0B')
+    expect(text).not.toContain('part-9.dmnd')
+    expect(text).toContain('genome-0.tsv')
+    expect(text).not.toContain('genome-10.tsv')
+    expect(text).toContain('Next page of 68')
+    expect(text).toContain('Next page of 13')
 
     const toggle = nodes(mounted.root).find((node) => node.tag === 'button' && content(node).includes('Bakta database'))!
     ;(toggle.props.onClick as () => void)()
     await VueRuntime.nextTick()
-    expect(content(mounted.root)).toContain('part-3.dmnd1000\u00a0B')
+    expect(content(mounted.root)).not.toContain('part-3.dmnd')
+    expect(content(mounted.root)).toContain('genome-0.tsv')
     mounted.app.unmount()
   })
 
-  it('shows every result on request when they lie in several folders', async () => {
-    const outputs = Array.from({ length: 8 }, (_, index) => stored('laptop', `results/part-${index % 2}/file-${index}.tsv`, '100'))
-    const mounted = await mountApp(RunProvenancePanel, { props: { run: { inputs: [], outputs } } })
-    expect(content(mounted.root)).not.toContain('file-7.tsv')
+  it('pages the files of one folder, the same in both cards', async () => {
+    const files = (folder: string) => Array.from({ length: 12 }, (_, index) => stored('laptop', `${folder}/part-${index % 2}/file-${index}.tsv`, '100'))
+    const mounted = await mountApp(RunProvenancePanel, { props: { run: { inputs: files('in'), outputs: files('out') } } })
+    expect(content(mounted.root)).toContain('part-0/file-0.tsv')
+    expect(content(mounted.root)).not.toContain('file-11.tsv')
+    expect(content(mounted.root)).not.toContain('Show all')
 
-    const more = nodes(mounted.root).find((node) => node.tag === 'button' && content(node).includes('Show all 8 files'))!
-    ;(more.props.onClick as () => void)()
+    const next = nodes(mounted.root).filter((node) => node.tag === 'button' && content(node).startsWith('Next page'))
+    expect(next).toHaveLength(2)
+    ;(next[1]!.props.onClick as () => void)()
     await VueRuntime.nextTick()
-    expect(content(mounted.root)).toContain('file-7.tsv')
-    expect(content(mounted.root)).not.toContain('Show all 8 files')
+    expect(content(mounted.root).split('file-11.tsv')).toHaveLength(2)
+    mounted.app.unmount()
+  })
+
+  it('shows no size for inputs without known sizes', async () => {
+    const inputs = Array.from({ length: 9 }, (_, index) => stored('drought-study-2026', `plots/file-${index}.csv`, ''))
+    const mounted = await mountApp(RunProvenancePanel, { props: { run: { inputs, outputs: [] } } })
+    const text = content(mounted.root)
+
+    expect(text).toContain('9 files')
+    expect(text).not.toContain('at least')
+    expect(text).not.toContain('0\u00a0B')
+    mounted.app.unmount()
+  })
+
+  it('sums the input sizes when every file names one', async () => {
+    const inputs = Array.from({ length: 9 }, (_, index) => stored('drought-study-2026', `plots/file-${index}.csv`, '1024'))
+    const mounted = await mountApp(RunProvenancePanel, { props: { run: { inputs, outputs: [] } } })
+
+    expect(content(mounted.root)).toContain('9 files 9\u00a0KiB')
     mounted.app.unmount()
   })
 

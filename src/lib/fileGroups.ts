@@ -20,7 +20,8 @@ export interface FileGroup {
   bytes: { total: number; complete: boolean }
 }
 
-function sharedFolder(keys: string[]): string {
+/** The folder all keys share, with a trailing slash; empty for the bucket root. */
+export function sharedFolder(keys: string[]): string {
   const folders = keys.map((key) => key.split('/').slice(0, -1))
   const shared: string[] = []
   for (const [index, part] of (folders[0] ?? []).entries()) {
