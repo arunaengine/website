@@ -21,7 +21,7 @@ function focusSelf(event: Event) {
 }
 
 const classes = computed(() => cn(
-  'flex w-[calc(100%-2rem)] max-w-6xl flex-col gap-0 overflow-hidden bg-background p-0 sm:w-[92vw]',
+  'flex w-[calc(100%-2rem)] max-w-6xl flex-col gap-0 overflow-hidden bg-background p-0 [--dialog-surface:hsl(var(--background))] sm:w-[92vw]',
   props.fit ? 'max-h-[88dvh]' : 'h-[88dvh]',
   props.contentClass,
 ))

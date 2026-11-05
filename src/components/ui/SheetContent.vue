@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 
 // A right sheet is 480 px for files and 640 px for runs (`size`); the rest keep their own widths.
 const sheetVariants = cva(
-  'fixed z-[var(--z-modal)] gap-4 bg-background shadow-xl outline-none transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-200 data-[state=open]:duration-300 scrollbar-thin overflow-y-auto',
+  'fixed z-[var(--z-modal)] gap-4 bg-background shadow-xl outline-none transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-200 data-[state=open]:duration-300 scrollbar-thin overflow-y-auto [overflow-wrap:anywhere]',
   {
     variants: {
       side: {

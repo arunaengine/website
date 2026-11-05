@@ -23,9 +23,10 @@ const emits = defineEmits<{
   (e: 'openAutoFocus', event: Event): void
 }>()
 const forwarded = useForwardPropsEmits(props, emits)
+// Dialogs never hide information: long values wrap and truncated text (outside buttons) wraps too.
 const classes = computed(() =>
   cn(
-    'fixed left-1/2 top-1/2 z-[var(--z-modal)] grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 gap-4 overflow-x-hidden overflow-y-auto border bg-popover p-6 shadow-xl duration-200 sm:w-full sm:rounded-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+    'fixed left-1/2 top-1/2 z-[var(--z-modal)] grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 grid-cols-[minmax(0,1fr)] gap-4 overflow-auto border bg-popover p-6 shadow-xl duration-200 [--dialog-surface:hsl(var(--popover))] [overflow-wrap:anywhere] [&_.truncate:not(button_*)]:whitespace-normal sm:rounded-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
     props.class,
   ),
 )

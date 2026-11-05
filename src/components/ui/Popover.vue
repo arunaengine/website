@@ -70,7 +70,7 @@ function keepOpen(event: Event) {
         :side="side || 'bottom'"
         :align="align || 'start'"
         :side-offset="6"
-        class="rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0"
+        class="rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-md outline-none [overflow-wrap:anywhere] data-[state=open]:animate-in data-[state=open]:fade-in-0"
         :class="[props.raised ? 'z-[var(--z-assistant-modal)]' : 'z-50', props.wide ? 'w-[34rem] max-w-[calc(100vw-2rem)]' : 'w-72']"
         @pointer-down-outside="keepOpen"
         @focus-outside="keepOpen"
