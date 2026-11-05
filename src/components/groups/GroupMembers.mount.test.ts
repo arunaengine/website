@@ -142,4 +142,38 @@ describe('group member picker', () => {
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
+
+  it('makes an existing member admin and revokes the admin role again', async () => {
+    const roles = [{ role_id: 'ra', name: 'admin' }, { role_id: 'r2', name: 'user' }]
+    const members = [
+      { user_id: 'a1', name: 'Ada', roles: [{ role_id: 'ra', name: 'admin' }], admin: true },
+      { user_id: 'u1', name: 'Bob', roles: [{ role_id: 'r2', name: 'user' }], admin: false },
+    ]
+    const onChanged = vi.fn()
+    const mounted = await mountApp(GroupMembers, { props: { groupId: 'g1', members, roles, canManage: true, onChanged } })
+    const row = (name: string) => element(mounted.root, (node) => node.tag === 'tr' && content(node).includes(name))
+    expect(content(row('Ada'))).not.toContain('Make admin')
+    await click(element(row('Bob'), (node) => node.tag === 'button' && content(node).includes('Make admin')))
+    expect(addGroupMember).toHaveBeenCalledWith('g1', { user_id: 'u1', role_ids: ['ra'] })
+    expect(onChanged).toHaveBeenCalledTimes(1)
+    await click(element(row('Ada'), (node) => node.tag === 'button' && node.props['aria-label'] === 'Revoke admin'))
+    expect(removeGroupMember).toHaveBeenCalledWith('g1', 'a1', 'ra')
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('shows a refused admin grant and offers no grant without the admin role', async () => {
+    addGroupMember.mockRejectedValueOnce(new Error('forbidden'))
+    const members = [{ user_id: 'u1', name: 'Bob', roles: [{ role_id: 'r2', name: 'user' }], admin: false }]
+    const roles = [{ role_id: 'ra', name: 'admin' }, { role_id: 'r2', name: 'user' }]
+    const mounted = await mountApp(GroupMembers, { props: { groupId: 'g1', members, roles, canManage: true } })
+    const grant = () => element(mounted.root, (node) => node.tag === 'button' && content(node).includes('Make admin'))
+    await click(grant())
+    expect(content(mounted.root)).toContain('forbidden')
+    expect(grant().props.disabled).toBe(false)
+    mounted.app.unmount()
+    const plain = await mountApp(GroupMembers, { props: { groupId: 'g1', members, roles: [roles[1]], canManage: true } })
+    expect(content(plain.root)).not.toContain('Make admin')
+    plain.app.unmount()
+  })
 })
