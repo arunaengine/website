@@ -13,6 +13,19 @@ const menuOpen = ref(false)
 function closeMenu(event: MouseEvent) {
   if ((event.target as Element).closest('a')) menuOpen.value = false
 }
+
+let hasSession = false
+try {
+  // Tokens are stored per realm and API origin as `aruna.authToken:<realm>@<origin>`.
+  hasSession = Object.keys(window.localStorage).some((key) => key.startsWith('aruna.authToken:'))
+} catch {
+  // Storage can be unavailable; the portal will resolve the session on entry.
+}
+
+async function onSignIn() {
+  const { useAuth } = await import('@/composables/useAuth')
+  await useAuth().requestSignIn({ redirectTo: '/app' })
+}
 </script>
 
 <template>
@@ -52,7 +65,8 @@ function closeMenu(event: MouseEvent) {
           <Sun v-if="isDark" class="lc" />
           <Moon v-else class="lc" />
         </button>
-        <RouterLink class="btn sec sm" to="/app">Sign in</RouterLink>
+        <RouterLink v-if="hasSession" class="btn sec sm" to="/app">Sign in</RouterLink>
+        <button v-else class="btn sec sm" type="button" @click="onSignIn">Sign in</button>
         <button
           :aria-expanded="menuOpen"
           aria-controls="mnav"
