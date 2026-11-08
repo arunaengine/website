@@ -20,7 +20,7 @@ import { ApiError, apiErrorMessage } from '@/lib/api'
 import { archiveEntries, selectedText } from '@/lib/objectListing'
 import { formatBytes } from '@/lib/utils'
 import { Download } from '@lucide/vue'
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 const props = defineProps<{
   open: boolean
@@ -38,8 +38,10 @@ const busy = ref(false)
 const error = ref<string | null>(null)
 const page = ref(1)
 const pageSize = ref(10)
-// Grows on every open and close, so a link that answers after the dialog closed is never opened.
+// Grows on every open, close and unmount, so a link that answers after the dialog closed or the
+// page left it is never opened.
 let round = 0
+onBeforeUnmount(() => round++)
 
 watch(
   () => props.open,

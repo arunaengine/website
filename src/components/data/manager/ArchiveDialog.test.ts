@@ -161,4 +161,21 @@ describe('ZIP download dialog', () => {
     expect(anchors).toHaveLength(0)
     expect(onStarted).not.toHaveBeenCalled()
   })
+
+  it('never opens a link that answers after the page left the dialog', async () => {
+    let answer: (url: string) => void = () => undefined
+    archiveLink.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    const onStarted = vi.fn()
+    const { app, root } = await open({ onStarted })
+
+    // The click waits for the link, so it is not awaited here.
+    void click(button(root, 'Download'))
+    await flush()
+    app.unmount()
+    answer('https://node-2.example/api/v1/data/archives/download?ticket=late')
+    await flush()
+
+    expect(anchors).toHaveLength(0)
+    expect(onStarted).not.toHaveBeenCalled()
+  })
 })
