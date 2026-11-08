@@ -47,19 +47,14 @@ const files = [
 ]
 const folders = [{ prefix: 'runs/reads/', name: 'reads' }]
 
-// The node env has no document; the anchor the dialog clicks is recorded instead.
-const anchors: { href: string; download: string; target: string; click: () => void }[] = []
+// The node env has no window; the tab the dialog opens is a recorded handle, null when blocked.
+let tab: { opener: unknown; location: { href: string }; close: ReturnType<typeof vi.fn> } | null
+const windowOpen = vi.fn((..._args: unknown[]) => tab)
 beforeEach(() => {
-  anchors.length = 0
+  tab = { opener: { portal: true }, location: { href: '' }, close: vi.fn() }
+  windowOpen.mockClear()
   archiveLink.mockReset()
-  vi.stubGlobal('document', {
-    body: { append: vi.fn() },
-    createElement: () => {
-      const anchor = { href: '', download: '', target: '', rel: '', click: vi.fn(), remove: vi.fn() }
-      anchors.push(anchor)
-      return anchor
-    },
-  })
+  vi.stubGlobal('window', { open: windowOpen })
 })
 afterEach(() => vi.unstubAllGlobals())
 
@@ -94,11 +89,13 @@ describe('ZIP download dialog', () => {
   it('opens the node link for the folders and files, then closes and reports the start', async () => {
     archiveLink.mockResolvedValue('https://node-2.example/api/v1/data/archives/download?ticket=t1')
     const onUpdateOpen = vi.fn()
-    const onStarted = vi.fn()
+    // The start is reported only once the tab is on its way to the link.
+    const onStarted = vi.fn(() => expect(tab!.location.href).toContain('ticket=t1'))
     const { root } = await open({ 'onUpdate:open': onUpdateOpen, onStarted })
 
     await click(button(root, 'Download'))
 
+    expect(windowOpen).toHaveBeenCalledWith('about:blank', '_blank')
     expect(archiveLink).toHaveBeenCalledWith(
       [
         { bucket: 'lab-data', prefix: 'runs/reads/' },
@@ -107,20 +104,25 @@ describe('ZIP download dialog', () => {
       ],
       'node-2',
     )
-    expect(anchors).toHaveLength(1)
-    expect(anchors[0]).toMatchObject({ href: 'https://node-2.example/api/v1/data/archives/download?ticket=t1', download: 'selection.zip' })
-    expect(anchors[0]!.click).toHaveBeenCalled()
+    // Its own tab, cut off from the portal: a download the node refuses shows there.
+    expect(tab).toMatchObject({ opener: null, location: { href: 'https://node-2.example/api/v1/data/archives/download?ticket=t1' } })
+    expect(tab!.close).not.toHaveBeenCalled()
     expect(onUpdateOpen).toHaveBeenCalledWith(false)
     expect(onStarted).toHaveBeenCalled()
   })
 
-  it('opens the link in its own tab, so a download the node refuses never replaces the portal', async () => {
-    archiveLink.mockResolvedValue('https://node-2.example/api/v1/data/archives/download?ticket=t2')
-    const { root } = await open()
+  it('asks for no link when the browser blocks the download tab, and says how to allow it', async () => {
+    tab = null
+    const onUpdateOpen = vi.fn()
+    const onStarted = vi.fn()
+    const { root } = await open({ 'onUpdate:open': onUpdateOpen, onStarted })
 
     await click(button(root, 'Download'))
 
-    expect(anchors[0]).toMatchObject({ target: '_blank', rel: 'noopener' })
+    expect(archiveLink).not.toHaveBeenCalled()
+    expect(content(root)).toContain('Your browser blocked the download window. Allow pop-ups for this site, then try again.')
+    expect(onUpdateOpen).not.toHaveBeenCalled()
+    expect(onStarted).not.toHaveBeenCalled()
   })
 
   it('shows a refused link in the dialog and keeps it open', async () => {
@@ -131,7 +133,8 @@ describe('ZIP download dialog', () => {
     await click(button(root, 'Download'))
 
     expect(content(root)).toContain('The node is busy with other downloads. Try again in a moment.')
-    expect(anchors).toHaveLength(0)
+    expect(tab!.close).toHaveBeenCalled()
+    expect(tab!.location.href).toBe('')
     expect(onUpdateOpen).not.toHaveBeenCalled()
 
     archiveLink.mockRejectedValue(new ApiError(400, 'an entry names either a key or a prefix'))
@@ -158,7 +161,8 @@ describe('ZIP download dialog', () => {
     answer('https://node-1.example/api/v1/data/archives/download?ticket=late')
     await flush()
 
-    expect(anchors).toHaveLength(0)
+    expect(tab!.close).toHaveBeenCalled()
+    expect(tab!.location.href).toBe('')
     expect(onStarted).not.toHaveBeenCalled()
   })
 
@@ -175,7 +179,8 @@ describe('ZIP download dialog', () => {
     answer('https://node-2.example/api/v1/data/archives/download?ticket=late')
     await flush()
 
-    expect(anchors).toHaveLength(0)
+    expect(tab!.close).toHaveBeenCalled()
+    expect(tab!.location.href).toBe('')
     expect(onStarted).not.toHaveBeenCalled()
   })
 })

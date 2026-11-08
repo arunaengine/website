@@ -39,14 +39,20 @@ const error = ref<string | null>(null)
 const page = ref(1)
 const pageSize = ref(10)
 // Grows on every open, close and unmount, so a link that answers after the dialog closed or the
-// page left it is never opened.
+// page left it is never opened; the tab opened for it closes at once.
 let round = 0
-onBeforeUnmount(() => round++)
+let pendingTab: Window | null = null
+function endRound() {
+  round++
+  pendingTab?.close()
+  pendingTab = null
+}
+onBeforeUnmount(endRound)
 
 watch(
   () => props.open,
   () => {
-    round++
+    endRound()
     busy.value = false
     error.value = null
     page.value = 1
@@ -79,29 +85,32 @@ function failure(cause: unknown): string {
 
 async function confirm() {
   if (busy.value) return
-  const mine = ++round
-  busy.value = true
   error.value = null
+  // Its own tab, so a refused GET shows there and never replaces the portal; the node's
+  // `frame-src blob:` rules out a hidden frame. It opens during the click, before the request,
+  // so a slow request cannot lose the click to the popup blocker.
+  const tab = window.open('about:blank', '_blank')
+  if (!tab) {
+    error.value = 'Your browser blocked the download window. Allow pop-ups for this site, then try again.'
+    return
+  }
+  tab.opener = null
+  const mine = ++round
+  pendingTab = tab
+  busy.value = true
   try {
     const entries = archiveEntries(props.bucket, props.files.map((file) => file.key), props.folders.map((folder) => folder.prefix))
     const url = await archiveLink(entries, props.nodeId)
-    if (mine !== round) return
-    // Its own tab: another origin ignores `download`, so a refused GET shows there, never in place
-    // of the portal. The node's `frame-src blob:` rules out a hidden frame. A detached anchor is
-    // ignored by some browsers, so it is clicked in the document.
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = 'selection.zip'
-    anchor.target = '_blank'
-    anchor.rel = 'noopener'
-    document.body.append(anchor)
-    anchor.click()
-    anchor.remove()
+    if (mine !== round) return void tab.close()
+    tab.location.href = url
+    pendingTab = null
     busy.value = false
     emit('update:open', false)
     emit('started')
   } catch (cause) {
+    tab.close()
     if (mine !== round) return
+    pendingTab = null
     busy.value = false
     error.value = failure(cause)
   }
