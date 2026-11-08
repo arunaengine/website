@@ -260,6 +260,7 @@ export function objectBrowser(): Component {
       '@/composables/useBucketUsage': { useBucketUsage: () => bucketUsage.value, usageText: (usage: { objects: number }) => `${usage.objects} files stored` },
       '@/lib/sync': { parseArunaArn: (arn: string) => ({ nodeId: arn.split(':')[3] ?? null }) },
       '@/components/data/manager/TransferDialog.vue': moduleDefault(Slotted('aside')),
+      '@/components/data/manager/ArchiveDialog.vue': moduleDefault(Slotted('dialog')),
       '@/components/watches/WatchButton.vue': moduleDefault(Slotted('button')),
       '@/components/storage/KeyedReadNotice.vue': moduleDefault(Slotted('aside')),
       '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },

@@ -612,10 +612,12 @@ describe('object browser selection', () => {
     await tick(checkbox(root, 'Select genomes'), true)
     expect(content(header())).not.toContain('Name')
     expect(content(header())).toContain('1 selected')
-    for (const label of ['Download', 'Copy to', 'Move to', 'Make public', 'Delete']) expect(() => action(header(), label)).not.toThrow()
-    // Folders alone cannot be downloaded; a ticked file allows it.
-    expect(action(header(), 'Download').props.disabled).toBe(true)
+    for (const label of ['Download as ZIP', 'Copy to', 'Move to', 'Make public', 'Delete']) expect(() => action(header(), label)).not.toThrow()
+    // A folder downloads as a ZIP; one file alone downloads directly.
+    expect(() => action(header(), 'Download')).toThrow()
+    await tick(checkbox(root, 'Select genomes'), false)
     await tick(checkbox(root, `Select ${listedObject.name}`), true)
+    expect(() => action(header(), 'Download as ZIP')).toThrow()
     expect(action(header(), 'Download').props.disabled).toBe(false)
   })
 
@@ -653,48 +655,58 @@ describe('object browser selection', () => {
     expect(download).toHaveBeenCalledWith(listedObject)
   })
 
-  it('downloads the ticked files one after another', async () => {
-    const second = { ...listedObject, key: 'raw/second.fastq', name: 'second.fastq' }
-    const objects = ref([listedObject, second])
-    let finish: () => void = () => undefined
-    const order: string[] = []
-    const slowDownload = vi.fn((object: typeof listedObject) => {
-      order.push(object.name)
-      return object.key === listedObject.key ? new Promise<void>((resolve) => (finish = resolve)) : Promise.resolve()
-    })
-    const root = await render({ objects, visibleObjects: objects, download: slowDownload })
-
+  it('opens the ZIP dialog with the ticked folders and files of this bucket', async () => {
+    download.mockClear()
+    const root = await render({ folders: ref([listedFolder]) })
+    await tick(checkbox(root, 'Select genomes'), true)
     await tick(checkbox(root, `Select ${listedObject.name}`), true)
-    await tick(checkbox(root, 'Select second.fastq'), true)
-    await click(action(root, 'Download'))
-    expect(order).toEqual(['reads.fastq'])
+    const dialog = () => element(root, (node) => node.tag === 'dialog')
+    expect(dialog().props.open).toBe(false)
 
-    finish()
-    await flush()
-    expect(order).toEqual(['reads.fastq', 'second.fastq'])
+    await click(action(element(root, (node) => node.tag === 'thead'), 'Download as ZIP'))
+
+    expect(dialog().props).toMatchObject({ open: true, bucket: 'reef', 'node-id': null, folders: [listedFolder], files: [listedObject], distributed: false })
+    expect(download).not.toHaveBeenCalled()
   })
 
-  it('stops a download batch when the bucket changes', async () => {
-    const second = { ...listedObject, key: 'raw/second.fastq', name: 'second.fastq' }
-    const objects = ref([listedObject, second])
-    const bucket = ref('reef')
-    let finish: () => void = () => undefined
-    const asked: string[] = []
-    const slowDownload = vi.fn((object: typeof listedObject) => {
-      asked.push(`${bucket.value}/${object.key}`)
-      return object.key === listedObject.key ? new Promise<void>((resolve) => (finish = resolve)) : Promise.resolve()
-    })
-    const root = await render({ bucket, objects, visibleObjects: objects, download: slowDownload })
+  it('shows where the ZIP went and keeps the ticks', async () => {
+    const root = await render({ folders: ref([listedFolder]) })
+    await tick(checkbox(root, 'Select genomes'), true)
+    await click(action(element(root, (node) => node.tag === 'thead'), 'Download as ZIP'))
 
-    await tick(checkbox(root, `Select ${listedObject.name}`), true)
-    await tick(checkbox(root, 'Select second.fastq'), true)
-    await click(action(root, 'Download'))
+    await (element(root, (node) => node.tag === 'dialog').props.onStarted as () => void)()
+    await flush()
+
+    expect(content(element(root, (node) => node.tag === 'thead'))).toContain("1 selectedDownload as ZIPSee your browser's downloads")
+  })
+
+  it('closes the ZIP dialog when the bucket changes', async () => {
+    const bucket = ref('reef')
+    const root = await render({ bucket, folders: ref([listedFolder]) })
+    await tick(checkbox(root, 'Select genomes'), true)
+    await click(action(element(root, (node) => node.tag === 'thead'), 'Download as ZIP'))
+
     bucket.value = 'other'
     await flush()
-    finish()
-    await flush()
 
-    expect(asked).toEqual(['reef/raw/reads.fastq'])
+    expect(element(root, (node) => node.tag === 'dialog').props.open).toBe(false)
+  })
+
+  it('leaves the ZIP out of a bucket locked on the node', async () => {
+    Object.assign(lockedState, { locked: true })
+    try {
+      const root = await render({ folders: ref([listedFolder]) })
+      const header = () => element(root, (node) => node.tag === 'thead')
+      await tick(checkbox(root, 'Select genomes'), true)
+      await tick(checkbox(root, `Select ${listedObject.name}`), true)
+
+      expect(() => action(header(), 'Download as ZIP')).toThrow()
+      expect(() => action(header(), 'Download')).toThrow()
+      await tick(checkbox(root, 'Select genomes'), false)
+      expect(() => action(header(), 'Download')).not.toThrow()
+    } finally {
+      Object.assign(lockedState, { locked: false })
+    }
   })
 
   it('retries a partial move with only the items still in place', async () => {
@@ -745,7 +757,7 @@ describe('object browser selection', () => {
     const head = element(root, (node) => node.tag === 'thead')
 
     const labels = nodes(head).map((node) => String(node.props['aria-label'] ?? '')).filter(Boolean)
-    expect(labels).toEqual(expect.arrayContaining(['Download', 'Copy to', 'Move to', 'Make public', 'Delete']))
+    expect(labels).toEqual(expect.arrayContaining(['Download as ZIP', 'Copy to', 'Move to', 'Make public', 'Delete']))
     expect(labels).not.toContain('Share')
     expect(content(head)).not.toContain('Copy links')
   })

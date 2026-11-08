@@ -23,6 +23,7 @@ import ObjectListBar from '@/components/data/manager/ObjectListBar.vue'
 import MetadataSearch from '@/components/data/MetadataSearch.vue'
 import RowMenu from '@/components/data/manager/RowMenu.vue'
 import SearchHint from '@/components/data/manager/SearchHint.vue'
+import ArchiveDialog from '@/components/data/manager/ArchiveDialog.vue'
 import SelectionBar from '@/components/data/manager/SelectionBar.vue'
 import TransferDialog from '@/components/data/manager/TransferDialog.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
@@ -469,8 +470,33 @@ async function downloadSelected() {
   }
 }
 
+// The ticked rows as they were when the ZIP dialog opened; another bucket, node or session closes it.
+const archiveOpen = ref(false)
+const archiveFiles = ref<ObjectEntry[]>([])
+const archiveFolders = ref<FolderEntry[]>([])
+const zipStarted = ref(false)
+let startedTimer: ReturnType<typeof setTimeout> | undefined
+watch([bucket, remoteNodeId, contextFingerprint], () => {
+  archiveOpen.value = false
+  zipStarted.value = false
+})
+onBeforeUnmount(() => clearTimeout(startedTimer))
+
+function openArchive() {
+  archiveFiles.value = visibleObjects.value.filter((object) => selectedObjectKeys.value.has(object.key))
+  archiveFolders.value = visibleFolders.value.filter((folder) => selectedPrefixes.value.has(folder.prefix))
+  archiveOpen.value = true
+}
+
+function onZipStarted() {
+  zipStarted.value = true
+  clearTimeout(startedTimer)
+  startedTimer = setTimeout(() => (zipStarted.value = false), 5000)
+}
+
 function onBarAction(action: SelectionAction) {
   if (action === 'download') void downloadSelected()
+  else if (action === 'zip') openArchive()
   else if (action === 'access') emit('public-access', publicTargets())
   else if (action === 'delete') deleteSelection()
   else openTransfer(action, selectedSources())
@@ -885,7 +911,7 @@ async function onDrop(event: DragEvent) {
             <col class="w-[132px]" />
           </colgroup>
           <thead class="text-xs text-muted-foreground @max-[600px]:hidden">
-            <SelectionBar v-if="selectedCount" :manager="manager" :span="columns - 1" @action="onBarAction" />
+            <SelectionBar v-if="selectedCount" :manager="manager" :span="columns - 1" :locked="lockedOnNode" :started="zipStarted" @action="onBarAction" />
             <tr v-else class="border-b border-border">
               <th class="p-0">
                 <label class="flex h-11 w-11 items-center justify-center">
@@ -1142,7 +1168,7 @@ async function onDrop(event: DragEvent) {
         </div>
         <template v-if="selectedCount">
           <div class="hidden h-16 @max-[600px]:block md:!hidden" aria-hidden="true" />
-          <SelectionBar bottom :manager="manager" class="hidden @max-[600px]:flex" @action="onBarAction" />
+          <SelectionBar bottom :manager="manager" :locked="lockedOnNode" class="hidden @max-[600px]:flex" @action="onBarAction" />
         </template>
         </template>
         <button
@@ -1163,6 +1189,17 @@ async function onDrop(event: DragEvent) {
         :node-id="remoteNodeId"
         :sources="transferSources"
         @done="onTransferDone"
+      />
+      <ArchiveDialog
+        v-model:open="archiveOpen"
+        :bucket="bucket"
+        :prefix="s3Prefix"
+        :node-id="remoteNodeId"
+        :node-name="realmNodes.displayName(remoteNodeId ?? realmNodes.localNodeId.value)"
+        :files="archiveFiles"
+        :folders="archiveFolders"
+        :distributed="Boolean(setId)"
+        @started="onZipStarted"
       />
       <KeyedReadNotice :wait="locked.wait.value" action="download" class="max-w-xl" @cancel="locked.cancel()" />
 

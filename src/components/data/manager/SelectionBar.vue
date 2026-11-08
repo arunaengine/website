@@ -9,11 +9,13 @@ import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import IconButton from '@/components/ui/IconButton.vue'
 import type { DataManager } from '@/composables/useDataManager'
 import { formatCount } from '@/lib/formatCount'
-import { actionBlocker, type SelectionAction } from '@/lib/objectListing'
-import { Copy, Download, FolderInput, Globe, Trash2, X } from '@lucide/vue'
+import { downloadKind, type SelectionAction } from '@/lib/objectListing'
+import { Copy, Download, FileArchive, FolderInput, Globe, Trash2, X } from '@lucide/vue'
+import { computed } from 'vue'
 
-// `span`: the table columns after the checkbox, which the actions cover.
-const props = withDefaults(defineProps<{ manager: DataManager; bottom?: boolean; span?: number }>(), { span: 4 })
+// `span`: the table columns after the checkbox, which the actions cover. `locked`: the bucket is
+// locked on its node, so no ZIP. `started`: a ZIP download just began.
+const props = withDefaults(defineProps<{ manager: DataManager; bottom?: boolean; span?: number; locked?: boolean; started?: boolean }>(), { span: 4 })
 const emit = defineEmits<{ (e: 'action', action: SelectionAction): void }>()
 
 const {
@@ -29,7 +31,7 @@ const {
   listLoading,
 } = props.manager
 
-const blocker = (action: SelectionAction) => actionBlocker(action, selectedObjectKeys.value.size, selectedPrefixes.value.size)
+const download = computed(() => downloadKind(selectedObjectKeys.value.size, selectedPrefixes.value.size, props.locked))
 const MOVES = [
   { id: 'copy', label: 'Copy to', icon: Copy },
   { id: 'move', label: 'Move to', icon: FolderInput },
@@ -54,9 +56,13 @@ const MOVES = [
     <th :colspan="span" class="px-3 py-1.5 text-left font-normal">
       <div class="flex min-w-0 items-center gap-1.5">
         <span class="mr-1.5 whitespace-nowrap font-medium">{{ formatCount(selectedCount) }} selected</span>
-        <IconButton label="Download" variant="outline" size="icon" class="h-8 w-auto px-2.5" :disabled-reason="blocker('download')" @click="emit('action', 'download')">
+        <IconButton v-if="download === 'download'" label="Download" variant="outline" size="icon" class="h-8 w-auto px-2.5" @click="emit('action', 'download')">
           <Download class="size-3.5" /><span class="@max-[600px]:hidden">Download</span>
         </IconButton>
+        <IconButton v-else-if="download === 'zip'" label="Download as ZIP" variant="outline" size="icon" class="h-8 w-auto px-2.5" @click="emit('action', 'zip')">
+          <FileArchive class="size-3.5" /><span class="@max-[600px]:hidden">Download as ZIP</span>
+        </IconButton>
+        <span v-if="started" role="status" class="ml-1.5 whitespace-nowrap text-xs text-muted-foreground">See your browser's downloads</span>
         <IconButton v-for="move in MOVES" :key="move.id" :label="move.label" variant="outline" size="icon" class="h-8 w-auto px-2.5" @click="emit('action', move.id)">
           <component :is="move.icon" class="size-3.5" /><span class="@max-[600px]:hidden">{{ move.label }}</span>
         </IconButton>
@@ -78,7 +84,8 @@ const MOVES = [
     aria-label="Selected files"
   >
     <span class="mr-auto whitespace-nowrap font-medium">{{ formatCount(selectedCount) }} selected</span>
-    <IconButton label="Download" variant="outline" size="icon" class="size-11" :disabled-reason="blocker('download')" @click="emit('action', 'download')"><Download class="size-4" /></IconButton>
+    <IconButton v-if="download === 'download'" label="Download" variant="outline" size="icon" class="size-11" @click="emit('action', 'download')"><Download class="size-4" /></IconButton>
+    <IconButton v-else-if="download === 'zip'" label="Download as ZIP" variant="outline" size="icon" class="size-11" @click="emit('action', 'zip')"><FileArchive class="size-4" /></IconButton>
     <DropdownMenu>
       <DropdownMenuTrigger as-child>
         <Button variant="outline" size="icon" class="size-11" title="Copy or move" aria-label="Copy or move"><Copy class="size-4" /></Button>
