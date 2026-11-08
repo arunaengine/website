@@ -105,6 +105,16 @@ describe('useVisitUploads', () => {
     expect(uploads.value[1].state).toBe('done')
   })
 
+  it('says to try again later when the member taking the name cannot be reached', async () => {
+    replies.push({ status: 503, body: { error: 'unreachable', code: 'range_unavailable' } }, { status: 201, body: { name: 'b.txt', size: 10 } })
+    const { uploads, add } = useVisitUploads(visit)
+
+    await add('', [file('a.txt'), file('b.txt')])
+
+    expect(uploads.value[0]).toMatchObject({ state: 'failed', error: 'This part of the folder takes no uploads right now. Try again later.' })
+    expect(uploads.value[1].state).toBe('done')
+  })
+
   it('says the link ended when the node no longer knows it', async () => {
     const ended = () => Promise.reject(new ApiError(404, 'gone', 'share_unavailable'))
     const { uploads, add } = useVisitUploads(ended as typeof visit)

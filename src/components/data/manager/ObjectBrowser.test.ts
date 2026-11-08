@@ -222,17 +222,15 @@ describe('object browser row actions', () => {
     ])
   })
 
-  it('says in one line that a distributed bucket has no share links', async () => {
-    const root = await render({ folders: ref([listedFolder]) }, { setId: 's1' })
-    const reason = 'Share links are not available for distributed buckets yet.'
+  it('offers share links for a distributed bucket like for an ordinary one', async () => {
+    const onShareLink = vi.fn()
+    const root = await render({ folders: ref([listedFolder]) }, { setId: 's1', onShareLink })
 
-    for (const name of ['reads.fastq', 'genomes']) {
-      expect(menuItem(root, 'Share', name).props.disabled).toBe(true)
-      expect(content(element(root, (node) => node.tag === 'tr' && content(node).includes(name)))).toContain(reason)
-    }
-    expect(nodes(root).some((node) => node.props['aria-label'] === 'Share bucket')).toBe(false)
-    const note = element(root, (node) => node.tag === 'span' && content(node).trim() === 'No share links for distributed buckets')
-    expect(note.props.title).toBe(reason)
+    for (const name of ['reads.fastq', 'genomes']) expect(menuItem(root, 'Share', name).props.disabled).toBeFalsy()
+    await click(action(root, 'Share bucket'))
+
+    expect(onShareLink).toHaveBeenCalledWith({ kind: 'bucket', bucket: 'reef' })
+    expect(content(root)).not.toContain('No share links')
   })
 
   it('links the realm website from the desktop and names the node that serves the bucket', async () => {

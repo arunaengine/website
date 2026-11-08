@@ -51,6 +51,16 @@ export function isUnavailable(cause: unknown): boolean {
   return cause instanceof ApiError && cause.status === 404 && cause.code === 'share_unavailable'
 }
 
+/** Whether the node that holds part of a distributed bucket cannot be reached right now. */
+export function isRangeUnavailable(cause: unknown): boolean {
+  return cause instanceof ApiError && cause.status === 503 && cause.code === 'range_unavailable'
+}
+
+/** What a visitor reads when a folder cannot be listed. */
+export function listFailure(cause: unknown): string {
+  return isRangeUnavailable(cause) ? 'Part of this folder cannot be listed right now. Try again later.' : errorMessage(cause)
+}
+
 export function useShareVisit() {
   const phase = ref<VisitPhase>('opening')
   const share = shallowRef<VisitShare | null>(null)

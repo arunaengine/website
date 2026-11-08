@@ -252,14 +252,14 @@ const linkedPart = computed(() => {
   return prefix ? ` (only ${prefix}/)` : ''
 })
 
-// Share links need an ordinary bucket on a node visitors can reach; the node refuses distributed ones.
+// Share links need a bucket on a node visitors can reach; a distributed bucket's link is served by
+// the member it is created on, which reads the other members' keys.
 const linksShown = computed(() => Boolean(bucket.value))
-const linkReason = computed(() => {
-  if (onThisComputer.value) return 'Share links need a bucket on a realm node, not on this computer.'
-  return props.setId ? 'Share links are not available for distributed buckets yet.' : null
-})
+const linkReason = computed(() =>
+  onThisComputer.value ? 'Share links need a bucket on a realm node, not on this computer.' : null,
+)
 // Where links are not offered, one short line says so in place of a greyed-out button.
-const linkNote = computed(() => (onThisComputer.value ? 'No share links on this computer' : 'No share links for distributed buckets'))
+const linkNote = 'No share links on this computer'
 
 // A bucket on this computer: its files are already here, so no folder can be linked.
 const onThisComputer = computed(

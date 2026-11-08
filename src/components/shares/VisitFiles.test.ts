@@ -3,13 +3,13 @@ import { defineComponent, h } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
 import * as Api from '@/lib/api'
-import { isUnavailable } from '@/composables/useShareVisit'
+import { isUnavailable, listFailure } from '@/composables/useShareVisit'
 import { errorMessage, formatBytes, formatDateTime } from '@/lib/utils'
 
 let sent: Array<{ url: string; body: unknown }> = []
 const assign = vi.fn()
 const listings: Record<string, unknown> = {
-  '': { files: [{ name: 'table.csv', size: 2048, last_modified: '2026-10-30T08:00:00Z' }], folders: ['plots/'], next_cursor: 'C2' },
+  '': { files: [{ name: 'table.csv', size: 2048, last_modified: '2026-10-30T08:00:00Z' }], folders: ['plots/', 'far/'], next_cursor: 'C2' },
   'C2': { files: [{ name: 'notes.txt', size: 10 }], folders: [], next_cursor: null },
   'plots/': { files: [{ name: 'plots/a.png', size: 5 }], folders: [], next_cursor: null },
 }
@@ -25,7 +25,7 @@ const VisitFiles = compileClientComponent(new URL('./VisitFiles.vue', import.met
   '@/components/ui/RefusalNote.vue': moduleDefault(defineComponent({ props: { message: String }, setup: (props) => () => h('p', props.message) })),
   '@/components/ui/Spinner.vue': moduleDefault(Pass),
   '@/components/shares/VisitUpload.vue': moduleDefault(defineComponent({ props: { prefix: String }, setup: (props) => () => h('section', `upload into "${props.prefix}"`) })),
-  '@/composables/useShareVisit': { isUnavailable },
+  '@/composables/useShareVisit': { isUnavailable, listFailure },
   '@/lib/api': Api,
   '@/lib/utils': { errorMessage, formatBytes, formatDateTime },
 })
@@ -41,6 +41,8 @@ beforeEach(() => {
     sent.push({ url: String(input), body: init.body ? JSON.parse(String(init.body)) : undefined })
     if (url.pathname.endsWith('/tickets')) return new Response(JSON.stringify({ path: '/api/v1/shares/download?ticket=T1', expires_at: '' }))
     const key = url.searchParams.get('cursor') ?? url.searchParams.get('prefix') ?? ''
+    // The member holding `far/` of a distributed bucket cannot be reached.
+    if (key === 'far/') return new Response(JSON.stringify({ error: 'unreachable', code: 'range_unavailable' }), { status: 503 })
     return new Response(JSON.stringify(listings[key]))
   }))
 })
@@ -61,6 +63,14 @@ describe('VisitFiles', () => {
 
     await click(button(root, 'results'))
     await vi.waitFor(() => expect(content(root)).toContain('table.csv'))
+  })
+
+  it('says to try again later when part of a distributed folder cannot be listed', async () => {
+    const { root } = await mountApp(VisitFiles, { props: { visit, rootName: 'results', uploads: false } })
+    await vi.waitFor(() => expect(content(root)).toContain('table.csv'))
+
+    await click(button(root, 'far'))
+    await vi.waitFor(() => expect(content(root)).toContain('Part of this folder cannot be listed right now. Try again later.'))
   })
 
   it('downloads through a fresh single-use ticket on the node origin', async () => {

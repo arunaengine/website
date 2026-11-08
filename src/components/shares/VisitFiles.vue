@@ -8,7 +8,7 @@ import ListPager from '@/components/ui/ListPager.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import VisitUpload from '@/components/shares/VisitUpload.vue'
-import { isUnavailable } from '@/composables/useShareVisit'
+import { isUnavailable, listFailure } from '@/composables/useShareVisit'
 import { listVisitFiles, ticketUrl, visitTicket, type VisitFile } from '@/lib/api'
 import { errorMessage, formatBytes, formatDateTime } from '@/lib/utils'
 
@@ -60,7 +60,7 @@ async function load() {
     folders.value = found.folders
     files.value = found.files
   } catch (cause) {
-    if (run === generation && !isUnavailable(cause)) error.value = errorMessage(cause)
+    if (run === generation && !isUnavailable(cause)) error.value = listFailure(cause)
   } finally {
     if (run === generation) loading.value = false
   }

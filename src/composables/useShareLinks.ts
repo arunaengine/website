@@ -30,7 +30,6 @@ export async function linkFor(id: string, nodeId: string | null): Promise<string
 
 export function shareErrorMessage(cause: unknown): string {
   if (cause instanceof ApiError) {
-    if (cause.code === 'distributed_bucket') return 'Share links are not available for distributed buckets yet.'
     if (cause.code === 'dataset_not_here') return 'This node holds no copy of the dataset, so it cannot share it.'
     if (cause.status === 403) return 'You cannot share this, or a policy does not allow share links here.'
   }

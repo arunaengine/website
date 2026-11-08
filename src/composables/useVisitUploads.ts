@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { ApiError, uploadVisitFile } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
-import { isUnavailable } from './useShareVisit'
+import { isRangeUnavailable, isUnavailable } from './useShareVisit'
 
 export interface VisitUpload {
   id: number
@@ -25,6 +25,7 @@ export function uploadName(prefix: string, file: File): string {
 
 function failure(cause: unknown): string {
   if (cause instanceof ApiError && cause.code === 'name_taken') return 'Another upload took this name. Send the file again.'
+  if (isRangeUnavailable(cause)) return 'This part of the folder takes no uploads right now. Try again later.'
   if (cause instanceof ApiError && cause.status === 409) return 'The storage of this group is full.'
   if (cause instanceof ApiError && cause.status === 403) return 'This link does not accept uploads here.'
   return errorMessage(cause)
