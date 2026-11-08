@@ -20,6 +20,9 @@ import {
   getDataLinks as requestDataLinks,
   getBucketDistribution as requestDistribution,
   getBucketUsage as requestBucketUsage,
+  createArchiveLink as requestArchiveLink,
+  apiUrl,
+  type ArchiveEntry,
   listBucketObjects as requestObjects,
   type ObjectListResponse,
   retryAdmission as requestRetry,
@@ -84,6 +87,13 @@ export async function getBucketRouting(bucket: string, nodeId?: string | null): 
 /** What the serving node counts in one bucket; 404 means the node lacks the route. */
 export async function getBucketUsage(bucket: string, nodeId?: string | null): Promise<BucketUsageResponse> {
   return requestBucketUsage(bucket, await nodeClientReady(nodeId))
+}
+
+/** A single-use ZIP download URL from the node that holds the buckets, resolved against its API base. */
+export async function archiveLink(entries: ArchiveEntry[], nodeId?: string | null): Promise<string> {
+  const client = await nodeClientReady(nodeId)
+  const link = await requestArchiveLink(entries, client)
+  return new URL(link.path, apiUrl('/', {}, client)).href
 }
 
 /** One page of a bucket's current objects with their versions, listed by the bucket's node. */
