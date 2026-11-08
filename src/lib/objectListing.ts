@@ -1,5 +1,6 @@
 // What the object list shows after its filters, and which list bar actions a
 // selection allows. Pure, so the Data view and its tests share one answer.
+import type { ArchiveEntry } from './api/archives'
 import { formatCount } from './formatCount'
 import type { DeletedObjectEntry } from './objectVersions'
 
@@ -72,6 +73,23 @@ export function actionBlocker(action: SelectionAction, files: number, folders: n
   if (action === 'rename' && count !== 1) return 'Tick exactly one file or folder to rename it.'
   if (action === 'download' && !files) return 'Folders cannot be downloaded here. Tick files.'
   return null
+}
+
+/** One ticked file downloads directly; more, or any folder, as one ZIP unless the bucket is locked. */
+export function downloadKind(files: number, folders: number, locked: boolean): 'download' | 'zip' | null {
+  if (files === 1 && !folders) return 'download'
+  return locked || files + folders === 0 ? null : 'zip'
+}
+
+/** The ZIP request entries of ticked folders and files of one bucket. */
+export function archiveEntries(bucket: string, keys: Iterable<string>, prefixes: Iterable<string>): ArchiveEntry[] {
+  return [...[...prefixes].map((prefix) => ({ bucket, prefix })), ...[...keys].map((key) => ({ bucket, key }))]
+}
+
+/** "3 files, 1 folder"; a kind with none is left out. */
+export function selectedText(files: number, folders: number): string {
+  const part = (count: number, noun: string) => `${formatCount(count)}\u00a0${noun}${count === 1 ? '' : 's'}`
+  return [files ? part(files, 'file') : '', folders ? part(folders, 'folder') : ''].filter(Boolean).join(', ')
 }
 
 export type SortKey = 'name' | 'size' | 'modified'

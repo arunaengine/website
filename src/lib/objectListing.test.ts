@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actionBlocker, deletedOnPage, fileRows, filtersChanged, lastListedKey, pageRange, shownDeleted, shownEntries, sortRows, splitName } from './objectListing'
+import { actionBlocker, archiveEntries, deletedOnPage, downloadKind, fileRows, filtersChanged, lastListedKey, pageRange, selectedText, shownDeleted, shownEntries, sortRows, splitName } from './objectListing'
 
 const folder = { prefix: 'raw/genomes/', name: 'genomes' }
 const file = { key: 'raw/reads.fastq', name: 'reads.fastq' }
@@ -68,6 +68,37 @@ describe('list bar actions', () => {
     expect(actionBlocker('download', 0, 2)).not.toBeNull()
     expect(actionBlocker('download', 1, 2)).toBeNull()
     expect(actionBlocker('move', 0, 2)).toBeNull()
+  })
+})
+
+describe('list bar downloads', () => {
+  it('downloads one file directly and anything more as a ZIP', () => {
+    expect(downloadKind(1, 0, false)).toBe('download')
+    expect(downloadKind(2, 0, false)).toBe('zip')
+    expect(downloadKind(0, 1, false)).toBe('zip')
+    expect(downloadKind(1, 1, false)).toBe('zip')
+    expect(downloadKind(0, 0, false)).toBeNull()
+  })
+
+  it('leaves the ZIP out of a bucket locked on its node, but keeps the single download', () => {
+    expect(downloadKind(2, 0, true)).toBeNull()
+    expect(downloadKind(0, 1, true)).toBeNull()
+    expect(downloadKind(1, 0, true)).toBe('download')
+  })
+
+  it('asks for folders by prefix and files by key, all in the one bucket', () => {
+    expect(archiveEntries('reef', ['raw/a.txt', 'b.csv'], ['raw/reads/'])).toEqual([
+      { bucket: 'reef', prefix: 'raw/reads/' },
+      { bucket: 'reef', key: 'raw/a.txt' },
+      { bucket: 'reef', key: 'b.csv' },
+    ])
+  })
+
+  it('counts the ticked files and folders in words', () => {
+    expect(selectedText(3, 1)).toBe('3\u00a0files, 1\u00a0folder')
+    expect(selectedText(1, 0)).toBe('1\u00a0file')
+    expect(selectedText(0, 2)).toBe('2\u00a0folders')
+    expect(selectedText(1200, 0)).toBe('1,200\u00a0files')
   })
 })
 
