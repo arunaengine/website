@@ -13,8 +13,8 @@ import { downloadKind, type SelectionAction } from '@/lib/objectListing'
 import { Copy, Download, FileArchive, FolderInput, Globe, Trash2, X } from '@lucide/vue'
 import { computed } from 'vue'
 
-// `span`: the table columns after the checkbox, which the actions cover. `locked`: the bucket is
-// locked on its node, so no ZIP. `started`: a ZIP download just began.
+// `span`: the table columns after the checkbox, which the actions cover. `locked`: no ZIP, as the
+// bucket is locked on its node or that is not known yet. `started`: a ZIP download just began.
 const props = withDefaults(defineProps<{ manager: DataManager; bottom?: boolean; span?: number; locked?: boolean; started?: boolean }>(), { span: 4 })
 const emit = defineEmits<{ (e: 'action', action: SelectionAction): void }>()
 

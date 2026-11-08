@@ -23,6 +23,7 @@ import {
   listedObject,
   lockedCancel,
   lockedDownload,
+  lockedLive,
   lockedState,
   objectBrowser,
   resetS3Access,
@@ -690,6 +691,30 @@ describe('object browser selection', () => {
     await flush()
 
     expect(element(root, (node) => node.tag === 'dialog').props.open).toBe(false)
+  })
+
+  it('offers the ZIP only once the lock state is read, and closes it when the bucket is locked', async () => {
+    Object.assign(lockedState, { settled: false })
+    try {
+      const root = await render({ folders: ref([listedFolder]) })
+      const header = () => element(root, (node) => node.tag === 'thead')
+      const dialog = () => element(root, (node) => node.tag === 'dialog')
+      await tick(checkbox(root, 'Select genomes'), true)
+      expect(() => action(header(), 'Download as ZIP')).toThrow()
+
+      lockedLive.statusSettled.value = true
+      await flush()
+      await click(action(header(), 'Download as ZIP'))
+      expect(dialog().props.open).toBe(true)
+
+      // A later read finds the bucket locked on its node: the open dialog closes, the action goes.
+      lockedLive.lockedOnNode.value = true
+      await flush()
+      expect(dialog().props.open).toBe(false)
+      expect(() => action(header(), 'Download as ZIP')).toThrow()
+    } finally {
+      Object.assign(lockedState, { settled: true })
+    }
   })
 
   it('leaves the ZIP out of a bucket locked on the node', async () => {

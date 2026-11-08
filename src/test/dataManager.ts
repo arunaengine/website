@@ -98,14 +98,19 @@ export function resetS3Access() {
 export const brokenFiles = { reasons: {} as Record<string, string> }
 
 /** The locked-bucket state the compiled browser sees: a plain bucket unless a test changes it. */
-export const lockedState = { locked: false, available: false, pending: new Set<string>() }
+export const lockedState = { locked: false, available: false, settled: true, pending: new Set<string>() }
+/** The lock refs of the last rendered browser, so a test can resolve the status later. */
+export const lockedLive = { lockedOnNode: ref(false), statusSettled: ref(true) }
 export const lockedDownload = vi.fn()
 export const lockedCancel = vi.fn()
 
 function lockedBucket(...args: unknown[]) {
   const plain = args[3] as (object: unknown) => unknown
+  lockedLive.lockedOnNode = ref(lockedState.locked)
+  lockedLive.statusSettled = ref(lockedState.settled)
   return {
-    lockedOnNode: ref(lockedState.locked),
+    lockedOnNode: lockedLive.lockedOnNode,
+    statusSettled: lockedLive.statusSettled,
     availableToYou: ref(lockedState.available),
     wait: ref(null),
     cancel: lockedCancel,

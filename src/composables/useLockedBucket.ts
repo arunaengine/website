@@ -27,6 +27,8 @@ export function useLockedBucket(
     return status?.mode === 'vault_locked' && !keyGenerations(status).list.some((key) => key.unlock.state === 'unlocked')
   })
   const availableToYou = ref(false)
+  // The status read has ended, also when it failed; until then nobody knows about a lock.
+  const statusSettled = computed(() => encryption.state.value !== 'loading')
 
   watch([lockedOnNode, encryption.revision], async () => {
     availableToYou.value = false
@@ -59,5 +61,5 @@ export function useLockedBucket(
 
   const keyPending = (key: string) => keyed.pending.value.has(`${bucket.value}\u0000${key}`)
 
-  return { lockedOnNode, availableToYou, wait: keyed.wait, cancel: keyed.cancel, keyPending, download }
+  return { lockedOnNode, statusSettled, availableToYou, wait: keyed.wait, cancel: keyed.cancel, keyPending, download }
 }

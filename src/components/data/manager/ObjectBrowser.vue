@@ -274,7 +274,7 @@ const onThisComputer = computed(
 const locked = useLockedBucket(bucket, remoteNodeId, activeGroupId, download)
 const { reasonOf: brokenReason } = useBrokenFiles(bucket, remoteNodeId, objects)
 const providerBucket = useProviderBucket(bucket, activeGroupId, remoteNodeId)
-const { lockedOnNode, availableToYou } = locked
+const { lockedOnNode, statusSettled, availableToYou } = locked
 // A read waiting in another folder ends with the folder.
 watch(prefix, () => locked.cancel())
 
@@ -481,6 +481,11 @@ watch([bucket, remoteNodeId, contextFingerprint], () => {
   zipStarted.value = false
 })
 onBeforeUnmount(() => clearTimeout(startedTimer))
+// No ZIP before the lock state is read, and an open dialog closes once the bucket is locked.
+const zipBlocked = computed(() => lockedOnNode.value || !statusSettled.value)
+watch(lockedOnNode, (now) => {
+  if (now) archiveOpen.value = false
+})
 
 function openArchive() {
   archiveFiles.value = visibleObjects.value.filter((object) => selectedObjectKeys.value.has(object.key))
@@ -911,7 +916,7 @@ async function onDrop(event: DragEvent) {
             <col class="w-[132px]" />
           </colgroup>
           <thead class="text-xs text-muted-foreground @max-[600px]:hidden">
-            <SelectionBar v-if="selectedCount" :manager="manager" :span="columns - 1" :locked="lockedOnNode" :started="zipStarted" @action="onBarAction" />
+            <SelectionBar v-if="selectedCount" :manager="manager" :span="columns - 1" :locked="zipBlocked" :started="zipStarted" @action="onBarAction" />
             <tr v-else class="border-b border-border">
               <th class="p-0">
                 <label class="flex h-11 w-11 items-center justify-center">
@@ -1168,7 +1173,7 @@ async function onDrop(event: DragEvent) {
         </div>
         <template v-if="selectedCount">
           <div class="hidden h-16 @max-[600px]:block md:!hidden" aria-hidden="true" />
-          <SelectionBar bottom :manager="manager" :locked="lockedOnNode" class="hidden @max-[600px]:flex" @action="onBarAction" />
+          <SelectionBar bottom :manager="manager" :locked="zipBlocked" class="hidden @max-[600px]:flex" @action="onBarAction" />
         </template>
         </template>
         <button
