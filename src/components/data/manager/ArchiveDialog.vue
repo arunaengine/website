@@ -84,10 +84,13 @@ async function confirm() {
     const entries = archiveEntries(props.bucket, props.files.map((file) => file.key), props.folders.map((folder) => folder.prefix))
     const url = await archiveLink(entries, props.nodeId)
     if (mine !== round) return
-    // A detached anchor is ignored by some browsers, so it is clicked in the document.
+    // Its own tab: another origin ignores `download`, so a refused GET shows there, never in place
+    // of the portal. The node's `frame-src blob:` rules out a hidden frame. A detached anchor is
+    // ignored by some browsers, so it is clicked in the document.
     const anchor = document.createElement('a')
     anchor.href = url
     anchor.download = 'selection.zip'
+    anchor.target = '_blank'
     anchor.rel = 'noopener'
     document.body.append(anchor)
     anchor.click()

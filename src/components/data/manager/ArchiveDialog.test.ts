@@ -48,14 +48,14 @@ const files = [
 const folders = [{ prefix: 'runs/reads/', name: 'reads' }]
 
 // The node env has no document; the anchor the dialog clicks is recorded instead.
-const anchors: { href: string; download: string; click: () => void }[] = []
+const anchors: { href: string; download: string; target: string; click: () => void }[] = []
 beforeEach(() => {
   anchors.length = 0
   archiveLink.mockReset()
   vi.stubGlobal('document', {
     body: { append: vi.fn() },
     createElement: () => {
-      const anchor = { href: '', download: '', rel: '', click: vi.fn(), remove: vi.fn() }
+      const anchor = { href: '', download: '', target: '', rel: '', click: vi.fn(), remove: vi.fn() }
       anchors.push(anchor)
       return anchor
     },
@@ -112,6 +112,15 @@ describe('ZIP download dialog', () => {
     expect(anchors[0]!.click).toHaveBeenCalled()
     expect(onUpdateOpen).toHaveBeenCalledWith(false)
     expect(onStarted).toHaveBeenCalled()
+  })
+
+  it('opens the link in its own tab, so a download the node refuses never replaces the portal', async () => {
+    archiveLink.mockResolvedValue('https://node-2.example/api/v1/data/archives/download?ticket=t2')
+    const { root } = await open()
+
+    await click(button(root, 'Download'))
+
+    expect(anchors[0]).toMatchObject({ target: '_blank', rel: 'noopener' })
   })
 
   it('shows a refused link in the dialog and keeps it open', async () => {
