@@ -11,8 +11,6 @@ const ALLOWED = new Set([
   '/app',
   '/app/docs/v1',
   '/app/datasets',
-  '/imprint',
-  '/terms',
   'https://github.com/arunaengine/aruna',
   'https://github.com/arunaengine/aruna/issues',
   'https://github.com/arunaengine/aruna#small-local-realm',

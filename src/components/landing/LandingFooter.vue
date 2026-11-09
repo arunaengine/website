@@ -3,6 +3,9 @@ import AppLogo from '@/components/layout/AppLogo.vue'
 import GithubIcon from '@/components/icons/GithubIcon.vue'
 import { BookOpen } from '@lucide/vue'
 import { RouterLink } from 'vue-router'
+import { legalLinks } from '@/lib/config'
+
+const legal = legalLinks()
 </script>
 
 <template>
@@ -55,8 +58,10 @@ import { RouterLink } from 'vue-router'
           © 2026 the Aruna project · Apache 2.0 and MIT licensed
         </div>
         <div class="flex items-center gap-3">
-          <RouterLink to="/imprint" class="hover:text-foreground">Imprint</RouterLink>
-          <RouterLink to="/terms" class="hover:text-foreground">Terms of service</RouterLink>
+          <template v-for="(link, index) in legal" :key="index">
+            <a v-if="link.external" :href="link.href" target="_blank" rel="noopener" class="hover:text-foreground">{{ link.label }}</a>
+            <RouterLink v-else :to="link.href" class="hover:text-foreground">{{ link.label }}</RouterLink>
+          </template>
           <a
             href="https://github.com/arunaengine/aruna"
             target="_blank"

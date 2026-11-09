@@ -18,6 +18,7 @@ const portalConfig = () => ({
   authCallbackOrigin: '',
   features: {} as Record<string, boolean>,
   terminology: { gatewayUrl: 'https://terminology.example/api-gateway' },
+  landing: true,
 })
 
 const RouterLinkStub = defineComponent({
@@ -42,6 +43,7 @@ beforeAll(async () => {
   vi.doMock('@/lib/config', () => ({
     featureEnabled: (flag: string) => enabledFeatures.has(flag),
     portalConfig,
+    legalLinks: () => [],
   }))
   vi.doMock('@/components/layout/AppLogo.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/ui/Sheet.vue', () => ({ default: PassthroughStub }))

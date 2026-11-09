@@ -109,7 +109,7 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
       stop: unwatchNode,
     }),
   },
-  '@/lib/config': { featureEnabled: () => true, portalConfig },
+  '@/lib/config': { featureEnabled: () => true, portalConfig, legalLinks: () => [] },
   '@/lib/desktop': { isDesktop: () => desktopMode },
   '@/lib/desktopBridge': { appQuit },
   '@/lib/desktopBoot': { probeRealm, realmReach },
@@ -148,7 +148,7 @@ beforeAll(async () => {
       stop: unwatchNode,
     }),
   }))
-  vi.doMock('@/lib/config', () => ({ featureEnabled: () => true, portalConfig }))
+  vi.doMock('@/lib/config', () => ({ featureEnabled: () => true, portalConfig, legalLinks: () => [] }))
   vi.doMock('@/lib/desktopBridge', () => ({ appQuit }))
   vi.doMock('@/lib/desktopBoot', () => ({ probeRealm, realmReach }))
   vi.doMock('@/components/dashboard/TopBar.vue', () => ({ default: TopBarStub }))
