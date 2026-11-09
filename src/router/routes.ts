@@ -1,25 +1,61 @@
-import type { RouteRecordRaw } from 'vue-router'
+import type { RouteLocationRaw, RouteRecordRaw } from 'vue-router'
+import { portalConfig } from '@/lib/config'
 import { isDesktop } from '@/lib/desktop'
+
+// A portal-only deployment has no landing page and no news; both open the dashboard.
+function landingGuard(): RouteLocationRaw | true {
+  return portalConfig().landing ? true : { name: 'dashboard' }
+}
+
+// Old /imprint and /terms links open the first document whose label names them, else the dashboard.
+function legalGuard(words: string[]) {
+  return (): RouteLocationRaw | false => {
+    const legal = portalConfig().legal
+    const index = legal.findIndex((item) => words.some((word) => item.label.toLowerCase().includes(word)))
+    const target = legal[index]
+    if (!target) return { name: 'dashboard' }
+    if ('markdown' in target) return { name: 'legal', params: { n: String(index) } }
+    window.location.replace(target.url)
+    return false
+  }
+}
 
 // The shell has no marketing surface, so '/' boots into the app shell, which
 // renders the signed-in views or its own sign-in prompt. LandingView stays a
 // lazy chunk either way, so the web build is untouched.
 function landingRoute(): RouteRecordRaw {
   if (isDesktop()) return { path: '/', redirect: { name: 'dashboard' } }
-  return { path: '/', name: 'landing', component: () => import('@/views/LandingView.vue') }
+  return { path: '/', name: 'landing', component: () => import('@/views/LandingView.vue'), beforeEnter: landingGuard }
 }
 
 // Public pages beside the landing page; the shell has no marketing surface.
 function publicRoutes(): RouteRecordRaw[] {
   if (isDesktop()) return []
   return [
-    { path: '/imprint', name: 'imprint', component: () => import('@/views/ImprintView.vue') },
-    { path: '/terms', name: 'terms', component: () => import('@/views/TermsView.vue') },
-    { path: '/news', name: 'news', component: () => import('@/views/NewsView.vue') },
-    { path: '/news/:slug', name: 'news-post', component: () => import('@/views/NewsPostView.vue') },
+    // The guards always leave these two; the component is only the record's required target.
+    {
+      path: '/imprint',
+      name: 'imprint',
+      component: () => import('@/views/NotFoundView.vue'),
+      beforeEnter: legalGuard(['imprint', 'impressum']),
+    },
+    {
+      path: '/terms',
+      name: 'terms',
+      component: () => import('@/views/NotFoundView.vue'),
+      beforeEnter: legalGuard(['terms', 'nutzungsbedingungen']),
+    },
+    { path: '/news', name: 'news', component: () => import('@/views/NewsView.vue'), beforeEnter: landingGuard },
+    { path: '/news/:slug', name: 'news-post', component: () => import('@/views/NewsPostView.vue'), beforeEnter: landingGuard },
     // A share link opens without an account, outside the app shell; its token is in the fragment.
     { path: '/s/:node', name: 'share-visit', component: () => import('@/views/ShareVisitView.vue') },
   ]
+}
+
+// A legal document the node serves as Markdown, shown inside the app shell.
+function legalRoutes(): RouteRecordRaw[] {
+  if (isDesktop()) return []
+  return [{ path: '/legal/:n', name: 'legal', component: () => import('@/views/LegalView.vue') }]
 }
 
 // One frontend, two shells: Aruna Desktop mounts a layout built around the
@@ -159,6 +195,7 @@ export function portalRoutes(): RouteRecordRaw[] {
         // A node opens as a dialog on the Status page; links by this name land there.
         { path: 'nodes/:nodeId', name: 'node', redirect: (to) => ({ name: 'status', query: { node: String(to.params.nodeId) } }) },
         ...desktopRoutes(),
+        ...legalRoutes(),
         // Settings (consolidates account preferences, members, tokens)
         {
           path: 'settings',

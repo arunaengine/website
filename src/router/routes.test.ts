@@ -5,6 +5,7 @@ interface AnyRoute {
   name?: string
   component?: unknown
   redirect?: unknown
+  beforeEnter?: () => unknown
   children?: AnyRoute[]
 }
 
@@ -36,6 +37,12 @@ function find(routes: AnyRoute[], path: string): AnyRoute | undefined {
 
 function appChildren(routes: AnyRoute[]): AnyRoute[] {
   return find(routes, '/app')?.children ?? []
+}
+
+// Installs a served config in the module graph the last build() made.
+async function configure(raw: Record<string, unknown>): Promise<void> {
+  const { applyPortalConfig } = await import('@/lib/config')
+  applyPortalConfig(raw)
 }
 
 afterEach(() => {
@@ -137,6 +144,65 @@ describe('web routes', () => {
     }
   })
 
+  it('opens the landing page and news unless the deployment is portal-only', async () => {
+    const routes = await build()
+    const guarded = ['/', '/news', '/news/:slug'].map((path) => find(routes, path)!)
+
+    for (const route of guarded) expect(route.beforeEnter?.()).toBe(true)
+    await configure({ landing: false })
+    for (const route of guarded) expect(route.beforeEnter?.()).toEqual({ name: 'dashboard' })
+  })
+
+  it('keeps share links, callbacks, the federation popup and docs in portal-only mode', async () => {
+    const routes = await build()
+    await configure({ landing: false })
+
+    for (const path of ['/s/:node', '/auth/callback', '/federation/popup']) {
+      expect(find(routes, path)?.beforeEnter).toBeUndefined()
+      expect(find(routes, path)?.redirect).toBeUndefined()
+    }
+    expect(child(routes, 'docs/v1/:topic?')?.name).toBe('docs')
+  })
+
+  it('sends old imprint and terms links to the matching document, else the dashboard', async () => {
+    const routes = await build()
+    const imprint = find(routes, '/imprint')!
+    const terms = find(routes, '/terms')!
+
+    expect(imprint.beforeEnter?.()).toEqual({ name: 'dashboard' })
+    expect(terms.beforeEnter?.()).toEqual({ name: 'dashboard' })
+
+    await configure({
+      legal: [
+        { label: 'Privacy', markdown: '# Privacy' },
+        { label: 'Nutzungsbedingungen', markdown: '# Bedingungen' },
+        { label: 'IMPRESSUM', markdown: '# Impressum' },
+        { label: 'Terms of service', markdown: '# Terms' },
+      ],
+    })
+    expect(imprint.beforeEnter?.()).toEqual({ name: 'legal', params: { n: '2' } })
+    expect(terms.beforeEnter?.()).toEqual({ name: 'legal', params: { n: '1' } })
+  })
+
+  it('leaves for an imprint that is a page of its own', async () => {
+    const routes = await build()
+    const replace = vi.fn()
+    vi.stubGlobal('window', { location: { replace } })
+    await configure({ legal: [{ label: 'Imprint', url: 'https://uni.example.org/imprint' }] })
+
+    expect(find(routes, '/imprint')?.beforeEnter?.()).toBe(false)
+    expect(replace).toHaveBeenCalledWith('https://uni.example.org/imprint')
+    expect(find(routes, '/terms')?.beforeEnter?.()).toEqual({ name: 'dashboard' })
+  })
+
+  it('shows Markdown legal documents inside the app shell', async () => {
+    const routes = await build()
+    const legal = child(routes, '/legal/:n')
+
+    expect(legal?.name).toBe('legal')
+    expect(typeof legal?.component).toBe('function')
+  })
+
   it('mounts no welcome view', async () => {
     const routes = await build()
     expect(find(routes, '/welcome')).toBeUndefined()
@@ -153,12 +219,14 @@ describe('desktop routes', () => {
     expect(root?.redirect).toEqual({ name: 'dashboard' })
     expect(root?.name).toBeUndefined()
     expect(root?.component).toBeUndefined()
+    expect(root?.beforeEnter).toBeUndefined()
   })
 
   it('has no public pages', async () => {
     const routes = await build({ apiBaseUrl: '/api/v1' })
 
     for (const path of ['/imprint', '/terms', '/news', '/news/:slug', '/s/:node']) expect(find(routes, path)).toBeUndefined()
+    expect(child(routes, '/legal/:n')).toBeUndefined()
   })
 
   it('mounts the device views', async () => {
