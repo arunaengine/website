@@ -128,32 +128,26 @@ const collapsed = computed(() => narrow.value || manualCollapsed.value)
         <ArrowLeft class="h-4 w-4 shrink-0" />
         <span v-if="!collapsed">Back to landing</span>
       </RouterLink>
-      <template v-if="legal.length">
-        <Popover v-if="collapsed" side="right" align="end">
-          <button
-            type="button"
-            title="Legal"
-            aria-label="Legal"
-            :class="[navRowClass(true), 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground']"
-          >
-            <Scale class="h-4 w-4 shrink-0" />
-          </button>
-          <template #content>
-            <nav aria-label="Legal" class="flex flex-col gap-2 text-sm">
-              <template v-for="(link, index) in legal" :key="index">
-                <a v-if="link.external" :href="link.href" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">{{ link.label }}</a>
-                <RouterLink v-else :to="link.href" class="text-primary hover:underline">{{ link.label }}</RouterLink>
-              </template>
-            </nav>
-          </template>
-        </Popover>
-        <nav v-else aria-label="Legal" class="mt-2 flex flex-wrap gap-x-3 gap-y-1 px-2.5">
-          <template v-for="(link, index) in legal" :key="index">
-            <a v-if="link.external" :href="link.href" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">{{ link.label }}</a>
-            <RouterLink v-else :to="link.href" class="text-primary hover:underline">{{ link.label }}</RouterLink>
-          </template>
-        </nav>
-      </template>
+      <!-- The documents also close every page; this row reaches them without scrolling. -->
+      <Popover v-if="legal.length" side="right" align="end">
+        <button
+          type="button"
+          :title="collapsed ? 'Legal' : undefined"
+          :aria-label="collapsed ? 'Legal' : undefined"
+          :class="[navRowClass(collapsed), 'text-muted-foreground/80 hover:bg-foreground/[0.04] hover:text-foreground']"
+        >
+          <Scale class="h-4 w-4 shrink-0" />
+          <span v-if="!collapsed">Legal</span>
+        </button>
+        <template #content>
+          <nav aria-label="Legal" class="flex flex-col gap-2 text-sm">
+            <template v-for="(link, index) in legal" :key="index">
+              <a v-if="link.external" :href="link.href" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">{{ link.label }}</a>
+              <RouterLink v-else :to="link.href" class="text-primary hover:underline">{{ link.label }}</RouterLink>
+            </template>
+          </nav>
+        </template>
+      </Popover>
       <slot name="footer" :collapsed="collapsed" />
     </div>
   </aside>

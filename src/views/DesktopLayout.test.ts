@@ -52,6 +52,7 @@ const TopBarStub = defineComponent({
   setup: (props) => () => h('div', `topbar:${props.variant}`),
 })
 const icons = new Proxy({}, { get: () => EmptyStub })
+let legal: Array<{ label: string; href: string; external: boolean }> = []
 const portalConfig = () => ({
   apiBaseUrl: '/api/v1',
   authCallbackOrigin: '',
@@ -109,7 +110,7 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
       stop: unwatchNode,
     }),
   },
-  '@/lib/config': { featureEnabled: () => true, portalConfig, legalLinks: () => [] },
+  '@/lib/config': { featureEnabled: () => true, portalConfig, legalLinks: () => legal },
   '@/lib/desktop': { isDesktop: () => desktopMode },
   '@/lib/desktopBridge': { appQuit },
   '@/lib/desktopBoot': { probeRealm, realmReach },
@@ -148,7 +149,7 @@ beforeAll(async () => {
       stop: unwatchNode,
     }),
   }))
-  vi.doMock('@/lib/config', () => ({ featureEnabled: () => true, portalConfig, legalLinks: () => [] }))
+  vi.doMock('@/lib/config', () => ({ featureEnabled: () => true, portalConfig, legalLinks: () => legal }))
   vi.doMock('@/lib/desktopBridge', () => ({ appQuit }))
   vi.doMock('@/lib/desktopBoot', () => ({ probeRealm, realmReach }))
   vi.doMock('@/components/dashboard/TopBar.vue', () => ({ default: TopBarStub }))
@@ -257,6 +258,26 @@ describe('desktop shell', () => {
 
     expect(desktop).toContain('Quit Aruna Desktop')
     expect(portal).not.toContain('Quit Aruna Desktop')
+  })
+
+  it('ends every portal page with one line of legal links above the mobile bar', async () => {
+    expect(await renderToString(createSSRApp(AppLayout))).toMatch(/<main[^>]*class="[^"]*pb-20/)
+
+    legal = [
+      { label: 'Imprint', href: 'https://uni.example.org/imprint', external: true },
+      { label: 'Terms', href: '/legal/1', external: false },
+    ]
+    try {
+      const html = await renderToString(createSSRApp(AppLayout))
+      const line = html.match(/<\/main>(?:<!--.*?-->)?<nav aria-label="Legal" class="([^"]*)">(.*?)<\/nav>/s)
+
+      expect(html).not.toMatch(/<main[^>]*class="[^"]*pb-20/)
+      expect(line?.[1]).toContain('pb-20')
+      expect(line?.[2]).toMatch(/href="https:\/\/uni\.example\.org\/imprint"[^>]*>Imprint<\/a>/)
+      expect(line?.[2]).toMatch(/href="\/legal\/1"[^>]*>Terms<\/a>/)
+    } finally {
+      legal = []
+    }
   })
 
   it('loads the main pages once at idle time on desktop and never in the browser', async () => {

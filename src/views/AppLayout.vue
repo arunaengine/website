@@ -7,7 +7,7 @@ import MobileNav from '@/components/dashboard/MobileNav.vue'
 import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
 import LinkOffer from '@/components/federation/LinkOffer.vue'
 import FeatureHidden from '@/components/layout/FeatureHidden.vue'
-import { RouterView, useRoute, useRouter } from 'vue-router'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { bootRestoring } from '@/composables/aruna/restoreGate'
@@ -18,6 +18,9 @@ import { bindTutorialRouter, tutorialActive } from '@/lib/tutorial/session'
 import { uploadQueueItems } from '@/composables/uploadQueueState'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import { probeRealm, realmReach } from '@/lib/desktopBoot'
+import { legalLinks } from '@/lib/config'
+
+const legal = legalLinks()
 
 const TransfersPanel = defineAsyncComponent({
   loader: () => import('@/components/data/TransfersPanel.vue'),
@@ -113,7 +116,13 @@ watch(
     <div class="flex min-w-0 flex-1 flex-col">
       <TopBar />
       <GlobalErrorBanner />
-      <main id="main-content" ref="mainEl" tabindex="-1" class="flex-1 overflow-x-hidden pb-20 outline-none md:pb-0">
+      <main
+        id="main-content"
+        ref="mainEl"
+        tabindex="-1"
+        class="flex-1 overflow-x-hidden outline-none md:pb-0"
+        :class="{ 'pb-20': !legal.length }"
+      >
         <RealmUnreachable v-if="unreachable" />
         <template v-else>
           <LinkOffer />
@@ -123,6 +132,13 @@ watch(
           <RouterView v-else />
         </template>
       </main>
+      <!-- One quiet line at the end of every page; on mobile its padding keeps it above the bottom bar. -->
+      <nav v-if="legal.length" aria-label="Legal" class="flex flex-wrap justify-end gap-x-3 px-4 pb-20 pt-6 text-[11px] sm:px-6 md:pb-3">
+        <template v-for="(link, index) in legal" :key="index">
+          <a v-if="link.external" :href="link.href" target="_blank" rel="noopener noreferrer" class="whitespace-nowrap text-muted-foreground/75 hover:underline">{{ link.label }}</a>
+          <RouterLink v-else :to="link.href" class="whitespace-nowrap text-muted-foreground/75 hover:underline">{{ link.label }}</RouterLink>
+        </template>
+      </nav>
     </div>
     <MobileNav />
     <!-- Uploads run through the shared queue and survive navigation, so the

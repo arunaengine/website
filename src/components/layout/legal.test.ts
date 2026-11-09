@@ -12,6 +12,8 @@ const RouterLinkStub = defineComponent({
 })
 const PassthroughStub = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const EmptyStub = defineComponent(() => () => null)
+// Renders the trigger and the menu at once, so the menu's links can be read.
+const PopoverStub = defineComponent((_, { slots }) => () => h('div', [slots.default?.(), slots.content?.()]))
 const PageHeaderStub = defineComponent({
   props: { title: { type: String, required: true } },
   setup: (props) => () => h('h1', props.title),
@@ -36,6 +38,7 @@ beforeAll(async () => {
   vi.doMock('@/composables/usePortalFeatures', () => ({ usePortalFeatures: () => ({ shown: () => true }) }))
   vi.doMock('@/components/layout/AppLogo.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/dashboard/PageHeader.vue', () => ({ default: PageHeaderStub }))
+  vi.doMock('@/components/ui/Popover.vue', () => ({ default: PopoverStub }))
   for (const ui of ['Sheet', 'SheetContent', 'DialogTitle', 'DialogDescription']) {
     vi.doMock(`@/components/ui/${ui}.vue`, () => ({ default: PassthroughStub }))
   }
@@ -60,22 +63,24 @@ function legalNav(html: string): string {
 }
 
 describe('legal links', () => {
-  it('lists the documents under Collapse as plain blue links', async () => {
+  it('opens the documents as plain blue links from a Legal row under Collapse', async () => {
     applyPortalConfig({ legal: LEGAL })
-    const links = legalNav(await render(SideNav))
+    const html = await render(SideNav)
+    const links = legalNav(html)
 
+    expect(html).toMatch(/<span>Collapse<\/span><\/button>.*<button[^>]*>.*<span>Legal<\/span><\/button>/s)
     expect(links).toMatch(/<a href="https:\/\/uni\.example\.org\/imprint" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Imprint<\/a>/)
     expect(links).toMatch(/<a href="\/legal\/1"[^>]*class="text-primary hover:underline">Terms of service<\/a>/)
     expect(links).not.toContain('<svg')
   })
 
-  it('offers one Legal row in the collapsed sidebar', async () => {
+  it('keeps the Legal row as an icon in the collapsed sidebar', async () => {
     applyPortalConfig({ legal: LEGAL })
     vi.stubGlobal('window', { localStorage: { getItem: () => '1', setItem: () => {} } })
     const html = await render(SideNav)
 
-    expect(html).toMatch(/<button[^>]*aria-label="Legal"/)
-    expect(legalNav(html)).toBe('')
+    expect(html).toMatch(/<button[^>]*title="Legal" aria-label="Legal"/)
+    expect(html).not.toContain('<span>Legal</span>')
   })
 
   it('has no back link in portal-only mode', async () => {
@@ -83,10 +88,15 @@ describe('legal links', () => {
     expect(await render(SideNav)).not.toContain('Back to landing')
   })
 
-  it('lists the same documents in the More sheet and both landing footers', async () => {
+  it('leaves the More sheet to the line at the end of the page', async () => {
+    applyPortalConfig({ legal: LEGAL })
+    expect(await render(MobileNav)).not.toMatch(/Legal|Imprint|\/legal\//)
+  })
+
+  it('lists the same documents in both landing footers', async () => {
     applyPortalConfig({ legal: LEGAL })
 
-    for (const component of [MobileNav, SiteFooter, LandingFooter]) {
+    for (const component of [SiteFooter, LandingFooter]) {
       const html = await render(component)
       expect(html).toMatch(/href="https:\/\/uni\.example\.org\/imprint"[^>]*>Imprint<\/a>/)
       expect(html).toMatch(/href="\/legal\/1"[^>]*>Terms of service<\/a>/)
@@ -96,8 +106,7 @@ describe('legal links', () => {
   it('shows no legal links anywhere without config', async () => {
     for (const component of [SideNav, MobileNav, SiteFooter, LandingFooter]) {
       const html = await render(component)
-      expect(html).not.toContain('aria-label="Legal"')
-      expect(html).not.toMatch(/Imprint|Terms|\/legal\//)
+      expect(html).not.toMatch(/Legal|Imprint|Terms|\/legal\//)
     }
   })
 })

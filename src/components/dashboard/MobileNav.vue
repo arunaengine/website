@@ -6,7 +6,6 @@ import { useAuth } from '@/composables/useAuth'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { assistantAvailable } from '@/composables/assistantState'
 import { isDesktop } from '@/lib/desktop'
-import { legalLinks } from '@/lib/config'
 import Sheet from '@/components/ui/Sheet.vue'
 import SheetContent from '@/components/ui/SheetContent.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
@@ -42,7 +41,6 @@ function isActive(item: NavItem): boolean {
 }
 
 const moreActive = computed(() => moreNav.value.some(isActive))
-const legal = legalLinks()
 </script>
 
 <template>
@@ -104,12 +102,6 @@ const legal = legalLinks()
           <component :is="item.icon" class="h-4 w-4 shrink-0" />
           <span>{{ item.label }}</span>
         </RouterLink>
-      </nav>
-      <nav v-if="legal.length" class="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm" aria-label="Legal">
-        <template v-for="(link, index) in legal" :key="index">
-          <a v-if="link.external" :href="link.href" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">{{ link.label }}</a>
-          <RouterLink v-else :to="link.href" class="text-primary hover:underline" @click="moreOpen = false">{{ link.label }}</RouterLink>
-        </template>
       </nav>
     </SheetContent>
   </Sheet>
