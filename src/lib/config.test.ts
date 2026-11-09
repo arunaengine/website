@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyPortalConfig } from '@/lib/config'
+import { applyPortalConfig, legalLinks } from '@/lib/config'
 
 describe('portal login config', () => {
   it('keeps named options with string params and drops the rest', () => {
@@ -42,5 +42,41 @@ describe('portal login config', () => {
 
   it('has no options and no account page without config', () => {
     expect(applyPortalConfig({}).login).toEqual({ options: [], accountUrl: '' })
+  })
+})
+
+describe('portal site config', () => {
+  it('keeps the landing page unless it is switched off', () => {
+    expect(applyPortalConfig({}).landing).toBe(true)
+    expect(applyPortalConfig({ landing: 'false' }).landing).toBe(true)
+    expect(applyPortalConfig({ landing: false }).landing).toBe(false)
+  })
+
+  it('keeps labelled https pages and Markdown documents in order', () => {
+    const { legal } = applyPortalConfig({
+      legal: [
+        { label: ' Imprint ', url: ' https://uni.example.org/imprint ' },
+        { label: 'Plain http', url: 'http://uni.example.org/privacy' },
+        { label: 'Script', url: 'javascript:alert(1)' },
+        { label: '', markdown: '# Unnamed' },
+        { label: 'Terms', markdown: '# Terms' },
+        { label: 'Nothing' },
+        'not a document',
+      ],
+    })
+    expect(legal).toEqual([
+      { label: 'Imprint', url: 'https://uni.example.org/imprint' },
+      { label: 'Terms', markdown: '# Terms' },
+    ])
+    expect(legalLinks()).toEqual([
+      { label: 'Imprint', href: 'https://uni.example.org/imprint', external: true },
+      { label: 'Terms', href: '/legal/1', external: false },
+    ])
+  })
+
+  it('has no legal documents without config', () => {
+    expect(applyPortalConfig({}).legal).toEqual([])
+    expect(applyPortalConfig({ legal: { label: 'Imprint' } }).legal).toEqual([])
+    expect(legalLinks()).toEqual([])
   })
 })

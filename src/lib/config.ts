@@ -39,6 +39,9 @@ export interface LoginConfig {
   accountUrl: string
 }
 
+/** A legal document: a page of the institution, or Markdown the node serves inline. */
+export type LegalDocument = { label: string; url: string } | { label: string; markdown: string }
+
 export interface PortalRuntimeConfig {
   apiBaseUrl: string
   // Origin the OIDC redirect_uri is built on; empty means this page's origin.
@@ -49,6 +52,10 @@ export interface PortalRuntimeConfig {
   // Realm registry the realm picker lists; empty means no registry list.
   registryUrl: string
   login: LoginConfig
+  // False runs the portal without its landing page.
+  landing: boolean
+  // In display order; empty shows no legal links.
+  legal: LegalDocument[]
 }
 
 export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
@@ -58,6 +65,8 @@ export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
   terminology: { gatewayUrl: 'https://terminology.services.base4nfdi.de/api-gateway' },
   registryUrl: '',
   login: { options: [], accountUrl: '' },
+  landing: true,
+  legal: [],
 }
 
 // Per-flag defaults are layered under the served `features` map, so deployments
@@ -83,6 +92,21 @@ let current: PortalRuntimeConfig = {
 
 export function portalConfig(): PortalRuntimeConfig {
   return current
+}
+
+export interface LegalLink {
+  label: string
+  href: string
+  external: boolean
+}
+
+/** The legal documents as links: the institution's page, or `/legal/<n>` inside the app shell. */
+export function legalLinks(): LegalLink[] {
+  return current.legal.map((item, index) =>
+    'url' in item
+      ? { label: item.label, href: item.url, external: true }
+      : { label: item.label, href: `/legal/${index}`, external: false },
+  )
 }
 
 export function featureEnabled(flag: string): boolean {
@@ -125,6 +149,8 @@ function mergeConfig(raw: Record<string, unknown>): PortalRuntimeConfig {
   }
   if (typeof raw.registryUrl === 'string') merged.registryUrl = raw.registryUrl.trim()
   merged.login = loginConfig(raw.login)
+  merged.landing = raw.landing !== false
+  merged.legal = legalDocuments(raw.legal)
   if (raw.features && typeof raw.features === 'object' && !Array.isArray(raw.features)) {
     for (const [key, value] of Object.entries(raw.features as Record<string, unknown>)) {
       if (typeof value === 'boolean') merged.features[key] = value
@@ -150,6 +176,28 @@ function upstreamLogin(option: Record<string, unknown>): UpstreamLogin | undefin
   const bridge = typeof option.bridge === 'string' ? option.bridge.trim().replace(/\/+$/, '') : ''
   return provider && bridge ? { provider, bridge } : undefined
 }
+
+// Only https pages link out; an entry with neither source is left out.
+function legalDocuments(raw: unknown): LegalDocument[] {
+  if (!Array.isArray(raw)) return []
+  return raw.flatMap((entry): LegalDocument[] => {
+    if (!entry || typeof entry !== 'object') return []
+    const item = entry as Record<string, unknown>
+    const label = typeof item.label === 'string' ? item.label.trim() : ''
+    if (!label) return []
+    if (typeof item.url === 'string') return httpsUrl(item.url) ? [{ label, url: item.url.trim() }] : []
+    return typeof item.markdown === 'string' ? [{ label, markdown: item.markdown }] : []
+  })
+}
+
+function httpsUrl(value: string): boolean {
+  try {
+    return new URL(value.trim()).protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 
 function loginConfig(raw: unknown): LoginConfig {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { options: [], accountUrl: '' }
