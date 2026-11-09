@@ -198,7 +198,6 @@ function httpsUrl(value: string): boolean {
   }
 }
 
-
 function loginConfig(raw: unknown): LoginConfig {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { options: [], accountUrl: '' }
   const login = raw as Record<string, unknown>
