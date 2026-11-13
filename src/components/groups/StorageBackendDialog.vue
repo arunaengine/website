@@ -15,7 +15,7 @@ import { Database, Lock } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useImportRoots } from '@/composables/useImportRoots'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
-import { BACKEND_KINDS, BACKEND_KIND_SCHEMAS, backendSchema, folderProblem, shortError } from '@/lib/storage'
+import { BACKEND_KINDS, BACKEND_KIND_SCHEMAS, backendSchema, folderProblem, shortError, targetLabel } from '@/lib/storage'
 import type { GroupBackendKind, GroupBackendResponse } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
 import Notice from '@/components/ui/Notice.vue'
@@ -29,7 +29,8 @@ const props = defineProps<{
   nodeId?: string | null
   /** A storage of another node whose name and connection a new one starts from; keys are entered again. */
   prefill?: GroupBackendResponse | null
-  /** The S3 bucket template new buckets on that node get once the new storage is saved. */
+  /** The S3 bucket template new buckets on that node get once the new storage is saved; a node that
+   *  already sends new buckets elsewhere keeps that unless the user chooses to replace it. */
   rule?: string | null
 }>()
 const emit = defineEmits<{
@@ -37,7 +38,16 @@ const emit = defineEmits<{
   (e: 'saved', backend?: GroupBackendResponse, ruleError?: string): void
 }>()
 
-const { createGroupBackend, replaceGroupBackend, disableGroupBackend, enableGroupBackend, putGroupRouting, saving } = useAruna()
+const {
+  createGroupBackend,
+  replaceGroupBackend,
+  disableGroupBackend,
+  enableGroupBackend,
+  putGroupRouting,
+  getGroupRouting,
+  listGroupBackends,
+  saving,
+} = useAruna()
 const { writesDisabled } = useConnectivity()
 const uid = useId()
 
@@ -68,6 +78,31 @@ const rootOptions = computed(() => {
   return list
 })
 const folderError = computed(() => (folderMode.value ? folderProblem(publicValues.value.folder ?? '') : null))
+
+// Where new buckets go on the node a copy is added to, read when the dialog opens with a rule.
+const ruleMode = computed(() => Boolean(props.rule && !props.backend))
+const ruleRead = ref<'reading' | 'done' | 'failed'>('done')
+const ruleCurrent = ref<string | null>(null)
+const replaceRule = ref(false)
+const setsRule = computed(() => ruleMode.value && ruleRead.value === 'done' && (ruleCurrent.value === null || replaceRule.value))
+let ruleRun = 0
+async function readRule() {
+  const run = ++ruleRun
+  ruleRead.value = 'reading'
+  ruleCurrent.value = null
+  replaceRule.value = false
+  try {
+    const [routing, list] = await Promise.all([
+      getGroupRouting(props.groupId, props.nodeId),
+      listGroupBackends(props.groupId, props.nodeId).catch(() => null),
+    ])
+    if (run !== ruleRun) return
+    ruleCurrent.value = routing.default_target ? targetLabel(routing.default_target, list?.backends ?? []) : null
+    ruleRead.value = 'done'
+  } catch {
+    if (run === ruleRun) ruleRead.value = 'failed'
+  }
+}
 
 const submitSummary = computed(() => (submitError.value ? shortError(submitError.value) : ''))
 
@@ -116,7 +151,7 @@ const needsCredentials = computed(() => !isEdit.value || credentialsEntered.valu
 const pathStyleOff = computed(() => kind.value === 's3' && !toggleOn.value)
 
 const submitDisabled = computed(() => {
-  if (saving.value || writesDisabled.value) return true
+  if (saving.value || writesDisabled.value || (ruleMode.value && ruleRead.value === 'reading')) return true
   // Nothing typed and nothing changed: there is nothing to save.
   if (isEdit.value && !settingsChanged.value && !credentialsEntered.value) return true
   if (missingRequired.value || !name.value.trim()) return true
@@ -148,6 +183,8 @@ watch(
     keysOpen.value = !props.backend
     removing.value = false
     submitError.value = null
+    ruleRun++
+    if (ruleMode.value) void readRule()
   },
 )
 
@@ -190,7 +227,7 @@ async function submit() {
       saved = await createGroupBackend(props.groupId, fullBody(), props.nodeId)
     }
     let ruleError: string | undefined
-    if (!existing && props.rule) {
+    if (!existing && props.rule && setsRule.value) {
       // The storage exists now; a failed rule must not lead to a second one.
       await putGroupRouting(props.groupId, { backend_id: saved.backend_id }, undefined, props.rule, props.nodeId).catch((err) => {
         ruleError = `Storage added, but new buckets on this node do not get their own S3 bucket: ${errorMessage(err)}`
@@ -332,9 +369,22 @@ async function setRemoved(remove: boolean) {
             </div>
           </div>
 
-          <p v-if="rule && !backend" class="text-xs text-muted-foreground">
-            New buckets on this node get their own S3 bucket <span class="font-mono text-foreground">{{ rule }}</span>.
-          </p>
+          <template v-if="ruleMode">
+            <p v-if="ruleRead === 'reading'" class="text-xs text-muted-foreground">Checking where new buckets go on this node…</p>
+            <p v-else-if="ruleRead === 'failed'" class="text-xs text-muted-foreground">
+              Could not read where new buckets go on this node, so that stays as it is.
+            </p>
+            <p v-else-if="ruleCurrent === null" class="text-xs text-muted-foreground">
+              New buckets on this node get their own S3 bucket <span class="font-mono text-foreground">{{ rule }}</span>.
+            </p>
+            <label v-else class="flex items-start gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" class="mt-0.5 accent-primary" :checked="replaceRule" @change="replaceRule = !replaceRule" />
+              <span>
+                Send new buckets on this node to {{ name.trim() || 'this storage' }} instead of {{ ruleCurrent }}, each in its own
+                S3 bucket <span class="font-mono text-foreground">{{ rule }}</span>
+              </span>
+            </label>
+          </template>
 
           <label v-if="schema.toggle" class="flex items-center justify-between gap-3 text-xs">
             <span>
