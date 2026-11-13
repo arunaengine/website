@@ -593,6 +593,7 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
       :backend="linkBackend"
       :backends="backends ?? []"
       :links="links"
+      :rule="linkBackend && defaultId === linkBackend.backend_id ? routing?.bucket_template : null"
       @saved="onLinked"
     />
     <!-- One instance per bucket, gone when closed, so no job or poll outlives it. -->

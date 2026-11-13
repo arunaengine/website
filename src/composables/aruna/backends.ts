@@ -16,13 +16,14 @@ export async function listGroupBackends(groupId: string, nodeId?: string | null)
 export async function createGroupBackend(
   groupId: string,
   input: GroupBackendRequest,
+  nodeId?: string | null,
 ): Promise<GroupBackendResponse> {
   saving.value = true
   try {
     return await request<GroupBackendResponse>(`/data/groups/${groupId}/storage/backends`, {
       method: 'POST',
       body: JSON.stringify(input),
-    })
+    }, nodeId)
   } finally {
     saving.value = false
   }

@@ -35,12 +35,13 @@ function pageHeaders(): Usage[] {
 }
 
 describe('page header docs links', () => {
-  it('maps every page except the manual itself to a topic and section that exist', () => {
+  it('maps every page except the manual and legal documents to a topic and section that exist', () => {
     const usages = pageHeaders()
     expect(usages.length).toBeGreaterThan(20)
 
     for (const usage of usages) {
-      if (basename(usage.file) === 'DocsView.vue') {
+      // The manual and the legal documents have no manual topic of their own.
+      if (['DocsView.vue', 'LegalView.vue'].includes(basename(usage.file))) {
         expect(usage.docs).toBeUndefined()
         continue
       }

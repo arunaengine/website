@@ -31,13 +31,13 @@ export interface BackendKindSchema {
 }
 
 // Mirrors the backend allowlists in aruna
-// operations/src/group_backends/validation.rs (rules_for_kind, identity_keys).
+// operations/src/groups/backends/validation.rs (rules_for_kind, identity_keys).
 // Keys outside these lists are rejected: the denylist alternative is
 // unenforceable because opendal silently accepts a wide alias set.
 export const BACKEND_KIND_SCHEMAS: Record<GroupBackendKind, BackendKindSchema> = {
   s3: {
     label: 'S3',
-    identity: ['endpoint', 'bucket'],
+    identity: ['endpoint', 'bucket', 'root'],
     public: [
       { key: 'endpoint', label: 'Endpoint', required: true, placeholder: 'https://s3.example.org' },
       // Only older storages have a fixed bucket; new ones name a bucket per rule.
@@ -57,7 +57,7 @@ export const BACKEND_KIND_SCHEMAS: Record<GroupBackendKind, BackendKindSchema> =
   },
   gcs: {
     label: 'Google Cloud Storage',
-    identity: ['endpoint', 'bucket'],
+    identity: ['endpoint', 'bucket', 'root'],
     public: [
       { key: 'bucket', label: 'Bucket', required: true, placeholder: 'my-bucket' },
       { key: 'endpoint', label: 'Endpoint', placeholder: 'https://storage.googleapis.com' },
@@ -67,7 +67,7 @@ export const BACKEND_KIND_SCHEMAS: Record<GroupBackendKind, BackendKindSchema> =
   },
   azblob: {
     label: 'Azure Blob Storage',
-    identity: ['endpoint', 'container', 'account_name'],
+    identity: ['endpoint', 'container', 'account_name', 'root'],
     public: [
       { key: 'endpoint', label: 'Endpoint', required: true, placeholder: 'https://acct.blob.core.windows.net' },
       { key: 'container', label: 'Container', required: true, placeholder: 'my-container' },
@@ -82,7 +82,7 @@ export const BACKEND_KIND_SCHEMAS: Record<GroupBackendKind, BackendKindSchema> =
   },
   azdls: {
     label: 'Azure Data Lake Storage',
-    identity: ['endpoint', 'filesystem', 'account_name'],
+    identity: ['endpoint', 'filesystem', 'account_name', 'root'],
     public: [
       { key: 'endpoint', label: 'Endpoint', required: true, placeholder: 'https://acct.dfs.core.windows.net' },
       { key: 'filesystem', label: 'Filesystem', required: true, placeholder: 'my-filesystem' },
@@ -97,7 +97,7 @@ export const BACKEND_KIND_SCHEMAS: Record<GroupBackendKind, BackendKindSchema> =
   },
   b2: {
     label: 'Backblaze B2',
-    identity: ['bucket', 'bucket_id'],
+    identity: ['bucket', 'bucket_id', 'root'],
     public: [
       { key: 'bucket', label: 'Bucket', required: true, placeholder: 'my-bucket' },
       { key: 'bucket_id', label: 'Bucket ID', required: true, placeholder: '4a48fe8875c6214145260818' },
@@ -133,6 +133,12 @@ export const BACKEND_KINDS = Object.keys(BACKEND_KIND_SCHEMAS) as GroupBackendKi
 
 export function backendSchema(kind: string): BackendKindSchema | null {
   return BACKEND_KIND_SCHEMAS[kind as GroupBackendKind] ?? null
+}
+
+/** Whether two storages, such as one per node, point at the same physical store. */
+export function sameStore(a: GroupBackendResponse, b: GroupBackendResponse): boolean {
+  const keys = backendSchema(a.kind)?.identity ?? Object.keys({ ...a.public_config, ...b.public_config })
+  return a.kind === b.kind && keys.every((key) => (a.public_config[key] ?? '') === (b.public_config[key] ?? ''))
 }
 
 /** Where this backend points, from the fields that identify it. */
