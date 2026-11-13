@@ -52,7 +52,11 @@ const free = ref(new Map<string, number | null>())
 // A missing entry is being read or could not be read, so the row says nothing about it.
 const rules = ref(new Map<string, { template: string; store: string | null } | null>())
 // Set once the node is chosen by hand, so a later answer does not move it.
-let picked = false
+const picked = ref(false)
+// The nodes whose rule is still being read; a failed read counts as read.
+const reading = ref(new Set<string>())
+// While a node's rule is read, a choice not made by hand may still move.
+const settling = computed(() => !picked.value && kind.value === 'stored' && reading.value.size > 0)
 
 // The reachable realm nodes, the open node first and a management node last, as it usually
 // holds no data; devices hold no new buckets here.
@@ -90,7 +94,8 @@ function pickKind(value: Kind) {
   if (value === 'referenced' && spread.value) choice.value = places.value[0]?.nodeId ?? ''
 }
 const canCreate = computed(() =>
-  Boolean(trimmed.value && props.groupId && choice.value && (kind.value === 'stored' || source.value.trim())) && !nameProblem.value && !creating.value)
+  Boolean(trimmed.value && props.groupId && choice.value && (kind.value === 'stored' || source.value.trim())) &&
+  !nameProblem.value && !creating.value && !settling.value)
 
 function freeLabel(id: string): string {
   if (!free.value.has(id)) return ''
@@ -114,6 +119,7 @@ function loadRules() {
   const run = ++rulesRun
   const groupId = props.groupId
   rules.value = new Map()
+  reading.value = new Set(groupId ? places.value.map((entry) => entry.nodeId) : [])
   if (!groupId) return
   for (const entry of places.value) {
     void Promise.all([getGroupRouting(groupId, entry.nodeId), listGroupBackends(groupId, entry.nodeId).catch(() => null)]).then(
@@ -125,10 +131,12 @@ function loadRules() {
         rules.value = new Map(rules.value).set(entry.nodeId, template ? { template, store } : null)
         // The first node, in the order shown, whose storage gives a new bucket its own S3 bucket.
         const ruled = places.value.find((place) => rules.value.get(place.nodeId))
-        if (!picked && ruled && kind.value === 'stored') choice.value = ruled.nodeId
+        if (!picked.value && ruled && kind.value === 'stored') choice.value = ruled.nodeId
       },
       () => {},
-    )
+    ).then(() => {
+      if (run === rulesRun) reading.value = new Set([...reading.value].filter((id) => id !== entry.nodeId))
+    })
   }
 }
 
@@ -147,7 +155,7 @@ watch(
     creating.value = false
     placement.value = defaultPlacement()
     choice.value = places.value[0]?.nodeId ?? ''
-    picked = false
+    picked.value = false
     loadFree()
     loadRules()
   },
@@ -167,7 +175,7 @@ watch(placement, (value) => {
 })
 
 function pick(value: string) {
-  picked = true
+  picked.value = true
   choice.value = value
   if (value === SPREAD && !placement.value.several) {
     placement.value = { ...defaultPlacement(), several: true }

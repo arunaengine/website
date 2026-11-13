@@ -188,11 +188,40 @@ describe('new bucket dialog', () => {
 
   it('says nothing about a node whose rule cannot be read and keeps the open node', async () => {
     getGroupRouting.mockRejectedValueOnce(new Error('forbidden')).mockRejectedValueOnce(new Error('forbidden'))
-    const { rows, chosen } = await mount('one')
+    const { rows, chosen, name, create } = await mount('one')
     expect(content(chosen()!)).toContain('name-one')
+    await typeValue(name(), 'progenomes')
+    expect(create().props.disabled).toBe(false)
     for (const row of rows().slice(0, 2)) {
       expect(content(row)).not.toContain('Plain Aruna bucket')
       expect(content(row)).not.toContain('Own S3 bucket')
     }
+  })
+
+  it('waits for the rule of every node before a bucket goes to the node it chose', async () => {
+    const replies: ((routing: object) => void)[] = []
+    const late = () => new Promise<object>((resolve) => replies.push(resolve))
+    getGroupRouting.mockImplementationOnce(late).mockImplementationOnce(late)
+    const { chosen, name, create } = await mount('one')
+    await typeValue(name(), 'progenomes')
+    expect(content(chosen()!)).toContain('name-one')
+    expect(create().props.disabled).toBe(true)
+
+    replies[0]({ group_id: 'g1', warnings: [] })
+    await flush()
+    expect(create().props.disabled).toBe(true)
+    replies[1]({ group_id: 'g1', default_target: { backend_id: 'b2' }, bucket_template: 'aruna-{bucket}', warnings: [] })
+    await flush()
+    expect(content(chosen()!)).toContain('name-two')
+    expect(create().props.disabled).toBe(false)
+  })
+
+  it('lets a node picked by hand take the bucket while the rules are still read', async () => {
+    getGroupRouting.mockImplementationOnce(() => new Promise(() => {})).mockImplementationOnce(() => new Promise(() => {}))
+    const { name, create, pick } = await mount('one')
+    await typeValue(name(), 'progenomes')
+    expect(create().props.disabled).toBe(true)
+    await pick('name-one')
+    expect(create().props.disabled).toBe(false)
   })
 })
