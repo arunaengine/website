@@ -92,6 +92,13 @@ const ownBucket = (template: string) => fillTemplate(template, trimmed.value || 
 function pickKind(value: Kind) {
   kind.value = value
   if (value === 'referenced' && spread.value) choice.value = places.value[0]?.nodeId ?? ''
+  if (value === 'stored') chooseRuled()
+}
+// Stored data not placed by hand goes to the first node, in the order shown, whose storage gives
+// a new bucket its own S3 bucket.
+function chooseRuled() {
+  const ruled = places.value.find((place) => rules.value.get(place.nodeId))
+  if (!picked.value && ruled && kind.value === 'stored') choice.value = ruled.nodeId
 }
 const canCreate = computed(() =>
   Boolean(trimmed.value && props.groupId && choice.value && (kind.value === 'stored' || source.value.trim())) &&
@@ -129,9 +136,7 @@ function loadRules() {
         const id = routing.default_target?.backend_id
         const store = list?.backends.find((backend) => backend.backend_id === id)?.name ?? null
         rules.value = new Map(rules.value).set(entry.nodeId, template ? { template, store } : null)
-        // The first node, in the order shown, whose storage gives a new bucket its own S3 bucket.
-        const ruled = places.value.find((place) => rules.value.get(place.nodeId))
-        if (!picked.value && ruled && kind.value === 'stored') choice.value = ruled.nodeId
+        chooseRuled()
       },
       () => {},
     ).then(() => {

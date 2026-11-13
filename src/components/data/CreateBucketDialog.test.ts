@@ -224,4 +224,23 @@ describe('new bucket dialog', () => {
     await pick('name-one')
     expect(create().props.disabled).toBe(false)
   })
+
+  it('chooses the node with the rule on the way back to stored data when its rule came meanwhile', async () => {
+    const replies: ((routing: object) => void)[] = []
+    const late = () => new Promise<object>((resolve) => replies.push(resolve))
+    getGroupRouting.mockImplementationOnce(late).mockImplementationOnce(late)
+    const { radios, chosen, name, create } = await mount('one')
+    await typeValue(name(), 'progenomes')
+    ;(radios()[1].props.onChange as () => void)()
+    await flush()
+    replies[0]({ group_id: 'g1', warnings: [] })
+    replies[1]({ group_id: 'g1', default_target: { backend_id: 'b2' }, bucket_template: 'aruna-{bucket}', warnings: [] })
+    await flush()
+    expect(content(chosen()!)).toContain('name-one')
+
+    ;(radios()[0].props.onChange as () => void)()
+    await flush()
+    expect(content(chosen()!)).toContain('name-two')
+    expect(create().props.disabled).toBe(false)
+  })
 })
