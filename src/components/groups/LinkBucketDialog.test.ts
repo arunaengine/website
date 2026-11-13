@@ -310,5 +310,22 @@ describe('LinkBucketDialog', () => {
       await answers(root, 'only-three')
       expect(chosen(root)).toBe(2)
     })
+
+    it('keeps a node picked by hand while the next bucket still works there', async () => {
+      nodeStores.set('node-1', [SPIRE]).set('node-2', [remote('2')]).set('node-3', [remote('3')])
+      nodeBuckets.set('node-1', ['shared', 'next', 'gone']).set('node-3', ['shared', 'next'])
+      const { root } = await mount()
+      await typeValue(byId(root, '-s3'), 'lab-raw')
+      await answers(root, 'shared')
+      expect(chosen(root)).toBe(0)
+      ;(radios(root)[2].props.onChange as () => void)()
+      await flush()
+      expect(chosen(root)).toBe(2)
+      await answers(root, 'next')
+      expect(chosen(root)).toBe(2)
+      // A bucket the picked node does not hold falls back to the automatic choice.
+      await answers(root, 'gone')
+      expect(chosen(root)).toBe(0)
+    })
   })
 })

@@ -159,18 +159,16 @@ function checkHolding() {
 }
 onBeforeUnmount(() => clearTimeout(holdTimer))
 
-// Once every node answered for the bucket, the node that can take the link is chosen; of
-// several, the connected node first. A pick by hand then stays while it still works.
-let autoPicked = false
+// Once every node answered for the bucket, the node picked by hand stays while it still works;
+// otherwise the node that can take the link is chosen, of several the connected node first.
+const manual = ref('')
 watch(hostRows, (rows) => {
   if (rows.some((row) => row.checking)) return
   const usable = rows.filter((row) => row.usable)
-  if (autoPicked && usable.some((row) => row.node.nodeId === nodeId.value)) return
-  nodeId.value = (usable.find((row) => row.node.isLocal) ?? usable[0])?.node.nodeId ?? ''
-  autoPicked = true
+  const kept = usable.find((row) => row.node.nodeId === manual.value)
+  nodeId.value = (kept ?? usable.find((row) => row.node.isLocal) ?? usable[0])?.node.nodeId ?? ''
 })
 watch(bucket, () => {
-  autoPicked = false
   if (props.open) checkHolding()
 })
 watch(hosts, () => {
@@ -188,7 +186,6 @@ function storageAdded(_saved?: GroupBackendResponse, ruleError?: string) {
   addError.value = ruleError ?? null
   if (addNode.value) {
     stores.value = new Map([...stores.value].filter(([id]) => id !== addNode.value))
-    autoPicked = false
     loadStores(addNode.value)
   }
 }
@@ -217,7 +214,7 @@ watch(
     submitError.value = null
     nodeId.value = ''
     addError.value = null
-    autoPicked = false
+    manual.value = ''
     loadStores()
     checkHolding()
   },
@@ -329,7 +326,7 @@ async function submit() {
                 class="accent-primary"
                 :checked="nodeId === row.node.nodeId"
                 :disabled="!row.usable"
-                @change="nodeId = row.node.nodeId"
+                @change="manual = nodeId = row.node.nodeId"
               />
               <Server class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
               <span class="min-w-0 flex-1">
