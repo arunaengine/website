@@ -7,6 +7,7 @@ import {
   copyOrigin,
   copyState,
   folderProblem,
+  sameStore,
   shortError,
   targetLabel,
   tenantClasses,
@@ -54,6 +55,20 @@ describe('backendSummary', () => {
     expect(backendSummary(backend('future', { endpoint: 'https://x.example.org' }))).toBe(
       'https://x.example.org',
     )
+  })
+})
+
+describe('sameStore', () => {
+  it('needs every key the node treats as the physical store, the root prefix too', () => {
+    const at = (kind: string, config: Record<string, string>) => backend(kind, config)
+    const s3 = { endpoint: 'https://s3.example.org' }
+    expect(sameStore(at('s3', { ...s3, root: 'production/' }), at('s3', { ...s3, root: 'production/' }))).toBe(true)
+    expect(sameStore(at('s3', { ...s3, root: 'production/' }), at('s3', { ...s3, root: 'staging/' }))).toBe(false)
+    expect(sameStore(at('s3', s3), at('s3', { ...s3, root: 'staging/' }))).toBe(false)
+    expect(sameStore(at('s3', { ...s3, region: 'a' }), at('s3', { ...s3, region: 'b' }))).toBe(true)
+    expect(sameStore(at('b2', { bucket: 'd', bucket_id: '1', root: 'x/' }), at('b2', { bucket: 'd', bucket_id: '1', root: 'y/' }))).toBe(false)
+    expect(sameStore(at('fs', { root: 'projects', folder: 'a/' }), at('fs', { root: 'projects', folder: 'b/' }))).toBe(false)
+    expect(sameStore(at('s3', s3), at('gcs', s3))).toBe(false)
   })
 })
 
