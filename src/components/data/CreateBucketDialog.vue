@@ -5,7 +5,6 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
-import Select from '@/components/ui/Select.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -22,6 +21,7 @@ import { s3ErrorMessage, useS3 } from '@/composables/useS3'
 import type { AdmissionResponse } from '@/lib/api'
 import type { BindSource } from '@/lib/bindSource'
 import { BUCKET_NAME_REQUIREMENT, bucketNameProblem } from '@/lib/bucketName'
+import { fillTemplate } from '@/lib/bucketNaming'
 import { readFreeSpace } from '@/lib/bucketPlace'
 import { defaultPlacement, type Placement } from '@/lib/distributedMock'
 import { formatBytes } from '@/lib/utils'
@@ -35,7 +35,7 @@ const emit = defineEmits<{
 }>()
 
 const SPREAD = 'several'
-const { apiBaseUrl, sessionEpoch } = useAruna()
+const { apiBaseUrl, sessionEpoch, apiGroups, getGroupRouting, listGroupBackends } = useAruna()
 const realmNodes = useRealmNodes()
 const s3 = useS3()
 
@@ -48,6 +48,11 @@ const storageOpen = ref(false)
 const resultsOpen = ref(false)
 // Space left per node; a missing entry is still being read.
 const free = ref(new Map<string, number | null>())
+// The S3 bucket template of the group on each node and the storage it names; null: none there.
+// A missing entry is being read or could not be read, so the row says nothing about it.
+const rules = ref(new Map<string, { template: string; store: string | null } | null>())
+// Set once the node is chosen by hand, so a later answer does not move it.
+let picked = false
 
 // The reachable realm nodes, the open node first and a management node last, as it usually
 // holds no data; devices hold no new buckets here.
@@ -77,10 +82,8 @@ const storedLine = computed(() =>
       : choice.value
         ? `Kept on ${realmNodes.displayName(choice.value)}, counted against quotas.`
         : 'Counted against quotas.')
-const placeOptions = computed(() => [
-  ...places.value.map((entry) => ({ value: entry.nodeId, label: [realmNodes.displayName(entry.nodeId), freeLabel(entry.nodeId)].filter(Boolean).join(', ') })),
-  ...(kind.value === 'stored' ? [{ value: SPREAD, label: 'Spread over several nodes' }] : []),
-])
+const groupName = computed(() => apiGroups.value.find((group) => group.group_id === props.groupId)?.display_name ?? '{group}')
+const ownBucket = (template: string) => fillTemplate(template, trimmed.value || '{bucket}', groupName.value)
 // A referenced bucket lives on one node; the spread stays a choice of stored data.
 function pickKind(value: Kind) {
   kind.value = value
@@ -106,6 +109,29 @@ function loadFree() {
   }
 }
 
+let rulesRun = 0
+function loadRules() {
+  const run = ++rulesRun
+  const groupId = props.groupId
+  rules.value = new Map()
+  if (!groupId) return
+  for (const entry of places.value) {
+    void Promise.all([getGroupRouting(groupId, entry.nodeId), listGroupBackends(groupId, entry.nodeId).catch(() => null)]).then(
+      ([routing, list]) => {
+        if (run !== rulesRun) return
+        const template = routing.bucket_template
+        const id = routing.default_target?.backend_id
+        const store = list?.backends.find((backend) => backend.backend_id === id)?.name ?? null
+        rules.value = new Map(rules.value).set(entry.nodeId, template ? { template, store } : null)
+        // The first node, in the order shown, whose storage gives a new bucket its own S3 bucket.
+        const ruled = places.value.find((place) => rules.value.get(place.nodeId))
+        if (!picked && ruled && kind.value === 'stored') choice.value = ruled.nodeId
+      },
+      () => {},
+    )
+  }
+}
+
 // Bumped on every open, close and unmount, so an older create ends unseen.
 let generation = 0
 onBeforeUnmount(() => generation++)
@@ -121,7 +147,9 @@ watch(
     creating.value = false
     placement.value = defaultPlacement()
     choice.value = places.value[0]?.nodeId ?? ''
+    picked = false
     loadFree()
+    loadRules()
   },
   { immediate: true },
 )
@@ -130,6 +158,7 @@ watch(places, (entries) => {
   if (!props.open) return
   if (!choice.value) choice.value = entries[0]?.nodeId ?? ''
   loadFree()
+  loadRules()
 })
 
 // Back to one node in the storage dialog: the first node is chosen again.
@@ -138,6 +167,7 @@ watch(placement, (value) => {
 })
 
 function pick(value: string) {
+  picked = true
   choice.value = value
   if (value === SPREAD && !placement.value.several) {
     placement.value = { ...defaultPlacement(), several: true }
@@ -221,13 +251,44 @@ function spreadCreated(outcome: AdmissionResponse) {
           <Input v-model="source" class="mt-1" placeholder="https://ftp.ncbi.nlm.nih.gov/genomes/refseq/" aria-label="Source address" />
         </label>
 
-        <div class="flex flex-wrap items-end gap-2">
-          <label class="block min-w-[12rem] flex-1">
-            <span class="text-xs font-medium text-muted-foreground">Node</span>
-            <Select :model-value="choice" :options="placeOptions" aria-label="Node" class="mt-1" @update:model-value="pick" />
-          </label>
-          <Button v-if="spread" variant="outline" @click="storageOpen = true"><Network class="h-4 w-4" /> Change the nodes and copies</Button>
-        </div>
+        <fieldset>
+          <legend class="text-xs font-medium text-muted-foreground">Node</legend>
+          <div class="mt-1 grid gap-1.5">
+            <label
+              v-for="entry in places"
+              :key="entry.nodeId"
+              class="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-md border px-3 py-2 text-sm"
+              :class="choice === entry.nodeId ? 'border-primary' : 'border-input hover:bg-muted/50'"
+            >
+              <input type="radio" name="bucket-node" class="accent-primary" :checked="choice === entry.nodeId" @change="pick(entry.nodeId)" />
+              <Server class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span class="min-w-0 flex-1">
+                <span class="block font-medium text-foreground">{{ realmNodes.displayName(entry.nodeId) }}</span>
+                <span v-if="rules.has(entry.nodeId)" class="block text-xs text-muted-foreground">
+                  <template v-if="rules.get(entry.nodeId)">
+                    Own S3 bucket <span class="font-mono text-foreground">{{ ownBucket(rules.get(entry.nodeId)!.template) }}</span>
+                    <template v-if="rules.get(entry.nodeId)!.store"> on <span class="whitespace-nowrap">{{ rules.get(entry.nodeId)!.store }}</span></template>
+                  </template>
+                  <template v-else>Plain Aruna bucket, no storage rule on this node</template>
+                </span>
+              </span>
+              <span v-if="freeLabel(entry.nodeId)" class="shrink-0 text-xs text-muted-foreground">{{ freeLabel(entry.nodeId) }}</span>
+            </label>
+            <label
+              v-if="kind === 'stored'"
+              class="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-md border px-3 py-2 text-sm"
+              :class="spread ? 'border-primary' : 'border-input hover:bg-muted/50'"
+            >
+              <input type="radio" name="bucket-node" class="accent-primary" :checked="spread" @change="pick(SPREAD)" />
+              <Network class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span class="min-w-0 flex-1">
+                <span class="block font-medium text-foreground">Spread over several nodes</span>
+                <span class="block text-xs text-muted-foreground">You pick the nodes and copies next.</span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+        <Button v-if="spread" variant="outline" @click="storageOpen = true"><Network class="h-4 w-4" /> Change the nodes and copies</Button>
         <p v-if="!places.length" class="text-xs text-muted-foreground">No reachable realm node is known yet.</p>
 
         <RefusalNote v-if="error" :message="error" />
