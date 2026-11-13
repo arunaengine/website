@@ -1,7 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { click, compileClientComponent, content, element, flush, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { click, compileClientComponent, content, element, flush, moduleDefault, mountApp, nodes, typeValue } from '@/test/clientRender'
 import * as Api from '@/lib/api'
 import * as BucketNaming from '@/lib/bucketNaming'
 import * as LinkedFolders from '@/lib/linkedFolders'
@@ -18,6 +18,21 @@ const folders = {
   load: vi.fn(),
 }
 const runBackendImport = vi.fn()
+// Per node: its storages and the buckets it holds.
+const hostList = ref<{ nodeId: string; kind: string; reachable: boolean; isLocal: boolean }[]>([])
+const nodeStores = new Map<string, Api.GroupBackendResponse[]>()
+const nodeBuckets = new Map<string, string[]>()
+const listGroupBackends = vi.fn(async (_group: string, node: string) => ({ backends: nodeStores.get(node) ?? [] }))
+const getBucketRouting = vi.fn(async (bucket: string, node: string) => {
+  if (!nodeBuckets.get(node)?.includes(bucket)) throw new Api.ApiError(404, 'no such bucket')
+  return { bucket, rules: [], warnings: [] }
+})
+const nodeClientReady = vi.fn(async (node: string) => ({ baseUrl: `https://${node}`, token: 't' }))
+const AddStub = defineComponent({
+  props: { open: Boolean, nodeId: String, prefill: Object, rule: String },
+  setup: (props) => () =>
+    h('aside', { 'data-add': props.open, 'data-node': props.nodeId, 'data-rule': props.rule, 'data-endpoint': (props.prefill as Api.GroupBackendResponse | undefined)?.public_config.endpoint }),
+})
 const Slot = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 const ButtonStub = defineComponent({
   inheritAttrs: false,
@@ -42,6 +57,8 @@ const SelectStub = defineComponent({
 
 const Dialog = compileClientComponent(new URL('./LinkBucketDialog.vue', import.meta.url), {
   vue: VueRuntime,
+  '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => null) }),
+  '@/components/groups/StorageBackendDialog.vue': moduleDefault(AddStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Dialog.vue': moduleDefault(Slot),
   '@/components/ui/DialogClose.vue': moduleDefault(Slot),
@@ -55,7 +72,10 @@ const Dialog = compileClientComponent(new URL('./LinkBucketDialog.vue', import.m
   '@/components/ui/Notice.vue': moduleDefault(Slot),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/composables/useImportRoots': { useImportRoots: () => folders },
-  '@/composables/useAruna': { useAruna: () => ({ apiBaseUrl: ref('https://api'), authToken: ref('t'), sessionEpoch: ref(0) }) },
+  '@/composables/useAruna': {
+    useAruna: () => ({ apiBaseUrl: ref('https://api'), authToken: ref('t'), sessionEpoch: ref(0), nodeClientReady, listGroupBackends, getBucketRouting }),
+  },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ nodes: hostList, displayName: (id: string) => id }) },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
   '@/lib/api': { ...Api, createBackendImport, runBackendImport },
   '@/lib/bucketNaming': BucketNaming,
@@ -78,7 +98,7 @@ async function mount(backend: Api.GroupBackendResponse = SPIRE, backends: Api.Gr
   const events: unknown[] = []
   const mounted = await mountApp(
     defineComponent(() => () =>
-      h(Dialog, { open: open.value, groupId: 'g1', backend, backends, links: [LINKED], onSaved: (error?: string) => events.push(error) }),
+      h(Dialog, { open: open.value, groupId: 'g1', backend, backends, links: [LINKED], rule: 'aruna-spire-{bucket}', onSaved: (error?: string) => events.push(error) }),
     ),
   )
   open.value = true
@@ -99,6 +119,10 @@ beforeEach(() => {
   folders.state.value = 'ready'
   folders.error.value = null
   folders.load.mockClear()
+  hostList.value = []
+  nodeStores.clear()
+  nodeBuckets.clear()
+  nodeClientReady.mockClear()
 })
 
 describe('LinkBucketDialog', () => {
@@ -217,6 +241,74 @@ describe('LinkBucketDialog', () => {
       await typeValue(byId(open.root, '-folder'), 'a/../b')
       expect(content(open.root)).toContain('Use a relative folder')
       expect(save(open.root).props.disabled).toBe(true)
+    })
+  })
+
+  describe('node choice', () => {
+    const remote = (id: string): Api.GroupBackendResponse => ({ ...SPIRE, backend_id: `r-${id}`, name: 'spire' })
+    const radios = (root: Root) => nodes(root).filter((node) => node.tag === 'input' && node.props.type === 'radio')
+    const chosen = (root: Root) => radios(root).findIndex((node) => node.props.checked)
+    async function answers(root: Root, bucket: string) {
+      await typeValue(byId(root, '-aruna'), bucket)
+      await vi.advanceTimersByTimeAsync(300)
+      await flush()
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      hostList.value = ['node-1', 'node-2', 'node-3'].map((nodeId) => ({ nodeId, kind: 'storage', reachable: true, isLocal: nodeId === 'node-1' }))
+    })
+    afterEach(() => vi.useRealTimers())
+
+    it('says why a node cannot take the link and offers to add the storage where the bucket is', async () => {
+      nodeStores.set('node-1', [SPIRE]).set('node-2', [{ ...SPIRE, backend_id: 'other', public_config: { endpoint: 'https://elsewhere' } }])
+      nodeBuckets.set('node-2', ['progenomes'])
+      const { root } = await mount()
+      await typeValue(byId(root, '-s3'), 'aruna-spire-progenomes')
+      await answers(root, 'progenomes')
+      const text = content(root)
+      expect(text).toContain('Does not hold progenomes')
+      expect(text).toContain('No spire storage on this node')
+      expect(text).toContain('Does not hold progenomes, no spire storage')
+      expect(radios(root).map((node) => node.props.disabled)).toEqual([true, true, true])
+      expect(save(root).props.disabled).toBe(true)
+
+      const adds = nodes(root).filter((node) => node.tag === 'button' && content(node).includes('+ Add storage'))
+      expect(adds).toHaveLength(1)
+      await click(adds[0])
+      const dialog = element(root, (node) => node.tag === 'aside')
+      expect(dialog.props).toMatchObject({ 'data-add': true, 'data-node': 'node-2', 'data-endpoint': 'https://s3', 'data-rule': 'aruna-spire-{bucket}' })
+    })
+
+    it('chooses the one node with both and links there through its own API', async () => {
+      nodeStores.set('node-1', [SPIRE]).set('node-2', [remote('2')]).set('node-3', [remote('3')])
+      nodeBuckets.set('node-2', ['progenomes'])
+      const { root, events } = await mount()
+      await typeValue(byId(root, '-s3'), 'aruna-spire-progenomes')
+      await answers(root, 'progenomes')
+      expect(chosen(root)).toBe(1)
+      expect(content(root)).toContain('Holds progenomes and spire storage')
+      await submit(root)
+      expect(nodeClientReady).toHaveBeenCalledWith('node-2')
+      expect(createBackendImport).toHaveBeenCalledWith(
+        'g1',
+        expect.objectContaining({ backend_id: 'r-2', bucket: 'progenomes' }),
+        { baseUrl: 'https://node-2', token: 't' },
+      )
+      expect(runBackendImport).toHaveBeenCalledWith('g1', 'i2', { baseUrl: 'https://node-2', token: 't' })
+      expect(events).toEqual([undefined])
+    })
+
+    it('prefers the connected node when several can take the link, and follows a new bucket', async () => {
+      nodeStores.set('node-1', [SPIRE]).set('node-2', [remote('2')]).set('node-3', [remote('3')])
+      nodeBuckets.set('node-1', ['shared']).set('node-3', ['shared', 'only-three'])
+      const { root } = await mount()
+      await typeValue(byId(root, '-s3'), 'lab-raw')
+      await answers(root, 'shared')
+      expect(chosen(root)).toBe(0)
+      expect(save(root).props.disabled).toBe(false)
+      await answers(root, 'only-three')
+      expect(chosen(root)).toBe(2)
     })
   })
 })

@@ -58,6 +58,11 @@ const OpenStub = (testid: string) =>
     props: { open: Boolean },
     setup: (props) => () => (props.open ? h('div', { 'data-testid': testid }) : null),
   })
+// The link dialog with the bucket rule it got for a copy of the storage on another node.
+const LinkStub = defineComponent({
+  props: { open: Boolean, rule: String },
+  setup: (props) => () => (props.open ? h('div', { 'data-testid': 'link-dialog', 'data-rule': props.rule ?? null }) : null),
+})
 
 const StorageSection = compileClientComponent(new URL('./StorageSection.vue', import.meta.url), {
   vue: VueRuntime,
@@ -71,7 +76,7 @@ const StorageSection = compileClientComponent(new URL('./StorageSection.vue', im
   '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('i', p.label) })),
   '@/components/groups/StorageBackendDialog.vue': moduleDefault(OpenStub('storage-dialog')),
   '@/components/groups/NewBucketsDialog.vue': moduleDefault(OpenStub('new-buckets-dialog')),
-  '@/components/groups/LinkBucketDialog.vue': moduleDefault(OpenStub('link-dialog')),
+  '@/components/groups/LinkBucketDialog.vue': moduleDefault(LinkStub),
   '@/components/groups/BucketEditDialog.vue': moduleDefault(EditStub),
   '@/components/storage/BucketJobLabel.vue': moduleDefault(JobStub),
   '@/composables/useAruna': {
@@ -686,5 +691,17 @@ describe('StorageSection', () => {
     expect(byTestId(root, 'storage-dialog')).toHaveLength(1)
     await click(element(byTestId(root, 'new-buckets-row')[0], (node) => node.tag === 'button'))
     expect(byTestId(root, 'new-buckets-dialog')).toHaveLength(1)
+  })
+
+  it('hands the link dialog the bucket rule of the storage that gets new buckets', async () => {
+    getGroupRouting.mockResolvedValue({ group_id: 'g1', default_target: { backend_id: 's1' }, bucket_template: 'aruna-spire-{bucket}', warnings: [] })
+    const { root } = await mount()
+    await click(buttonIn(root, '+ Link an S3 bucket'))
+    expect(byTestId(root, 'link-dialog')[0].props['data-rule']).toBe('aruna-spire-{bucket}')
+
+    getGroupRouting.mockResolvedValue({ group_id: 'g1', default_target: { backend_id: 'other' }, bucket_template: 'aruna-spire-{bucket}', warnings: [] })
+    const elsewhere = await mount()
+    await click(buttonIn(elsewhere.root, '+ Link an S3 bucket'))
+    expect(byTestId(elsewhere.root, 'link-dialog')[0].props['data-rule']).toBeNull()
   })
 })

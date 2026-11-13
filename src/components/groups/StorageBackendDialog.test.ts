@@ -28,6 +28,7 @@ const createGroupBackend = vi.fn(async (_group: string, _body: GroupBackendReque
 const replaceGroupBackend = vi.fn(async (_group: string, _id: string, _body: GroupBackendRequest) => saved)
 const disableGroupBackend = vi.fn(async (_group: string, _id: string) => {})
 const enableGroupBackend = vi.fn(async (_group: string, _id: string) => saved)
+const putGroupRouting = vi.fn(async () => ({}))
 const saving = ref(false)
 const folders = {
   roots: ref<ImportRoot[]>([]),
@@ -78,7 +79,7 @@ const StorageBackendDialog = compileClientComponent(new URL('./StorageBackendDia
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
   '@/composables/useImportRoots': { useImportRoots: () => folders },
   '@/composables/useAruna': {
-    useAruna: () => ({ createGroupBackend, replaceGroupBackend, disableGroupBackend, enableGroupBackend, saving }),
+    useAruna: () => ({ createGroupBackend, replaceGroupBackend, disableGroupBackend, enableGroupBackend, putGroupRouting, saving }),
   },
   '@/components/ui/Dialog.vue': moduleDefault(Passthrough),
   '@/components/ui/DialogContent.vue': moduleDefault(Passthrough),
@@ -101,15 +102,16 @@ const byLabel = (root: Root, label: string) => element(root, (node) => node.prop
 const byId = (root: Root, suffix: string) =>
   element(root, (node) => node.tag === 'input' && String(node.props.id ?? '').endsWith(suffix))
 
-async function mount(backend: GroupBackendResponse | null = null) {
+async function mount(backend: GroupBackendResponse | null = null, extra: Record<string, unknown> = {}) {
   const open = ref(false)
+  const events: unknown[][] = []
   const Host = defineComponent(
-    () => () => h(StorageBackendDialog, { open: open.value, groupId: 'g1', backend }),
+    () => () => h(StorageBackendDialog, { open: open.value, groupId: 'g1', backend, onSaved: (...args: unknown[]) => events.push(args), ...extra }),
   )
   const mounted = await mountApp(Host)
   open.value = true
   await flush()
-  return mounted
+  return { ...mounted, events }
 }
 
 async function submit(root: Root) {
@@ -128,6 +130,7 @@ const stored: GroupBackendResponse = {
 
 describe('Storage dialog connection', () => {
   beforeEach(() => {
+    putGroupRouting.mockClear()
     createGroupBackend.mockClear()
     replaceGroupBackend.mockClear()
     disableGroupBackend.mockClear()
@@ -251,6 +254,40 @@ describe('Storage dialog connection', () => {
     expect(disableGroupBackend).not.toHaveBeenCalled()
     await click(buttonWith(root, 'Remove'))
     expect(disableGroupBackend).toHaveBeenCalledWith('g1', 'b1')
+  })
+
+  describe('copy for another node', () => {
+    const source: GroupBackendResponse = { ...stored, name: 'spire', backend_id: 'src' }
+    async function fillKeys(root: Root) {
+      await typeValue(byId(root, '-sec-access_key_id'), 'key')
+      await typeValue(byId(root, '-sec-secret_access_key'), 'secret')
+    }
+
+    it('starts from the connection, asks for keys again and adds it with the rule on that node', async () => {
+      const { root, events } = await mount(null, { prefill: source, nodeId: 'node-2', rule: 'aruna-spire-{bucket}' })
+      expect(byId(root, '-name').props.value).toBe('spire')
+      expect(byId(root, '-pub-endpoint').props.value).toBe('https://s3.test')
+      expect(content(root)).toContain('aruna-spire-{bucket}')
+      expect(save(root).props.disabled).toBe(true)
+      await fillKeys(root)
+      await submit(root)
+      expect(createGroupBackend).toHaveBeenCalledWith(
+        'g1',
+        expect.objectContaining({ name: 'spire', public_config: { endpoint: 'https://s3.test', force_path_style: 'true' } }),
+        'node-2',
+      )
+      expect(putGroupRouting).toHaveBeenCalledWith('g1', { backend_id: 'b1' }, undefined, 'aruna-spire-{bucket}', 'node-2')
+      expect(events).toEqual([[saved, undefined]])
+    })
+
+    it('keeps the added storage when the rule is refused and says so', async () => {
+      putGroupRouting.mockRejectedValueOnce(new Error('denied'))
+      const { root, events } = await mount(null, { prefill: source, nodeId: 'node-2', rule: 'aruna-spire-{bucket}' })
+      await fillKeys(root)
+      await submit(root)
+      expect(createGroupBackend).toHaveBeenCalledTimes(1)
+      expect(String(events[0][1])).toContain('Storage added, but new buckets on this node do not get their own S3 bucket: denied')
+    })
   })
 
   describe('local folder', () => {

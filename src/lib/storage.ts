@@ -135,6 +135,12 @@ export function backendSchema(kind: string): BackendKindSchema | null {
   return BACKEND_KIND_SCHEMAS[kind as GroupBackendKind] ?? null
 }
 
+/** Whether two storages, such as one per node, point at the same physical store. */
+export function sameStore(a: GroupBackendResponse, b: GroupBackendResponse): boolean {
+  const keys = backendSchema(a.kind)?.identity ?? Object.keys({ ...a.public_config, ...b.public_config })
+  return a.kind === b.kind && keys.every((key) => (a.public_config[key] ?? '') === (b.public_config[key] ?? ''))
+}
+
 /** Where this backend points, from the fields that identify it. */
 export function backendSummary(backend: GroupBackendResponse): string {
   const schema = backendSchema(backend.kind)

@@ -25,13 +25,19 @@ const props = defineProps<{
   open: boolean
   groupId: string
   backend?: GroupBackendResponse | null
+  /** The node a new storage goes to; the connected node when absent. */
+  nodeId?: string | null
+  /** A storage of another node whose name and connection a new one starts from; keys are entered again. */
+  prefill?: GroupBackendResponse | null
+  /** The S3 bucket template new buckets on that node get once the new storage is saved. */
+  rule?: string | null
 }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
-  (e: 'saved', backend?: GroupBackendResponse): void
+  (e: 'saved', backend?: GroupBackendResponse, ruleError?: string): void
 }>()
 
-const { createGroupBackend, replaceGroupBackend, disableGroupBackend, enableGroupBackend, saving } = useAruna()
+const { createGroupBackend, replaceGroupBackend, disableGroupBackend, enableGroupBackend, putGroupRouting, saving } = useAruna()
 const { writesDisabled } = useConnectivity()
 const uid = useId()
 
@@ -70,7 +76,7 @@ const schema = computed(() => BACKEND_KIND_SCHEMAS[kind.value])
 // A new S3 storage has no fixed bucket: each rule names its own.
 const fields = computed(() =>
   schema.value.public.filter(
-    (field) => !(kind.value === 's3' && field.key === 'bucket' && !props.backend?.public_config.bucket),
+    (field) => !(kind.value === 's3' && field.key === 'bucket' && !(props.backend ?? props.prefill)?.public_config.bucket),
   ),
 )
 // The keys naming the store cannot change: every stored object is stamped with
@@ -131,7 +137,7 @@ watch(
   () => props.open,
   (open) => {
     if (!open) return
-    const source = props.backend
+    const source = props.backend ?? props.prefill
     name.value = source?.name ?? ''
     const known = source ? backendSchema(source.kind) : null
     kind.value = known && source ? (source.kind as GroupBackendKind) : 's3'
@@ -139,7 +145,7 @@ watch(
     secretValues.value = {}
     const toggleKey = BACKEND_KIND_SCHEMAS[kind.value].toggle?.key
     toggleOn.value = toggleKey !== undefined && source?.public_config[toggleKey] === 'true'
-    keysOpen.value = !source
+    keysOpen.value = !props.backend
     removing.value = false
     submitError.value = null
   },
@@ -181,9 +187,16 @@ async function submit() {
     if (existing) {
       saved = await replaceGroupBackend(props.groupId, existing.backend_id, fullBody())
     } else {
-      saved = await createGroupBackend(props.groupId, fullBody())
+      saved = await createGroupBackend(props.groupId, fullBody(), props.nodeId)
     }
-    emit('saved', saved)
+    let ruleError: string | undefined
+    if (!existing && props.rule) {
+      // The storage exists now; a failed rule must not lead to a second one.
+      await putGroupRouting(props.groupId, { backend_id: saved.backend_id }, undefined, props.rule, props.nodeId).catch((err) => {
+        ruleError = `Storage added, but new buckets on this node do not get their own S3 bucket: ${errorMessage(err)}`
+      })
+    }
+    emit('saved', saved, ruleError)
     emit('update:open', false)
   } catch (err) {
     submitError.value = errorMessage(err)
@@ -318,6 +331,10 @@ async function setRemoved(remove: boolean) {
               </p>
             </div>
           </div>
+
+          <p v-if="rule && !backend" class="text-xs text-muted-foreground">
+            New buckets on this node get their own S3 bucket <span class="font-mono text-foreground">{{ rule }}</span>.
+          </p>
 
           <label v-if="schema.toggle" class="flex items-center justify-between gap-3 text-xs">
             <span>

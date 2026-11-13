@@ -66,6 +66,7 @@ export async function putGroupRouting(
   target: RoutingTarget | null,
   bucket?: string,
   bucketTemplate?: string,
+  nodeId?: string | null,
 ): Promise<GroupRoutingResponse> {
   saving.value = true
   try {
@@ -74,7 +75,7 @@ export async function putGroupRouting(
     return await request<GroupRoutingResponse>(`/data/groups/${groupId}/storage/routing`, {
       method: 'PUT',
       body: JSON.stringify(body),
-    })
+    }, nodeId)
   } finally {
     saving.value = false
   }
