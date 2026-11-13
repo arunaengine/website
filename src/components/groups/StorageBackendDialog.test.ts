@@ -292,6 +292,21 @@ describe('Storage dialog connection', () => {
       expect(events).toEqual([[saved, undefined]])
     })
 
+    it('locks the type and the fields naming the store to the source, an empty one too', async () => {
+      const rooted = { ...source, public_config: { ...source.public_config, root: 'production/' } }
+      const { root } = await mount(null, { prefill: rooted, nodeId: 'node-2' })
+      expect(byLabel(root, 'Type').props.disabled).toBe(true)
+      expect(byId(root, '-pub-root').props).toMatchObject({ value: 'production/', disabled: true })
+      expect(byId(root, '-pub-endpoint').props).toMatchObject({ value: 'https://s3.test', disabled: true })
+      expect(byId(root, '-pub-region').props.disabled).toBeFalsy()
+      await fillKeys(root)
+      await submit(root)
+      expect(createGroupBackend.mock.calls[0][1].public_config).toEqual({ endpoint: 'https://s3.test', root: 'production/', force_path_style: 'true' })
+
+      const plain = await mount(null, { prefill: source, nodeId: 'node-2' })
+      expect(byId(plain.root, '-pub-root').props).toMatchObject({ value: '', disabled: true })
+    })
+
     it('keeps the default of a node that has one unless asked to replace it', async () => {
       getGroupRouting.mockResolvedValue({ group_id: 'g1', default_target: { backend_id: 'old' }, warnings: [] })
       const kept = await mount(null, { prefill: source, nodeId: 'node-2', rule: 'aruna-spire-{bucket}' })

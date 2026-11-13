@@ -114,9 +114,11 @@ const fields = computed(() =>
     (field) => !(kind.value === 's3' && field.key === 'bucket' && !(props.backend ?? props.prefill)?.public_config.bucket),
   ),
 )
-// The keys naming the store cannot change: every stored object is stamped with
-// this backend, so repointing it would make that data unreadable.
-const fixed = computed(() => (isEdit.value ? new Set(schema.value.identity) : new Set<string>()))
+// The keys naming the store cannot change: every stored object is stamped with this backend,
+// so repointing it would make that data unreadable. A copy for another node keeps the source's,
+// or that node would not count it as the same store.
+const keepsStore = computed(() => isEdit.value || Boolean(props.prefill))
+const fixed = computed(() => (keepsStore.value ? new Set(schema.value.identity) : new Set<string>()))
 // A disabled backend refuses a settings change, but its credentials may still
 // be replaced so a leaked key can be invalidated.
 const settingsLocked = computed(() => Boolean(props.backend?.disabled))
@@ -306,7 +308,7 @@ async function setRemoved(remove: boolean) {
               <Select
                 :model-value="kind"
                 :options="KIND_OPTIONS"
-                :disabled="isEdit"
+                :disabled="keepsStore"
                 aria-label="Type"
                 class="mt-1"
                 @update:model-value="(v: string) => pickKind(v as GroupBackendKind)"
