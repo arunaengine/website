@@ -9,7 +9,7 @@ vi.mock('@/composables/useAruna', () => ({
     getBucketUsage: (bucket: string, node: string | null) => new Promise<BucketUsageResponse>((resolve) => asked.push({ bucket, node, resolve })),
   }),
 }))
-const { usageParts, usageText, useBucketUsage } = await import('./useBucketUsage')
+const { refreshUsage, usageParts, usageText, useBucketUsage } = await import('./useBucketUsage')
 const { lastUpload } = await import('./uploadQueueState')
 const settle = async () => {
   for (let i = 0; i < 4; i++) await Promise.resolve()
@@ -76,6 +76,22 @@ describe('bucket usage', () => {
     await settle()
     expect(read.value?.objects).toBe(4)
   })
+
+  it('reads the open bucket again on refresh and keeps the old count meanwhile', async () => {
+    asked.length = 0
+    const read = useBucketUsage(ref('open'), ref<string | null>(null))
+    asked[0].resolve(usage({ bucket: 'open', objects: 1 }))
+    await settle()
+
+    refreshUsage()
+    await nextTick()
+    const again = asked.filter((entry) => entry.bucket === 'open')
+    expect(again).toHaveLength(2)
+    expect(read.value?.objects).toBe(1)
+    again[1].resolve(usage({ bucket: 'open', objects: 9 }))
+    await settle()
+    expect(read.value?.objects).toBe(9)
+  })
 })
 
 describe('listed bucket usage', () => {
@@ -114,5 +130,26 @@ describe('listed bucket usage', () => {
     asked.splice(0)[0].resolve(usage({ bucket: 'up', objects: 4 }))
     await settle()
     expect(listed.textOf('up', 'n2')).toBe('4\u00a0files, 50.2\u00a0MiB stored')
+  })
+
+  it('reads every listed bucket again on refresh and keeps the old count meanwhile', async () => {
+    const { useListedUsage } = await import('./useBucketUsage')
+    for (const entry of asked.splice(0)) entry.resolve(usage({ bucket: entry.bucket }))
+    await settle()
+    const listed = useListedUsage()
+    listed.ensure([{ bucket: 'kept', nodeId: 'n3' }])
+    asked.splice(0)[0].resolve(usage({ bucket: 'kept', objects: 1 }))
+    await settle()
+
+    refreshUsage()
+    await nextTick()
+    expect(asked.length).toBeGreaterThan(0)
+    expect(listed.textOf('kept', 'n3')).toBe('1\u00a0file, 50.2\u00a0MiB stored')
+    // Earlier tests left other buckets known, so the reads go out four at a time.
+    while (asked.length) {
+      for (const entry of asked.splice(0)) entry.resolve(usage({ bucket: entry.bucket, objects: 7 }))
+      await settle()
+    }
+    expect(listed.textOf('kept', 'n3')).toBe('7\u00a0files, 50.2\u00a0MiB stored')
   })
 })

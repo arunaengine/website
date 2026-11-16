@@ -8,6 +8,7 @@ import { contextKey, shouldOpenContext } from './s3/context'
 import { useAruna } from './useAruna'
 import { useBrowserSelection } from './useBrowserSelection'
 import { useBuckets } from './useBuckets'
+import { refreshUsage } from './useBucketUsage'
 import { useBucketShortcuts, type BucketShortcut } from './useBucketShortcuts'
 import { useGroupContext } from './useGroupSelection'
 import { useListPages } from './useListPages'
@@ -938,6 +939,7 @@ export function useDataManager() {
   // Without an open bucket, only the shown bucket list reloads. The linked folders always do.
   function refreshAll(): Promise<unknown> {
     void syncedFolders?.load()
+    refreshUsage()
     if (bucket.value) return refreshBucket()
     return bucketNodeChoice.value === null ? allBuckets.reload() : bucketList.refresh()
   }

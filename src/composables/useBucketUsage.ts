@@ -35,6 +35,10 @@ export function usageParts(usage: BucketUsageResponse): UsageParts {
   }
 }
 
+// Raised by the Data refresh, so every shown usage is read again.
+const refreshRound = ref(0)
+export const refreshUsage = () => void refreshRound.value++
+
 export function useBucketUsage(bucket: Ref<string>, nodeId: Ref<string | null>) {
   const { getBucketUsage, sessionEpoch } = useAruna()
   const usage = ref<BucketUsageResponse | null>(null)
@@ -57,6 +61,7 @@ export function useBucketUsage(bucket: Ref<string>, nodeId: Ref<string | null>) 
   watch(lastUpload, (done) => {
     if (done?.bucket === bucket.value && done.nodeId === nodeId.value) void read()
   })
+  watch(refreshRound, () => void read())
   return usage
 }
 
@@ -88,13 +93,25 @@ export function useListedUsage() {
     }
   }
 
-  // A finished upload drops its bucket's count, so the next ensure reads it again.
-  watch(lastUpload, (done) => {
-    if (!done) return
-    const key = listedKey(done.bucket, done.nodeId)
+  // Reads a known count again; the old one stays shown until the new one arrives.
+  function reread(bucket: string, nodeId: string | null) {
+    const key = listedKey(bucket, nodeId)
     if (!listed.value.has(key) || pending.has(key)) return
     pending.add(key)
-    queue.push({ key, bucket: done.bucket, nodeId: done.nodeId })
+    queue.push({ key, bucket, nodeId })
+  }
+
+  watch(lastUpload, (done) => {
+    if (!done) return
+    reread(done.bucket, done.nodeId)
+    pump()
+  })
+  // A bucket name holds no slash, so the last one ends the node part of the key.
+  watch(refreshRound, () => {
+    for (const key of listed.value.keys()) {
+      const cut = key.lastIndexOf('/')
+      reread(key.slice(cut + 1), key.slice(0, cut) || null)
+    }
     pump()
   })
 
