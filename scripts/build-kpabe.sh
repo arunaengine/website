@@ -19,6 +19,6 @@ fi
 rm -rf "$OUT"
 wasm-bindgen --target web --out-dir "$OUT" --out-name kpabe \
     "$ARUNA/target/wasm32-unknown-unknown/release/aruna_kpabe_wasm.wasm"
-cp "$ARUNA/kpabe/tests/vectors.json" "$FIXTURES/kpabe-vectors.json"
-cp "$ARUNA/kpabe/wasm/tests/issue.json" "$FIXTURES/kpabe-issue.json"
-cp "$ARUNA/core/tests/vectors/abe-grant.json" "$FIXTURES/abe-grant.json"
+cp "$ARUNA/domain/kpabe/tests/vectors.json" "$FIXTURES/kpabe-vectors.json"
+cp "$ARUNA/domain/kpabe/wasm/tests/issue.json" "$FIXTURES/kpabe-issue.json"
+cp "$ARUNA/domain/core/tests/vectors/abe-grant.json" "$FIXTURES/abe-grant.json"

@@ -1,5 +1,5 @@
-// GET /metadata/search: verified against aruna api/src/routes/metadata.rs and
-// operations/src/metadata/{api.rs,search_cursor.rs} (aruna feat/portal-backend).
+// GET /metadata/search: verified against aruna frontends/api/src/routes/search.rs
+// and domain/ops-data/src/metadata/{api/search.rs,search_cursor.rs}.
 // Contract: `q` is required and trimmed to >= 2 chars (shorter ⇒ 400); `limit`
 // defaults to 25 and is clamped 1..=100; `mode=local|distributed`. `group_id`
 // and `conforms_to` (exact conformsTo profile IRI) filter documents server-side.

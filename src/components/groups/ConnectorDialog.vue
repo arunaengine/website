@@ -47,7 +47,7 @@ interface ToggleSpec {
   hint: string
 }
 
-// Mirrors the backend allowlists in aruna operations/src/connectors/
+// Mirrors the backend allowlists in aruna domain/ops-data/src/connectors/
 // validation.rs (rules_for_kind). `aruna_native` is rejected by
 // validate_connector_input, so it is not offered here.
 const KIND_SCHEMAS: Record<

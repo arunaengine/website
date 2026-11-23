@@ -203,7 +203,7 @@ describe('alternative paths', () => {
   })
 })
 
-// Copies of the node's shipped operations/src/metadata/datacite.ttl and publisher.ttl.
+// Copies of the node's shipped domain/core/src/repository/datacite.ttl and publisher.ttl.
 describe('the built-in repository shapes', () => {
   const result = liftShapes([fixture('repository-datacite.ttl'), fixture('repository-publisher.ttl')].join('\n'))
   const dataset = entityFor(result, 'http://schema.org/Dataset')

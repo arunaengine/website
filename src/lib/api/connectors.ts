@@ -23,7 +23,7 @@ export interface ListSourceConnectorsResponse {
 // full replace: secret_config always overwrites the stored secrets, and
 // responses never echo them back (only has_secret_config). Allowed/required
 // config keys are validated per kind server-side
-// (aruna operations/src/connectors/validation.rs); `aruna_native` is rejected.
+// (aruna domain/ops-data/src/connectors/validation.rs); `aruna_native` is rejected.
 export interface SourceConnectorRequest {
   name: string
   kind: SourceConnectorKind

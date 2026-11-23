@@ -31,7 +31,7 @@ export interface BackendKindSchema {
 }
 
 // Mirrors the backend allowlists in aruna
-// operations/src/groups/backends/validation.rs (rules_for_kind, identity_keys).
+// domain/ops-identity/src/groups/backends/validation.rs (rules_for_kind, identity_keys).
 // Keys outside these lists are rejected: the denylist alternative is
 // unenforceable because opendal silently accepts a wide alias set.
 export const BACKEND_KIND_SCHEMAS: Record<GroupBackendKind, BackendKindSchema> = {

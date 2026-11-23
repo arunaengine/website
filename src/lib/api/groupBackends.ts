@@ -2,9 +2,9 @@ import { apiRequest, type ApiClientOptions } from './client'
 
 // ── Group storage backends ──────────────────────────────────────────────────
 // GET/POST /data/groups/{gid}/storage/backends, GET/PUT/DELETE .../{bid}: verified
-// against aruna api/src/routes/group_backends.rs, with the per-kind key
-// allowlists in operations/src/group_backends/validation.rs. Every route takes
-// group ADMIN. Secrets live in their own keyspace and are never returned.
+// against aruna frontends/api/src/routes/storage/group_backends.rs, with the
+// per-kind allowlists in domain/ops-identity/src/groups/backends/validation.rs.
+// Every route takes group ADMIN. Secrets live in their own keyspace and are never returned.
 //
 // Three fields/routes are gated on presence: `disabled` (absent on older
 // nodes), the enable route and the credentials route (both 404 there). DELETE
